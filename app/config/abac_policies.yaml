@@ -1,0 +1,53 @@
+policies:
+# --- Client Policies ---
+  - name: "Self-Registration for Clients"
+    description: >
+      Allow unauthenticated users to self-register by creating a new client account.
+      The registration endpoint is open, but the payload must indicate that the user is registering as a client.
+    condition:
+      authenticated: false
+      requested_role: "client"
+    allowed_actions: ["POST"]
+
+  - name: "Client Comprehensive Data Access"
+    description: >
+      Allows registered clients to view products, restaurants, plates, and qr_code,
+      and view addresses only when the address_type is 'restaurant'.
+    condition:
+      # Verify the request comes from an authenticated client.
+      user_id: "{user.id}"
+      role_type: "client"
+      # Verify that the requested resource is one of the allowed types.
+      resource_type:
+        - "products"
+        - "restaurants"
+        - "plates"
+        - "qr_code"
+        - "addresses"
+      # For addresses, add an extra condition that address_type must be 'restaurant'.
+      # Your ABAC engine should apply this condition only when resource_type is 'addresses'.
+      address_type: "restaurant"
+    allowed_actions: ["GET"]
+
+
+# --- Institution Policies ---
+  - name: "Institution Data Access"
+    description: "Allow institution users to access data for their own institution only."
+    condition:
+      institution_id: "{user.institution_id}"  # The resource's institution_id must match the user's institution_id.
+    allowed_actions: ["GET", "POST", "PUT"]
+    roles: ["client", "supplier"]  # High-level role types that are allowed via ABAC.
+
+# --- Employee Policies ---
+  - name: "Employee Full Access"
+    description: "Employees can access all data across institutions for administrative purposes."
+    condition: {}  # No additional attribute-based filtering required.
+    allowed_actions: ["GET", "POST", "PUT", "DELETE"]
+    roles: ["employee"]
+
+# --- All People Policies ---
+- name: "Self-Data Access"
+    description: "Allow users to view and update only their own account information."
+    condition:
+      user_id: "{user.id}"
+    allowed_actions: ["GET", "PUT"]

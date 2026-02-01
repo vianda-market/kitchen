@@ -1,0 +1,109 @@
+# .gitignore for Kitchen API Backend
+# GitHub Repository Ready - Last Updated: 2026-02-01
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment folders
+venv/
+kenv/
+
+# Environment variables
+.env
+
+# macOS specific files
+.DS_Store
+
+# IDE folders
+.idea/
+.vscode/
+.cursor/
+
+# Custom project files
+.qodo
+
+# Local-only documentation (credentials, notes)
+docs/local/
+
+# Testing and Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.cache
+nosetests.xml
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Database backup files (sensitive - production data)
+*_backup.sql
+*_dump.sql
+
+# Seed data scripts (may contain production/sensitive data)
+.seed_data.py
+*seed_data.py
+
+# Note: Development database files ARE included in repo:
+# - schema.sql, seed.sql, test.sql (test data only, no production secrets)
+# - trigger.sql, uuid7_function.sql (database logic)

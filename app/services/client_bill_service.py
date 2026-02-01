@@ -1,0 +1,347 @@
+"""
+Client Bill Business Logic Service
+
+This service contains all business logic related to client bill operations,
+including currency resolution, validation, and bill processing.
+"""
+
+from uuid import UUID
+from typing import Dict, Any, Optional, List
+from fastapi import HTTPException, status
+import psycopg2.extensions
+
+from app.dto.models import ClientBillDTO, CreditCurrencyDTO
+from app.services.crud_service import client_bill_service, credit_currency_service
+from app.services.credit_currency_service import resolve_currency_code
+from app.utils.log import log_info, log_warning
+from app.utils.error_messages import client_bill_not_found
+from app.config import Status
+
+
+class ClientBillBusinessService:
+    """Service for handling client bill business logic"""
+    
+    def __init__(self):
+        pass
+    
+    def create_client_bill(
+        self, 
+        bill_data: Dict[str, Any], 
+        current_user: Dict[str, Any], 
+        db: psycopg2.extensions.connection
+    ) -> ClientBillDTO:
+        """
+        Create a new client bill with currency resolution.
+        
+        Args:
+            bill_data: Client bill data dictionary
+            current_user: Current user information
+            db: Database connection
+            
+        Returns:
+            Created client bill DTO
+            
+        Raises:
+            HTTPException: For validation or creation failures
+        """
+        # Validate bill data
+        self._validate_bill_data(bill_data)
+        
+        # Set modified_by field
+        bill_data["modified_by"] = current_user["user_id"]
+        
+        # Resolve currency code from credit currency
+        self._resolve_currency_code(bill_data, db)
+        
+        # Apply business rules
+        self._apply_bill_creation_rules(bill_data)
+        
+        # Create the client bill
+        client_bill = client_bill_service.create(bill_data, db)
+        if not client_bill:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail="Failed to create client bill"
+            )
+        
+        log_info(f"Client bill created: {client_bill}")
+        return client_bill
+    
+    def update_client_bill(
+        self, 
+        bill_id: UUID, 
+        bill_data: Dict[str, Any], 
+        current_user: Dict[str, Any], 
+        db: psycopg2.extensions.connection
+    ) -> ClientBillDTO:
+        """
+        Update an existing client bill.
+        
+        Args:
+            bill_id: Client bill ID
+            bill_data: Updated bill data dictionary
+            current_user: Current user information
+            db: Database connection
+            
+        Returns:
+            Updated client bill DTO
+            
+        Raises:
+            HTTPException: For validation or update failures
+        """
+        # Validate bill data
+        self._validate_bill_data(bill_data)
+        
+        # Set modified_by field
+        bill_data["modified_by"] = current_user["user_id"]
+        
+        # Resolve currency code if credit_currency_id is being updated
+        if "credit_currency_id" in bill_data:
+            self._resolve_currency_code(bill_data, db)
+        
+        # Apply business rules
+        self._apply_bill_update_rules(bill_data)
+        
+        # Update the client bill
+        updated_bill = client_bill_service.update(bill_id, bill_data, db)
+        if not updated_bill:
+            raise client_bill_not_found()
+        
+        log_info(f"Client bill updated: {updated_bill}")
+        return updated_bill
+    
+    def get_client_bill_with_currency(
+        self, 
+        bill_id: UUID, 
+        db: psycopg2.extensions.connection
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get client bill with associated currency information.
+        
+        Args:
+            bill_id: Client bill ID
+            db: Database connection
+            
+        Returns:
+            Dictionary with bill and currency data, or None if not found
+        """
+        # Get client bill
+        bill = client_bill_service.get_by_id(bill_id, db)
+        if not bill:
+            return None
+        
+        # Get currency information
+        currency = credit_currency_service.get_by_id(bill.credit_currency_id, db)
+        
+        result = {
+            "bill": bill,
+            "currency": currency
+        }
+        
+        return result
+    
+    def validate_bill_amount(
+        self, 
+        amount: float, 
+        currency_id: UUID, 
+        db: psycopg2.extensions.connection
+    ) -> bool:
+        """
+        Validate bill amount against currency constraints.
+        
+        Args:
+            amount: Bill amount
+            currency_id: Credit currency ID
+            db: Database connection
+            
+        Returns:
+            True if amount is valid, False otherwise
+        """
+        # Get currency information
+        currency = credit_currency_service.get_by_id(currency_id, db)
+        if not currency:
+            return False
+        
+        # Basic validation - amount must be positive
+        if amount <= 0:
+            return False
+        
+        # Additional currency-specific validations can be added here
+        # For example, minimum/maximum amounts per currency
+        
+        return True
+    
+    def calculate_bill_total(
+        self, 
+        base_amount: float, 
+        tax_rate: Optional[float] = None, 
+        discount_amount: Optional[float] = None
+    ) -> Dict[str, float]:
+        """
+        Calculate bill total with tax and discount.
+        
+        Args:
+            base_amount: Base bill amount
+            tax_rate: Tax rate (as decimal, e.g., 0.08 for 8%)
+            discount_amount: Discount amount to subtract
+            
+        Returns:
+            Dictionary with calculated amounts
+        """
+        subtotal = base_amount
+        
+        # Apply discount
+        if discount_amount and discount_amount > 0:
+            subtotal = max(0, subtotal - discount_amount)
+        
+        # Calculate tax
+        tax_amount = 0.0
+        if tax_rate and tax_rate > 0:
+            tax_amount = subtotal * tax_rate
+        
+        total = subtotal + tax_amount
+        
+        return {
+            "base_amount": base_amount,
+            "discount_amount": discount_amount or 0.0,
+            "subtotal": subtotal,
+            "tax_rate": tax_rate or 0.0,
+            "tax_amount": tax_amount,
+            "total": total
+        }
+    
+    def _validate_bill_data(self, bill_data: Dict[str, Any]) -> None:
+        """
+        Validate client bill data.
+        
+        Args:
+            bill_data: Bill data dictionary
+            
+        Raises:
+            HTTPException: For validation failures
+        """
+        required_fields = ["credit_currency_id", "amount"]
+        missing_fields = [field for field in required_fields if not bill_data.get(field)]
+        
+        if missing_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required fields: {', '.join(missing_fields)}"
+            )
+        
+        # Validate amount
+        amount = bill_data.get("amount", 0)
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Amount must be a positive number"
+            )
+        
+        # Validate credit_currency_id format
+        try:
+            UUID(str(bill_data["credit_currency_id"]))
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid credit_currency_id format"
+            )
+    
+    def _resolve_currency_code(
+        self, 
+        bill_data: Dict[str, Any], 
+        db: psycopg2.extensions.connection
+    ) -> None:
+        """
+        Resolve currency code from credit currency ID using centralized service.
+        
+        Args:
+            bill_data: Bill data dictionary (modified in place)
+            db: Database connection
+            
+        Raises:
+            HTTPException: For currency resolution failures
+        """
+        resolve_currency_code(bill_data, db)
+    
+    def _apply_bill_creation_rules(self, bill_data: Dict[str, Any]) -> None:
+        """
+        Apply business rules for bill creation.
+        
+        Args:
+            bill_data: Bill data dictionary (modified in place)
+        """
+        # Set default values
+        bill_data.setdefault("status", Status.PENDING)
+        bill_data.setdefault("is_archived", False)
+        
+        # Ensure amount is properly formatted
+        if "amount" in bill_data:
+            bill_data["amount"] = float(bill_data["amount"])
+        
+        # Set creation timestamp if not provided
+        if "created_date" not in bill_data:
+            from datetime import datetime
+            bill_data["created_date"] = datetime.utcnow()
+        
+        log_info("Applied bill creation business rules")
+    
+    def _apply_bill_update_rules(self, bill_data: Dict[str, Any]) -> None:
+        """
+        Apply business rules for bill updates.
+        
+        Args:
+            bill_data: Bill data dictionary (modified in place)
+        """
+        # Ensure amount is properly formatted if being updated
+        if "amount" in bill_data:
+            bill_data["amount"] = float(bill_data["amount"])
+        
+        # Set update timestamp
+        from datetime import datetime
+        bill_data["modified_date"] = datetime.utcnow()
+        
+        log_info("Applied bill update business rules")
+    
+    def get_bills_by_status(
+        self, 
+        status: str, 
+        db: psycopg2.extensions.connection
+    ) -> List[ClientBillDTO]:
+        """
+        Get all client bills by status.
+        
+        Args:
+            status: Bill status to filter by
+            db: Database connection
+            
+        Returns:
+            List of client bill DTOs
+        """
+        # This would typically be implemented in the CRUD service
+        # For now, we'll use the generic get_all and filter
+        all_bills = client_bill_service.get_all(db)
+        return [bill for bill in all_bills if bill.status == status]
+    
+    def get_bills_by_currency(
+        self, 
+        currency_id: UUID, 
+        db: psycopg2.extensions.connection
+    ) -> List[ClientBillDTO]:
+        """
+        Get all client bills for a specific currency.
+        
+        Args:
+            currency_id: Credit currency ID
+            db: Database connection
+            
+        Returns:
+            List of client bill DTOs
+        """
+        # This would typically be implemented in the CRUD service
+        # For now, we'll use the generic get_all and filter
+        all_bills = client_bill_service.get_all(db)
+        return [bill for bill in all_bills if bill.credit_currency_id == currency_id]
+
+
+# Create service instance
+client_bill_business_service = ClientBillBusinessService()

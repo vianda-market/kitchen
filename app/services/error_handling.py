@@ -1,0 +1,355 @@
+# app/services/error_handling.py
+"""
+Centralized error handling service.
+
+This module provides dedicated error handling functions that can be used
+across the application to handle common error scenarios without cluttering
+business logic with try/except blocks.
+
+Benefits:
+- Clean separation of error handling from business logic
+- Consistent error handling patterns
+- Easier testing of error scenarios
+- Reusable error handling functions
+"""
+
+from typing import Optional, Any, Callable, TypeVar
+from fastapi import HTTPException
+from uuid import UUID
+import psycopg2.extensions
+from app.utils.log import log_info, log_warning, log_error
+
+T = TypeVar('T')
+
+
+# =============================================================================
+# GENERIC ERROR HANDLING FUNCTIONS
+# =============================================================================
+
+def handle_service_call(
+    service_func: Callable[..., T],
+    error_message: str,
+    http_status: int = 500,
+    *args,
+    **kwargs
+) -> Optional[T]:
+    """
+    Generic error handler for service calls.
+    
+    Args:
+        service_func: The service function to call
+        error_message: Error message to log and return
+        http_status: HTTP status code for HTTPException
+        *args, **kwargs: Arguments to pass to service_func
+        
+    Returns:
+        Result of service_func or None if error
+        
+    Raises:
+        HTTPException if http_status is provided and error occurs
+    """
+    try:
+        return service_func(*args, **kwargs)
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"{error_message}: {e}")
+        if http_status:
+            raise HTTPException(status_code=http_status, detail=error_message)
+        return None
+
+
+def handle_database_operation(
+    operation_func: Callable[..., T],
+    operation_name: str,
+    entity_id: Optional[UUID] = None,
+    http_status: int = 500,
+    *args,
+    **kwargs
+) -> Optional[T]:
+    """
+    Generic error handler for database operations.
+    
+    Args:
+        operation_func: The database operation function to call
+        operation_name: Name of the operation (e.g., "fetching user")
+        entity_id: Optional entity ID for logging
+        http_status: HTTP status code for HTTPException
+        *args, **kwargs: Arguments to pass to operation_func
+        
+    Returns:
+        Result of operation_func or None if error
+        
+    Raises:
+        HTTPException if http_status is provided and error occurs
+    """
+    entity_context = f" for {entity_id}" if entity_id else ""
+    error_message = f"Error {operation_name}{entity_context}"
+    
+    try:
+        return operation_func(*args, **kwargs)
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"{error_message}: {e}")
+        if http_status:
+            raise HTTPException(status_code=http_status, detail=error_message)
+        return None
+
+
+# =============================================================================
+# ENTITY-SPECIFIC ERROR HANDLERS
+# =============================================================================
+
+def handle_get_by_id(
+    service_func: Callable[[UUID, psycopg2.extensions.connection], Optional[T]],
+    entity_id: UUID,
+    db: psycopg2.extensions.connection,
+    entity_name: str,
+    include_archived: bool = False,
+    extra_kwargs: Optional[dict] = None
+) -> Optional[T]:
+    """
+    Handle get_by_id operations with consistent error handling.
+    
+    Args:
+        service_func: The get_by_id service function
+        entity_id: ID of the entity to fetch
+        db: Database connection
+        entity_name: Name of the entity (e.g., "user", "product")
+        include_archived: Whether to include archived records
+        
+    Returns:
+        Entity DTO or None if not found
+        
+    Raises:
+        HTTPException with 404 status if entity not found
+    """
+    extra_kwargs = extra_kwargs or {}
+
+    try:
+        if include_archived:
+            entity = service_func(entity_id, db, **extra_kwargs)
+            log_info(f"Queried {entity_name} by id (including archived): {entity_id}")
+        else:
+            # Use get_by_id_non_archived if available, otherwise use get_by_id
+            if hasattr(service_func, '__self__'):
+                # Method call - try to get non-archived version
+                service_instance = service_func.__self__
+                if hasattr(service_instance, 'get_by_id_non_archived'):
+                    entity = service_instance.get_by_id_non_archived(entity_id, db, **extra_kwargs)
+                else:
+                    entity = service_func(entity_id, db, **extra_kwargs)
+            else:
+                entity = service_func(entity_id, db, **extra_kwargs)
+            log_info(f"Queried non-archived {entity_name} by id: {entity_id}")
+        
+        if entity is None:
+            raise HTTPException(status_code=404, detail=f"{entity_name.title()} not found")
+        
+        return entity
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"Error fetching {entity_name} {entity_id}: {e}")
+        raise HTTPException(status_code=404, detail=f"{entity_name.title()} not found")
+
+
+def handle_get_all(
+    service_func: Callable[[psycopg2.extensions.connection], list[T]],
+    db: psycopg2.extensions.connection,
+    entity_name: str,
+    include_archived: bool = False
+) -> list[T]:
+    """
+    Handle get_all operations with consistent error handling.
+    
+    Args:
+        service_func: The get_all service function
+        db: Database connection
+        entity_name: Name of the entity (e.g., "users", "products")
+        include_archived: Whether to include archived records
+        
+    Returns:
+        List of entity DTOs
+        
+    Raises:
+        HTTPException with 500 status if error occurs
+    """
+    try:
+        entities = service_func(db)
+        log_context = "all" if include_archived else "non-archived"
+        log_info(f"Retrieved {log_context} {entity_name}")
+        return entities
+    except Exception as e:
+        log_error(f"Error retrieving {entity_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving {entity_name}")
+
+
+def handle_create(
+    service_func: Callable[[dict, psycopg2.extensions.connection], Optional[T]],
+    data: dict,
+    db: psycopg2.extensions.connection,
+    entity_name: str
+) -> Optional[T]:
+    """
+    Handle create operations with consistent error handling.
+    
+    Args:
+        service_func: The create service function
+        data: Data to create entity with
+        db: Database connection
+        entity_name: Name of the entity (e.g., "user", "product")
+        
+    Returns:
+        Created entity DTO or None if error
+        
+    Raises:
+        HTTPException with 500 status if error occurs
+    """
+    try:
+        entity = service_func(data, db)
+        if entity:
+            log_info(f"Successfully created {entity_name}: {entity}")
+            return entity
+        else:
+            log_error(f"Failed to create {entity_name}")
+            raise HTTPException(status_code=500, detail=f"Failed to create {entity_name}")
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"Error creating {entity_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating {entity_name}")
+
+
+def handle_update(
+    service_func: Callable[[UUID, dict, psycopg2.extensions.connection], Optional[T]],
+    entity_id: UUID,
+    data: dict,
+    db: psycopg2.extensions.connection,
+    entity_name: str
+) -> Optional[T]:
+    """
+    Handle update operations with consistent error handling.
+    
+    Args:
+        service_func: The update service function
+        entity_id: ID of the entity to update
+        data: Data to update entity with
+        db: Database connection
+        entity_name: Name of the entity (e.g., "user", "product")
+        
+    Returns:
+        Updated entity DTO or None if error
+        
+    Raises:
+        HTTPException with 500 status if error occurs
+    """
+    try:
+        entity = service_func(entity_id, data, db)
+        if entity:
+            log_info(f"Successfully updated {entity_name}: {entity_id}")
+            return entity
+        else:
+            log_error(f"Failed to update {entity_name}: {entity_id}")
+            raise HTTPException(status_code=500, detail=f"Failed to update {entity_name}")
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"Error updating {entity_name} {entity_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating {entity_name}")
+
+
+def handle_delete(
+    service_func: Callable[[UUID, psycopg2.extensions.connection], bool],
+    entity_id: UUID,
+    db: psycopg2.extensions.connection,
+    entity_name: str
+) -> bool:
+    """
+    Handle delete operations with consistent error handling.
+    
+    Args:
+        service_func: The delete service function
+        entity_id: ID of the entity to delete
+        db: Database connection
+        entity_name: Name of the entity (e.g., "user", "product")
+        
+    Returns:
+        True if successful, False otherwise
+        
+    Raises:
+        HTTPException with 500 status if error occurs
+    """
+    try:
+        success = service_func(entity_id, db)
+        if success:
+            log_info(f"Successfully deleted {entity_name}: {entity_id}")
+            return True
+        else:
+            log_error(f"Failed to delete {entity_name}: {entity_id}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete {entity_name}")
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        log_error(f"Error deleting {entity_name} {entity_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting {entity_name}")
+
+
+# =============================================================================
+# BUSINESS LOGIC ERROR HANDLERS
+# =============================================================================
+
+def handle_business_operation(
+    operation_func: Callable[..., T],
+    operation_name: str,
+    success_message: Optional[str] = None,
+    *args,
+    **kwargs
+) -> T:
+    """
+    Handle business logic operations with consistent error handling.
+    
+    Args:
+        operation_func: The business operation function
+        operation_name: Name of the operation
+        success_message: Optional success message to log
+        *args, **kwargs: Arguments to pass to operation_func
+        
+    Returns:
+        Result of operation_func
+        
+    Raises:
+        HTTPException with 500 status if error occurs
+    """
+    try:
+        result = operation_func(*args, **kwargs)
+        if success_message and result:
+            log_info(success_message)
+        return result
+    except HTTPException:
+        # Re-raise HTTPExceptions (these are intentional)
+        raise
+    except Exception as e:
+        # Safely convert exception to string, handling UUID objects and other types
+        import traceback
+        error_trace = traceback.format_exc()
+        
+        # Safely get error message
+        try:
+            error_msg = str(e)
+        except Exception:
+            try:
+                error_msg = repr(e)
+            except Exception:
+                error_msg = f"Error of type {type(e).__name__}"
+        
+        # Log with full traceback
+        log_error(f"Error in {operation_name}: {error_msg}\nFull traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"Error in {operation_name}: {error_msg}")
