@@ -33,7 +33,7 @@
 
 ```bash
 # Navigate to your project
-cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen"
+cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen"git ni
 
 # Initialize Git
 git init
