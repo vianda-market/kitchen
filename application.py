@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from app.routes.main import router as main_router
 from app.routes.user import router as user_router
-from app.routes.user_public import router as user_public_router
+from app.routes.user_public import router as user_public_router, auth_router as password_recovery_router
 from app.auth.routes import router as auth_router
 
 # Consolidated CRUD routes
@@ -30,6 +30,7 @@ from app.routes.institution_entity import router as institution_entity_router
 from app.routes.restaurant import router as restaurant_router
 from app.routes.restaurant_balance import router as restaurant_balance_router
 from app.routes.restaurant_transaction import router as restaurant_transaction_router
+from app.routes.restaurant_staff import router as restaurant_staff_router
 from app.routes.plate_kitchen_days import router as plate_kitchen_days_router
 from app.routes.national_holidays import router as national_holidays_router
 from app.routes.restaurant_holidays import router as restaurant_holidays_router
@@ -144,6 +145,11 @@ def create_app() -> FastAPI:
     v1_user_public_router.include_router(user_public_router)
     app.include_router(v1_user_public_router)
     
+    # Create versioned password recovery router (public auth endpoints)
+    v1_password_recovery_router = create_versioned_router("api", ["Password Recovery"], APIVersion.V1)
+    v1_password_recovery_router.include_router(password_recovery_router)
+    app.include_router(v1_password_recovery_router)
+    
     # Versioned complex routes (v1)
     v1_plate_selection_router = create_versioned_router("api", ["Plate Selection"], APIVersion.V1)
     v1_plate_selection_router.include_router(plate_selection_router)
@@ -192,6 +198,10 @@ def create_app() -> FastAPI:
     v1_restaurant_transaction_router = create_versioned_router("api", ["Restaurant Transactions"], APIVersion.V1)
     v1_restaurant_transaction_router.include_router(restaurant_transaction_router)
     app.include_router(v1_restaurant_transaction_router)
+    
+    v1_restaurant_staff_router = create_versioned_router("api", ["Restaurant Staff"], APIVersion.V1)
+    v1_restaurant_staff_router.include_router(restaurant_staff_router)
+    app.include_router(v1_restaurant_staff_router)
     
     v1_restaurant_holidays_router = create_versioned_router("api", ["Restaurant Holidays"], APIVersion.V1)
     v1_restaurant_holidays_router.include_router(restaurant_holidays_router)

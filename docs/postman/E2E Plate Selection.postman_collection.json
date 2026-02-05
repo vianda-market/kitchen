@@ -8,7 +8,7 @@
 	},
 	"item": [
 		{
-			"name": "🔐 Authentication & Setup",
+			"name": "\ud83d\udd10 Authentication & Setup",
 			"item": [
 				{
 					"name": "Login Admin",
@@ -122,69 +122,69 @@
 				{
 					"name": "Create Credit Currency",
 					"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"// Test: Accept both 201 (created) and 409 (already exists) as success",
-							"pm.test(\"Credit currency ready (201 created or 409 already exists)\", function () {",
-							"    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
-							"});",
-							"",
-							"if (pm.response.code === 409) {",
-							"    // 409 Conflict: Currency already exists - fetch it and set variables",
-							"    console.log(\"ℹ️ Currency already exists (expected on re-runs). Fetching existing currency...\");",
-							"    ",
-							"    // Extract currency_code from the request body",
-							"    const requestBody = JSON.parse(pm.request.body.raw);",
-							"    const currencyCode = requestBody.currency_code;",
-							"    ",
-							"    // Fetch all currencies and find the one with matching code",
-							"    pm.sendRequest({",
-							"        url: pm.environment.get(\"baseUrl\") + \"/api/v1/credit-currencies/\",",
-							"        method: 'GET',",
-							"        header: {",
-							"            'Authorization': 'Bearer ' + pm.environment.get(\"authToken\")",
-							"        }",
-							"    }, function (err, res) {",
-							"        if (err) {",
-							"            console.error(\"❌ Error fetching currencies:\", err);",
-							"        } else if (res.code === 200) {",
-							"            const currencies = res.json();",
-							"            const existingCurrency = currencies.find(c => c.currency_code === currencyCode);",
-							"            ",
-							"            if (existingCurrency) {",
-							"                pm.collectionVariables.set(\"planCreditCurrencyId\", existingCurrency.credit_currency_id);",
-							"                pm.collectionVariables.set(\"planCreditCurrencyCode\", existingCurrency.currency_code);",
-							"                console.log(\"✅ Using existing currency:\");",
-							"                console.log(\"   planCreditCurrencyId:\", existingCurrency.credit_currency_id);",
-							"                console.log(\"   planCreditCurrencyCode:\", existingCurrency.currency_code);",
-							"            } else {",
-							"                console.error(\"❌ Currency with code\", currencyCode, \"not found in list\");",
-							"            }",
-							"        } else {",
-							"            console.error(\"❌ Failed to fetch currencies. Status:\", res.code);",
-							"        }",
-							"    });",
-							"} else if (pm.response.code >= 200 && pm.response.code < 300) {",
-							"    // Success: Set the variables from the response",
-							"    const body = pm.response.json();",
-							"    pm.collectionVariables.set(\"planCreditCurrencyId\", body.credit_currency_id);",
-							"    pm.collectionVariables.set(\"planCreditCurrencyCode\", body.currency_code);",
-							"    console.log(\"✅ Created new currency:\");",
-							"    console.log(\"   planCreditCurrencyId:\", body.credit_currency_id);",
-							"    console.log(\"   planCreditCurrencyCode:\", body.currency_code);",
-							"} else {",
-							"    // Other errors: Optionally clear the variables",
-							"    pm.collectionVariables.set(\"planCreditCurrencyId\", null);",
-							"    pm.collectionVariables.set(\"planCreditCurrencyCode\", null);",
-							"    console.error(\"❌ ERROR: Unexpected error occurred, cleared currency variables.\");",
-							"}"
-						],
-						"type": "text/javascript",
-						"packages": {}
-					}
-				},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test: Accept both 201 (created) and 409 (already exists) as success",
+									"pm.test(\"Credit currency ready (201 created or 409 already exists)\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+									"});",
+									"",
+									"if (pm.response.code === 409) {",
+									"    // 409 Conflict: Currency already exists - fetch it and set variables",
+									"    console.log(\"\u2139\ufe0f Currency already exists (expected on re-runs). Fetching existing currency...\");",
+									"    ",
+									"    // Extract currency_code from the request body",
+									"    const requestBody = JSON.parse(pm.request.body.raw);",
+									"    const currencyCode = requestBody.currency_code;",
+									"    ",
+									"    // Fetch all currencies and find the one with matching code",
+									"    pm.sendRequest({",
+									"        url: pm.environment.get(\"baseUrl\") + \"/api/v1/credit-currencies/\",",
+									"        method: 'GET',",
+									"        header: {",
+									"            'Authorization': 'Bearer ' + pm.environment.get(\"authToken\")",
+									"        }",
+									"    }, function (err, res) {",
+									"        if (err) {",
+									"            console.error(\"\u274c Error fetching currencies:\", err);",
+									"        } else if (res.code === 200) {",
+									"            const currencies = res.json();",
+									"            const existingCurrency = currencies.find(c => c.currency_code === currencyCode);",
+									"            ",
+									"            if (existingCurrency) {",
+									"                pm.collectionVariables.set(\"planCreditCurrencyId\", existingCurrency.credit_currency_id);",
+									"                pm.collectionVariables.set(\"planCreditCurrencyCode\", existingCurrency.currency_code);",
+									"                console.log(\"\u2705 Using existing currency:\");",
+									"                console.log(\"   planCreditCurrencyId:\", existingCurrency.credit_currency_id);",
+									"                console.log(\"   planCreditCurrencyCode:\", existingCurrency.currency_code);",
+									"            } else {",
+									"                console.error(\"\u274c Currency with code\", currencyCode, \"not found in list\");",
+									"            }",
+									"        } else {",
+									"            console.error(\"\u274c Failed to fetch currencies. Status:\", res.code);",
+									"        }",
+									"    });",
+									"} else if (pm.response.code >= 200 && pm.response.code < 300) {",
+									"    // Success: Set the variables from the response",
+									"    const body = pm.response.json();",
+									"    pm.collectionVariables.set(\"planCreditCurrencyId\", body.credit_currency_id);",
+									"    pm.collectionVariables.set(\"planCreditCurrencyCode\", body.currency_code);",
+									"    console.log(\"\u2705 Created new currency:\");",
+									"    console.log(\"   planCreditCurrencyId:\", body.credit_currency_id);",
+									"    console.log(\"   planCreditCurrencyCode:\", body.currency_code);",
+									"} else {",
+									"    // Other errors: Optionally clear the variables",
+									"    pm.collectionVariables.set(\"planCreditCurrencyId\", null);",
+									"    pm.collectionVariables.set(\"planCreditCurrencyCode\", null);",
+									"    console.error(\"\u274c ERROR: Unexpected error occurred, cleared currency variables.\");",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
 						{
 							"listen": "prerequest",
 							"script": {
@@ -267,7 +267,7 @@
 									"",
 									"// Validate that credit_currency_id is set",
 									"if (!planCreditCurrencyId) {",
-									"    throw new Error(\"❌ planCreditCurrencyId is not set. Please run 'Create Credit Currency' first and ensure it completes successfully.\");",
+									"    throw new Error(\"\u274c planCreditCurrencyId is not set. Please run 'Create Credit Currency' first and ensure it completes successfully.\");",
 									"}",
 									"",
 									"payload.credit_currency_id = planCreditCurrencyId;",
@@ -275,7 +275,7 @@
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Using credit_currency_id:\", planCreditCurrencyId);"
+									"console.log(\"\u2705 Using credit_currency_id:\", planCreditCurrencyId);"
 								],
 								"type": "text/javascript",
 								"packages": {},
@@ -315,7 +315,7 @@
 									"// 3) pull the UUID (no quotes) from your collection variables",
 									"const planId = pm.collectionVariables.get(\"planId\");",
 									"if (!planId) {",
-									"    throw new Error(\"❌ planId is not set. Please run 'Create Subscription Plans' first.\");",
+									"    throw new Error(\"\u274c planId is not set. Please run 'Create Subscription Plans' first.\");",
 									"}",
 									"",
 									"payload.plan_id = planId;",
@@ -326,7 +326,7 @@
 									"// 5) overwrite the body with the new, merged JSON",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Using plan_id:\", planId);"
+									"console.log(\"\u2705 Using plan_id:\", planId);"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -348,7 +348,7 @@
 									"    pm.collectionVariables.set(\"fintechLinkProvider\", body.provider);",
 									"    pm.collectionVariables.set(\"fintechLink\", body.fintech_link);",
 									"    ",
-									"    console.log(\"✅ Fintech Link created with ID:\", fintechLinkId);",
+									"    console.log(\"\u2705 Fintech Link created with ID:\", fintechLinkId);",
 									"});",
 									""
 								],
@@ -396,8 +396,9 @@
 									"    pm.expect(pm.environment.get(\"authToken\")).to.be.undefined;",
 									"});",
 									"",
-									"// Test 4: Verify token is cleared",
+									"// Test 4: Verify admin token is cleared",
 									"pm.test(\"adminAuthToken cleared\", function () {",
+									"    pm.environment.unset(\"adminAuthToken\");",
 									"    pm.expect(pm.environment.get(\"adminAuthToken\")).to.be.undefined;",
 									"});"
 								],
@@ -436,7 +437,7 @@
 			]
 		},
 		{
-			"name": "🏢 Supplier Setup",
+			"name": "\ud83c\udfe2 Supplier Setup",
 			"item": [
 				{
 					"name": "Login Admin",
@@ -609,7 +610,7 @@
 									"// Save institution_id for subsequent requests",
 									"const body = pm.response.json();",
 									"pm.collectionVariables.set(\"institutionId\", body.institution_id);",
-									"console.log(\"✅ institutionId set:\", body.institution_id);"
+									"console.log(\"\u2705 institutionId set:\", body.institution_id);"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -683,31 +684,31 @@
 									"let raw = pm.request.body.raw;",
 									"let payload = JSON.parse(raw);",
 									"",
-									"// ✅ Pull from environment (not collection)",
+									"// \u2705 Pull from environment (not collection)",
 									"let institutionId = pm.collectionVariables.get(\"institutionId\");",
 									"",
-									"// ✅ Add logging for visibility",
+									"// \u2705 Add logging for visibility",
 									"console.log(\"Loaded institutionId from environment:\", institutionId);",
 									"",
-									"// ❌ Fail early if missing",
+									"// \u274c Fail early if missing",
 									"if (!institutionId) {",
 									"    throw new Error(\"institutionId is not set in collectionVariables. Check the previous step.\");",
 									"}",
 									"",
-									"// ✅ Inject institution_id",
+									"// \u2705 Inject institution_id",
 									"payload.institution_id = institutionId;",
 									"",
-									"// ✅ Store the plain text password for login",
+									"// \u2705 Store the plain text password for login",
 									"pm.collectionVariables.set(\"supplierPassword\", payload.password);",
 									"console.log(\"supplierPassword set in collection variables:\", payload.password);",
 									"",
-									"// ✅ Ensure JSON Content-Type",
+									"// \u2705 Ensure JSON Content-Type",
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 									"",
-									"// ✅ Overwrite body with updated payload",
+									"// \u2705 Overwrite body with updated payload",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"// ✅ Test registration and load the user ID",
+									"// \u2705 Test registration and load the user ID",
 									"pm.test(\"Store supplier user ID\", function () {",
 									"    const body = pm.response.json();",
 									"    pm.expect(body).to.have.property(\"user_id\");",
@@ -759,8 +760,9 @@
 									"    pm.expect(pm.environment.get(\"authToken\")).to.be.undefined;",
 									"});",
 									"",
-									"// Test 4: Verify token is cleared",
+									"// Test 4: Verify admin token is cleared",
 									"pm.test(\"adminAuthToken cleared\", function () {",
+									"    pm.environment.unset(\"adminAuthToken\");",
 									"    pm.expect(pm.environment.get(\"adminAuthToken\")).to.be.undefined;",
 									"});"
 								],
@@ -930,7 +932,7 @@
 									"    const body = pm.response.json();",
 									"    pm.expect(body).to.have.property(\"address_id\");",
 									"",
-									"    // persist it to this collection’s variables",
+									"    // persist it to this collection\u2019s variables",
 									"    pm.collectionVariables.set(\"supplierAddressId\", body.address_id);",
 									"});"
 								],
@@ -974,7 +976,7 @@
 									"    throw new Error(\"Missing supplierAddressId in collection variables\");",
 									"}",
 									"",
-									"console.log(\"🏢 Creating Institution Entity with:\");",
+									"console.log(\"\ud83c\udfe2 Creating Institution Entity with:\");",
 									"console.log(\"Institution ID:\", institutionId);",
 									"console.log(\"Address ID:\", supplierAddressId);",
 									"console.log(\"Tax ID: SUPPLIER-TAX-001\");",
@@ -994,11 +996,11 @@
 									"    // Store the entity ID for bank account creation",
 									"    pm.collectionVariables.set(\"institutionEntityId\", response.institution_entity_id);",
 									"    ",
-									"    console.log(\"✅ Institution Entity created successfully!\");",
+									"    console.log(\"\u2705 Institution Entity created successfully!\");",
 									"    console.log(\"Entity ID:\", response.institution_entity_id);",
 									"    ",
 									"} else {",
-									"    console.log(\"❌ Failed to create Institution Entity\");",
+									"    console.log(\"\u274c Failed to create Institution Entity\");",
 									"    console.log(\"Status Code:\", pm.response.code);",
 									"}"
 								],
@@ -1050,11 +1052,11 @@
 									"    // Store the bank account ID for future use",
 									"    pm.collectionVariables.set(\"entityBankAccountId\", response.bank_account_id);",
 									"    ",
-									"    console.log(\"✅ Bank Account created successfully!\");",
+									"    console.log(\"\u2705 Bank Account created successfully!\");",
 									"    console.log(\"Bank Account ID:\", response.bank_account_id);",
 									"    ",
 									"} else {",
-									"    console.log(\"❌ Failed to create Bank Account\");",
+									"    console.log(\"\u274c Failed to create Bank Account\");",
 									"    console.log(\"Status Code:\", pm.response.code);",
 									"}"
 								],
@@ -1100,16 +1102,16 @@
 									"",
 									"// Validate required variables",
 									"if (!institutionId) {",
-									"    throw new Error(\"❌ institutionId is not set. Please run 'Register Supplier Institution' first.\");",
+									"    throw new Error(\"\u274c institutionId is not set. Please run 'Register Supplier Institution' first.\");",
 									"}",
 									"if (!institutionEntityId) {",
-									"    throw new Error(\"❌ institutionEntityId is not set. Please run 'Register Supplier Entity' first.\");",
+									"    throw new Error(\"\u274c institutionEntityId is not set. Please run 'Register Supplier Entity' first.\");",
 									"}",
 									"if (!supplierAddressId) {",
-									"    throw new Error(\"❌ supplierAddressId is not set. Please run 'Register Supplier Address' first.\");",
+									"    throw new Error(\"\u274c supplierAddressId is not set. Please run 'Register Supplier Address' first.\");",
 									"}",
 									"if (!planCreditCurrencyId) {",
-									"    throw new Error(\"❌ planCreditCurrencyId is not set. Please run 'Create Credit Currency' first.\");",
+									"    throw new Error(\"\u274c planCreditCurrencyId is not set. Please run 'Create Credit Currency' first.\");",
 									"}",
 									"",
 									"payload.institution_id = institutionId;",
@@ -1123,10 +1125,10 @@
 									"// 5) overwrite the body with the new, merged JSON",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Using institution_id:\", institutionId);",
-									"console.log(\"✅ Using institution_entity_id:\", institutionEntityId);",
-									"console.log(\"✅ Using address_id:\", supplierAddressId);",
-									"console.log(\"✅ Using credit_currency_id:\", planCreditCurrencyId);"
+									"console.log(\"\u2705 Using institution_id:\", institutionId);",
+									"console.log(\"\u2705 Using institution_entity_id:\", institutionEntityId);",
+									"console.log(\"\u2705 Using address_id:\", supplierAddressId);",
+									"console.log(\"\u2705 Using credit_currency_id:\", planCreditCurrencyId);"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1191,7 +1193,7 @@
 									"",
 									"// Validate required variable",
 									"if (!restaurantId) {",
-									"    throw new Error(\"❌ restaurantId is not set. Please run 'Register Supplier Restaurant' first.\");",
+									"    throw new Error(\"\u274c restaurantId is not set. Please run 'Register Supplier Restaurant' first.\");",
 									"}",
 									"",
 									"payload.restaurant_id = restaurantId;",
@@ -1202,7 +1204,7 @@
 									"// 5) overwrite the body with the new, merged JSON",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Using restaurant_id:\", restaurantId);"
+									"console.log(\"\u2705 Using restaurant_id:\", restaurantId);"
 								],
 								"type": "text/javascript",
 								"packages": {},
@@ -1285,6 +1287,7 @@
 									"",
 									"// Test 4: Verify supplier token is cleared",
 									"pm.test(\"supplierAuthToken cleared\", function () {",
+									"    pm.environment.unset(\"supplierAuthToken\");",
 									"    pm.expect(pm.environment.get(\"supplierAuthToken\")).to.be.undefined;",
 									"});"
 								],
@@ -1322,7 +1325,7 @@
 			]
 		},
 		{
-			"name": "🍽️ Supplier Menu Setup",
+			"name": "\ud83c\udf7d\ufe0f Supplier Menu Setup",
 			"item": [
 				{
 					"name": "Login Supplier User",
@@ -1457,7 +1460,7 @@
 									"    const body = pm.response.json();",
 									"    pm.expect(body).to.have.property(\"product_id\");",
 									"",
-									"    // persist it to this collection’s variables",
+									"    // persist it to this collection\u2019s variables",
 									"    pm.collectionVariables.set(\"productId\", body.product_id);",
 									"});"
 								],
@@ -1621,9 +1624,9 @@
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Creating restaurant holiday for restaurant:\", restaurantId);",
-									"console.log(\"📅 Holiday date:\", holidayDate);",
-									"console.log(\"🏷️ Holiday name:\", payload.holiday_name);"
+									"console.log(\"\u2705 Creating restaurant holiday for restaurant:\", restaurantId);",
+									"console.log(\"\ud83d\udcc5 Holiday date:\", holidayDate);",
+									"console.log(\"\ud83c\udff7\ufe0f Holiday name:\", payload.holiday_name);"
 								],
 								"type": "text/javascript",
 								"packages": {},
@@ -1648,10 +1651,10 @@
 									"    // Store holiday_id for potential future use",
 									"    pm.collectionVariables.set(\"restaurantHolidayId\", body.holiday_id);",
 									"    ",
-									"    console.log(\"✅ Restaurant holiday created successfully\");",
-									"    console.log(\"🎉 Holiday ID:\", body.holiday_id);",
-									"    console.log(\"📅 Holiday date:\", body.holiday_date);",
-									"    console.log(\"🏷️ Holiday name:\", body.holiday_name);",
+									"    console.log(\"\u2705 Restaurant holiday created successfully\");",
+									"    console.log(\"\ud83c\udf89 Holiday ID:\", body.holiday_id);",
+									"    console.log(\"\ud83d\udcc5 Holiday date:\", body.holiday_date);",
+									"    console.log(\"\ud83c\udff7\ufe0f Holiday name:\", body.holiday_name);",
 									"});"
 								],
 								"type": "text/javascript",
@@ -1714,7 +1717,7 @@
 									"    const body = pm.response.json();",
 									"    pm.expect(body).to.have.property(\"plate_id\");",
 									"",
-									"    // persist it to this collection’s variables",
+									"    // persist it to this collection\u2019s variables",
 									"    pm.collectionVariables.set(\"plateId\", body.plate_id);",
 									"});"
 								],
@@ -1763,7 +1766,7 @@
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"✅ Using new batch API for kitchen days assignment\");",
+									"console.log(\"\u2705 Using new batch API for kitchen days assignment\");",
 									"console.log(\"Plate ID:\", plateId);",
 									"console.log(\"Kitchen Days:\", payload.kitchen_days);"
 								],
@@ -1792,8 +1795,8 @@
 									"        pm.expect(kitchenDay.kitchen_day).to.be.oneOf([\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"]);",
 									"    });",
 									"    ",
-									"    console.log(\"✅ Successfully created\", body.length, \"kitchen day assignments\");",
-									"    console.log(\"📋 Created days:\", body.map(d => d.kitchen_day).join(\", \"));",
+									"    console.log(\"\u2705 Successfully created\", body.length, \"kitchen day assignments\");",
+									"    console.log(\"\ud83d\udccb Created days:\", body.map(d => d.kitchen_day).join(\", \"));",
 									"});"
 								],
 								"type": "text/javascript",
@@ -1843,6 +1846,7 @@
 									"",
 									"// Test 4: Verify supplier token is cleared",
 									"pm.test(\"supplierAuthToken cleared\", function () {",
+									"    pm.environment.unset(\"supplierAuthToken\");",
 									"    pm.expect(pm.environment.get(\"supplierAuthToken\")).to.be.undefined;",
 									"});"
 								],
@@ -1880,7 +1884,7 @@
 			]
 		},
 		{
-			"name": "👤 Client Setup",
+			"name": "\ud83d\udc64 Client Setup",
 			"item": [
 				{
 					"name": "Register Customer User",
@@ -2077,7 +2081,7 @@
 									"    const body = pm.response.json();",
 									"    pm.expect(body).to.have.property(\"address_id\");",
 									"",
-									"    // persist it to this collection’s variables",
+									"    // persist it to this collection\u2019s variables",
 									"    pm.collectionVariables.set(\"customerAddressId\", body.address_id);",
 									"});"
 								],
@@ -2139,7 +2143,7 @@
 									"            value: 'Bearer ' + authToken",
 									"        });",
 									"    } else {",
-									"        console.warn('⚠️ Warning: authToken not found in environment or collection variables');",
+									"        console.warn('\u26a0\ufe0f Warning: authToken not found in environment or collection variables');",
 									"    }",
 									"}",
 									"",
@@ -2150,8 +2154,8 @@
 									"});",
 									"",
 									"// Log request details",
-									"console.log('📤 Request:', pm.request.method, pm.request.url);",
-									"console.log('🔑 Using token:', pm.environment.get('authToken') ? 'Environment token' : 'Collection token');"
+									"console.log('\ud83d\udce4 Request:', pm.request.method, pm.request.url);",
+									"console.log('\ud83d\udd11 Using token:', pm.environment.get('authToken') ? 'Environment token' : 'Collection token');"
 								],
 								"type": "text/javascript",
 								"packages": {},
@@ -2202,10 +2206,10 @@
 									"",
 									"// Log response summary",
 									"const response = pm.response.json();",
-									"console.log('📥 Response:', pm.response.code);",
-									"console.log('📊 Total employers:', response.length);",
+									"console.log('\ud83d\udce5 Response:', pm.response.code);",
+									"console.log('\ud83d\udcca Total employers:', response.length);",
 									"if (response.length > 0) {",
-									"    console.log('✅ Sample employer:', response[0].name, '(ID:', response[0].employer_id + ')');",
+									"    console.log('\u2705 Sample employer:', response[0].name, '(ID:', response[0].employer_id + ')');",
 									"}"
 								],
 								"type": "text/javascript",
@@ -2273,7 +2277,7 @@
 									"        pm.collectionVariables.set('currentUserId', userId);",
 									"        pm.collectionVariables.set('currentInstitutionId', institutionId);",
 									"        ",
-									"        console.log('✅ Extracted from JWT:');",
+									"        console.log('\u2705 Extracted from JWT:');",
 									"        console.log('   user_id:', userId);",
 									"        console.log('   institution_id:', institutionId);",
 									"    } else {",
@@ -2315,7 +2319,7 @@
 									"pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log('📤 Creating employer atomically with assignment');",
+									"console.log('\ud83d\udce4 Creating employer atomically with assignment');",
 									"console.log('   Employer name:', payload.name);",
 									"console.log('   Assign to user:', payload.assign_employer);"
 								],
@@ -2354,7 +2358,7 @@
 									"if (response.employer_id) {",
 									"    pm.collectionVariables.set('createdEmployerId', response.employer_id);",
 									"    pm.collectionVariables.set('createdEmployerAddressId', response.address_id);",
-									"    console.log('✅ Employer created successfully');",
+									"    console.log('\u2705 Employer created successfully');",
 									"    console.log('   Employer ID:', response.employer_id);",
 									"    console.log('   Address ID:', response.address_id);",
 									"    console.log('   Name:', response.name);",
@@ -2432,7 +2436,7 @@
 							"    const body = pm.response.json();",
 							"    pm.expect(body).to.have.property(\"subscription_id\");",
 							"",
-							"    // persist it to this collection’s variables",
+							"    // persist it to this collection\u2019s variables",
 							"    pm.collectionVariables.set(\"subscriptionId\", body.subscription_id);",
 							"});"
 						],
@@ -2476,7 +2480,7 @@
 							"    throw new Error(\"authToken is not set. Please run 'Login Customer User' first.\");",
 							"}",
 							"",
-							"console.log(\"📝 Creating payment method for authenticated user\");",
+							"console.log(\"\ud83d\udcdd Creating payment method for authenticated user\");",
 							""
 						],
 						"type": "text/javascript",
@@ -2496,7 +2500,7 @@
 							"    pm.collectionVariables.set(\"paymentMethodId\", body.payment_method_id);",
 							"    pm.collectionVariables.set(\"paymentMethodUserId\", body.user_id);",
 							"    ",
-							"    console.log(\"✅ Payment method created:\", body.payment_method_id);",
+							"    console.log(\"\u2705 Payment method created:\", body.payment_method_id);",
 							"    console.log(\"   user_id:\", body.user_id);",
 							"});"
 						],
@@ -2560,7 +2564,7 @@
 							"        const currentUserId = payload.sub;",
 							"        ",
 							"        if (paymentMethodUserId && currentUserId !== paymentMethodUserId) {",
-							"            console.warn(\"⚠️ WARNING: Payment method was created for user:\", paymentMethodUserId);",
+							"            console.warn(\"\u26a0\ufe0f WARNING: Payment method was created for user:\", paymentMethodUserId);",
 							"            console.warn(\"   But current authenticated user is:\", currentUserId);",
 							"            console.warn(\"   This will cause a 403 Forbidden error.\");",
 							"            console.warn(\"   Solution: Ensure you're using the same auth token for both requests.\");",
@@ -2573,7 +2577,7 @@
 							"payload.payment_method_id = paymentMethodId;",
 							"payload.fintech_link_id = fintechLinkId;",
 							"",
-							"console.log(\"📝 Creating fintech link assignment with:\");",
+							"console.log(\"\ud83d\udcdd Creating fintech link assignment with:\");",
 							"console.log(\"   payment_method_id:\", paymentMethodId);",
 							"console.log(\"   fintech_link_id:\", fintechLinkId);",
 							"",
@@ -2618,16 +2622,16 @@
 							"            pm.test(\"Payment method status is Active\", function () {",
 							"                pm.expect(paymentMethod.status).to.eql(\"Active\");",
 							"            });",
-							"            console.log(\"✅ Payment method linked and activated:\");",
+							"            console.log(\"\u2705 Payment method linked and activated:\");",
 							"            console.log(\"   method_type_id:\", paymentMethod.method_type_id);",
 							"            console.log(\"   status:\", paymentMethod.status);",
 							"        } else {",
-							"            console.warn(\"⚠️ Could not verify payment method update:\", err || res.text());",
+							"            console.warn(\"\u26a0\ufe0f Could not verify payment method update:\", err || res.text());",
 							"        }",
 							"    });",
 							"}",
 							"",
-							"console.log(\"✅ Fintech link assignment created:\", response.fintech_link_assignment_id);",
+							"console.log(\"\u2705 Fintech link assignment created:\", response.fintech_link_assignment_id);",
 							""
 						],
 						"type": "text/javascript"
@@ -2689,7 +2693,7 @@
 							"    const body = pm.response.json();",
 							"    pm.expect(body).to.have.property(\"payment_id\");",
 							"",
-							"    // persist it to this collection’s variables",
+							"    // persist it to this collection\u2019s variables",
 							"    pm.collectionVariables.set(\"paymentId\", body.payment_id);",
 							"});"
 						],
@@ -2774,7 +2778,7 @@
 							"// NOTE: This endpoint requires Employee access, so Customers cannot use it.",
 							"// The currency_code is already stored in planCreditCurrencyCode collection variable",
 							"// during the 'Create Credit Currency' step, so this request is not needed.",
-							"console.warn(\"⚠️ DEPRECATED: This endpoint requires Employee access.\");",
+							"console.warn(\"\u26a0\ufe0f DEPRECATED: This endpoint requires Employee access.\");",
 							"console.warn(\"   Use the planCreditCurrencyCode collection variable instead.\");",
 							"console.warn(\"   It is set during the 'Create Credit Currency' step.\");"
 						],
@@ -2786,7 +2790,7 @@
 					"listen": "prerequest",
 					"script": {
 						"exec": [
-							"console.warn(\"⚠️ WARNING: This endpoint requires Employee access and will fail for Customer users.\");",
+							"console.warn(\"\u26a0\ufe0f WARNING: This endpoint requires Employee access and will fail for Customer users.\");",
 							"console.warn(\"   Consider skipping this request or using planCreditCurrencyCode collection variable.\");"
 						],
 						"type": "text/javascript",
@@ -2831,7 +2835,7 @@
 							"// 2. Get currency_code from collection variables (set during currency creation)",
 							"let currencyCode = pm.collectionVariables.get(\"planCreditCurrencyCode\");",
 							"if (!currencyCode) {",
-							"    console.warn(\"⚠️ WARNING: planCreditCurrencyCode not found in collection variables. Using empty string.\");",
+							"    console.warn(\"\u26a0\ufe0f WARNING: planCreditCurrencyCode not found in collection variables. Using empty string.\");",
 							"    currencyCode = \"\";",
 							"}",
 							"",
@@ -2851,7 +2855,7 @@
 							"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 							"pm.request.body.update(JSON.stringify(payload));",
 							"",
-							"console.log(\"✅ Using currency_code from collection variables:\", currencyCode);"
+							"console.log(\"\u2705 Using currency_code from collection variables:\", currencyCode);"
 						],
 						"type": "text/javascript",
 						"packages": {}
@@ -2960,8 +2964,8 @@
 							"        // Store in collection variable",
 							"        pm.collectionVariables.set(\"plateSelectionId\", plateId);",
 							"        ",
-							"        console.log(\"✅ Plate ID stored:\", plateId);",
-							"        console.log(\"📋 Plate details:\", firstPlate);",
+							"        console.log(\"\u2705 Plate ID stored:\", plateId);",
+							"        console.log(\"\ud83d\udccb Plate details:\", firstPlate);",
 							"        ",
 							"        // Also store other useful values",
 							"        pm.collectionVariables.set(\"plateRestaurantId\", firstPlate.restaurant_id);",
@@ -2970,11 +2974,11 @@
 							"        pm.collectionVariables.set(\"plateNoShowDiscount\", firstPlate.no_show_discount);",
 							"        ",
 							"    } else {",
-							"        console.log(\"⚠️ No plates found in response\");",
+							"        console.log(\"\u26a0\ufe0f No plates found in response\");",
 							"        pm.collectionVariables.set(\"plateSelectionId\", \"\");",
 							"    }",
 							"} else {",
-							"    console.log(\"❌ Failed to get plates:\", pm.response.status);",
+							"    console.log(\"\u274c Failed to get plates:\", pm.response.status);",
 							"    pm.collectionVariables.set(\"plateSelectionId\", \"\");",
 							"}"
 						],
@@ -2987,7 +2991,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-							"raw": "{{baseUrl}}/api/v1/plates/?include_archived=false",
+					"raw": "{{baseUrl}}/api/v1/plates/?include_archived=false",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -3074,20 +3078,20 @@
 							"                pm.expect(pendingOrder.qr_code_checksum).to.be.a(\"string\");",
 							"            });",
 							"        } else {",
-							"            console.log(\"⚠️ Pending order missing qr_code_checksum (expected after back-end update)\");",
+							"            console.log(\"\u26a0\ufe0f Pending order missing qr_code_checksum (expected after back-end update)\");",
 							"        }",
 							"        ",
-							"        console.log(\"✅ Found pending order for restaurant:\", pendingOrder.restaurant_name);",
-							"        console.log(\"✅ Total orders:\", pendingOrder.total_orders);",
-							"        console.log(\"✅ Orders:\", JSON.stringify(pendingOrder.orders));",
-							"        console.log(\"✅ QR Code ID to scan:\", pendingOrder.qr_code_id);",
-							"        console.log(\"✅ Pickup window:\", pendingOrder.pickup_window);",
-							"        console.log(\"✅ QR Code checksum:\", pendingOrder.qr_code_checksum);",
+							"        console.log(\"\u2705 Found pending order for restaurant:\", pendingOrder.restaurant_name);",
+							"        console.log(\"\u2705 Total orders:\", pendingOrder.total_orders);",
+							"        console.log(\"\u2705 Orders:\", JSON.stringify(pendingOrder.orders));",
+							"        console.log(\"\u2705 QR Code ID to scan:\", pendingOrder.qr_code_id);",
+							"        console.log(\"\u2705 Pickup window:\", pendingOrder.pickup_window);",
+							"        console.log(\"\u2705 QR Code checksum:\", pendingOrder.qr_code_checksum);",
 							"    } else {",
-							"        console.log(\"❌ No pending order found\");",
+							"        console.log(\"\u274c No pending order found\");",
 							"    }",
 							"} else {",
-							"    console.log(\"❌ Failed to get pending order:\", pm.response.text());",
+							"    console.log(\"\u274c Failed to get pending order:\", pm.response.text());",
 							"}"
 						],
 						"type": "text/javascript",
@@ -3133,11 +3137,11 @@
 							"const qrCodePayload = `restaurant_id:${restaurantId}`;",
 							"",
 							"if (!restaurantId) {",
-							"    throw new Error(\"❌ No restaurantId found. Run 'List Active QR Codes' first.\");",
+							"    throw new Error(\"\u274c No restaurantId found. Run 'List Active QR Codes' first.\");",
 							"}",
 							"",
-							"console.log(\"✅ Using restaurant_id:\", restaurantId);",
-							"console.log(\"✅ Using qr_code_payload:\", qrCodePayload);",
+							"console.log(\"\u2705 Using restaurant_id:\", restaurantId);",
+							"console.log(\"\u2705 Using qr_code_payload:\", qrCodePayload);",
 							"",
 							"// Set the payload for the request",
 							"pm.collectionVariables.set(\"qrCodePayload\", qrCodePayload);"
@@ -3154,13 +3158,13 @@
 							"// Verify successful QR scan",
 							"if (pm.response.code === 200) {",
 							"    const responseData = pm.response.json();",
-							"    console.log(\"✅ QR scan successful:\", responseData.message);",
+							"    console.log(\"\u2705 QR scan successful:\", responseData.message);",
 							"    if (responseData.confirmation_code) {",
-							"        console.log(\"🎫 Confirmation code:\", responseData.confirmation_code);",
+							"        console.log(\"\ud83c\udfab Confirmation code:\", responseData.confirmation_code);",
 							"    }",
 							"} else {",
 							"    const error = pm.response.json();",
-							"    console.log(\"❌ QR scan failed:\", error.message || error.detail);",
+							"    console.log(\"\u274c QR scan failed:\", error.message || error.detail);",
 							"}"
 						],
 						"type": "text/javascript",
@@ -3186,84 +3190,6 @@
 			"response": []
 		},
 		{
-			"name": "Generate Daily Bills",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							"// Calculate today's date in YYYY-MM-DD format",
-							"const today = new Date().toISOString().split('T')[0];",
-							"pm.collectionVariables.set(\"billDate\", today);",
-							"",
-							"console.log(\"✅ Generating bills for date:\", today);",
-							"console.log(\"📅 This will complete all pending orders and create bills\");"
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"if (pm.response.code === 200 || pm.response.code === 201) {",
-							"    const response = pm.response.json();",
-							"    console.log(\"✅ Bills generated successfully\");",
-							"    console.log(\"📊 Message:\", response.message);",
-							"    console.log(\"📅 Date:\", response.date);",
-							"    console.log(\"📊 Statistics:\", JSON.stringify(response.statistics, null, 2));",
-							"    ",
-							"    if (response.statistics) {",
-							"        console.log(\"💰 Bills created:\", response.statistics.bills_created);",
-							"        console.log(\"💵 Total amount:\", response.statistics.total_amount);",
-							"        console.log(\"🏪 Restaurants processed:\", response.statistics.restaurants_processed);",
-							"    }",
-							"} else {",
-							"    console.log(\"❌ Failed to generate bills:\", pm.response.text());",
-							"}"
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "{{baseUrl}}/api/v1/institution-bills/generate-daily-bills?bill_date={{billDate}}",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"api",
-						"v1",
-						"institution-bills",
-						"generate-daily-bills"
-					],
-					"query": [
-						{
-							"key": "bill_date",
-							"value": "{{billDate}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
 			"name": "Logout Customer User",
 			"event": [
 				{
@@ -3280,16 +3206,17 @@
 							"    pm.expect(pm.response.responseTime).to.be.below(500);",
 							"});",
 							"",
-							"// Test 3: Remove auth token",
-							"pm.test(\"Auth token removed from environment\", function () {",
-							"    pm.environment.unset(\"authToken\");",
-							"    pm.expect(pm.environment.get(\"authToken\")).to.be.undefined;",
-							"});",
-							"",
-							"// Test 4: Verify customer token is cleared",
-							"pm.test(\"clientUserAuthToken cleared\", function () {",
-							"    pm.expect(pm.environment.get(\"clientUserAuthToken\")).to.be.undefined;",
-							"});"
+				"// Test 3: Remove auth token",
+				"pm.test(\"Auth token removed from environment\", function () {",
+				"    pm.environment.unset(\"authToken\");",
+				"    pm.expect(pm.environment.get(\"authToken\")).to.be.undefined;",
+				"});",
+				"",
+				"// Test 4: Verify customer token is cleared",
+				"pm.test(\"clientUserAuthToken cleared\", function () {",
+				"    pm.environment.unset(\"clientUserAuthToken\");",
+				"    pm.expect(pm.environment.get(\"clientUserAuthToken\")).to.be.undefined;",
+				"});"
 						],
 						"type": "text/javascript",
 						"packages": {}
@@ -3322,6 +3249,242 @@
 				"url": "{{baseUrl}}/"
 			},
 			"response": []
+		},
+		{
+			"name": "\ud83c\udfea Restaurant Staff Operations",
+			"item": [
+				{
+					"name": "Get Restaurant Daily Orders",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Switch to Supplier authentication",
+									"const supplierToken = pm.environment.get(\"supplierAuthToken\");",
+									"if (!supplierToken) {",
+									"    throw new Error(\"\u274c No supplier auth token found. Please run 'Login Supplier' first.\");",
+									"}",
+									"pm.environment.set(\"authToken\", supplierToken);",
+									"console.log(\"\u2705 Using Supplier authentication\");"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test 1: Status code validation",
+									"pm.test(\"Daily orders retrieved successfully - Status 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Test 2: Response time SLA",
+									"pm.test(\"Response time is acceptable (< 1000ms)\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+									"});",
+									"",
+				"// Test 3: Response structure validation",
+				"pm.test(\"Response has correct structure\", function () {",
+				"    const body = pm.response.json();",
+				"    pm.expect(body).to.have.property(\"order_date\");",
+				"    pm.expect(body).to.have.property(\"restaurants\");",
+				"    pm.expect(body.restaurants).to.be.an(\"array\");",
+				"});",
+									"",
+									"// Test 4: Restaurant data structure",
+									"pm.test(\"Restaurant data has required fields\", function () {",
+									"    const body = pm.response.json();",
+									"    if (body.restaurants.length > 0) {",
+									"        const restaurant = body.restaurants[0];",
+									"        pm.expect(restaurant).to.have.property(\"restaurant_id\");",
+									"        pm.expect(restaurant).to.have.property(\"restaurant_name\");",
+									"        pm.expect(restaurant).to.have.property(\"orders\");",
+									"        pm.expect(restaurant).to.have.property(\"summary\");",
+									"        pm.expect(restaurant.orders).to.be.an(\"array\");",
+									"    }",
+									"});",
+									"",
+									"// Test 5: Order data structure",
+									"pm.test(\"Order data has required fields\", function () {",
+									"    const body = pm.response.json();",
+									"    if (body.restaurants.length > 0 && body.restaurants[0].orders.length > 0) {",
+									"        const order = body.restaurants[0].orders[0];",
+									"        pm.expect(order).to.have.property(\"customer_name\");",
+									"        pm.expect(order).to.have.property(\"plate_name\");",
+									"        pm.expect(order).to.have.property(\"confirmation_code\");",
+									"        pm.expect(order).to.have.property(\"status\");",
+									"        pm.expect(order).to.have.property(\"pickup_time_range\");",
+									"        pm.expect(order).to.have.property(\"kitchen_day\");",
+									"    }",
+									"});",
+									"",
+									"// Test 6: Privacy - Customer name format",
+									"pm.test(\"Customer names are privacy-safe (First L. format)\", function () {",
+									"    const body = pm.response.json();",
+									"    if (body.restaurants.length > 0 && body.restaurants[0].orders.length > 0) {",
+									"        const order = body.restaurants[0].orders[0];",
+									"        const namePattern = /^[\\w\\s]+ [A-Z]\\.$/; // Matches 'First L.' format",
+									"        pm.expect(order.customer_name).to.match(namePattern);",
+									"    }",
+									"});",
+									"",
+									"// Test 7: Summary statistics",
+									"pm.test(\"Summary statistics are present and valid\", function () {",
+									"    const body = pm.response.json();",
+									"    if (body.restaurants.length > 0) {",
+									"        const summary = body.restaurants[0].summary;",
+									"        pm.expect(summary).to.have.property(\"total_orders\");",
+									"        pm.expect(summary).to.have.property(\"pending\");",
+									"        pm.expect(summary).to.have.property(\"arrived\");",
+									"        pm.expect(summary).to.have.property(\"completed\");",
+									"        pm.expect(summary.total_orders).to.be.a(\"number\");",
+									"        pm.expect(summary.total_orders).to.be.at.least(0);",
+									"    }",
+									"});",
+									"",
+				"// Test 8: Date format validation",
+				"pm.test(\"Date is in correct format (YYYY-MM-DD)\", function () {",
+				"    const body = pm.response.json();",
+				"    const datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;",
+				"    pm.expect(body.order_date).to.match(datePattern);",
+				"});",
+									"",
+									"// Log results for debugging",
+				"if (pm.response.code === 200) {",
+				"    const body = pm.response.json();",
+				"    console.log(\"\u2705 Daily orders retrieved successfully\");",
+				"    console.log(\"\ud83d\udcc5 Date:\", body.order_date);",
+				"    console.log(\"\ud83c\udfea Restaurants:\", body.restaurants.length);",
+									"    ",
+									"    body.restaurants.forEach((restaurant, idx) => {",
+									"        console.log(`\\n\ud83c\udfea Restaurant ${idx + 1}: ${restaurant.restaurant_name}`);",
+									"        console.log(`   \ud83d\udcca Total orders: ${restaurant.summary.total_orders}`);",
+									"        console.log(`   \u23f3 Pending: ${restaurant.summary.pending}`);",
+									"        console.log(`   \u2705 Arrived: ${restaurant.summary.arrived}`);",
+									"        console.log(`   \u2714\ufe0f  Completed: ${restaurant.summary.completed}`);",
+									"        ",
+									"        if (restaurant.orders.length > 0) {",
+									"            console.log(`   \ud83d\udccb Sample order: ${restaurant.orders[0].customer_name} - ${restaurant.orders[0].plate_name}`);",
+									"        }",
+									"    });",
+									"} else {",
+									"    console.log(\"\u274c Failed to retrieve daily orders:\", pm.response.text());",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurant-staff/daily-orders",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-staff",
+								"daily-orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Daily Bills",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Ensure using Supplier authentication",
+									"const supplierToken = pm.environment.get(\"supplierAuthToken\");",
+									"if (supplierToken) {",
+									"    pm.environment.set(\"authToken\", supplierToken);",
+									"}",
+									"",
+									"// Calculate today's date in YYYY-MM-DD format",
+									"const today = new Date().toISOString().split('T')[0];",
+									"pm.collectionVariables.set(\"billDate\", today);",
+									"",
+									"console.log(\"\u2705 Generating bills for date:\", today);",
+									"console.log(\"\ud83d\udcc5 This will complete all pending orders and create bills\");"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    console.log(\"\u2705 Bills generated successfully\");",
+									"    console.log(\"\ud83d\udcca Message:\", response.message);",
+									"    console.log(\"\ud83d\udcc5 Date:\", response.date);",
+									"    console.log(\"\ud83d\udcca Statistics:\", JSON.stringify(response.statistics, null, 2));",
+									"    ",
+									"    if (response.statistics) {",
+									"        console.log(\"\ud83d\udcb0 Bills created:\", response.statistics.bills_created);",
+									"        console.log(\"\ud83d\udcb5 Total amount:\", response.statistics.total_amount);",
+									"        console.log(\"\ud83c\udfea Restaurants processed:\", response.statistics.restaurants_processed);",
+									"    }",
+									"} else {",
+									"    console.log(\"\u274c Failed to generate bills:\", pm.response.text());",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/generate-daily-bills?bill_date={{billDate}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"institution-bills",
+								"generate-daily-bills"
+							],
+							"query": [
+								{
+									"key": "bill_date",
+									"value": "{{billDate}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Operations for restaurant staff to view daily orders and generate bills"
 		},
 		{
 			"name": "Login Admin",
@@ -3433,24 +3596,24 @@
 							"    const today = new Date().toISOString().split('T')[0];",
 							"    pm.collectionVariables.set(\"billDate\", today);",
 							"    billDate = today;",
-							"    console.log(\"⚠️ billDate was not set, using today:\", billDate);",
+							"    console.log(\"\u26a0\ufe0f billDate was not set, using today:\", billDate);",
 							"}",
 							"",
 							"// CRITICAL: Get restaurantId from COLLECTION variables (not environment)",
 							"const restaurantId = pm.collectionVariables.get(\"restaurantId\");",
 							"if (!restaurantId) {",
-							"    throw new Error(\"❌ restaurantId is not set in collection variables. Please create a restaurant first.\");",
+							"    throw new Error(\"\u274c restaurantId is not set in collection variables. Please create a restaurant first.\");",
 							"}",
 							"",
 							"// Validate billDate format",
 							"if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(billDate)) {",
-							"    throw new Error(`❌ Invalid billDate format: ${billDate}. Expected YYYY-MM-DD format.`);",
+							"    throw new Error(`\u274c Invalid billDate format: ${billDate}. Expected YYYY-MM-DD format.`);",
 							"}",
 							"",
-							"console.log(\"✅ Using restaurant_id from COLLECTION variables:\", restaurantId);",
-							"console.log(\"✅ Using billDate:\", billDate);",
-							"console.log(\"✅ period_start will be:\", billDate + \"T00:00:00Z\");",
-							"console.log(\"✅ period_end will be:\", billDate + \"T23:59:59Z\");",
+							"console.log(\"\u2705 Using restaurant_id from COLLECTION variables:\", restaurantId);",
+							"console.log(\"\u2705 Using billDate:\", billDate);",
+							"console.log(\"\u2705 period_start will be:\", billDate + \"T00:00:00Z\");",
+							"console.log(\"\u2705 period_end will be:\", billDate + \"T23:59:59Z\");",
 							"",
 							"// Build request body dynamically using collection variables to avoid environment variable conflicts",
 							"const requestBody = {",
@@ -3465,7 +3628,7 @@
 							"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 							"pm.request.body.update(JSON.stringify(requestBody));",
 							"",
-							"console.log(\"✅ Request body set dynamically:\", JSON.stringify(requestBody, null, 2));"
+							"console.log(\"\u2705 Request body set dynamically:\", JSON.stringify(requestBody, null, 2));"
 						],
 						"type": "text/javascript",
 						"packages": {}
@@ -3492,10 +3655,10 @@
 							"        ",
 							"        // Verify it was set",
 							"        const setValue = pm.collectionVariables.get(\"entityBillId\");",
-							"        console.log(\"✅ Set entityBillId to:\", setValue);",
-							"        console.log(\"✅ Set value type:\", typeof setValue);",
+							"        console.log(\"\u2705 Set entityBillId to:\", setValue);",
+							"        console.log(\"\u2705 Set value type:\", typeof setValue);",
 							"        ",
-							"        console.log(\"✅ Institution bill created successfully\");",
+							"        console.log(\"\u2705 Institution bill created successfully\");",
 							"        console.log(\"Bill ID:\", response.institution_bill_id);",
 							"        console.log(\"Amount:\", response.amount);",
 							"        console.log(\"Currency Code:\", response.currency_code);",
@@ -3503,11 +3666,11 @@
 							"        console.log(\"Restaurant ID:\", response.restaurant_id);",
 							"        ",
 							"    } catch (error) {",
-							"        console.log(\"❌ Error parsing response:\", error);",
+							"        console.log(\"\u274c Error parsing response:\", error);",
 							"        pm.collectionVariables.set(\"entityBillId\", \"PARSE_ERROR\");",
 							"    }",
 							"} else {",
-							"    console.log(\"❌ Bill creation failed\");",
+							"    console.log(\"\u274c Bill creation failed\");",
 							"    console.log(\"Response:\", pm.response.text());",
 							"    pm.collectionVariables.set(\"entityBillId\", \"CREATION_FAILED\");",
 							"}",
@@ -3575,7 +3738,7 @@
 							"        // Get the first bill ID (you can modify this logic if you need a specific bill)",
 							"        const firstBill = response[0];",
 							"        pm.collectionVariables.set(\"entityBillId\", firstBill.institution_bill_id);",
-							"        console.log(\"✅ Bill ID set:\", firstBill.institution_bill_id);",
+							"        console.log(\"\u2705 Bill ID set:\", firstBill.institution_bill_id);",
 							"        console.log(\"Bill details:\", {",
 							"            amount: firstBill.amount,",
 							"            currency: firstBill.currency_code,",
@@ -3583,7 +3746,7 @@
 							"            period: `${firstBill.period_start} to ${firstBill.period_end}`",
 							"        });",
 							"    } else {",
-							"        console.log(\"⚠️ No bills found for the specified date\");",
+							"        console.log(\"\u26a0\ufe0f No bills found for the specified date\");",
 							"        pm.collectionVariables.set(\"entityBillId\", \"NO_BILLS_FOUND\");",
 							"    }",
 							"} else {",

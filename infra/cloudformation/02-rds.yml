@@ -1,0 +1,289 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Kitchen RDS PostgreSQL Database'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+  
+  NetworkStackName:
+    Type: String
+    Default: kitchen-network-prod
+    Description: Name of the network stack to import values from
+  
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues:
+      - db.t3.micro     # Free tier eligible (1 vCPU, 1 GB RAM)
+      - db.t3.small     # 2 vCPU, 2 GB RAM
+      - db.t3.medium    # 2 vCPU, 4 GB RAM
+      - db.t3.large     # 2 vCPU, 8 GB RAM
+    Description: RDS instance class
+  
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 100
+    Description: Allocated storage in GB (20 GB free tier eligible)
+  
+  DBName:
+    Type: String
+    Default: kitchen_db_prod
+    Description: Initial database name
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters and underscores
+  
+  DBMasterUsername:
+    Type: String
+    Default: kitchen_admin
+    NoEcho: false
+    Description: Master database username
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+  
+  DBMasterPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    Description: Master database password (8-41 characters)
+    AllowedPattern: '[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?]*'
+  
+  BackupRetentionPeriod:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 35
+    Description: Number of days to retain automated backups
+  
+  MultiAZ:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Multi-AZ for high availability (not free tier eligible)
+  
+  PostgreSQLVersion:
+    Type: String
+    Default: '15.5'
+    AllowedValues:
+      - '13.13'
+      - '14.10'
+      - '15.5'
+      - '16.1'
+    Description: PostgreSQL engine version
+
+Conditions:
+  IsMultiAZ: !Equals [!Ref MultiAZ, 'true']
+  IsProduction: !Equals [!Ref Environment, 'prod']
+
+Resources:
+  # DB Subnet Group (required for RDS in VPC)
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub 'kitchen-db-subnet-group-${Environment}'
+      DBSubnetGroupDescription: Subnet group for Kitchen RDS instances
+      SubnetIds:
+        - Fn::ImportValue: !Sub '${NetworkStackName}-PrivateSubnet1'
+        - Fn::ImportValue: !Sub '${NetworkStackName}-PrivateSubnet2'
+      Tags:
+        - Key: Name
+          Value: !Sub 'kitchen-db-subnet-group-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: Kitchen
+
+  # RDS PostgreSQL Instance
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot  # Create final snapshot before deletion
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub 'kitchen-db-${Environment}'
+      Engine: postgres
+      EngineVersion: !Ref PostgreSQLVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp2  # General Purpose SSD
+      StorageEncrypted: true
+      
+      # Database Configuration
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      Port: 5432
+      
+      # Network & Security
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub '${NetworkStackName}-RDSSecurityGroup'
+      PubliclyAccessible: false  # Never expose database to internet
+      
+      # High Availability
+      MultiAZ: !If [IsMultiAZ, true, false]
+      
+      # Backup & Maintenance
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      PreferredBackupWindow: '03:00-04:00'  # 3-4 AM UTC
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'  # Sunday 4-5 AM UTC
+      AutoMinorVersionUpgrade: !If [IsProduction, false, true]  # Manual upgrades in prod
+      CopyTagsToSnapshot: true
+      DeleteAutomatedBackups: !If [IsProduction, false, true]  # Keep backups in prod
+      
+      # Monitoring
+      EnableCloudwatchLogsExports:
+        - postgresql
+      EnablePerformanceInsights: false  # Not available on t3.micro
+      MonitoringInterval: 0  # Disable enhanced monitoring for free tier
+      
+      # Parameter Group (optional customization)
+      # DBParameterGroupName: !Ref DBParameterGroup
+      
+      Tags:
+        - Key: Name
+          Value: !Sub 'kitchen-db-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: Kitchen
+        - Key: SchemaSource
+          Value: 'app/db/*.sql'  # Schema managed in monorepo for now
+        - Key: BackupPolicy
+          Value: !Sub '${BackupRetentionPeriod}-days-retention'
+
+  # Optional: Custom Parameter Group
+  # DBParameterGroup:
+  #   Type: AWS::RDS::DBParameterGroup
+  #   Properties:
+  #     DBParameterGroupName: !Sub 'kitchen-db-params-${Environment}'
+  #     Description: Custom parameter group for Kitchen database
+  #     Family: !Sub 'postgres${PostgreSQLVersion}'
+  #     Parameters:
+  #       max_connections: '100'
+  #       shared_buffers: '{DBInstanceClassMemory/32768}'  # 25% of RAM
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub 'kitchen-db-params-${Environment}'
+
+  # CloudWatch Alarms for Database Monitoring
+  
+  # High CPU Alarm
+  DBHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'kitchen-db-high-cpu-${Environment}'
+      AlarmDescription: Alert when database CPU exceeds 80%
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300  # 5 minutes
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DBInstance
+      TreatMissingData: notBreaching
+
+  # Low Storage Alarm
+  DBLowStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'kitchen-db-low-storage-${Environment}'
+      AlarmDescription: Alert when free storage space is low (< 2 GB)
+      MetricName: FreeStorageSpace
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2147483648  # 2 GB in bytes
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DBInstance
+      TreatMissingData: notBreaching
+
+  # High Connection Count Alarm
+  DBHighConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'kitchen-db-high-connections-${Environment}'
+      AlarmDescription: Alert when database connections exceed 80
+      MetricName: DatabaseConnections
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80  # Adjust based on max_connections setting
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DBInstance
+      TreatMissingData: notBreaching
+
+  # Read Latency Alarm
+  DBHighReadLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'kitchen-db-high-read-latency-${Environment}'
+      AlarmDescription: Alert when read latency exceeds 100ms
+      MetricName: ReadLatency
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0.1  # 100ms in seconds
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DBInstance
+      TreatMissingData: notBreaching
+
+Outputs:
+  DBInstanceEndpoint:
+    Description: RDS instance endpoint address
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-DBEndpoint'
+
+  DBInstancePort:
+    Description: RDS instance port
+    Value: !GetAtt DBInstance.Endpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-DBPort'
+
+  DBName:
+    Description: Database name
+    Value: !Ref DBName
+    Export:
+      Name: !Sub '${AWS::StackName}-DBName'
+
+  DBUsername:
+    Description: Database master username
+    Value: !Ref DBMasterUsername
+    Export:
+      Name: !Sub '${AWS::StackName}-DBUsername'
+
+  DBInstanceIdentifier:
+    Description: RDS instance identifier
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-DBInstanceId'
+
+  ConnectionString:
+    Description: Database connection string (password not included)
+    Value: !Sub 'postgresql://${DBMasterUsername}:PASSWORD@${DBInstance.Endpoint.Address}:${DBInstance.Endpoint.Port}/${DBName}'
+
+  SchemaDeploymentNote:
+    Description: How to deploy schema
+    Value: 'Connect to RDS and run: psql -h <endpoint> -U kitchen_admin -d kitchen_db_prod -f app/db/schema.sql'
