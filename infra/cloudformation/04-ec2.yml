@@ -1,0 +1,334 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Kitchen EC2 Compute - Backend API Server'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+  
+  NetworkStackName:
+    Type: String
+    Default: kitchen-network-prod
+    Description: Name of the network stack to import values from
+  
+  SecretsStackName:
+    Type: String
+    Default: kitchen-secrets-prod
+    Description: Name of the secrets stack to import IAM policy ARNs
+  
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro     # Free tier eligible (1 vCPU, 1 GB RAM)
+      - t2.small     # 1 vCPU, 2 GB RAM
+      - t3.small     # 2 vCPU, 2 GB RAM
+      - t3.medium    # 2 vCPU, 4 GB RAM
+    Description: EC2 instance type
+  
+  KeyPairName:
+    Type: String
+    Description: EC2 Key Pair name for SSH access (must exist in your AWS account)
+    Default: ''
+  
+  GitHubRepoURL:
+    Type: String
+    Default: 'https://github.com/cdeachaval/kitchen-backend.git'
+    Description: GitHub repository URL for backend code
+  
+  GitHubBranch:
+    Type: String
+    Default: 'main'
+    Description: Git branch to deploy
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
+
+Mappings:
+  # Latest Amazon Linux 2023 AMI per region
+  RegionMap:
+    us-east-1:
+      AMI: ami-0c101f26f147fa7fd  # Amazon Linux 2023
+    us-west-2:
+      AMI: ami-0d081196e3df05f4d
+    eu-west-1:
+      AMI: ami-0d71ea30463e0ff8d
+    sa-east-1:
+      AMI: ami-0c820c196a818d66a
+
+Resources:
+  # IAM Role for EC2 Instance
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'kitchen-ec2-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - Fn::ImportValue: !Sub '${SecretsStackName}-EC2SecretsAccessPolicyArn'
+        - Fn::ImportValue: !Sub '${SecretsStackName}-EC2CloudWatchLogsPolicyArn'
+      Tags:
+        - Key: Name
+          Value: !Sub 'kitchen-ec2-role-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Instance Profile
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'kitchen-ec2-profile-${Environment}'
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # EC2 Instance
+  BackendEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-PublicSubnet1'
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub '${NetworkStackName}-BackendSecurityGroup'
+      
+      # User Data Script - Bootstrap the server
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          
+          # Log everything
+          exec > >(tee /var/log/user-data.log)
+          exec 2>&1
+          
+          echo "========================================="
+          echo "Kitchen Backend EC2 Bootstrap Script"
+          echo "Environment: ${Environment}"
+          echo "========================================="
+          
+          # Update system
+          echo "Updating system packages..."
+          dnf update -y
+          
+          # Install dependencies
+          echo "Installing dependencies..."
+          dnf install -y \
+            python3.11 \
+            python3.11-pip \
+            git \
+            nginx \
+            supervisor \
+            postgresql15 \
+            jq
+          
+          # Install AWS CLI v2
+          echo "Installing AWS CLI..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+          rm -rf aws awscliv2.zip
+          
+          # Create application directory
+          echo "Setting up application directory..."
+          mkdir -p /opt/kitchen-backend
+          cd /opt/kitchen-backend
+          
+          # Clone repository
+          echo "Cloning repository: ${GitHubRepoURL}"
+          git clone -b ${GitHubBranch} ${GitHubRepoURL} .
+          
+          # Create virtual environment
+          echo "Creating Python virtual environment..."
+          python3.11 -m venv venv
+          source venv/bin/activate
+          
+          # Install Python dependencies
+          echo "Installing Python dependencies..."
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Fetch secrets from AWS Secrets Manager
+          echo "Fetching secrets from AWS Secrets Manager..."
+          DB_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id kitchen/${Environment}/database/credentials \
+            --query 'SecretString' \
+            --output text \
+            --region ${AWS::Region})
+          
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id kitchen/${Environment}/backend/api-keys \
+            --query 'SecretString' \
+            --output text \
+            --region ${AWS::Region})
+          
+          EMAIL_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id kitchen/${Environment}/email/config \
+            --query 'SecretString' \
+            --output text \
+            --region ${AWS::Region})
+          
+          # Create .env file
+          echo "Creating .env file..."
+          cat > /opt/kitchen-backend/.env << 'EOF'
+          # Database Configuration
+          DB_HOST=$(echo $DB_SECRET | jq -r '.host')
+          DB_PORT=5432
+          DB_NAME=$(echo $DB_SECRET | jq -r '.database')
+          DB_USER=$(echo $DB_SECRET | jq -r '.username')
+          DB_PASSWORD=$(echo $DB_SECRET | jq -r '.password')
+          
+          # JWT Configuration
+          JWT_SECRET=$(echo $API_SECRET | jq -r '.jwt_secret')
+          JWT_ALGORITHM=HS256
+          
+          # External API Keys
+          GOOGLE_MAPS_API_KEY=$(echo $API_SECRET | jq -r '.google_maps_api_key')
+          MERCADOPAGO_CLIENT_ID=$(echo $API_SECRET | jq -r '.mercadopago_client_id')
+          MERCADOPAGO_CLIENT_SECRET=$(echo $API_SECRET | jq -r '.mercadopago_client_secret')
+          
+          # Email Configuration
+          SMTP_HOST=$(echo $EMAIL_SECRET | jq -r '.smtp_host')
+          SMTP_PORT=$(echo $EMAIL_SECRET | jq -r '.smtp_port')
+          SMTP_USERNAME=$(echo $EMAIL_SECRET | jq -r '.smtp_username')
+          SMTP_PASSWORD=$(echo $EMAIL_SECRET | jq -r '.smtp_password')
+          FROM_EMAIL=$(echo $EMAIL_SECRET | jq -r '.from_email')
+          
+          # Application Settings
+          ENVIRONMENT=${Environment}
+          DEBUG=false
+          LOG_LEVEL=INFO
+          EOF
+          
+          # Configure Supervisor
+          echo "Configuring Supervisor..."
+          cat > /etc/supervisord.d/kitchen-backend.ini << EOF
+          [program:kitchen-backend]
+          directory=/opt/kitchen-backend
+          command=/opt/kitchen-backend/venv/bin/uvicorn application:app --host 0.0.0.0 --port 8000 --workers 2
+          user=root
+          autostart=true
+          autorestart=true
+          redirect_stderr=true
+          stdout_logfile=/var/log/kitchen-backend.log
+          environment=PATH="/opt/kitchen-backend/venv/bin"
+          EOF
+          
+          # Configure Nginx
+          echo "Configuring Nginx..."
+          cat > /etc/nginx/conf.d/kitchen-backend.conf << EOF
+          server {
+              listen 80;
+              server_name _;
+              
+              location /health {
+                  proxy_pass http://127.0.0.1:8000/health;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+              }
+              
+              location / {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_connect_timeout 60s;
+                  proxy_send_timeout 60s;
+                  proxy_read_timeout 60s;
+              }
+          }
+          EOF
+          
+          # Start services
+          echo "Starting services..."
+          systemctl enable nginx
+          systemctl start nginx
+          systemctl enable supervisord
+          systemctl start supervisord
+          
+          # Wait for backend to start
+          sleep 10
+          
+          # Health check
+          echo "Performing health check..."
+          curl -f http://localhost/health || echo "WARNING: Health check failed"
+          
+          echo "========================================="
+          echo "Bootstrap complete!"
+          echo "========================================="
+      
+      Tags:
+        - Key: Name
+          Value: !Sub 'kitchen-backend-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: Kitchen
+        - Key: Application
+          Value: Backend
+
+  # Elastic IP (optional, for static IP)
+  BackendEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref BackendEC2Instance
+      Tags:
+        - Key: Name
+          Value: !Sub 'kitchen-backend-eip-${Environment}'
+
+  # CloudWatch Log Group
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/kitchen/${Environment}/backend'
+      RetentionInDays: 7
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref BackendEC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  PublicIP:
+    Description: Public IP address
+    Value: !Ref BackendEIP
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+
+  PublicDNS:
+    Description: Public DNS name
+    Value: !GetAtt BackendEC2Instance.PublicDnsName
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicDNS'
+
+  PrivateIP:
+    Description: Private IP address
+    Value: !GetAtt BackendEC2Instance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateIP'
+
+  APIEndpoint:
+    Description: Backend API endpoint
+    Value: !Sub 'http://${BackendEIP}/api/v1'
+
+  SSHCommand:
+    Description: SSH command to connect (if key pair provided)
+    Value: !If 
+      - HasKeyPair
+      - !Sub 'ssh -i ~/.ssh/${KeyPairName}.pem ec2-user@${BackendEIP}'
+      - 'No key pair specified - SSH not available'

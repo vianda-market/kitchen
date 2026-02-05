@@ -1277,3 +1277,51 @@ class NationalHolidayBulkCreateSchema(BaseModel):
         return v
 
 
+# ============================================================================
+# Restaurant Staff Schemas
+# ============================================================================
+
+class DailyOrderItemSchema(BaseModel):
+    """Schema for a single order item in daily orders view"""
+    customer_name: str = Field(..., description="Privacy-safe customer name (First L.)")
+    plate_name: str = Field(..., description="Name of the plate ordered")
+    confirmation_code: str = Field(..., description="Pickup confirmation code")
+    status: str = Field(..., description="Order status")
+    arrival_time: Optional[datetime] = Field(None, description="When customer arrived")
+    pickup_time_range: str = Field(..., description="Expected pickup time range")
+    kitchen_day: str = Field(..., description="Kitchen day for the order")
+    
+    class Config:
+        orm_mode = True
+
+
+class OrderSummarySchema(BaseModel):
+    """Schema for order summary statistics"""
+    total_orders: int = Field(..., description="Total number of orders")
+    pending: int = Field(..., description="Number of pending orders (not yet arrived)")
+    arrived: int = Field(..., description="Number of arrived orders (waiting for pickup)")
+    completed: int = Field(..., description="Number of completed orders")
+    
+    class Config:
+        orm_mode = True
+
+
+class RestaurantDailyOrdersSchema(BaseModel):
+    """Schema for a restaurant's daily orders"""
+    restaurant_id: UUID = Field(..., description="Restaurant UUID")
+    restaurant_name: str = Field(..., description="Restaurant name")
+    orders: List[DailyOrderItemSchema] = Field(..., description="List of orders for this restaurant")
+    summary: OrderSummarySchema = Field(..., description="Summary statistics for this restaurant")
+    
+    class Config:
+        orm_mode = True
+
+
+class DailyOrdersResponseSchema(BaseModel):
+    """Schema for daily orders response"""
+    order_date: date = Field(..., description="Date of the orders")
+    restaurants: List[RestaurantDailyOrdersSchema] = Field(..., description="List of restaurants with their orders")
+    
+    class Config:
+        orm_mode = True
+

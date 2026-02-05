@@ -1,0 +1,82 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "VpcCIDR",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "PublicSubnet1CIDR",
+    "ParameterValue": "10.0.1.0/24"
+  },
+  {
+    "ParameterKey": "PublicSubnet2CIDR",
+    "ParameterValue": "10.0.2.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnet1CIDR",
+    "ParameterValue": "10.0.10.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnet2CIDR",
+    "ParameterValue": "10.0.11.0/24"
+  },
+  {
+    "ParameterKey": "SSHAccessCIDR",
+    "ParameterValue": "0.0.0.0/0"
+  },
+  {
+    "ParameterKey": "DBInstanceClass",
+    "ParameterValue": "db.t3.micro"
+  },
+  {
+    "ParameterKey": "DBAllocatedStorage",
+    "ParameterValue": "20"
+  },
+  {
+    "ParameterKey": "DBName",
+    "ParameterValue": "kitchen_db_dev"
+  },
+  {
+    "ParameterKey": "DBMasterUsername",
+    "ParameterValue": "kitchen_admin"
+  },
+  {
+    "ParameterKey": "DBMasterPassword",
+    "ParameterValue": "CHANGE_ME_DEV_PASSWORD"
+  },
+  {
+    "ParameterKey": "BackupRetentionPeriod",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "MultiAZ",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "PostgreSQLVersion",
+    "ParameterValue": "15.5"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.micro"
+  },
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "GitHubRepoURL",
+    "ParameterValue": "https://github.com/cdeachaval/kitchen-backend.git"
+  },
+  {
+    "ParameterKey": "GitHubBranch",
+    "ParameterValue": "main"
+  },
+  {
+    "ParameterKey": "CertificateArn",
+    "ParameterValue": ""
+  }
+]

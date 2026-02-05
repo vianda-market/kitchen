@@ -98,6 +98,106 @@ get_current_user() (base authentication)
 
 ## Core Engineering Standards
 
+### Working with PostgreSQL Enums
+
+**CRITICAL RULE**: Always check the database schema enum definition before assigning enum values in services.
+
+#### Enum Value Format Rules
+
+1. **Check Schema First**: Before using enum values in queries or service logic, verify the exact format in `app/db/schema.sql`
+2. **Never Assume Case**: Enums are case-sensitive. `'Monday'` ≠ `'MONDAY'` ≠ `'monday'`
+3. **Use Python Enums**: Reference the corresponding Python enum in `app/config/enums/` for type safety
+
+#### Common PostgreSQL Enums
+
+| Database Enum | Format | Python Enum | Example Values |
+|---------------|--------|-------------|----------------|
+| `kitchen_day_enum` | **Title Case** | `KitchenDay` | `'Monday'`, `'Tuesday'`, `'Wednesday'` |
+| `address_type_enum` | **Title Case** | `AddressType` | `'Restaurant'`, `'Customer Home'` |
+| `status_enum` | **Title Case** | `Status` | `'Active'`, `'Inactive'`, `'Pending'` |
+| `role_type_enum` | **Title Case** | `RoleType` | `'Employee'`, `'Supplier'`, `'Customer'` |
+| `pickup_type_enum` | **lowercase** | `PickupType` | `'self'`, `'for_others'`, `'by_others'` |
+
+#### Correct Pattern
+
+```python
+# ✅ GOOD: Check schema, use correct case
+def get_daily_orders(order_date: date, db):
+    # Kitchen day enum in DB: 'Monday', 'Tuesday', etc. (Title Case)
+    kitchen_day = order_date.strftime('%A')  # Returns 'Wednesday'
+    kitchen_day = kitchen_day.title()  # Ensure Title Case
+    
+    query = """
+        SELECT * FROM plate_selection
+        WHERE kitchen_day = %s  -- Will match 'Wednesday' in DB
+    """
+    return db_read(query, [kitchen_day], db)
+
+# ✅ GOOD: Use Python enum for type safety
+from app.config.enums.kitchen_days import KitchenDay
+
+def validate_kitchen_day(day_str: str) -> bool:
+    valid_days = [day.value for day in KitchenDay]
+    return day_str in valid_days  # ['Monday', 'Tuesday', ...]
+```
+
+#### Incorrect Patterns
+
+```python
+# ❌ BAD: Wrong case - will cause SQL error
+def get_daily_orders(order_date: date, db):
+    kitchen_day = order_date.strftime('%A').upper()  # Returns 'WEDNESDAY'
+    # Error: invalid input value for enum kitchen_day_enum: "WEDNESDAY"
+    query = """SELECT * FROM plate_selection WHERE kitchen_day = %s"""
+    return db_read(query, [kitchen_day], db)
+
+# ❌ BAD: Hardcoded without checking schema
+def create_pickup(pickup_type: str):
+    # Assumes lowercase, but what if enum is Title Case?
+    query = """INSERT INTO pickup_preferences (pickup_type) VALUES (%s)"""
+    db_write(query, [pickup_type.lower()])  # May fail if enum is 'Self', not 'self'
+
+# ❌ BAD: Not using Python enum for validation
+def validate_status(status: str) -> bool:
+    # Hardcoded list may get out of sync with DB
+    return status in ['Active', 'Inactive', 'Pending']
+```
+
+#### Enum Maintenance Checklist
+
+When adding or modifying enum values:
+
+1. **Update Database**: Modify `app/db/schema.sql` enum definition
+2. **Update Python Enum**: Sync `app/config/enums/*.py` file
+3. **Update Validators**: Check Pydantic validators in `app/schemas/consolidated_schemas.py`
+4. **Update Services**: Search for hardcoded enum values in services
+5. **Update Tests**: Verify test fixtures use correct enum values
+6. **Migration**: Create ALTER TYPE migration if modifying existing enum
+
+**Reference**: See `docs/database/ENUM_MAINTENANCE.md` for detailed enum management guide.
+
+#### Debugging Enum Errors
+
+**Error**: `invalid input value for enum kitchen_day_enum: "WEDNESDAY"`
+
+**Diagnosis**:
+```bash
+# 1. Check database enum definition
+psql -d kitchen_db_dev -c "SELECT unnest(enum_range(NULL::kitchen_day_enum))"
+
+# Output:
+#  Monday
+#  Tuesday
+#  Wednesday  # ← Title Case, not UPPERCASE
+
+# 2. Check your code
+grep -r "WEDNESDAY" app/services/  # Find the uppercase usage
+```
+
+**Fix**: Use `.title()` instead of `.upper()` to match database format.
+
+---
+
 ### Function-First Design
 1. **Functions over classes** - Use classes only for essential state management (e.g., `BaseModelCRUD`)
 2. **Explicit dependencies** - Pass `db: psycopg2.connection`, `logger: LoggerAdapter` as parameters
@@ -430,6 +530,63 @@ class PickupPreferencesCreateSchema(BaseModel):
             raise ValueError('Pickup time cannot be in the past')
         return v
 ```
+
+### Schema Field Naming - Reserved Type Names
+
+**CRITICAL RULE**: Never use Python type names as field names in Pydantic schemas. This causes `RuntimeError: error checking inheritance` during schema validation.
+
+**Reserved Names to Avoid**:
+```python
+# ❌ BAD: Using type names as field names
+class BadSchema(BaseModel):
+    date: date          # Conflicts with datetime.date type
+    time: time          # Conflicts with datetime.time type
+    datetime: datetime  # Conflicts with datetime.datetime type
+    list: List[str]     # Conflicts with built-in list type
+    dict: Dict[str, Any]  # Conflicts with built-in dict type
+    set: Set[str]       # Conflicts with built-in set type
+    tuple: Tuple[str]   # Conflicts with built-in tuple type
+    type: str           # Conflicts with built-in type
+    object: Any         # Conflicts with built-in object
+    int: int            # Conflicts with built-in int (rare but avoid)
+    str: str            # Conflicts with built-in str (rare but avoid)
+    bool: bool          # Conflicts with built-in bool (rare but avoid)
+
+# ✅ GOOD: Use descriptive names instead
+class GoodSchema(BaseModel):
+    order_date: date           # Clear and specific
+    pickup_time: time          # Clear and specific
+    created_datetime: datetime # Clear and specific
+    items_list: List[str]      # Or just "items"
+    metadata_dict: Dict[str, Any]  # Or just "metadata"
+    tags_set: Set[str]         # Or just "tags"
+    coordinates: Tuple[float, float]  # Or "coords"
+    entity_type: str           # Clear and specific
+    data_object: Any           # Or just "data"
+```
+
+**Error Example**:
+```python
+# This will cause: RuntimeError: error checking inheritance of FieldInfo
+class DailyOrdersResponseSchema(BaseModel):
+    date: date = Field(..., description="Date of the orders")  # ❌ BREAKS!
+    
+# Fix:
+class DailyOrdersResponseSchema(BaseModel):
+    order_date: date = Field(..., description="Date of the orders")  # ✅ WORKS!
+```
+
+**Why This Happens**:
+- Pydantic's validator system uses `issubclass()` checks during schema creation
+- When field name matches type name, Python's namespace resolution gets confused
+- The validator tries to check if the field is a subclass of itself
+- Results in: `TypeError: issubclass() arg 1 must be a class`
+
+**Best Practices**:
+1. **Prefix with context**: `order_date`, `pickup_time`, `created_datetime`
+2. **Suffix with type**: `items_list`, `metadata_dict` (or just use plural: `items`, `tags`)
+3. **Use descriptive names**: `scheduled_at`, `delivery_window`, `customer_tags`
+4. **Be specific**: `start_date` instead of `date`, `access_token` instead of `token`
 
 ## Centralization Patterns
 

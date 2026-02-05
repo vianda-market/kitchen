@@ -104,6 +104,13 @@ dmypy.json
 .seed_data.py
 *seed_data.py
 
+# Generated static files (created by build scripts and API uploads)
+static/qr_codes/*.png
+static/product_images/*.png
+
+# Keep placeholder files
+!static/placeholders/*.png
+
 # Note: Development database files ARE included in repo:
 # - schema.sql, seed.sql, test.sql (test data only, no production secrets)
 # - trigger.sql, uuid7_function.sql (database logic)

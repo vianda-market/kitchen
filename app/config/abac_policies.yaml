@@ -51,3 +51,19 @@ policies:
     condition:
       user_id: "{user.id}"
     allowed_actions: ["GET", "PUT"]
+
+# --- Restaurant Staff Policies ---
+  - name: "Restaurant Daily Orders - Employee Access"
+    description: "Employees can view all restaurant orders across all institutions for support purposes."
+    condition:
+      role_type: "employee"
+    allowed_actions: ["GET"]
+    resources: ["restaurant_daily_orders"]
+  
+  - name: "Restaurant Daily Orders - Supplier Access"
+    description: "Suppliers can view orders for their institution entity's restaurants."
+    condition:
+      role_type: "supplier"
+      institution_entity_match: true
+    allowed_actions: ["GET"]
+    resources: ["restaurant_daily_orders"]
