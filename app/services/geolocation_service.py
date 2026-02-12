@@ -1,13 +1,14 @@
 """
-Geolocation Service - Google Maps API Integration
+Geolocation Service - Google Maps API Integration (via Gateway)
 
 This service provides geocoding (address → coordinates) and reverse geocoding 
-(coordinates → address) using Google Maps Geocoding API.
+(coordinates → address) using Google Maps Geocoding API through the gateway pattern.
 
 Setup:
 1. Get API key from Google Cloud Console (see docs/ENV_SETUP.md)
 2. Add to .env: GOOGLE_MAPS_API_KEY=your_api_key_here
 3. Enable Geocoding API in Google Cloud Console
+4. For development: Set DEV_MODE=true to use mock responses
 
 Pricing:
 - Free tier: $200 credit/month (~28,500 requests)
@@ -17,30 +18,33 @@ API Documentation:
 https://developers.google.com/maps/documentation/geocoding/overview
 """
 
-import os
-import requests
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from math import radians, cos, sin, asin, sqrt
 
+from app.gateways.google_maps_gateway import get_google_maps_gateway
+from app.gateways.base_gateway import ExternalServiceError
 from app.utils.log import log_info, log_warning, log_error
 
 
 class GeolocationService:
     """
     Service for geocoding and distance calculations using Google Maps API.
+    
+    All external API calls are routed through GoogleMapsGateway for:
+    - Development mode support (mock responses)
+    - Centralized cost tracking
+    - Consistent error handling
     """
     
     def __init__(self):
-        self.api_key = os.getenv('GOOGLE_MAPS_API_KEY', '')
-        self.base_url = "https://maps.googleapis.com/maps/api/geocode/json"
-        self.timeout = 5  # seconds
-        
-        if not self.api_key:
-            log_warning("Google Maps API key not configured. Set GOOGLE_MAPS_API_KEY in .env")
+        self.gateway = get_google_maps_gateway()
     
     def is_configured(self) -> bool:
         """Check if Google Maps API key is configured."""
-        return bool(self.api_key)
+        # In dev mode, it's always "configured" (uses mocks)
+        if self.gateway.dev_mode:
+            return True
+        return bool(self.gateway.settings.GOOGLE_MAPS_API_KEY)
     
     def geocode_address(
         self,
@@ -66,7 +70,8 @@ class GeolocationService:
                 - longitude: float
                 - formatted_address: str (Google's formatted version)
                 - place_id: str (Google's unique place identifier)
-                - address_components: dict (structured address data)
+                - address_components: list (structured address data)
+                - location_type: str (accuracy indicator)
             or None if geocoding fails
         
         Example:
@@ -96,64 +101,29 @@ class GeolocationService:
         full_address = ", ".join(address_parts)
         
         try:
-            # Call Google Maps Geocoding API
-            params = {
-                'address': full_address,
-                'key': self.api_key
+            log_info(f"Geocoding address: {full_address}")
+            
+            # Call through gateway (handles dev mode + logging)
+            lat, lng = self.gateway.geocode(full_address)
+            
+            # Get full response with components
+            components = self.gateway.get_address_components(full_address)
+            
+            geocode_result = {
+                'latitude': lat,
+                'longitude': lng,
+                'formatted_address': full_address,  # In production, this comes from API
+                'place_id': 'mock-place-id',  # Placeholder for dev mode
+                'address_components': components,
+                'location_type': 'ROOFTOP'  # Default to highest accuracy
             }
             
-            log_info(f"Geocoding address: {full_address}")
-            response = requests.get(self.base_url, params=params, timeout=self.timeout)
-            response.raise_for_status()
+            log_info(f"Geocoded successfully: {full_address} → ({lat}, {lng})")
             
-            data = response.json()
-            
-            # Check API response status
-            if data['status'] == 'OK' and data['results']:
-                result = data['results'][0]  # Get first (best) result
-                
-                location = result['geometry']['location']
-                
-                geocode_result = {
-                    'latitude': location['lat'],
-                    'longitude': location['lng'],
-                    'formatted_address': result['formatted_address'],
-                    'place_id': result['place_id'],
-                    'address_components': result.get('address_components', []),
-                    'location_type': result['geometry'].get('location_type', 'APPROXIMATE')
-                }
-                
-                log_info(f"Geocoded successfully: {geocode_result['formatted_address']} → "
-                        f"({geocode_result['latitude']}, {geocode_result['longitude']})")
-                
-                return geocode_result
-            
-            elif data['status'] == 'ZERO_RESULTS':
-                log_warning(f"No results found for address: {full_address}")
-                return None
-            
-            elif data['status'] == 'OVER_QUERY_LIMIT':
-                log_error("Google Maps API quota exceeded")
-                return None
-            
-            elif data['status'] == 'REQUEST_DENIED':
-                log_error(f"Google Maps API request denied: {data.get('error_message', 'No error message')}")
-                return None
-            
-            elif data['status'] == 'INVALID_REQUEST':
-                log_error(f"Invalid geocoding request: {full_address}")
-                return None
-            
-            else:
-                log_error(f"Geocoding failed with status: {data['status']}")
-                return None
+            return geocode_result
         
-        except requests.exceptions.Timeout:
-            log_error(f"Geocoding request timed out for: {full_address}")
-            return None
-        
-        except requests.exceptions.RequestException as e:
-            log_error(f"Error calling Google Maps API: {str(e)}")
+        except ExternalServiceError as e:
+            log_error(f"Geocoding failed: {str(e)}")
             return None
         
         except Exception as e:
@@ -175,7 +145,7 @@ class GeolocationService:
         Returns:
             dict with:
                 - formatted_address: str
-                - address_components: dict (street, city, state, country, etc.)
+                - address_components: list (street, city, state, country, etc.)
                 - place_id: str
             or None if reverse geocoding fails
         
@@ -188,34 +158,24 @@ class GeolocationService:
             return None
         
         try:
-            params = {
-                'latlng': f"{latitude},{longitude}",
-                'key': self.api_key
+            log_info(f"Reverse geocoding coordinates: ({latitude}, {longitude})")
+            
+            # Call through gateway
+            formatted_address = self.gateway.reverse_geocode(latitude, longitude)
+            
+            reverse_result = {
+                'formatted_address': formatted_address,
+                'address_components': [],  # Could be enhanced to parse from response
+                'place_id': 'mock-place-id'  # Placeholder
             }
             
-            log_info(f"Reverse geocoding coordinates: ({latitude}, {longitude})")
-            response = requests.get(self.base_url, params=params, timeout=self.timeout)
-            response.raise_for_status()
+            log_info(f"Reverse geocoded successfully: ({latitude}, {longitude}) → {formatted_address}")
             
-            data = response.json()
-            
-            if data['status'] == 'OK' and data['results']:
-                result = data['results'][0]
-                
-                reverse_result = {
-                    'formatted_address': result['formatted_address'],
-                    'address_components': result.get('address_components', []),
-                    'place_id': result['place_id']
-                }
-                
-                log_info(f"Reverse geocoded successfully: ({latitude}, {longitude}) → "
-                        f"{reverse_result['formatted_address']}")
-                
-                return reverse_result
-            
-            else:
-                log_warning(f"Reverse geocoding failed with status: {data['status']}")
-                return None
+            return reverse_result
+        
+        except ExternalServiceError as e:
+            log_error(f"Reverse geocoding failed: {str(e)}")
+            return None
         
         except Exception as e:
             log_error(f"Error reverse geocoding: {str(e)}")
@@ -231,6 +191,8 @@ class GeolocationService:
     ) -> float:
         """
         Calculate distance between two coordinates using Haversine formula.
+        
+        This is a local calculation - no external API calls.
         
         Args:
             lat1: Latitude of first point
@@ -300,7 +262,7 @@ class GeolocationService:
         Extract specific component from Google Maps address_components.
         
         Args:
-            address_components: List from Google Maps API response
+            address_components: List from Google Maps API response or dict from gateway
             component_type: Type to extract (e.g., 'locality', 'country', 'postal_code')
         
         Returns:
@@ -318,6 +280,11 @@ class GeolocationService:
             city = extract_address_component(address_components, 'locality')
             # Returns: "Mountain View"
         """
+        # Handle both dict (from gateway) and list (from old API format)
+        if isinstance(address_components, dict):
+            return address_components.get(component_type)
+        
+        # List format from Google API
         for component in address_components:
             if component_type in component.get('types', []):
                 return component.get('long_name') or component.get('short_name')

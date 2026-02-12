@@ -196,7 +196,7 @@
         "header": [],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"institution_id\": \"{{institution_id}}\",\n  \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"address_type\": [\"Entity Address\"],\n  \"country\": \"Argentina\",\n  \"province\": \"Buenos Aires\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1000\",\n  \"street_type\": \"Street\",\n  \"street_name\": \"Test Street\",\n  \"building_number\": \"123\"\n}",
+          "raw": "{\n  \"institution_id\": \"{{institution_id}}\",\n  \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"address_type\": [\"Entity Address\"],\n  \"country_code\": \"ARG\",\n  \"province\": \"Buenos Aires\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1000\",\n  \"street_type\": \"Street\",\n  \"street_name\": \"Test Street\",\n  \"building_number\": \"123\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -342,6 +342,9 @@
               "    pm.expect(response).to.have.property('address_id');",
               "    pm.expect(response).to.have.property('status');",
               "    pm.expect(response.status).to.equal('Active');",
+              "    ",
+              "    // Store the bank_account_id for later use",
+              "    pm.collectionVariables.set('bank_account_id', response.bank_account_id);",
               "    ",
               "    console.log('Created Minimal Bank Account ID:', response.bank_account_id);",
               "    console.log('Auto-populated Address ID:', response.address_id);",

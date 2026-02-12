@@ -837,7 +837,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"\",\n  \"user_id\": \"{{otherUserId}}\",\n  \"address_type\": [\"Customer Home\"],\n  \"country\": \"Argentina\",\n  \"province\": \"Test Province\",\n  \"city\": \"Test City\",\n  \"postal_code\": \"12345\",\n  \"street_type\": \"Street\",\n  \"street_name\": \"Test Street\",\n  \"building_number\": \"123\"\n}"
+							"raw": "{\n  \"institution_id\": \"\",\n  \"user_id\": \"{{otherUserId}}\",\n  \"address_type\": [\"Customer Home\"],\n  \"country_code\": \"ARG\",\n  \"province\": \"Test Province\",\n  \"city\": \"Test City\",\n  \"postal_code\": \"12345\",\n  \"street_type\": \"Street\",\n  \"street_name\": \"Test Street\",\n  \"building_number\": \"123\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/addresses/",
@@ -1124,6 +1124,61 @@
 					}
 				},
 				{
+					"name": "Markets - GET (Employee) - For Plan Creation",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Set Authorization header from collection variable",
+									"const token = pm.collectionVariables.get(\"employeeAdminToken\");",
+									"if (token) {",
+									"    pm.request.headers.add({",
+									"        key: \"Authorization\",",
+									"        value: \"Bearer \" + token",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Store first market (Argentina if available)",
+									"if (pm.response.code === 200) {",
+									"    const markets = pm.response.json();",
+									"    if (Array.isArray(markets) && markets.length > 0) {",
+									"        // Prefer Argentina market",
+									"        const argMarket = markets.find(m => m.country_code === 'ARG');",
+									"        const marketToUse = argMarket || markets[0];",
+									"        pm.collectionVariables.set(\"testMarketId\", marketToUse.market_id);",
+									"        console.log(\"Stored testMarketId:\", marketToUse.market_id, \"(\"+marketToUse.country_name+\")\");",
+									"    } else {",
+									"        console.error(\"No markets found. Plan creation will fail.\");",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "markets", ""]
+						}
+					}
+				},
+				{
 					"name": "Plans - POST (Employee)",
 					"event": [
 						{
@@ -1139,6 +1194,12 @@
 									"    });",
 									"}",
 									"",
+									"// Get market ID (should be set by 'Markets - GET' request)",
+									"let marketId = pm.collectionVariables.get(\"testMarketId\");",
+									"if (!marketId) {",
+									"    throw new Error(\"testMarketId not set. Run 'Markets - GET (Employee)' first.\");",
+									"}",
+									"",
 									"// Get credit currency ID (should be set by previous request or GET)",
 									"let creditCurrencyId = pm.collectionVariables.get(\"testCreditCurrencyId\");",
 									"",
@@ -1149,10 +1210,11 @@
 									"    throw new Error(\"testCreditCurrencyId not set. If Credit Currency POST returned 409, wait a moment and run 'Credit Currency - GET' first, or run requests in folder order.\");",
 									"}",
 									"",
-									"// Update request body with credit_currency_id and fix field name",
+									"// Update request body with market_id, credit_currency_id and fix field name",
 									"const body = JSON.parse(pm.request.body.raw);",
 									"body.name = body.plan_name || body.name || \"Test Plan\";",
 									"delete body.plan_name;",
+									"body.market_id = marketId;",
 									"body.credit_currency_id = creditCurrencyId;",
 									"pm.request.body.raw = JSON.stringify(body);"
 								],
@@ -1188,15 +1250,15 @@
 								"value": "application/json"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"name\": \"Test Plan\",\n  \"price\": 100.00,\n  \"credit\": 10\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/plans/",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "plans", ""]
-						}
+					"body": {
+						"mode": "raw",
+						"raw": "{\n  \"market_id\": \"\",\n  \"name\": \"Test Plan\",\n  \"price\": 100.00,\n  \"credit\": 10\n}"
+					},
+					"url": {
+						"raw": "{{baseUrl}}/api/v1/plans/",
+						"host": ["{{baseUrl}}"],
+						"path": ["api", "v1", "plans", ""]
+					}
 					}
 				},
 				{
@@ -1287,9 +1349,9 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
 							"host": ["{{baseUrl}}"],
-							"path": ["admin", "discretionary", "requests", ""]
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
 					}
 				},
@@ -1354,9 +1416,9 @@
 							"raw": "{\n  \"user_id\": \"{{customerUserId}}\",\n  \"category\": \"Client\",\n  \"reason\": \"Marketing Campaign\",\n  \"amount\": 10.00,\n  \"comment\": \"Test discretionary request for approval testing\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
 							"host": ["{{baseUrl}}"],
-							"path": ["admin", "discretionary", "requests", ""]
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
 					}
 				},
@@ -1663,9 +1725,9 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
 							"host": ["{{baseUrl}}"],
-							"path": ["admin", "discretionary", "requests", ""]
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
 					}
 				},
@@ -1971,9 +2033,9 @@
 							"raw": "{\n  \"resolution_comment\": \"Approved for testing\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/super-admin/discretionary/requests/{{testDiscretionaryRequestId}}/approve",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{testDiscretionaryRequestId}}/approve",
 							"host": ["{{baseUrl}}"],
-							"path": ["super-admin", "discretionary", "requests", "{{testDiscretionaryRequestId}}", "approve"]
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{testDiscretionaryRequestId}}", "approve"]
 						}
 					}
 				},
@@ -2012,9 +2074,9 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/admin/discretionary/pending-requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests/",
 							"host": ["{{baseUrl}}"],
-							"path": ["admin", "discretionary", "pending-requests", ""]
+							"path": ["api", "v1", "admin", "discretionary", "pending-requests", ""]
 						}
 					}
 				}
@@ -3087,7 +3149,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Test Employer\",\n  \"address\": {\n    \"institution_id\": \"{{institutionAId}}\",\n    \"user_id\": \"{{customerUserId}}\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country\": \"Argentina\",\n    \"province\": \"Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"Street\",\n    \"street_name\": \"Test Street\",\n    \"building_number\": \"123\"\n  }\n}"
+							"raw": "{\n  \"name\": \"Test Employer\",\n  \"address\": {\n    \"institution_id\": \"{{institutionAId}}\",\n    \"user_id\": \"{{customerUserId}}\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country_code\": \"ARG\",\n    \"province\": \"Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"Street\",\n    \"street_name\": \"Test Street\",\n    \"building_number\": \"123\"\n  }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/employers/",
@@ -3228,7 +3290,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"{{institutionAId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\"Customer Employer\"],\n  \"country\": \"Argentina\",\n  \"province\": \"Córdoba\",\n  \"city\": \"Córdoba\",\n  \"postal_code\": \"5000\",\n  \"street_type\": \"Avenue\",\n  \"street_name\": \"Colón\",\n  \"building_number\": \"456\"\n}"
+							"raw": "{\n  \"institution_id\": \"{{institutionAId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\"Customer Employer\"],\n  \"country_code\": \"ARG\",\n  \"province\": \"Córdoba\",\n  \"city\": \"Córdoba\",\n  \"postal_code\": \"5000\",\n  \"street_type\": \"Avenue\",\n  \"street_name\": \"Colón\",\n  \"building_number\": \"456\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/employers/{{testEmployerId}}/addresses",
@@ -3414,9 +3476,9 @@
 							"raw": "{\n  \"resolution_comment\": \"Should fail\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/super-admin/discretionary/requests/{{testDiscretionaryRequestId}}/approve",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{testDiscretionaryRequestId}}/approve",
 							"host": ["{{baseUrl}}"],
-							"path": ["super-admin", "discretionary", "requests", "{{testDiscretionaryRequestId}}", "approve"]
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{testDiscretionaryRequestId}}", "approve"]
 						}
 					}
 				}

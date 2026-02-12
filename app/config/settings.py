@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     DEV_OVERRIDE_DAY: str = ""  # Override current day for testing (e.g., "Monday")
+    DEV_MODE: bool = True  # Enable to bypass external API calls and use mock responses
+    
+    # External API Keys
+    GOOGLE_MAPS_API_KEY: str = ""  # Required for geolocation services
 
     class Config:
         env_file = ".env"
@@ -37,3 +41,12 @@ class Settings(BaseSettings):
     AUTO_ARCHIVAL_ENABLED: bool = True
 
 settings = Settings()
+
+def get_settings() -> Settings:
+    """
+    Get application settings singleton.
+    
+    Returns:
+        Settings instance
+    """
+    return settings

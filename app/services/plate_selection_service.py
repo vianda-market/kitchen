@@ -69,7 +69,7 @@ def create_plate_selection_with_transactions(
             context["plate"],
             get_effective_current_day(),
             context["kitchen_days"],
-            context["address"].country,
+            context["address"].country_code,
             db
         )
         
@@ -88,8 +88,8 @@ def create_plate_selection_with_transactions(
             
             target_date = (datetime.now() + timedelta(days=days_ahead)).strftime('%Y-%m-%d')
             
-            # Get country code for holiday validation
-            country_code = MarketDetectionService._country_name_to_code(context["address"].country)
+            # Get country code for holiday validation (already stored in address)
+            country_code = context["address"].country_code
             
             # Validate restaurant (status + holidays for target date)
             if country_code:

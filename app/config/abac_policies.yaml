@@ -67,3 +67,33 @@ policies:
       institution_entity_match: true
     allowed_actions: ["GET"]
     resources: ["restaurant_daily_orders"]
+
+# --- Market Policies ---
+  - name: "Market Read Access - Employee"
+    description: "Employees can view all markets for system administration."
+    condition:
+      role_type: "employee"
+    allowed_actions: ["GET"]
+    resources: ["market"]
+  
+  - name: "Market Read Access - Supplier"
+    description: "Suppliers can view markets (read-only) to understand available regions."
+    condition:
+      role_type: "supplier"
+    allowed_actions: ["GET"]
+    resources: ["market"]
+  
+  - name: "Market Management - Employee Only"
+    description: "Only employees can create, update, or delete markets (system configuration)."
+    condition:
+      role_type: "employee"
+    allowed_actions: ["POST", "PUT", "DELETE"]
+    resources: ["market"]
+
+# --- Enum Service Policies ---
+  - name: "Enum Service Read Access - All Authenticated Users"
+    description: "All authenticated users can fetch system enum values for dropdown population."
+    condition:
+      authenticated: true
+    allowed_actions: ["GET"]
+    resources: ["enums"]

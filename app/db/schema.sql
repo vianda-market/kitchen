@@ -27,6 +27,8 @@ DROP TABLE IF EXISTS discretionary_resolution_history CASCADE;
 DROP TABLE IF EXISTS discretionary_resolution_info CASCADE;
 DROP TABLE IF EXISTS restaurant_balance_history CASCADE;
 DROP TABLE IF EXISTS plate_history CASCADE;
+DROP TABLE IF EXISTS market_history CASCADE;
+DROP TABLE IF EXISTS market_info CASCADE;
 DROP TABLE IF EXISTS credit_currency_history CASCADE;
 DROP TABLE IF EXISTS role_history CASCADE;
 DROP TABLE IF EXISTS geolocation_history CASCADE;
@@ -237,7 +239,8 @@ CREATE TABLE address_info (
     address_type address_type_enum[] NOT NULL,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     floor VARCHAR(50), -- Floor number or 'Main Floor' or null
-    country VARCHAR(50) NOT NULL,
+    country_name VARCHAR(100) NOT NULL,
+    country_code VARCHAR(3) NOT NULL,
     province VARCHAR(50) NOT NULL,
     city VARCHAR(50) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
@@ -255,6 +258,7 @@ CREATE TABLE address_info (
     -- Note: user_id and modified_by foreign keys removed to resolve circular dependency
     -- with employer_info -> address_info -> user_info dependency chain
     -- Note: employer_id foreign key will be added after employer_info table is created
+    -- Note: country_code foreign key will be added after market_info table is created
 );
 
 \echo 'Creating table: address_history'
@@ -267,7 +271,8 @@ CREATE TABLE address_history (
     address_type address_type_enum[],
     is_default BOOLEAN DEFAULT FALSE,
     floor VARCHAR(50),
-    country VARCHAR(50),
+    country_name VARCHAR(100),
+    country_code VARCHAR(3),
     province VARCHAR(50),
     city VARCHAR(50),
     postal_code VARCHAR(20),
@@ -372,6 +377,46 @@ CREATE TABLE credit_currency_history (
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Creating table: market_info'
+CREATE TABLE market_info (
+    market_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    country_name VARCHAR(100) NOT NULL UNIQUE,
+    country_code VARCHAR(3) NOT NULL UNIQUE,  -- ISO 3166-1 alpha-3: ARG, PER, CHL
+    credit_currency_id UUID NOT NULL,         -- FK to credit_currency_info
+    timezone VARCHAR(50) NOT NULL,            -- e.g., 'America/Argentina/Buenos_Aires'
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+-- Add foreign key constraint from address_info to market_info (deferred to avoid circular dependency)
+\echo 'Adding foreign key: address_info.country_code -> market_info.country_code'
+ALTER TABLE address_info ADD CONSTRAINT fk_address_country_code FOREIGN KEY (country_code) REFERENCES market_info(country_code) ON DELETE RESTRICT;
+
+\echo 'Creating table: market_history'
+CREATE TABLE market_history (
+    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    market_id UUID NOT NULL,
+    country_name VARCHAR(100) NOT NULL,
+    country_code VARCHAR(3) NOT NULL,
+    credit_currency_id UUID NOT NULL,
+    timezone VARCHAR(50) NOT NULL,
+    is_archived BOOLEAN NOT NULL,
+    status status_enum NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
+    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
@@ -782,6 +827,7 @@ CREATE TABLE pickup_preferences (
 \echo 'Creating table: plan_info'
 CREATE TABLE plan_info (
     plan_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    market_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     credit INTEGER NOT NULL,
@@ -793,6 +839,7 @@ CREATE TABLE plan_info (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT
 );
@@ -801,6 +848,7 @@ CREATE TABLE plan_info (
 CREATE TABLE plan_history (
     event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_id UUID NOT NULL,
+    market_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
     name VARCHAR(100),
     credit INTEGER NOT NULL,
@@ -815,6 +863,7 @@ CREATE TABLE plan_history (
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (plan_id) REFERENCES plan_info(plan_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
@@ -1182,27 +1231,46 @@ CREATE TABLE client_transaction (
 CREATE TABLE subscription_info (
     subscription_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
+    market_id UUID NOT NULL,
     plan_id UUID NOT NULL,
     renewal_date TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'),
     balance NUMERIC DEFAULT 0,
+    subscription_status VARCHAR(20) NOT NULL DEFAULT 'Pending',  -- 'Active', 'On Hold', 'Pending', 'Expired', 'Cancelled'
+    hold_start_date TIMESTAMPTZ,  -- When subscription was put on hold
+    hold_end_date TIMESTAMPTZ,    -- When subscription will resume (NULL = indefinite)
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
+    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,  -- Keep for backward compatibility
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (plan_id) REFERENCES plan_info(plan_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
+
+-- Ensure one active subscription per user per market
+CREATE UNIQUE INDEX idx_user_market_active 
+    ON subscription_info(user_id, market_id) 
+    WHERE is_archived = FALSE;
+
+-- Index for querying subscriptions by market
+CREATE INDEX idx_subscription_market 
+    ON subscription_info(market_id) 
+    WHERE is_archived = FALSE;
 
 \echo 'Creating table: subscription_history'
 CREATE TABLE subscription_history (
     event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subscription_id UUID  NOT NULL,
     user_id UUID  NOT NULL,
+    market_id UUID NOT NULL,
     plan_id UUID NOT NULL,
     renewal_date TIMESTAMPTZ,
     balance NUMERIC DEFAULT 0,
+    subscription_status VARCHAR(20) NOT NULL,
+    hold_start_date TIMESTAMPTZ,
+    hold_end_date TIMESTAMPTZ,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
@@ -1211,6 +1279,7 @@ CREATE TABLE subscription_history (
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (subscription_id) REFERENCES subscription_info(subscription_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 

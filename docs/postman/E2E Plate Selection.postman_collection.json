@@ -210,10 +210,64 @@
 						},
 						"url": "{{baseUrl}}/api/v1/credit-currencies/"
 					},
-					"response": []
+			"response": []
+		},
+		{
+			"name": "List Markets",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Test: Successfully retrieved markets",
+							"pm.test(\"Markets retrieved successfully\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([200]);",
+							"});",
+							"",
+							"if (pm.response.code === 200) {",
+							"    const markets = pm.response.json();",
+							"    console.log(\"📊 Retrieved markets:\", markets.length);",
+							"    ",
+							"    if (markets && markets.length > 0) {",
+							"        // Store the first market (Argentina) for plan creation",
+							"        const defaultMarket = markets.find(m => m.country_code === 'ARG') || markets[0];",
+							"        pm.collectionVariables.set(\"planMarketId\", defaultMarket.market_id);",
+							"        pm.collectionVariables.set(\"planMarketCountry\", defaultMarket.country_name);",
+							"        pm.collectionVariables.set(\"planMarketCurrency\", defaultMarket.currency_code);",
+							"        ",
+							"        console.log(\"✅ Set planMarketId:\", defaultMarket.market_id);",
+							"        console.log(\"📍 Market:\", defaultMarket.country_name, \"(\"+defaultMarket.currency_code+\")\");",
+							"    } else {",
+							"        console.error(\"❌ No markets found in response\");",
+							"    }",
+							"} else {",
+							"    console.error(\"❌ Failed to retrieve markets:\", pm.response.text());",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
 				},
 				{
-					"name": "Create Subscription Plans",
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{baseUrl}}/api/v1/markets/"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Subscription Plans",
 					"event": [
 						{
 							"listen": "test",
@@ -264,18 +318,26 @@
 									"let payload = JSON.parse(raw);",
 									"",
 									"const planCreditCurrencyId = pm.collectionVariables.get(\"planCreditCurrencyId\");",
+									"const planMarketId = pm.collectionVariables.get(\"planMarketId\");",
 									"",
 									"// Validate that credit_currency_id is set",
 									"if (!planCreditCurrencyId) {",
 									"    throw new Error(\"\u274c planCreditCurrencyId is not set. Please run 'Create Credit Currency' first and ensure it completes successfully.\");",
 									"}",
 									"",
+									"// Validate that market_id is set",
+									"if (!planMarketId) {",
+									"    throw new Error(\"\u274c planMarketId is not set. Please run 'List Markets' first and ensure it completes successfully.\");",
+									"}",
+									"",
 									"payload.credit_currency_id = planCreditCurrencyId;",
+									"payload.market_id = planMarketId;",
 									"",
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
 									"pm.request.body.update(JSON.stringify(payload));",
 									"",
-									"console.log(\"\u2705 Using credit_currency_id:\", planCreditCurrencyId);"
+									"console.log(\"\u2705 Using credit_currency_id:\", planCreditCurrencyId);",
+									"console.log(\"\u2705 Using market_id:\", planMarketId);"
 								],
 								"type": "text/javascript",
 								"packages": {},
@@ -286,9 +348,9 @@
 					"request": {
 						"method": "POST",
 						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"credit_currency_id\": \"\",\n  \"name\": \"Entry Level\",\n  \"credit\": 5,\n  \"price\": 160000.00\n}",
+					"body": {
+						"mode": "raw",
+						"raw": "{\n  \"market_id\": \"\",\n  \"credit_currency_id\": \"\",\n  \"name\": \"Entry Level\",\n  \"credit\": 5,\n  \"price\": 160000.00\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -946,7 +1008,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\"institution_id\": \"\",\n\"user_id\": \"\",\n\"address_type\": [\"Restaurant\", \"Entity Billing\"],\n\"country\": \"Argentina\",\n\"province\": \"Ciudad Autonoma de Buenos Aires\",\n\"city\": \"Ciudad Autonoma de Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave.\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
+							"raw": "{\n\"institution_id\": \"\",\n\"user_id\": \"\",\n\"address_type\": [\"Restaurant\", \"Entity Billing\"],\n\"country_code\": \"ARG\",\n\"province\": \"Ciudad Autonoma de Buenos Aires\",\n\"city\": \"Ciudad Autonoma de Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave.\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1668,7 +1730,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"restaurant_id\": \"\",\n  \"country\": \"Argentina\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
+							"raw": "{\n  \"restaurant_id\": \"\",\n  \"country_code\": \"ARG\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2095,7 +2157,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\"institution_id\": \"44444444-4444-4444-4444-444444444444\",\n\"user_id\": \"\",\n\"address_type\": [\"Customer Home\", \"Customer Billing\"],\n\"country\": \"Argentina\",\n\"province\": \"Ciudad Autonoma de Buenos Aires\",\n\"city\": \"Ciudad Autonoma de Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave.\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
+							"raw": "{\n\"institution_id\": \"44444444-4444-4444-4444-444444444444\",\n\"user_id\": \"\",\n\"address_type\": [\"Customer Home\", \"Customer Billing\"],\n\"country_code\": \"ARG\",\n\"province\": \"Ciudad Autonoma de Buenos Aires\",\n\"city\": \"Ciudad Autonoma de Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave.\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2378,7 +2440,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Acme Corporation\",\n  \"assign_employer\": true,\n  \"address\": {\n    \"institution_id\": \"\",\n    \"user_id\": \"\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country\": \"Argentina\",\n    \"province\": \"Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"Street\",\n    \"street_name\": \"Main Street\",\n    \"building_number\": \"123\",\n    \"floor\": null,\n    \"apartment_unit\": null\n  }\n}",
+							"raw": "{\n  \"name\": \"Acme Corporation\",\n  \"assign_employer\": true,\n  \"address\": {\n    \"institution_id\": \"\",\n    \"user_id\": \"\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country_code\": \"ARG\",\n    \"province\": \"Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"Street\",\n    \"street_name\": \"Main Street\",\n    \"building_number\": \"123\",\n    \"floor\": null,\n    \"apartment_unit\": null\n  }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -4093,6 +4155,18 @@
 		},
 		{
 			"key": "pendingOrderRestaurantId",
+			"value": ""
+		},
+		{
+			"key": "planMarketId",
+			"value": ""
+		},
+		{
+			"key": "planMarketCountry",
+			"value": ""
+		},
+		{
+			"key": "planMarketCurrency",
 			"value": ""
 		}
 	]

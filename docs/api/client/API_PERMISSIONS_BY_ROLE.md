@@ -420,6 +420,73 @@ This document provides a comprehensive reference for API endpoint permissions or
 
 ---
 
+## 11. Markets API (`/api/v1/markets/`)
+
+**Description**: Market (country-level subscription regions) management. Markets define the countries where the platform operates, each with its own currency, timezone, and subscription plans.
+
+| Role | GET | POST | PUT | DELETE |
+|------|-----|------|-----|--------|
+| **Super Admin Employee** | ✅ | ✅ | ✅ | ✅ |
+| **Admin Employee** | ✅ | ❌ | ❌ | ❌ |
+| **Supplier** | ✅ | ❌ | ❌ | ❌ |
+| **Customer** | ❌ | ❌ | ❌ | ❌ |
+
+**Notes**:
+- **Super Admin** (`role_name = "Super Admin"`): Full CRUD access for system configuration
+- **Admin** (`role_name = "Admin"`): Read-only access for reference data
+- **Supplier**: Read-only access for dropdown when creating plans (need to select market)
+- **Customer**: No direct access (market determined by subscription)
+- GET operations available to Super Admin, Admin, and Suppliers
+- POST/PUT/DELETE restricted to Super Admin only
+
+**Enriched Endpoint**:
+- `GET /api/v1/markets/enriched/` - Returns markets with currency details (currency_name, currency_code)
+- `GET /api/v1/markets/enriched/{market_id}` - Returns specific market with currency details
+
+**Dependencies**: `get_current_user()` with role validation
+
+**Related**: See [Markets API Documentation](./MARKETS_API_CLIENT.md) for detailed usage
+
+---
+
+## 12. Credit Currency Enriched API (`/api/v1/credit-currencies/enriched/`)
+
+**Description**: Enriched credit currency data with market information.
+
+| Role | GET | POST | PUT | DELETE |
+|------|-----|------|-----|--------|
+| **Employee** | ✅ | 🔒 | 🔒 | 🔒 |
+| **Customer** | ❌ | ❌ | ❌ | ❌ |
+| **Supplier** | ❌ | ❌ | ❌ | ❌ |
+
+**Notes**:
+- Enriched endpoint for viewing credit currencies with market details
+- All operations (POST/PUT/DELETE) use base endpoint `/api/v1/credit-currencies/` (not enriched)
+- GET enriched includes: `market_id`, `market_name`, `country_code`
+
+**Dependencies**: `get_employee_user()` for GET operations
+
+---
+
+## 13. Discretionary Enriched API (`/api/v1/admin/discretionary/enriched/`)
+
+**Description**: Enriched discretionary requests with user, restaurant, institution, and market information.
+
+| Role | GET | POST | PUT | DELETE |
+|------|-----|------|-----|--------|
+| **Employee** | ✅ | 🔒 | 🔒 | 🔒 |
+| **Customer** | ❌ | ❌ | ❌ | ❌ |
+| **Supplier** | ❌ | ❌ | ❌ | ❌ |
+
+**Notes**:
+- Enriched endpoint for viewing discretionary requests with full context
+- All operations (POST/PUT/DELETE) use base endpoint `/api/v1/admin/discretionary/` (not enriched)
+- GET enriched includes: `user_full_name`, `restaurant_name`, `institution_name`, `market_id`, `market_name`, `country_code`
+
+**Dependencies**: `get_employee_user()` for GET operations
+
+---
+
 ## Permission Dependency Functions
 
 The following dependency functions are used to enforce these permissions:
@@ -477,5 +544,5 @@ Applied via `UserScope` service, which restricts Customers to their own `user_id
 
 ---
 
-*Last Updated: 2025-11-17*
+*Last Updated: 2026-02-05*
 

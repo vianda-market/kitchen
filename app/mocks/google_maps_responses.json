@@ -1,0 +1,188 @@
+{
+  "geocode": {
+    "results": [
+      {
+        "address_components": [
+          {
+            "long_name": "2567",
+            "short_name": "2567",
+            "types": ["street_number"]
+          },
+          {
+            "long_name": "Avenida Santa Fe",
+            "short_name": "Av. Santa Fe",
+            "types": ["route"]
+          },
+          {
+            "long_name": "Palermo",
+            "short_name": "Palermo",
+            "types": ["neighborhood", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "CABA",
+            "types": ["locality", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "Buenos Aires",
+            "types": ["administrative_area_level_1", "political"]
+          },
+          {
+            "long_name": "Argentina",
+            "short_name": "AR",
+            "types": ["country", "political"]
+          },
+          {
+            "long_name": "1425",
+            "short_name": "1425",
+            "types": ["postal_code"]
+          }
+        ],
+        "formatted_address": "Av. Santa Fe 2567, C1425 CABA, Argentina",
+        "geometry": {
+          "location": {
+            "lat": -34.5880634,
+            "lng": -58.4023328
+          },
+          "location_type": "ROOFTOP",
+          "viewport": {
+            "northeast": {
+              "lat": -34.5867144197085,
+              "lng": -58.4009838197085
+            },
+            "southwest": {
+              "lat": -34.5894123802915,
+              "lng": -58.4036817802915
+            }
+          }
+        },
+        "place_id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+        "plus_code": {
+          "compound_code": "CH6X+F5 Buenos Aires, Argentina",
+          "global_code": "48Q3CH6X+F5"
+        },
+        "types": ["street_address"]
+      }
+    ],
+    "status": "OK"
+  },
+  "reverse_geocode": {
+    "results": [
+      {
+        "address_components": [
+          {
+            "long_name": "2567",
+            "short_name": "2567",
+            "types": ["street_number"]
+          },
+          {
+            "long_name": "Avenida Santa Fe",
+            "short_name": "Av. Santa Fe",
+            "types": ["route"]
+          },
+          {
+            "long_name": "Palermo",
+            "short_name": "Palermo",
+            "types": ["neighborhood", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "CABA",
+            "types": ["locality", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "Buenos Aires",
+            "types": ["administrative_area_level_1", "political"]
+          },
+          {
+            "long_name": "Argentina",
+            "short_name": "AR",
+            "types": ["country", "political"]
+          },
+          {
+            "long_name": "1425",
+            "short_name": "1425",
+            "types": ["postal_code"]
+          }
+        ],
+        "formatted_address": "Av. Santa Fe 2567, C1425 CABA, Argentina",
+        "geometry": {
+          "location": {
+            "lat": -34.5880634,
+            "lng": -58.4023328
+          },
+          "location_type": "ROOFTOP",
+          "viewport": {
+            "northeast": {
+              "lat": -34.5867144197085,
+              "lng": -58.4009838197085
+            },
+            "southwest": {
+              "lat": -34.5894123802915,
+              "lng": -58.4036817802915
+            }
+          }
+        },
+        "place_id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+        "types": ["street_address"]
+      },
+      {
+        "address_components": [
+          {
+            "long_name": "Palermo",
+            "short_name": "Palermo",
+            "types": ["neighborhood", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "CABA",
+            "types": ["locality", "political"]
+          },
+          {
+            "long_name": "Buenos Aires",
+            "short_name": "Buenos Aires",
+            "types": ["administrative_area_level_1", "political"]
+          },
+          {
+            "long_name": "Argentina",
+            "short_name": "AR",
+            "types": ["country", "political"]
+          }
+        ],
+        "formatted_address": "Palermo, CABA, Argentina",
+        "geometry": {
+          "bounds": {
+            "northeast": {
+              "lat": -34.5622639,
+              "lng": -58.3933201
+            },
+            "southwest": {
+              "lat": -34.5959648,
+              "lng": -58.4298098
+            }
+          },
+          "location": {
+            "lat": -34.5790792,
+            "lng": -58.4212734
+          },
+          "location_type": "APPROXIMATE",
+          "viewport": {
+            "northeast": {
+              "lat": -34.5622639,
+              "lng": -58.3933201
+            },
+            "southwest": {
+              "lat": -34.5959648,
+              "lng": -58.4298098
+            }
+          }
+        },
+        "place_id": "ChIJH5kNsljLvJURBaVCQfcME9o",
+        "types": ["neighborhood", "political"]
+      }
+    ],
+    "status": "OK"
+  }
+}

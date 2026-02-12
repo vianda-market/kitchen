@@ -189,7 +189,8 @@ BEGIN
         address_type,
         is_default,
         floor,
-        country,
+        country_name,
+        country_code,
         province,
         city,
         postal_code,
@@ -214,7 +215,8 @@ BEGIN
         NEW.address_type,
         NEW.is_default,
         NEW.floor,
-        NEW.country,
+        NEW.country_name,
+        NEW.country_code,
         NEW.province,
         NEW.city,
         NEW.postal_code,
@@ -529,6 +531,7 @@ BEGIN
     INSERT INTO plan_history (
         event_id,
         plan_id,
+        market_id,
         credit_currency_id,
         name,
         credit,
@@ -546,6 +549,7 @@ BEGIN
     VALUES (
         new_event_id,
         NEW.plan_id,
+        NEW.market_id,
         NEW.credit_currency_id,
         NEW.name,
         NEW.credit,
@@ -589,9 +593,13 @@ BEGIN
         event_id,
         subscription_id,
         user_id,
+        market_id,
         plan_id,
         renewal_date,
         balance,
+        subscription_status,
+        hold_start_date,
+        hold_end_date,
         is_archived,
         status,
         created_date,
@@ -604,9 +612,13 @@ BEGIN
         new_event_id,
         NEW.subscription_id,
         NEW.user_id,
+        NEW.market_id,
         NEW.plan_id,
         NEW.renewal_date,
         NEW.balance,
+        NEW.subscription_status,
+        NEW.hold_start_date,
+        NEW.hold_end_date,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -889,6 +901,61 @@ CREATE TRIGGER credit_currency_history_trigger
 AFTER INSERT OR UPDATE ON credit_currency_info
 FOR EACH ROW
 EXECUTE FUNCTION credit_currency_history_trigger_func();
+
+-- Trigger function for market_info history logging
+CREATE OR REPLACE FUNCTION market_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuid_generate_v4();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        -- Mark the previous history record for this market as not current
+        UPDATE market_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE market_id = OLD.market_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO market_history (
+        event_id,
+        market_id,
+        country_name,
+        country_code,
+        credit_currency_id,
+        timezone,
+        is_archived,
+        status,
+        created_date,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.market_id,
+        NEW.country_name,
+        NEW.country_code,
+        NEW.credit_currency_id,
+        NEW.timezone,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on market_info
+CREATE TRIGGER market_history_trigger
+AFTER INSERT OR UPDATE ON market_info
+FOR EACH ROW
+EXECUTE FUNCTION market_history_trigger_func();
 
 -- Trigger function for fintech_link_info history logging
 CREATE OR REPLACE FUNCTION fintech_link_history_trigger_func()
