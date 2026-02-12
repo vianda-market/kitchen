@@ -208,6 +208,9 @@ grep -r "WEDNESDAY" app/services/  # Find the uppercase usage
 7. **Data Transfer Objects (DTOs)** - Pure data structures with no functions, separate from business logic
 
 ### Testing Standards
+
+#### Unit Tests (Python `pytest`) - For Non-Service Code Only
+
 1. **Minimize asserts per concept** - Test one concept per test function, use minimal assertions
 2. **Fast execution** - Tests should complete in milliseconds, not seconds
 3. **Independent tests** - Tests should not set conditions for other tests, no shared state
@@ -218,6 +221,132 @@ grep -r "WEDNESDAY" app/services/  # Find the uppercase usage
 8. **Test business logic, not framework code** - Focus on testing service functions, not FastAPI routes
 9. **Use descriptive test names** - Test names should clearly describe what is being tested
 10. **Arrange-Act-Assert pattern** - Structure tests with clear setup, execution, and verification phases
+
+#### What to Test with Python Unit Tests
+
+✅ **DO Test**:
+- **Gateways** (`app/gateways/`) - External service abstractions
+- **Utils** (`app/utils/`) - Pure functions, helpers
+- **Security** (`app/security/`) - Scoping logic, permissions
+- **Auth Dependencies** (`app/auth/dependencies.py`) - Permission checks
+- **DTOs/Models** (`app/dto/`) - Data transformation logic
+- **Schemas** (`app/schemas/`) - Validation logic (if complex)
+
+❌ **DON'T Test**:
+- **Services** (`app/services/`) - Use Postman instead (see below)
+- **Routes** (`app/routes/`) - Use Postman instead
+- **Database Layer** (`app/dependencies/database.py`) - Framework code
+
+#### Service Testing - Postman Collections ONLY
+
+**CRITICAL RULE**: Services are tested EXCLUSIVELY via Postman E2E collections, never with Python unit tests.
+
+**Why Postman for Services?**
+1. Tests the full HTTP stack (routes → services → database)
+2. Tests with real authentication and authorization
+3. Tests with actual database state and transactions
+4. Avoids complex mocking of database connections
+5. Self-contained and easy to share with QA/stakeholders
+6. Can be run in CI/CD pipelines
+
+**Postman Collection Requirements:**
+
+Each Postman collection testing a service must be **self-contained**:
+
+✅ **Option A: Create Test Data** (Preferred for complex scenarios)
+```javascript
+// Pre-request script
+// 1. Create a test user
+pm.sendRequest({
+    url: pm.environment.get("baseUrl") + "/api/v1/customers/signup",
+    method: "POST",
+    header: {"Content-Type": "application/json"},
+    body: {
+        mode: "raw",
+        raw: JSON.stringify({username: "test_" + Date.now(), ...})
+    }
+}, (err, res) => {
+    pm.collectionVariables.set("testUserId", res.json().user_id);
+});
+
+// 2. Create required entities (restaurants, addresses, etc.)
+// 3. Execute the actual test
+```
+
+✅ **Option A: Query Existing Data** (Preferred for simple scenarios)
+```javascript
+// Pre-request script
+// 1. Query for ANY active restaurant
+pm.sendRequest({
+    url: pm.environment.get("baseUrl") + "/api/v1/restaurants/?include_archived=false",
+    method: "GET",
+    header: {"Authorization": "Bearer " + pm.environment.get("authToken")}
+}, (err, res) => {
+    const restaurants = res.json();
+    if (restaurants.length > 0) {
+        pm.collectionVariables.set("randomRestaurantId", restaurants[0].restaurant_id);
+    }
+});
+
+// 2. Use the queried data in the test
+```
+
+**Choose Whichever is Easier:**
+- **Query**: Faster for simple tests, requires seed data
+- **Create**: More control, works on empty database, but more setup
+
+**Self-Contained Means:**
+- ✅ Collection can run standalone on a fresh database (with seed data)
+- ✅ Collection creates or queries all data it needs
+- ✅ No hardcoded UUIDs from specific environments
+- ✅ Tests include proper authentication setup
+- ✅ Collection cleans up test data (optional, use archival system instead)
+
+**Example: Testing Geolocation Service**
+```json
+{
+    "name": "Test Geocode Address",
+    "event": [{
+        "listen": "prerequest",
+        "script": {
+            "exec": [
+                "// Option 1: Query existing address",
+                "pm.sendRequest({",
+                "    url: pm.environment.get('baseUrl') + '/api/v1/addresses/?include_archived=false',",
+                "    method: 'GET',",
+                "    header: {'Authorization': 'Bearer ' + pm.environment.get('authToken')}",
+                "}, (err, res) => {",
+                "    const addresses = res.json();",
+                "    if (addresses.length > 0) {",
+                "        pm.collectionVariables.set('testAddressId', addresses[0].address_id);",
+                "    }",
+                "});",
+                "",
+                "// Option 2: Create test address (if needed)",
+                "// ... create address via API ..."
+            ]
+        }
+    }, {
+        "listen": "test",
+        "script": {
+            "exec": [
+                "pm.test('Geocoding successful', () => {",
+                "    pm.response.to.have.status(200);",
+                "    const body = pm.response.json();",
+                "    pm.expect(body).to.have.property('latitude');",
+                "    pm.expect(body).to.have.property('longitude');",
+                "});"
+            ]
+        }
+    }],
+    "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/addresses/{{testAddressId}}/geocode"
+    }
+}
+```
+
+**Reference**: See `docs/postman/` for existing collections following this pattern.
 
 ### Service vs Utils Architecture
 1. **Services contain business logic** - Domain rules, complex operations, orchestration logic
@@ -397,6 +526,200 @@ def handle_employer_creation_transaction(
 
 ## PostgreSQL-Specific Principles
 
+### Database Schema Change Management
+
+**CRITICAL RULE**: Database schema changes must be synchronized across multiple layers. Missing any layer will cause runtime failures.
+
+#### **Required Updates for Schema Changes**
+
+When adding, modifying, or removing database columns, you MUST update all of the following in the correct order:
+
+```
+1. Database Schema (schema.sql)
+   ↓
+2. Database Triggers (trigger.sql) - if table has history
+   ↓
+3. Database Seed Data (seed.sql) - if seeding the table
+   ↓
+4. DTOs (app/dto/models.py) ← CRITICAL - Often forgotten!
+   ↓
+5. Pydantic Schemas (app/schemas/consolidated_schemas.py) - if exposed via API
+   ↓
+6. Postman Collection - if testing the endpoint
+```
+
+#### **Why Each Layer Matters**
+
+**1. Database Schema** (`app/db/schema.sql`)
+- Defines the table structure
+- Sets constraints (NOT NULL, UNIQUE, FOREIGN KEY)
+- Example: Adding `market_id UUID NOT NULL` to `plan_info`
+
+**2. Database Triggers** (`app/db/trigger.sql`)
+- History tables must mirror main table structure
+- Triggers copy data to history tables
+- **Missing field in trigger = NULL constraint violation**
+- Example: `plan_history_trigger_func()` must INSERT `market_id`
+
+```sql
+-- ❌ BAD: Missing market_id in INSERT
+INSERT INTO plan_history (
+    event_id, plan_id, credit_currency_id, name, ...
+)
+
+-- ✅ GOOD: Includes market_id
+INSERT INTO plan_history (
+    event_id, plan_id, market_id, credit_currency_id, name, ...
+)
+VALUES (
+    new_event_id, NEW.plan_id, NEW.market_id, NEW.credit_currency_id, ...
+)
+```
+
+**3. Database Seed Data** (`app/db/seed.sql`)
+- Must include new required fields
+- Example: `INSERT INTO plan_info` must provide `market_id`
+
+**4. DTOs (Data Transfer Objects)** (`app/dto/models.py`) ← **MOST COMMONLY FORGOTTEN**
+- **DTOs define which fields the CRUDService writes to the database**
+- Missing field in DTO = Field ignored during INSERT/UPDATE
+- **Even if the field is in the API request, it won't reach the database!**
+
+```python
+# ❌ BAD: Missing market_id - field will be stripped during insert
+class PlanDTO(BaseModel):
+    plan_id: UUID
+    credit_currency_id: UUID
+    name: str
+    # ... missing market_id!
+
+# ✅ GOOD: Includes all database fields
+class PlanDTO(BaseModel):
+    plan_id: UUID
+    market_id: UUID  # ← Must match database schema
+    credit_currency_id: UUID
+    name: str
+```
+
+**Why DTOs Are Critical:**
+```
+Request → Pydantic Schema ✅ → Route ✅ → DTO ❌ → Database ❌
+                                          ↑
+                                    Missing field here
+                                    breaks everything
+```
+
+**5. Pydantic Schemas** (`app/schemas/consolidated_schemas.py`)
+- Only needed if the field is exposed via API
+- Some fields (internal, audit) may exist in DTO but not in schemas
+- Example: `modified_by` is in DTO but often not in response schemas
+
+```python
+# API Request Schema
+class PlanCreateSchema(BaseModel):
+    market_id: UUID  # ← User must provide
+    credit_currency_id: UUID
+    name: str
+
+# API Response Schema  
+class PlanResponseSchema(BaseModel):
+    plan_id: UUID
+    market_id: UUID  # ← User can see
+    name: str
+```
+
+**6. Postman Collection** (optional)
+- Update test requests to include new required fields
+- Update test assertions to verify new fields in responses
+
+#### **Common Failure Scenarios**
+
+**Scenario 1: Forgot to update DTO**
+```
+Error: "null value in column 'market_id' violates not-null constraint"
+Cause: Field in schema but not in DTO → stripped before INSERT
+```
+
+**Scenario 2: Forgot to update trigger**
+```
+Error: "null value in column 'market_id' of relation 'plan_history'"
+Cause: Main table has field, but trigger doesn't copy it to history table
+```
+
+**Scenario 3: Forgot to update schema (but updated DTO)**
+```
+Error: "Validation error: field 'market_id' is required"
+Cause: Database and DTO have field, but API schema rejects it
+```
+
+#### **Verification Checklist**
+
+After making schema changes, verify:
+
+```bash
+# 1. Database schema applied
+psql kitchen_db_dev -c "\d plan_info"  # Check column exists
+
+# 2. Trigger updated (if applicable)
+psql kitchen_db_dev -c "\sf plan_history_trigger_func"  # Check function includes field
+
+# 3. Application imports successfully
+python3 -c "from application import app; print('OK')"
+
+# 4. Create/Update works in Postman
+# Run Postman collection to verify end-to-end
+
+# 5. Check history table (if applicable)
+psql kitchen_db_dev -c "SELECT * FROM plan_history LIMIT 1"  # Verify field exists
+```
+
+#### **Not All Fields Are Exposed Via API**
+
+Some fields exist in the database and DTO but NOT in API schemas:
+- `modified_by` - Set automatically from `current_user`
+- `modified_date` - Set automatically by database
+- `created_date` - Set automatically by database
+- Internal audit fields, flags, etc.
+
+**Rule**: If the field has `DEFAULT` or is set by triggers, it might not need to be in API schemas.
+
+#### **Example: Complete Schema Change**
+
+Adding `market_id` to `plan_info`:
+
+```sql
+-- 1. schema.sql
+ALTER TABLE plan_info ADD COLUMN market_id UUID NOT NULL 
+    REFERENCES market_info(market_id);
+
+-- 2. trigger.sql
+-- Update plan_history_trigger_func() to include NEW.market_id
+
+-- 3. seed.sql
+INSERT INTO plan_info (plan_id, market_id, credit_currency_id, ...)
+VALUES (..., '11111111-1111-1111-1111-111111111111', ...);
+```
+
+```python
+# 4. app/dto/models.py
+class PlanDTO(BaseModel):
+    plan_id: UUID
+    market_id: UUID  # ← Add here
+    credit_currency_id: UUID
+
+# 5. app/schemas/consolidated_schemas.py
+class PlanCreateSchema(BaseModel):
+    market_id: UUID  # ← User provides
+    credit_currency_id: UUID
+
+class PlanResponseSchema(BaseModel):
+    plan_id: UUID
+    market_id: UUID  # ← Return to user
+    credit_currency_id: UUID
+```
+
+**Remember**: DTOs are the bridge between your API and database. Don't skip them!
+
 ### Database Connection Management
 ```python
 # Good: Explicit connection handling
@@ -508,6 +831,106 @@ def create_pickup_preference(
     except Exception as e:
         log_warning(f"Error creating pickup preference: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+```
+
+### API Versioning and Route Registration
+
+**CRITICAL RULE**: All business API routes MUST be registered under `/api/v1/` using versioned wrappers. Never register routes directly to the app.
+
+#### ✅ Correct Pattern: Versioned Router Wrapper
+
+```python
+# In application.py
+
+from app.core.versioning import create_versioned_router, APIVersion
+
+# Import the router from your route file
+from app.routes.admin.markets import router as markets_admin_router
+
+# ✅ CORRECT: Wrap in versioned router
+v1_markets_router = create_versioned_router("api", ["Markets"], APIVersion.V1)
+v1_markets_router.include_router(markets_admin_router)
+app.include_router(v1_markets_router)
+
+# This creates: /api/v1/markets/
+```
+
+#### ❌ Incorrect Pattern: Direct Registration
+
+```python
+# ❌ WRONG: Direct registration (creates /markets/ instead of /api/v1/markets/)
+app.include_router(markets_admin_router)
+
+# This would create: /markets/ (missing /api/v1/ prefix)
+```
+
+#### Route File Structure
+
+```python
+# In app/routes/admin/markets.py
+
+from fastapi import APIRouter
+
+# Define the route prefix WITHOUT /api/v1/ 
+# (the versioned wrapper adds this automatically)
+router = APIRouter(prefix="/markets", tags=["Markets"])
+
+@router.get("/")
+async def list_markets():
+    """Lists all markets - will be available at /api/v1/markets/"""
+    return []
+```
+
+#### Key Principles
+
+1. **Versioned Wrapper Required**: All business routes MUST use `create_versioned_router()`
+2. **Prefix Without Version**: Route files define prefixes like `/markets`, NOT `/api/v1/markets`
+3. **Version Added by Wrapper**: The `create_versioned_router()` automatically adds `/api/v1/`
+4. **Consistency**: This ensures all API endpoints follow the same versioning pattern
+5. **Future-Proof**: Easy to add v2 routes alongside v1 when needed
+
+#### Exceptions (Non-Versioned Routes)
+
+Only these routes are allowed without versioned wrappers:
+- `/health` - Health check endpoint
+- `/admin/archival/*` - Internal admin tools (not part of public API)
+- `/admin/archival-config/*` - Internal admin configuration
+
+#### Common Mistakes
+
+❌ **Mistake 1**: Forgetting to wrap the router
+```python
+# Wrong - creates /markets/ instead of /api/v1/markets/
+app.include_router(markets_admin_router)
+```
+
+❌ **Mistake 2**: Adding version to route prefix
+```python
+# Wrong - creates /api/v1/api/v1/markets/ (double prefix)
+router = APIRouter(prefix="/api/v1/markets", tags=["Markets"])
+```
+
+✅ **Correct**: Let the wrapper handle versioning
+```python
+# Correct - route file just defines the resource path
+router = APIRouter(prefix="/markets", tags=["Markets"])
+
+# Correct - application.py wraps with versioning
+v1_markets_router = create_versioned_router("api", ["Markets"], APIVersion.V1)
+v1_markets_router.include_router(markets_admin_router)
+app.include_router(v1_markets_router)
+```
+
+#### Verification
+
+After adding a new route, verify it's correctly registered:
+```python
+# Test script to check routes
+from application import app
+
+routes = [route.path for route in app.routes]
+# Should see: /api/v1/markets/, /api/v1/markets/{market_id}
+# NOT: /markets/, /markets/{market_id}
 ```
 
 ### Schema Design

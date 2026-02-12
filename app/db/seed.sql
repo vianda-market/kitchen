@@ -29,7 +29,7 @@ ALTER TABLE institution_bill_info
 
 -- (and any other that you ADD at the bottom)
 
-TRUNCATE user_info, institution_info, credit_currency_info CASCADE;
+TRUNCATE user_info, institution_info, market_info, credit_currency_info CASCADE;
 -- role_info, status_info, and transaction_type_info tables removed
 -- Enums are now stored directly on entities (user_info, etc.)
 
@@ -156,18 +156,7 @@ INSERT INTO national_holidays (country_code, holiday_name, holiday_date, is_recu
 ('PE', 'Labor Day', '2025-05-01', TRUE, 5, 1, 'Active'::status_enum, '11111111-1111-1111-1111-111111111111'),
 ('PE', 'Christmas Day', '2025-12-25', TRUE, 12, 25, 'Active'::status_enum, '11111111-1111-1111-1111-111111111111');
 
--- Sample address data with multi-select types
-INSERT INTO address_info (address_id, institution_id, user_id, address_type, country, province, city, postal_code, street_type, street_name, building_number, timezone, modified_by) VALUES
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', ARRAY['Entity Billing', 'Restaurant']::address_type_enum[], 'Argentina', 'Buenos Aires', 'Buenos Aires', '1001', 'Street', 'Av. 9 de Julio', '123', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
-('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', ARRAY['Restaurant']::address_type_enum[], 'Argentina', 'Buenos Aires', 'Buenos Aires', '1002', 'Street', 'Av. Corrientes', '456', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
-('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', ARRAY['Entity Billing', 'Restaurant']::address_type_enum[], 'Peru', 'Lima', 'Lima', '15001', 'Street', 'Av. Arequipa', '789', 'America/Lima', '11111111-1111-1111-1111-111111111111'),
-('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', ARRAY['Customer Home']::address_type_enum[], 'Argentina', 'Buenos Aires', 'Buenos Aires', '1003', 'Street', 'Av. Santa Fe', '321', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
-('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', ARRAY['Customer Billing']::address_type_enum[], 'Argentina', 'Buenos Aires', 'Buenos Aires', '1004', 'Street', 'Av. Callao', '654', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111');
-
--- Sample institution entity data
-INSERT INTO institution_entity_info (institution_entity_id, institution_id, address_id, tax_id, name, modified_by) VALUES
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'AR-12345678-9', 'La Parrilla Argentina S.A.', '11111111-1111-1111-1111-111111111111'),
-('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'PE-87654321-0', 'Restaurante Peruano E.I.R.L.', '11111111-1111-1111-1111-111111111111');
+-- Sample address and institution entity data (moved to after market_info to satisfy FK constraints)
 
 -- Restaurant data will be created via API endpoints after currencies are created
 -- INSERT INTO restaurant_info (restaurant_id, institution_id, institution_entity_id, address_id, credit_currency_id, name, cuisine, modified_by) VALUES
@@ -180,6 +169,65 @@ INSERT INTO institution_entity_info (institution_entity_id, institution_id, addr
 -- ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 15, 500.00, 'ARS', '11111111-1111-1111-1111-111111111111'),
 -- ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 8, 300.00, 'ARS', '11111111-1111-1111-1111-111111111111'),
 -- ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 12, 400.00, 'PEN', '11111111-1111-1111-1111-111111111111');
+
+-- ============================================================================
+-- MARKET-BASED SUBSCRIPTION SYSTEM SEED DATA
+-- ============================================================================
+
+-- Insert credit currency data FIRST (required by market_info FK)
+INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value, is_archived, status, created_date, modified_by, modified_date) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Argentine Peso', 'ARS', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Peruvian Sol', 'PEN', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Chilean Peso', 'CLP', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP);
+
+-- Insert market data (country-based markets with FK to credit_currency_info)
+INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, is_archived, status, created_date, modified_by, modified_date) VALUES
+('11111111-1111-1111-1111-111111111111', 'Argentina', 'ARG', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'America/Argentina/Buenos_Aires', FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('22222222-2222-2222-2222-222222222222', 'Peru', 'PER', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'America/Lima', FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('33333333-3333-3333-3333-333333333333', 'Chile', 'CHL', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'America/Santiago', FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP);
+
+-- Insert address data (after market_info to satisfy FK constraint on country_code)
+INSERT INTO address_info (address_id, institution_id, user_id, address_type, country_name, country_code, province, city, postal_code, street_type, street_name, building_number, timezone, modified_by) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', ARRAY['Entity Billing', 'Restaurant']::address_type_enum[], 'Argentina', 'ARG', 'Buenos Aires', 'Buenos Aires', '1001', 'Street', 'Av. 9 de Julio', '123', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', ARRAY['Restaurant']::address_type_enum[], 'Argentina', 'ARG', 'Buenos Aires', 'Buenos Aires', '1002', 'Street', 'Av. Corrientes', '456', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', ARRAY['Entity Billing', 'Restaurant']::address_type_enum[], 'Peru', 'PER', 'Lima', 'Lima', '15001', 'Street', 'Av. Arequipa', '789', 'America/Lima', '11111111-1111-1111-1111-111111111111'),
+('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', ARRAY['Customer Home']::address_type_enum[], 'Argentina', 'ARG', 'Buenos Aires', 'Buenos Aires', '1003', 'Street', 'Av. Santa Fe', '321', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111'),
+('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', ARRAY['Customer Billing']::address_type_enum[], 'Argentina', 'ARG', 'Buenos Aires', 'Buenos Aires', '1004', 'Street', 'Av. Callao', '654', 'America/Argentina/Buenos_Aires', '11111111-1111-1111-1111-111111111111');
+
+-- Insert institution entity data (after address_info to satisfy FK constraint)
+INSERT INTO institution_entity_info (institution_entity_id, institution_id, address_id, tax_id, name, modified_by) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'AR-12345678-9', 'La Parrilla Argentina S.A.', '11111111-1111-1111-1111-111111111111'),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'PE-87654321-0', 'Restaurante Peruano E.I.R.L.', '11111111-1111-1111-1111-111111111111');
+
+-- Insert plan data (market-specific plans)
+-- Argentina Market Plans
+INSERT INTO plan_info (plan_id, market_id, credit_currency_id, name, credit, price, rollover, rollover_cap, is_archived, status, created_date, modified_by, modified_date) VALUES
+('11111111-aaaa-aaaa-aaaa-111111111111', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Argentina Basic', 20, 5000.00, TRUE, 5, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('11111111-bbbb-bbbb-bbbb-111111111111', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Argentina Standard', 40, 9000.00, TRUE, 10, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('11111111-cccc-cccc-cccc-111111111111', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Argentina Premium', 60, 12000.00, TRUE, 15, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+
+-- Peru Market Plans
+('22222222-aaaa-aaaa-aaaa-222222222222', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Peru Basic', 20, 150.00, TRUE, 5, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('22222222-bbbb-bbbb-bbbb-222222222222', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Peru Standard', 40, 270.00, TRUE, 10, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('22222222-cccc-cccc-cccc-222222222222', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Peru Premium', 60, 360.00, TRUE, 15, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+
+-- Chile Market Plans
+('33333333-aaaa-aaaa-aaaa-333333333333', '33333333-3333-3333-3333-333333333333', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Chile Basic', 20, 15000.00, TRUE, 5, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('33333333-bbbb-bbbb-bbbb-333333333333', '33333333-3333-3333-3333-333333333333', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Chile Standard', 40, 27000.00, TRUE, 10, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+('33333333-cccc-cccc-cccc-333333333333', '33333333-3333-3333-3333-333333333333', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Chile Premium', 60, 36000.00, TRUE, 15, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP);
+
+-- Sample subscription data (admin has subscriptions in Argentina and Peru)
+-- Note: subscription_status values: 'Active', 'On Hold', 'Pending', 'Expired', 'Cancelled'
+INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, renewal_date, balance, subscription_status, hold_start_date, hold_end_date, is_archived, status, created_date, modified_by, modified_date) VALUES
+-- Admin user active subscription in Argentina
+('aaaaaaaa-0001-0001-0001-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', '11111111-bbbb-bbbb-bbbb-111111111111', CURRENT_TIMESTAMP + INTERVAL '30 days', 40, 'Active', NULL, NULL, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP),
+
+-- Superadmin active subscription in Peru  
+('bbbbbbbb-0002-0002-0002-bbbbbbbbbbbb', 'dddddddd-dddd-dddd-dddd-dddddddddddd', '22222222-2222-2222-2222-222222222222', '22222222-aaaa-aaaa-aaaa-222222222222', CURRENT_TIMESTAMP + INTERVAL '30 days', 20, 'Active', NULL, NULL, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP);
+
+-- ============================================================================
+-- END MARKET-BASED SUBSCRIPTION SYSTEM SEED DATA
+-- ============================================================================
 
 ALTER TABLE institution_info
 ADD CONSTRAINT fk_institution_info_modified_by

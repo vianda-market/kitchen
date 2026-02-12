@@ -26,7 +26,7 @@ from app.utils.log import log_info, log_warning, log_error
 from app.utils.db import db_read
 from fastapi import HTTPException
 from app.security.institution_scope import InstitutionScope
-from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, InstitutionBankAccountEnrichedResponseSchema, InstitutionPaymentAttemptEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema
+from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, InstitutionBankAccountEnrichedResponseSchema, InstitutionPaymentAttemptEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema
 from app.schemas.payment_method import PaymentMethodEnrichedResponseSchema
 from app.schemas.restaurant_holidays import RestaurantHolidayEnrichedResponseSchema
 from app.schemas.payment_methods.fintech_link import FintechLinkEnrichedResponseSchema
@@ -307,7 +307,7 @@ def get_enriched_institution_entities(
     include_archived: bool = False
 ) -> List[InstitutionEntityEnrichedResponseSchema]:
     """
-    Get all institution entities with enriched data (institution_name, address_country, address_province, address_city).
+    Get all institution entities with enriched data (institution, address, and market information).
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -316,7 +316,7 @@ def get_enriched_institution_entities(
         include_archived: Whether to include archived records
         
     Returns:
-        List of enriched institution entity schemas with institution name and address details
+        List of enriched institution entity schemas with institution, address, and market details
     """
     return _institution_entity_enriched_service.get_enriched(
         db,
@@ -324,8 +324,12 @@ def get_enriched_institution_entities(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "ie.address_id",
-            "a.country as address_country",
+            "a.country_name as address_country_name",
+            "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
             "ie.tax_id",
@@ -338,7 +342,8 @@ def get_enriched_institution_entities(
         ],
         joins=[
             ("INNER", "institution_info", "i", "ie.institution_id = i.institution_id"),
-            ("INNER", "address_info", "a", "ie.address_id = a.address_id")
+            ("INNER", "address_info", "a", "ie.address_id = a.address_id"),
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=scope,
         include_archived=include_archived
@@ -352,7 +357,7 @@ def get_enriched_institution_entity_by_id(
     include_archived: bool = False
 ) -> Optional[InstitutionEntityEnrichedResponseSchema]:
     """
-    Get a single institution entity by ID with enriched data (institution_name, address_country, address_province, address_city).
+    Get a single institution entity by ID with enriched data (institution, address, and market information).
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -362,7 +367,7 @@ def get_enriched_institution_entity_by_id(
         include_archived: Whether to include archived records
         
     Returns:
-        Enriched institution entity schema with institution name and address details, or None if not found
+        Enriched institution entity schema with institution, address, and market details, or None if not found
     """
     return _institution_entity_enriched_service.get_enriched_by_id(
         entity_id,
@@ -371,8 +376,12 @@ def get_enriched_institution_entity_by_id(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "ie.address_id",
-            "a.country as address_country",
+            "a.country_name as address_country_name",
+            "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
             "ie.tax_id",
@@ -385,7 +394,8 @@ def get_enriched_institution_entity_by_id(
         ],
         joins=[
             ("INNER", "institution_info", "i", "ie.institution_id = i.institution_id"),
-            ("INNER", "address_info", "a", "ie.address_id = a.address_id")
+            ("INNER", "address_info", "a", "ie.address_id = a.address_id"),
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=scope,
         include_archived=include_archived
@@ -437,7 +447,8 @@ def get_enriched_addresses(
             "a.address_type",
             "a.is_default",
             "a.floor",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -494,7 +505,8 @@ def get_enriched_address_by_id(
             "a.address_type",
             "a.is_default",
             "a.floor",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -559,7 +571,8 @@ def get_enriched_restaurants(
             "r.institution_entity_id",
             "ie.name as institution_entity_name",
             "r.address_id",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -612,7 +625,8 @@ def get_enriched_restaurant_by_id(
             "r.institution_entity_id",
             "ie.name as institution_entity_name",
             "r.address_id",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -675,7 +689,8 @@ def get_enriched_qr_codes(
             "r.name as restaurant_name",
             "r.institution_id",
             "i.name as institution_name",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -730,7 +745,8 @@ def get_enriched_qr_code_by_id(
             "r.name as restaurant_name",
             "r.institution_id",
             "i.name as institution_name",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "a.postal_code",
@@ -904,7 +920,8 @@ def get_enriched_plates(
             "i.name as institution_name",
             "r.name as restaurant_name",
             "r.cuisine",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "pr.name as product_name",
@@ -964,7 +981,8 @@ def get_enriched_plate_by_id(
             "i.name as institution_name",
             "r.name as restaurant_name",
             "r.cuisine",
-            "a.country",
+            "a.country_name",
+            "a.country_code",
             "a.province",
             "a.city",
             "pr.name as product_name",
@@ -993,6 +1011,108 @@ def get_enriched_plate_by_id(
     )
 
 # =============================================================================
+# MARKET ENRICHED BUSINESS LOGIC
+# =============================================================================
+
+# Initialize EnrichedService instance for markets
+# Note: Markets don't have institution scoping, so we pass None for institution_column
+_market_enriched_service = EnrichedService(
+    base_table="market_info",
+    table_alias="m",
+    id_column="market_id",
+    schema_class=MarketResponseSchema,
+    institution_column=None,  # Markets don't have institution scoping
+    institution_table_alias=None
+)
+
+def get_enriched_markets(
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> List[MarketResponseSchema]:
+    """
+    Get all markets with enriched data (currency name and code).
+    
+    Args:
+        db: Database connection
+        scope: Optional institution scope for filtering (not used for markets, but kept for consistency)
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        List of MarketResponseSchema with currency name and code
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _market_enriched_service.get_enriched(
+        db,
+        select_fields=[
+            "m.market_id",
+            "m.country_name",
+            "m.country_code",
+            "m.credit_currency_id",
+            "c.currency_name",
+            "c.currency_code",
+            "m.timezone",
+            "m.is_archived",
+            "m.status",
+            "m.created_date",
+            "m.modified_date"
+        ],
+        joins=[
+            ("LEFT", "credit_currency_info", "c", "m.credit_currency_id = c.credit_currency_id")
+        ],
+        scope=None,  # Markets don't have institution scoping
+        include_archived=include_archived
+    )
+
+def get_enriched_market_by_id(
+    market_id: UUID,
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> Optional[MarketResponseSchema]:
+    """
+    Get a single market by ID with enriched data (currency name and code).
+    
+    Args:
+        market_id: Market ID
+        db: Database connection
+        scope: Optional institution scope for filtering (not used for markets, but kept for consistency)
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        MarketResponseSchema with currency name and code, or None if not found
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _market_enriched_service.get_enriched_by_id(
+        market_id,
+        db,
+        select_fields=[
+            "m.market_id",
+            "m.country_name",
+            "m.country_code",
+            "m.credit_currency_id",
+            "c.currency_name",
+            "c.currency_code",
+            "m.timezone",
+            "m.is_archived",
+            "m.status",
+            "m.created_date",
+            "m.modified_date"
+        ],
+        joins=[
+            ("LEFT", "credit_currency_info", "c", "m.credit_currency_id = c.credit_currency_id")
+        ],
+        scope=None,  # Markets don't have institution scoping
+        include_archived=include_archived
+    )
+
+# =============================================================================
 # PLAN ENRICHED BUSINESS LOGIC
 # =============================================================================
 
@@ -1014,7 +1134,7 @@ def get_enriched_plans(
     include_archived: bool = False
 ) -> List[PlanEnrichedResponseSchema]:
     """
-    Get all plans with enriched data (currency name and code).
+    Get all plans with enriched data (currency name, code, and market info).
     
     Args:
         db: Database connection
@@ -1022,7 +1142,7 @@ def get_enriched_plans(
         include_archived: Whether to include archived records (default: False)
         
     Returns:
-        List of PlanEnrichedResponseSchema with currency name and code
+        List of PlanEnrichedResponseSchema with currency and market data
         
     Raises:
         HTTPException: For system errors or database failures
@@ -1031,6 +1151,9 @@ def get_enriched_plans(
         db,
         select_fields=[
             "pl.plan_id",
+            "pl.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "pl.credit_currency_id",
             "cc.currency_name",
             "cc.currency_code",
@@ -1045,7 +1168,8 @@ def get_enriched_plans(
             "pl.modified_date"
         ],
         joins=[
-            ("INNER", "credit_currency_info", "cc", "pl.credit_currency_id = cc.credit_currency_id")
+            ("INNER", "credit_currency_info", "cc", "pl.credit_currency_id = cc.credit_currency_id"),
+            ("INNER", "market_info", "m", "pl.market_id = m.market_id")
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived
@@ -1059,7 +1183,7 @@ def get_enriched_plan_by_id(
     include_archived: bool = False
 ) -> Optional[PlanEnrichedResponseSchema]:
     """
-    Get a single plan by ID with enriched data (currency name and code).
+    Get a single plan by ID with enriched data (currency name, code, and market info).
     
     Args:
         plan_id: Plan ID
@@ -1068,7 +1192,7 @@ def get_enriched_plan_by_id(
         include_archived: Whether to include archived records (default: False)
         
     Returns:
-        PlanEnrichedResponseSchema with currency name and code, or None if not found
+        PlanEnrichedResponseSchema with currency and market data, or None if not found
         
     Raises:
         HTTPException: For system errors or database failures
@@ -1078,6 +1202,9 @@ def get_enriched_plan_by_id(
         db,
         select_fields=[
             "pl.plan_id",
+            "pl.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "pl.credit_currency_id",
             "cc.currency_name",
             "cc.currency_code",
@@ -1092,9 +1219,246 @@ def get_enriched_plan_by_id(
             "pl.modified_date"
         ],
         joins=[
-            ("INNER", "credit_currency_info", "cc", "pl.credit_currency_id = cc.credit_currency_id")
+            ("INNER", "credit_currency_info", "cc", "pl.credit_currency_id = cc.credit_currency_id"),
+            ("INNER", "market_info", "m", "pl.market_id = m.market_id")
         ],
         scope=None,  # Plans don't have institution scoping
+        include_archived=include_archived
+    )
+
+# =============================================================================
+# CREDIT CURRENCY ENRICHED BUSINESS LOGIC
+# =============================================================================
+
+# Initialize EnrichedService instance for credit currencies
+# Note: Credit currencies don't have institution scoping, so we pass None for institution_column
+_credit_currency_enriched_service = EnrichedService(
+    base_table="credit_currency_info",
+    table_alias="cc",
+    id_column="credit_currency_id",
+    schema_class=CreditCurrencyEnrichedResponseSchema,
+    institution_column=None,  # Credit currencies don't have institution scoping
+    institution_table_alias=None
+)
+
+def get_enriched_credit_currencies(
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> List[CreditCurrencyEnrichedResponseSchema]:
+    """
+    Get all credit currencies with enriched data (market information).
+    
+    Args:
+        db: Database connection
+        scope: Optional institution scope for filtering (not used for credit currencies, but kept for consistency)
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        List of CreditCurrencyEnrichedResponseSchema with market data
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _credit_currency_enriched_service.get_enriched(
+        db,
+        select_fields=[
+            "cc.credit_currency_id",
+            "cc.currency_name",
+            "cc.currency_code",
+            "cc.credit_value",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
+            "cc.is_archived",
+            "cc.status",
+            "cc.created_date",
+            "cc.modified_date"
+        ],
+        joins=[
+            ("INNER", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+        ],
+        scope=None,  # Credit currencies don't have institution scoping
+        include_archived=include_archived
+    )
+
+def get_enriched_credit_currency_by_id(
+    credit_currency_id: UUID,
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> Optional[CreditCurrencyEnrichedResponseSchema]:
+    """
+    Get a single credit currency by ID with enriched data (market information).
+    
+    Args:
+        credit_currency_id: Credit Currency ID
+        db: Database connection
+        scope: Optional institution scope for filtering (not used for credit currencies, but kept for consistency)
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        CreditCurrencyEnrichedResponseSchema with market data, or None if not found
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _credit_currency_enriched_service.get_enriched_by_id(
+        credit_currency_id,
+        db,
+        select_fields=[
+            "cc.credit_currency_id",
+            "cc.currency_name",
+            "cc.currency_code",
+            "cc.credit_value",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
+            "cc.is_archived",
+            "cc.status",
+            "cc.created_date",
+            "cc.modified_date"
+        ],
+        joins=[
+            ("INNER", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+        ],
+        scope=None,  # Credit currencies don't have institution scoping
+        include_archived=include_archived
+    )
+
+# =============================================================================
+# DISCRETIONARY ENRICHED BUSINESS LOGIC
+# =============================================================================
+
+# Initialize EnrichedService instance for discretionary requests
+# Note: Discretionary requests have institution scoping through user or restaurant
+_discretionary_enriched_service = EnrichedService(
+    base_table="discretionary_info",
+    table_alias="d",
+    id_column="discretionary_id",
+    schema_class=DiscretionaryEnrichedResponseSchema,
+    institution_column="i.institution_id",  # Via user or restaurant
+    institution_table_alias="i"
+)
+
+def get_enriched_discretionary_requests(
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> List[DiscretionaryEnrichedResponseSchema]:
+    """
+    Get all discretionary requests with enriched data (user, restaurant, institution, and market information).
+    
+    Args:
+        db: Database connection
+        scope: Optional institution scope for filtering
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        List of DiscretionaryEnrichedResponseSchema with full context
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _discretionary_enriched_service.get_enriched(
+        db,
+        select_fields=[
+            "d.discretionary_id",
+            "d.user_id",
+            "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as user_full_name",
+            "d.restaurant_id",
+            "r.name as restaurant_name",
+            "COALESCE(u.institution_id, ie.institution_id) as institution_id",
+            "i.name as institution_name",
+            "r.credit_currency_id",
+            "cc.currency_name",
+            "cc.currency_code",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
+            "d.approval_id",
+            "d.category",
+            "d.reason",
+            "d.amount",
+            "d.comment",
+            "d.is_archived",
+            "d.status",
+            "d.created_date",
+            "d.modified_date"
+        ],
+        joins=[
+            ("LEFT", "user_info", "u", "d.user_id = u.user_id"),
+            ("LEFT", "restaurant_info", "r", "d.restaurant_id = r.restaurant_id"),
+            ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
+            ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
+            ("LEFT", "credit_currency_info", "cc", "r.credit_currency_id = cc.credit_currency_id"),
+            ("LEFT", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+        ],
+        scope=scope,
+        include_archived=include_archived
+    )
+
+def get_enriched_discretionary_request_by_id(
+    discretionary_id: UUID,
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False
+) -> Optional[DiscretionaryEnrichedResponseSchema]:
+    """
+    Get a single discretionary request by ID with enriched data.
+    
+    Args:
+        discretionary_id: Discretionary Request ID
+        db: Database connection
+        scope: Optional institution scope for filtering
+        include_archived: Whether to include archived records (default: False)
+        
+    Returns:
+        DiscretionaryEnrichedResponseSchema with full context, or None if not found
+        
+    Raises:
+        HTTPException: For system errors or database failures
+    """
+    return _discretionary_enriched_service.get_enriched_by_id(
+        discretionary_id,
+        db,
+        select_fields=[
+            "d.discretionary_id",
+            "d.user_id",
+            "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as user_full_name",
+            "d.restaurant_id",
+            "r.name as restaurant_name",
+            "COALESCE(u.institution_id, ie.institution_id) as institution_id",
+            "i.name as institution_name",
+            "r.credit_currency_id",
+            "cc.currency_name",
+            "cc.currency_code",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
+            "d.approval_id",
+            "d.category",
+            "d.reason",
+            "d.amount",
+            "d.comment",
+            "d.is_archived",
+            "d.status",
+            "d.created_date",
+            "d.modified_date"
+        ],
+        joins=[
+            ("LEFT", "user_info", "u", "d.user_id = u.user_id"),
+            ("LEFT", "restaurant_info", "r", "d.restaurant_id = r.restaurant_id"),
+            ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
+            ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
+            ("LEFT", "credit_currency_info", "cc", "r.credit_currency_id = cc.credit_currency_id"),
+            ("LEFT", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+        ],
+        scope=scope,
         include_archived=include_archived
     )
 
@@ -1581,7 +1945,8 @@ def get_enriched_employers(
             "e.employer_id",
             "e.name",
             "e.address_id",
-            "a.country as address_country",
+            "a.country_name as address_country",
+            "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
             "a.postal_code as address_postal_code",
@@ -1629,7 +1994,8 @@ def get_enriched_employer_by_id(
             "e.employer_id",
             "e.name",
             "e.address_id",
-            "a.country as address_country",
+            "a.country_name as address_country",
+            "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
             "a.postal_code as address_postal_code",
@@ -1696,9 +2062,10 @@ def get_enriched_subscriptions(
     user_id: Optional[UUID] = None
 ) -> List[SubscriptionEnrichedResponseSchema]:
     """
-    Get all subscriptions with enriched data (user information and plan information).
+    Get all subscriptions with enriched data (user, plan, and market information).
     Includes: user_full_name, user_username, user_email, user_status, user_cellphone,
-    plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status.
+    plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status,
+    market_id, market_name, country_code.
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -1708,7 +2075,7 @@ def get_enriched_subscriptions(
         user_id: Optional user_id to filter subscriptions by user
         
     Returns:
-        List of enriched subscription schemas with user information
+        List of enriched subscription schemas with user, plan, and market information
     """
     additional_conditions = []
     if user_id:
@@ -1731,6 +2098,9 @@ def get_enriched_subscriptions(
             "p.rollover as plan_rollover",
             "p.rollover_cap as plan_rollover_cap",
             "p.status as plan_status",
+            "p.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "s.renewal_date",
             "s.balance",
             "s.is_archived",
@@ -1741,7 +2111,8 @@ def get_enriched_subscriptions(
         ],
         joins=[
             ("INNER", "user_info", "u", "s.user_id = u.user_id"),
-            ("INNER", "plan_info", "p", "s.plan_id = p.plan_id")
+            ("INNER", "plan_info", "p", "s.plan_id = p.plan_id"),
+            ("INNER", "market_info", "m", "p.market_id = m.market_id")
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1756,9 +2127,10 @@ def get_enriched_subscription_by_id(
     include_archived: bool = False
 ) -> Optional[SubscriptionEnrichedResponseSchema]:
     """
-    Get a single subscription by ID with enriched data (user information and plan information).
+    Get a single subscription by ID with enriched data (user, plan, and market information).
     Includes: user_full_name, user_username, user_email, user_status, user_cellphone,
-    plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status.
+    plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status,
+    market_id, market_name, country_code.
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -1768,7 +2140,7 @@ def get_enriched_subscription_by_id(
         include_archived: Whether to include archived records
         
     Returns:
-        Enriched subscription schema with user information, or None if not found
+        Enriched subscription schema with user, plan, and market information, or None if not found
     """
     return _subscription_enriched_service.get_enriched_by_id(
         subscription_id,
@@ -1788,6 +2160,9 @@ def get_enriched_subscription_by_id(
             "p.rollover as plan_rollover",
             "p.rollover_cap as plan_rollover_cap",
             "p.status as plan_status",
+            "p.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "s.renewal_date",
             "s.balance",
             "s.is_archived",
@@ -1798,7 +2173,8 @@ def get_enriched_subscription_by_id(
         ],
         joins=[
             ("INNER", "user_info", "u", "s.user_id = u.user_id"),
-            ("INNER", "plan_info", "p", "s.plan_id = p.plan_id")
+            ("INNER", "plan_info", "p", "s.plan_id = p.plan_id"),
+            ("INNER", "market_info", "m", "p.market_id = m.market_id")
         ],
         scope=scope,
         include_archived=include_archived
@@ -1825,7 +2201,7 @@ def get_enriched_institution_bills(
     include_archived: bool = False
 ) -> List[InstitutionBillEnrichedResponseSchema]:
     """
-    Get all institution bills with enriched data (institution name, entity name, restaurant name).
+    Get all institution bills with enriched data (institution, entity, restaurant, and market information).
     Returns an array of enriched institution bill records.
     
     Scoping rules:
@@ -1838,7 +2214,7 @@ def get_enriched_institution_bills(
         include_archived: Whether to include archived records (default: False)
         
     Returns:
-        List of InstitutionBillEnrichedResponseSchema with institution, entity, restaurant, and currency information
+        List of InstitutionBillEnrichedResponseSchema with institution, entity, restaurant, currency, and market information
         
     Raises:
         HTTPException: For system errors or database failures
@@ -1854,6 +2230,9 @@ def get_enriched_institution_bills(
             "ibi.restaurant_id",
             "COALESCE(r.name, '') as restaurant_name",
             "ibi.credit_currency_id",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "ibi.payment_id",
             "ibi.transaction_count",
             "ibi.amount",
@@ -1871,7 +2250,8 @@ def get_enriched_institution_bills(
         joins=[
             ("LEFT", "institution_info", "i", "ibi.institution_id = i.institution_id"),
             ("LEFT", "institution_entity_info", "ie", "ibi.institution_entity_id = ie.institution_entity_id"),
-            ("LEFT", "restaurant_info", "r", "ibi.restaurant_id = r.restaurant_id")
+            ("LEFT", "restaurant_info", "r", "ibi.restaurant_id = r.restaurant_id"),
+            ("INNER", "market_info", "m", "ibi.credit_currency_id = m.credit_currency_id")
         ],
         scope=scope,
         include_archived=include_archived
@@ -1898,7 +2278,7 @@ def get_enriched_institution_bank_accounts(
     include_archived: bool = False
 ) -> List[InstitutionBankAccountEnrichedResponseSchema]:
     """
-    Get all institution bank accounts with enriched data (institution name, entity name, country).
+    Get all institution bank accounts with enriched data (institution, entity, address, and market information).
     Returns an array of enriched institution bank account records.
     
     Scoping rules:
@@ -1911,7 +2291,7 @@ def get_enriched_institution_bank_accounts(
         include_archived: Whether to include archived records (default: False)
         
     Returns:
-        List of InstitutionBankAccountEnrichedResponseSchema with institution, entity, and address information
+        List of InstitutionBankAccountEnrichedResponseSchema with institution, entity, address, and market information
         
     Raises:
         HTTPException: For system errors or database failures
@@ -1924,8 +2304,11 @@ def get_enriched_institution_bank_accounts(
             "ie.institution_id",
             "COALESCE(i.name, '') as institution_name",
             "COALESCE(ie.name, '') as institution_entity_name",
+            "m.market_id",
+            "m.country_name as market_name",
+            "m.country_code",
             "iba.address_id",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
             "iba.account_holder_name",
             "iba.bank_name",
             "iba.account_type",
@@ -1939,7 +2322,8 @@ def get_enriched_institution_bank_accounts(
         joins=[
             ("INNER", "institution_entity_info", "ie", "iba.institution_entity_id = ie.institution_entity_id"),
             ("LEFT", "institution_info", "i", "ie.institution_id = i.institution_id"),
-            ("LEFT", "address_info", "a", "iba.address_id = a.address_id")
+            ("LEFT", "address_info", "a", "iba.address_id = a.address_id"),
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=scope,
         include_archived=include_archived
@@ -1993,7 +2377,8 @@ def get_enriched_institution_payment_attempts(
             "COALESCE(ie.name, '') as institution_entity_name",
             "ipa.bank_account_id",
             "COALESCE(iba.bank_name, '') as bank_name",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "ipa.institution_bill_id",
             "ibi.period_start",
             "ibi.period_end",
@@ -2054,7 +2439,8 @@ def get_enriched_institution_payment_attempt_by_id(
             "COALESCE(ie.name, '') as institution_entity_name",
             "ipa.bank_account_id",
             "COALESCE(iba.bank_name, '') as bank_name",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "ipa.institution_bill_id",
             "ibi.period_start",
             "ibi.period_end",
@@ -2130,7 +2516,8 @@ def get_enriched_restaurant_balances(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "rb.credit_currency_id",
             "rb.transaction_count",
             "rb.balance",
@@ -2190,7 +2577,8 @@ def get_enriched_restaurant_balance_by_id(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "rb.credit_currency_id",
             "rb.transaction_count",
             "rb.balance",
@@ -2268,7 +2656,8 @@ def get_enriched_restaurant_transactions(
             "rt.discretionary_id",
             "rt.credit_currency_id",
             "rt.currency_code",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "rt.was_collected",
             "rt.ordered_timestamp",
             "rt.collected_timestamp",
@@ -2343,7 +2732,8 @@ def get_enriched_restaurant_transaction_by_id(
             "rt.discretionary_id",
             "rt.credit_currency_id",
             "rt.currency_code",
-            "COALESCE(a.country, '') as country",
+            "a.country_name",
+            "a.country_code",
             "rt.was_collected",
             "rt.ordered_timestamp",
             "rt.collected_timestamp",
@@ -2433,7 +2823,8 @@ def get_enriched_plate_pickups(
                 ppl.user_id,
                 ppl.restaurant_id,
                 COALESCE(r.name, '') as restaurant_name,
-                COALESCE(a.country, '') as country,
+                a.country_name,
+                a.country_code,
                 COALESCE(a.province, '') as province,
                 COALESCE(a.city, '') as city,
                 COALESCE(a.postal_code, '') as postal_code,
@@ -2748,7 +3139,7 @@ def get_enriched_restaurant_holidays(
         restaurants_query = f"""
             SELECT DISTINCT
                 r.restaurant_id,
-                a.country
+                a.country_code
             FROM restaurant_info r
             INNER JOIN address_info a ON r.address_id = a.address_id
             {restaurant_where_national}
@@ -2763,11 +3154,9 @@ def get_enriched_restaurant_holidays(
         # Collect unique country codes
         country_codes = set()
         for restaurant_row in restaurants or []:
-            country_name = restaurant_row.get("country")
-            if country_name:
-                country_code = MarketDetectionService._country_name_to_code(country_name)
-                if country_code:
-                    country_codes.add(country_code)
+            country_code = restaurant_row.get("country_code")
+            if country_code:
+                country_codes.add(country_code)
         
         # Get national holidays for these country codes
         if country_codes:

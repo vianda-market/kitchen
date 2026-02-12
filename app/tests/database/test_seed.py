@@ -68,12 +68,28 @@ class TestSeedDataRecords:
             str(SEED_INSTITUTION_VIANDA_ID)
         ), f"Vianda Enterprises institution with ID {SEED_INSTITUTION_VIANDA_ID} should be seeded"
     
-    @pytest.mark.skip(reason="Currencies are no longer seeded - created via API")
-    def test_usd_currency_seeded(self, db_transaction):
-        """Test that USD currency is seeded (skipped - currencies created via API)."""
-        # This test is skipped because currencies are now created via API endpoints
-        # rather than being seeded into the database
-        pass
+    def test_ars_currency_seeded(self, db_transaction):
+        """Test that ARS (Argentine Peso) currency is seeded."""
+        assert record_exists(
+            db_transaction,
+            'credit_currency_info',
+            'credit_currency_id',
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        ), "Argentine Peso (ARS) currency should be seeded"
+        
+        # Verify currency properties
+        with db_transaction.cursor() as cur:
+            cur.execute("""
+                SELECT currency_name, currency_code
+                FROM credit_currency_info
+                WHERE credit_currency_id = %s
+            """, ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',))
+            result = cur.fetchone()
+            
+            assert result is not None, "ARS currency should exist"
+            currency_name, currency_code = result
+            assert currency_name == 'Argentine Peso', f"Expected 'Argentine Peso', got '{currency_name}'"
+            assert currency_code == 'ARS', f"Expected 'ARS', got '{currency_code}'"
     
     def test_admin_user_properties(self, db_transaction):
         """Test that admin user has correct properties."""

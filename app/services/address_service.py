@@ -56,10 +56,22 @@ class AddressBusinessService:
         # Set modified_by field
         address_data["modified_by"] = current_user["user_id"]
         
-        # Automatically set timezone based on country and city
-        timezone = get_timezone_from_location(address_data["country"], address_data["city"])
+        # Fetch country_name from market_info using country_code
+        from app.services.market_service import market_service
+        country_code = address_data.get("country_code")
+        if country_code:
+            market = market_service.get_by_country_code(country_code)
+            if market:
+                address_data["country_name"] = market["country_name"]
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
+        else:
+            raise HTTPException(status_code=400, detail="country_code is required")
+        
+        # Automatically set timezone based on country_name and city
+        timezone = get_timezone_from_location(address_data["country_name"], address_data["city"])
         address_data["timezone"] = timezone
-        log_info(f"Set timezone '{timezone}' for address in {address_data['city']}, {address_data['country']}")
+        log_info(f"Set timezone '{timezone}' for address in {address_data['city']}, {address_data['country_name']}")
 
         # Create the address first (even for restaurants), so we get an address_id
         # NOTE: address_service.create() should ONLY be called from this business service.
@@ -147,7 +159,7 @@ class AddressBusinessService:
         Returns:
             Formatted address string
         """
-        return f"{address_data['building_number']} {address_data['street_name']}, {address_data['city']}, {address_data['province']}, {address_data['country']}"
+        return f"{address_data['building_number']} {address_data['street_name']}, {address_data['city']}, {address_data['province']}, {address_data['country_name']}"
     
     def validate_address_data(self, address_data: Dict[str, Any]) -> None:
         """
@@ -162,7 +174,7 @@ class AddressBusinessService:
         # Check required fields for restaurant addresses
         address_types = address_data.get("address_type", [])
         if isinstance(address_types, list) and "Restaurant" in address_types:
-            required_fields = ["building_number", "street_name", "city", "province", "country"]
+            required_fields = ["building_number", "street_name", "city", "province", "country_code"]
             missing_fields = [field for field in required_fields if not address_data.get(field)]
             
             if missing_fields:
@@ -172,11 +184,11 @@ class AddressBusinessService:
                 )
         
         # Validate country code format (basic validation)
-        country = address_data.get("country", "").strip()
-        if len(country) != 2:
+        country_code = address_data.get("country_code", "").strip()
+        if len(country_code) != 3:
             raise HTTPException(
                 status_code=400,
-                detail="Country must be a 2-letter country code (e.g., 'US', 'CA')"
+                detail="country_code must be a 3-letter ISO 3166-1 alpha-3 country code (e.g., 'ARG', 'PER', 'CHL')"
             )
     
     def get_address_with_geolocation(
@@ -236,18 +248,29 @@ class AddressBusinessService:
         # Set modified_by field
         address_data["modified_by"] = current_user["user_id"]
         
-        # Update timezone if country/city changed
-        if "country" in address_data or "city" in address_data:
+        # Fetch country_name from market_info if country_code is provided
+        if "country_code" in address_data:
+            from app.services.market_service import market_service
+            country_code = address_data.get("country_code")
+            if country_code:
+                market = market_service.get_by_country_code(country_code)
+                if market:
+                    address_data["country_name"] = market["country_name"]
+                else:
+                    raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
+        
+        # Update timezone if country_code/city changed
+        if "country_code" in address_data or "city" in address_data:
             # Get current address to merge with updates
             current_address = address_service.get_by_id(address_id, db, scope=scope)
             if current_address:
                 merged_data = {
-                    "country": address_data.get("country", current_address.country),
+                    "country_name": address_data.get("country_name", current_address.country_name),
                     "city": address_data.get("city", current_address.city)
                 }
-                timezone = get_timezone_from_location(merged_data["country"], merged_data["city"])
+                timezone = get_timezone_from_location(merged_data["country_name"], merged_data["city"])
                 address_data["timezone"] = timezone
-                log_info(f"Updated timezone to '{timezone}' for address in {merged_data['city']}, {merged_data['country']}")
+                log_info(f"Updated timezone to '{timezone}' for address in {merged_data['city']}, {merged_data['country_name']}")
         
         # Update the address
         updated_address = address_service.update(address_id, address_data, db, scope=scope)
@@ -260,7 +283,7 @@ class AddressBusinessService:
         is_restaurant = (isinstance(address_types, list) and "Restaurant" in address_types) or \
                        (isinstance(current_address_types, list) and "Restaurant" in current_address_types)
         if (is_restaurant or 
-            any(field in address_data for field in ["building_number", "street_name", "city", "province", "country"])):
+            any(field in address_data for field in ["building_number", "street_name", "city", "province", "country_code"])):
             
             # Get updated address data for geocoding
             full_address_data = {
@@ -268,7 +291,7 @@ class AddressBusinessService:
                 "street_name": address_data.get("street_name", updated_address.street_name),
                 "city": address_data.get("city", updated_address.city),
                 "province": address_data.get("province", updated_address.province),
-                "country": address_data.get("country", updated_address.country)
+                "country_name": address_data.get("country_name", updated_address.country_name)
             }
             
             # Update geolocation

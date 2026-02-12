@@ -104,9 +104,9 @@ dmypy.json
 .seed_data.py
 *seed_data.py
 
-# Generated static files (created by build scripts and API uploads)
-static/qr_codes/*.png
-static/product_images/*.png
+# Generated static files (created by build scripts, API uploads, and tests)
+static/qr_codes/**/*.png
+static/product_images/**/*.png
 
 # Keep placeholder files
 !static/placeholders/*.png

@@ -49,6 +49,7 @@ from app.routes.billing.institution_bill import router as institution_bill_route
 # Admin routes
 from app.routes.admin.archival import router as archival_admin_router
 from app.routes.admin.archival_config import router as archival_config_admin_router
+from app.routes.admin.markets import router as markets_admin_router
 
 # Configure logging - using the custom logger from app.utils.log
 from app.utils.log import logger
@@ -109,8 +110,8 @@ def create_app() -> FastAPI:
         """Redirect to current API version"""
         return RedirectResponse(url="/api/v1/", status_code=307)
     
-    # Admin/infrastructure routes (non-versioned)
-    # main_router includes: admin_discretionary_router, super_admin_discretionary_router, and /pool-stats
+    # Infrastructure/monitoring routes (non-versioned)
+    # main_router includes: /pool-stats (database connection pool monitoring)
     app.include_router(main_router)
     
     # =============================================================================
@@ -243,7 +244,30 @@ def create_app() -> FastAPI:
     v1_institution_bill_router.include_router(institution_bill_router)
     app.include_router(v1_institution_bill_router)
     
-    # Admin routes
+    # Markets router (versioned)
+    v1_markets_router = create_versioned_router("api", ["Markets"], APIVersion.V1)
+    v1_markets_router.include_router(markets_admin_router)
+    app.include_router(v1_markets_router)
+    
+    # Enum Service router (versioned)
+    from app.routes.enums import router as enums_router
+    v1_enums_router = create_versioned_router("api", ["Enums"], APIVersion.V1)
+    v1_enums_router.include_router(enums_router)
+    app.include_router(v1_enums_router)
+    
+    # Admin Discretionary router (versioned)
+    from app.routes.admin.discretionary import router as admin_discretionary_router
+    v1_admin_discretionary_router = create_versioned_router("api", ["Admin Discretionary"], APIVersion.V1)
+    v1_admin_discretionary_router.include_router(admin_discretionary_router)
+    app.include_router(v1_admin_discretionary_router)
+    
+    # Super-Admin Discretionary router (versioned)
+    from app.routes.super_admin.discretionary import router as super_admin_discretionary_router
+    v1_super_admin_discretionary_router = create_versioned_router("api", ["Super-Admin Discretionary"], APIVersion.V1)
+    v1_super_admin_discretionary_router.include_router(super_admin_discretionary_router)
+    app.include_router(v1_super_admin_discretionary_router)
+    
+    # Admin routes (non-versioned - infrastructure only)
     app.include_router(archival_admin_router)
     app.include_router(archival_config_admin_router)
 

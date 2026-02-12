@@ -193,7 +193,8 @@ class AddressDTO(BaseModel):
     address_type: List[str]
     is_default: bool = False
     floor: Optional[str] = None
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     postal_code: str
@@ -399,10 +400,14 @@ class SubscriptionDTO(BaseModel):
     subscription_id: UUID
     user_id: UUID
     plan_id: UUID
+    market_id: UUID  # Market (country) this subscription belongs to
     balance: Decimal
     renewal_date: datetime
     is_archived: bool = False
-    status: Status
+    status: Status  # General status (Active/Inactive)
+    subscription_status: Optional[str] = None  # Specific subscription status (Active/On Hold/Cancelled/Expired)
+    hold_start_date: Optional[datetime] = None  # When subscription was put on hold
+    hold_end_date: Optional[datetime] = None  # When subscription is expected to resume
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
@@ -413,6 +418,7 @@ class SubscriptionDTO(BaseModel):
 class PlanDTO(BaseModel):
     """Pure DTO for plan data"""
     plan_id: UUID
+    market_id: UUID  # Market (country) this plan belongs to
     credit_currency_id: UUID
     name: str
     credit: int

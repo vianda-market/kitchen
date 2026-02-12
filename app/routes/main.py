@@ -7,21 +7,21 @@ from app.utils.performance import monitor_endpoint
 from app.services.error_handling import handle_business_operation
 import psycopg2.extensions
 
-# Import discretionary routes
-from app.routes.admin.discretionary import router as admin_discretionary_router
-from app.routes.super_admin.discretionary import router as super_admin_discretionary_router
-
 router = APIRouter()
 
-# Include discretionary routes
-router.include_router(admin_discretionary_router)
-router.include_router(super_admin_discretionary_router)
-
-# Note: Root (/) and /health endpoints are handled at the app level (non-versioned)
-# for infrastructure/monitoring purposes. They are available at:
-# - / (root)
-# - /health (health check)
-# Business endpoints require versioning: /api/v1/...
+# Note: This router contains NON-VERSIONED infrastructure/monitoring endpoints only.
+# All business API routes (including admin/super-admin discretionary) are versioned
+# in application.py with the /api/v1/ prefix.
+#
+# Non-versioned endpoints (infrastructure/monitoring only):
+# - / (root) - handled at app level
+# - /health (health check) - handled at app level
+# - /pool-stats (database pool statistics) - included below
+#
+# Versioned business endpoints in application.py:
+# - /api/v1/admin/discretionary/ (admin discretionary management)
+# - /api/v1/super-admin/discretionary/ (super-admin discretionary approval)
+# - All other business APIs
 
 @router.get("/pool-stats")
 async def get_pool_stats(

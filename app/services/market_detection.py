@@ -6,8 +6,8 @@ This service detects the market/country code (ISO format) from entity addresses
 to enable market-specific business logic, particularly for billing and timing configurations.
 
 Key Features:
-- Extracts country codes from institution entities, restaurants, and institutions
-- Converts country names (from address records) to ISO country codes (e.g., "Argentina" -> "AR")
+- Extracts country codes directly from institution entities, restaurants, and institutions
+- Uses ISO 3166-1 alpha-3 country codes stored in address records (e.g., "ARG", "PER", "CHL")
 - Limited to Americas countries only (from Canada to Argentina)
 - Used primarily by the billing service to determine market-specific kitchen day timing
 
@@ -64,16 +64,10 @@ class MarketDetectionService:
             
             address = address_obj
             
-            # Extract country code from address (using 'country' field, not 'country_code')
-            country = address.country
-            if not country:
-                log_warning(f"No country found in address {entity.address_id}")
-                return None
-            
-            # Convert country name to country code
-            country_code = MarketDetectionService._country_name_to_code(country)
+            # Extract country code directly from address
+            country_code = address.country_code
             if not country_code:
-                log_warning(f"Unknown country: {country}")
+                log_warning(f"No country_code found in address {entity.address_id}")
                 return None
             
             log_info(f"Detected country {country_code} for entity {entity_id}")
@@ -111,16 +105,10 @@ class MarketDetectionService:
             
             address = address_obj
             
-            # Extract country code from address
-            country = address.country
-            if not country:
-                log_warning(f"No country found in address {restaurant.address_id}")
-                return None
-            
-            # Convert country name to country code
-            country_code = MarketDetectionService._country_name_to_code(country)
+            # Extract country code directly from address
+            country_code = address.country_code
             if not country_code:
-                log_warning(f"Unknown country: {country}")
+                log_warning(f"No country_code found in address {restaurant.address_id}")
                 return None
             
             log_info(f"Detected country {country_code} for restaurant {restaurant_id}")

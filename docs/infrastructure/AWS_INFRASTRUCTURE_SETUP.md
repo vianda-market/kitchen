@@ -202,10 +202,10 @@ kitchen-database/
 - name: Apply Database Migrations
   run: |
     # Clone kitchen-database repo
-    git clone https://github.com/cdeachaval/kitchen-database.git
+git clone https://github.com/cdeachaval/kitchen-database.git
     
     # Apply migrations
-    cd kitchen-database
+cd kitchen-database
     ./scripts/migrate.sh $DB_HOST $DB_NAME $DB_USER
 ```
 

@@ -8,7 +8,7 @@ CREATE INDEX idx_institution_entity_history_institution_entity_id ON institution
 
 CREATE INDEX idx_address_history_address_id ON address_history(address_id);
 
-CREATE INDEX idx_address_location ON address_info(country, province, city);
+CREATE INDEX idx_address_location ON address_info(country_code, province, city);
 
 CREATE INDEX idx_payment_method_address_id ON payment_method(address_id);
 
@@ -71,7 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_address_info_status ON address_info(status) WHERE
 CREATE INDEX IF NOT EXISTS idx_address_info_address_type ON address_info USING GIN(address_type) WHERE NOT is_archived;
 
 -- Location indexes for UI filtering (individual columns for dropdowns/filters)
-CREATE INDEX IF NOT EXISTS idx_address_info_country ON address_info(country) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_address_info_country_code ON address_info(country_code) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_address_info_province ON address_info(province) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_address_info_city ON address_info(city) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_address_info_postal_code ON address_info(postal_code) WHERE NOT is_archived;
@@ -80,9 +80,9 @@ CREATE INDEX IF NOT EXISTS idx_address_info_postal_code ON address_info(postal_c
 CREATE INDEX IF NOT EXISTS idx_address_info_employer_id ON address_info(employer_id) WHERE employer_id IS NOT NULL AND NOT is_archived;
 
 -- Composite indexes for common query patterns
--- For location-based filtering (country, province, city, postal_code) - matches common UI filter patterns
-CREATE INDEX IF NOT EXISTS idx_address_info_location ON address_info(country, province, city, postal_code) WHERE NOT is_archived;
--- For filtering by country + province (common hierarchical filter)
-CREATE INDEX IF NOT EXISTS idx_address_info_country_province ON address_info(country, province) WHERE NOT is_archived;
--- For filtering by country + province + city (refined location filter)
-CREATE INDEX IF NOT EXISTS idx_address_info_country_province_city ON address_info(country, province, city) WHERE NOT is_archived;
+-- For location-based filtering (country_code, province, city, postal_code) - matches common UI filter patterns
+CREATE INDEX IF NOT EXISTS idx_address_info_location ON address_info(country_code, province, city, postal_code) WHERE NOT is_archived;
+-- For filtering by country_code + province (common hierarchical filter)
+CREATE INDEX IF NOT EXISTS idx_address_info_country_province ON address_info(country_code, province) WHERE NOT is_archived;
+-- For filtering by country_code + province + city (refined location filter)
+CREATE INDEX IF NOT EXISTS idx_address_info_country_province_city ON address_info(country_code, province, city) WHERE NOT is_archived;

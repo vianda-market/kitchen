@@ -322,7 +322,8 @@ class PlateEnrichedResponseSchema(BaseModel):
     institution_name: str
     restaurant_name: str
     cuisine: Optional[str]
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     product_name: str
@@ -460,8 +461,26 @@ class CreditCurrencyResponseSchema(BaseModel):
     class Config:
         orm_mode = True
 
+class CreditCurrencyEnrichedResponseSchema(BaseModel):
+    """Schema for enriched credit currency response data with market information"""
+    credit_currency_id: UUID
+    currency_name: str
+    currency_code: str
+    credit_value: int
+    market_id: UUID  # Market that uses this currency
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+    class Config:
+        orm_mode = True
+
 class PlanCreateSchema(BaseModel):
     """Schema for creating a new plan"""
+    market_id: UUID = Field(..., description="Market (country) this plan belongs to")
     credit_currency_id: UUID
     name: str = Field(..., max_length=100)
     credit: int = Field(..., gt=0)
@@ -471,6 +490,7 @@ class PlanCreateSchema(BaseModel):
 
 class PlanUpdateSchema(BaseModel):
     """Schema for updating plan information"""
+    market_id: Optional[UUID] = Field(None, description="Market (country) this plan belongs to")
     credit_currency_id: Optional[UUID] = None
     name: Optional[str] = Field(None, max_length=100)
     credit: Optional[int] = Field(None, gt=0)
@@ -482,6 +502,7 @@ class PlanUpdateSchema(BaseModel):
 class PlanResponseSchema(BaseModel):
     """Schema for plan response data"""
     plan_id: UUID
+    market_id: UUID
     credit_currency_id: UUID
     name: str
     credit: int
@@ -500,6 +521,9 @@ class PlanResponseSchema(BaseModel):
 class PlanEnrichedResponseSchema(BaseModel):
     """Schema for enriched plan response data with currency name and code"""
     plan_id: UUID
+    market_id: UUID
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
     credit_currency_id: UUID
     currency_name: str
     currency_code: str
@@ -517,7 +541,7 @@ class PlanEnrichedResponseSchema(BaseModel):
         orm_mode = True
 
 class SubscriptionEnrichedResponseSchema(BaseModel):
-    """Schema for enriched subscription response data with user and plan information"""
+    """Schema for enriched subscription response data with user, plan, and market information"""
     subscription_id: UUID
     user_id: UUID
     user_full_name: str
@@ -532,6 +556,9 @@ class SubscriptionEnrichedResponseSchema(BaseModel):
     plan_rollover: bool
     plan_rollover_cap: Optional[Decimal]
     plan_status: Status
+    market_id: UUID  # Market (country) for this subscription
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
     renewal_date: datetime
     balance: Decimal
     is_archived: bool
@@ -544,7 +571,7 @@ class SubscriptionEnrichedResponseSchema(BaseModel):
         orm_mode = True
 
 class InstitutionBillEnrichedResponseSchema(BaseModel):
-    """Schema for enriched institution bill response data with institution, entity, and restaurant details"""
+    """Schema for enriched institution bill response data with institution, entity, restaurant, and market details"""
     institution_bill_id: UUID
     institution_id: UUID
     institution_name: str
@@ -553,6 +580,9 @@ class InstitutionBillEnrichedResponseSchema(BaseModel):
     restaurant_id: UUID
     restaurant_name: str
     credit_currency_id: UUID
+    market_id: UUID  # Via credit_currency_id → market_info
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
     payment_id: Optional[UUID] = None
     transaction_count: Optional[int] = None
     amount: Optional[Decimal] = None
@@ -571,14 +601,17 @@ class InstitutionBillEnrichedResponseSchema(BaseModel):
         orm_mode = True
 
 class InstitutionBankAccountEnrichedResponseSchema(BaseModel):
-    """Schema for enriched institution bank account response data with institution, entity, and address details"""
+    """Schema for enriched institution bank account response data with institution, entity, address, and market details"""
     bank_account_id: UUID
     institution_entity_id: UUID
     institution_id: UUID
     institution_name: str
     institution_entity_name: str
+    market_id: UUID  # Via address → country_code → market
+    market_name: str  # country_name from market_info
+    country_code: str  # from address (matches market_info.country_code)
     address_id: UUID
-    country: str
+    country_name: str  # from address (matches market_info.country_name)
     account_holder_name: str
     bank_name: str
     account_type: str
@@ -600,7 +633,8 @@ class InstitutionPaymentAttemptEnrichedResponseSchema(BaseModel):
     institution_entity_name: str
     bank_account_id: UUID
     bank_name: str
-    country: str
+    country_name: str
+    country_code: str
     institution_bill_id: Optional[UUID]
     period_start: Optional[datetime]
     period_end: Optional[datetime]
@@ -644,7 +678,7 @@ class AddressCreateSchema(BaseModel):
         return v
     is_default: bool = False
     floor: Optional[str] = Field(None, max_length=50)
-    country: str = Field(..., max_length=50)
+    country_code: str = Field(..., max_length=3, description="ISO 3166-1 alpha-3 country code (e.g., ARG, PER, CHL)")
     province: str = Field(..., max_length=50)
     city: str = Field(..., max_length=50)
     postal_code: str = Field(..., max_length=20)
@@ -656,7 +690,8 @@ class AddressCreateSchema(BaseModel):
         True,
         description="If True (default), assign the employer to the current user when adding address. Only applies to Customers. Employees/Suppliers ignore this parameter. Can be set to False to opt-out of assignment."
     )
-    # timezone is automatically assigned based on country/city - not required in API
+    # timezone is automatically assigned based on country_code/city - not required in API
+    # country_name is automatically populated from market_info via country_code
 
 class AddressUpdateSchema(BaseModel):
     """Schema for updating address information"""
@@ -683,7 +718,7 @@ class AddressUpdateSchema(BaseModel):
         return v
     is_default: Optional[bool] = None
     floor: Optional[str] = Field(None, max_length=50)
-    country: Optional[str] = Field(None, max_length=50)
+    country_code: Optional[str] = Field(None, max_length=3, description="ISO 3166-1 alpha-3 country code (e.g., ARG, PER, CHL)")
     province: Optional[str] = Field(None, max_length=50)
     city: Optional[str] = Field(None, max_length=50)
     postal_code: Optional[str] = Field(None, max_length=20)
@@ -691,7 +726,8 @@ class AddressUpdateSchema(BaseModel):
     street_name: Optional[str] = Field(None, max_length=100)
     building_number: Optional[str] = Field(None, max_length=20)
     apartment_unit: Optional[str] = Field(None, max_length=20)
-    # timezone is automatically assigned based on country/city - not required in API
+    # timezone is automatically assigned based on country_code/city - not required in API
+    # country_name is automatically populated from market_info via country_code
 
 class AddressResponseSchema(BaseModel):
     """Schema for address response data"""
@@ -702,7 +738,8 @@ class AddressResponseSchema(BaseModel):
     address_type: List[str]
     is_default: bool
     floor: Optional[str]
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     postal_code: str
@@ -733,7 +770,8 @@ class AddressEnrichedResponseSchema(BaseModel):
     address_type: List[str]
     is_default: bool
     floor: Optional[str]
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     postal_code: str
@@ -758,7 +796,8 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_entity_name: str
     address_id: UUID
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     postal_code: str
@@ -797,7 +836,8 @@ class RestaurantBalanceEnrichedResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_entity_name: str
     restaurant_name: str
-    country: str
+    country_name: str
+    country_code: str
     credit_currency_id: UUID
     transaction_count: int
     balance: Decimal
@@ -852,7 +892,8 @@ class RestaurantTransactionEnrichedResponseSchema(BaseModel):
     discretionary_id: Optional[UUID]
     credit_currency_id: UUID
     currency_code: Optional[str]
-    country: str
+    country_name: str
+    country_code: str
     was_collected: bool
     ordered_timestamp: datetime
     collected_timestamp: Optional[datetime]
@@ -879,7 +920,8 @@ class QRCodeEnrichedResponseSchema(BaseModel):
     restaurant_name: str
     institution_id: UUID
     institution_name: str
-    country: str
+    country_name: str
+    country_code: str
     province: str
     city: str
     postal_code: str
@@ -1103,6 +1145,34 @@ class DiscretionaryResponseSchema(BaseModel):
     class Config:
         orm_mode = True
 
+class DiscretionaryEnrichedResponseSchema(BaseModel):
+    """Schema for enriched discretionary request response data with user, restaurant, institution, and market information"""
+    discretionary_id: UUID
+    user_id: Optional[UUID] = None  # NULL for Supplier requests
+    user_full_name: Optional[str] = None  # For Customer requests
+    restaurant_id: Optional[UUID] = None  # NULL for Client requests
+    restaurant_name: Optional[str] = None  # For Supplier requests
+    institution_id: UUID
+    institution_name: str
+    credit_currency_id: UUID
+    currency_name: str
+    currency_code: str
+    market_id: UUID  # Via credit_currency_id → market_info
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
+    approval_id: Optional[UUID]
+    category: str
+    reason: DiscretionaryReason
+    amount: Decimal
+    comment: Optional[str]
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+    class Config:
+        orm_mode = True
+
 class DiscretionaryResolutionCreateSchema(BaseModel):
     """Schema for creating discretionary resolutions"""
     discretionary_id: UUID = Field(..., description="ID of the discretionary request")
@@ -1181,12 +1251,16 @@ class InstitutionEntityResponseSchema(BaseModel):
         orm_mode = True
 
 class InstitutionEntityEnrichedResponseSchema(BaseModel):
-    """Schema for enriched institution entity response data with institution name and address details"""
+    """Schema for enriched institution entity response data with institution, address, and market details"""
     institution_entity_id: UUID
     institution_id: UUID
     institution_name: str
+    market_id: UUID  # Via institution → credit_currency → market
+    market_name: str  # country_name from market_info
+    country_code: str  # from market_info
     address_id: UUID
-    address_country: str
+    address_country_name: str
+    address_country_code: str
     address_province: str
     address_city: str
     tax_id: str
@@ -1324,4 +1398,80 @@ class DailyOrdersResponseSchema(BaseModel):
     
     class Config:
         orm_mode = True
+
+
+# =============================================================================
+# Market Schemas
+# =============================================================================
+
+class MarketResponseSchema(BaseModel):
+    """Schema for market response (country-based subscription markets)"""
+    market_id: UUID = Field(..., description="Unique identifier for the market")
+    country_name: str = Field(..., description="Full country name (e.g., 'Argentina')")
+    country_code: str = Field(..., description="ISO 3166-1 alpha-3 country code (e.g., 'ARG')")
+    credit_currency_id: UUID = Field(..., description="FK to credit_currency_info")
+    currency_code: Optional[str] = Field(None, description="Currency code (enriched from JOIN)")
+    currency_name: Optional[str] = Field(None, description="Currency name (enriched from JOIN)")
+    timezone: str = Field(..., description="Timezone for this market (e.g., 'America/Argentina/Buenos_Aires')")
+    is_archived: bool = Field(..., description="Whether this market is archived")
+    status: Status = Field(..., description="Market status (Active/Inactive)")
+    created_date: datetime = Field(..., description="When this market was created")
+    modified_date: datetime = Field(..., description="When this market was last modified")
+
+    class Config:
+        orm_mode = True
+
+
+class MarketCreateSchema(BaseModel):
+    """Schema for creating a new market"""
+    country_name: str = Field(..., description="Full country name", min_length=2, max_length=100)
+    country_code: str = Field(..., description="ISO 3166-1 alpha-3 country code", min_length=3, max_length=3)
+    credit_currency_id: UUID = Field(..., description="FK to credit_currency_info")
+    timezone: str = Field(..., description="Timezone (e.g., 'America/Argentina/Buenos_Aires')", max_length=50)
+    status: Optional[Status] = Field(default=Status.ACTIVE, description="Market status")
+
+
+class MarketUpdateSchema(BaseModel):
+    """Schema for updating a market"""
+    country_name: Optional[str] = Field(None, description="Full country name", min_length=2, max_length=100)
+    country_code: Optional[str] = Field(None, description="ISO 3166-1 alpha-3 country code", min_length=3, max_length=3)
+    credit_currency_id: Optional[UUID] = Field(None, description="FK to credit_currency_info")
+    timezone: Optional[str] = Field(None, description="Timezone", max_length=50)
+    status: Optional[Status] = Field(None, description="Market status")
+    is_archived: Optional[bool] = Field(None, description="Archive status")
+
+
+# =============================================================================
+# ENUM SERVICE SCHEMAS
+# =============================================================================
+
+class EnumsResponseSchema(BaseModel):
+    """
+    Response schema for all system enums.
+    
+    Returns all valid enum values used throughout the system for frontend
+    dropdown population and form validation.
+    """
+    status: List[str] = Field(..., description="Valid status values")
+    address_type: List[str] = Field(..., description="Valid address types")
+    role_type: List[str] = Field(..., description="Valid role types")
+    role_name: List[str] = Field(..., description="Valid role names")
+    subscription_status: List[str] = Field(..., description="Valid subscription statuses")
+    method_type: List[str] = Field(..., description="Valid payment method types")
+    account_type: List[str] = Field(..., description="Valid bank account types")
+    transaction_type: List[str] = Field(..., description="Valid transaction types")
+    street_type: List[str] = Field(..., description="Valid street type abbreviations")
+    kitchen_day: List[str] = Field(..., description="Valid kitchen days")
+    pickup_type: List[str] = Field(..., description="Valid pickup types")
+    discretionary_reason: List[str] = Field(..., description="Valid discretionary request reasons")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": ["Active", "Inactive", "Pending", "Arrived", "Complete", "Cancelled", "Processed"],
+                "address_type": ["Restaurant", "Entity Billing", "Entity Address", "Customer Home", "Customer Billing", "Customer Employer"],
+                "role_type": ["Employee", "Supplier", "Customer"],
+                "subscription_status": ["Active", "On Hold", "Pending", "Expired", "Cancelled"]
+            }
+        }
 

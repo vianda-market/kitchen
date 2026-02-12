@@ -105,6 +105,45 @@ def reject_discretionary_request(
     return resolution
 
 
+@router.get("/pending-requests/", response_model=List[DiscretionarySummarySchema])
+def get_pending_discretionary_requests(
+    current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get all pending discretionary requests for super-admin dashboard.
+    
+    Returns all requests with status 'Pending' for approval/rejection.
+    Available to Admin and Super Admin employees (role_type='Employee' AND role_name IN ('Admin', 'Super Admin')).
+    """
+    log_info(f"Super-admin {current_user['user_id']} retrieving pending discretionary requests")
+    
+    # Delegate to service layer
+    pending_requests = discretionary_service.get_pending_requests(db)
+    
+    # Convert to summary format for dashboard
+    summary_requests = []
+    for request in pending_requests:
+        summary_requests.append(DiscretionarySummarySchema(
+            discretionary_id=request.discretionary_id,
+            user_id=request.user_id,
+            restaurant_id=request.restaurant_id,
+            category=request.category,
+            reason=request.reason,
+            amount=request.amount,
+            status=request.status,
+            created_date=request.created_date,
+            resolved_date=None,
+            resolved_by=None,
+            resolution_comment=None
+        ))
+    
+    # Sort by creation date (newest first)
+    summary_requests.sort(key=lambda x: x.created_date, reverse=True)
+    
+    return summary_requests
+
+
 @router.get("/requests/", response_model=List[DiscretionarySummarySchema])
 def get_all_discretionary_requests(
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
