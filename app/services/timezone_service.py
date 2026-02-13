@@ -1,343 +1,399 @@
 """
 Timezone Service
 
-Handles automatic timezone assignment based on country and city combinations.
-This service provides a mapping of supported countries/cities to their timezones.
+Handles automatic timezone assignment based on country_code and province/state.
+For single-timezone countries, uses market_info table as source of truth.
+For multi-timezone countries, uses province/state mappings.
 """
 
 from typing import Dict, Optional
+import psycopg2.extensions
+from fastapi import HTTPException
 from app.utils.log import log_info, log_warning
+from app.utils.db import db_read
 
 class TimezoneService:
-    """Service for managing timezone assignments"""
+    """Service for managing timezone assignments based on country_code and province"""
     
-    # Mapping of country -> city -> timezone
-    # Focused on North and South American countries
-    TIMEZONE_MAPPING = {
-        "Argentina": {
-            "default": "America/Argentina/Buenos_Aires",
-            "Ciudad Autonoma de Buenos Aires": "America/Argentina/Buenos_Aires",
-            "Buenos Aires": "America/Argentina/Buenos_Aires",
-            "Cordoba": "America/Argentina/Cordoba",
-            "Rosario": "America/Argentina/Buenos_Aires",
-            "Mendoza": "America/Argentina/Mendoza",
-            "La Plata": "America/Argentina/Buenos_Aires",
-            "Tucuman": "America/Argentina/Tucuman",
-            "Mar del Plata": "America/Argentina/Buenos_Aires",
-        },
-        "United States": {
-            "default": "America/New_York",
+    # Mapping for multi-timezone countries only (country_code -> province -> timezone)
+    # Single-timezone countries (ARG, PER, CHL, etc.) use market_info table
+    PROVINCE_TIMEZONE_MAPPING = {
+        "USA": {
+            # States by full name
+            "Alabama": "America/Chicago",
+            "Alaska": "America/Anchorage",
+            "Arizona": "America/Phoenix",
+            "Arkansas": "America/Chicago",
+            "California": "America/Los_Angeles",
+            "Colorado": "America/Denver",
+            "Connecticut": "America/New_York",
+            "Delaware": "America/New_York",
+            "Florida": "America/New_York",
+            "Georgia": "America/New_York",
+            "Hawaii": "Pacific/Honolulu",
+            "Idaho": "America/Denver",
+            "Illinois": "America/Chicago",
+            "Indiana": "America/New_York",
+            "Iowa": "America/Chicago",
+            "Kansas": "America/Chicago",
+            "Kentucky": "America/New_York",
+            "Louisiana": "America/Chicago",
+            "Maine": "America/New_York",
+            "Maryland": "America/New_York",
+            "Massachusetts": "America/New_York",
+            "Michigan": "America/New_York",
+            "Minnesota": "America/Chicago",
+            "Mississippi": "America/Chicago",
+            "Missouri": "America/Chicago",
+            "Montana": "America/Denver",
+            "Nebraska": "America/Chicago",
+            "Nevada": "America/Los_Angeles",
+            "New Hampshire": "America/New_York",
+            "New Jersey": "America/New_York",
+            "New Mexico": "America/Denver",
             "New York": "America/New_York",
-            "Los Angeles": "America/Los_Angeles",
-            "Chicago": "America/Chicago",
-            "Houston": "America/Chicago",
-            "Phoenix": "America/Phoenix",
-            "Philadelphia": "America/New_York",
-            "San Antonio": "America/Chicago",
-            "San Diego": "America/Los_Angeles",
-            "Dallas": "America/Chicago",
-            "San Jose": "America/Los_Angeles",
-            "Austin": "America/Chicago",
-            "Jacksonville": "America/New_York",
-            "Fort Worth": "America/Chicago",
-            "Columbus": "America/New_York",
-            "Charlotte": "America/New_York",
-            "San Francisco": "America/Los_Angeles",
-            "Indianapolis": "America/New_York",
-            "Seattle": "America/Los_Angeles",
-            "Denver": "America/Denver",
-            "Washington": "America/New_York",
-            "Boston": "America/New_York",
-            "El Paso": "America/Denver",
-            "Nashville": "America/Chicago",
-            "Detroit": "America/New_York",
-            "Oklahoma City": "America/Chicago",
-            "Portland": "America/Los_Angeles",
-            "Las Vegas": "America/Los_Angeles",
-            "Memphis": "America/Chicago",
-            "Louisville": "America/New_York",
-            "Baltimore": "America/New_York",
+            "North Carolina": "America/New_York",
+            "North Dakota": "America/Chicago",
+            "Ohio": "America/New_York",
+            "Oklahoma": "America/Chicago",
+            "Oregon": "America/Los_Angeles",
+            "Pennsylvania": "America/New_York",
+            "Rhode Island": "America/New_York",
+            "South Carolina": "America/New_York",
+            "South Dakota": "America/Chicago",
+            "Tennessee": "America/Chicago",
+            "Texas": "America/Chicago",
+            "Utah": "America/Denver",
+            "Vermont": "America/New_York",
+            "Virginia": "America/New_York",
+            "Washington": "America/Los_Angeles",
+            "West Virginia": "America/New_York",
+            "Wisconsin": "America/Chicago",
+            "Wyoming": "America/Denver",
+            # States by code
+            "AL": "America/Chicago",
+            "AK": "America/Anchorage",
+            "AZ": "America/Phoenix",
+            "AR": "America/Chicago",
+            "CA": "America/Los_Angeles",
+            "CO": "America/Denver",
+            "CT": "America/New_York",
+            "DE": "America/New_York",
+            "FL": "America/New_York",
+            "GA": "America/New_York",
+            "HI": "Pacific/Honolulu",
+            "ID": "America/Denver",
+            "IL": "America/Chicago",
+            "IN": "America/New_York",
+            "IA": "America/Chicago",
+            "KS": "America/Chicago",
+            "KY": "America/New_York",
+            "LA": "America/Chicago",
+            "ME": "America/New_York",
+            "MD": "America/New_York",
+            "MA": "America/New_York",
+            "MI": "America/New_York",
+            "MN": "America/Chicago",
+            "MS": "America/Chicago",
+            "MO": "America/Chicago",
+            "MT": "America/Denver",
+            "NE": "America/Chicago",
+            "NV": "America/Los_Angeles",
+            "NH": "America/New_York",
+            "NJ": "America/New_York",
+            "NM": "America/Denver",
+            "NY": "America/New_York",
+            "NC": "America/New_York",
+            "ND": "America/Chicago",
+            "OH": "America/New_York",
+            "OK": "America/Chicago",
+            "OR": "America/Los_Angeles",
+            "PA": "America/New_York",
+            "RI": "America/New_York",
+            "SC": "America/New_York",
+            "SD": "America/Chicago",
+            "TN": "America/Chicago",
+            "TX": "America/Chicago",
+            "UT": "America/Denver",
+            "VT": "America/New_York",
+            "VA": "America/New_York",
+            "WA": "America/Los_Angeles",
+            "WV": "America/New_York",
+            "WI": "America/Chicago",
+            "WY": "America/Denver",
         },
-        "Brazil": {
-            "default": "America/Sao_Paulo",
-            "Sao Paulo": "America/Sao_Paulo",
+        "BRA": {
+            # Brazilian states by name
+            "Acre": "America/Rio_Branco",
+            "Alagoas": "America/Maceio",
+            "Amapa": "America/Belem",
+            "Amazonas": "America/Manaus",
+            "Bahia": "America/Bahia",
+            "Ceara": "America/Fortaleza",
+            "Distrito Federal": "America/Sao_Paulo",
+            "Espirito Santo": "America/Sao_Paulo",
+            "Goias": "America/Sao_Paulo",
+            "Maranhao": "America/Fortaleza",
+            "Mato Grosso": "America/Cuiaba",
+            "Mato Grosso do Sul": "America/Campo_Grande",
+            "Minas Gerais": "America/Sao_Paulo",
+            "Para": "America/Belem",
+            "Paraiba": "America/Fortaleza",
+            "Parana": "America/Sao_Paulo",
+            "Pernambuco": "America/Recife",
+            "Piaui": "America/Fortaleza",
             "Rio de Janeiro": "America/Sao_Paulo",
-            "Brasilia": "America/Sao_Paulo",
-            "Salvador": "America/Bahia",
-            "Fortaleza": "America/Fortaleza",
-            "Belo Horizonte": "America/Sao_Paulo",
-            "Manaus": "America/Manaus",
-            "Curitiba": "America/Sao_Paulo",
-            "Recife": "America/Recife",
-            "Goiania": "America/Sao_Paulo",
-            "Porto Alegre": "America/Sao_Paulo",
-            "Belem": "America/Belem",
-            "Guarulhos": "America/Sao_Paulo",
-            "Campinas": "America/Sao_Paulo",
+            "Rio Grande do Norte": "America/Fortaleza",
+            "Rio Grande do Sul": "America/Sao_Paulo",
+            "Rondonia": "America/Porto_Velho",
+            "Roraima": "America/Boa_Vista",
+            "Santa Catarina": "America/Sao_Paulo",
+            "Sao Paulo": "America/Sao_Paulo",
+            "Sergipe": "America/Maceio",
+            "Tocantins": "America/Araguaina",
         },
-        "Mexico": {
-            "default": "America/Mexico_City",
-            "Mexico City": "America/Mexico_City",
-            "Guadalajara": "America/Mexico_City",
-            "Monterrey": "America/Monterrey",
-            "Puebla": "America/Mexico_City",
-            "Tijuana": "America/Tijuana",
-            "Leon": "America/Mexico_City",
-            "Juarez": "America/Ciudad_Juarez",
-            "Torreon": "America/Monterrey",
-            "Queretaro": "America/Mexico_City",
-            "San Luis Potosi": "America/Mexico_City",
-            "Zapopan": "America/Mexico_City",
-            "Merida": "America/Merida",
-            "Mexicali": "America/Tijuana",
+        "CAN": {
+            # Canadian provinces by name
+            "Alberta": "America/Edmonton",
+            "British Columbia": "America/Vancouver",
+            "Manitoba": "America/Winnipeg",
+            "New Brunswick": "America/Halifax",
+            "Newfoundland and Labrador": "America/St_Johns",
+            "Northwest Territories": "America/Yellowknife",
+            "Nova Scotia": "America/Halifax",
+            "Nunavut": "America/Iqaluit",
+            "Ontario": "America/Toronto",
+            "Prince Edward Island": "America/Halifax",
+            "Quebec": "America/Toronto",
+            "Saskatchewan": "America/Regina",
+            "Yukon": "America/Whitehorse",
+            # Provinces by code
+            "AB": "America/Edmonton",
+            "BC": "America/Vancouver",
+            "MB": "America/Winnipeg",
+            "NB": "America/Halifax",
+            "NL": "America/St_Johns",
+            "NT": "America/Yellowknife",
+            "NS": "America/Halifax",
+            "NU": "America/Iqaluit",
+            "ON": "America/Toronto",
+            "PE": "America/Halifax",
+            "QC": "America/Toronto",
+            "SK": "America/Regina",
+            "YT": "America/Whitehorse",
+        },
+        "MEX": {
+            # Mexican states by name
             "Aguascalientes": "America/Mexico_City",
-        },
-        "Canada": {
-            "default": "America/Toronto",
-            "Toronto": "America/Toronto",
-            "Montreal": "America/Toronto",
-            "Vancouver": "America/Vancouver",
-            "Calgary": "America/Edmonton",
-            "Edmonton": "America/Edmonton",
-            "Ottawa": "America/Toronto",
-            "Winnipeg": "America/Winnipeg",
-            "Quebec City": "America/Toronto",
-            "Hamilton": "America/Toronto",
-            "Kitchener": "America/Toronto",
-            "London": "America/Toronto",
-            "Victoria": "America/Vancouver",
-            "Halifax": "America/Halifax",
-            "Oshawa": "America/Toronto",
-        },
-        "Colombia": {
-            "default": "America/Bogota",
-            "Bogota": "America/Bogota",
-            "Medellin": "America/Bogota",
-            "Cali": "America/Bogota",
-            "Barranquilla": "America/Bogota",
-            "Cartagena": "America/Bogota",
-            "Cucuta": "America/Bogota",
-            "Bucaramanga": "America/Bogota",
-            "Pereira": "America/Bogota",
-            "Santa Marta": "America/Bogota",
-            "Ibague": "America/Bogota",
-            "Pasto": "America/Bogota",
-            "Manizales": "America/Bogota",
-            "Neiva": "America/Bogota",
-            "Villavicencio": "America/Bogota",
-        },
-        "Ecuador": {
-            "default": "America/Guayaquil",
-            "Quito": "America/Guayaquil",
-            "Guayaquil": "America/Guayaquil",
-            "Cuenca": "America/Guayaquil",
-            "Santo Domingo": "America/Guayaquil",
-            "Machala": "America/Guayaquil",
-            "Manta": "America/Guayaquil",
-            "Portoviejo": "America/Guayaquil",
-            "Ambato": "America/Guayaquil",
-            "Riobamba": "America/Guayaquil",
-            "Quevedo": "America/Guayaquil",
-            "Loja": "America/Guayaquil",
-            "Ibarra": "America/Guayaquil",
-            "Milagro": "America/Guayaquil",
-            "Esmeraldas": "America/Guayaquil",
-        },
-        "Peru": {
-            "default": "America/Lima",
-            "Lima": "America/Lima",
-            "Arequipa": "America/Lima",
-            "Trujillo": "America/Lima",
-            "Cusco": "America/Lima",
-            "Chiclayo": "America/Lima",
-            "Piura": "America/Lima",
-            "Iquitos": "America/Lima",
-            "Huancayo": "America/Lima",
-            "Tacna": "America/Lima",
-            "Ica": "America/Lima",
-            "Juliaca": "America/Lima",
-            "Cajamarca": "America/Lima",
-            "Pucallpa": "America/Lima",
-            "Chimbote": "America/Lima",
-        },
-        "Chile": {
-            "default": "America/Santiago",
-            "Santiago": "America/Santiago",
-            "Valparaiso": "America/Santiago",
-            "Concepcion": "America/Santiago",
-            "La Serena": "America/Santiago",
-            "Antofagasta": "America/Santiago",
-            "Temuco": "America/Santiago",
-            "Rancagua": "America/Santiago",
-            "Talca": "America/Santiago",
-            "Arica": "America/Santiago",
-            "Chillan": "America/Santiago",
-            "Iquique": "America/Santiago",
-            "Los Angeles": "America/Santiago",
-            "Puerto Montt": "America/Santiago",
-            "Valdivia": "America/Santiago",
-        },
-        "Paraguay": {
-            "default": "America/Asuncion",
-            "Asuncion": "America/Asuncion",
-            "Ciudad del Este": "America/Asuncion",
-            "San Lorenzo": "America/Asuncion",
-            "Lambare": "America/Asuncion",
-            "Fernando de la Mora": "America/Asuncion",
-            "Limpio": "America/Asuncion",
-            "Nemby": "America/Asuncion",
-            "Encarnacion": "America/Asuncion",
-            "Villa Elisa": "America/Asuncion",
-            "Capiatá": "America/Asuncion",
-            "Lambarén": "America/Asuncion",
-            "Concepción": "America/Asuncion",
-            "Coronel Oviedo": "America/Asuncion",
-            "Pedro Juan Caballero": "America/Asuncion",
-        },
-        "Panama": {
-            "default": "America/Panama",
-            "Panama City": "America/Panama",
-            "San Miguelito": "America/Panama",
-            "Tocumen": "America/Panama",
-            "David": "America/Panama",
-            "Arraijan": "America/Panama",
-            "Colon": "America/Panama",
-            "Las Cumbres": "America/Panama",
-            "La Chorrera": "America/Panama",
-            "Pacora": "America/Panama",
-            "Santiago": "America/Panama",
-            "Chitre": "America/Panama",
-            "Vista Alegre": "America/Panama",
-            "Chilibre": "America/Panama",
-            "Cativa": "America/Panama",
-        },
-        "Uruguay": {
-            "default": "America/Montevideo",
-            "Montevideo": "America/Montevideo",
-            "Salto": "America/Montevideo",
-            "Paysandu": "America/Montevideo",
-            "Las Piedras": "America/Montevideo",
-            "Rivera": "America/Montevideo",
-            "Maldonado": "America/Montevideo",
-            "Tacuarembo": "America/Montevideo",
-            "Melo": "America/Montevideo",
-            "Mercedes": "America/Montevideo",
-            "Artigas": "America/Montevideo",
-            "Minas": "America/Montevideo",
-            "San Jose de Mayo": "America/Montevideo",
-            "Durazno": "America/Montevideo",
-            "Florida": "America/Montevideo",
+            "Baja California": "America/Tijuana",
+            "Baja California Sur": "America/Mazatlan",
+            "Campeche": "America/Merida",
+            "Chiapas": "America/Mexico_City",
+            "Chihuahua": "America/Chihuahua",
+            "Coahuila": "America/Monterrey",
+            "Colima": "America/Mexico_City",
+            "Durango": "America/Monterrey",
+            "Guanajuato": "America/Mexico_City",
+            "Guerrero": "America/Mexico_City",
+            "Hidalgo": "America/Mexico_City",
+            "Jalisco": "America/Mexico_City",
+            "Mexico": "America/Mexico_City",
+            "Mexico City": "America/Mexico_City",
+            "Michoacan": "America/Mexico_City",
+            "Morelos": "America/Mexico_City",
+            "Nayarit": "America/Mazatlan",
+            "Nuevo Leon": "America/Monterrey",
+            "Oaxaca": "America/Mexico_City",
+            "Puebla": "America/Mexico_City",
+            "Queretaro": "America/Mexico_City",
+            "Quintana Roo": "America/Cancun",
+            "San Luis Potosi": "America/Mexico_City",
+            "Sinaloa": "America/Mazatlan",
+            "Sonora": "America/Hermosillo",
+            "Tabasco": "America/Mexico_City",
+            "Tamaulipas": "America/Monterrey",
+            "Tlaxcala": "America/Mexico_City",
+            "Veracruz": "America/Mexico_City",
+            "Yucatan": "America/Merida",
+            "Zacatecas": "America/Mexico_City",
         }
     }
     
     @classmethod
-    def get_timezone_for_location(cls, country: str, city: str) -> str:
+    def deduce_timezone(cls, country_code: str, province: Optional[str], db: psycopg2.extensions.connection) -> str:
         """
-        Get timezone for a given country and city combination.
+        Deduce timezone from country_code and optional province/state.
+        
+        Logic:
+        1. Query market_info for country's default timezone
+        2. If country not found → raise HTTPException (400)
+        3. If country has single timezone (not in PROVINCE_TIMEZONE_MAPPING) → return market default
+        4. If country has multiple timezones:
+           - If province provided → lookup in PROVINCE_TIMEZONE_MAPPING
+           - If province found → return province timezone
+           - If province not found or not provided → return market default + log warning
         
         Args:
-            country: Country name
-            city: City name
+            country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA", "BRA")
+            province: Province/state name or code (optional for single-TZ countries)
+            db: Database connection
             
         Returns:
-            Timezone string (e.g., "America/New_York")
+            Timezone string (e.g., "America/New_York", "America/Argentina/Buenos_Aires")
+            
+        Raises:
+            HTTPException: 400 if country_code not found in market_info
         """
-        if not country or not city:
-            log_warning(f"Missing location data: country='{country}', city='{city}'")
-            return cls._get_fallback_timezone()
+        if not country_code:
+            raise HTTPException(status_code=400, detail="country_code is required for timezone deduction")
         
-        # Normalize inputs
-        country = country.strip()
-        city = city.strip()
+        country_code = country_code.strip().upper()
         
-        # Check if country exists in mapping
-        if country not in cls.TIMEZONE_MAPPING:
-            log_warning(f"Country '{country}' not found in timezone mapping")
-            return cls._get_fallback_timezone()
+        # Query market_info for default timezone
+        market_data = cls._get_market_timezone(country_code, db)
+        if not market_data:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid country_code: {country_code}. Market not found in market_info."
+            )
         
-        country_mapping = cls.TIMEZONE_MAPPING[country]
+        default_timezone = market_data["timezone"]
+        country_name = market_data["country_name"]
         
-        # Check if city exists in country mapping
-        if city in country_mapping:
-            timezone = country_mapping[city]
-            log_info(f"Found timezone for {city}, {country}: {timezone}")
-            return timezone
+        # Check if this is a multi-timezone country
+        if country_code not in cls.PROVINCE_TIMEZONE_MAPPING:
+            # Single-timezone country - use market default
+            log_info(f"Single-timezone country {country_name} ({country_code}): using {default_timezone}")
+            return default_timezone
         
-        # Use default timezone for the country
-        if "default" in country_mapping:
-            timezone = country_mapping["default"]
-            log_info(f"Using default timezone for {country}: {timezone}")
-            return timezone
+        # Multi-timezone country - check province
+        if not province:
+            log_warning(
+                f"Multi-timezone country {country_name} ({country_code}) but no province provided. "
+                f"Using default timezone: {default_timezone}"
+            )
+            return default_timezone
         
-        # Fallback to global default
-        log_warning(f"No timezone mapping found for {city}, {country}")
-        return cls._get_fallback_timezone()
+        # Normalize province name
+        normalized_province = cls._normalize_province_name(province)
+        
+        # Lookup province in mapping
+        province_mapping = cls.PROVINCE_TIMEZONE_MAPPING[country_code]
+        if normalized_province in province_mapping:
+            province_timezone = province_mapping[normalized_province]
+            log_info(
+                f"Found timezone for {normalized_province}, {country_name} ({country_code}): {province_timezone}"
+            )
+            return province_timezone
+        
+        # Province not found - use default + warning
+        log_warning(
+            f"Province '{province}' not found in timezone mapping for {country_name} ({country_code}). "
+            f"Using default timezone: {default_timezone}. "
+            f"Available provinces: {list(province_mapping.keys())[:10]}..."
+        )
+        return default_timezone
     
     @classmethod
-    def get_supported_countries(cls) -> list:
+    def _get_market_timezone(cls, country_code: str, db: psycopg2.extensions.connection) -> Optional[Dict]:
         """
-        Get list of supported countries.
-        
-        Returns:
-            List of supported country names
-        """
-        return list(cls.TIMEZONE_MAPPING.keys())
-    
-    @classmethod
-    def get_supported_cities(cls, country: str) -> list:
-        """
-        Get list of supported cities for a given country.
+        Query market_info table for country's default timezone.
         
         Args:
-            country: Country name
+            country_code: ISO 3166-1 alpha-3 country code
+            db: Database connection
             
         Returns:
-            List of supported city names (excluding 'default')
+            Dict with 'timezone' and 'country_name' keys, or None if not found
         """
-        if country not in cls.TIMEZONE_MAPPING:
+        query = """
+            SELECT timezone, country_name 
+            FROM market_info 
+            WHERE country_code = %s AND is_archived = FALSE
+        """
+        result = db_read(query, [country_code], connection=db, fetch_one=True)
+        return result
+    
+    @classmethod
+    def _normalize_province_name(cls, province: str) -> str:
+        """
+        Normalize province/state name for consistent lookups.
+        Handles variations like "New York" vs "NY" vs "New York State".
+        
+        Args:
+            province: Province/state name or code
+            
+        Returns:
+            Normalized province name
+        """
+        if not province:
+            return ""
+        
+        # Strip whitespace and convert to title case
+        normalized = province.strip().title()
+        
+        # Remove common suffixes
+        suffixes_to_remove = [" State", " Province", " Territory"]
+        for suffix in suffixes_to_remove:
+            if normalized.endswith(suffix):
+                normalized = normalized[:-len(suffix)].strip()
+        
+        # If it's already uppercase and 2 chars, assume it's a state code
+        if province.strip().isupper() and len(province.strip()) == 2:
+            normalized = province.strip().upper()
+        
+        return normalized
+    
+    @classmethod
+    def get_supported_multi_timezone_countries(cls) -> list:
+        """
+        Get list of country codes with multiple timezones.
+        
+        Returns:
+            List of country codes (e.g., ["USA", "BRA", "CAN", "MEX"])
+        """
+        return list(cls.PROVINCE_TIMEZONE_MAPPING.keys())
+    
+    @classmethod
+    def get_supported_provinces(cls, country_code: str) -> list:
+        """
+        Get list of supported provinces/states for a multi-timezone country.
+        
+        Args:
+            country_code: ISO 3166-1 alpha-3 country code
+            
+        Returns:
+            List of province names/codes, or empty list if single-timezone country
+        """
+        if country_code not in cls.PROVINCE_TIMEZONE_MAPPING:
             return []
         
-        cities = list(cls.TIMEZONE_MAPPING[country].keys())
-        return [city for city in cities if city != "default"]
-    
-    @classmethod
-    def _get_fallback_timezone(cls) -> str:
-        """
-        Get fallback timezone when no mapping is found.
-        
-        Returns:
-            Fallback timezone string
-        """
-        log_warning("Using fallback timezone: America/New_York")
-        return "America/New_York"
-    
-    @classmethod
-    def validate_timezone(cls, timezone: str) -> bool:
-        """
-        Validate if a timezone string is valid.
-        
-        Args:
-            timezone: Timezone string to validate
-            
-        Returns:
-            True if timezone is valid, False otherwise
-        """
-        try:
-            import pytz
-            pytz.timezone(timezone)
-            return True
-        except Exception:
-            return False
+        return list(cls.PROVINCE_TIMEZONE_MAPPING[country_code].keys())
 
-# Convenience functions for easy import
+# Convenience function for backward compatibility (deprecated)
 def get_timezone_for_location(country: str, city: str) -> str:
-    """Get timezone for a given country and city combination."""
-    return TimezoneService.get_timezone_for_location(country, city)
+    """
+    DEPRECATED: Use deduce_timezone_from_address() instead.
+    Legacy function for backward compatibility with city-based lookups.
+    """
+    log_warning(
+        f"get_timezone_for_location(country='{country}', city='{city}') is deprecated. "
+        f"Use deduce_timezone_from_address() with country_code and province instead."
+    )
+    # Fallback to a default timezone
+    return "America/New_York"
 
-def get_supported_countries() -> list:
-    """Get list of supported countries."""
-    return TimezoneService.get_supported_countries()
-
-def get_supported_cities(country: str) -> list:
-    """Get list of supported cities for a given country."""
-    return TimezoneService.get_supported_cities(country)
+def deduce_timezone_from_address(country_code: str, province: Optional[str], db: psycopg2.extensions.connection) -> str:
+    """
+    Deduce timezone from country_code and province.
+    Convenience function that delegates to TimezoneService.deduce_timezone().
+    
+    Args:
+        country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA")
+        province: Province/state name or code (optional for single-TZ countries)
+        db: Database connection
+        
+    Returns:
+        Timezone string (e.g., "America/New_York")
+    """
+    return TimezoneService.deduce_timezone(country_code, province, db)

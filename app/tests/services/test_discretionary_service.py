@@ -58,8 +58,8 @@ class TestDiscretionaryService:
         return {
             "user_id": uuid4(),
             "restaurant_id": None,
-            "category": "Client",  # Valid category (must match valid_categories)
-            "reason": "Marketing Campaign",  # Valid reason for Client category
+            "category": DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            "reason": "New customer onboarding incentive",  # Reason is now free-form text
             "amount": Decimal("10.0"),
             "comment": "Customer service issue resolved"
         }
@@ -72,8 +72,8 @@ class TestDiscretionaryService:
             user_id=uuid4(),
             restaurant_id=None,
             approval_id=None,
-            category="Client",
-            reason=DiscretionaryReason.MARKETING_CAMPAIGN,
+            category=DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            reason="New customer onboarding incentive",  # Reason is now free-form text
             amount=Decimal("10.0"),
             comment="Customer service issue resolved",
             is_archived=False,
@@ -163,11 +163,11 @@ class TestDiscretionaryService:
     
     def test_create_discretionary_request_with_restaurant_success(self, discretionary_service, sample_admin_user, sample_restaurant_dto, sample_discretionary_dto, mock_db):
         """Test successful discretionary request creation with restaurant"""
-        # Arrange - Use valid category "Supplier" for restaurant requests (no user_id)
+        # Arrange - Use restaurant-specific category
         request_data = {
             "restaurant_id": uuid4(),
-            "category": "Supplier",  # Valid category for restaurant requests
-            "reason": "Order incorrectly marked as not collected",  # Valid reason for Supplier category
+            "category": DiscretionaryReason.FULL_ORDER_REFUND,  # Restaurant-specific category
+            "reason": "Order was marked as not collected but customer confirmed pickup",  # Free-form explanation
             "amount": Decimal("15.0"),
             "comment": "Restaurant service issue"
         }
@@ -195,9 +195,8 @@ class TestDiscretionaryService:
         """Test discretionary request creation with missing required fields"""
         # Arrange
         incomplete_request_data = {
-            "user_id": uuid4(),
-            "category": "client_refund"
-            # Missing: reason, amount
+            "user_id": uuid4()
+            # Missing: category, amount (reason is optional)
         }
         
         # Act & Assert
@@ -214,8 +213,8 @@ class TestDiscretionaryService:
         # Arrange
         request_data = {
             "user_id": uuid4(),
-            "category": "client_refund",
-            "reason": "Order incorrectly marked as not collected",  # Valid reason for Supplier category
+            "category": DiscretionaryReason.CREDIT_REFUND,
+            "reason": "Customer refund request",
             "amount": Decimal("0")  # Invalid: zero amount
         }
         
@@ -233,8 +232,8 @@ class TestDiscretionaryService:
         # Arrange
         request_data = {
             "user_id": uuid4(),
-            "category": "invalid_category",
-            "reason": "Order incorrectly marked as not collected",  # Valid reason for Supplier category
+            "category": "invalid_category",  # Invalid enum value
+            "reason": "Some explanation",
             "amount": Decimal("10.0")
         }
         
@@ -247,34 +246,30 @@ class TestDiscretionaryService:
         assert exc_info.value.status_code == 400
         assert "Invalid category" in exc_info.value.detail
     
-    def test_create_discretionary_request_invalid_reason(self, discretionary_service, sample_admin_user, mock_db):
-        """Test discretionary request creation with invalid reason"""
-        # Arrange - Use valid category first, then test invalid reason
+    def test_create_discretionary_request_requires_restaurant(self, discretionary_service, sample_admin_user, mock_db):
+        """Test discretionary request creation with restaurant-required category but user_id provided"""
+        # Arrange - Use restaurant-specific category with user_id (should fail)
         request_data = {
-            "user_id": uuid4(),
-            "category": "Client",  # Valid category
-            "reason": "invalid_reason",  # Invalid reason
+            "user_id": uuid4(),  # Has user_id but no restaurant_id
+            "category": DiscretionaryReason.FULL_ORDER_REFUND,  # Requires restaurant_id
+            "reason": "Trying to refund order without restaurant context",
             "amount": Decimal("10.0")
         }
         
-        # Mock user to pass user validation
-        with patch('app.services.discretionary_service.user_service') as mock_user_service:
-            mock_user_service.get_by_id.return_value = Mock()  # User exists
-            
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                discretionary_service.create_discretionary_request(
-                    request_data, sample_admin_user, mock_db
-                )
-            
-            assert exc_info.value.status_code == 400
-            assert "Invalid reason" in exc_info.value.detail
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            discretionary_service.create_discretionary_request(
+                request_data, sample_admin_user, mock_db
+            )
+        
+        assert exc_info.value.status_code == 400
+        assert "requires restaurant_id" in exc_info.value.detail
     
     def test_create_discretionary_request_user_not_found(self, discretionary_service, sample_admin_user, sample_request_data, mock_db):
         """Test discretionary request creation with non-existent user"""
         # Arrange - Category validation happens first, so we need valid category
         request_data = sample_request_data.copy()
-        request_data["category"] = "Client"  # Ensure valid category
+        request_data["category"] = DiscretionaryReason.CREDIT_REFUND  # Ensure valid category enum
         
         with patch('app.services.discretionary_service.user_service') as mock_user_service:
             mock_user_service.get_by_id.return_value = None
@@ -291,11 +286,11 @@ class TestDiscretionaryService:
     
     def test_create_discretionary_request_restaurant_not_found(self, discretionary_service, sample_admin_user, sample_user_dto, mock_db):
         """Test discretionary request creation with non-existent restaurant"""
-        # Arrange - Use valid category "Supplier" for restaurant requests
+        # Arrange - Use restaurant-specific category
         request_data = {
             "restaurant_id": uuid4(),
-            "category": "Supplier",  # Valid category for restaurant requests
-            "reason": "Order incorrectly marked as not collected",  # Valid reason for Supplier category
+            "category": DiscretionaryReason.FULL_ORDER_REFUND,  # Restaurant-specific category
+            "reason": "Full refund for incorrectly processed order",
             "amount": Decimal("10.0")
         }
         
@@ -493,8 +488,8 @@ class TestDiscretionaryService:
             user_id=uuid4(),
             restaurant_id=None,
             approval_id=None,
-            category="Client",
-            reason=DiscretionaryReason.MARKETING_CAMPAIGN,
+            category=DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            reason="New customer promotional credit",  # Reason is now free-form text
             amount=Decimal("10.0"),
             comment="Test comment",
             is_archived=False,
@@ -509,8 +504,8 @@ class TestDiscretionaryService:
             user_id=uuid4(),
             restaurant_id=None,
             approval_id=None,
-            category="Client",
-            reason=DiscretionaryReason.MARKETING_CAMPAIGN,
+            category=DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            reason="New customer promotional credit",  # Reason is now free-form text
             amount=Decimal("10.0"),
             comment="Test comment",
             is_archived=False,
@@ -565,8 +560,8 @@ class TestDiscretionaryService:
             user_id=uuid4(),
             restaurant_id=None,
             approval_id=None,
-            category="Client",
-            reason=DiscretionaryReason.MARKETING_CAMPAIGN,
+            category=DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            reason="New customer promotional credit",  # Reason is now free-form text
             amount=Decimal("10.0"),
             comment="Test comment",
             is_archived=False,
@@ -581,8 +576,8 @@ class TestDiscretionaryService:
             user_id=uuid4(),
             restaurant_id=None,
             approval_id=None,
-            category="Client",
-            reason=DiscretionaryReason.MARKETING_CAMPAIGN,
+            category=DiscretionaryReason.MARKETING_CAMPAIGN,  # Category is now the enum
+            reason="New customer promotional credit",  # Reason is now free-form text
             amount=Decimal("10.0"),
             comment="Test comment",
             is_archived=False,

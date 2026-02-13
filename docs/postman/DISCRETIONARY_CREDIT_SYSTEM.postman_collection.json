@@ -361,8 +361,11 @@
 									"pm.test(\"Status is Pending\", function () {",
 									"    pm.expect(response.status).to.eql('Pending');",
 									"});",
-									"pm.test(\"Category is Client\", function () {",
-									"    pm.expect(response.category).to.eql('Client');",
+									"pm.test(\"Category is Marketing Campaign\", function () {",
+									"    pm.expect(response.category).to.eql('Marketing Campaign');",
+									"});",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
 									"});",
 									"",
 									"pm.environment.set(\"clientCreditRequestId\", response.discretionary_id);"
@@ -381,7 +384,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Client\",\n    \"reason\": \"Marketing Campaign\",\n    \"amount\": 15.50,\n    \"comment\": \"Marketing campaign credit for new customer\"\n}"
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Marketing campaign credit for new customer\",\n    \"amount\": 15.50,\n    \"comment\": \"Additional context for admin review\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
@@ -458,8 +461,11 @@
 									"pm.test(\"Status is Pending\", function () {",
 									"    pm.expect(response.status).to.eql('Pending');",
 									"});",
-									"pm.test(\"Category is Supplier\", function () {",
-									"    pm.expect(response.category).to.eql('Supplier');",
+									"pm.test(\"Category is Full Order Refund\", function () {",
+									"    pm.expect(response.category).to.eql('Full Order Refund');",
+									"});",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
 									"});",
 									"",
 									"pm.environment.set(\"restaurantCreditRequestId\", response.discretionary_id);"
@@ -478,7 +484,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"restaurant_id\": \"{{testRestaurantId}}\",\n    \"category\": \"Supplier\",\n    \"reason\": \"Full Order Refund\",\n    \"amount\": 25.00,\n    \"comment\": \"Full refund for order incorrectly processed\"\n}"
+							"raw": "{\n    \"restaurant_id\": \"{{testRestaurantId}}\",\n    \"category\": \"Full Order Refund\",\n    \"reason\": \"Full refund for order incorrectly processed by restaurant\",\n    \"amount\": 25.00,\n    \"comment\": \"Additional notes for admin review\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
@@ -535,11 +541,12 @@
 									"pm.test(\"Status is Pending\", function () {",
 									"    pm.expect(response.status).to.eql('Pending');",
 									"});",
-									"pm.test(\"Category is Client\", function () {",
-									"    pm.expect(response.category).to.eql('Client');",
+									"pm.test(\"Category is Credit Refund\", function () {",
+									"    pm.expect(response.category).to.eql('Credit Refund');",
 									"});",
-									"pm.test(\"Reason is Credit Refund\", function () {",
-									"    pm.expect(response.reason).to.eql('Credit Refund');",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
+									"    pm.expect(response.reason).to.be.a('string');",
 									"});",
 									"",
 									"pm.environment.set(\"pendingClientRequestId\", response.discretionary_id);",
@@ -561,7 +568,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Client\",\n    \"reason\": \"Credit Refund\",\n    \"amount\": 20.00,\n    \"comment\": \"Credit refund request - leave pending for UI testing\"\n}"
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Credit Refund\",\n    \"reason\": \"Customer requested refund for service issue\",\n    \"amount\": 20.00,\n    \"comment\": \"Credit refund request - leave pending for UI testing\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
@@ -1088,7 +1095,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Client\",\n    \"reason\": \"Marketing Campaign\",\n    \"amount\": -5.00,\n    \"comment\": \"Invalid negative amount test\"\n}"
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Invalid negative amount test\",\n    \"amount\": -5.00,\n    \"comment\": \"This should fail validation\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
@@ -1133,7 +1140,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"invalid_category\",\n    \"reason\": \"Marketing Campaign\",\n    \"amount\": 10.00,\n    \"comment\": \"Invalid category test\"\n}"
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"invalid_category\",\n    \"reason\": \"This should fail because category is not a valid enum value\",\n    \"amount\": 10.00,\n    \"comment\": \"Invalid category test\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",

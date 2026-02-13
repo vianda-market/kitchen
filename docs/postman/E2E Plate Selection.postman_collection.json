@@ -2,6 +2,7 @@
 	"info": {
 		"_postman_id": "2b573da6-6182-4cb6-a39f-93e653ba85c3",
 		"name": "E2E Plate Selection",
+		"description": "End-to-end plate selection flow. After Login Admin, Address Suggest (E2E) and Address Validate (E2E) run to emulate the normal UX: user gets a recommended address from the API and \"accepts\" it. Register Supplier Address, Register Customer Address, and Create Employer (atomic) then use that normalized payload when available (collection variable e2eNormalizedAddress).\n\nAddress autocomplete works without Google API keys: when the app runs with DEV_MODE=true (default when GOOGLE_MAPS_API_KEY is not set), the backend uses mock responses from app/mocks/address_autocomplete_mocks.json for suggest and validate.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
 		"_exporter_id": "43849671",
 		"_collection_link": "https://christian-9549343.postman.co/workspace/Kitchen~46b14db1-f19b-49e8-9a70-a28037a45fe5/collection/43849671-2b573da6-6182-4cb6-a39f-93e653ba85c3?action=share&source=collection_link&creator=43849671"
@@ -116,6 +117,77 @@
 							]
 						},
 						"url": "{{baseUrl}}/api/v1/auth/token"
+					},
+					"response": []
+				},
+				{
+					"name": "Address Suggest (E2E)",
+					"description": "GET /addresses/suggest. Returns address suggestions (autocomplete). Works without Google API key when app is in DEV_MODE (uses mocks). Saves first suggestion to e2eFirstSuggestion; later Address Validate (E2E) stores normalized address for Register Supplier/Customer Address and Create Employer.",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Suggest returns 200\", function () { pm.response.to.have.status(200); });",
+									"const body = pm.response.json();",
+									"if (body.suggestions && body.suggestions.length > 0) {",
+									"    pm.collectionVariables.set(\"e2eFirstSuggestion\", JSON.stringify(body.suggestions[0]));",
+									"} else {",
+									"    pm.collectionVariables.set(\"e2eFirstSuggestion\", \"\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{"key": "Authorization", "value": "Bearer {{authToken}}", "type": "text"}],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Santa+Fe+2567+Buenos+Aires&country=ARG&limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [
+								{"key": "q", "value": "Av. Santa Fe 2567 Buenos Aires"},
+								{"key": "country", "value": "ARG"},
+								{"key": "limit", "value": "5"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Address Validate (E2E)",
+					"description": "POST /addresses/validate. Returns is_valid and normalized address (the API \"recommendation\"). Works without Google API key in DEV_MODE (mocks). Test script saves normalized to e2eNormalizedAddress; Register Supplier Address, Register Customer Address, and Create Employer use it to emulate user accepting the recommendation.",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Validate returns 200\", function () { pm.response.to.have.status(200); });",
+									"const body = pm.response.json();",
+									"if (body.normalized) {",
+									"    pm.collectionVariables.set(\"e2eNormalizedAddress\", JSON.stringify(body.normalized));",
+									"} else {",
+									"    pm.collectionVariables.set(\"e2eNormalizedAddress\", \"\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{authToken}}", "type": "text"},
+							{"key": "Content-Type", "value": "application/json", "type": "text"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"street_name\": \"Santa Fe\",\n  \"street_type\": \"Ave.\",\n  \"building_number\": \"2567\",\n  \"apartment_unit\": \"1A\",\n  \"floor\": null,\n  \"city\": \"Ciudad Autonoma de Buenos Aires\",\n  \"province\": \"CABA\",\n  \"postal_code\": \"1414\",\n  \"country_code\": \"ARG\"\n}",
+							"options": {"raw": {"language": "json"}}
+						},
+						"url": "{{baseUrl}}/api/v1/addresses/validate"
 					},
 					"response": []
 				},
@@ -964,23 +1036,34 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// 1) grab the raw JSON you just typed",
-									"let raw = pm.request.body.raw;",
-									"",
-									"// 2) parse it so we can update fields",
-									"let payload = JSON.parse(raw);",
-									"",
-									"// 3) pull the UUIDs (no quotes) from your collection variables",
-									"payload.institution_id = pm.collectionVariables.get(\"institutionId\");",
-									"payload.user_id        = pm.collectionVariables.get(\"supplierUserId\");",
-									"",
-									"// 4) ensure this goes out as JSON",
+									"// Use normalized address from Address Validate (E2E) when available (emulates user accepting API recommendation)",
+									"const rawNorm = pm.collectionVariables.get(\"e2eNormalizedAddress\");",
+									"let payload;",
+									"if (rawNorm && rawNorm !== \"\") {",
+									"    const n = JSON.parse(rawNorm);",
+									"    payload = {",
+									"        institution_id: pm.collectionVariables.get(\"institutionId\"),",
+									"        user_id: pm.collectionVariables.get(\"supplierUserId\"),",
+									"        address_type: [\"Restaurant\", \"Entity Billing\"],",
+									"        is_default: false,",
+									"        street_name: n.street_name,",
+									"        street_type: n.street_type,",
+									"        building_number: n.building_number,",
+									"        apartment_unit: n.apartment_unit || null,",
+									"        floor: n.floor || null,",
+									"        city: n.city,",
+									"        province: n.province,",
+									"        postal_code: n.postal_code,",
+									"        country_code: n.country_code",
+									"    };",
+									"} else {",
+									"    let raw = pm.request.body.raw;",
+									"    payload = JSON.parse(raw);",
+									"    payload.institution_id = pm.collectionVariables.get(\"institutionId\");",
+									"    payload.user_id = pm.collectionVariables.get(\"supplierUserId\");",
+									"}",
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-									"",
-									"// 5) overwrite the body with the new, merged JSON",
-									"pm.request.body.update(JSON.stringify(payload));",
-									"",
-									""
+									"pm.request.body.update(JSON.stringify(payload));"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -2116,19 +2199,33 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// 1) grab the raw JSON you just typed",
-									"let raw = pm.request.body.raw;",
-									"",
-									"// 2) parse it so we can update fields",
-									"let payload = JSON.parse(raw);",
-									"",
-									"// 3) pull the UUIDs (no quotes) from your collection variables",
-									"payload.user_id        = pm.collectionVariables.get(\"customerUserId\");",
-									"",
-									"// 4) ensure this goes out as JSON",
+									"// Use normalized address from Address Validate (E2E) when available (emulates user accepting API recommendation)",
+									"const rawNorm = pm.collectionVariables.get(\"e2eNormalizedAddress\");",
+									"const customerInstitutionId = \"44444444-4444-4444-4444-444444444444\";",
+									"let payload;",
+									"if (rawNorm && rawNorm !== \"\") {",
+									"    const n = JSON.parse(rawNorm);",
+									"    payload = {",
+									"        institution_id: customerInstitutionId,",
+									"        user_id: pm.collectionVariables.get(\"customerUserId\"),",
+									"        address_type: [\"Customer Home\", \"Customer Billing\"],",
+									"        is_default: false,",
+									"        street_name: n.street_name,",
+									"        street_type: n.street_type,",
+									"        building_number: n.building_number,",
+									"        apartment_unit: n.apartment_unit || null,",
+									"        floor: n.floor || null,",
+									"        city: n.city,",
+									"        province: n.province,",
+									"        postal_code: n.postal_code,",
+									"        country_code: n.country_code",
+									"    };",
+									"} else {",
+									"    let raw = pm.request.body.raw;",
+									"    payload = JSON.parse(raw);",
+									"    payload.user_id = pm.collectionVariables.get(\"customerUserId\");",
+									"}",
 									"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-									"",
-									"// 5) overwrite the body with the new, merged JSON",
 									"pm.request.body.update(JSON.stringify(payload));"
 								],
 								"type": "text/javascript",
@@ -2361,6 +2458,22 @@
 									"let raw = pm.request.body.raw;",
 									"let payload = JSON.parse(raw);",
 									"",
+									"// Use normalized address from Address Validate (E2E) when available (emulates user accepting API recommendation)",
+									"const rawNorm = pm.collectionVariables.get('e2eNormalizedAddress');",
+									"if (rawNorm && rawNorm !== '') {",
+									"    const n = JSON.parse(rawNorm);",
+									"    payload.address = {",
+									"        street_name: n.street_name,",
+									"        street_type: n.street_type,",
+									"        building_number: n.building_number,",
+									"        apartment_unit: n.apartment_unit || null,",
+									"        floor: n.floor || null,",
+									"        city: n.city,",
+									"        province: n.province,",
+									"        postal_code: n.postal_code,",
+									"        country_code: n.country_code",
+									"    };",
+									"}",
 									"// Inject user_id and institution_id into address",
 									"payload.address.user_id = userId;",
 									"payload.address.institution_id = institutionId;",
@@ -3080,7 +3193,18 @@
 					"listen": "prerequest",
 					"script": {
 						"exec": [
-							""
+							"// Use plate from List Plates for Customer (plateSelectionId) or fallback to supplier plate (plateId)",
+							"let plateId = pm.collectionVariables.get(\"plateSelectionId\");",
+							"if (!plateId || plateId === \"\") {",
+							"    plateId = pm.collectionVariables.get(\"plateId\");",
+							"}",
+							"if (!plateId || plateId === \"\") {",
+							"    throw new Error(\"No plate_id available. Run 'List Plates for Customer' first (sets plateSelectionId from first plate), or ensure 'Register Supplier Plate' has set plateId.\");",
+							"}",
+							"const body = JSON.parse(pm.request.body.raw || '{}');",
+							"body.plate_id = plateId;",
+							"if (!body.pickup_time_range) body.pickup_time_range = \"12:00-12:15\";",
+							"pm.request.body.update(JSON.stringify(body));"
 						],
 						"type": "text/javascript",
 						"packages": {},
@@ -3314,7 +3438,42 @@
 		},
 		{
 			"name": "\ud83c\udfea Restaurant Staff Operations",
+			"description": "Supplier must be logged in. The first request 'Login Supplier User (for Restaurant Staff)' runs so supplierAuthToken is set (it was cleared by 'Logout Supplier User' earlier in the E2E flow).",
 			"item": [
+				{
+					"name": "Login Supplier User (for Restaurant Staff)",
+					"description": "Logs in as supplier and sets supplierAuthToken so Get Restaurant Daily Orders and Generate Daily Bills can run. Required because 'Logout Supplier User' in Supplier Menu Setup clears the token.",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login successful - Status 200\", function () { pm.response.to.have.status(200); });",
+									"const body = pm.response.json();",
+									"if (body && body.access_token) {",
+									"    pm.environment.set(\"authToken\", body.access_token);",
+									"    pm.environment.set(\"supplierAuthToken\", body.access_token);",
+									"    console.log(\"\u2705 Supplier logged in for Restaurant Staff operations\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded", "type": "text"}],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{"key": "username", "value": "{{supplierUsername}}", "type": "text"},
+								{"key": "password", "value": "{{supplierPassword}}", "type": "text"}
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					},
+					"response": []
+				},
 				{
 					"name": "Get Restaurant Daily Orders",
 					"event": [
@@ -3325,7 +3484,7 @@
 									"// Switch to Supplier authentication",
 									"const supplierToken = pm.environment.get(\"supplierAuthToken\");",
 									"if (!supplierToken) {",
-									"    throw new Error(\"\u274c No supplier auth token found. Please run 'Login Supplier' first.\");",
+									"    throw new Error(\"\u274c No supplier auth token found. Run the collection in order so 'Login Supplier User (for Restaurant Staff)' runs first, or run that request manually.\");",
 									"}",
 									"pm.environment.set(\"authToken\", supplierToken);",
 									"console.log(\"\u2705 Using Supplier authentication\");"
@@ -3825,7 +3984,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/institution-bills/?institution_id={{institutionEntityId}}&status=Pending",
+					"raw": "{{baseUrl}}/api/v1/institution-bills/?institution_id={{institutionId}}&status=Pending",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -3838,7 +3997,7 @@
 					"query": [
 						{
 							"key": "institution_id",
-							"value": "{{institutionEntityId}}"
+							"value": "{{institutionId}}"
 						},
 						{
 							"key": "status",
@@ -3856,7 +4015,11 @@
 					"listen": "prerequest",
 					"script": {
 						"exec": [
-							""
+							"const entityBillId = pm.collectionVariables.get(\"entityBillId\");",
+							"const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+							"if (!entityBillId || !uuidRegex.test(String(entityBillId))) {",
+							"    throw new Error(\"entityBillId is not a valid UUID. Run 'Issue bills' then 'Get Bills' so a bill ID is set, or fix upstream failures (Create Customer Subscription, Register plate selection, Issue bills).\");",
+							"}"
 						],
 						"type": "text/javascript",
 						"packages": {},
@@ -4167,6 +4330,10 @@
 		},
 		{
 			"key": "planMarketCurrency",
+			"value": ""
+		},
+		{
+			"key": "e2eNormalizedAddress",
 			"value": ""
 		}
 	]

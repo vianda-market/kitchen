@@ -1,43 +1,53 @@
 # app/config/discretionary_reasons.py
 """
-Discretionary Request Reason Enum
+Discretionary Request Category Enum
 
-Defines valid reason values for discretionary credit requests.
-Reasons are category-specific:
-- Client: Marketing Campaign, Credit Refund
-- Supplier: Order incorrectly marked as not collected, Full Order Refund, Marketing Campaign
+Defines valid category values for discretionary credit requests.
+Categories classify the type of discretionary credit action:
+- Marketing Campaign: Credits issued for marketing/promotional purposes
+- Credit Refund: General credit refunds for customers
+- Order incorrectly marked as not collected: Restaurant-specific issue requiring restaurant context
+- Full Order Refund: Complete order refund requiring restaurant context
 """
 from enum import Enum
 
 
 class DiscretionaryReason(str, Enum):
-    """Valid reasons for discretionary credit requests"""
+    """Valid categories for discretionary credit requests (formerly 'reasons')"""
     
-    # Client reasons
+    # General categories (user or restaurant)
     MARKETING_CAMPAIGN = "Marketing Campaign"
     CREDIT_REFUND = "Credit Refund"
     
-    # Supplier reasons
+    # Restaurant-specific categories (require restaurant_id)
     ORDER_INCORRECTLY_MARKED = "Order incorrectly marked as not collected"
     FULL_ORDER_REFUND = "Full Order Refund"
-    # Note: Marketing Campaign is also valid for Supplier
     
     @classmethod
-    def get_valid_for_category(cls, category: str) -> list[str]:
-        """Get valid reason values for a given category"""
-        if category == "Client":
-            return [cls.MARKETING_CAMPAIGN.value, cls.CREDIT_REFUND.value]
-        elif category == "Supplier":
-            return [
-                cls.ORDER_INCORRECTLY_MARKED.value,
-                cls.FULL_ORDER_REFUND.value,
-                cls.MARKETING_CAMPAIGN.value
-            ]
-        return []
+    def values(cls) -> list[str]:
+        """Return list of all valid discretionary category values"""
+        return [item.value for item in cls]
     
     @classmethod
-    def is_valid_for_category(cls, reason: str, category: str) -> bool:
-        """Check if a reason is valid for a given category"""
-        valid_reasons = cls.get_valid_for_category(category)
-        return reason in valid_reasons
+    def is_valid(cls, value: str) -> bool:
+        """Check if a value is a valid discretionary category"""
+        return value in cls.values()
+    
+    @classmethod
+    def requires_restaurant(cls, category: 'DiscretionaryReason') -> bool:
+        """
+        Check if a category requires restaurant_id to be specified.
+        
+        Categories that require restaurant context:
+        - ORDER_INCORRECTLY_MARKED: Needs restaurant for order verification
+        - FULL_ORDER_REFUND: Needs restaurant for refund processing
+        
+        Returns:
+            bool: True if restaurant_id is required, False otherwise
+        """
+        restaurant_required = [
+            cls.ORDER_INCORRECTLY_MARKED,
+            cls.FULL_ORDER_REFUND
+        ]
+        return category in restaurant_required
 

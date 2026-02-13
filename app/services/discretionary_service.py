@@ -283,8 +283,8 @@ class DiscretionaryService:
         Raises:
             HTTPException: For validation errors
         """
-        # Validate required fields (category, reason, amount are always required)
-        required_fields = ["category", "reason", "amount"]
+        # Validate required fields (category and amount are always required, reason is optional)
+        required_fields = ["category", "amount"]
         missing_fields = [field for field in required_fields if field not in request_data]
         
         if missing_fields:
@@ -293,14 +293,20 @@ class DiscretionaryService:
                 detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
         
-        # Validate that either user_id or restaurant_id is provided
+        # Validate that either user_id or restaurant_id is provided (mutually exclusive)
         user_id = request_data.get("user_id")
         restaurant_id = request_data.get("restaurant_id")
         
         if not user_id and not restaurant_id:
             raise HTTPException(
                 status_code=400,
-                detail="Either user_id (for Client) or restaurant_id (for Supplier) must be provided"
+                detail="Either user_id or restaurant_id must be provided"
+            )
+        
+        if user_id and restaurant_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot specify both user_id and restaurant_id"
             )
         
         # Validate amount is positive
@@ -310,52 +316,32 @@ class DiscretionaryService:
                 detail="Amount must be greater than 0"
             )
         
-        # Validate category
-        valid_categories = ["Client", "Supplier"]
-        if request_data["category"] not in valid_categories:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid category. Must be one of: {', '.join(valid_categories)}"
-            )
-        
-        # Enforce category based on user_id/restaurant_id relationship
-        user_id = request_data.get("user_id")
-        restaurant_id = request_data.get("restaurant_id")
+        # Validate category is a valid DiscretionaryReason enum
         category = request_data["category"]
         
-        if user_id and not restaurant_id:
-            # Client request: must have category "Client"
-            if category != "Client":
+        # Convert to enum if it's a string
+        if isinstance(category, str):
+            if not DiscretionaryReason.is_valid(category):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid category. Must be one of: {', '.join(DiscretionaryReason.values())}"
+                )
+            # Convert string to enum for further validation
+            try:
+                category = DiscretionaryReason(category)
+                request_data["category"] = category
+            except ValueError:
                 raise HTTPException(
                     status_code=400,
-                    detail="Category must be 'Client' when user_id is set and restaurant_id is null"
+                    detail=f"Invalid category value: {category}"
                 )
-        elif restaurant_id:
-            # Supplier request: must have category "Supplier"
-            if category != "Supplier":
-                raise HTTPException(
-                    status_code=400,
-                    detail="Category must be 'Supplier' when restaurant_id is set"
-                )
-        else:
-            # Both null is invalid
+        
+        # Validate restaurant_id is provided for restaurant-specific categories
+        if DiscretionaryReason.requires_restaurant(category) and not restaurant_id:
             raise HTTPException(
                 status_code=400,
-                detail="Either user_id (for Client) or restaurant_id (for Supplier) must be provided"
+                detail=f"Category '{category.value}' requires restaurant_id to be specified"
             )
-        
-        # Validate reason based on category (using enum)
-        reason = request_data.get("reason")
-        if reason:
-            # Convert enum to string if needed
-            reason_str = reason.value if isinstance(reason, DiscretionaryReason) else str(reason)
-            
-            if not DiscretionaryReason.is_valid_for_category(reason_str, category):
-                valid_reasons = DiscretionaryReason.get_valid_for_category(category)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid reason for {category} category. Must be one of: {', '.join(valid_reasons)}"
-                )
     
     def _create_discretionary_transaction(
         self, 

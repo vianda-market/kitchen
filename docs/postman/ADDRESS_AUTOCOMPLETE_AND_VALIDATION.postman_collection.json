@@ -1,0 +1,526 @@
+{
+	"info": {
+		"_postman_id": "address-autocomplete-validation-2026",
+		"name": "Address Autocomplete and Validation",
+		"description": "Tests for the address suggest (autocomplete) and validate (normalize) API. Same endpoints for web, iOS, Android, React Native.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "adminUsername",
+			"value": "admin"
+		},
+		{
+			"key": "adminPassword",
+			"value": ""
+		},
+		{
+			"key": "authToken",
+			"value": ""
+		},
+		{
+			"key": "testInstitutionId",
+			"value": "11111111-1111-1111-1111-111111111111"
+		},
+		{
+			"key": "testUserId",
+			"value": "11111111-1111-1111-1111-111111111111"
+		},
+		{
+			"key": "lastValidateNormalized",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login as Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has access_token', function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set('authToken', response.access_token);",
+									"pm.environment.set('authToken', response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{adminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{adminPassword}}"
+								}
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				}
+			]
+		},
+		{
+			"name": "Suggest (Autocomplete)",
+			"item": [
+				{
+					"name": "Suggest - partial address (no country)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has suggestions array', function () {",
+									"    pm.expect(response).to.have.property('suggestions');",
+									"    pm.expect(response.suggestions).to.be.an('array');",
+									"});",
+									"",
+									"if (response.suggestions.length > 0) {",
+									"    const s = response.suggestions[0];",
+									"    pm.test('Suggestion has required address fields', function () {",
+									"        pm.expect(s).to.have.property('street_name');",
+									"        pm.expect(s).to.have.property('street_type');",
+									"        pm.expect(s).to.have.property('building_number');",
+									"        pm.expect(s).to.have.property('city');",
+									"        pm.expect(s).to.have.property('province');",
+									"        pm.expect(s).to.have.property('postal_code');",
+									"        pm.expect(s).to.have.property('country_code');",
+									"    });",
+									"    pm.test('country_code is alpha-3', function () {",
+									"        pm.expect(s.country_code.length).to.equal(3);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Corrientes&limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [
+								{"key": "q", "value": "Av. Corrientes"},
+								{"key": "limit", "value": "5"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Suggest - with country filter (ARG)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has suggestions array', function () {",
+									"    pm.expect(response).to.have.property('suggestions');",
+									"});",
+									"",
+									"response.suggestions.forEach(function(s) {",
+									"    pm.test('Suggestion country_code is ARG when filter applied', function () {",
+									"        pm.expect(s.country_code).to.equal('ARG');",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Santa+Fe&country=ARG&limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [
+								{"key": "q", "value": "Santa Fe"},
+								{"key": "country", "value": "ARG"},
+								{"key": "limit", "value": "5"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Suggest - empty query returns 200 with empty suggestions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Suggestions is array', function () {",
+									"    pm.expect(response.suggestions).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [{"key": "q", "value": ""}]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Validate (Normalize)",
+			"item": [
+				{
+					"name": "Validate - valid address",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has is_valid', function () {",
+									"    pm.expect(response).to.have.property('is_valid');",
+									"});",
+									"pm.test('Response has confidence', function () {",
+									"    pm.expect(response).to.have.property('confidence');",
+									"});",
+									"",
+									"if (response.is_valid && response.normalized) {",
+									"    pm.test('Normalized has required fields', function () {",
+									"        const n = response.normalized;",
+									"        pm.expect(n).to.have.property('street_name');",
+									"        pm.expect(n).to.have.property('street_type');",
+									"        pm.expect(n).to.have.property('building_number');",
+									"        pm.expect(n).to.have.property('city');",
+									"        pm.expect(n).to.have.property('province');",
+									"        pm.expect(n).to.have.property('postal_code');",
+									"        pm.expect(n).to.have.property('country_code');",
+									"    });",
+									"    pm.test('Normalized country_code is alpha-3', function () {",
+									"        pm.expect(response.normalized.country_code.length).to.equal(3);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"street_name\": \"Corrientes\",\n  \"street_type\": \"Ave\",\n  \"building_number\": \"1234\",\n  \"apartment_unit\": null,\n  \"floor\": null,\n  \"city\": \"Buenos Aires\",\n  \"province\": \"CABA\",\n  \"postal_code\": \"C1043\",\n  \"country_code\": \"ARG\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses/validate"
+					}
+				},
+				{
+					"name": "Validate - with apartment unit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has is_valid and confidence', function () {",
+									"    pm.expect(response).to.have.property('is_valid');",
+									"    pm.expect(response).to.have.property('confidence');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"street_name\": \"Santa Fe\",\n  \"street_type\": \"Ave\",\n  \"building_number\": \"2567\",\n  \"apartment_unit\": \"2B\",\n  \"floor\": null,\n  \"city\": \"Buenos Aires\",\n  \"province\": \"CABA\",\n  \"postal_code\": \"C1425\",\n  \"country_code\": \"ARG\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses/validate"
+					}
+				}
+			]
+		},
+		{
+			"name": "Auth required",
+			"item": [
+				{
+					"name": "Suggest without token returns 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 401', function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=test",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [{"key": "q", "value": "test"}]
+						}
+					}
+				},
+				{
+					"name": "Validate without token returns 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 401', function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"street_name\": \"Test\",\n  \"street_type\": \"St\",\n  \"building_number\": \"1\",\n  \"city\": \"City\",\n  \"province\": \"State\",\n  \"postal_code\": \"12345\",\n  \"country_code\": \"ARG\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses/validate"
+					}
+				}
+			]
+		},
+		{
+			"name": "E2E: Suggest → Validate → Create Address",
+			"description": "Run in order: 1) Suggest, 2) Validate, 3) Create Address. Step 2 saves the normalized payload; step 3 creates an address with it so autocomplete is tested end-to-end. Set testInstitutionId and testUserId (e.g. from seed or login).",
+			"item": [
+				{
+					"name": "1. Suggest (for E2E)",
+					"request": {
+						"method": "GET",
+						"header": [{"key": "Authorization", "value": "Bearer {{authToken}}"}],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Corrientes+1234+Buenos+Aires&country=ARG&limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [
+								{"key": "q", "value": "Av. Corrientes 1234 Buenos Aires"},
+								{"key": "country", "value": "ARG"},
+								{"key": "limit", "value": "5"}
+							]
+						}
+					}
+				},
+				{
+					"name": "2. Validate (for E2E)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"const response = pm.response.json();",
+									"if (response.normalized) {",
+									"    pm.collectionVariables.set('lastValidateNormalized', JSON.stringify(response.normalized));",
+									"} else {",
+									"    pm.collectionVariables.set('lastValidateNormalized', '');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{authToken}}"},
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"street_name\": \"Corrientes\",\n  \"street_type\": \"Ave\",\n  \"building_number\": \"1234\",\n  \"apartment_unit\": null,\n  \"floor\": null,\n  \"city\": \"Buenos Aires\",\n  \"province\": \"CABA\",\n  \"postal_code\": \"C1043\",\n  \"country_code\": \"ARG\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses/validate"
+					}
+				},
+				{
+					"name": "3. Create Address (from normalized)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const raw = pm.collectionVariables.get('lastValidateNormalized');",
+									"const inst = pm.collectionVariables.get('testInstitutionId');",
+									"const uid = pm.collectionVariables.get('testUserId');",
+									"let body;",
+									"if (raw && raw !== '') {",
+									"    const n = JSON.parse(raw);",
+									"    body = {",
+									"        institution_id: inst,",
+									"        user_id: uid,",
+									"        address_type: ['Restaurant'],",
+									"        is_default: false,",
+									"        street_name: n.street_name,",
+									"        street_type: n.street_type,",
+									"        building_number: n.building_number,",
+									"        apartment_unit: n.apartment_unit || null,",
+									"        floor: n.floor || null,",
+									"        city: n.city,",
+									"        province: n.province,",
+									"        postal_code: n.postal_code,",
+									"        country_code: n.country_code",
+									"    };",
+									"} else {",
+									"    body = {",
+									"        institution_id: inst,",
+									"        user_id: uid,",
+									"        address_type: ['Restaurant'],",
+									"        is_default: false,",
+									"        street_name: 'Corrientes',",
+									"        street_type: 'Avenida',",
+									"        building_number: '1234',",
+									"        city: 'Buenos Aires',",
+									"        province: 'CABA',",
+									"        postal_code: 'C1043',",
+									"        country_code: 'ARG'",
+									"    };",
+									"}",
+									"pm.request.body.raw = JSON.stringify(body, null, 2);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+									"const response = pm.response.json();",
+									"if (response.address_id) {",
+									"    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{authToken}}"},
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {"mode": "raw", "raw": "{}"},
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				}
+			]
+		}
+	]
+}

@@ -907,8 +907,8 @@ CREATE TABLE discretionary_info (
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
     restaurant_id UUID,  -- NULL for Client requests, required for Supplier requests
     approval_id UUID,
-    category VARCHAR(50),
-    reason discretionary_reason_enum NOT NULL,
+    category discretionary_reason_enum NOT NULL,  -- Classification: Marketing Campaign, Credit Refund, etc.
+    reason TEXT,  -- Free-form explanation/details
     amount NUMERIC,
     comment TEXT,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -930,8 +930,8 @@ CREATE TABLE discretionary_history (
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
     restaurant_id UUID,  -- NULL for Client requests, required for Supplier requests
     approval_id UUID,
-    category VARCHAR(50),
-    reason discretionary_reason_enum NOT NULL,
+    category discretionary_reason_enum NOT NULL,  -- Classification: Marketing Campaign, Credit Refund, etc.
+    reason TEXT,  -- Free-form explanation/details
     amount NUMERIC,
     comment TEXT,
     is_archived BOOLEAN NOT NULL,
