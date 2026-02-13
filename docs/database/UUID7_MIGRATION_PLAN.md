@@ -1,500 +1,219 @@
-# UUID7 Full Migration Plan
+# UUID7 Implementation Plan
 
 ## Executive Summary
 
-**Recommendation**: ✅ **Full UUID7 Migration**
+**Recommendation**: ✅ **Full UUID7 for all tables**
 
-Since we're in local development and can tear down/rebuild the database, we should migrate **all tables** to UUID7 for maximum performance benefits with minimal effort.
+We will **tear down and rebuild** the database (no in-place migration). All tables that use UUID primary keys will use **UUID7** for new row generation. This gives time-ordered, sortable IDs and allows simpler indexing and query patterns.
 
-**PostgreSQL Support**: PostgreSQL 18+ has native `uuidv7()` function (same as `gen_random_uuid()` for UUID4)
+**PostgreSQL**: Use native `uuidv7()` on PostgreSQL 18+; on PostgreSQL &lt; 18 use the custom function in `app/db/uuid7_function.sql`.
 
 ---
 
-## What Can Be Eliminated/Simplified
+## Scope: Tables to Update
 
-### 1. Indexes That Can Be Removed
+The following tables are in the current schema and must use UUID7 for their UUID primary-key default. Any table added after this plan was written should also use UUID7.
 
-**Indexes on `created_date` for time-ordering:**
-```sql
--- These can be removed (ID is time-ordered):
-CREATE INDEX idx_plate_pickup_stats ON plate_pickup_live(is_archived, created_date);
-CREATE INDEX idx_restaurant_transaction_stats ON restaurant_transaction(is_archived, created_date);
-CREATE INDEX idx_client_transaction_stats ON client_transaction(is_archived, created_date);
-```
+### Tables using `uuid_generate_v4()` (replace with `uuidv7()`)
 
-**Indexes that can be simplified:**
-```sql
--- Can change from:
-CREATE INDEX idx_client_transaction_archival ON client_transaction(status, created_date, is_archived);
--- To (using ID for time ordering):
-CREATE INDEX idx_client_transaction_archival ON client_transaction(status, transaction_id, is_archived);
-```
+| Table | Primary Key Column | Notes |
+|-------|--------------------|--------|
+| institution_info | institution_id | |
+| address_info | address_id | |
+| address_history | event_id | |
+| employer_info | employer_id | |
+| employer_history | event_id | |
+| user_info | user_id | |
+| credit_currency_info | credit_currency_id | |
+| credit_currency_history | event_id | |
+| **market_info** | **market_id** | Added since original plan |
+| **market_history** | **event_id** | Added since original plan |
+| institution_history | event_id | |
+| user_history | event_id | |
+| credential_recovery | token | |
+| geolocation_info | geolocation_id | |
+| geolocation_history | event_id | |
+| institution_entity_info | institution_entity_id | |
+| institution_entity_history | event_id | |
+| restaurant_info | restaurant_id | |
+| restaurant_history | event_id | |
+| qr_code | qr_code_id | |
+| product_info | product_id | |
+| product_history | event_id | |
+| plate_info | plate_id | |
+| restaurant_holidays | holiday_id | |
+| restaurant_holidays_history | event_id | |
+| plate_kitchen_days | plate_kitchen_day_id | |
+| plate_kitchen_days_history | event_id | |
+| plate_history | event_id | |
+| plate_selection | plate_selection_id | |
+| plate_pickup_live | plate_pickup_id | |
+| pickup_preferences | preference_id | |
+| plan_info | plan_id | |
+| plan_history | event_id | |
+| fintech_link_info | fintech_link_id | |
+| fintech_link_history | event_id | |
+| discretionary_info | discretionary_id | |
+| discretionary_history | history_id | |
+| discretionary_resolution_info | approval_id | |
+| discretionary_resolution_history | history_id | |
+| client_transaction | transaction_id | |
+| subscription_info | subscription_id | |
+| subscription_history | event_id | |
+| payment_method | payment_method_id | |
+| credit_card | credit_card_id | |
+| bank_account | bank_account_id | |
+| appstore_account | appstore_account_id | |
+| fintech_link_assignment | fintech_link_assignment_id | |
+| fintech_wallet | fintech_wallet_id | |
+| fintech_wallet_auth | fintech_wallet_auth_id | |
+| client_payment_attempt | payment_id | |
+| client_bill_info | client_bill_id | |
+| client_bill_history | event_id | |
+| restaurant_transaction | transaction_id | |
+| restaurant_balance_history | event_id | |
+| institution_bill_info | institution_bill_id | |
+| institution_bill_history | event_id | |
+| institution_bank_account | bank_account_id | |
+| institution_payment_attempt | payment_id | |
 
-**Estimated Index Reduction**: ~5-7 indexes can be removed or simplified
+### Tables using `gen_random_uuid()` (replace with `uuidv7()`)
 
-### 2. Query Simplifications
+| Table | Primary Key Column | Notes |
+|-------|--------------------|--------|
+| national_holidays | holiday_id | |
+| national_holidays_history | history_id | |
 
-**Before (UUID4):**
-```sql
--- Need created_date for time ordering
-SELECT * FROM plate_selection 
-WHERE user_id = $1 
-ORDER BY created_date DESC 
-LIMIT 10;
-```
+### Tables with no default (no change)
 
-**After (UUID7):**
-```sql
--- Can use ID directly (it's time-ordered)
-SELECT * FROM plate_selection 
-WHERE user_id = $1 
-ORDER BY plate_selection_id DESC 
-LIMIT 10;
-```
+| Table | Primary Key Column | Reason |
+|-------|--------------------|--------|
+| restaurant_balance_info | restaurant_id | PK is FK from restaurant_info; no default. |
 
-**Code Changes:**
-- `app/services/crud_service.py`: Remove `ORDER BY created_date DESC` → Use `ORDER BY {id_column} DESC`
-- `app/services/archival.py`: Can use ID for time-range queries instead of `created_date`
-- `app/services/entity_service.py`: Simplify time-based queries
+---
 
-### 3. Archival Service Simplification
+## Approach: Rebuild, Not Migration
 
-**Before (UUID4):**
-```python
-# Need to query by created_date
-cutoff_date = datetime.now() - timedelta(days=retention_days)
-query = f"""
-    SELECT * FROM {table_name}
-    WHERE is_archived = false 
-      AND created_date < %s
-    ORDER BY created_date ASC
-"""
-```
-
-**After (UUID7):**
-```python
-# Can use ID for time-based archival
-cutoff_uuid = generate_uuid7_for_date(cutoff_date)
-query = f"""
-    SELECT * FROM {table_name}
-    WHERE is_archived = false 
-      AND {id_column} < %s  -- UUID7 is time-ordered!
-    ORDER BY {id_column} ASC
-"""
-```
-
-### 4. Application Code Simplifications
-
-**Eliminate `created_date` from:**
-- Default ordering in CRUD service
-- Time-range queries
-- "Get latest N records" queries
-- Pagination by time
-
-**Keep `created_date` for:**
-- Display purposes (showing creation date to users)
-- Audit logging
-- Reporting (if needed)
-- But **not** for querying/sorting
+- **Tear down** the database (or drop all objects) and **rebuild** from `schema.sql`, `index.sql`, `trigger.sql`, and seed (if any).
+- **No** in-place data migration, no backfilling of existing rows.
+- **Seed data**: If seed uses hardcoded UUIDs (e.g. for test data), those remain as-is; only **new** rows created after rebuild will get UUID7 from the default.
 
 ---
 
 ## PostgreSQL UUID7 Support
 
-### Native Support (PostgreSQL 18+)
+### Option A: PostgreSQL 18+
 
-PostgreSQL 18+ has built-in `uuidv7()` function:
+- Use **native** `uuidv7()`.
+- No custom function; ensure `schema.sql` does not depend on `uuid-ossp` for UUID generation (we still need it for `uuid_generate_v4()` until we remove it; after switch, we can rely only on `uuidv7()`).
 
-```sql
--- Auto-generation (same as UUID4)
-CREATE TABLE example (
-    id UUID PRIMARY KEY DEFAULT uuidv7()
-);
-```
+### Option B: PostgreSQL &lt; 18
 
-### For PostgreSQL < 18 (Current: PostgreSQL 14.17)
+- **Include** `app/db/uuid7_function.sql` in the build (creates `uuidv7()`).
+- Run it **before** table creation in `schema.sql` (e.g. `\i app/db/uuid7_function.sql` or equivalent in your run order).
+- See `app/db/uuid7_function.sql` for the implementation.
 
-**Current Environment**: PostgreSQL 14.17 - Need custom function
+### Naming
 
-If using older PostgreSQL, need custom function:
-
-```sql
--- Custom UUID7 function (works on PostgreSQL 13+)
-CREATE OR REPLACE FUNCTION uuidv7()
-RETURNS UUID AS $$
-DECLARE
-    unix_ts_ms BIGINT;
-    uuid_bytes BYTEA;
-BEGIN
-    unix_ts_ms := EXTRACT(EPOCH FROM clock_timestamp()) * 1000;
-    uuid_bytes := 
-        set_byte(
-            set_byte(
-                set_byte(
-                    set_byte(
-                        set_byte(
-                            set_byte(
-                                set_byte(
-                                    set_byte(
-                                        gen_random_uuid()::bytea,
-                                        0, (unix_ts_ms >> 40)::int
-                                    ),
-                                    1, (unix_ts_ms >> 32)::int
-                                ),
-                                2, (unix_ts_ms >> 24)::int
-                            ),
-                            3, (unix_ts_ms >> 16)::int
-                        ),
-                        4, (unix_ts_ms >> 8)::int
-                    ),
-                    5, unix_ts_ms::int
-                ),
-                6, ((unix_ts_ms >> 56) & 0x0F)::int | 0x70
-            ),
-            7, ((unix_ts_ms >> 48) & 0x3F)::int | 0x80
-        );
-    RETURN encode(uuid_bytes, 'hex')::uuid;
-END;
-$$ LANGUAGE plpgsql;
-```
+- Use **`uuidv7()`** in schema so the same name works with PG18 native and the custom function.
+- In PG18 docs the native function may be named `uuid_generate_v7()`; if so, we can add a compatibility wrapper or use the name that PG18 actually provides and document it here after verification.
 
 ---
 
-## Migration Effort Assessment
+## Schema Changes (Implementation Phase)
 
-### Low Effort (Since We Can Rebuild)
+1. **UUID7 function**
+   - If PG18+: rely on native `uuidv7()` (or `uuid_generate_v7()` — confirm name).
+   - If PG &lt; 18: run `uuid7_function.sql` before creating tables.
 
-**1. Schema Changes** (1-2 hours)
-- Replace `uuid_generate_v4()` with `uuidv7()` in `schema.sql`
-- Replace `gen_random_uuid()` with `uuidv7()` in `schema.sql`
-- Add UUID7 function if PostgreSQL < 18
+2. **Replace defaults in `schema.sql`**
+   - Replace every `DEFAULT uuid_generate_v4()` with `DEFAULT uuidv7()` (or the chosen name).
+   - Replace every `DEFAULT gen_random_uuid()` with `DEFAULT uuidv7()`.
 
-**2. Index Updates** (1 hour)
-- Remove redundant `created_date` indexes
-- Update archival indexes to use ID instead of `created_date`
+3. **Extension**
+   - After full switch, we may be able to stop using `uuid-ossp` if no remaining references to `uuid_generate_v4()`. Leave as-is if other code still references it.
 
-**3. Code Updates** (2-3 hours)
-- Update `crud_service.py` to use ID for ordering
-- Update `archival.py` to use ID for time queries
-- Update any `ORDER BY created_date` to `ORDER BY {id}`
-- Add helper function to extract timestamp from UUID7 (if needed)
-
-**4. Testing** (1-2 hours)
-- Test UUID7 generation
-- Test time-ordered queries
-- Test archival with UUID7
-- Run Postman collections
-
-**Total Estimated Effort**: 5-8 hours
+4. **Replace counts (for verification)**
+   - In `schema.sql` as of Feb 2026: **58** occurrences of `DEFAULT uuid_generate_v4()` and **2** of `DEFAULT gen_random_uuid()`. All 60 must become `DEFAULT uuidv7()` (or the chosen PG18 function name).
 
 ---
 
-## Detailed Migration Steps
+## Index and Query Simplifications (Implementation Phase)
 
-### Step 1: Add UUID7 Function (if needed)
+### Indexes that can be removed or simplified
 
-**Check PostgreSQL version:**
-```sql
-SELECT version();
-```
+- Indexes that exist only to order by `created_date` can often be removed or changed to order by the UUID7 primary key instead (time-ordered).
+- **To be verified** in `app/db/index.sql`:
+  - Any index on `(is_archived, created_date)` for time-ordering → consider `(is_archived, {id_column})`.
+  - Archival indexes that use `created_date` → consider using the ID column for time-range queries.
 
-**If PostgreSQL 18+:**
-- No function needed, use `uuidv7()` directly
+### Query patterns
 
-**If PostgreSQL < 18:**
-- Add custom function to `schema.sql` before table creation
+- **Default ordering**: Prefer `ORDER BY {id_column} DESC` instead of `ORDER BY created_date DESC` where time-ordering is the goal.
+- **Archival**: Where we today use `created_date < cutoff`, we can use `{id_column} < uuid7_at(cutoff)` (with a small helper or DB function) so archival remains time-based.
+- **Keep** `created_date` for display, audit, and reporting; use ID for sorting and time-range filters where beneficial.
 
-### Step 2: Update Schema
+---
 
-**Find and Replace in `schema.sql`:**
-```sql
--- Replace all instances of:
-DEFAULT uuid_generate_v4()
--- With:
-DEFAULT uuidv7()
+## Application Code (Implementation Phase)
 
--- Replace all instances of:
-DEFAULT gen_random_uuid()
--- With:
-DEFAULT uuidv7()
-```
+- **Validation**: API schemas should accept any valid UUID (e.g. standard `UUID` type in Pydantic), so that UUID7-generated IDs (and any remaining seed IDs) are accepted.
+- **Ordering**: In `crud_service.py` and elsewhere, replace `ORDER BY created_date DESC` with `ORDER BY {id_column} DESC` where the intent is “newest first.”
+- **Archival**: In `archival.py` (or equivalent), consider time-range by ID using a UUID7-from-timestamp helper if we add one; otherwise keep using `created_date` for cutoff until we introduce the helper.
+- **New utility** (optional): `app/utils/uuid7.py` with `timestamp_from_uuid7()` and, if needed, `uuid7_from_timestamp()` for archival boundaries.
 
-**Example:**
-```sql
--- Before:
-institution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+---
 
--- After:
-institution_id UUID PRIMARY KEY DEFAULT uuidv7(),
-user_id UUID PRIMARY KEY DEFAULT uuidv7(),
-```
+## Implementation Checklist (No Code Yet)
 
-### Step 3: Update Indexes
+### Database (schema rebuild)
 
-**Remove redundant indexes:**
-```sql
--- Remove these (can use ID for time ordering):
-DROP INDEX IF EXISTS idx_plate_pickup_stats;
-DROP INDEX IF EXISTS idx_restaurant_transaction_stats;
-DROP INDEX IF EXISTS idx_client_transaction_stats;
-```
+- [ ] Decide PostgreSQL version path: 18+ (native) vs &lt; 18 (custom `uuidv7()`).
+- [ ] If PG &lt; 18: ensure `uuid7_function.sql` is run before table creation.
+- [ ] In `schema.sql`: replace all `DEFAULT uuid_generate_v4()` with `DEFAULT uuidv7()` (or PG18 equivalent).
+- [ ] In `schema.sql`: replace all `DEFAULT gen_random_uuid()` with `DEFAULT uuidv7()`.
+- [ ] Review `index.sql`: remove or adjust indexes that only supported `created_date` ordering.
+- [ ] Rebuild DB (tear down + run schema, index, trigger, seed).
+- [ ] Verify: `SELECT uuidv7();` and insert into a table, confirm PK is UUID7 (version 7).
 
-**Update archival indexes:**
-```sql
--- Change from created_date to ID:
--- Before:
-CREATE INDEX idx_client_transaction_archival 
-ON client_transaction(status, created_date, is_archived);
+### Application code (after schema is done)
 
--- After:
-CREATE INDEX idx_client_transaction_archival 
-ON client_transaction(status, transaction_id, is_archived);
-```
+- [ ] Update default ordering in `crud_service.py` to use ID where appropriate.
+- [ ] Update archival logic to use ID for time-ranges if we add a UUID7 timestamp helper; otherwise leave `created_date`-based cutoff.
+- [ ] Add `app/utils/uuid7.py` if we need timestamp extraction or UUID7-from-timestamp for queries.
+- [ ] Ensure all API schemas that accept UUIDs use a type that accepts UUID7 (e.g. `UUID`, not only `UUID4`).
+- [ ] Run tests and Postman collections after rebuild.
 
-### Step 4: Update Application Code
+### Documentation
 
-**File: `app/services/crud_service.py`**
-
-```python
-# Before:
-order_clause = "ORDER BY created_date DESC"
-
-# After:
-order_clause = f"ORDER BY {self.id_column} DESC"
-```
-
-**File: `app/services/archival.py`**
-
-```python
-# Before:
-cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
-query = f"""
-    SELECT * FROM {table_name}
-    WHERE is_archived = false 
-      AND created_date < %s
-    ORDER BY created_date ASC
-"""
-
-# After:
-from app.utils.uuid7 import uuid7_from_timestamp
-
-cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
-cutoff_uuid = uuid7_from_timestamp(cutoff_date)
-query = f"""
-    SELECT * FROM {table_name}
-    WHERE is_archived = false 
-      AND {id_column} < %s
-    ORDER BY {id_column} ASC
-"""
-```
-
-**File: `app/utils/uuid7.py` (new file)**
-
-```python
-"""
-UUID7 utility functions for time-ordered UUIDs
-"""
-from datetime import datetime
-from uuid import UUID
-import time
-
-def timestamp_from_uuid7(uuid7: UUID) -> datetime:
-    """
-    Extract timestamp from UUID7.
-    
-    UUID7 format: 48 bits timestamp + random bits
-    """
-    # Extract first 48 bits (6 bytes) from UUID
-    uuid_bytes = uuid7.bytes
-    timestamp_ms = (
-        (uuid_bytes[0] << 40) |
-        (uuid_bytes[1] << 32) |
-        (uuid_bytes[2] << 24) |
-        (uuid_bytes[3] << 16) |
-        (uuid_bytes[4] << 8) |
-        uuid_bytes[5]
-    )
-    # Convert to datetime
-    return datetime.fromtimestamp(timestamp_ms / 1000.0)
-
-def uuid7_from_timestamp(dt: datetime) -> UUID:
-    """
-    Generate a UUID7-like value for a given timestamp.
-    Used for time-range queries.
-    
-    Note: This generates a UUID that would be less than any UUID7
-    generated after this timestamp. For exact matching, use timestamp extraction.
-    """
-    timestamp_ms = int(dt.timestamp() * 1000)
-    # This is a simplified version - actual UUID7 generation is done by PostgreSQL
-    # This is mainly for query boundaries
-    from app.utils.db import db_read
-    result = db_read("SELECT uuidv7()", fetch_one=True)
-    # For query boundaries, we'd need a more sophisticated approach
-    # For now, keep using created_date for archival queries
-    # Or use a different approach
-    pass
-```
-
-**Note**: For archival, we might want to keep `created_date` for simplicity, but use ID for ordering.
-
-### Step 5: Update Query Patterns
-
-**Find all `ORDER BY created_date`:**
-```bash
-grep -r "ORDER BY.*created_date" app/
-```
-
-**Replace with ID-based ordering where appropriate:**
-- Keep `created_date` for display/reporting
-- Use ID for sorting/filtering
+- [ ] Update this plan with the exact PG18 function name once confirmed (`uuidv7()` vs `uuid_generate_v7()`).
+- [ ] Note in `cursorrules.md` or README that the project uses UUID7 for new rows and rebuild (no migration).
 
 ---
 
 ## What We Keep
 
-### Keep `created_date` Column
-
-**Why:**
-- Display purposes (show creation date to users)
-- Audit logging
-- Reporting and analytics
-- Debugging
-- Human-readable timestamps
-
-**But:**
-- Don't use it for sorting (use ID)
-- Don't use it for time-range queries (use ID)
-- Don't index it for ordering (use ID index)
-
-### Keep `modified_date` Column
-
-**Why:**
-- Track last modification time
-- Not embedded in UUID7 (UUID7 only has creation time)
-- Still needed for update tracking
+- **`created_date`** (and `modified_date`): Keep for display, audit, reporting. Do not remove; use for human-facing and compliance needs.
+- **Seed data**: If seed uses fixed UUIDs for test data, leave them; only defaults for new rows change to UUID7.
 
 ---
 
-## Benefits Summary
+## Benefits
 
-### Performance Improvements
-
-1. **Index Efficiency**
-   - 20-30% fewer page splits on inserts (sequential vs random)
-   - 10-15% smaller indexes (less fragmentation)
-   - Better cache locality (30% improvement)
-   - Reduced I/O for index maintenance
-
-2. **Query Performance**
-   - 30% faster time-range queries (using ID instead of `created_date`)
-   - Eliminate need for `created_date` index in many cases
-   - Better sequential access patterns
-   - Natural pagination by ID (time-ordered)
-
-3. **Simplified Code**
-   - Remove `ORDER BY created_date` → Use `ORDER BY id` (9 locations)
-   - Simplify archival queries (can use ID for ordering)
-   - Reduce index maintenance (5-7 fewer indexes)
-   - Natural time-ordering without extra columns
-
-### Code Simplifications
-
-1. **Removed Complexity**
-   - Fewer indexes to maintain (5-7 indexes can be removed/simplified)
-   - Simpler query patterns (9 `ORDER BY created_date` → `ORDER BY id`)
-   - Less code for time-based queries
-   - Eliminate redundant `created_date` indexes
-
-2. **Better Patterns**
-   - Natural ordering by ID (time-ordered automatically)
-   - Time-range queries using ID (for sorting/filtering)
-   - Pagination by ID (time-ordered, no need for `created_date`)
-   - "Get latest N records" → `ORDER BY id DESC LIMIT N`
-
-### What We Can Eliminate
-
-**Indexes (5-7 can be removed/simplified):**
-- `idx_plate_pickup_stats` (can use ID)
-- `idx_restaurant_transaction_stats` (can use ID)
-- `idx_client_transaction_stats` (can use ID)
-- Some `created_date` components in composite indexes
-
-**Code Patterns (9 locations):**
-- `ORDER BY created_date DESC` → `ORDER BY {id_column} DESC`
-- Time-based sorting logic → Use ID directly
-- Pagination by date → Pagination by ID
-
-**Query Complexity:**
-- Archival queries can use ID for ordering (simpler)
-- "Latest records" queries can use ID (simpler)
-- Time-range filtering can use ID boundaries (more efficient)
+- **Time-ordered IDs**: Sortable by creation time without a separate timestamp column for ordering.
+- **Index efficiency**: Better insert locality, fewer page splits, smaller/faster indexes.
+- **Simpler queries**: “Latest N” and pagination by ID; optional simplification of archival windows by ID.
+- **Consistency**: All new tables and all existing tables (after rebuild) use the same UUID7 default.
 
 ---
 
-## Implementation Checklist
+## Risks and Notes
 
-### Database Changes
-- [ ] Add UUID7 function (if PostgreSQL < 18)
-- [ ] Replace all `uuid_generate_v4()` with `uuidv7()`
-- [ ] Replace all `gen_random_uuid()` with `uuidv7()`
-- [ ] Remove redundant `created_date` indexes
-- [ ] Update archival indexes to use ID
-
-### Code Changes
-- [ ] Update `crud_service.py` ordering
-- [ ] Update `archival.py` time queries
-- [ ] Update any `ORDER BY created_date` queries
-- [ ] Add UUID7 utility functions (if needed)
-- [ ] Update tests
-
-### Testing
-- [ ] Test UUID7 generation
-- [ ] Test time-ordered queries
-- [ ] Test archival with UUID7
-- [ ] Run Postman collections
-- [ ] Verify performance improvements
+- **PostgreSQL version**: PG18+ gives native UUID7; older versions require the custom function and correct build order.
+- **Time in IDs**: UUID7 encodes creation time; do not rely on it for security-sensitive ordering only (use `created_date` where audit matters).
+- **Seed**: Rebuild will re-insert seed; ensure seed does not depend on v4-only validation in the app (we already accept any UUID in client_bill and similar).
 
 ---
 
-## Risk Assessment
-
-**Low Risk** (since we can rebuild):
-- ✅ No data migration needed
-- ✅ Can test before production
-- ✅ Can rollback easily
-- ✅ No foreign key issues
-
-**Considerations:**
-- ⚠️ Need PostgreSQL 18+ for native support (or custom function)
-- ⚠️ Time leakage in IDs (creation time visible)
-- ⚠️ Need to update application code
-
----
-
-## Recommendation
-
-**✅ Proceed with Full UUID7 Migration**
-
-**Rationale:**
-1. We can rebuild (no migration risk)
-2. Significant performance benefits
-3. Code simplifications
-4. PostgreSQL 18+ has native support
-5. Low effort (5-8 hours)
-6. Better long-term maintainability
-
-**Next Steps:**
-1. Check PostgreSQL version
-2. Add UUID7 function (if needed)
-3. Update schema
-4. Update indexes
-5. Update application code
-6. Test and verify
-
----
-
-**Last Updated**: December 2024  
-**Status**: Ready for Implementation
-
+**Last Updated**: February 2026  
+**Status**: Plan approved; implementation to start after repo push. No code changes until then.

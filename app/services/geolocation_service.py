@@ -318,10 +318,32 @@ def call_geocode_api(full_address: str) -> dict:
 
 def get_timezone_from_location(country: str, city: str) -> str:
     """
-    Map country and city to a timezone string.
-    Returns a default timezone if no mapping is found.
+    DEPRECATED: Use get_timezone_from_address() instead.
+    Legacy function for backward compatibility with city-based lookups.
     
-    This function uses the centralized TimezoneService for consistency.
+    This function is maintained for backward compatibility but logs a deprecation warning.
     """
     from app.services.timezone_service import get_timezone_for_location
     return get_timezone_for_location(country, city)
+
+def get_timezone_from_address(country_code: str, province: str, db) -> str:
+    """
+    Deduce timezone from country_code and province/state.
+    
+    This function uses the TimezoneService to automatically deduce timezone:
+    - For single-timezone countries (ARG, PER, CHL): uses market_info default
+    - For multi-timezone countries (USA, BRA, CAN): uses province mapping
+    
+    Args:
+        country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA", "BRA")
+        province: Province/state name or code (e.g., "California", "CA", "Buenos Aires")
+        db: Database connection
+        
+    Returns:
+        Timezone string (e.g., "America/New_York", "America/Argentina/Buenos_Aires")
+        
+    Raises:
+        HTTPException: 400 if country_code not found in market_info
+    """
+    from app.services.timezone_service import deduce_timezone_from_address
+    return deduce_timezone_from_address(country_code, province, db)

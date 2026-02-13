@@ -788,6 +788,64 @@ class AddressEnrichedResponseSchema(BaseModel):
     class Config:
         orm_mode = True
 
+
+# --- Address autocomplete (suggest / validate) ---
+
+class AddressSuggestionSchema(BaseModel):
+    """One address suggestion from GET /addresses/suggest (matches address schema for pre-fill)."""
+    street_name: str
+    street_type: str
+    building_number: str
+    apartment_unit: Optional[str] = None
+    floor: Optional[str] = None
+    city: str
+    province: str
+    postal_code: str
+    country_code: str = Field(..., description="ISO 3166-1 alpha-3 (e.g. ARG)")
+    country_name: Optional[str] = None
+    formatted_address: Optional[str] = None
+
+
+class AddressSuggestResponseSchema(BaseModel):
+    """Response for GET /api/v1/addresses/suggest."""
+    suggestions: List[AddressSuggestionSchema] = Field(default_factory=list)
+
+
+class AddressValidateRequestSchema(BaseModel):
+    """Request body for POST /api/v1/addresses/validate (address fields only)."""
+    street_name: str = Field(..., max_length=100)
+    street_type: str = Field(..., max_length=50)
+    building_number: str = Field(..., max_length=20)
+    apartment_unit: Optional[str] = Field(None, max_length=20)
+    floor: Optional[str] = Field(None, max_length=50)
+    city: str = Field(..., max_length=50)
+    province: str = Field(..., max_length=50)
+    postal_code: str = Field(..., max_length=20)
+    country_code: str = Field(..., max_length=3, description="ISO 3166-1 alpha-3 (e.g. ARG)")
+
+
+class AddressNormalizedSchema(BaseModel):
+    """Normalized address (same shape as suggestion) for validate response."""
+    street_name: str
+    street_type: str
+    building_number: str
+    apartment_unit: Optional[str] = None
+    floor: Optional[str] = None
+    city: str
+    province: str
+    postal_code: str
+    country_code: str
+
+
+class AddressValidateResponseSchema(BaseModel):
+    """Response for POST /api/v1/addresses/validate."""
+    is_valid: bool
+    normalized: Optional[AddressNormalizedSchema] = None
+    formatted_address: Optional[str] = None
+    confidence: str = Field(..., description="e.g. high, medium, low, none")
+    message: Optional[str] = None
+
+
 class RestaurantEnrichedResponseSchema(BaseModel):
     """Schema for enriched restaurant response data with institution, entity, and address details"""
     restaurant_id: UUID
@@ -1075,45 +1133,41 @@ class DiscretionaryCreateSchema(BaseModel):
     """Schema for creating a new discretionary request"""
     user_id: Optional[UUID] = None
     restaurant_id: Optional[UUID] = None
-    category: str = Field(..., max_length=50)
-    reason: DiscretionaryReason
+    category: DiscretionaryReason  # Classification: Marketing Campaign, Credit Refund, etc.
+    reason: Optional[str] = Field(None, max_length=500)  # Free-form explanation
     amount: Decimal = Field(..., gt=0)
     comment: Optional[str] = Field(None, max_length=500)
     
     @root_validator
     def validate_user_or_restaurant(cls, values):
-        """Ensure either user_id (Client) or restaurant_id (Supplier) is provided"""
+        """Ensure either user_id or restaurant_id is provided (mutually exclusive)"""
         user_id = values.get("user_id")
         restaurant_id = values.get("restaurant_id")
-        category = values.get("category")
         
         if not user_id and not restaurant_id:
-            raise ValueError("Either user_id (for Client) or restaurant_id (for Supplier) must be provided")
+            raise ValueError("Either user_id or restaurant_id must be provided")
         
-        # Enforce category based on provided IDs
-        if user_id and not restaurant_id:
-            if category != "Client":
-                raise ValueError("Category must be 'Client' when user_id is set and restaurant_id is null")
-        elif restaurant_id:
-            if category != "Supplier":
-                raise ValueError("Category must be 'Supplier' when restaurant_id is set")
+        if user_id and restaurant_id:
+            raise ValueError("Cannot specify both user_id and restaurant_id")
         
         return values
     
     @root_validator
-    def validate_reason_for_category(cls, values):
-        """Validate that reason is valid for the given category"""
+    def validate_restaurant_requirement(cls, values):
+        """Validate that restaurant_id is provided for restaurant-specific categories"""
+        restaurant_id = values.get("restaurant_id")
         category = values.get("category")
-        reason = values.get("reason")
         
-        if category and reason:
-            # Convert enum to string if needed
-            reason_str = reason.value if isinstance(reason, DiscretionaryReason) else str(reason)
+        if category:
+            # Categories that require restaurant context
+            restaurant_required = [
+                DiscretionaryReason.ORDER_INCORRECTLY_MARKED,
+                DiscretionaryReason.FULL_ORDER_REFUND
+            ]
             
-            if not DiscretionaryReason.is_valid_for_category(reason_str, category):
-                valid_reasons = DiscretionaryReason.get_valid_for_category(category)
+            if category in restaurant_required and not restaurant_id:
                 raise ValueError(
-                    f"Invalid reason for {category} category. Must be one of: {', '.join(valid_reasons)}"
+                    f"Category '{category.value}' requires restaurant_id to be specified"
                 )
         
         return values
@@ -1122,8 +1176,8 @@ class DiscretionaryUpdateSchema(BaseModel):
     """Schema for updating discretionary request information"""
     user_id: Optional[UUID] = None
     restaurant_id: Optional[UUID] = None
-    category: Optional[str] = Field(None, max_length=50)
-    reason: Optional[DiscretionaryReason] = None
+    category: Optional[DiscretionaryReason] = None  # Classification enum
+    reason: Optional[str] = Field(None, max_length=500)  # Free-form explanation
     amount: Optional[Decimal] = Field(None, gt=0)
     comment: Optional[str] = Field(None, max_length=500)
 
@@ -1133,8 +1187,8 @@ class DiscretionaryResponseSchema(BaseModel):
     user_id: Optional[UUID] = None  # NULL for Supplier requests, required for Client requests
     restaurant_id: Optional[UUID] = None  # NULL for Client requests, required for Supplier requests
     approval_id: Optional[UUID]
-    category: str
-    reason: DiscretionaryReason
+    category: DiscretionaryReason  # Classification enum
+    reason: Optional[str]  # Free-form explanation
     amount: Decimal
     comment: Optional[str]
     is_archived: bool
@@ -1161,8 +1215,8 @@ class DiscretionaryEnrichedResponseSchema(BaseModel):
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
     approval_id: Optional[UUID]
-    category: str
-    reason: DiscretionaryReason
+    category: DiscretionaryReason  # Classification enum
+    reason: Optional[str]  # Free-form explanation
     amount: Decimal
     comment: Optional[str]
     is_archived: bool
@@ -1204,8 +1258,8 @@ class DiscretionarySummarySchema(BaseModel):
     discretionary_id: UUID
     user_id: Optional[UUID] = None  # NULL for Supplier requests, required for Client requests
     restaurant_id: Optional[UUID] = None  # NULL for Client requests, required for Supplier requests
-    category: str
-    reason: DiscretionaryReason
+    category: DiscretionaryReason  # Classification enum
+    reason: Optional[str]  # Free-form explanation
     amount: Decimal
     status: Status
     created_date: datetime

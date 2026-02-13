@@ -1,0 +1,75 @@
+{
+  "places_autocomplete": {
+    "suggestions": [
+      {
+        "placePrediction": {
+          "placeId": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+          "text": {
+            "text": "Av. Santa Fe 2567, C1425 CABA, Argentina"
+          }
+        }
+      },
+      {
+        "placePrediction": {
+          "placeId": "ChIJPlace2MockId000000000001",
+          "text": {
+            "text": "Av. Corrientes 1234, C1043 CABA, Argentina"
+          }
+        }
+      }
+    ]
+  },
+  "place_details": {
+    "ChIJB_KWWvXKvJURs8VJkFcGiNE": {
+      "id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+      "formattedAddress": "Av. Santa Fe 2567, C1425 CABA, Argentina",
+      "addressComponents": [
+        { "longText": "2567", "shortText": "2567", "types": ["street_number"] },
+        { "longText": "Avenida Santa Fe", "shortText": "Av. Santa Fe", "types": ["route"] },
+        { "longText": "Buenos Aires", "shortText": "CABA", "types": ["locality", "political"] },
+        { "longText": "Buenos Aires", "shortText": "Buenos Aires", "types": ["administrative_area_level_1", "political"] },
+        { "longText": "Argentina", "shortText": "AR", "types": ["country", "political"] },
+        { "longText": "C1425", "shortText": "C1425", "types": ["postal_code"] }
+      ]
+    },
+    "ChIJPlace2MockId000000000001": {
+      "id": "ChIJPlace2MockId000000000001",
+      "formattedAddress": "Av. Corrientes 1234, C1043 CABA, Argentina",
+      "addressComponents": [
+        { "longText": "1234", "shortText": "1234", "types": ["street_number"] },
+        { "longText": "Avenida Corrientes", "shortText": "Av. Corrientes", "types": ["route"] },
+        { "longText": "Buenos Aires", "shortText": "CABA", "types": ["locality", "political"] },
+        { "longText": "Ciudad Autónoma de Buenos Aires", "shortText": "CABA", "types": ["administrative_area_level_1", "political"] },
+        { "longText": "Argentina", "shortText": "AR", "types": ["country", "political"] },
+        { "longText": "C1043AAZ", "shortText": "C1043AAZ", "types": ["postal_code"] }
+      ]
+    }
+  },
+  "validate_address": {
+    "result": {
+      "verdict": {
+        "addressComplete": true,
+        "validationGranularity": "PREMISE"
+      },
+      "address": {
+        "formattedAddress": "Av. Santa Fe 2567, C1425 CABA, Argentina",
+        "addressComponents": [
+          { "componentName": { "text": "2567" }, "componentType": "street_number" },
+          { "componentName": { "text": "Avenida Santa Fe" }, "componentType": "route" },
+          { "componentName": { "text": "Buenos Aires" }, "componentType": "locality" },
+          { "componentName": { "text": "Ciudad Autónoma de Buenos Aires" }, "componentType": "administrative_area_level_1" },
+          { "componentName": { "text": "Argentina" }, "componentType": "country", "confirmationLevel": "CONFIRMED" }
+        ]
+      }
+    }
+  },
+  "validate_address_invalid": {
+    "result": {
+      "verdict": {
+        "addressComplete": false,
+        "validationGranularity": "OTHER"
+      },
+      "address": null
+    }
+  }
+}

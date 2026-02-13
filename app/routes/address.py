@@ -12,7 +12,12 @@ from app.schemas.consolidated_schemas import (
     AddressUpdateSchema,
     AddressResponseSchema,
     AddressEnrichedResponseSchema,
+    AddressSuggestResponseSchema,
+    AddressValidateRequestSchema,
+    AddressValidateResponseSchema,
+    AddressNormalizedSchema,
 )
+from app.services.address_autocomplete_service import address_autocomplete_service
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.query_params import include_archived_query, include_archived_optional_query
@@ -26,6 +31,49 @@ router = APIRouter(
     tags=["Addresses"],
     dependencies=[Depends(oauth2_scheme)]
 )
+
+
+# =============================================================================
+# ADDRESS AUTOCOMPLETE (suggest / validate) – same API for web, iOS, Android, React Native
+# =============================================================================
+
+@router.get("/suggest", response_model=AddressSuggestResponseSchema)
+def address_suggest(
+    q: str,
+    country: Optional[str] = None,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Address autocomplete suggestions. Returns structured address suggestions for form pre-fill.
+    q: partial address input. country: optional ISO alpha-2 or alpha-3 to restrict results. limit: max suggestions (default 5).
+    """
+    if limit < 1 or limit > 10:
+        limit = 5
+    suggestions = address_autocomplete_service.suggest(q=q, country=country, limit=limit)
+    return AddressSuggestResponseSchema(suggestions=suggestions)
+
+
+@router.post("/validate", response_model=AddressValidateResponseSchema)
+def address_validate(
+    body: AddressValidateRequestSchema,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Validate and normalize an address. Returns is_valid, normalized address (for confirm before submit), formatted_address, confidence, message.
+    """
+    result = address_autocomplete_service.validate(body=body.dict())
+    normalized = None
+    if result.get("normalized"):
+        normalized = AddressNormalizedSchema(**result["normalized"])
+    return AddressValidateResponseSchema(
+        is_valid=result["is_valid"],
+        normalized=normalized,
+        formatted_address=result.get("formatted_address"),
+        confidence=result["confidence"],
+        message=result.get("message"),
+    )
+
 
 # GET /addresses/{address_id}?include_archived=...
 @router.get("/{address_id}", response_model=AddressResponseSchema)

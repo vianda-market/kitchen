@@ -639,8 +639,8 @@ class DiscretionaryDTO(BaseModel):
     user_id: Optional[UUID] = None  # NULL for Supplier requests, required for Client requests
     restaurant_id: Optional[UUID] = None  # NULL for Client requests, required for Supplier requests
     approval_id: Optional[UUID] = None
-    category: str = Field(..., max_length=50)
-    reason: DiscretionaryReason
+    category: DiscretionaryReason  # Classification enum (Marketing Campaign, Credit Refund, etc.)
+    reason: Optional[str] = None  # Free-form explanation
     amount: Decimal = Field(..., gt=0)
     comment: Optional[str] = None
     is_archived: bool = False

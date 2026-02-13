@@ -1,88 +1,113 @@
 """
 Location Information Routes
 
-Provides endpoints for getting supported countries, cities, and timezone information.
-This helps frontend applications populate dropdowns and validate location data.
+DEPRECATED: These endpoints are legacy city-based timezone lookups.
+Use the Markets API and province-based timezone deduction instead:
+- GET /api/v1/markets/ - Get available countries with country_code
+- Timezone is automatically calculated from country_code + province during address creation
+
+These endpoints are maintained for backward compatibility but will log deprecation warnings.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Dict
-from app.services.timezone_service import (
-    get_supported_countries, 
-    get_supported_cities, 
-    get_timezone_for_location
-)
-from app.utils.log import log_info
+import psycopg2.extensions
+from app.services.timezone_service import TimezoneService
+from app.dependencies.database import get_db
+from app.utils.log import log_info, log_warning
 
 router = APIRouter(
     prefix="/location-info",
-    tags=["Location Information"]
+    tags=["Location Information (Deprecated)"]
 )
 
-@router.get("/countries", response_model=List[str])
+@router.get("/multi-timezone-countries", response_model=List[str])
+def get_multi_timezone_countries():
+    """
+    Get list of country codes that have multiple timezones.
+    
+    These countries require province/state for accurate timezone deduction.
+    
+    Returns:
+        List of country codes (e.g., ["USA", "BRA", "CAN", "MEX"])
+    """
+    countries = TimezoneService.get_supported_multi_timezone_countries()
+    log_info(f"Returning {len(countries)} multi-timezone countries")
+    return countries
+
+@router.get("/countries/{country_code}/provinces", response_model=List[str])
+def get_provinces_for_country(country_code: str):
+    """
+    Get list of supported provinces/states for a multi-timezone country.
+    
+    Args:
+        country_code: ISO 3166-1 alpha-3 country code (e.g., "USA", "BRA", "CAN")
+        
+    Returns:
+        List of province/state names and codes. Empty list for single-timezone countries.
+    """
+    provinces = TimezoneService.get_supported_provinces(country_code.upper())
+    log_info(f"Returning {len(provinces)} provinces for {country_code}")
+    return provinces
+
+@router.get("/countries", response_model=List[str], deprecated=True)
 def get_countries():
     """
+    DEPRECATED: Use GET /api/v1/markets/ instead.
+    
     Get list of supported countries for timezone assignment.
     
     Returns:
-        List of supported country names
+        List of supported country names (deprecated format)
     """
-    countries = get_supported_countries()
-    log_info(f"Returning {len(countries)} supported countries")
-    return countries
+    log_warning("DEPRECATED: /location-info/countries called. Use /api/v1/markets/ instead.")
+    # Return empty list since old country names are deprecated
+    return []
 
-@router.get("/countries/{country}/cities", response_model=List[str])
+@router.get("/countries/{country}/cities", response_model=List[str], deprecated=True)
 def get_cities_for_country(country: str):
     """
-    Get list of supported cities for a specific country.
+    DEPRECATED: Use province-based timezone deduction instead.
     
     Args:
-        country: Country name
+        country: Country name (deprecated)
         
     Returns:
-        List of supported city names for the country
+        Empty list (deprecated endpoint)
     """
-    cities = get_supported_cities(country)
-    log_info(f"Returning {len(cities)} supported cities for {country}")
-    return cities
+    log_warning(f"DEPRECATED: /location-info/countries/{country}/cities called. Use province-based system instead.")
+    return []
 
-@router.get("/timezone/{country}/{city}", response_model=Dict[str, str])
+@router.get("/timezone/{country}/{city}", response_model=Dict[str, str], deprecated=True)
 def get_timezone_for_city(country: str, city: str):
     """
-    Get timezone for a specific country and city combination.
+    DEPRECATED: Use country_code + province for timezone deduction in address creation.
     
     Args:
-        country: Country name
-        city: City name
+        country: Country name (deprecated)
+        city: City name (deprecated)
         
     Returns:
-        Dictionary with timezone information
+        Dictionary with timezone information (deprecated format)
     """
+    log_warning(f"DEPRECATED: /location-info/timezone/{country}/{city} called. Use province-based system instead.")
+    from app.services.timezone_service import get_timezone_for_location
     timezone = get_timezone_for_location(country, city)
-    log_info(f"Timezone for {city}, {country}: {timezone}")
     return {
         "country": country,
         "city": city,
-        "timezone": timezone
+        "timezone": timezone,
+        "deprecated": True,
+        "message": "Use country_code + province for timezone deduction. See /api/v1/markets/ for available countries."
     }
 
-@router.get("/supported-locations", response_model=Dict[str, Dict[str, List[str]]])
+@router.get("/supported-locations", response_model=Dict[str, Dict], deprecated=True)
 def get_all_supported_locations():
     """
-    Get complete mapping of supported countries and their cities.
+    DEPRECATED: Use GET /api/v1/markets/ and province endpoints instead.
     
     Returns:
-        Dictionary mapping countries to their supported cities
+        Empty dictionary (deprecated endpoint)
     """
-    from app.services.timezone_service import TimezoneService
-    
-    result = {}
-    for country in get_supported_countries():
-        cities = get_supported_cities(country)
-        result[country] = {
-            "cities": cities,
-            "default_timezone": TimezoneService.TIMEZONE_MAPPING[country]["default"]
-        }
-    
-    log_info(f"Returning location mapping for {len(result)} countries")
-    return result
+    log_warning("DEPRECATED: /location-info/supported-locations called. Use /api/v1/markets/ instead.")
+    return {}

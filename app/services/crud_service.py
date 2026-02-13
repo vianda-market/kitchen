@@ -629,6 +629,15 @@ class CRUDService(Generic[T]):
         try:
             log_info(f"[CRUDService.create] Table: {self.table_name}, Data keys before scope: {list(data.keys())}")
             self._apply_scope_to_create_data(data, scope, db)
+            # Subscription create: resolve market_id from plan_id (subscription_info requires market_id, plan has it)
+            if self.table_name == "subscription_info" and "market_id" not in data and data.get("plan_id"):
+                from app.services.crud_service import plan_service
+                plan = plan_service.get_by_id(data["plan_id"], db)
+                if plan:
+                    data["market_id"] = plan.market_id
+                else:
+                    log_error(f"Plan not found for plan_id={data['plan_id']}, cannot create subscription")
+                    raise HTTPException(status_code=404, detail=f"Plan not found: {data['plan_id']}")
             log_info(f"[CRUDService.create] Data keys after scope: {list(data.keys())}")
             # Add timestamps
             data["created_date"] = datetime.now()

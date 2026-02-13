@@ -15,7 +15,7 @@ from app.dto.models import AddressDTO, GeolocationDTO
 from app.services.crud_service import address_service, geolocation_service
 from app.security.institution_scope import InstitutionScope
 from app.utils.log import log_info, log_warning
-from app.services.geolocation_service import call_geocode_api, get_timezone_from_location
+from app.services.geolocation_service import call_geocode_api
 from app.config import Status
 
 
@@ -68,10 +68,12 @@ class AddressBusinessService:
         else:
             raise HTTPException(status_code=400, detail="country_code is required")
         
-        # Automatically set timezone based on country_name and city
-        timezone = get_timezone_from_location(address_data["country_name"], address_data["city"])
+        # Automatically set timezone based on country_code and province
+        from app.services.geolocation_service import get_timezone_from_address
+        province = address_data.get("province", "")
+        timezone = get_timezone_from_address(country_code, province, db)
         address_data["timezone"] = timezone
-        log_info(f"Set timezone '{timezone}' for address in {address_data['city']}, {address_data['country_name']}")
+        log_info(f"Set timezone '{timezone}' for address in {province}, {address_data['country_name']} ({country_code})")
 
         # Create the address first (even for restaurants), so we get an address_id
         # NOTE: address_service.create() should ONLY be called from this business service.
@@ -259,18 +261,17 @@ class AddressBusinessService:
                 else:
                     raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
         
-        # Update timezone if country_code/city changed
-        if "country_code" in address_data or "city" in address_data:
+        # Update timezone if country_code or province changed
+        if "country_code" in address_data or "province" in address_data:
             # Get current address to merge with updates
             current_address = address_service.get_by_id(address_id, db, scope=scope)
             if current_address:
-                merged_data = {
-                    "country_name": address_data.get("country_name", current_address.country_name),
-                    "city": address_data.get("city", current_address.city)
-                }
-                timezone = get_timezone_from_location(merged_data["country_name"], merged_data["city"])
+                from app.services.geolocation_service import get_timezone_from_address
+                merged_country_code = address_data.get("country_code", current_address.country_code)
+                merged_province = address_data.get("province", current_address.province)
+                timezone = get_timezone_from_address(merged_country_code, merged_province, db)
                 address_data["timezone"] = timezone
-                log_info(f"Updated timezone to '{timezone}' for address in {merged_data['city']}, {merged_data['country_name']}")
+                log_info(f"Updated timezone to '{timezone}' for address in {merged_province}, {merged_country_code}")
         
         # Update the address
         updated_address = address_service.update(address_id, address_data, db, scope=scope)
