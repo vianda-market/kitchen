@@ -1,14 +1,49 @@
+import time
+from collections import defaultdict
+from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, HTTPException, status, Depends
-from pydantic import BaseModel, EmailStr, Field
+from fastapi import APIRouter, HTTPException, status, Depends, Request
+from pydantic import BaseModel, EmailStr, Field, root_validator
 from app.dto.models import UserDTO
 from app.services.user_signup_service import user_signup_service
 from app.services.password_recovery_service import password_recovery_service
 from app.services.error_handling import handle_business_operation
 from app.schemas.consolidated_schemas import CustomerSignupSchema, UserResponseSchema
 from app.dependencies.database import get_db
-from app.utils.log import log_info, log_warning
+from app.utils.log import log_info, log_warning, log_password_recovery_debug
+from app.utils.db import db_read
+from app.config.settings import settings
 import psycopg2.extensions
+
+
+class SignupRequestResponse(BaseModel):
+    """Response for POST /customers/signup/request (email verification flow)."""
+    success: bool
+    message: str
+    already_registered: bool = Field(
+        default=False,
+        description="True when the email is already registered; frontend should prompt user to log in.",
+    )
+
+
+class VerifySignupRequest(BaseModel):
+    """Request for POST /customers/signup/verify."""
+    code: Optional[str] = Field(None, description="6-digit verification code from email")
+    token: Optional[str] = Field(None, description="Legacy verification token (use code instead)")
+
+    @root_validator
+    def require_code_or_token(cls, values):
+        code = (values.get("code") or "").strip()
+        token = (values.get("token") or "").strip()
+        if not code and not token:
+            raise ValueError("Either code or token is required")
+        return values
+
+
+class VerifySignupResponse(BaseModel):
+    """Response for POST /customers/signup/verify: user and optional JWT."""
+    user: UserResponseSchema
+    access_token: str
 
 router = APIRouter(
     prefix="/customers",
@@ -24,38 +59,192 @@ auth_router = APIRouter(
 # Get signup constants from service
 SIGNUP_CONSTANTS = user_signup_service.get_signup_constants()
 
+
+# =============================================================================
+# CUSTOMER SIGNUP (EMAIL VERIFICATION FLOW)
+# =============================================================================
+
+@router.post(
+    "/signup/request",
+    response_model=SignupRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Request customer signup (send verification email)",
+    responses={
+        201: {"description": "Verification email sent; check inbox."},
+        409: {
+            "description": "Email already registered; user should log in.",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string", "example": "This email is already registered. Please log in."}
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def signup_request(
+    user: CustomerSignupSchema,
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    Step 1 of customer signup: validate payload, store pending signup, send verification email.
+    Returns 409 when the email is already registered so the frontend can prompt the user to log in.
+    """
+    def _request():
+        return user_signup_service.request_customer_signup(user.dict(), db)
+
+    result = handle_business_operation(
+        _request,
+        "customer signup request",
+        "A verification link has been sent to your email.",
+    )
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing signup request",
+        )
+    if result.get("already_registered"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=result["message"],
+        )
+    return result
+
+
+@router.post(
+    "/signup/verify",
+    response_model=VerifySignupResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Verify email and complete customer signup",
+)
+def signup_verify(
+    body: VerifySignupRequest,
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    Step 2 of customer signup: validate verification code (or legacy token) from email, create user, return user and JWT.
+    """
+    code_or_token = (body.code and body.code.strip()) or (body.token and body.token.strip()) or ""
+    def _verify():
+        return user_signup_service.verify_and_complete_signup(code_or_token, db)
+
+    result = handle_business_operation(
+        _verify,
+        "customer signup verify",
+        "Signup verified",
+    )
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code",
+        )
+    user_dto, access_token = result
+    return VerifySignupResponse(user=user_dto, access_token=access_token)
+
+
+class DevPendingTokenResponse(BaseModel):
+    """Dev-only: verification token for the given email (for E2E/Postman)."""
+    token: str
+
+
+@router.get(
+    "/signup/dev-pending-token",
+    response_model=DevPendingTokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="(Dev only) Get pending verification token by email",
+    deprecated=False,
+)
+def get_dev_pending_token(
+    email: str,
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    **Only available when DEV_MODE is True.** Returns the current verification token
+    for a pending signup with the given email. Use for E2E/Postman after calling
+    POST /signup/request so you can call POST /signup/verify without reading email.
+    """
+    if not getattr(settings, "DEV_MODE", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not available")
+    row = db_read(
+        """
+        SELECT verification_code FROM pending_customer_signup
+        WHERE email = %s AND used = FALSE AND token_expiry > CURRENT_TIMESTAMP
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        (email.strip().lower(),),
+        connection=db,
+        fetch_one=True,
+    )
+    if not row or not row.get("verification_code"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No pending signup found for this email",
+        )
+    return DevPendingTokenResponse(token=row["verification_code"])
+
+
 @router.post(
     "/signup",
     response_model=UserResponseSchema,
     status_code=status.HTTP_201_CREATED,
-    summary="Customer self-registration"
+    summary="Customer self-registration (deprecated)",
+    deprecated=True,
 )
 def signup_customer(
     user: CustomerSignupSchema,
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Public signup endpoint for customers.
-    Automatically assigns the 'Vianda Customers' institution and role,
-    and marks creation by the bot account.
+    **Deprecated.** Use POST /signup/request then POST /signup/verify (email verification flow).
+    Creates a customer user immediately without email verification.
     """
     def _process_customer_signup():
         user_data = user.dict()
         return user_signup_service.process_customer_signup(user_data, db)
-    
+
     result = handle_business_operation(
         _process_customer_signup,
         "customer signup",
-        "Customer self-signed up successfully"
+        "Customer self-signed up successfully",
     )
-    
     if not result:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error signing up customer"
+            detail="Error signing up customer",
         )
-    
     return result
+
+
+# =============================================================================
+# USERNAME RECOVERY (forgot username) - rate limited, no auth
+# =============================================================================
+
+RATE_LIMIT_USERNAME_REQUESTS = 60
+RATE_LIMIT_USERNAME_WINDOW_SECONDS = 60
+_username_recovery_rate_limit: dict = defaultdict(list)
+
+
+def _rate_limit_username_recovery(request: Request) -> None:
+    """Allow at most RATE_LIMIT_USERNAME_REQUESTS per IP per window."""
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _username_recovery_rate_limit[ip] = [
+        t for t in _username_recovery_rate_limit[ip]
+        if now - t < RATE_LIMIT_USERNAME_WINDOW_SECONDS
+    ]
+    if len(_username_recovery_rate_limit[ip]) >= RATE_LIMIT_USERNAME_REQUESTS:
+        raise HTTPException(status_code=429, detail="Too many requests")
+    _username_recovery_rate_limit[ip].append(now)
+
+
+class ForgotUsernameRequest(BaseModel):
+    """Request for POST /auth/forgot-username."""
+    email: EmailStr = Field(..., description="Email address of the account")
+    send_password_reset: bool = Field(False, description="If true, also send a password reset link to this email")
 
 
 # =============================================================================
@@ -69,14 +258,50 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     """Request schema for password reset"""
-    token: str = Field(..., min_length=1, description="Password reset token from email")
+    code: Optional[str] = Field(None, description="6-digit reset code from email")
+    token: Optional[str] = Field(None, description="Legacy reset token (use code instead)")
     new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+    @root_validator
+    def require_code_or_token(cls, values):
+        code = (values.get("code") or "").strip()
+        token = (values.get("token") or "").strip()
+        if not code and not token:
+            raise ValueError("Either code or token is required")
+        return values
 
 
 class PasswordRecoveryResponse(BaseModel):
     """Response schema for password recovery operations"""
     success: bool
     message: str
+
+
+@auth_router.post(
+    "/forgot-username",
+    response_model=PasswordRecoveryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request username recovery (forgot username)",
+    description="""
+    Send the account username to the given email. Optionally also send a password reset link.
+    No authentication required. Rate limited per IP.
+    Always returns the same generic message to prevent email enumeration.
+    """
+)
+def forgot_username(
+    request: Request,
+    body: ForgotUsernameRequest,
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Request username recovery; optionally also trigger password reset email."""
+    log_password_recovery_debug(f"POST /forgot-username received email={body.email!r} send_password_reset={body.send_password_reset}")
+    _rate_limit_username_recovery(request)
+    result = password_recovery_service.request_username_recovery(
+        email=body.email,
+        send_password_reset=body.send_password_reset,
+        db=db
+    )
+    return result
 
 
 @auth_router.post(
@@ -103,9 +328,10 @@ def forgot_password(
 ):
     """
     Request password reset for an account.
-    
+
     An email with a password reset link will be sent if the account exists.
     """
+    log_password_recovery_debug(f"POST /forgot-password received email={request.email!r}")
     def _request_password_reset():
         return password_recovery_service.request_password_reset(
             email=request.email,
@@ -144,13 +370,14 @@ def reset_password(
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Reset password using valid token from email.
-    
-    The token can only be used once and expires after 24 hours.
+    Reset password using valid reset code (or legacy token) from email.
+    Code can only be used once and expires after 24 hours.
     """
+    code_or_token = (request.code and request.code.strip()) or (request.token and request.token.strip()) or ""
+    log_password_recovery_debug("POST /reset-password received (code/token and new_password present)")
     def _reset_password():
         return password_recovery_service.reset_password(
-            token=request.token,
+            code=code_or_token,
             new_password=request.new_password,
             db=db
         )
