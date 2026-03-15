@@ -90,6 +90,91 @@ def address_suggest(
     return AddressSuggestResponseSchema(suggestions=suggestions)
 
 
+# =============================================================================
+# ENRICHED ADDRESS ENDPOINTS (with institution_name, user_username, user_first_name, user_last_name)
+# Must be registered before /{address_id} so /enriched and /search are not parsed as address_id.
+# =============================================================================
+
+# GET /addresses/enriched - List all addresses with enriched data
+@router.get("/enriched", response_model=List[AddressEnrichedResponseSchema])
+def list_enriched_addresses(
+    institution_id: Optional[UUID] = institution_filter(),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Employee dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
+    if current_user.get("role_type") == "Customer":
+        user_scope = get_user_scope(current_user)
+
+        def _get_enriched_addresses():
+            return get_enriched_addresses_for_customer(
+                user_scope.user_id, db, include_archived=False
+            )
+
+        return handle_business_operation(
+            _get_enriched_addresses,
+            "enriched address list retrieval"
+        )
+
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
+    effective_institution_id = resolve_institution_filter(institution_id, scope)
+
+    def _get_enriched_addresses():
+        return get_enriched_addresses(
+            db, scope=scope, include_archived=False, institution_id=effective_institution_id
+        )
+
+    return handle_business_operation(
+        _get_enriched_addresses,
+        "enriched address list retrieval"
+    )
+
+# GET /addresses/search - Search addresses by institution and optional text (for B2B restaurant address picker)
+@router.get("/search", response_model=List[AddressEnrichedResponseSchema])
+def search_enriched_addresses(
+    institution_id: Optional[UUID] = Query(None, description="Restrict to addresses for this institution"),
+    q: Optional[str] = Query(None, description="Text search (street_name, city, postal_code, province)"),
+    limit: int = Query(50, ge=1, le=100, description="Max results (default 50)"),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Search addresses with enriched data. Optional institution_id and q for B2B dropdown/type-to-search. Non-archived only."""
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
+
+    def _search():
+        return get_enriched_addresses_search(
+            db,
+            institution_id=institution_id,
+            q=q,
+            scope=scope,
+            include_archived=False,
+            limit=limit,
+        )
+
+    return handle_business_operation(_search, "address search")
+
+# GET /addresses/enriched/{address_id} - Get a single address with enriched data
+@router.get("/enriched/{address_id}", response_model=AddressEnrichedResponseSchema)
+def get_enriched_address_by_id_route(
+    address_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get a single address by ID with enriched data (institution_name, user_username, user_first_name, user_last_name). Non-archived only."""
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
+
+    def _get_enriched_address():
+        enriched_address = get_enriched_address_by_id(address_id, db, scope=scope, include_archived=False)
+        if not enriched_address:
+            from app.utils.error_messages import address_not_found
+            raise address_not_found(address_id)
+        return enriched_address
+
+    return handle_business_operation(
+        _get_enriched_address,
+        "enriched address retrieval"
+    )
+
 # GET /addresses/{address_id}
 @router.get("/{address_id}", response_model=AddressResponseSchema)
 def get_address(
@@ -316,87 +401,3 @@ def delete_address(
 
     handle_delete(_delete, address_id, db, "address")
     return {"detail": "Address deleted successfully"}
-
-# =============================================================================
-# ENRICHED ADDRESS ENDPOINTS (with institution_name, user_username, user_first_name, user_last_name)
-# =============================================================================
-
-# GET /addresses/enriched/ - List all addresses with enriched data
-@router.get("/enriched", response_model=List[AddressEnrichedResponseSchema])
-def list_enriched_addresses(
-    institution_id: Optional[UUID] = institution_filter(),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Employee dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
-    if current_user.get("role_type") == "Customer":
-        user_scope = get_user_scope(current_user)
-
-        def _get_enriched_addresses():
-            return get_enriched_addresses_for_customer(
-                user_scope.user_id, db, include_archived=False
-            )
-
-        return handle_business_operation(
-            _get_enriched_addresses,
-            "enriched address list retrieval"
-        )
-
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
-    effective_institution_id = resolve_institution_filter(institution_id, scope)
-
-    def _get_enriched_addresses():
-        return get_enriched_addresses(
-            db, scope=scope, include_archived=False, institution_id=effective_institution_id
-        )
-
-    return handle_business_operation(
-        _get_enriched_addresses,
-        "enriched address list retrieval"
-    )
-
-# GET /addresses/search/ - Search addresses by institution and optional text (for B2B restaurant address picker)
-@router.get("/search", response_model=List[AddressEnrichedResponseSchema])
-def search_enriched_addresses(
-    institution_id: Optional[UUID] = Query(None, description="Restrict to addresses for this institution"),
-    q: Optional[str] = Query(None, description="Text search (street_name, city, postal_code, province)"),
-    limit: int = Query(50, ge=1, le=100, description="Max results (default 50)"),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Search addresses with enriched data. Optional institution_id and q for B2B dropdown/type-to-search. Non-archived only."""
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
-
-    def _search():
-        return get_enriched_addresses_search(
-            db,
-            institution_id=institution_id,
-            q=q,
-            scope=scope,
-            include_archived=False,
-            limit=limit,
-        )
-
-    return handle_business_operation(_search, "address search")
-
-# GET /addresses/enriched/{address_id} - Get a single address with enriched data
-@router.get("/enriched/{address_id}", response_model=AddressEnrichedResponseSchema)
-def get_enriched_address_by_id_route(
-    address_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get a single address by ID with enriched data (institution_name, user_username, user_first_name, user_last_name). Non-archived only."""
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
-
-    def _get_enriched_address():
-        enriched_address = get_enriched_address_by_id(address_id, db, scope=scope, include_archived=False)
-        if not enriched_address:
-            from app.utils.error_messages import address_not_found
-            raise address_not_found(address_id)
-        return enriched_address
-
-    return handle_business_operation(
-        _get_enriched_address,
-        "enriched address retrieval"
-    )

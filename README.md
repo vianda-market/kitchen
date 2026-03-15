@@ -34,8 +34,8 @@ API docs: http://localhost:8000/docs
 Full documentation lives in [docs/](docs/):
 
 - **[docs/README.md](docs/README.md)** — Documentation index
-- **[docs/CLAUDE.md](docs/CLAUDE.md)** — Development principles and conventions
-- **[docs/CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)** — Architecture overview
+- **[CLAUDE.md](CLAUDE.md)** — Development principles and conventions
+- **[CLAUDE_ARCHITECTURE.md](CLAUDE_ARCHITECTURE.md)** — Architecture overview
 - **[docs/postman/](docs/postman/)** — Postman collections and testing
 - **[docs/database/](docs/database/)** — Database schema and rebuild procedures
 

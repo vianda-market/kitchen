@@ -452,6 +452,66 @@ def get_restaurants_by_city_route(
     return RestaurantsByCityResponseSchema(**data)
 
 
+# =============================================================================
+# ENRICHED RESTAURANT ENDPOINTS (with institution_name, entity_name, address details)
+# Must be registered before /{restaurant_id} so /enriched is not parsed as restaurant_id.
+# =============================================================================
+
+# GET /restaurants/enriched - List all restaurants with enriched data
+@router.get("/enriched", response_model=List[RestaurantEnrichedResponseSchema])
+def list_enriched_restaurants(
+    institution_id: Optional[UUID] = institution_filter(),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Employee dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
+    try:
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
+        effective_institution_id = resolve_institution_filter(institution_id, scope)
+        institution_market_id: Optional[UUID] = None
+        if effective_institution_id is not None:
+            inst = institution_service.get_by_id(effective_institution_id, db, scope=None)
+            if inst and getattr(inst, "market_id", None) is not None and not is_global_market(inst.market_id):
+                institution_market_id = inst.market_id
+        enriched_restaurants = get_enriched_restaurants(
+            db,
+            scope=scope,
+            include_archived=False,
+            institution_id=effective_institution_id,
+            institution_market_id=institution_market_id
+        )
+        return enriched_restaurants
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched restaurants: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurants")
+
+# GET /restaurants/enriched/{restaurant_id} - Get a single restaurant with enriched data
+@router.get("/enriched/{restaurant_id}", response_model=RestaurantEnrichedResponseSchema)
+def get_enriched_restaurant_by_id_route(
+    restaurant_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get a single restaurant by ID with enriched data (institution_name, entity_name, address details). Non-archived only."""
+    try:
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
+        enriched_restaurant = get_enriched_restaurant_by_id(
+            restaurant_id,
+            db,
+            scope=scope,
+            include_archived=False
+        )
+        if not enriched_restaurant:
+            raise entity_not_found("Restaurant", restaurant_id)
+        return enriched_restaurant
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched restaurant {restaurant_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurant")
+
 # GET /restaurants/{restaurant_id}/coworker-pickup-windows — must be before GET /{restaurant_id}
 @router.get("/{restaurant_id}/coworker-pickup-windows", response_model=CoworkerPickupWindowsResponseSchema)
 def get_coworker_pickup_windows_route(
@@ -632,62 +692,3 @@ def create_balance_for_restaurant(
     except Exception as e:
         log_error(f"Error creating balance for restaurant {restaurant_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to create balance record")
-
-# =============================================================================
-# ENRICHED RESTAURANT ENDPOINTS (with institution_name, entity_name, address details)
-# =============================================================================
-
-# GET /restaurants/enriched/ - List all restaurants with enriched data
-@router.get("/enriched", response_model=List[RestaurantEnrichedResponseSchema])
-def list_enriched_restaurants(
-    institution_id: Optional[UUID] = institution_filter(),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Employee dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
-    try:
-        scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
-        effective_institution_id = resolve_institution_filter(institution_id, scope)
-        institution_market_id: Optional[UUID] = None
-        if effective_institution_id is not None:
-            inst = institution_service.get_by_id(effective_institution_id, db, scope=None)
-            if inst and getattr(inst, "market_id", None) is not None and not is_global_market(inst.market_id):
-                institution_market_id = inst.market_id
-        enriched_restaurants = get_enriched_restaurants(
-            db,
-            scope=scope,
-            include_archived=False,
-            institution_id=effective_institution_id,
-            institution_market_id=institution_market_id
-        )
-        return enriched_restaurants
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched restaurants: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurants")
-
-# GET /restaurants/enriched/{restaurant_id} - Get a single restaurant with enriched data
-@router.get("/enriched/{restaurant_id}", response_model=RestaurantEnrichedResponseSchema)
-def get_enriched_restaurant_by_id_route(
-    restaurant_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get a single restaurant by ID with enriched data (institution_name, entity_name, address details). Non-archived only."""
-    try:
-        scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
-        enriched_restaurant = get_enriched_restaurant_by_id(
-            restaurant_id,
-            db,
-            scope=scope,
-            include_archived=False
-        )
-        if not enriched_restaurant:
-            raise entity_not_found("Restaurant", restaurant_id)
-        return enriched_restaurant
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurant")

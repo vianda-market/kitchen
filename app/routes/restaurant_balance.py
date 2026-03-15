@@ -49,6 +49,83 @@ def _restaurant_balance_not_found() -> HTTPException:
     )
 
 
+# GET /restaurant-balances/enriched – Get all enriched restaurant balances (read-only)
+# Must be registered before /{restaurant_id} so /enriched is not parsed as restaurant_id.
+@router.get("/enriched", response_model=List[RestaurantBalanceEnrichedResponseSchema])
+def get_all_enriched_restaurant_balances(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get all restaurant balances with enriched data (institution name, entity name, restaurant name, country) (read-only).
+    
+    **Note: This is a read-only endpoint. Restaurant balances are automatically
+    managed by the backend through transactions and billing operations. They
+    cannot be created or modified via API.**
+    
+    Restaurant balances are updated automatically when:
+    - Customers place orders (via plate selection)
+    - Customers arrive at restaurants (via QR code scan)
+    - Institution bills are generated and paid
+    - Transactions are processed
+    """
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
+
+    def _get_enriched_restaurant_balances():
+        balances = get_enriched_restaurant_balances(
+            db,
+            scope=scope,
+            include_archived=False
+        )
+        log_info(f"Retrieved {len(balances)} enriched restaurant balances")
+        return balances
+    
+    return handle_business_operation(
+        _get_enriched_restaurant_balances,
+        "enriched restaurant balances retrieval"
+    )
+
+# GET /restaurant-balances/enriched/{restaurant_id} – Get single enriched restaurant balance (read-only)
+@router.get("/enriched/{restaurant_id}", response_model=RestaurantBalanceEnrichedResponseSchema)
+def get_enriched_restaurant_balance(
+    restaurant_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get a single restaurant balance by restaurant ID with enriched data (institution name, entity name, restaurant name, country) (read-only).
+    
+    **Note: This is a read-only endpoint. Restaurant balances are automatically
+    managed by the backend through transactions and billing operations. They
+    cannot be created or modified via API.**
+    
+    Restaurant balances are updated automatically when:
+    - Customers place orders (via plate selection)
+    - Customers arrive at restaurants (via QR code scan)
+    - Institution bills are generated and paid
+    - Transactions are processed
+    """
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
+
+    def _get_enriched_restaurant_balance():
+        balance = get_enriched_restaurant_balance_by_id(
+            db,
+            restaurant_id,
+            scope=scope,
+            include_archived=False
+        )
+        
+        if not balance:
+            raise _restaurant_balance_not_found()
+        
+        log_info(f"Retrieved enriched restaurant balance for restaurant: {restaurant_id}")
+        return balance
+    
+    return handle_business_operation(
+        _get_enriched_restaurant_balance,
+        "enriched restaurant balance retrieval"
+    )
+
 # GET /restaurant-balances/ – Get all restaurant balances (read-only)
 @router.get("", response_model=List[RestaurantBalanceResponseSchema])
 def get_all_restaurant_balances(
@@ -125,83 +202,5 @@ def get_restaurant_balance(
     return handle_business_operation(
         _get_restaurant_balance,
         "restaurant balance retrieval"
-    )
-
-
-# GET /restaurant-balances/enriched/ – Get all enriched restaurant balances (read-only)
-@router.get("/enriched", response_model=List[RestaurantBalanceEnrichedResponseSchema])
-def get_all_enriched_restaurant_balances(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get all restaurant balances with enriched data (institution name, entity name, restaurant name, country) (read-only).
-    
-    **Note: This is a read-only endpoint. Restaurant balances are automatically
-    managed by the backend through transactions and billing operations. They
-    cannot be created or modified via API.**
-    
-    Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
-    - Customers arrive at restaurants (via QR code scan)
-    - Institution bills are generated and paid
-    - Transactions are processed
-    """
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
-
-    def _get_enriched_restaurant_balances():
-        balances = get_enriched_restaurant_balances(
-            db,
-            scope=scope,
-            include_archived=False
-        )
-        log_info(f"Retrieved {len(balances)} enriched restaurant balances")
-        return balances
-    
-    return handle_business_operation(
-        _get_enriched_restaurant_balances,
-        "enriched restaurant balances retrieval"
-    )
-
-
-# GET /restaurant-balances/enriched/{restaurant_id} – Get single enriched restaurant balance (read-only)
-@router.get("/enriched/{restaurant_id}", response_model=RestaurantBalanceEnrichedResponseSchema)
-def get_enriched_restaurant_balance(
-    restaurant_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get a single restaurant balance by restaurant ID with enriched data (institution name, entity name, restaurant name, country) (read-only).
-    
-    **Note: This is a read-only endpoint. Restaurant balances are automatically
-    managed by the backend through transactions and billing operations. They
-    cannot be created or modified via API.**
-    
-    Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
-    - Customers arrive at restaurants (via QR code scan)
-    - Institution bills are generated and paid
-    - Transactions are processed
-    """
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
-
-    def _get_enriched_restaurant_balance():
-        balance = get_enriched_restaurant_balance_by_id(
-            db,
-            restaurant_id,
-            scope=scope,
-            include_archived=False
-        )
-        
-        if not balance:
-            raise _restaurant_balance_not_found()
-        
-        log_info(f"Retrieved enriched restaurant balance for restaurant: {restaurant_id}")
-        return balance
-    
-    return handle_business_operation(
-        _get_enriched_restaurant_balance,
-        "enriched restaurant balance retrieval"
     )
 

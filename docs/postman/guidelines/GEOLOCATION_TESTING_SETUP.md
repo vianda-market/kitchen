@@ -134,7 +134,7 @@ You can also run requests individually:
 
 ## 📖 Self-Contained Design
 
-This collection follows the **self-contained design pattern** documented in `docs/CLAUDE.md`:
+This collection follows the **self-contained design pattern** documented in `CLAUDE.md`:
 
 ✅ **Queries Existing Data:**
 - Automatically finds any active address in the database
@@ -175,7 +175,7 @@ This collection tests the **geolocation service** through the API, verifying:
 ## 📚 Related Documentation
 
 - **Gateway Architecture**: `docs/architecture/EXTERNAL_SERVICE_GATEWAY.md`
-- **Testing Guidelines**: `docs/CLAUDE.md` (Testing Standards section)
+- **Testing Guidelines**: `CLAUDE.md` (Testing Standards section)
 - **E2E Collection**: `docs/postman/collections/E2E Plate Selection.postman_collection.json`
 
 ---

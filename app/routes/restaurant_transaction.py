@@ -87,48 +87,8 @@ def get_all_restaurant_transactions(
     )
 
 
-# GET /restaurant-transactions/{transaction_id} – Get single restaurant transaction (read-only)
-@router.get("/{transaction_id}", response_model=RestaurantTransactionResponseSchema)
-def get_restaurant_transaction(
-    transaction_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get a single restaurant transaction by transaction ID (read-only).
-    
-    **Note: This is a read-only endpoint. Restaurant transactions are automatically
-    managed by the backend through plate selection, QR code scanning, and billing
-    operations. They cannot be created or modified via API.**
-    
-    Restaurant transactions are created and updated automatically when:
-    - Customers place orders (via plate selection)
-    - Customers arrive at restaurants (via QR code scan)
-    - Orders are completed or marked as no-show
-    - Institution bills are generated and paid
-    """
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_TRANSACTION, current_user)
-
-    def _get_restaurant_transaction():
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
-        transaction = restaurant_transaction_service.get_by_id(transaction_id, db, scope=scope)
-        
-        if not transaction:
-            raise _restaurant_transaction_not_found()
-        
-        if transaction.is_archived:
-            raise _restaurant_transaction_not_found()
-        
-        log_info(f"Retrieved restaurant transaction: {transaction_id}")
-        return transaction
-    
-    return handle_business_operation(
-        _get_restaurant_transaction,
-        "restaurant transaction retrieval"
-    )
-
-
-# GET /restaurant-transactions/enriched/ – Get all enriched restaurant transactions (read-only)
+# Enriched routes MUST be before /{transaction_id} so /enriched is not parsed as transaction_id
+# GET /restaurant-transactions/enriched – Get all enriched restaurant transactions (read-only)
 @router.get("/enriched", response_model=List[RestaurantTransactionEnrichedResponseSchema])
 def get_all_enriched_restaurant_transactions(
     current_user: dict = Depends(get_current_user),
@@ -205,3 +165,43 @@ def get_enriched_restaurant_transaction(
         "enriched restaurant transaction retrieval"
     )
 
+
+# GET /restaurant-transactions/{transaction_id} – Get single restaurant transaction (read-only)
+@router.get("/{transaction_id}", response_model=RestaurantTransactionResponseSchema)
+def get_restaurant_transaction(
+    transaction_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get a single restaurant transaction by transaction ID (read-only).
+    
+    **Note: This is a read-only endpoint. Restaurant transactions are automatically
+    managed by the backend through plate selection, QR code scanning, and billing
+    operations. They cannot be created or modified via API.**
+    
+    Restaurant transactions are created and updated automatically when:
+    - Customers place orders (via plate selection)
+    - Customers arrive at restaurants (via QR code scan)
+    - Orders are completed or marked as no-show
+    - Institution bills are generated and paid
+    """
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_TRANSACTION, current_user)
+
+    def _get_restaurant_transaction():
+        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        transaction = restaurant_transaction_service.get_by_id(transaction_id, db, scope=scope)
+        
+        if not transaction:
+            raise _restaurant_transaction_not_found()
+        
+        if transaction.is_archived:
+            raise _restaurant_transaction_not_found()
+        
+        log_info(f"Retrieved restaurant transaction: {transaction_id}")
+        return transaction
+    
+    return handle_business_operation(
+        _get_restaurant_transaction,
+        "restaurant transaction retrieval"
+    )

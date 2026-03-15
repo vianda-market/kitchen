@@ -513,7 +513,55 @@ def create_plan_routes() -> APIRouter:
             plans = plan_service.get_all(connection, scope=scope, include_archived=False)
             return [p for p in plans if p.market_id != GLOBAL_MARKET_ID]
         return handle_get_all(service_callable, db, "plans")
-    
+
+    # Enriched routes MUST be before /{plan_id} so /enriched is not parsed as plan_id
+    @router.get("/enriched", response_model=List[PlanEnrichedResponseSchema])
+    def list_enriched_plans(
+        market_id: Optional[UUID] = market_filter(),
+        status: Optional[str] = status_filter(),
+        currency_code: Optional[str] = currency_code_filter(),
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        db: psycopg2.extensions.connection = Depends(get_db)
+    ):
+        """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code. Excludes plans for Global Marketplace. Non-archived only."""
+        try:
+            filters = {"market_id": market_id, "status": status, "currency_code": currency_code}
+            additional_conditions = list(build_filter_conditions("plans", filters) or [])
+            additional_conditions.append(("pl.market_id != %s::uuid", str(GLOBAL_MARKET_ID)))
+            enriched_plans = get_enriched_plans(
+                db,
+                include_archived=False,
+                additional_conditions=additional_conditions
+            )
+            return enriched_plans
+        except HTTPException:
+            raise
+        except Exception as e:
+            log_error(f"Error getting enriched plans: {e}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plans")
+
+    @router.get("/enriched/{plan_id}", response_model=PlanEnrichedResponseSchema)
+    def get_enriched_plan_by_id_route(
+        plan_id: UUID,
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        db: psycopg2.extensions.connection = Depends(get_db)
+    ):
+        """Get a single plan by ID with enriched data (currency_name and currency_code) - Available to Clients and Employees only. Non-archived only."""
+        try:
+            enriched_plan = get_enriched_plan_by_id(
+                plan_id,
+                db,
+                include_archived=False
+            )
+            if not enriched_plan:
+                raise entity_not_found("Plan", plan_id)
+            return enriched_plan
+        except HTTPException:
+            raise
+        except Exception as e:
+            log_error(f"Error getting enriched plan {plan_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan")
+
     @router.get("/{plan_id}", response_model=PlanResponseSchema)
     def get_plan(
         plan_id: UUID,
@@ -581,57 +629,6 @@ def create_plan_routes() -> APIRouter:
             return plan_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
         handle_delete(delete_callable, plan_id, db, "plan")
         return {"detail": "Plan deleted successfully"}
-
-    # =============================================================================
-    # ENRICHED PLAN ENDPOINTS (with currency_name and currency_code)
-    # =============================================================================
-    
-    @router.get("/enriched", response_model=List[PlanEnrichedResponseSchema])
-    def list_enriched_plans(
-        market_id: Optional[UUID] = market_filter(),
-        status: Optional[str] = status_filter(),
-        currency_code: Optional[str] = currency_code_filter(),
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
-        db: psycopg2.extensions.connection = Depends(get_db)
-    ):
-        """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code. Excludes plans for Global Marketplace. Non-archived only."""
-        try:
-            filters = {"market_id": market_id, "status": status, "currency_code": currency_code}
-            additional_conditions = list(build_filter_conditions("plans", filters) or [])
-            additional_conditions.append(("pl.market_id != %s::uuid", str(GLOBAL_MARKET_ID)))
-            enriched_plans = get_enriched_plans(
-                db,
-                include_archived=False,
-                additional_conditions=additional_conditions
-            )
-            return enriched_plans
-        except HTTPException:
-            raise
-        except Exception as e:
-            log_error(f"Error getting enriched plans: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plans")
-
-    @router.get("/enriched/{plan_id}", response_model=PlanEnrichedResponseSchema)
-    def get_enriched_plan_by_id_route(
-        plan_id: UUID,
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
-        db: psycopg2.extensions.connection = Depends(get_db)
-    ):
-        """Get a single plan by ID with enriched data (currency_name and currency_code) - Available to Clients and Employees only. Non-archived only."""
-        try:
-            enriched_plan = get_enriched_plan_by_id(
-                plan_id,
-                db,
-                include_archived=False
-            )
-            if not enriched_plan:
-                raise entity_not_found("Plan", plan_id)
-            return enriched_plan
-        except HTTPException:
-            raise
-        except Exception as e:
-            log_error(f"Error getting enriched plan {plan_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan")
 
     return router
 
@@ -1202,25 +1199,7 @@ def create_plate_routes() -> APIRouter:
                 return plate_service.get_all(connection, scope=scope, include_archived=False)
             return handle_get_all(service_callable, db, "plates")
 
-        @router.get("/{plate_id}", response_model=PlateResponseSchema)
-        def get_plate(
-            plate_id: UUID,
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """Get plate by ID - Customers: any. Employees/Suppliers: institution-scoped. Non-archived only."""
-            if current_user.get("role_type") == "Customer":
-                scope = None
-            else:
-                scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
-            return handle_get_by_id(
-                plate_service.get_by_id,
-                plate_id,
-                db,
-                "plate",
-                extra_kwargs={"scope": scope} if scope else None
-            )
-
+        # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
         @router.get("/enriched", response_model=List[PlateEnrichedResponseSchema])
         def list_enriched_plates(
             current_user: dict = Depends(get_current_user),
@@ -1275,6 +1254,25 @@ def create_plate_routes() -> APIRouter:
             except Exception as e:
                 log_error(f"Error getting enriched plate {plate_id}: {e}")
                 raise HTTPException(status_code=500, detail="Failed to retrieve enriched plate")
+
+        @router.get("/{plate_id}", response_model=PlateResponseSchema)
+        def get_plate(
+            plate_id: UUID,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db)
+        ):
+            """Get plate by ID - Customers: any. Employees/Suppliers: institution-scoped. Non-archived only."""
+            if current_user.get("role_type") == "Customer":
+                scope = None
+            else:
+                scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+            return handle_get_by_id(
+                plate_service.get_by_id,
+                plate_id,
+                db,
+                "plate",
+                extra_kwargs={"scope": scope} if scope else None
+            )
 
     router = create_crud_routes(
         config=config,

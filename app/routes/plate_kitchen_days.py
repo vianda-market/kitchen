@@ -113,6 +113,56 @@ def list_plate_kitchen_days(
         log_error(f"Error listing plate kitchen days: {e}")
         raise HTTPException(status_code=500, detail=f"Error listing plate kitchen days: {str(e)}")
 
+# Enriched routes MUST be before /{kitchen_day_id} so /enriched is not parsed as kitchen_day_id
+@router.get("/enriched", response_model=List[PlateKitchenDayEnrichedResponseSchema])
+def list_enriched_plate_kitchen_days(
+    institution_id: Optional[UUID] = institution_filter(),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
+    scope = _get_scope_for_entity(current_user)
+    effective_institution_id = resolve_institution_filter(institution_id, scope)
+    
+    try:
+        enriched_days = get_enriched_plate_kitchen_days(
+            db,
+            scope=scope,
+            include_archived=False,
+            institution_id=effective_institution_id
+        )
+        return enriched_days
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched plate kitchen days: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen days: {str(e)}")
+
+@router.get("/enriched/{kitchen_day_id}", response_model=PlateKitchenDayEnrichedResponseSchema)
+def get_enriched_plate_kitchen_day(
+    kitchen_day_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get a single plate kitchen day assignment with enriched data"""
+    scope = _get_scope_for_entity(current_user)
+    
+    try:
+        enriched_day = get_enriched_plate_kitchen_day_by_id(
+            kitchen_day_id,
+            db,
+            scope=scope,
+            include_archived=False
+        )
+        if not enriched_day:
+            raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+        return enriched_day
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched plate kitchen day {kitchen_day_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen day: {str(e)}")
+
 @router.get("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)
 def get_plate_kitchen_day(
     kitchen_day_id: UUID,
@@ -274,53 +324,4 @@ def delete_plate_kitchen_day(
     
     handle_business_operation(delete_operation, "delete plate kitchen day", None, db)
     return None
-
-@router.get("/enriched", response_model=List[PlateKitchenDayEnrichedResponseSchema])
-def list_enriched_plate_kitchen_days(
-    institution_id: Optional[UUID] = institution_filter(),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
-    scope = _get_scope_for_entity(current_user)
-    effective_institution_id = resolve_institution_filter(institution_id, scope)
-    
-    try:
-        enriched_days = get_enriched_plate_kitchen_days(
-            db,
-            scope=scope,
-            include_archived=False,
-            institution_id=effective_institution_id
-        )
-        return enriched_days
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched plate kitchen days: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen days: {str(e)}")
-
-@router.get("/enriched/{kitchen_day_id}", response_model=PlateKitchenDayEnrichedResponseSchema)
-def get_enriched_plate_kitchen_day(
-    kitchen_day_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get a single plate kitchen day assignment with enriched data"""
-    scope = _get_scope_for_entity(current_user)
-    
-    try:
-        enriched_day = get_enriched_plate_kitchen_day_by_id(
-            kitchen_day_id,
-            db,
-            scope=scope,
-            include_archived=False
-        )
-        if not enriched_day:
-            raise HTTPException(status_code=404, detail="Plate kitchen day not found")
-        return enriched_day
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched plate kitchen day: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen day: {str(e)}")
 

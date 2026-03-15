@@ -47,6 +47,33 @@ def search_employers(
     
     return handle_business_operation(_search_employers, "employer search")
 
+# GET /employers/enriched - Get all employers with enriched address data
+# Must be registered before /{employer_id} so /enriched is not parsed as employer_id.
+@router.get("/enriched", response_model=List[EmployerEnrichedResponseSchema])
+def get_all_employers_enriched(
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get all employers with enriched address data. Non-archived only."""
+    def _get_enriched_employers():
+        return get_enriched_employers(db, include_archived=False)
+    
+    return handle_business_operation(_get_enriched_employers, "enriched employers retrieval")
+
+# GET /employers/enriched/{employer_id} - Get single employer with enriched address data
+@router.get("/enriched/{employer_id}", response_model=EmployerEnrichedResponseSchema)
+def get_employer_enriched(
+    employer_id: UUID,
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get a single employer by ID with enriched address data. Non-archived only."""
+    def _get_enriched_employer():
+        enriched_employer = get_enriched_employer_by_id(employer_id, db, include_archived=False)
+        if not enriched_employer:
+            raise employer_not_found(employer_id)
+        return enriched_employer
+    
+    return handle_business_operation(_get_enriched_employer, "enriched employer retrieval")
+
 # GET /employers/{employer_id}/addresses - Get all addresses for an employer
 # NOTE: This route must come BEFORE /{employer_id} to ensure FastAPI matches it correctly
 @router.get("/{employer_id}/addresses", response_model=List[AddressResponseSchema])
@@ -184,32 +211,6 @@ def get_employer(
         db,
         "employer"
     )
-
-# GET /employers/enriched/ - Get all employers with enriched address data
-@router.get("/enriched", response_model=List[EmployerEnrichedResponseSchema])
-def get_all_employers_enriched(
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get all employers with enriched address data. Non-archived only."""
-    def _get_enriched_employers():
-        return get_enriched_employers(db, include_archived=False)
-    
-    return handle_business_operation(_get_enriched_employers, "enriched employers retrieval")
-
-# GET /employers/enriched/{employer_id} - Get single employer with enriched address data
-@router.get("/enriched/{employer_id}", response_model=EmployerEnrichedResponseSchema)
-def get_employer_enriched(
-    employer_id: UUID,
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get a single employer by ID with enriched address data. Non-archived only."""
-    def _get_enriched_employer():
-        enriched_employer = get_enriched_employer_by_id(employer_id, db, include_archived=False)
-        if not enriched_employer:
-            raise employer_not_found(employer_id)
-        return enriched_employer
-    
-    return handle_business_operation(_get_enriched_employer, "enriched employer retrieval")
 
 # GET /employers/
 @router.get("", response_model=List[EmployerResponseSchema])
