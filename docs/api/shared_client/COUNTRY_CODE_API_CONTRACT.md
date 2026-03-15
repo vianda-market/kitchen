@@ -36,7 +36,7 @@
 - **Addresses**: Create/update, suggest — see [ADDRESSES_API_CLIENT.md](ADDRESSES_API_CLIENT.md).
 - **Markets**: List/available, create/update — see [MARKET_SCOPE_FOR_CLIENTS.md](MARKET_SCOPE_FOR_CLIENTS.md). Response `country_code` is alpha-2.
 - **Leads**: Zipcode metrics query param — default `US` when omitted.
-- **Restaurant holidays**, **employers**, **location-info**: Same rule; use alpha-2 in all request bodies and query/path params.
+- **Restaurant holidays**, **employers**, **provinces**, **markets**: Same rule; use alpha-2 in all request bodies and query/path params.
 
 ---
 

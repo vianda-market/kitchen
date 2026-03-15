@@ -2,7 +2,7 @@
 
 ## Overview
 
-This codebase uses `uuidv7()` for time-ordered primary keys throughout the schema and triggers. On PostgreSQL 18+, `uuidv7()` is built-in. On PostgreSQL 14–17, the custom `app/db/uuid7_function.sql` must be run before the schema. The build script (`build_kitchen_db_dev.sh`) does not include `uuid7_function.sql`; it assumes PostgreSQL 18+ or that you have run it manually on earlier versions.
+This codebase uses `uuidv7()` for time-ordered primary keys throughout the schema and triggers. On PostgreSQL 18+, `uuidv7()` is built-in. On PostgreSQL 14–17, the custom `docs/archived/db_migrations/uuid7_function.sql` must be run before the schema. The build script assumes PostgreSQL 18+.
 
 ## Current Status
 
@@ -96,14 +96,14 @@ CREATE TABLE example_table (
 
 ## Code Changes Made
 
-1. ✅ Removed `\i app/db/uuid7_function.sql` from the build script and schema
-2. ✅ `app/db/uuid7_function.sql` still exists for PostgreSQL 14–17; run it manually before `schema.sql` if not on PG 18+
+1. ✅ Build script assumes PostgreSQL 18+ (no uuid7_function in normal flow)
+2. ✅ `uuid7_function.sql` archived to `docs/archived/db_migrations/`; run it manually before `schema.sql` if on PG 14–17
 3. ✅ Added comment in `schema.sql` noting PostgreSQL 18+ native support
 
 ## Notes
 
-- **Current Usage**: The schema and triggers use `uuidv7()` everywhere for primary keys and history events (e.g. `DEFAULT uuidv7()`). On PostgreSQL 14–17 this comes from `app/db/uuid7_function.sql`; on PostgreSQL 18+ it is built-in.
-- **PostgreSQL 14–17**: The build script expects `uuidv7()` to exist. Since the script runs `DROP SCHEMA CASCADE` first, add `\i app/db/uuid7_function.sql` to `build_kitchen_db_dev.sh` after `CREATE SCHEMA public;` and before `\i app/db/schema.sql`. Alternatively, run the build on PG 18+ where `uuidv7()` is built-in.
+- **Current Usage**: The schema and triggers use `uuidv7()` everywhere for primary keys and history events (e.g. `DEFAULT uuidv7()`). On PostgreSQL 14–17 this comes from `docs/archived/db_migrations/uuid7_function.sql`; on PostgreSQL 18+ it is built-in.
+- **PostgreSQL 14–17**: The build script expects `uuidv7()` to exist. Add `\i docs/archived/db_migrations/uuid7_function.sql` after `CREATE SCHEMA public;` and before `\i app/db/schema.sql`. Or run on PG 18+ where `uuidv7()` is built-in.
 - **PostgreSQL 18+**: No custom function needed; `uuidv7()` is native. The build script works as-is.
 
 ## Verification
@@ -132,6 +132,6 @@ brew link postgresql@14
 brew services start postgresql@14
 ```
 
-The custom `uuid7_function.sql` file is still in the repo at `app/db/uuid7_function.sql`. Run it before `schema.sql` when using PostgreSQL 14–17:  
-`psql -U cdeachaval -h localhost -d kitchen_db_dev -f app/db/uuid7_function.sql`
+The custom `uuid7_function.sql` file is archived at `docs/archived/db_migrations/uuid7_function.sql`. Run it before `schema.sql` when using PostgreSQL 14–17:
+`psql -U cdeachaval -h localhost -d kitchen_db_dev -f docs/archived/db_migrations/uuid7_function.sql`
 

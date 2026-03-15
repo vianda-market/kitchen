@@ -144,4 +144,4 @@ static/product_images/**/*.png
 
 # Note: Development database files ARE included in repo:
 # - schema.sql, seed.sql, test.sql (test data only, no production secrets)
-# - trigger.sql, uuid7_function.sql (database logic)
+# - trigger.sql (database logic; uuid7_function.sql archived)

@@ -669,7 +669,7 @@ def create_credit_currency_routes() -> APIRouter:
     
     config = RouteConfig(
         prefix="/credit-currencies",
-        tags=["credit-currencies"],
+        tags=["Credit Currencies"],
         entity_name="credit currency",
         entity_name_plural="credit currencies"
     )
@@ -1330,7 +1330,7 @@ def create_geolocation_routes() -> APIRouter:
     
     config = RouteConfig(
         prefix="/geolocations",
-        tags=["geolocations"],
+        tags=["Geolocations"],
         entity_name="geolocation",
         entity_name_plural="geolocations"
     )

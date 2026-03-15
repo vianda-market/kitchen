@@ -35,6 +35,7 @@ CREATE SCHEMA public;
 \i app/db/schema.sql
 \i app/db/index.sql
 \i app/db/trigger.sql
+\i app/db/archival_config_table.sql
 \i app/db/archival_indexes.sql
 \i app/db/seed.sql
 SQL

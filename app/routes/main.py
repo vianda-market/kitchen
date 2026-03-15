@@ -23,7 +23,7 @@ router = APIRouter()
 # - /api/v1/super-admin/discretionary/ (super-admin discretionary approval)
 # - All other business APIs
 
-@router.get("/pool-stats")
+@router.get("/pool-stats", include_in_schema=False)
 async def get_pool_stats(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

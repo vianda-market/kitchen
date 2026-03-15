@@ -30,7 +30,6 @@ from app.routes.plate_review import router as plate_review_router
 from app.routes.favorite import router as favorite_router
 from app.routes.employer import router as employer_router
 from app.routes.address import router as address_router
-from app.routes.location_info import router as location_info_router
 from app.routes.qr_code import router as qr_code_router
 from app.routes.institution_entity import router as institution_entity_router
 from app.routes.restaurant import router as restaurant_router
@@ -90,8 +89,59 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, 'db_pool') and app.state.db_pool:
         app.state.db_pool.close_pool()
 
+OPENAPI_TAGS = [
+    {"name": "Auth", "description": "Authentication and session management"},
+    {"name": "Users", "description": "User profile and management"},
+    {"name": "User Public", "description": "Public user endpoints (signup, etc.)"},
+    {"name": "Password Recovery", "description": "Password reset flow"},
+    {"name": "CRUD", "description": "Generic CRUD operations"},
+    {"name": "User CRUD", "description": "User-specific CRUD"},
+    {"name": "Products", "description": "Product CRUD"},
+    {"name": "Plans", "description": "Plan CRUD"},
+    {"name": "Credit Currencies", "description": "Credit currency CRUD"},
+    {"name": "Subscriptions", "description": "Subscription CRUD"},
+    {"name": "Institutions", "description": "Institution CRUD"},
+    {"name": "Payment Methods", "description": "Payment method CRUD"},
+    {"name": "Plates", "description": "Plate CRUD"},
+    {"name": "Geolocations", "description": "Geolocation CRUD"},
+    {"name": "Plate Selections", "description": "Plate selection CRUD"},
+    {"name": "Plate Selection", "description": "Plate selection flows"},
+    {"name": "Plate Pickup", "description": "Plate pickup management"},
+    {"name": "Plate Reviews", "description": "Plate review ratings"},
+    {"name": "Favorites", "description": "User favorites"},
+    {"name": "Employers", "description": "Employer entities"},
+    {"name": "Addresses", "description": "Address management"},
+    {"name": "QR Codes", "description": "QR code generation and lookup"},
+    {"name": "Institution Entities", "description": "Institutions and entities"},
+    {"name": "Plate Kitchen Days", "description": "Kitchen day scheduling"},
+    {"name": "Restaurants", "description": "Restaurant management"},
+    {"name": "Restaurant Balances", "description": "Restaurant balance and credits"},
+    {"name": "Restaurant Transactions", "description": "Restaurant transactions"},
+    {"name": "Restaurant Staff", "description": "Restaurant staff management"},
+    {"name": "Restaurant Holidays", "description": "Restaurant holiday schedules"},
+    {"name": "National Holidays", "description": "National holiday reference data"},
+    {"name": "Mercado Pago", "description": "Mercado Pago payment integration"},
+    {"name": "Client Bills", "description": "Client billing"},
+    {"name": "Institution Bills", "description": "Institution billing"},
+    {"name": "Markets", "description": "Market and country-scope data"},
+    {"name": "Countries", "description": "Supported countries"},
+    {"name": "Currencies", "description": "Supported currencies"},
+    {"name": "Cities", "description": "City reference data"},
+    {"name": "Provinces", "description": "Province/state reference data"},
+    {"name": "Cuisines", "description": "Cuisine types"},
+    {"name": "Leads", "description": "Lead capture (unauthenticated)"},
+    {"name": "Webhooks", "description": "Webhook handlers (e.g. Stripe)"},
+    {"name": "Customer", "description": "B2C customer payment methods"},
+    {"name": "Enums", "description": "Enum reference values"},
+    {"name": "Admin Discretionary", "description": "Admin discretionary credit management"},
+    {"name": "Super-Admin Discretionary", "description": "Super-admin discretionary credits"},
+    {"name": "Admin Archival", "description": "Archival statistics and operations"},
+    {"name": "Admin Archival Config", "description": "Archival configuration"},
+]
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="Kitchen API", lifespan=lifespan)
+    app = FastAPI(title="Kitchen API", lifespan=lifespan, openapi_tags=OPENAPI_TAGS)
 
     # Add CORS middleware
     app.add_middleware(
@@ -111,7 +161,7 @@ def create_app() -> FastAPI:
     # They don't require versioning as they're not part of the business API.
     # =============================================================================
     
-    @app.get("/")
+    @app.get("/", include_in_schema=False)
     async def root():
         """Root endpoint - API status and information"""
         return {
@@ -123,12 +173,12 @@ def create_app() -> FastAPI:
             "health": "/health"
         }
     
-    @app.get("/health")
+    @app.get("/health", include_in_schema=False)
     async def health_check():
         """Health check endpoint for load balancers and monitoring tools"""
         return {"status": "healthy"}
     
-    @app.get("/api/")
+    @app.get("/api/", include_in_schema=False)
     async def api_root():
         """Redirect to current API version"""
         return RedirectResponse(url="/api/v1/", status_code=307)
@@ -199,10 +249,6 @@ def create_app() -> FastAPI:
     v1_address_router.include_router(address_router)
     app.include_router(v1_address_router)
     
-    v1_location_info_router = create_versioned_router("api", ["Location Info"], APIVersion.V1)
-    v1_location_info_router.include_router(location_info_router)
-    app.include_router(v1_location_info_router)
-    
     v1_qr_code_router = create_versioned_router("api", ["QR Codes"], APIVersion.V1)
     v1_qr_code_router.include_router(qr_code_router)
     app.include_router(v1_qr_code_router)
@@ -239,8 +285,10 @@ def create_app() -> FastAPI:
     v1_national_holidays_router.include_router(national_holidays_router)
     app.include_router(v1_national_holidays_router)
     
-    # Payment method routes (non-versioned routes without versioned equivalents)
-    app.include_router(mercado_pago_router)
+    # Payment method routes (versioned)
+    v1_mercado_pago_router = create_versioned_router("api", ["Mercado Pago"], APIVersion.V1)
+    v1_mercado_pago_router.include_router(mercado_pago_router)
+    app.include_router(v1_mercado_pago_router)
     
     # Billing routes (non-versioned routes without versioned equivalents)
     # Note: client_bill_router is now versioned - moved to versioned section below
@@ -321,9 +369,14 @@ def create_app() -> FastAPI:
     v1_super_admin_discretionary_router.include_router(super_admin_discretionary_router)
     app.include_router(v1_super_admin_discretionary_router)
     
-    # Admin routes (non-versioned - infrastructure only)
-    app.include_router(archival_admin_router)
-    app.include_router(archival_config_admin_router)
+    # Admin archival routes (versioned)
+    v1_archival_admin_router = create_versioned_router("api", ["Admin Archival"], APIVersion.V1)
+    v1_archival_admin_router.include_router(archival_admin_router)
+    app.include_router(v1_archival_admin_router)
+
+    v1_archival_config_admin_router = create_versioned_router("api", ["Admin Archival Config"], APIVersion.V1)
+    v1_archival_config_admin_router.include_router(archival_config_admin_router)
+    app.include_router(v1_archival_config_admin_router)
 
     # Static files (product images, placeholders, QR codes)
     static_dir = Path(__file__).resolve().parent / "static"

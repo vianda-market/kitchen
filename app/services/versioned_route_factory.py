@@ -182,7 +182,7 @@ def create_versioned_credit_currency_routes(version: APIVersion = APIVersion.V1)
     
     config = VersionedRouteConfig(
         prefix="credit-currencies",
-        tags=["credit-currencies"],
+        tags=["Credit Currencies"],
         entity_name="credit currency",
         entity_name_plural="credit currencies",
         version=version

@@ -4,14 +4,16 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- CREATE EXTENSION IF NOT EXISTS pgtap;
 
 -- UUID7: All new rows use uuidv7() for time-ordered IDs.
--- PostgreSQL 18+: native uuid_generate_v7() exists; add wrapper if needed: CREATE OR REPLACE FUNCTION uuidv7() RETURNS uuid AS $$ SELECT uuid_generate_v7(); $$ LANGUAGE sql;
--- PostgreSQL < 18: run app/db/uuid7_function.sql before this schema to create uuidv7().
+-- PostgreSQL 18+: uuidv7() is built-in. No action needed.
+-- PostgreSQL < 18: run docs/archived/db_migrations/uuid7_function.sql before this schema.
 
 -- =============================================================================
 -- DROP TABLES FIRST (with CASCADE to handle dependencies)
 -- =============================================================================
 
 -- Drop dependent/history/resolution tables first
+DROP TABLE IF EXISTS archival_config_history CASCADE;
+DROP TABLE IF EXISTS archival_config CASCADE;
 DROP TABLE IF EXISTS client_bill_history CASCADE;
 DROP TABLE IF EXISTS subscription_history CASCADE;
 DROP TABLE IF EXISTS user_history CASCADE;
@@ -38,6 +40,13 @@ DROP TABLE IF EXISTS status_history CASCADE;
 DROP TABLE IF EXISTS transaction_type_info CASCADE;
 DROP TABLE IF EXISTS transaction_type_history CASCADE;
 DROP TABLE IF EXISTS employer_history CASCADE;
+DROP TABLE IF EXISTS national_holidays_history CASCADE;
+DROP TABLE IF EXISTS national_holidays CASCADE;
+DROP TABLE IF EXISTS restaurant_holidays_history CASCADE;
+DROP TABLE IF EXISTS restaurant_holidays CASCADE;
+DROP TABLE IF EXISTS plate_kitchen_days_history CASCADE;
+DROP TABLE IF EXISTS plate_kitchen_days CASCADE;
+DROP TABLE IF EXISTS pickup_preferences CASCADE;
 
 -- Drop tables that are children of other base tables
 -- credit_card, bank_account, fintech_wallet, fintech_wallet_auth, appstore_account removed (Stripe/aggregator-only)
@@ -47,8 +56,6 @@ DROP TABLE IF EXISTS institution_payment_attempt CASCADE;
 DROP TABLE IF EXISTS discretionary_history CASCADE;
 DROP TABLE IF EXISTS discretionary_info CASCADE;
 DROP TABLE IF EXISTS client_transaction CASCADE;
-DROP TABLE IF EXISTS user_favorite_info CASCADE;
-DROP TABLE IF EXISTS user_favorite_info CASCADE;
 DROP TABLE IF EXISTS user_favorite_info CASCADE;
 DROP TABLE IF EXISTS plate_review_info CASCADE;
 DROP TABLE IF EXISTS plate_pickup_live CASCADE;
@@ -282,7 +289,7 @@ CREATE TABLE IF NOT EXISTS national_holidays_history (
 -- tables removed - enums are now stored directly on entities (user_info, etc.)
 
 \echo 'Creating table: institution_info'
-CREATE TABLE institution_info (
+CREATE TABLE IF NOT EXISTS institution_info (
     institution_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(50) NOT NULL,
     institution_type institution_type_enum NOT NULL DEFAULT 'Supplier'::institution_type_enum,
@@ -300,7 +307,7 @@ CREATE TABLE institution_info (
 );
 
 \echo 'Creating table: address_info'
-CREATE TABLE address_info (
+CREATE TABLE IF NOT EXISTS address_info (
     address_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     user_id UUID NULL,  -- Required only for Customer Comensal home/other; nullable for Supplier, Employee, Employer
@@ -331,7 +338,7 @@ CREATE TABLE address_info (
 \echo 'Creating table: address_history'
 -- Use case: address_info still has updates (address_type from linkages, is_archived, status, modified_by/date).
 -- Address core (street, city, province, etc.) is immutable; subpremise edits (floor, unit, is_default) are in address_subpremise.
-CREATE TABLE address_history (
+CREATE TABLE IF NOT EXISTS address_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     address_id UUID NOT NULL,
     institution_id UUID NOT NULL,
@@ -360,7 +367,7 @@ CREATE TABLE address_history (
 );
 
 \echo 'Creating table: employer_info'
-CREATE TABLE employer_info (
+CREATE TABLE IF NOT EXISTS employer_info (
     employer_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(100) NOT NULL,
     address_id UUID NOT NULL,
@@ -379,7 +386,7 @@ ADD CONSTRAINT fk_address_info_employer_id
 FOREIGN KEY (employer_id) REFERENCES employer_info(employer_id) ON DELETE SET NULL;
 
 \echo 'Creating table: employer_history'
-CREATE TABLE employer_history (
+CREATE TABLE IF NOT EXISTS employer_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     employer_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -396,7 +403,7 @@ CREATE TABLE employer_history (
 );
 
 \echo 'Creating table: user_info'
-CREATE TABLE user_info (
+CREATE TABLE IF NOT EXISTS user_info (
     user_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     role_type role_type_enum NOT NULL,
@@ -420,7 +427,7 @@ CREATE TABLE user_info (
 );
 
 \echo 'Creating table: address_subpremise'
-CREATE TABLE address_subpremise (
+CREATE TABLE IF NOT EXISTS address_subpremise (
     subpremise_id UUID PRIMARY KEY DEFAULT uuidv7(),
     address_id UUID NOT NULL REFERENCES address_info(address_id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_info(user_id) ON DELETE CASCADE,
@@ -435,7 +442,7 @@ CREATE TABLE address_subpremise (
 );
 
 \echo 'Creating table: credit_currency_info'
-CREATE TABLE credit_currency_info (
+CREATE TABLE IF NOT EXISTS credit_currency_info (
     credit_currency_id UUID PRIMARY KEY DEFAULT uuidv7(),
     currency_name VARCHAR(50) NOT NULL,
     currency_code VARCHAR(10) NOT NULL UNIQUE,
@@ -451,7 +458,7 @@ CREATE TABLE credit_currency_info (
 
 
 \echo 'Creating table: credit_currency_history'
-CREATE TABLE credit_currency_history (
+CREATE TABLE IF NOT EXISTS credit_currency_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     credit_currency_id UUID NOT NULL,
     currency_name VARCHAR(50) NOT NULL,
@@ -469,7 +476,7 @@ CREATE TABLE credit_currency_history (
 );
 
 \echo 'Creating table: market_info'
-CREATE TABLE market_info (
+CREATE TABLE IF NOT EXISTS market_info (
     market_id UUID PRIMARY KEY DEFAULT uuidv7(),
     country_name VARCHAR(100) NOT NULL UNIQUE,
     country_code VARCHAR(2) NOT NULL UNIQUE,  -- ISO 3166-1 alpha-2: AR, PE, CL
@@ -491,7 +498,7 @@ CREATE TABLE market_info (
 ALTER TABLE address_info ADD CONSTRAINT fk_address_country_code FOREIGN KEY (country_code) REFERENCES market_info(country_code) ON DELETE RESTRICT;
 
 \echo 'Creating table: market_history'
-CREATE TABLE market_history (
+CREATE TABLE IF NOT EXISTS market_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     market_id UUID NOT NULL,
     country_name VARCHAR(100) NOT NULL,
@@ -513,7 +520,7 @@ CREATE TABLE market_history (
 );
 
 \echo 'Creating table: city_info'
-CREATE TABLE city_info (
+CREATE TABLE IF NOT EXISTS city_info (
     city_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(100) NOT NULL,
     country_code VARCHAR(2) NOT NULL,
@@ -530,23 +537,23 @@ CREATE TABLE city_info (
 
 \echo 'Adding user_info.market_id (required: one market per user, v1)'
 ALTER TABLE user_info ADD COLUMN market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE RESTRICT;
-CREATE INDEX idx_user_info_market_id ON user_info(market_id);
+CREATE INDEX IF NOT EXISTS idx_user_info_market_id ON user_info(market_id);
 
 \echo 'Adding user_info.stripe_customer_id (Stripe Customer for saved payment methods)'
 ALTER TABLE user_info ADD COLUMN stripe_customer_id VARCHAR(255) NULL;
 
-CREATE INDEX idx_city_info_country_code ON city_info(country_code) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_city_info_country_code ON city_info(country_code) WHERE NOT is_archived;
 
 \echo 'Adding user_info.city_id (user primary city for scoping; NOT NULL, default Global for B2B)'
 ALTER TABLE user_info ADD COLUMN city_id UUID NOT NULL DEFAULT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' REFERENCES city_info(city_id) ON DELETE RESTRICT;
-CREATE INDEX idx_user_info_city_id ON user_info(city_id);
+CREATE INDEX IF NOT EXISTS idx_user_info_city_id ON user_info(city_id);
 
 \echo 'Adding institution_info.market_id (required: every institution has a market — Global, single, or multi; default Global for backfill)'
 ALTER TABLE institution_info ADD COLUMN market_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES market_info(market_id) ON DELETE RESTRICT;
-CREATE INDEX idx_institution_info_market_id ON institution_info(market_id);
+CREATE INDEX IF NOT EXISTS idx_institution_info_market_id ON institution_info(market_id);
 
 \echo 'Creating table: user_market_assignment (v2: multi-market per user)'
-CREATE TABLE user_market_assignment (
+CREATE TABLE IF NOT EXISTS user_market_assignment (
     assignment_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES user_info(user_id) ON DELETE CASCADE,
     market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE CASCADE,
@@ -554,11 +561,11 @@ CREATE TABLE user_market_assignment (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, market_id)
 );
-CREATE INDEX idx_user_market_assignment_user_id ON user_market_assignment(user_id);
-CREATE INDEX idx_user_market_assignment_market_id ON user_market_assignment(market_id);
+CREATE INDEX IF NOT EXISTS idx_user_market_assignment_user_id ON user_market_assignment(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_market_assignment_market_id ON user_market_assignment(market_id);
 
 \echo 'Creating table: user_messaging_preferences'
-CREATE TABLE user_messaging_preferences (
+CREATE TABLE IF NOT EXISTS user_messaging_preferences (
     user_id UUID PRIMARY KEY REFERENCES user_info(user_id) ON DELETE CASCADE,
     notify_coworker_pickup_alert BOOLEAN NOT NULL DEFAULT TRUE,
     notify_plate_readiness_alert BOOLEAN NOT NULL DEFAULT TRUE,
@@ -571,7 +578,7 @@ CREATE TABLE user_messaging_preferences (
 );
 
 \echo 'Creating table: institution_history'
-CREATE TABLE institution_history (
+CREATE TABLE IF NOT EXISTS institution_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     name VARCHAR(50) NOT NULL,
@@ -590,7 +597,7 @@ CREATE TABLE institution_history (
 );
 
 \echo 'Creating table: user_history'
-CREATE TABLE user_history (
+CREATE TABLE IF NOT EXISTS user_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     institution_id UUID NOT NULL,
@@ -620,7 +627,7 @@ CREATE TABLE user_history (
 );
 
 \echo 'Creating table: credential_recovery'
-CREATE TABLE credential_recovery (
+CREATE TABLE IF NOT EXISTS credential_recovery (
     credential_recovery_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     recovery_code VARCHAR(10) NOT NULL,
@@ -632,11 +639,11 @@ CREATE TABLE credential_recovery (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
-CREATE UNIQUE INDEX idx_credential_recovery_code ON credential_recovery(recovery_code);
-CREATE INDEX idx_credential_recovery_user_id ON credential_recovery(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credential_recovery_code ON credential_recovery(recovery_code);
+CREATE INDEX IF NOT EXISTS idx_credential_recovery_user_id ON credential_recovery(user_id);
 
 \echo 'Creating table: pending_customer_signup'
-CREATE TABLE pending_customer_signup (
+CREATE TABLE IF NOT EXISTS pending_customer_signup (
     pending_id UUID PRIMARY KEY DEFAULT uuidv7(),
     email VARCHAR(100) NOT NULL,
     verification_code VARCHAR(10) NOT NULL,
@@ -651,12 +658,12 @@ CREATE TABLE pending_customer_signup (
     market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE RESTRICT,
     city_id UUID NOT NULL REFERENCES city_info(city_id) ON DELETE RESTRICT
 );
-CREATE UNIQUE INDEX idx_pending_customer_signup_code ON pending_customer_signup(verification_code);
-CREATE UNIQUE INDEX idx_pending_customer_signup_email_active ON pending_customer_signup(email) WHERE used = FALSE;
-CREATE INDEX idx_pending_customer_signup_expiry ON pending_customer_signup(token_expiry);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_code ON pending_customer_signup(verification_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_email_active ON pending_customer_signup(email) WHERE used = FALSE;
+CREATE INDEX IF NOT EXISTS idx_pending_customer_signup_expiry ON pending_customer_signup(token_expiry);
 
 \echo 'Creating table: geolocation_info'
-CREATE TABLE geolocation_info (
+CREATE TABLE IF NOT EXISTS geolocation_info (
     geolocation_id UUID PRIMARY KEY DEFAULT uuidv7(),
     address_id UUID NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
@@ -675,7 +682,7 @@ CREATE TABLE geolocation_info (
 );
 
 \echo 'Creating table: geolocation_history'
-CREATE TABLE geolocation_history (
+CREATE TABLE IF NOT EXISTS geolocation_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     geolocation_id UUID NOT NULL,
     address_id UUID NOT NULL,
@@ -696,7 +703,7 @@ CREATE TABLE geolocation_history (
 );
 
 \echo 'Creating table: institution_entity_info'
-CREATE TABLE institution_entity_info (
+CREATE TABLE IF NOT EXISTS institution_entity_info (
     institution_entity_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     address_id UUID NOT NULL,
@@ -716,7 +723,7 @@ CREATE TABLE institution_entity_info (
 );
 
 \echo 'Creating table: institution_entity_history'
-CREATE TABLE institution_entity_history (
+CREATE TABLE IF NOT EXISTS institution_entity_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_entity_id UUID NOT NULL,
     institution_id UUID,
@@ -737,7 +744,7 @@ CREATE TABLE institution_entity_history (
 );
 
 \echo 'Creating table: restaurant_info'
-CREATE TABLE restaurant_info (
+CREATE TABLE IF NOT EXISTS restaurant_info (
     restaurant_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
@@ -758,7 +765,7 @@ CREATE TABLE restaurant_info (
 );
 
 \echo 'Creating table: restaurant_history'
-CREATE TABLE restaurant_history (
+CREATE TABLE IF NOT EXISTS restaurant_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     institution_id UUID NOT NULL,
@@ -780,7 +787,7 @@ CREATE TABLE restaurant_history (
 );
 
 \echo 'Creating table: qr_code'
-CREATE TABLE qr_code (
+CREATE TABLE IF NOT EXISTS qr_code (
     qr_code_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     qr_code_payload VARCHAR(255) NOT NULL,
@@ -798,7 +805,7 @@ CREATE TABLE qr_code (
 );
 
 \echo 'Creating table: product_info'
-CREATE TABLE product_info (
+CREATE TABLE IF NOT EXISTS product_info (
     product_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -820,7 +827,7 @@ CREATE TABLE product_info (
 );
 
 \echo 'Creating table: product_history'
-CREATE TABLE product_history (
+CREATE TABLE IF NOT EXISTS product_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     product_id UUID NOT NULL,
     institution_id UUID NOT NULL,
@@ -845,7 +852,7 @@ CREATE TABLE product_history (
 );
 
 \echo 'Creating table: plate_info'
-CREATE TABLE plate_info (
+CREATE TABLE IF NOT EXISTS plate_info (
     plate_id UUID PRIMARY KEY DEFAULT uuidv7(),
     product_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
@@ -864,7 +871,7 @@ CREATE TABLE plate_info (
 );
 
 \echo 'Creating table: restaurant_holidays'
-CREATE TABLE restaurant_holidays (
+CREATE TABLE IF NOT EXISTS restaurant_holidays (
     holiday_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     country VARCHAR(100) NOT NULL,
@@ -884,7 +891,7 @@ CREATE TABLE restaurant_holidays (
 );
 
 \echo 'Creating table: restaurant_holidays_history'
-CREATE TABLE restaurant_holidays_history (
+CREATE TABLE IF NOT EXISTS restaurant_holidays_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     holiday_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
@@ -905,7 +912,7 @@ CREATE TABLE restaurant_holidays_history (
 );
 
 \echo 'Creating table: plate_kitchen_days'
-CREATE TABLE plate_kitchen_days (
+CREATE TABLE IF NOT EXISTS plate_kitchen_days (
     plate_kitchen_day_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
@@ -921,7 +928,7 @@ CREATE TABLE plate_kitchen_days (
 );
 
 \echo 'Creating table: plate_kitchen_days_history'
-CREATE TABLE plate_kitchen_days_history (
+CREATE TABLE IF NOT EXISTS plate_kitchen_days_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_kitchen_day_id UUID NOT NULL,
     plate_id UUID NOT NULL,
@@ -938,7 +945,7 @@ CREATE TABLE plate_kitchen_days_history (
 );
 
 \echo 'Creating table: plate_history'
-CREATE TABLE plate_history (
+CREATE TABLE IF NOT EXISTS plate_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_id UUID NOT NULL,
     product_id UUID NOT NULL,
@@ -958,7 +965,7 @@ CREATE TABLE plate_history (
 );
 
 \echo 'Creating table: plate_selection_info'
-CREATE TABLE plate_selection_info (
+CREATE TABLE IF NOT EXISTS plate_selection_info (
     plate_selection_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     plate_id UUID NOT NULL,
@@ -995,7 +1002,7 @@ CREATE TABLE plate_selection_info (
 );
 
 \echo 'Creating table: plate_selection_history'
-CREATE TABLE plate_selection_history (
+CREATE TABLE IF NOT EXISTS plate_selection_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -1021,10 +1028,10 @@ CREATE TABLE plate_selection_history (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_plate_selection_history_plate_selection ON plate_selection_history(plate_selection_id) WHERE is_current = TRUE;
+CREATE INDEX IF NOT EXISTS idx_plate_selection_history_plate_selection ON plate_selection_history(plate_selection_id) WHERE is_current = TRUE;
 
 \echo 'Creating table: coworker_pickup_notification'
-CREATE TABLE coworker_pickup_notification (
+CREATE TABLE IF NOT EXISTS coworker_pickup_notification (
     notification_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     notifier_user_id UUID NOT NULL,
@@ -1035,10 +1042,10 @@ CREATE TABLE coworker_pickup_notification (
     FOREIGN KEY (notified_user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_coworker_pickup_notification_plate_selection ON coworker_pickup_notification(plate_selection_id);
+CREATE INDEX IF NOT EXISTS idx_coworker_pickup_notification_plate_selection ON coworker_pickup_notification(plate_selection_id);
 
 \echo 'Creating table: plate_pickup_live'
-CREATE TABLE plate_pickup_live (
+CREATE TABLE IF NOT EXISTS plate_pickup_live (
     plate_pickup_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -1067,7 +1074,7 @@ CREATE TABLE plate_pickup_live (
 );
 
 \echo 'Creating table: plate_review_info'
-CREATE TABLE plate_review_info (
+CREATE TABLE IF NOT EXISTS plate_review_info (
     plate_review_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     plate_id UUID NOT NULL,
@@ -1082,10 +1089,10 @@ CREATE TABLE plate_review_info (
     FOREIGN KEY (plate_pickup_id) REFERENCES plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_plate_review_plate_id ON plate_review_info(plate_id) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_plate_review_plate_id ON plate_review_info(plate_id) WHERE NOT is_archived;
 
 \echo 'Creating table: user_favorite_info'
-CREATE TABLE user_favorite_info (
+CREATE TABLE IF NOT EXISTS user_favorite_info (
     favorite_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     entity_type favorite_entity_type_enum NOT NULL,
@@ -1094,10 +1101,10 @@ CREATE TABLE user_favorite_info (
     UNIQUE(user_id, entity_type, entity_id),
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
 );
-CREATE INDEX idx_user_favorite_user_entity ON user_favorite_info(user_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_user_favorite_user_entity ON user_favorite_info(user_id, entity_type);
 
 \echo 'Creating table: pickup_preferences'
-CREATE TABLE pickup_preferences (
+CREATE TABLE IF NOT EXISTS pickup_preferences (
     preference_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -1119,7 +1126,7 @@ CREATE TABLE pickup_preferences (
 );
 
 \echo 'Creating table: plan_info'
-CREATE TABLE plan_info (
+CREATE TABLE IF NOT EXISTS plan_info (
     plan_id UUID PRIMARY KEY DEFAULT uuidv7(),
     market_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -1140,7 +1147,7 @@ CREATE TABLE plan_info (
 );
 
 \echo 'Creating table: plan_history'
-CREATE TABLE plan_history (
+CREATE TABLE IF NOT EXISTS plan_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plan_id UUID NOT NULL,
     market_id UUID NOT NULL,
@@ -1164,7 +1171,7 @@ CREATE TABLE plan_history (
 );
 
 \echo 'Creating table: discretionary_info'
-CREATE TABLE discretionary_info (
+CREATE TABLE IF NOT EXISTS discretionary_info (
     discretionary_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
     restaurant_id UUID,  -- NULL for Client requests, required for Supplier requests
@@ -1187,7 +1194,7 @@ CREATE TABLE discretionary_info (
 );
 
 \echo 'Creating table: discretionary_history'
-CREATE TABLE discretionary_history (
+CREATE TABLE IF NOT EXISTS discretionary_history (
     history_id UUID PRIMARY KEY DEFAULT uuidv7(),
     discretionary_id UUID NOT NULL,
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
@@ -1210,7 +1217,7 @@ CREATE TABLE discretionary_history (
 );
 
 \echo 'Creating table: discretionary_resolution_info'
-CREATE TABLE discretionary_resolution_info (
+CREATE TABLE IF NOT EXISTS discretionary_resolution_info (
     approval_id UUID PRIMARY KEY DEFAULT uuidv7(),
     discretionary_id UUID NOT NULL,
     resolution discretionary_status_enum NOT NULL DEFAULT 'Pending'::discretionary_status_enum,
@@ -1225,7 +1232,7 @@ CREATE TABLE discretionary_resolution_info (
 );
 
 \echo 'Creating table: discretionary_resolution_history'
-CREATE TABLE discretionary_resolution_history (
+CREATE TABLE IF NOT EXISTS discretionary_resolution_history (
     history_id UUID PRIMARY KEY DEFAULT uuidv7(),
     approval_id UUID NOT NULL,
     discretionary_id UUID NOT NULL,
@@ -1371,6 +1378,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS discretionary_info_history_trigger ON discretionary_info;
 CREATE TRIGGER discretionary_info_history_trigger
 AFTER INSERT OR UPDATE OR DELETE ON discretionary_info
 FOR EACH ROW EXECUTE FUNCTION discretionary_info_history_trigger();
@@ -1474,12 +1482,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS discretionary_resolution_info_history_trigger ON discretionary_resolution_info;
 CREATE TRIGGER discretionary_resolution_info_history_trigger
 AFTER INSERT OR UPDATE OR DELETE ON discretionary_resolution_info
 FOR EACH ROW EXECUTE FUNCTION discretionary_resolution_info_history_trigger();
 
 \echo 'Creating table: client_transaction'
-CREATE TABLE client_transaction (
+CREATE TABLE IF NOT EXISTS client_transaction (
     transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     source VARCHAR(50) NOT NULL,  -- e.g., 'plate_selection' or 'discretionary_promotion'
@@ -1499,7 +1508,7 @@ CREATE TABLE client_transaction (
 );
 
 \echo 'Creating table: subscription_info'
-CREATE TABLE subscription_info (
+CREATE TABLE IF NOT EXISTS subscription_info (
     subscription_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     market_id UUID NOT NULL,
@@ -1522,17 +1531,17 @@ CREATE TABLE subscription_info (
 );
 
 -- Ensure one active subscription per user per market
-CREATE UNIQUE INDEX idx_user_market_active 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_market_active 
     ON subscription_info(user_id, market_id) 
     WHERE is_archived = FALSE;
 
 -- Index for querying subscriptions by market
-CREATE INDEX idx_subscription_market 
+CREATE INDEX IF NOT EXISTS idx_subscription_market 
     ON subscription_info(market_id) 
     WHERE is_archived = FALSE;
 
 \echo 'Creating table: subscription_history'
-CREATE TABLE subscription_history (
+CREATE TABLE IF NOT EXISTS subscription_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_id UUID  NOT NULL,
     user_id UUID  NOT NULL,
@@ -1557,7 +1566,7 @@ CREATE TABLE subscription_history (
 );
 
 \echo 'Creating table: subscription_payment'
-CREATE TABLE subscription_payment (
+CREATE TABLE IF NOT EXISTS subscription_payment (
     subscription_payment_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_id UUID NOT NULL,
     payment_provider VARCHAR(50) NOT NULL DEFAULT 'stripe',
@@ -1568,11 +1577,11 @@ CREATE TABLE subscription_payment (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subscription_id) REFERENCES subscription_info(subscription_id) ON DELETE RESTRICT
 );
-CREATE INDEX idx_subscription_payment_subscription_id ON subscription_payment(subscription_id);
-CREATE INDEX idx_subscription_payment_external_id ON subscription_payment(external_payment_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_payment_subscription_id ON subscription_payment(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_payment_external_id ON subscription_payment(external_payment_id);
 
 \echo 'Creating table: payment_method'
-CREATE TABLE payment_method (
+CREATE TABLE IF NOT EXISTS payment_method (
     payment_method_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     method_type VARCHAR(50) NOT NULL,
@@ -1591,7 +1600,7 @@ CREATE TABLE payment_method (
 );
 
 \echo 'Creating table: external_payment_method'
-CREATE TABLE external_payment_method (
+CREATE TABLE IF NOT EXISTS external_payment_method (
     external_payment_method_id UUID PRIMARY KEY DEFAULT uuidv7(),
     payment_method_id UUID NOT NULL UNIQUE,
     provider VARCHAR(50) NOT NULL,
@@ -1604,11 +1613,11 @@ CREATE TABLE external_payment_method (
     CONSTRAINT uq_external_payment_method_provider_external UNIQUE (provider, external_id),
     FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT
 );
-CREATE INDEX idx_external_payment_method_payment_method_id ON external_payment_method(payment_method_id);
-CREATE INDEX idx_external_payment_method_provider ON external_payment_method(provider);
+CREATE INDEX IF NOT EXISTS idx_external_payment_method_payment_method_id ON external_payment_method(payment_method_id);
+CREATE INDEX IF NOT EXISTS idx_external_payment_method_provider ON external_payment_method(provider);
 
 \echo 'Creating table: client_bill_info'
-CREATE TABLE client_bill_info (
+CREATE TABLE IF NOT EXISTS client_bill_info (
     client_bill_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_payment_id UUID NOT NULL,
     subscription_id UUID NOT NULL,
@@ -1632,7 +1641,7 @@ CREATE TABLE client_bill_info (
 );
 
 \echo 'Creating table: client_bill_history'
-CREATE TABLE client_bill_history (
+CREATE TABLE IF NOT EXISTS client_bill_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     client_bill_id UUID NOT NULL,
     subscription_payment_id UUID NOT NULL,
@@ -1654,7 +1663,7 @@ CREATE TABLE client_bill_history (
 );
 
 \echo 'Creating table: restaurant_transaction'
-CREATE TABLE restaurant_transaction (
+CREATE TABLE IF NOT EXISTS restaurant_transaction (
     transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     plate_selection_id UUID,
@@ -1685,7 +1694,7 @@ CREATE TABLE restaurant_transaction (
 );
 
 \echo 'Creating table: restaurant_balance_info'
-CREATE TABLE restaurant_balance_info (
+CREATE TABLE IF NOT EXISTS restaurant_balance_info (
     restaurant_id UUID PRIMARY KEY,
     credit_currency_id UUID NOT NULL,
     transaction_count INTEGER NOT NULL,
@@ -1702,7 +1711,7 @@ CREATE TABLE restaurant_balance_info (
 );
 
 \echo 'Creating table: restaurant_balance_history'
-CREATE TABLE restaurant_balance_history (
+CREATE TABLE IF NOT EXISTS restaurant_balance_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
@@ -1721,7 +1730,7 @@ CREATE TABLE restaurant_balance_history (
 );
 
 \echo 'Creating table: institution_bill_info'
-CREATE TABLE institution_bill_info (
+CREATE TABLE IF NOT EXISTS institution_bill_info (
     institution_bill_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
@@ -1748,7 +1757,7 @@ CREATE TABLE institution_bill_info (
 );
 
 \echo 'Creating table: institution_bill_history'
-CREATE TABLE institution_bill_history (
+CREATE TABLE IF NOT EXISTS institution_bill_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_bill_id UUID NOT NULL,
     institution_id UUID NOT NULL,
@@ -1776,7 +1785,7 @@ CREATE TABLE institution_bill_history (
 );
 
 \echo 'Creating table: institution_settlement'
-CREATE TABLE institution_settlement (
+CREATE TABLE IF NOT EXISTS institution_settlement (
     settlement_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_entity_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
@@ -1805,12 +1814,12 @@ CREATE TABLE institution_settlement (
     FOREIGN KEY (institution_bill_id) REFERENCES institution_bill_info(institution_bill_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
-CREATE INDEX idx_institution_settlement_entity_period ON institution_settlement(institution_entity_id, period_start, period_end);
-CREATE INDEX idx_institution_settlement_restaurant_period ON institution_settlement(restaurant_id, period_start, period_end);
-CREATE INDEX idx_institution_settlement_bill ON institution_settlement(institution_bill_id);
+CREATE INDEX IF NOT EXISTS idx_institution_settlement_entity_period ON institution_settlement(institution_entity_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_institution_settlement_restaurant_period ON institution_settlement(restaurant_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_institution_settlement_bill ON institution_settlement(institution_bill_id);
 
 \echo 'Creating table: institution_settlement_history'
-CREATE TABLE institution_settlement_history (
+CREATE TABLE IF NOT EXISTS institution_settlement_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     settlement_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
