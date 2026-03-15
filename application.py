@@ -205,6 +205,11 @@ def create_app() -> FastAPI:
     v1_auth_router = create_versioned_router("api", ["Auth"], APIVersion.V1)
     v1_auth_router.include_router(auth_router)
     app.include_router(v1_auth_router)
+
+    # Institution entities: register enriched-only router BEFORE crud so /enriched matches before /{entity_id}
+    v1_institution_entity_router = create_versioned_router("api", ["Institution Entities"], APIVersion.V1)
+    v1_institution_entity_router.include_router(institution_entity_router)
+    app.include_router(v1_institution_entity_router)
     
     # Create versioned CRUD router
     v1_crud_router = create_versioned_router("api", ["CRUD"], APIVersion.V1)
@@ -259,10 +264,6 @@ def create_app() -> FastAPI:
     v1_qr_code_router = create_versioned_router("api", ["QR Codes"], APIVersion.V1)
     v1_qr_code_router.include_router(qr_code_router)
     app.include_router(v1_qr_code_router)
-    
-    v1_institution_entity_router = create_versioned_router("api", ["Institution Entities"], APIVersion.V1)
-    v1_institution_entity_router.include_router(institution_entity_router)
-    app.include_router(v1_institution_entity_router)
     
     v1_plate_kitchen_days_router = create_versioned_router("api", ["Plate Kitchen Days"], APIVersion.V1)
     v1_plate_kitchen_days_router.include_router(plate_kitchen_days_router)
