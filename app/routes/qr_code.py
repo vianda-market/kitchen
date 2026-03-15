@@ -75,6 +75,57 @@ def get_all_qr_codes(
     
     return handle_business_operation(_get_qr_codes, "QR codes retrieval")
 
+# =============================================================================
+# ENRICHED QR CODE ENDPOINTS (with institution_name, restaurant_name, address details)
+# Must be registered before /{qr_code_id} so /enriched is not parsed as qr_code_id.
+# =============================================================================
+
+# GET /qr-codes/enriched - List all QR codes with enriched data
+@router.get("/enriched", response_model=List[QRCodeEnrichedResponseSchema])
+def list_enriched_qr_codes(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """List all QR codes with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
+    try:
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
+        enriched_qr_codes = get_enriched_qr_codes(
+            db,
+            scope=scope,
+            include_archived=False
+        )
+        return enriched_qr_codes
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched QR codes: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR codes")
+
+# GET /qr-codes/enriched/{qr_code_id} - Get a single QR code with enriched data
+@router.get("/enriched/{qr_code_id}", response_model=QRCodeEnrichedResponseSchema)
+def get_enriched_qr_code_by_id_route(
+    qr_code_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Get a single QR code by ID with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
+    try:
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
+        enriched_qr_code = get_enriched_qr_code_by_id(
+            qr_code_id,
+            db,
+            scope=scope,
+            include_archived=False
+        )
+        if not enriched_qr_code:
+            raise entity_not_found("QR code", qr_code_id)
+        return enriched_qr_code
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(f"Error getting enriched QR code {qr_code_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR code")
+
 @router.get("/{qr_code_id}", response_model=QRCodeResponseSchema)
 def get_qr_code(
     qr_code_id: UUID,
@@ -171,53 +222,3 @@ def get_qr_code_by_restaurant(
         return qr_code_service.get_by_field("restaurant_id", restaurant_id, db, scope=scope)
     
     return handle_business_operation(_get_qr_code_by_restaurant, "QR code retrieval by restaurant")
-
-# =============================================================================
-# ENRICHED QR CODE ENDPOINTS (with institution_name, restaurant_name, address details)
-# =============================================================================
-
-# GET /qr-codes/enriched/ - List all QR codes with enriched data
-@router.get("/enriched", response_model=List[QRCodeEnrichedResponseSchema])
-def list_enriched_qr_codes(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """List all QR codes with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
-    try:
-        scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
-        enriched_qr_codes = get_enriched_qr_codes(
-            db,
-            scope=scope,
-            include_archived=False
-        )
-        return enriched_qr_codes
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched QR codes: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR codes")
-
-# GET /qr-codes/enriched/{qr_code_id} - Get a single QR code with enriched data
-@router.get("/enriched/{qr_code_id}", response_model=QRCodeEnrichedResponseSchema)
-def get_enriched_qr_code_by_id_route(
-    qr_code_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Get a single QR code by ID with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
-    try:
-        scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
-        enriched_qr_code = get_enriched_qr_code_by_id(
-            qr_code_id,
-            db,
-            scope=scope,
-            include_archived=False
-        )
-        if not enriched_qr_code:
-            raise entity_not_found("QR code", qr_code_id)
-        return enriched_qr_code
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(f"Error getting enriched QR code {qr_code_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR code")

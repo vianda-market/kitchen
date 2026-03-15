@@ -150,6 +150,64 @@ def list_restaurant_holidays(
     return handle_business_operation(get_operation, "restaurant holidays retrieval", None, db)
 
 
+# Enriched routes MUST be before /{holiday_id} so /enriched is not parsed as holiday_id
+@router.get("/enriched", response_model=List[RestaurantHolidayEnrichedResponseSchema])
+def list_enriched_restaurant_holidays(
+    restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get enriched restaurant holidays including both restaurant-specific holidays
+    and applicable national holidays.
+    
+    This endpoint allows restaurant people (Suppliers) to see national holidays
+    that apply to their restaurants without direct access to the employee-only
+    national holidays API.
+    
+    Suppliers can only see holidays for restaurants in their institution.
+    Employees can see holidays for all restaurants.
+    """
+    scope = _get_scope_for_entity(current_user)
+    
+    def get_operation(connection: psycopg2.extensions.connection):
+        from app.services.entity_service import get_enriched_restaurant_holidays
+        return get_enriched_restaurant_holidays(
+            restaurant_id=restaurant_id,
+            db=connection,
+            scope=scope,
+            include_archived=False
+        )
+    
+    return handle_business_operation(get_operation, "enriched restaurant holidays retrieval", None, db)
+
+
+@router.get("/enriched/{restaurant_id}", response_model=List[RestaurantHolidayEnrichedResponseSchema])
+def get_enriched_restaurant_holidays_by_restaurant(
+    restaurant_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get enriched restaurant holidays for a specific restaurant.
+    
+    Returns both restaurant-specific holidays and applicable national holidays
+    for the specified restaurant.
+    """
+    scope = _get_scope_for_entity(current_user)
+    
+    def get_operation(connection: psycopg2.extensions.connection):
+        from app.services.entity_service import get_enriched_restaurant_holidays_by_restaurant
+        return get_enriched_restaurant_holidays_by_restaurant(
+            restaurant_id=restaurant_id,
+            db=connection,
+            scope=scope,
+            include_archived=False
+        )
+    
+    return handle_business_operation(get_operation, "enriched restaurant holidays retrieval by restaurant", None, db)
+
+
 @router.get("/{holiday_id}", response_model=RestaurantHolidayResponseSchema)
 def get_restaurant_holiday(
     holiday_id: UUID,
@@ -425,61 +483,4 @@ def delete_restaurant_holiday(
     
     handle_business_operation(delete_operation, "restaurant holiday deletion", None, db)
     return None
-
-
-@router.get("/enriched", response_model=List[RestaurantHolidayEnrichedResponseSchema])
-def list_enriched_restaurant_holidays(
-    restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get enriched restaurant holidays including both restaurant-specific holidays
-    and applicable national holidays.
-    
-    This endpoint allows restaurant people (Suppliers) to see national holidays
-    that apply to their restaurants without direct access to the employee-only
-    national holidays API.
-    
-    Suppliers can only see holidays for restaurants in their institution.
-    Employees can see holidays for all restaurants.
-    """
-    scope = _get_scope_for_entity(current_user)
-    
-    def get_operation(connection: psycopg2.extensions.connection):
-        from app.services.entity_service import get_enriched_restaurant_holidays
-        return get_enriched_restaurant_holidays(
-            restaurant_id=restaurant_id,
-            db=connection,
-            scope=scope,
-            include_archived=False
-        )
-    
-    return handle_business_operation(get_operation, "enriched restaurant holidays retrieval", None, db)
-
-
-@router.get("/enriched/{restaurant_id}", response_model=List[RestaurantHolidayEnrichedResponseSchema])
-def get_enriched_restaurant_holidays_by_restaurant(
-    restaurant_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get enriched restaurant holidays for a specific restaurant.
-    
-    Returns both restaurant-specific holidays and applicable national holidays
-    for the specified restaurant.
-    """
-    scope = _get_scope_for_entity(current_user)
-    
-    def get_operation(connection: psycopg2.extensions.connection):
-        from app.services.entity_service import get_enriched_restaurant_holidays_by_restaurant
-        return get_enriched_restaurant_holidays_by_restaurant(
-            restaurant_id=restaurant_id,
-            db=connection,
-            scope=scope,
-            include_archived=False
-        )
-    
-    return handle_business_operation(get_operation, "enriched restaurant holidays retrieval by restaurant", None, db)
 

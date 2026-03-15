@@ -7,6 +7,12 @@ Maximize developer velocity while guaranteeing data integrity in PostgreSQL-back
 
 **Keep in context:** [CLAUDE_ARCHITECTURE.md](./CLAUDE_ARCHITECTURE.md) — Directory structure, route registration, data flow, key entry points. Use it to quickly locate modules without exploratory searches.
 
+## Quick Reference for AI Assistants (Cursor)
+
+- **Paths**: Use the short workspace path: `~/Desktop/local/kitchen` (or `$HOME/Desktop/local/kitchen`). Never use long iCloud paths when editing files or running commands.
+- **Database changes**: Do not write or run database migrations. Assume the database will be torn down and rebuilt for schema changes. Primary keys use **UUID7** for new rows (see `docs/database/UUID7_MIGRATION_PLAN.md`); PostgreSQL 18+ has built-in `uuidv7()`. Sync all layers in order: `schema.sql` → `trigger.sql` → `seed.sql` → DTOs → Pydantic schemas.
+- **User quoting agent output**: When the user writes "[Copied output from you kitchen Agent]" or similar, they are passing back a reference to this agent's prior output—treat it as a self-citation, not an external source.
+
 ## Permission Model and Role-Based Access Control
 
 ### Role Type vs Role Name
@@ -961,7 +967,7 @@ async def list_markets():
 
 #### Trailing Slash Convention (REST Standard)
 
-**CRITICAL RULE**: All collection endpoints use **no trailing slash**. This is the industry standard for REST APIs and avoids 307 redirects that break mobile POST clients.
+**CRITICAL RULE**: All collection endpoints use **no trailing slash**. When adding new API endpoints, do **not** use trailing slashes. This is the industry standard for REST APIs and avoids 307 redirects that break mobile POST clients.
 
 - **Canonical**: `/api/v1/employers`, `/api/v1/employers/enriched`, `/api/v1/markets`
 - **Avoid**: `/api/v1/employers/`, `/api/v1/employers/enriched/`
@@ -1636,16 +1642,16 @@ def get_enriched_user_by_id_route(
 ## API Documentation
 
 ### Architecture
-- **Architecture Reference**: [docs/CLAUDE_ARCHITECTURE.md](CLAUDE_ARCHITECTURE.md) — Repo structure, route flow, entry points
+- **Architecture Reference**: [CLAUDE_ARCHITECTURE.md](CLAUDE_ARCHITECTURE.md) — Repo structure, route flow, entry points
 
 ### Versioning Strategy
-- **API Versioning Guide**: [docs/api/API_VERSIONING_GUIDE.md](api/API_VERSIONING_GUIDE.md)
+- **API Versioning Guide**: [docs/api/API_VERSIONING_GUIDE.md](docs/api/API_VERSIONING_GUIDE.md)
 - **Current Version**: v1 (default)
 - **Versioning Strategy**: URL Path (`/api/v1/plans/`)
 - **Schema Versioning**: Infrastructure ready for version-specific schemas
 
 ### Route Architecture
-- **User-Dependent Routes Pattern**: [docs/api/USER_DEPENDENT_ROUTES_PATTERN.md](api/USER_DEPENDENT_ROUTES_PATTERN.md)
+- **User-Dependent Routes Pattern**: [docs/api/USER_DEPENDENT_ROUTES_PATTERN.md](docs/api/USER_DEPENDENT_ROUTES_PATTERN.md)
 - **Admin/System Routes**: `crud_routes.py` - Operations by administrators, no user context required
 - **User Routes**: `crud_routes_user.py` - Operations by end-users, require user_id extraction
 - **Route Separation**: Clear distinction between admin operations vs user-owned entity operations
@@ -1653,18 +1659,18 @@ def get_enriched_user_by_id_route(
 ## Database Documentation
 
 ### Connection Patterns
-- **Database Connection Patterns**: [docs/database/DATABASE_CONNECTION_PATTERNS.md](database/DATABASE_CONNECTION_PATTERNS.md)
+- **Database Connection Patterns**: [docs/database/DATABASE_CONNECTION_PATTERNS.md](docs/database/DATABASE_CONNECTION_PATTERNS.md)
 - **Pattern Types**: Database utility functions vs Business service functions
 - **Usage Guidelines**: When to use `connection=db` vs positional `db` parameter
 
 ### Table Naming Conventions
-- **Database Table Naming Patterns**: [docs/database/DATABASE_TABLE_NAMING_PATTERNS.md](database/DATABASE_TABLE_NAMING_PATTERNS.md)
+- **Database Table Naming Patterns**: [docs/database/DATABASE_TABLE_NAMING_PATTERNS.md](docs/database/DATABASE_TABLE_NAMING_PATTERNS.md)
 - **Naming Rules**: `_info` suffix for fully editable tables with history tracking
 - **Table Categories**: Fully editable, immutable, partially editable, and event/log tables
 - **Implementation Guidelines**: CRUD service configuration and route factory patterns
 
 ### Database Management
-- **Database Rebuild Guide**: [docs/database/DATABASE_REBUILD_PERSISTENCE.md](database/DATABASE_REBUILD_PERSISTENCE.md)
+- **Database Rebuild Guide**: [docs/database/DATABASE_REBUILD_PERSISTENCE.md](docs/database/DATABASE_REBUILD_PERSISTENCE.md)
 - **Rebuild Process**: Step-by-step database reconstruction and data persistence
 ## Enriched Endpoint Field Naming Guidelines
 

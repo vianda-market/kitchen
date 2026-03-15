@@ -97,6 +97,78 @@ async def list_markets(
     return markets
 
 
+# =============================================================================
+# ENRICHED MARKET ENDPOINTS (with currency_name and currency_code)
+# Must be registered before /{market_id} so /enriched is not parsed as market_id.
+# =============================================================================
+
+@router.get("/enriched", response_model=List[MarketResponseSchema])
+async def list_enriched_markets(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    List all markets with enriched data (currency details). Non-archived only.
+
+    **Authorization**: Any authenticated user (Employee, Supplier, Customer). Used for country dropdown when creating addresses.
+
+    This enriched endpoint returns markets with currency information
+    (currency_name and currency_code) from the credit_currency_info table.
+
+    **Returns**: List of markets with enriched currency data
+
+    **Use Case**: Display markets with full currency details in admin UI
+    """
+    try:
+        enriched_markets = get_enriched_markets(
+            db,
+            include_archived=False
+        )
+        return enriched_markets
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched markets: {str(e)}")
+
+
+@router.get("/enriched/{market_id}", response_model=MarketResponseSchema)
+async def get_enriched_market(
+    market_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get a specific market by ID with enriched data (currency details). Non-archived only.
+
+    **Authorization**: Any authenticated user (Employee, Supplier, Customer).
+
+    **Path Parameters**:
+    - `market_id`: UUID of the market
+
+    **Returns**: Market with enriched currency data
+
+    **Raises**:
+    - 404: Market not found
+
+    **Use Case**: Display market details with full currency information in admin UI
+    """
+    try:
+        enriched_market = get_enriched_market_by_id(
+            market_id,
+            db,
+            include_archived=False
+        )
+        
+        if not enriched_market:
+            raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
+        
+        return enriched_market
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched market: {str(e)}")
+
+
 @router.get("/{market_id}", response_model=MarketResponseSchema)
 async def get_market(
     market_id: UUID,
@@ -277,74 +349,3 @@ async def archive_market(
         raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
     
     return None
-
-
-# =============================================================================
-# ENRICHED MARKET ENDPOINTS (with currency_name and currency_code)
-# =============================================================================
-
-@router.get("/enriched", response_model=List[MarketResponseSchema])
-async def list_enriched_markets(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    List all markets with enriched data (currency details). Non-archived only.
-
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer). Used for country dropdown when creating addresses.
-
-    This enriched endpoint returns markets with currency information
-    (currency_name and currency_code) from the credit_currency_info table.
-
-    **Returns**: List of markets with enriched currency data
-
-    **Use Case**: Display markets with full currency details in admin UI
-    """
-    try:
-        enriched_markets = get_enriched_markets(
-            db,
-            include_archived=False
-        )
-        return enriched_markets
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched markets: {str(e)}")
-
-
-@router.get("/enriched/{market_id}", response_model=MarketResponseSchema)
-async def get_enriched_market(
-    market_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get a specific market by ID with enriched data (currency details). Non-archived only.
-
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer).
-
-    **Path Parameters**:
-    - `market_id`: UUID of the market
-
-    **Returns**: Market with enriched currency data
-
-    **Raises**:
-    - 404: Market not found
-
-    **Use Case**: Display market details with full currency information in admin UI
-    """
-    try:
-        enriched_market = get_enriched_market_by_id(
-            market_id,
-            db,
-            include_archived=False
-        )
-        
-        if not enriched_market:
-            raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
-        
-        return enriched_market
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched market: {str(e)}")

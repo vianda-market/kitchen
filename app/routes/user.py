@@ -564,6 +564,95 @@ def assign_my_employer(
 
     return handle_business_operation(_assign_employer, "employer assignment")
 
+# =============================================================================
+# ENRICHED USER ENDPOINTS (with role_name, role_type, institution_name)
+# Must be registered before /{user_id} so /enriched is not parsed as user_id.
+# =============================================================================
+
+# GET /users/enriched - List all users with enriched data
+@router.get("/enriched", response_model=List[UserEnrichedResponseSchema])
+def list_enriched_users(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """List all users with enriched data (role_name, role_type, institution_name). Non-archived only."""
+    scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
+
+    def _get_enriched_users():
+        return get_enriched_users(db, scope=scope, include_archived=False)
+
+    return handle_business_operation(
+        _get_enriched_users,
+        "enriched user list retrieval"
+    )
+
+# GET /users/enriched/{user_id} - Get a single user with enriched data
+@router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema, deprecated=True)
+def get_enriched_user_by_id_route(
+    user_id: UUID,
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Get a single user by ID with enriched data (role_name, role_type, institution_name)
+
+    ⚠️ **DEPRECATED for self-reads**: Use `GET /users/me` for reading your own profile (returns enriched data).
+    This endpoint remains available for Admins to read OTHER users' profiles.
+    """
+    role_type = current_user.get("role_type")
+    role_name = current_user.get("role_name")
+    current_user_id = current_user["user_id"]
+
+    # Detect self-read and log deprecation warning
+    is_self_read = str(user_id) == str(current_user_id)
+    if is_self_read:
+        log_deprecated_endpoint_usage(
+            "GET /api/v1/users/enriched/{user_id} (self-read)",
+            str(current_user_id),
+            role_type or "",
+            role_name or "",
+        )
+        log_warning(
+            f"DEPRECATED: User {current_user_id} ({role_type}/{role_name}) used GET /users/enriched/{{user_id}} "
+            f"for self-read. Please migrate to GET /users/me"
+        )
+        response.headers["X-Deprecated-Endpoint"] = "true"
+        response.headers["X-Use-Instead"] = "GET /api/v1/users/me"
+        response.headers["X-Deprecation-Date"] = "2024-12-04"
+        response.headers["X-Removal-Date"] = "2026-06-04"
+
+    # Apply user scoping for Customers and Employee Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+        user_scope = get_user_scope(current_user)
+        user_scope.enforce_user(user_id)
+        scope = None
+    else:
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
+        # Check if user exists first (without scope), then check access (with scope)
+        # This ensures we return 403 for cross-institution access, not 404
+        user_exists = user_service.get_by_id(user_id, db, scope=None)
+        if not user_exists:
+            raise user_not_found()
+        if scope and not scope.is_global:
+            user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
+            if not user_with_scope:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Forbidden: You do not have access to this user"
+                )
+
+    def _get_enriched_user():
+        enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=False)
+        if not enriched_user:
+            raise user_not_found()
+        return enriched_user
+
+    return handle_business_operation(
+        _get_enriched_user,
+        "enriched user retrieval"
+    )
+
 # 3. Get a single user by primary key (user_id)
 @router.get("/{user_id}", response_model=UserResponseSchema, deprecated=True)
 def get_user_by_id(
@@ -1006,94 +1095,3 @@ def delete_user(
         return {"detail": "User deleted successfully"}
     
     return handle_business_operation(_delete_user, "user deletion")
-
-# =============================================================================
-# ENRICHED USER ENDPOINTS (with role_name, role_type, institution_name)
-# =============================================================================
-
-# GET /users/enriched/ - List all users with enriched data
-@router.get("/enriched", response_model=List[UserEnrichedResponseSchema])
-def list_enriched_users(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """List all users with enriched data (role_name, role_type, institution_name). Non-archived only."""
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
-
-    def _get_enriched_users():
-        return get_enriched_users(db, scope=scope, include_archived=False)
-
-    return handle_business_operation(
-        _get_enriched_users,
-        "enriched user list retrieval"
-    )
-
-# GET /users/enriched/{user_id} - Get a single user with enriched data
-@router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema, deprecated=True)
-def get_enriched_user_by_id_route(
-    user_id: UUID,
-    response: Response,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """
-    Get a single user by ID with enriched data (role_name, role_type, institution_name)
-    
-    ⚠️ **DEPRECATED for self-reads**: Use `GET /users/me` for reading your own profile (returns enriched data).
-    This endpoint remains available for Admins to read OTHER users' profiles.
-    """
-    role_type = current_user.get("role_type")
-    role_name = current_user.get("role_name")
-    current_user_id = current_user["user_id"]
-    
-    # Detect self-read and log deprecation warning
-    is_self_read = str(user_id) == str(current_user_id)
-    if is_self_read:
-        log_deprecated_endpoint_usage(
-            "GET /api/v1/users/enriched/{user_id} (self-read)",
-            str(current_user_id),
-            role_type or "",
-            role_name or "",
-        )
-        log_warning(
-            f"DEPRECATED: User {current_user_id} ({role_type}/{role_name}) used GET /users/enriched/{{user_id}} "
-            f"for self-read. Please migrate to GET /users/me"
-        )
-        response.headers["X-Deprecated-Endpoint"] = "true"
-        response.headers["X-Use-Instead"] = "GET /api/v1/users/me"
-        response.headers["X-Deprecation-Date"] = "2024-12-04"
-        response.headers["X-Removal-Date"] = "2026-06-04"
-    
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
-        user_scope = get_user_scope(current_user)
-        user_scope.enforce_user(user_id)
-        # Customers and Employee Operators can only access their own user_id, so scope is None (no institution filtering needed)
-        scope = None
-    else:
-        scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
-        # Check if user exists first (without scope), then check access (with scope)
-        # This ensures we return 403 for cross-institution access, not 404
-        user_exists = user_service.get_by_id(user_id, db, scope=None)
-        if not user_exists:
-            raise user_not_found()
-        
-        # Now check if user has access with scope
-        if scope and not scope.is_global:
-            user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
-            if not user_with_scope:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Forbidden: You do not have access to this user"
-                )
-
-    def _get_enriched_user():
-        enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=False)
-        if not enriched_user:
-            raise user_not_found()
-        return enriched_user
-
-    return handle_business_operation(
-        _get_enriched_user,
-        "enriched user retrieval"
-    )

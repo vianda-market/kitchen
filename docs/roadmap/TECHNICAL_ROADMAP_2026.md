@@ -464,7 +464,7 @@ cd infra
 ### Backend
 - `docs/START_SERVER.md` - Local development setup
 - `docs/CODING_GUIDELINES.md` - Code standards
-- `docs/CLAUDE.md` - AI development notes
+- `CLAUDE.md` - AI development notes
 
 ### Testing
 - `docs/testing/TESTING_STRATEGY.md` - Test approach
