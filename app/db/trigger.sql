@@ -50,6 +50,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS institution_trigger ON institution_info;
 CREATE TRIGGER institution_trigger
 AFTER INSERT OR UPDATE ON institution_info
 FOR EACH ROW
@@ -123,6 +124,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on user_info
+DROP TRIGGER IF EXISTS user_history_trigger ON user_info;
 CREATE TRIGGER user_history_trigger
 AFTER INSERT OR UPDATE ON user_info
 FOR EACH ROW
@@ -139,6 +141,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS user_messaging_preferences_trigger ON user_info;
 CREATE TRIGGER user_messaging_preferences_trigger
 AFTER INSERT ON user_info
 FOR EACH ROW
@@ -198,6 +201,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on institution_entity_info
+DROP TRIGGER IF EXISTS institution_entity_history_trigger ON institution_entity_info;
 CREATE TRIGGER institution_entity_history_trigger
 AFTER INSERT OR UPDATE ON institution_entity_info
 FOR EACH ROW
@@ -269,6 +273,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on address_info
+DROP TRIGGER IF EXISTS address_history_trigger ON address_info;
 CREATE TRIGGER address_history_trigger
 AFTER INSERT OR UPDATE ON address_info
 FOR EACH ROW
@@ -330,6 +335,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on geolocation_info
+DROP TRIGGER IF EXISTS geolocation_history_trigger ON geolocation_info;
 CREATE TRIGGER geolocation_history_trigger
 AFTER INSERT OR UPDATE ON geolocation_info
 FOR EACH ROW
@@ -391,6 +397,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on restaurant_info
+DROP TRIGGER IF EXISTS restaurant_history_trigger ON restaurant_info;
 CREATE TRIGGER restaurant_history_trigger
 AFTER INSERT OR UPDATE ON restaurant_info
 FOR EACH ROW
@@ -458,6 +465,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on product_info
+DROP TRIGGER IF EXISTS product_history_trigger ON product_info;
 CREATE TRIGGER product_history_trigger
 AFTER INSERT OR UPDATE ON product_info
 FOR EACH ROW
@@ -515,6 +523,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on plate_info
+DROP TRIGGER IF EXISTS plate_history_trigger ON plate_info;
 CREATE TRIGGER plate_history_trigger
 AFTER INSERT OR UPDATE ON plate_info
 FOR EACH ROW
@@ -622,6 +631,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS plate_selection_history_trigger ON plate_selection_info;
 CREATE TRIGGER plate_selection_history_trigger
 AFTER INSERT OR UPDATE ON plate_selection_info
 FOR EACH ROW
@@ -636,6 +646,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS plan_info_set_credit_worth_trigger ON plan_info;
 CREATE TRIGGER plan_info_set_credit_worth_trigger
 BEFORE INSERT OR UPDATE ON plan_info
 FOR EACH ROW
@@ -699,6 +710,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on plan_info
+DROP TRIGGER IF EXISTS plan_history_trigger ON plan_info;
 CREATE TRIGGER plan_history_trigger
 AFTER INSERT OR UPDATE ON plan_info
 FOR EACH ROW
@@ -764,6 +776,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on subscription_info
+DROP TRIGGER IF EXISTS subscription_history_trigger ON subscription_info;
 CREATE TRIGGER subscription_history_trigger
 AFTER INSERT OR UPDATE ON subscription_info
 FOR EACH ROW
@@ -786,6 +799,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on subscription_info for automatic status activation
+DROP TRIGGER IF EXISTS subscription_status_activation ON subscription_info;
 CREATE TRIGGER subscription_status_activation
 BEFORE UPDATE ON subscription_info
 FOR EACH ROW
@@ -850,6 +864,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on client_bill_info
+DROP TRIGGER IF EXISTS client_bill_history_trigger ON client_bill_info;
 CREATE TRIGGER client_bill_history_trigger
 AFTER INSERT OR UPDATE ON client_bill_info
 FOR EACH ROW
@@ -908,6 +923,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on restaurant_balance_info
+DROP TRIGGER IF EXISTS restaurant_balance_history_trigger ON restaurant_balance_info;
 CREATE TRIGGER restaurant_balance_history_trigger
 AFTER INSERT OR UPDATE ON restaurant_balance_info
 FOR EACH ROW
@@ -981,6 +997,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on institution_bill_info
+DROP TRIGGER IF EXISTS institution_bill_history_trigger ON institution_bill_info;
 CREATE TRIGGER institution_bill_history_trigger
 AFTER INSERT OR UPDATE ON institution_bill_info
 FOR EACH ROW
@@ -1112,6 +1129,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on credit_currency_info
+DROP TRIGGER IF EXISTS credit_currency_history_trigger ON credit_currency_info;
 CREATE TRIGGER credit_currency_history_trigger
 AFTER INSERT OR UPDATE ON credit_currency_info
 FOR EACH ROW
@@ -1171,6 +1189,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger on market_info
+DROP TRIGGER IF EXISTS market_history_trigger ON market_info;
 CREATE TRIGGER market_history_trigger
 AFTER INSERT OR UPDATE ON market_info
 FOR EACH ROW
@@ -1248,6 +1267,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS restaurant_holidays_history_trigger ON restaurant_holidays;
 CREATE TRIGGER restaurant_holidays_history_trigger
 AFTER INSERT OR UPDATE OR DELETE ON restaurant_holidays
 FOR EACH ROW
@@ -1312,11 +1332,12 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
     ELSE
-        RETURN NEW;
-    END IF;
+    RETURN NEW;
+END IF;
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS plate_kitchen_days_history_trigger ON plate_kitchen_days;
 CREATE TRIGGER plate_kitchen_days_history_trigger
 AFTER INSERT OR UPDATE OR DELETE ON plate_kitchen_days
 FOR EACH ROW
@@ -1365,6 +1386,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS restaurant_auto_deactivate_on_plate_kitchen_days ON plate_kitchen_days;
 CREATE TRIGGER restaurant_auto_deactivate_on_plate_kitchen_days
 AFTER UPDATE OR DELETE ON plate_kitchen_days
 FOR EACH ROW
@@ -1412,6 +1434,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS restaurant_auto_deactivate_on_qr_code ON qr_code;
 CREATE TRIGGER restaurant_auto_deactivate_on_qr_code
 AFTER UPDATE OR DELETE ON qr_code
 FOR EACH ROW
@@ -1456,6 +1479,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS national_holidays_history_trigger ON national_holidays;
 CREATE TRIGGER national_holidays_history_trigger
     AFTER INSERT OR UPDATE OR DELETE ON national_holidays
     FOR EACH ROW EXECUTE FUNCTION national_holidays_history_trigger();

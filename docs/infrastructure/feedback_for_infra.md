@@ -60,24 +60,22 @@
 ### Schema Source
 Schema lives in this repo under `app/db/`:
 
-- `schema.sql` — main schema
+- `schema.sql` — main schema (idempotent: DROP + CREATE IF NOT EXISTS)
 - `index.sql` — indexes
 - `trigger.sql` — audit triggers
-- `uuid7_function.sql` — UUID v7 helper
 - `archival_config_table.sql` — archival config
 - `archival_indexes.sql` — archival indexes
-- `migrations/001_forbid_plans_global_marketplace.sql` — migrations
 - `seed.sql` — seed data
 
+**Note**: `uuid7_function.sql` archived to `docs/archived/db_migrations/` — PostgreSQL 18+ has built-in `uuidv7()`. Migrations also archived there. Schema.sql is source of truth for fresh builds.
+
 ### Apply Order
-1. `uuid7_function.sql`
-2. `schema.sql`
-3. `index.sql`
-4. `trigger.sql`
-5. `archival_config_table.sql`
-6. `archival_indexes.sql`
-7. Migrations (in order)
-8. `seed.sql` (per environment)
+1. `schema.sql`
+2. `index.sql`
+3. `trigger.sql`
+4. `archival_config_table.sql`
+5. `archival_indexes.sql`
+6. `seed.sql` (per environment)
 
 ### PostgreSQL
 - Version: 13+ (or match current RDS default)

@@ -94,6 +94,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS archival_config_history_trigger ON archival_config;
 CREATE TRIGGER archival_config_history_trigger
 AFTER INSERT OR UPDATE ON archival_config
 FOR EACH ROW

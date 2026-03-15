@@ -124,7 +124,7 @@ INSERT INTO user_info (
 ) VALUES (
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'superadmin',
-  '$2b$12$RKsOxNeKO/qCfuSXy2ZzN.PwkIbusKTzQ55cQIlbHWiQJUsf6DLZK',   -- SuperAdmin1!
+  '$2b$12$H7UZ/eImB4SmjzNybAqKl.rL2JYyGZRlJhcHjivhNAz7qRIfAZLUq',   -- SuperAdmin1 (no special chars)
   'Super',
   'Admin',
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises

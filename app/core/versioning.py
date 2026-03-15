@@ -163,7 +163,7 @@ def create_versioned_router(
     
     router = APIRouter(
         prefix=versioned_prefix,
-        tags=[f"{tag} ({version.value})" for tag in tags]
+        tags=tags,
     )
     
     return router

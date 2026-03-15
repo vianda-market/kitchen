@@ -15,7 +15,7 @@ import psycopg2.extensions
 
 router = APIRouter(
     prefix="/plate-pickup", 
-    tags=["plate-pickup"],
+    tags=["Plate Pickup"],
     dependencies=[Depends(oauth2_scheme)]
 )
 

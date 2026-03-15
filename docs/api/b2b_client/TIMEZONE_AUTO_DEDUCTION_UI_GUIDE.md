@@ -388,19 +388,20 @@ GET /api/v1/markets/
 ### Get Provinces for Multi-TZ Country (Optional)
 
 ```http
-GET /location-info/countries/{country_code}/provinces
+GET /api/v1/provinces/?country_code={country_code}
 ```
 
 **Example:**
 ```http
-GET /location-info/countries/US/provinces
+GET /api/v1/provinces/?country_code=US
 ```
 
 **Response:**
 ```json
 [
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California",
-  "AL", "AK", "AZ", "AR", "CA",
+  { "province_code": "AL", "province_name": "Alabama", "country_code": "US" },
+  { "province_code": "AK", "province_name": "Alaska", "country_code": "US" },
+  { "province_code": "CA", "province_name": "California", "country_code": "US" },
   ...
 ]
 ```

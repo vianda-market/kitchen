@@ -9,7 +9,7 @@ MERCADOPAGO_REDIRECT_URI = os.getenv("MERCADOPAGO_REDIRECT_URI")  # Same you con
 
 router = APIRouter(
     prefix="/mercado-pago",
-    tags=["Meracado Pago"],
+    tags=["Mercado Pago"],
     dependencies=[Depends(oauth2_scheme)]
 )
 
