@@ -1,0 +1,40 @@
+# Kitchen backend - exclude from Docker build context
+
+.git
+.gitignore
+.env
+.env.*
+*.pyc
+__pycache__
+.venv
+venv
+.pytest_cache
+.coverage
+htmlcov
+*.md
+.dockerignore
+Dockerfile
+
+# IDE and project metadata
+.cursor
+.idea
+.vscode
+.DS_Store
+
+# Tests (not needed in production image)
+app/tests
+
+# Documentation (not needed at runtime)
+docs/
+
+# Linter and type checker cache
+.ruff_cache
+.mypy_cache
+
+# Postman (may contain local secrets)
+*.postman_test_run.json
+*local*.postman_environment.json
+
+# Logs and ephemeral files
+*.log
+logs/
