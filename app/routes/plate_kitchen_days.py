@@ -28,6 +28,8 @@ from app.utils.error_messages import entity_not_found
 from app.services.error_handling import handle_business_operation
 from app.security.institution_scope import InstitutionScope
 from app.security.entity_scoping import EntityScopingService, ENTITY_PLATE_KITCHEN_DAYS
+from app.security.scoping import resolve_institution_filter
+from app.utils.query_params import institution_filter
 from app.utils.db import db_read
 import psycopg2.extensions
 
@@ -55,41 +57,56 @@ def _check_unique_constraint(
     db: psycopg2.extensions.connection,
     exclude_id: Optional[UUID] = None
 ) -> bool:
-    """Check if a (plate_id, kitchen_day) combination already exists"""
+    """
+    Check if a (plate_id, kitchen_day) combination already exists for a non-archived record.
+
+    Uniqueness rules:
+    1. Same plate_id cannot be assigned to same kitchen_day more than once (per restaurant, via plate).
+    2. Different plate_ids CAN share the same kitchen_day (e.g. plate A and plate B both on Monday).
+    3. Archived records do not count - archiving is soft delete, so the slot is considered free.
+    """
+    base_where = """
+        plate_id = %s AND kitchen_day = %s AND is_archived = FALSE
+    """
     if exclude_id:
-        query = """
+        query = f"""
             SELECT plate_kitchen_day_id
             FROM plate_kitchen_days
-            WHERE plate_id = %s
-              AND kitchen_day = %s
+            WHERE {base_where}
               AND plate_kitchen_day_id != %s
         """
         result = db_read(query, (str(plate_id), kitchen_day, str(exclude_id)), connection=db, fetch_one=True)
     else:
-        query = """
+        query = f"""
             SELECT plate_kitchen_day_id
             FROM plate_kitchen_days
-            WHERE plate_id = %s
-              AND kitchen_day = %s
+            WHERE {base_where}
         """
         result = db_read(query, (str(plate_id), kitchen_day), connection=db, fetch_one=True)
     return result is not None
 
 @router.get("/", response_model=List[PlateKitchenDayResponseSchema])
 def list_plate_kitchen_days(
-    include_archived: bool = Query(False, description="Include archived records if true"),
+    institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all plate kitchen day assignments"""
+    """List all plate kitchen day assignments. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
     scope = _get_scope_for_entity(current_user)
+    effective_institution_id = resolve_institution_filter(institution_id, scope)
+    if effective_institution_id is not None:
+        effective_scope = InstitutionScope(
+            institution_id=str(effective_institution_id), role_type="Employee", role_name="Manager"
+        )
+    else:
+        effective_scope = scope
     
     try:
         # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
         results = plate_kitchen_days_service.get_all(
             db,
-            scope=scope,
-            include_archived=include_archived
+            scope=effective_scope,
+            include_archived=False
         )
         return results
     except Exception as e:
@@ -99,7 +116,6 @@ def list_plate_kitchen_days(
 @router.get("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)
 def get_plate_kitchen_day(
     kitchen_day_id: UUID,
-    include_archived: bool = Query(False, description="Include archived records if true"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -111,7 +127,7 @@ def get_plate_kitchen_day(
     if not kitchen_day:
         raise HTTPException(status_code=404, detail="Plate kitchen day not found")
     
-    if not include_archived and kitchen_day.is_archived:
+    if kitchen_day.is_archived:
         raise HTTPException(status_code=404, detail="Plate kitchen day not found")
     
     return kitchen_day
@@ -181,39 +197,34 @@ def update_plate_kitchen_day(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Update an existing plate kitchen day assignment"""
+    """Update an existing plate kitchen day assignment. plate_id is immutable; use create + archive to change it."""
+    # Reject plate_id on update - must create new record and archive old one
+    if payload.plate_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="plate_id cannot be changed on an existing kitchen day; create a new record and archive the old one if needed.",
+        )
+
     scope = _get_scope_for_entity(current_user)
-    
+
     def update_operation(connection: psycopg2.extensions.connection):
         # Get existing record (with scoping - will return None if not accessible)
         existing = plate_kitchen_days_service.get_by_id(kitchen_day_id, connection, scope=scope)
         if not existing:
             raise HTTPException(status_code=404, detail="Plate kitchen day not found")
-        
-        # Determine plate_id to use (existing or updated)
-        plate_id = payload.plate_id if payload.plate_id is not None else existing.plate_id
+
         kitchen_day = payload.kitchen_day if payload.kitchen_day is not None else existing.kitchen_day
-        
-        # If plate_id or kitchen_day is being changed, validate
-        if payload.plate_id is not None or payload.kitchen_day is not None:
-            # Validate new plate exists if changed
-            if payload.plate_id is not None:
-                plate = plate_service.get_by_id(payload.plate_id, connection)
-                if not plate:
-                    raise HTTPException(status_code=404, detail=f"Plate not found: {payload.plate_id}")
-                # CRUDService will automatically validate new plate belongs to institution via JOIN-based scoping
-            
-            # Check unique constraint (excluding current record)
-            if _check_unique_constraint(plate_id, kitchen_day, connection, exclude_id=kitchen_day_id):
+
+        # If kitchen_day is being changed, validate unique constraint (plate_id unchanged)
+        if payload.kitchen_day is not None:
+            if _check_unique_constraint(existing.plate_id, kitchen_day, connection, exclude_id=kitchen_day_id):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Plate {plate_id} is already assigned to {kitchen_day}"
+                    detail=f"Plate {existing.plate_id} is already assigned to {kitchen_day}"
                 )
-        
-        # Build update data
+
+        # Build update data - plate_id is immutable, never include it
         update_data = {}
-        if payload.plate_id is not None:
-            update_data["plate_id"] = str(payload.plate_id)
         if payload.kitchen_day is not None:
             update_data["kitchen_day"] = payload.kitchen_day
         if payload.status is not None:
@@ -266,18 +277,20 @@ def delete_plate_kitchen_day(
 
 @router.get("/enriched/", response_model=List[PlateKitchenDayEnrichedResponseSchema])
 def list_enriched_plate_kitchen_days(
-    include_archived: Optional[bool] = Query(False, description="Include archived records if true"),
+    institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all plate kitchen day assignments with enriched data"""
+    """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
     scope = _get_scope_for_entity(current_user)
+    effective_institution_id = resolve_institution_filter(institution_id, scope)
     
     try:
         enriched_days = get_enriched_plate_kitchen_days(
             db,
             scope=scope,
-            include_archived=include_archived or False
+            include_archived=False,
+            institution_id=effective_institution_id
         )
         return enriched_days
     except HTTPException:
@@ -289,7 +302,6 @@ def list_enriched_plate_kitchen_days(
 @router.get("/enriched/{kitchen_day_id}", response_model=PlateKitchenDayEnrichedResponseSchema)
 def get_enriched_plate_kitchen_day(
     kitchen_day_id: UUID,
-    include_archived: Optional[bool] = Query(False, description="Include archived records if true"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -301,7 +313,7 @@ def get_enriched_plate_kitchen_day(
             kitchen_day_id,
             db,
             scope=scope,
-            include_archived=include_archived or False
+            include_archived=False
         )
         if not enriched_day:
             raise HTTPException(status_code=404, detail="Plate kitchen day not found")

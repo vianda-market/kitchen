@@ -179,7 +179,7 @@ class PlatePickupService:
             )
         
         # Soft delete the pickup record
-        deleted_count = plate_pickup_live_service.soft_delete(pickup_id, db)
+        deleted_count = plate_pickup_live_service.soft_delete(pickup_id, current_user["user_id"], db)
         if deleted_count == 0:
             raise pickup_record_not_found(pickup_id)
         
@@ -353,7 +353,7 @@ class PlatePickupService:
     ) -> None:
         """Update pickup record with completion information (commit=False for atomic transaction)"""
         update_data = {
-            "status": Status.COMPLETE,
+            "status": Status.COMPLETED,
             "is_archived": False,  # Keep active per retention policy (archived after 30 days)
             "completion_time": completion_time,
             "was_collected": True,
@@ -380,7 +380,7 @@ class PlatePickupService:
         
         # First update the transaction status and completion time
         rt_update_data = {
-            "status": Status.COMPLETE,
+            "status": Status.COMPLETED,
             "completion_time": completion_time,
             "modified_by": current_user["user_id"]
         }
@@ -433,6 +433,7 @@ class PlatePickupService:
             ppl.status,
             MIN(ppl.created_date) as earliest_order_time,
             COUNT(*) as total_orders,
+            ARRAY_AGG(DISTINCT ppl.plate_pickup_id) as plate_pickup_ids,
             STRING_AGG(
                 CONCAT(prod.name, ':', 
                        CASE 
@@ -440,7 +441,8 @@ class PlatePickupService:
                            WHEN pp.user_id = %s THEN 'x2'
                            ELSE 'x3'
                        END, ':',
-                       COALESCE(p.delivery_time_minutes::text, '15')
+                       COALESCE(p.delivery_time_minutes::text, '15'), ':',
+                       ppl.plate_pickup_id::text
                 ), 
                 '|'
             ) as orders_data
@@ -448,7 +450,7 @@ class PlatePickupService:
         LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
         LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
         LEFT JOIN qr_code qc ON ppl.restaurant_id = qc.restaurant_id
-        LEFT JOIN plate_selection ps ON ppl.plate_selection_id = ps.plate_selection_id
+        LEFT JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id
         LEFT JOIN plate_info p ON ps.plate_id = p.plate_id
         LEFT JOIN product_info prod ON p.product_id = prod.product_id
         WHERE ppl.status IN ('Pending', 'Arrived') 
@@ -464,7 +466,7 @@ class PlatePickupService:
             )
         )
         GROUP BY ppl.restaurant_id, r.name, qc.qr_code_id, qc.qr_code_payload, ppl.status
-        ORDER BY MIN(ppl.created_date) DESC
+        ORDER BY MAX(ppl.plate_pickup_id) DESC
         LIMIT 1
         """
         
@@ -502,18 +504,36 @@ class PlatePickupService:
         # Calculate pickup window constrained to 11:30-14:30
         pickup_window = self._calculate_pickup_window(earliest_time_local)
         
-        # Parse orders_data string
+        # Parse orders_data string (format: plate_name:order_count:delivery_time[:plate_pickup_id])
         orders = []
         if result['orders_data']:
             for order_str in result['orders_data'].split('|'):
                 if order_str:
                     parts = order_str.split(':')
                     if len(parts) >= 2:
+                        plate_pickup_id = None
+                        if len(parts) > 3:
+                            try:
+                                plate_pickup_id = UUID(parts[3])
+                            except (ValueError, TypeError):
+                                pass
                         orders.append({
                             'plate_name': parts[0],
                             'order_count': parts[1],
-                            'delivery_time_minutes': int(parts[2]) if len(parts) > 2 else 15
+                            'delivery_time_minutes': int(parts[2]) if len(parts) > 2 else 15,
+                            'plate_pickup_id': plate_pickup_id,
                         })
+        
+        # Build plate_pickup_ids list (from ARRAY_AGG or fallback to orders)
+        plate_pickup_ids = []
+        if result.get('plate_pickup_ids'):
+            ids = result['plate_pickup_ids']
+            if isinstance(ids, (list, tuple)):
+                plate_pickup_ids = [UUID(str(x)) for x in ids if x]
+            elif isinstance(ids, str):
+                plate_pickup_ids = [UUID(x.strip()) for x in ids.split(',') if x.strip()]
+        if not plate_pickup_ids and orders:
+            plate_pickup_ids = [o['plate_pickup_id'] for o in orders if o.get('plate_pickup_id')]
         
         return {
             'restaurant_id': UUID(result['restaurant_id']),
@@ -521,6 +541,8 @@ class PlatePickupService:
             'qr_code_id': UUID(result['qr_code_id']),
             'qr_code_payload': result['qr_code_payload'],
             'total_orders': result['total_orders'],
+            'total_plate_count': result['total_orders'],  # Same: count of plates for assigned user
+            'plate_pickup_ids': plate_pickup_ids,
             'orders': orders,
             'pickup_window': pickup_window,
             'status': result['status'],
@@ -608,11 +630,12 @@ class PlatePickupService:
             # Case 1: Success - customer has orders at this restaurant
             confirmation_code = self._generate_confirmation_code()
             self._update_orders_arrival(user_id, restaurant_id, confirmation_code, db)
-            
+            plates = self._get_plates_for_pickup_display(user_id, restaurant_id, db)
             return {
                 "status": "success",
                 "message": "Order confirmed! Show this to restaurant staff",
-                "confirmation_code": confirmation_code
+                "confirmation_code": confirmation_code,
+                "plates": plates
             }
         else:
             # Check if they have orders elsewhere or no orders at all
@@ -723,10 +746,48 @@ class PlatePickupService:
         """Generate a 6-character alphanumeric confirmation code"""
         import random
         import string
-        
+
         characters = string.ascii_uppercase + string.digits
         return ''.join(random.choice(characters) for _ in range(6))
-    
+
+    def _get_plates_for_pickup_display(
+        self, user_id: UUID, restaurant_id: UUID, db: psycopg2.extensions.connection
+    ) -> list:
+        """Get plate details for B2C 'what you can pickup' display. Returns list of {plate_name, quantity, plate_pickup_id}."""
+        from app.utils.db import db_read
+
+        query = """
+            SELECT ppl.plate_pickup_id, prod.name as plate_name
+            FROM plate_pickup_live ppl
+            LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
+            JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id
+            JOIN plate_info pl ON ps.plate_id = pl.plate_id
+            JOIN product_info prod ON pl.product_id = prod.product_id
+            WHERE ppl.restaurant_id = %s
+            AND ppl.status IN ('Pending', 'Arrived')
+            AND ppl.is_archived = FALSE
+            AND (
+                ppl.user_id = %s
+                OR pp.user_id = %s
+            )
+        """
+        rows = db_read(query, (str(restaurant_id), str(user_id), str(user_id)), connection=db)
+        if not rows:
+            return []
+
+        # Aggregate by plate_name, sum quantity, use first plate_pickup_id per group
+        from collections import defaultdict
+        agg = defaultdict(lambda: {"quantity": 0, "plate_pickup_id": None})
+        for row in rows:
+            name = row.get("plate_name") or "Unknown"
+            agg[name]["quantity"] += 1
+            if agg[name]["plate_pickup_id"] is None:
+                agg[name]["plate_pickup_id"] = str(row["plate_pickup_id"])
+        return [
+            {"plate_name": name, "quantity": data["quantity"], "plate_pickup_id": data["plate_pickup_id"]}
+            for name, data in agg.items()
+        ]
+
     def _update_orders_arrival(
         self, 
         user_id: UUID, 

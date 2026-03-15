@@ -7,7 +7,7 @@ to enable market-specific business logic, particularly for billing and timing co
 
 Key Features:
 - Extracts country codes directly from institution entities, restaurants, and institutions
-- Uses ISO 3166-1 alpha-3 country codes stored in address records (e.g., "ARG", "PER", "CHL")
+- Uses ISO 3166-1 alpha-2 country codes stored in address records (e.g., "AR", "PE", "CL")
 - Limited to Americas countries only (from Canada to Argentina)
 - Used primarily by the billing service to determine market-specific kitchen day timing
 

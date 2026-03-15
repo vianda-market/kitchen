@@ -293,7 +293,7 @@ def test_institution_scope_is_global_for_employee_admin():
 def test_institution_scope_not_global_for_employee_management():
     current_user = {
         "role_type": "Employee",
-        "role_name": "Management",
+        "role_name": "Manager",
         "institution_id": "33333333-3333-3333-3333-333333333333"
     }
     scope = get_institution_scope(current_user)

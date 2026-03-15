@@ -31,7 +31,6 @@ from app.services.entity_service import (
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.log import log_info
-from app.utils.query_params import include_archived_query
 from app.services.error_handling import handle_business_operation
 from app.security.institution_scope import InstitutionScope
 from app.security.entity_scoping import EntityScopingService, ENTITY_RESTAURANT_BALANCE
@@ -53,7 +52,6 @@ def _restaurant_balance_not_found() -> HTTPException:
 # GET /restaurant-balances/ – Get all restaurant balances (read-only)
 @router.get("/", response_model=List[RestaurantBalanceResponseSchema])
 def get_all_restaurant_balances(
-    include_archived: bool = include_archived_query("restaurant balances"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -77,7 +75,7 @@ def get_all_restaurant_balances(
         balances = restaurant_balance_service.get_all(
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         log_info(f"Retrieved {len(balances)} restaurant balances")
         return balances
@@ -92,7 +90,6 @@ def get_all_restaurant_balances(
 @router.get("/{restaurant_id}", response_model=RestaurantBalanceResponseSchema)
 def get_restaurant_balance(
     restaurant_id: UUID,
-    include_archived: bool = include_archived_query("restaurant balances"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -119,7 +116,7 @@ def get_restaurant_balance(
         if not balance:
             raise _restaurant_balance_not_found()
         
-        if not include_archived and balance.is_archived:
+        if balance.is_archived:
             raise _restaurant_balance_not_found()
         
         log_info(f"Retrieved restaurant balance for restaurant: {restaurant_id}")
@@ -134,7 +131,6 @@ def get_restaurant_balance(
 # GET /restaurant-balances/enriched/ – Get all enriched restaurant balances (read-only)
 @router.get("/enriched/", response_model=List[RestaurantBalanceEnrichedResponseSchema])
 def get_all_enriched_restaurant_balances(
-    include_archived: bool = include_archived_query("restaurant balances"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -157,7 +153,7 @@ def get_all_enriched_restaurant_balances(
         balances = get_enriched_restaurant_balances(
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         log_info(f"Retrieved {len(balances)} enriched restaurant balances")
         return balances
@@ -172,7 +168,6 @@ def get_all_enriched_restaurant_balances(
 @router.get("/enriched/{restaurant_id}", response_model=RestaurantBalanceEnrichedResponseSchema)
 def get_enriched_restaurant_balance(
     restaurant_id: UUID,
-    include_archived: bool = include_archived_query("restaurant balances"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -196,7 +191,7 @@ def get_enriched_restaurant_balance(
             db,
             restaurant_id,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         
         if not balance:

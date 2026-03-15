@@ -61,7 +61,11 @@ class ArchivalService:
                 parsed_records = []
                 for result in results:
                     parsed_record = model_class._parse_result(result)
-                    parsed_records.append(parsed_record.dict() if hasattr(parsed_record, 'dict') else parsed_record)
+                    parsed_records.append(
+                    parsed_record.model_dump()
+                    if hasattr(parsed_record, "model_dump")
+                    else (parsed_record.dict() if hasattr(parsed_record, "dict") else parsed_record)
+                )
                 return parsed_records
             except Exception as e:
                 log_warning(f"Error parsing results for {table_name}: {e}, returning raw results")

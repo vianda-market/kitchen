@@ -31,7 +31,6 @@ router = APIRouter(
 
 @router.get("/", response_model=List[NationalHolidayResponseSchema])
 def list_national_holidays(
-    include_archived: bool = Query(False, description="Include archived holidays"),
     country_code: Optional[str] = Query(None, description="Filter by country code"),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -42,11 +41,8 @@ def list_national_holidays(
     Employee-only endpoint. Supports filtering by country code and archived status.
     """
     def get_operation(connection: psycopg2.extensions.connection):
-        conditions = []
+        conditions = ["is_archived = FALSE"]
         params = []
-        
-        if not include_archived:
-            conditions.append("is_archived = FALSE")
         
         if country_code:
             conditions.append("country_code = %s")
@@ -91,7 +87,7 @@ def get_national_holiday(
     """
     def get_operation(connection: psycopg2.extensions.connection):
         holiday = national_holiday_service.get_by_id(holiday_id, connection)
-        if not holiday:
+        if not holiday or holiday.is_archived:
             raise HTTPException(status_code=404, detail=f"National holiday not found: {holiday_id}")
         return holiday
     

@@ -4,7 +4,7 @@
 CREATE OR REPLACE FUNCTION institution_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         UPDATE institution_history
@@ -17,9 +17,13 @@ BEGIN
         event_id,
         institution_id,
         name,
+        institution_type,
+        market_id,
+        no_show_discount,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -29,9 +33,13 @@ BEGIN
         new_event_id,
         NEW.institution_id,
         NEW.name,
+        NEW.institution_type,
+        NEW.market_id,
+        NEW.no_show_discount,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -51,7 +59,7 @@ EXECUTE FUNCTION institution_trigger_func();
 CREATE OR REPLACE FUNCTION user_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this user as not current
@@ -73,9 +81,13 @@ BEGIN
         last_name,
         email,
         cellphone,
+        market_id,
+        city_id,
+        stripe_customer_id,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -93,9 +105,13 @@ BEGIN
         NEW.last_name,
         NEW.email,
         NEW.cellphone,
+        NEW.market_id,
+        NEW.city_id,
+        NEW.stripe_customer_id,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -112,11 +128,27 @@ AFTER INSERT OR UPDATE ON user_info
 FOR EACH ROW
 EXECUTE FUNCTION user_history_trigger_func();
 
+-- Trigger: create default user_messaging_preferences on user insert
+CREATE OR REPLACE FUNCTION user_messaging_preferences_insert_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_messaging_preferences (user_id)
+    VALUES (NEW.user_id)
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_messaging_preferences_trigger
+AFTER INSERT ON user_info
+FOR EACH ROW
+EXECUTE FUNCTION user_messaging_preferences_insert_func();
+
 -- Trigger function for institution_entity_info history logging
 CREATE OR REPLACE FUNCTION institution_entity_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this supplier entity as not current
@@ -131,11 +163,13 @@ BEGIN
         institution_entity_id,
         institution_id,
         address_id,
+        credit_currency_id,
         tax_id,
         name,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -146,11 +180,13 @@ BEGIN
         NEW.institution_entity_id,
         NEW.institution_id,
         NEW.address_id,
+        NEW.credit_currency_id,
         NEW.tax_id,
         NEW.name,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -171,7 +207,7 @@ EXECUTE FUNCTION institution_entity_history_trigger_func();
 CREATE OR REPLACE FUNCTION address_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this supplier entity as not current
@@ -187,9 +223,6 @@ BEGIN
         institution_id,
         user_id,
         address_type,
-        is_default,
-        floor,
-        country_name,
         country_code,
         province,
         city,
@@ -197,11 +230,11 @@ BEGIN
         street_type,
         street_name,
         building_number,
-        apartment_unit,
         timezone,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -213,9 +246,6 @@ BEGIN
         NEW.institution_id,
         NEW.user_id,
         NEW.address_type,
-        NEW.is_default,
-        NEW.floor,
-        NEW.country_name,
         NEW.country_code,
         NEW.province,
         NEW.city,
@@ -223,11 +253,11 @@ BEGIN
         NEW.street_type,
         NEW.street_name,
         NEW.building_number,
-        NEW.apartment_unit,
         NEW.timezone,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -248,7 +278,7 @@ EXECUTE FUNCTION address_history_trigger_func();
 CREATE OR REPLACE FUNCTION geolocation_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this supplier entity as not current
@@ -264,9 +294,13 @@ BEGIN
         address_id,
         latitude,
         longitude,
+        place_id,
+        viewport,
+        formatted_address_google,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -278,9 +312,13 @@ BEGIN
         NEW.address_id,
         NEW.latitude,
         NEW.longitude,
+        NEW.place_id,
+        NEW.viewport,
+        NEW.formatted_address_google,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -301,7 +339,7 @@ EXECUTE FUNCTION geolocation_history_trigger_func();
 CREATE OR REPLACE FUNCTION restaurant_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this restaurant as not current
@@ -317,12 +355,13 @@ BEGIN
         institution_id,
         institution_entity_id,
         address_id,
-        credit_currency_id,
         name,
         cuisine,
+        pickup_instructions,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -334,12 +373,13 @@ BEGIN
         NEW.institution_id,
         NEW.institution_entity_id,
         NEW.address_id,
-        NEW.credit_currency_id,
         NEW.name,
         NEW.cuisine,
+        NEW.pickup_instructions,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -360,7 +400,7 @@ EXECUTE FUNCTION restaurant_history_trigger_func();
 CREATE OR REPLACE FUNCTION product_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this product as not current
@@ -382,7 +422,10 @@ BEGIN
         image_storage_path,
         image_checksum,
         image_url,
+        image_thumbnail_storage_path,
+        image_thumbnail_url,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -400,7 +443,10 @@ BEGIN
         NEW.image_storage_path,
         NEW.image_checksum,
         NEW.image_url,
+        NEW.image_thumbnail_storage_path,
+        NEW.image_thumbnail_url,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -421,7 +467,7 @@ EXECUTE FUNCTION product_history_trigger_func();
 CREATE OR REPLACE FUNCTION plate_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this plate as not current
@@ -438,11 +484,10 @@ BEGIN
         restaurant_id,
         price,
         credit,
-        savings,
-        no_show_discount,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -455,11 +500,10 @@ BEGIN
         NEW.restaurant_id,
         NEW.price,
         NEW.credit,
-        NEW.savings,
-        NEW.no_show_discount,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -506,19 +550,102 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_plate_selection_ct ON plate_selection;
+DROP TRIGGER IF EXISTS trg_plate_selection_ct ON plate_selection_info;
 
 CREATE TRIGGER trg_plate_selection_ct
-  AFTER INSERT ON plate_selection
+  AFTER INSERT ON plate_selection_info
   FOR EACH ROW
   WHEN (NEW.status = 'Active')  -- guard clause
   EXECUTE FUNCTION log_plate_selection_txn();
+
+-- Trigger function for plate_selection_info history logging
+CREATE OR REPLACE FUNCTION plate_selection_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE plate_selection_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE plate_selection_id = OLD.plate_selection_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO plate_selection_history (
+        event_id,
+        plate_selection_id,
+        user_id,
+        plate_id,
+        restaurant_id,
+        product_id,
+        qr_code_id,
+        credit,
+        kitchen_day,
+        pickup_date,
+        pickup_time_range,
+        pickup_intent,
+        flexible_on_time,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.plate_selection_id,
+        NEW.user_id,
+        NEW.plate_id,
+        NEW.restaurant_id,
+        NEW.product_id,
+        NEW.qr_code_id,
+        NEW.credit,
+        NEW.kitchen_day,
+        NEW.pickup_date,
+        NEW.pickup_time_range,
+        NEW.pickup_intent,
+        NEW.flexible_on_time,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER plate_selection_history_trigger
+AFTER INSERT OR UPDATE ON plate_selection_info
+FOR EACH ROW
+EXECUTE FUNCTION plate_selection_history_trigger_func();
+
+-- Before insert/update on plan_info: set credit_worth = price / credit (local currency per credit)
+CREATE OR REPLACE FUNCTION plan_info_set_credit_worth_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.credit_worth := COALESCE(NEW.price / NULLIF(NEW.credit, 0), 0);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER plan_info_set_credit_worth_trigger
+BEFORE INSERT OR UPDATE ON plan_info
+FOR EACH ROW
+EXECUTE FUNCTION plan_info_set_credit_worth_func();
 
 -- Trigger function for plan_info history logging
 CREATE OR REPLACE FUNCTION plan_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this plan as not current
@@ -532,15 +659,16 @@ BEGIN
         event_id,
         plan_id,
         market_id,
-        credit_currency_id,
         name,
         credit,
         price,
+        credit_worth,
         rollover,
         rollover_cap,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -550,15 +678,16 @@ BEGIN
         new_event_id,
         NEW.plan_id,
         NEW.market_id,
-        NEW.credit_currency_id,
         NEW.name,
         NEW.credit,
         NEW.price,
+        NEW.credit_worth,
         NEW.rollover,
         NEW.rollover_cap,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -579,7 +708,7 @@ EXECUTE FUNCTION plan_history_trigger_func();
 CREATE OR REPLACE FUNCTION subscription_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this subscription as not current
@@ -603,6 +732,7 @@ BEGIN
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -622,6 +752,7 @@ BEGIN
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -665,7 +796,7 @@ EXECUTE FUNCTION subscription_status_activation_trigger();
 CREATE OR REPLACE FUNCTION client_bill_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this client_bill as not current
@@ -678,7 +809,7 @@ BEGIN
     INSERT INTO client_bill_history (
         event_id,
         client_bill_id,
-        payment_id,
+        subscription_payment_id,
         subscription_id,
         user_id,
         plan_id,
@@ -688,6 +819,7 @@ BEGIN
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -696,7 +828,7 @@ BEGIN
     VALUES (
         new_event_id,
         NEW.client_bill_id,
-        NEW.payment_id,
+        NEW.subscription_payment_id,
         NEW.subscription_id,
         NEW.user_id,
         NEW.plan_id,
@@ -706,6 +838,7 @@ BEGIN
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -727,7 +860,7 @@ EXECUTE FUNCTION client_bill_history_trigger_func();
 CREATE OR REPLACE FUNCTION restaurant_balance_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this restaurant_balance as not current
@@ -747,6 +880,7 @@ BEGIN
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -762,6 +896,7 @@ BEGIN
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -782,7 +917,7 @@ EXECUTE FUNCTION restaurant_balance_history_trigger_func();
 CREATE OR REPLACE FUNCTION institution_bill_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this institution_bill as not current
@@ -797,19 +932,20 @@ BEGIN
         institution_bill_id,
         institution_id,
         institution_entity_id,
-        restaurant_id,
         credit_currency_id,
-        payment_id,
         transaction_count,
         amount,
         currency_code,
-        balance_event_id,
         period_start,
         period_end,
         is_archived,
         status,
         resolution,
+        tax_doc_external_id,
+        stripe_payout_id,
+        payout_completed_at,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -820,19 +956,20 @@ BEGIN
         NEW.institution_bill_id,
         NEW.institution_id,
         NEW.institution_entity_id,
-        NEW.restaurant_id,
         NEW.credit_currency_id,
-        NEW.payment_id,
         NEW.transaction_count,
         NEW.amount,
         NEW.currency_code,
-        NEW.balance_event_id,
         NEW.period_start,
         NEW.period_end,
         NEW.is_archived,
         NEW.status,
         NEW.resolution,
+        NEW.tax_doc_external_id,
+        NEW.stripe_payout_id,
+        NEW.payout_completed_at,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -849,11 +986,87 @@ AFTER INSERT OR UPDATE ON institution_bill_info
 FOR EACH ROW
 EXECUTE FUNCTION institution_bill_history_trigger_func();
 
+-- Trigger function for institution_settlement history logging
+CREATE OR REPLACE FUNCTION institution_settlement_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE institution_settlement_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE settlement_id = OLD.settlement_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO institution_settlement_history (
+        event_id,
+        settlement_id,
+        institution_entity_id,
+        restaurant_id,
+        period_start,
+        period_end,
+        kitchen_day,
+        amount,
+        currency_code,
+        credit_currency_id,
+        transaction_count,
+        balance_event_id,
+        settlement_number,
+        settlement_run_id,
+        institution_bill_id,
+        country_code,
+        status,
+        is_archived,
+        created_at,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.settlement_id,
+        NEW.institution_entity_id,
+        NEW.restaurant_id,
+        NEW.period_start,
+        NEW.period_end,
+        NEW.kitchen_day,
+        NEW.amount,
+        NEW.currency_code,
+        NEW.credit_currency_id,
+        NEW.transaction_count,
+        NEW.balance_event_id,
+        NEW.settlement_number,
+        NEW.settlement_run_id,
+        NEW.institution_bill_id,
+        NEW.country_code,
+        NEW.status,
+        NEW.is_archived,
+        NEW.created_at,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS institution_settlement_history_trigger ON institution_settlement;
+CREATE TRIGGER institution_settlement_history_trigger
+AFTER INSERT OR UPDATE ON institution_settlement
+FOR EACH ROW
+EXECUTE FUNCTION institution_settlement_history_trigger_func();
+
 -- Trigger function for credit_currency_info history logging
 CREATE OR REPLACE FUNCTION credit_currency_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this credit_currency as not current
@@ -872,6 +1085,7 @@ BEGIN
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -886,6 +1100,7 @@ BEGIN
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -906,7 +1121,7 @@ EXECUTE FUNCTION credit_currency_history_trigger_func();
 CREATE OR REPLACE FUNCTION market_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark the previous history record for this market as not current
@@ -923,9 +1138,11 @@ BEGIN
         country_code,
         credit_currency_id,
         timezone,
+        kitchen_close_time,
         is_archived,
         status,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         is_current,
@@ -938,9 +1155,11 @@ BEGIN
         NEW.country_code,
         NEW.credit_currency_id,
         NEW.timezone,
+        NEW.kitchen_close_time,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
+        NEW.created_by,
         NEW.modified_by,
         NEW.modified_date,
         TRUE,
@@ -956,63 +1175,6 @@ CREATE TRIGGER market_history_trigger
 AFTER INSERT OR UPDATE ON market_info
 FOR EACH ROW
 EXECUTE FUNCTION market_history_trigger_func();
-
--- Trigger function for fintech_link_info history logging
-CREATE OR REPLACE FUNCTION fintech_link_history_trigger_func()
-RETURNS TRIGGER AS $$
-DECLARE
-    v_operation audit_operation_enum;
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        v_operation := 'CREATE'::audit_operation_enum;
-    ELSIF TG_OP = 'UPDATE' THEN
-        IF OLD.is_archived = FALSE AND NEW.is_archived = TRUE THEN
-            v_operation := 'ARCHIVE'::audit_operation_enum;
-        ELSE
-            v_operation := 'UPDATE'::audit_operation_enum;
-        END IF;
-    ELSIF TG_OP = 'DELETE' THEN
-        v_operation := 'DELETE'::audit_operation_enum;
-    END IF;
-
-    INSERT INTO fintech_link_history (
-        event_id,
-        fintech_link_id,
-        plan_id,
-        provider,
-        fintech_link,
-        is_archived,
-        status,
-        created_date,
-        modified_by,
-        modified_date,
-        operation
-    ) VALUES (
-        uuid_generate_v4(),
-        COALESCE(NEW.fintech_link_id, OLD.fintech_link_id),
-        COALESCE(NEW.plan_id, OLD.plan_id),
-        COALESCE(NEW.provider, OLD.provider),
-        COALESCE(NEW.fintech_link, OLD.fintech_link),
-        COALESCE(NEW.is_archived, OLD.is_archived),
-        COALESCE(NEW.status, OLD.status),
-        COALESCE(NEW.created_date, OLD.created_date),
-        COALESCE(NEW.modified_by, OLD.modified_by),
-        COALESCE(NEW.modified_date, OLD.modified_date),
-        v_operation
-    );
-    
-    IF TG_OP = 'DELETE' THEN
-        RETURN OLD;
-    ELSE
-        RETURN NEW;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER fintech_link_history_trigger
-AFTER INSERT OR UPDATE OR DELETE ON fintech_link_info
-FOR EACH ROW
-EXECUTE FUNCTION fintech_link_history_trigger_func();
 
 -- Trigger function for restaurant_holidays history logging
 CREATE OR REPLACE FUNCTION restaurant_holidays_history_trigger_func()
@@ -1052,13 +1214,14 @@ BEGIN
         status,
         is_archived,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         operation,
         is_current,
         valid_until
     ) VALUES (
-        uuid_generate_v4(),
+        uuidv7(),
         COALESCE(NEW.holiday_id, OLD.holiday_id),
         COALESCE(NEW.restaurant_id, OLD.restaurant_id),
         COALESCE(NEW.country, OLD.country),
@@ -1069,6 +1232,7 @@ BEGIN
         COALESCE(NEW.status, OLD.status),
         COALESCE(NEW.is_archived, OLD.is_archived),
         COALESCE(NEW.created_date, OLD.created_date),
+        COALESCE(NEW.created_by, OLD.created_by),
         COALESCE(NEW.modified_by, OLD.modified_by),
         COALESCE(NEW.modified_date, OLD.modified_date),
         v_operation,
@@ -1123,19 +1287,21 @@ BEGIN
         status,
         is_archived,
         created_date,
+        created_by,
         modified_by,
         modified_date,
         operation,
         is_current,
         valid_until
     ) VALUES (
-        uuid_generate_v4(),
+        uuidv7(),
         COALESCE(NEW.plate_kitchen_day_id, OLD.plate_kitchen_day_id),
         COALESCE(NEW.plate_id, OLD.plate_id),
         COALESCE(NEW.kitchen_day, OLD.kitchen_day),
         COALESCE(NEW.status, OLD.status),
         COALESCE(NEW.is_archived, OLD.is_archived),
         COALESCE(NEW.created_date, OLD.created_date),
+        COALESCE(NEW.created_by, OLD.created_by),
         COALESCE(NEW.modified_by, OLD.modified_by),
         COALESCE(NEW.modified_date, OLD.modified_date),
         v_operation,
@@ -1156,6 +1322,101 @@ AFTER INSERT OR UPDATE OR DELETE ON plate_kitchen_days
 FOR EACH ROW
 EXECUTE FUNCTION plate_kitchen_days_history_trigger_func();
 
+-- Auto-deactivate restaurant when all its plate_kitchen_days become inactive (archived or deleted)
+CREATE OR REPLACE FUNCTION restaurant_auto_deactivate_when_no_plate_kitchen_days()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_restaurant_id UUID;
+    v_active_count BIGINT;
+BEGIN
+    -- Only care when we are removing an active row (UPDATE is_archived to TRUE, or status to Inactive, or DELETE of an active row)
+    IF TG_OP = 'UPDATE' AND (
+        (OLD.is_archived = FALSE AND NEW.is_archived = TRUE) OR
+        (OLD.status = 'Active'::status_enum AND NEW.status != 'Active'::status_enum)
+    ) THEN
+        NULL; -- fall through to get restaurant and check
+    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'Active'::status_enum THEN
+        NULL; -- fall through
+    ELSE
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    SELECT p.restaurant_id INTO v_restaurant_id
+    FROM plate_info p
+    WHERE p.plate_id = COALESCE(OLD.plate_id, NEW.plate_id);
+
+    IF v_restaurant_id IS NULL THEN
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    SELECT COUNT(*) INTO v_active_count
+    FROM plate_info p
+    INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'::status_enum
+    WHERE p.restaurant_id = v_restaurant_id AND p.is_archived = FALSE;
+
+    IF v_active_count = 0 THEN
+        UPDATE restaurant_info
+        SET status = 'Inactive'::status_enum,
+            modified_date = CURRENT_TIMESTAMP
+        WHERE restaurant_id = v_restaurant_id AND status = 'Active'::status_enum;
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER restaurant_auto_deactivate_on_plate_kitchen_days
+AFTER UPDATE OR DELETE ON plate_kitchen_days
+FOR EACH ROW
+EXECUTE FUNCTION restaurant_auto_deactivate_when_no_plate_kitchen_days();
+
+-- Auto-deactivate restaurant when all its active QR codes are removed (archived, deleted, or set to Inactive)
+CREATE OR REPLACE FUNCTION restaurant_auto_deactivate_when_no_active_qr_code()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_restaurant_id UUID;
+    v_active_count BIGINT;
+BEGIN
+    -- Only care when we are removing an active QR code (UPDATE is_archived to TRUE, or status to Inactive, or DELETE of an active row)
+    IF TG_OP = 'UPDATE' AND (
+        (OLD.is_archived = FALSE AND NEW.is_archived = TRUE) OR
+        (OLD.status = 'Active'::status_enum AND NEW.status != 'Active'::status_enum)
+    ) THEN
+        NULL; -- fall through
+    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'Active'::status_enum THEN
+        NULL; -- fall through
+    ELSE
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    v_restaurant_id := COALESCE(OLD.restaurant_id, NEW.restaurant_id);
+
+    IF v_restaurant_id IS NULL THEN
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    SELECT COUNT(*) INTO v_active_count
+    FROM qr_code
+    WHERE restaurant_id = v_restaurant_id
+      AND is_archived = FALSE
+      AND status = 'Active'::status_enum;
+
+    IF v_active_count = 0 THEN
+        UPDATE restaurant_info
+        SET status = 'Inactive'::status_enum,
+            modified_date = CURRENT_TIMESTAMP
+        WHERE restaurant_id = v_restaurant_id AND status = 'Active'::status_enum;
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER restaurant_auto_deactivate_on_qr_code
+AFTER UPDATE OR DELETE ON qr_code
+FOR EACH ROW
+EXECUTE FUNCTION restaurant_auto_deactivate_when_no_active_qr_code();
+
 -- status_info trigger removed - status_info table deprecated, status stored directly on entities as enum
 -- transaction_type_info trigger removed - transaction_type_info table deprecated, transaction_type stored directly on transaction tables as enum
 
@@ -1165,29 +1426,29 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         INSERT INTO national_holidays_history (
-            holiday_id, country_code, holiday_name, holiday_date, is_recurring, 
-            recurring_month, recurring_day, status, is_archived, created_date, modified_by, modified_date
+            holiday_id, country_code, holiday_name, holiday_date, is_recurring,
+            recurring_month, recurring_day, status, is_archived, created_date, created_by, modified_by, modified_date
         ) VALUES (
             NEW.holiday_id, NEW.country_code, NEW.holiday_name, NEW.holiday_date, NEW.is_recurring,
-            NEW.recurring_month, NEW.recurring_day, NEW.status, NEW.is_archived, NEW.created_date, NEW.modified_by, NEW.modified_date
+            NEW.recurring_month, NEW.recurring_day, NEW.status, NEW.is_archived, NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date
         );
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
         INSERT INTO national_holidays_history (
             holiday_id, country_code, holiday_name, holiday_date, is_recurring,
-            recurring_month, recurring_day, status, is_archived, created_date, modified_by, modified_date
+            recurring_month, recurring_day, status, is_archived, created_date, created_by, modified_by, modified_date
         ) VALUES (
             NEW.holiday_id, NEW.country_code, NEW.holiday_name, NEW.holiday_date, NEW.is_recurring,
-            NEW.recurring_month, NEW.recurring_day, NEW.status, NEW.is_archived, NEW.created_date, NEW.modified_by, NEW.modified_date
+            NEW.recurring_month, NEW.recurring_day, NEW.status, NEW.is_archived, NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date
         );
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
         INSERT INTO national_holidays_history (
             holiday_id, country_code, holiday_name, holiday_date, is_recurring,
-            recurring_month, recurring_day, status, is_archived, created_date, modified_by, modified_date
+            recurring_month, recurring_day, status, is_archived, created_date, created_by, modified_by, modified_date
         ) VALUES (
             OLD.holiday_id, OLD.country_code, OLD.holiday_name, OLD.holiday_date, OLD.is_recurring,
-            OLD.recurring_month, OLD.recurring_day, OLD.status, OLD.is_archived, OLD.created_date, OLD.modified_by, OLD.modified_date
+            OLD.recurring_month, OLD.recurring_day, OLD.status, OLD.is_archived, OLD.created_date, OLD.created_by, OLD.modified_by, OLD.modified_date
         );
         RETURN OLD;
     END IF;

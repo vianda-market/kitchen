@@ -4,14 +4,12 @@ from uuid import UUID
 from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Depends
 from app.dto.models import InstitutionBillDTO
-from app.services.crud_service import institution_bill_service
+from app.services.crud_service import institution_bill_service, get_bills_by_restaurant_and_period
 from app.services.entity_service import get_pending_bills_by_institution, get_bills_by_status, get_enriched_institution_bills
+from app.config.enums import BillResolution
 from app.schemas.billing.institution_bill import (
-    InstitutionBillCreateSchema, 
-    InstitutionBillCreateFullSchema,
     InstitutionBillUpdateSchema, 
     InstitutionBillResponseSchema,
-    RecordPaymentSchema
 )
 from app.schemas.consolidated_schemas import InstitutionBillEnrichedResponseSchema
 from app.security.entity_scoping import EntityScopingService, ENTITY_INSTITUTION_BILL
@@ -24,37 +22,6 @@ from app.services.error_handling import handle_business_operation, handle_get_by
 import psycopg2.extensions
 
 router = APIRouter(prefix="/institution-bills", tags=["Institution Bills"])
-
-@router.post("/", response_model=InstitutionBillResponseSchema)
-def create_institution_bill(
-    payload: InstitutionBillCreateSchema,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Create a new institution bill for a restaurant and reset its balance to zero"""
-    def _create_institution_bill():
-        # Use the unified service method to create the bill
-        bill_record = InstitutionBillingService.create_bill_for_restaurant(
-            restaurant_id=payload.restaurant_id,
-            period_start=payload.period_start,
-            period_end=payload.period_end,
-            system_user_id=current_user["user_id"],
-            status=payload.status,
-            resolution=payload.resolution,
-            connection=db
-        )
-        
-        if not bill_record:
-            raise HTTPException(status_code=400, detail="Failed to create institution bill - check restaurant balance and data")
-        
-        log_info(f"Institution bill created via API: {bill_record.institution_bill_id} for restaurant {payload.restaurant_id}")
-        return bill_record
-    
-    return handle_business_operation(
-        _create_institution_bill,
-        "institution bill creation",
-        "Institution bill created successfully"
-    )
 
 @router.get("/", response_model=List[InstitutionBillResponseSchema])
 def get_institution_bills(
@@ -83,15 +50,14 @@ def get_institution_bills(
             else:
                 bills = get_pending_bills_by_institution(institution_id, db)
         elif restaurant_id:
-            # Get bills for specific restaurant
+            # Get bills for specific restaurant (via institution_settlement; bills no longer have restaurant_id)
             if not start_date or not end_date:
                 raise HTTPException(status_code=400, detail="start_date and end_date required for restaurant filter")
             
             period_start = datetime.combine(start_date, datetime.min.time())
             period_end = datetime.combine(end_date, datetime.max.time())
             
-            bill = institution_bill_service.get_by_field("restaurant_id", str(restaurant_id), db)
-            bills = [bill] if bill else []
+            bills = get_bills_by_restaurant_and_period(restaurant_id, period_start, period_end, db)
         else:
             # Get all pending bills across all institutions (default behavior when no institution_id)
             bills = InstitutionBillingService.get_pending_bills(connection=db)
@@ -102,13 +68,12 @@ def get_institution_bills(
 
 @router.get("/enriched/", response_model=List[InstitutionBillEnrichedResponseSchema])
 def get_enriched_institution_bills_endpoint(
-    include_archived: bool = Query(False, description="Include archived bills if true"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Get all institution bills with enriched data (institution name, entity name, restaurant name).
-    Returns an array of enriched institution bill records.
-    
+    Returns an array of enriched institution bill records. Non-archived only.
+
     Scoping:
     - Employees: See all institution bills
     - Suppliers: See bills for restaurants in their institution
@@ -119,7 +84,7 @@ def get_enriched_institution_bills_endpoint(
         return get_enriched_institution_bills(
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
     
     return handle_business_operation(_get_enriched_bills, "enriched institution bills retrieval")
@@ -135,8 +100,7 @@ def get_institution_bill(
         institution_bill_service.get_by_id,
         bill_id,
         db,
-        "institution bill",
-        include_archived=False
+        "institution bill"
     )
 
 @router.put("/{bill_id}", response_model=InstitutionBillResponseSchema)
@@ -148,10 +112,8 @@ def update_institution_bill(
 ):
     """Update an institution bill"""
     def _update_institution_bill():
-        # Prepare update data
+        # Prepare update data (institution_bill_info has no payment_id; payments are via pipeline)
         update_data = {}
-        if payload.payment_id is not None:
-            update_data["payment_id"] = payload.payment_id
         if payload.transaction_count is not None:
             update_data["transaction_count"] = payload.transaction_count
         if payload.amount is not None:
@@ -159,7 +121,7 @@ def update_institution_bill(
         if payload.status is not None:
             update_data["status"] = payload.status
         if payload.resolution is not None:
-            update_data["resolution"] = payload.resolution
+            update_data["resolution"] = payload.resolution.value if hasattr(payload.resolution, 'value') else payload.resolution
         
         update_data["modified_by"] = current_user["user_id"]
         update_data["modified_date"] = datetime.now()
@@ -182,47 +144,6 @@ def update_institution_bill(
         "Institution bill updated successfully"
     )
 
-@router.post("/{bill_id}/mark-paid")
-def mark_bill_paid(
-    bill_id: UUID,
-    payment_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Mark a bill as paid"""
-    def _mark_bill_paid():
-        success = InstitutionBillingService.mark_bill_paid(bill_id, payment_id, current_user["user_id"], connection=db)
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to mark bill as paid")
-        
-        log_info(f"Institution bill {bill_id} marked as paid")
-        return {"message": "Bill marked as paid successfully", "bill_id": bill_id, "payment_id": payment_id}
-    
-    return handle_business_operation(_mark_bill_paid, "bill payment marking")
-
-@router.post("/{bill_id}/record-payment")
-def record_manual_payment(
-    bill_id: UUID,
-    payment_data: RecordPaymentSchema,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
-    """Record a manual payment for a bill (MVP - manual bank payments)"""
-    def _record_payment():
-        result = InstitutionBillingService.record_manual_payment(
-            bill_id=bill_id,
-            bank_account_id=payment_data.bank_account_id,
-            external_transaction_id=payment_data.external_transaction_id,
-            transaction_result=payment_data.transaction_result or "Approved",
-            user_id=current_user["user_id"],
-            connection=db
-        )
-        
-        log_info(f"Recorded manual payment for bill {bill_id}: {result}")
-        return result
-    
-    return handle_business_operation(_record_payment, "manual payment recording")
-
 @router.post("/{bill_id}/cancel")
 def cancel_bill(
     bill_id: UUID,
@@ -244,22 +165,73 @@ def cancel_bill(
 
 @router.post("/generate-daily-bills")
 def generate_daily_bills(
-    bill_date: date,
+    bill_date: Optional[date] = Query(None, description="Bill date (default: today)"),
+    country_code: Optional[str] = Query(None, description="Country code (e.g. US); auto-detected if omitted"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Generate institution bills for all restaurants for a specific date"""
-    def _generate_daily_bills():
-        result = InstitutionBillingService.generate_daily_bills(bill_date, current_user["user_id"], connection=db)
-        
-        log_info(f"Daily bill generation completed for {bill_date}: {result}")
+    """Run the settlement → bill → payout pipeline for a date. All bill creation goes through this pipeline."""
+    from datetime import timezone
+    if bill_date is None:
+        bill_date = datetime.now(timezone.utc).date()
+    log_info(f"Generate daily bills (pipeline) for {bill_date} (country_code={country_code})")
+
+    def _run():
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
+            bill_date=bill_date,
+            system_user_id=current_user["user_id"],
+            country_code=country_code,
+            connection=db,
+        )
+        log_info(f"Daily bill pipeline completed for {bill_date}: {result}")
         return {
-            "message": "Daily bills generated successfully",
+            "message": "Daily bills (settlement pipeline) completed",
             "date": bill_date.isoformat(),
-            "statistics": result
+            "country_code": country_code,
+            "statistics": {
+                "settlements_created": result.get("settlements_created", 0),
+                "bills_created": result.get("bills_created", 0),
+                "bills_paid": result.get("bills_paid", 0),
+                "total_amount": result.get("total_amount", 0.0),
+                "restaurants_processed": result.get("settlements_created", 0),
+            },
         }
-    
-    return handle_business_operation(_generate_daily_bills, "daily bill generation")
+    return handle_business_operation(_run, "daily bill generation")
+
+
+@router.post("/run-settlement-pipeline")
+def run_settlement_pipeline(
+    bill_date: Optional[date] = Query(None, description="Bill date (default: today)"),
+    country_code: Optional[str] = Query(None, description="Country code (e.g. US); auto-detected if omitted"),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """
+    Run the atomic settlement → bill → payout pipeline for a given date.
+    This is the intended supplier payment flow: Phase 1 settlements (one per restaurant with balance),
+    Phase 2 one bill per entity, then tax doc stub, payout (mock/live), mark_paid.
+    Normally triggered by cron; this endpoint allows manual/test runs.
+    """
+    from datetime import timezone
+    if bill_date is None:
+        bill_date = datetime.now(timezone.utc).date()
+    log_info(f"Running settlement pipeline for {bill_date} (country_code={country_code})")
+
+    def _run():
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
+            bill_date=bill_date,
+            system_user_id=current_user["user_id"],
+            country_code=country_code,
+            connection=db,
+        )
+        return {
+            "message": "Settlement pipeline completed",
+            "bill_date": bill_date.isoformat(),
+            "country_code": country_code,
+            **result,
+        }
+
+    return handle_business_operation(_run, "settlement pipeline")
 
 @router.get("/summary/{institution_id}")
 def get_billing_summary(

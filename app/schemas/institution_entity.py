@@ -1,5 +1,5 @@
 # app/schemas/institution_entity.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -28,6 +28,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_id: UUID
     address_id: UUID
+    credit_currency_id: UUID
     tax_id: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
     is_archived: bool
@@ -36,6 +37,5 @@ class InstitutionEntityResponseSchema(BaseModel):
     modified_by: UUID
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 

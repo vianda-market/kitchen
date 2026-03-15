@@ -8,7 +8,7 @@ account termination, employer assignment, and profile updates.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 
 from app.services.crud_service import user_service, employer_service
@@ -34,11 +34,12 @@ class TestUserProfileService:
             email="test@example.com",
             cellphone="1234567890",
             employer_id=None,
+            market_id=uuid4(),
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
 
     @pytest.fixture
@@ -50,9 +51,9 @@ class TestUserProfileService:
             address_id=uuid4(),
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
 
     @pytest.fixture
@@ -131,37 +132,67 @@ class TestUserProfileService:
             # In actual endpoint, this would raise HTTPException(500)
 
     def test_assign_employer_validates_employer_exists(self, sample_current_user, sample_employer_dto, sample_user_dto, mock_db):
-        """Test that employer assignment validates employer exists."""
+        """Test that employer assignment validates employer exists and address belongs to employer."""
         # Arrange
+        from app.dto.models import AddressDTO
+
         user_id = sample_current_user["user_id"]
         employer_id = sample_employer_dto.employer_id
-        
+        address_id = sample_employer_dto.address_id
+        sample_address = AddressDTO(
+            address_id=address_id,
+            institution_id=uuid4(),
+            user_id=user_id,
+            employer_id=employer_id,
+            address_type=["Customer Employer"],
+            street_type="St",
+            street_name="Test St",
+            building_number="123",
+            city="Buenos Aires",
+            province="Buenos Aires",
+            country_code="AR",
+            country_name="Argentina",
+            postal_code="1000",
+            timezone="America/Argentina/Buenos_Aires",
+            is_archived=False,
+            status=Status.ACTIVE,
+            created_date=datetime.now(timezone.utc),
+            modified_by=user_id,
+            modified_date=datetime.now(timezone.utc),
+        )
+
         with patch('app.services.crud_service.employer_service') as mock_employer_service, \
+             patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.crud_service.user_service') as mock_user_service:
-            
+
             mock_employer_service.get_by_id.return_value = sample_employer_dto
-            mock_user_service.get_by_id.return_value = sample_user_dto
+            mock_address_service.get_by_id.return_value = sample_address
             mock_user_service.update.return_value = sample_user_dto
-            
-            # Act - Simulate the endpoint logic
+
+            # Act - Simulate the endpoint logic (employer + address validation, then update)
             employer = mock_employer_service.get_by_id(employer_id, mock_db)
+            address = mock_address_service.get_by_id(address_id, mock_db, scope=None)
             assert employer is not None
-            
+            assert address is not None
+            assert address.employer_id == employer_id
+
             update_data = {
                 "employer_id": employer_id,
+                "employer_address_id": address_id,
                 "modified_by": user_id
             }
-            
+
             updated = mock_user_service.update(
                 user_id,
                 update_data,
                 mock_db,
                 scope=None
             )
-            
+
             # Assert
             assert updated is not None
             mock_employer_service.get_by_id.assert_called_once_with(employer_id, mock_db)
+            mock_address_service.get_by_id.assert_called_once_with(address_id, mock_db, scope=None)
             mock_user_service.update.assert_called_once_with(
                 user_id,
                 update_data,
@@ -186,33 +217,58 @@ class TestUserProfileService:
 
     def test_assign_employer_handles_update_failure(self, sample_current_user, sample_employer_dto, mock_db):
         """Test that employer assignment handles update failure."""
-        # Arrange
+        from app.dto.models import AddressDTO
+
         user_id = sample_current_user["user_id"]
         employer_id = sample_employer_dto.employer_id
-        
+        address_id = sample_employer_dto.address_id
+        sample_address = AddressDTO(
+            address_id=address_id,
+            institution_id=uuid4(),
+            user_id=user_id,
+            employer_id=employer_id,
+            address_type=["Customer Employer"],
+            street_type="St",
+            street_name="Test St",
+            building_number="123",
+            city="Buenos Aires",
+            province="Buenos Aires",
+            country_code="AR",
+            country_name="Argentina",
+            postal_code="1000",
+            timezone="America/Argentina/Buenos_Aires",
+            is_archived=False,
+            status=Status.ACTIVE,
+            created_date=datetime.now(timezone.utc),
+            modified_by=user_id,
+            modified_date=datetime.now(timezone.utc),
+        )
+
         with patch('app.services.crud_service.employer_service') as mock_employer_service, \
+             patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.crud_service.user_service') as mock_user_service:
-            
+
             mock_employer_service.get_by_id.return_value = sample_employer_dto
+            mock_address_service.get_by_id.return_value = sample_address
             mock_user_service.update.return_value = None
-            
-            # Act
+
             employer = mock_employer_service.get_by_id(employer_id, mock_db)
+            address = mock_address_service.get_by_id(address_id, mock_db, scope=None)
             assert employer is not None
-            
+            assert address is not None
+
             update_data = {
                 "employer_id": employer_id,
+                "employer_address_id": address_id,
                 "modified_by": user_id
             }
-            
+
             updated = mock_user_service.update(
                 user_id,
                 update_data,
                 mock_db,
                 scope=None
             )
-            
-            # Assert
+
             assert updated is None
-            # In actual endpoint, this would raise HTTPException(500)
 

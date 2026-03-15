@@ -12,7 +12,7 @@ from app.services.billing.institution_billing import InstitutionBillingService
 from app.utils.log import log_info, log_warning, log_error
 
 # System user ID for automated operations - using existing bot_chef user
-SYSTEM_USER_ID = UUID("22222222-2222-2222-2222-222222222222")
+SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 def run_daily_billing(bill_date: Optional[date] = None, country_code: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -39,13 +39,24 @@ def run_daily_billing(bill_date: Optional[date] = None, country_code: Optional[s
         else:
             log_info("Country code not provided - will auto-detect from restaurant addresses")
         
-        # Generate bills for the specified date and market
-        result = InstitutionBillingService.generate_daily_bills(
+        # Run settlement → bill → payout pipeline
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
             bill_date=bill_date,
             system_user_id=SYSTEM_USER_ID,
-            country_code=country_code
+            country_code=country_code,
         )
-        
+        if result.get("error"):
+            return {
+                "cron_job": "daily_billing",
+                "bill_date": bill_date.isoformat(),
+                "country_code": country_code,
+                "execution_time": datetime.now(timezone.utc).isoformat(),
+                "success": False,
+                "error": result["error"],
+                "settlements_created": result.get("settlements_created", 0),
+                "bills_created": result.get("bills_created", 0),
+                "total_amount": result.get("total_amount", 0.0),
+            }
         # Add cron job metadata
         result.update({
             "cron_job": "daily_billing",
@@ -54,7 +65,7 @@ def run_daily_billing(bill_date: Optional[date] = None, country_code: Optional[s
             "execution_time": datetime.now(timezone.utc).isoformat(),
             "success": True
         })
-        
+        result.setdefault("restaurants_processed", result.get("settlements_created", 0))
         log_info(f"Daily billing cron job completed successfully: {result}")
         return result
         
@@ -69,10 +80,54 @@ def run_daily_billing(bill_date: Optional[date] = None, country_code: Optional[s
             "execution_time": datetime.now(timezone.utc).isoformat(),
             "success": False,
             "error": str(e),
+            "settlements_created": 0,
             "bills_created": 0,
             "total_amount": 0.0,
             "restaurants_processed": 0
         }
+
+
+def run_daily_settlement_bill_and_payout(
+    bill_date: Optional[date] = None,
+    country_code: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Atomic closeout-to-payout pipeline: Phase 1 settlements (one per restaurant with balance),
+    Phase 2 one bill per entity, then tax doc stub, payout (mock/live), mark_paid.
+    Schedule at 3:30 PM local (or configurable) via external cron.
+    """
+    try:
+        if not bill_date:
+            bill_date = datetime.now(timezone.utc).date()
+        log_info(f"Starting daily settlement-bill-payout pipeline for {bill_date}")
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
+            bill_date=bill_date,
+            system_user_id=SYSTEM_USER_ID,
+            country_code=country_code,
+        )
+        result.update({
+            "cron_job": "daily_settlement_bill_and_payout",
+            "bill_date": bill_date.isoformat(),
+            "country_code": country_code,
+            "execution_time": datetime.now(timezone.utc).isoformat(),
+            "success": "error" not in result,
+        })
+        log_info(f"Daily settlement-bill-payout completed: {result}")
+        return result
+    except Exception as e:
+        log_error(f"Fatal error in daily settlement-bill-payout: {e}")
+        return {
+            "cron_job": "daily_settlement_bill_and_payout",
+            "bill_date": bill_date.isoformat() if bill_date else None,
+            "country_code": country_code,
+            "execution_time": datetime.now(timezone.utc).isoformat(),
+            "success": False,
+            "error": str(e),
+            "settlements_created": 0,
+            "bills_created": 0,
+            "bills_paid": 0,
+        }
+
 
 def run_kitchen_day_closure_billing(country_code: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -111,13 +166,25 @@ def run_kitchen_day_closure_billing(country_code: Optional[str] = None) -> Dict[
                 "reason": f"Not yet time to bill for market {country_code}"
             }
         
-        # Generate bills for the current day and market
-        result = InstitutionBillingService.generate_daily_bills(
+        # Run settlement → bill → payout pipeline
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
             bill_date=current_day,
             system_user_id=SYSTEM_USER_ID,
-            country_code=country_code
+            country_code=country_code,
         )
-        
+        if result.get("error"):
+            return {
+                "cron_job": "kitchen_day_closure_billing",
+                "bill_date": current_day.isoformat(),
+                "country_code": country_code,
+                "execution_time": current_time.isoformat(),
+                "success": False,
+                "error": result["error"],
+                "settlements_created": result.get("settlements_created", 0),
+                "bills_created": result.get("bills_created", 0),
+                "total_amount": result.get("total_amount", 0.0),
+                "restaurants_processed": result.get("settlements_created", 0),
+            }
         # Add cron job metadata
         result.update({
             "cron_job": "kitchen_day_closure_billing",
@@ -126,7 +193,7 @@ def run_kitchen_day_closure_billing(country_code: Optional[str] = None) -> Dict[
             "execution_time": current_time.isoformat(),
             "success": True
         })
-        
+        result.setdefault("restaurants_processed", result.get("settlements_created", 0))
         log_info(f"Kitchen day closure billing completed successfully: {result}")
         return result
         
@@ -232,12 +299,24 @@ def run_monthly_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
         
         log_info(f"Starting monthly billing cron job for {bill_date}")
         
-        # Generate bills for the month
-        result = InstitutionBillingService.generate_daily_bills(
+        # Run settlement → bill → payout pipeline
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
             bill_date=bill_date,
-            system_user_id=SYSTEM_USER_ID
+            system_user_id=SYSTEM_USER_ID,
+            country_code=None,
         )
-        
+        if result.get("error"):
+            return {
+                "cron_job": "monthly_billing",
+                "bill_date": bill_date.isoformat(),
+                "execution_time": datetime.now(timezone.utc).isoformat(),
+                "success": False,
+                "error": result["error"],
+                "settlements_created": result.get("settlements_created", 0),
+                "bills_created": result.get("bills_created", 0),
+                "total_amount": result.get("total_amount", 0.0),
+                "restaurants_processed": result.get("settlements_created", 0),
+            }
         # Add cron job metadata
         result.update({
             "cron_job": "monthly_billing",
@@ -245,7 +324,7 @@ def run_monthly_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
             "execution_time": datetime.now(timezone.utc).isoformat(),
             "success": True
         })
-        
+        result.setdefault("restaurants_processed", result.get("settlements_created", 0))
         log_info(f"Monthly billing cron job completed successfully: {result}")
         return result
         
@@ -267,41 +346,49 @@ def run_monthly_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
 def get_billing_dashboard() -> Dict[str, Any]:
     """
     Generate billing dashboard with current status and statistics.
-    
-    Returns:
-        Dict with billing dashboard data
+    Restaurant count per institution is derived from institution_settlement (bills no longer have restaurant_id).
     """
+    from app.utils.db import get_db_connection, close_db_connection
+    from app.utils.db import db_read
     try:
         log_info("Generating billing dashboard")
-        
-        # Get pending bills across all institutions
-        pending_bills = InstitutionBillingService.get_pending_bills()
-        
-        # Calculate totals
-        total_pending_amount = sum((bill.amount or 0) for bill in pending_bills)
-        total_pending_bills = len(pending_bills)
-        
-        # Group by institution
-        institution_summary = {}
-        for bill in pending_bills:
-            inst_id = str(bill.institution_id)
-            if inst_id not in institution_summary:
-                institution_summary[inst_id] = {
-                    "institution_id": inst_id,
-                    "pending_bills": 0,
-                    "pending_amount": 0,
-                    "restaurants": set()
-                }
-            
-            institution_summary[inst_id]["pending_bills"] += 1
-            institution_summary[inst_id]["pending_amount"] += (bill.amount or 0)
-            institution_summary[inst_id]["restaurants"].add(str(bill.restaurant_id))
-        
-        # Convert sets to counts
-        for inst in institution_summary.values():
-            inst["restaurant_count"] = len(inst["restaurants"])
-            del inst["restaurants"]
-        
+        connection = get_db_connection()
+        try:
+            pending_bills = InstitutionBillingService.get_pending_bills(connection=connection)
+            total_pending_amount = sum((bill.amount or 0) for bill in pending_bills)
+            total_pending_bills = len(pending_bills)
+            bill_ids = [str(bill.institution_bill_id) for bill in pending_bills]
+            institution_summary = {}
+            for bill in pending_bills:
+                inst_id = str(bill.institution_id)
+                if inst_id not in institution_summary:
+                    institution_summary[inst_id] = {
+                        "institution_id": inst_id,
+                        "pending_bills": 0,
+                        "pending_amount": 0,
+                        "restaurants": set()
+                    }
+                institution_summary[inst_id]["pending_bills"] += 1
+                institution_summary[inst_id]["pending_amount"] += (bill.amount or 0)
+            if bill_ids:
+                placeholders = ",".join(["%s"] * len(bill_ids))
+                query = f"""
+                    SELECT ibi.institution_id, s.restaurant_id
+                    FROM institution_bill_info ibi
+                    INNER JOIN institution_settlement s ON s.institution_bill_id = ibi.institution_bill_id
+                    WHERE ibi.institution_bill_id IN ({placeholders})
+                      AND ibi.is_archived = FALSE AND s.is_archived = FALSE
+                """
+                rows = db_read(query, tuple(bill_ids), connection=connection)
+                for row in (rows or []):
+                    inst_id = str(row["institution_id"])
+                    if inst_id in institution_summary:
+                        institution_summary[inst_id]["restaurants"].add(str(row["restaurant_id"]))
+            for inst in institution_summary.values():
+                inst["restaurant_count"] = len(inst["restaurants"])
+                del inst["restaurants"]
+        finally:
+            close_db_connection(connection)
         dashboard = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "summary": {
@@ -314,12 +401,11 @@ def get_billing_dashboard() -> Dict[str, Any]:
                 {
                     "bill_id": str(bill.institution_bill_id),
                     "institution_id": str(bill.institution_id),
-                    "restaurant_id": str(bill.restaurant_id),
                     "amount": float(bill.amount or 0),
                     "status": bill.status,
                     "created_date": bill.created_date.isoformat()
                 }
-                for bill in pending_bills[:10]  # Show last 10
+                for bill in pending_bills[:10]
             ]
         }
         
@@ -364,6 +450,13 @@ def dashboard_entry():
     result = get_billing_dashboard()
     return result
 
+
+def kitchen_start_promotion_entry(country_code: Optional[str] = None):
+    """Entry point for kitchen start promotion cron. Promotes locked plate selections to live."""
+    from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
+    return run_kitchen_start_promotion(country_code=country_code)
+
+
 if __name__ == "__main__":
     import sys
     
@@ -385,9 +478,13 @@ if __name__ == "__main__":
         elif command == "multi_market":
             result = run_multi_market_billing()
             log_info(f"Multi-market billing result: {result}")
+        elif command == "kitchen_start":
+            from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
+            result = run_kitchen_start_promotion(country_code=sys.argv[2] if len(sys.argv) > 2 else None)
+            log_info(f"Kitchen start promotion result: {result}")
         else:
             log_warning(f"Unknown command: {command}")
-            log_info("Available commands: daily, monthly, dashboard, kitchen_closure, multi_market")
+            log_info("Available commands: daily, monthly, dashboard, kitchen_closure, multi_market, kitchen_start")
     else:
         result = run_daily_billing()
         log_info(f"Daily billing result: {result}")

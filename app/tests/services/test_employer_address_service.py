@@ -8,7 +8,7 @@ getting addresses for an employer and adding addresses to an employer.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 
 from app.services.crud_service import employer_service, address_service
@@ -29,9 +29,9 @@ class TestEmployerAddressService:
             address_id=uuid4(),
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
 
     @pytest.fixture
@@ -45,20 +45,21 @@ class TestEmployerAddressService:
             address_type=[AddressType.CUSTOMER_EMPLOYER.value],
             is_default=False,
             floor=None,
-            country="Argentina",
+            country_name="Argentina",
+            country_code="AR",
             province="Buenos Aires",
             city="Buenos Aires",
             postal_code="1000",
-            street_type="Street",
+            street_type="St",
             street_name="Test Street",
             building_number="123",
             apartment_unit=None,
             timezone="America/Argentina/Buenos_Aires",
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
 
     @pytest.fixture
@@ -80,13 +81,13 @@ class TestEmployerAddressService:
              patch('app.services.crud_service.address_service') as mock_address_service:
             
             mock_employer_service.get_by_id.return_value = sample_employer_dto
-            mock_address_service.get_by_field.return_value = [sample_address_dto]
+            mock_address_service.get_all_by_field.return_value = [sample_address_dto]
             
             # Act - Simulate the endpoint logic
             employer = mock_employer_service.get_by_id(employer_id, mock_db)
             assert employer is not None
             
-            addresses = mock_address_service.get_by_field(
+            addresses = mock_address_service.get_all_by_field(
                 "employer_id",
                 employer_id,
                 mock_db,
@@ -97,7 +98,7 @@ class TestEmployerAddressService:
             assert addresses is not None
             assert len(addresses) == 1
             mock_employer_service.get_by_id.assert_called_once_with(employer_id, mock_db)
-            mock_address_service.get_by_field.assert_called_once_with(
+            mock_address_service.get_all_by_field.assert_called_once_with(
                 "employer_id",
                 employer_id,
                 mock_db,
@@ -128,11 +129,11 @@ class TestEmployerAddressService:
              patch('app.services.crud_service.address_service') as mock_address_service:
             
             mock_employer_service.get_by_id.return_value = sample_employer_dto
-            mock_address_service.get_by_field.return_value = []
+            mock_address_service.get_all_by_field.return_value = []
             
             # Act
             employer = mock_employer_service.get_by_id(employer_id, mock_db)
-            addresses = mock_address_service.get_by_field(
+            addresses = mock_address_service.get_all_by_field(
                 "employer_id",
                 employer_id,
                 mock_db,
@@ -154,7 +155,7 @@ class TestEmployerAddressService:
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "Street",
+            "street_type": "St",
             "street_name": "Test Street",
             "building_number": "123"
         }
@@ -165,7 +166,7 @@ class TestEmployerAddressService:
             mock_employer_service.get_by_id.return_value = sample_employer_dto
             
             # Create address DTO with the correct employer_id for the mock return value
-            address_dict = sample_address_dto.dict()
+            address_dict = sample_address_dto.model_dump()
             address_dict["employer_id"] = employer_id  # Set to match the employer_id being tested
             address_with_correct_employer = AddressDTO(**address_dict)
             mock_address_service.create_address_with_geocoding.return_value = address_with_correct_employer
@@ -225,7 +226,7 @@ class TestEmployerAddressService:
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "Street",
+            "street_type": "St",
             "street_name": "Test Street",
             "building_number": "123",
             "employer_id": employer_id,
@@ -253,39 +254,35 @@ class TestEmployerAddressService:
             assert new_address is None
             # In actual endpoint, this would raise HTTPException(500)
 
-    def test_add_employer_address_ensures_customer_employer_type(self, sample_employer_dto, sample_address_dto, sample_current_user, mock_db):
-        """Test that adding employer address ensures Customer Employer type is included."""
+    def test_add_employer_address_does_not_send_address_type(self, sample_employer_dto, sample_address_dto, sample_current_user, mock_db):
+        """Test that adding employer address does not send address_type; backend derives it from employer_id linkage."""
         # Arrange
         employer_id = sample_employer_dto.employer_id
         address_data = {
             "institution_id": str(uuid4()),
             "user_id": str(sample_current_user["user_id"]),
-            "address_type": ["Customer Home"],  # Missing Customer Employer
+            "address_type": ["Customer Home"],  # Client may send; route strips it
             "country": "Argentina",
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "Street",
+            "street_type": "St",
             "street_name": "Test Street",
-            "building_number": "123"
+            "building_number": "123",
         }
-        
         with patch('app.services.crud_service.employer_service') as mock_employer_service, \
              patch('app.services.address_service.address_business_service') as mock_address_service:
-            
             mock_employer_service.get_by_id.return_value = sample_employer_dto
             mock_address_service.create_address_with_geocoding.return_value = sample_address_dto
-            
-            # Act - Simulate the endpoint logic
-            employer = mock_employer_service.get_by_id(employer_id, mock_db)
-            
-            # Ensure address_type includes "Customer Employer"
-            address_types = address_data.get("address_type", [])
-            if AddressType.CUSTOMER_EMPLOYER.value not in address_types:
-                address_types.append(AddressType.CUSTOMER_EMPLOYER.value)
-            address_data["address_type"] = address_types
-            
-            # Assert
-            assert AddressType.CUSTOMER_EMPLOYER.value in address_data["address_type"]
-            assert "Customer Home" in address_data["address_type"]
+
+            # Simulate route: strip address_type, set employer_id, then create
+            address_data.pop("address_type", None)
+            address_data["employer_id"] = employer_id
+            address_data["modified_by"] = sample_current_user["user_id"]
+            mock_address_service.create_address_with_geocoding(address_data, sample_current_user, mock_db, scope=None)
+
+            # Assert: create was called with address_data that has employer_id and no client address_type
+            call_args = mock_address_service.create_address_with_geocoding.call_args[0][0]
+            assert call_args.get("employer_id") == employer_id
+            assert "address_type" not in call_args or call_args.get("address_type") == []
 

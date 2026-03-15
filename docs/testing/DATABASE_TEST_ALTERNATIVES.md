@@ -61,7 +61,7 @@ def test_all_tables_exist(db_connection):
         
         expected_tables = [
             'user_info', 'institution_info', 'payment_method',
-            'credit_card', 'bank_account', ...
+            ...
         ]
         
         for table in expected_tables:
@@ -233,7 +233,7 @@ class TestSchemaExists:
         # History tables
         'user_history', 'institution_history', 'restaurant_history',
         # Child tables
-        'credit_card', 'bank_account', 'plate_selection',
+        'plate_selection',
         # ... etc
     ]
     

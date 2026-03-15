@@ -1,12 +1,13 @@
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
 from typing import Optional, Dict, Any
 from uuid import UUID
 from app.config import Status
+from app.config.enums.payment_method_types import PaymentMethodProvider
 
-# --- For creating a new payment method ---
+# --- For creating a new payment method (aggregator-only) ---
 class PaymentMethodCreateSchema(BaseModel):
-    method_type: str = Field(..., max_length=20)
+    method_type: str = Field(..., max_length=50, description="Provider: Stripe, Mercado Pago, PayU")
     method_type_id: Optional[UUID] = None
     is_default: Optional[bool] = False
     address_id: Optional[UUID] = Field(None, description="UUID of existing address to use")
@@ -17,21 +18,22 @@ class PaymentMethodCreateSchema(BaseModel):
     # is_archived will be automatically set to False by base model
     # created_date and modified_date will be automatically set by base model
     
-    @root_validator
-    def validate_address_fields(cls, values):
+    @model_validator(mode="after")
+    def validate_address_fields(self):
         """Ensure either address_id or address_data is provided, not both"""
-        address_id = values.get('address_id')
-        address_data = values.get('address_data')
-        
-        if address_id and address_data:
+        if self.address_id and self.address_data:
             raise ValueError("Cannot provide both address_id and address_data. Provide one or the other.")
-        # Note: Validation for required address (credit_card/bank_account) is done in business logic
-        
-        return values
+        return self
 
-# --- For updating an existing payment method (payment_method_id is immutable) ---
+    @model_validator(mode="after")
+    def validate_method_type(self):
+        if self.method_type and not PaymentMethodProvider.is_valid(self.method_type):
+            raise ValueError(f"method_type must be one of: {PaymentMethodProvider.values()}")
+        return self
+
+# --- For updating an existing payment method ---
 class PaymentMethodUpdateSchema(BaseModel):
-    method_type: Optional[str] = Field(None, max_length=20)
+    method_type: Optional[str] = Field(None, max_length=50)
     method_type_id: Optional[UUID] = None
     address_id: Optional[UUID] = None
     is_archived: Optional[bool] = None
@@ -42,7 +44,7 @@ class PaymentMethodUpdateSchema(BaseModel):
 class PaymentMethodResponseSchema(BaseModel):
     payment_method_id: UUID
     user_id: UUID
-    method_type: str = Field(..., max_length=20)
+    method_type: str = Field(..., max_length=50)
     method_type_id: Optional[UUID] = None
     address_id: Optional[UUID] = None
     is_archived: bool
@@ -52,19 +54,18 @@ class PaymentMethodResponseSchema(BaseModel):
     modified_by: UUID
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- For returning enriched payment method details with user information ---
+# --- For returning enriched payment method details with user and provider info ---
 class PaymentMethodEnrichedResponseSchema(BaseModel):
-    """Schema for enriched payment method response data with user information"""
+    """Enriched payment method with user info and optional provider display (last4, brand)."""
     payment_method_id: UUID
     user_id: UUID
     full_name: str
     username: str
     email: str
-    cellphone: str
+    cellphone: Optional[str] = None
     method_type: str
     method_type_id: Optional[UUID] = None
     address_id: Optional[UUID] = None
@@ -74,6 +75,8 @@ class PaymentMethodEnrichedResponseSchema(BaseModel):
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
+    provider: Optional[str] = None
+    last4: Optional[str] = None
+    brand: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

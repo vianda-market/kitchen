@@ -28,9 +28,7 @@ ENTITY_RESTAURANT = "restaurant"
 ENTITY_PLATE = "plate"
 ENTITY_PRODUCT = "product"
 ENTITY_INSTITUTION_ENTITY = "institution_entity"
-ENTITY_INSTITUTION_BANK_ACCOUNT = "institution_bank_account"
 ENTITY_INSTITUTION_BILL = "institution_bill"
-ENTITY_INSTITUTION_PAYMENT_ATTEMPT = "institution_payment_attempt"
 ENTITY_USER = "user"
 ENTITY_ADDRESS = "address"
 ENTITY_SUBSCRIPTION = "subscription"
@@ -56,9 +54,7 @@ class EntityScopingService:
         ENTITY_PLATE: "_scope_plate",
         ENTITY_PRODUCT: "_scope_product",
         ENTITY_INSTITUTION_ENTITY: "_scope_institution_entity",
-        ENTITY_INSTITUTION_BANK_ACCOUNT: "_scope_institution_bank_account",
         ENTITY_INSTITUTION_BILL: "_scope_institution_bill",
-        ENTITY_INSTITUTION_PAYMENT_ATTEMPT: "_scope_institution_payment_attempt",
         ENTITY_USER: "_scope_user",
         ENTITY_ADDRESS: "_scope_address",
         ENTITY_SUBSCRIPTION: "_scope_subscription",
@@ -136,7 +132,7 @@ class EntityScopingService:
         if role_type == "Employee":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
-            elif role_name == "Management":
+            elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
                 # Employee Operators should be blocked in route layer
@@ -308,48 +304,12 @@ class EntityScopingService:
         return get_institution_scope(current_user)
     
     @staticmethod
-    def _scope_institution_bank_account(
-        current_user: dict,
-        **kwargs
-    ) -> Optional[InstitutionScope]:
-        """
-        Scoping rules for institution_bank_account.
-        
-        Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
-        - Customers: Standard institution scoping (typically not used, but allowed)
-        """
-        # get_institution_scope handles role_name logic automatically
-        return get_institution_scope(current_user)
-    
-    @staticmethod
     def _scope_institution_bill(
         current_user: dict,
         **kwargs
     ) -> Optional[InstitutionScope]:
         """
         Scoping rules for institution_bill.
-        
-        Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
-        - Customers: Standard institution scoping (typically not used, but allowed)
-        """
-        # get_institution_scope handles role_name logic automatically
-        return get_institution_scope(current_user)
-    
-    @staticmethod
-    def _scope_institution_payment_attempt(
-        current_user: dict,
-        **kwargs
-    ) -> Optional[InstitutionScope]:
-        """
-        Scoping rules for institution_payment_attempt.
         
         Rules:
         - Employee Admin/Super Admin: Global access (None)
@@ -386,7 +346,7 @@ class EntityScopingService:
         if role_type == "Employee":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
-            elif role_name == "Management":
+            elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
                 # Employee Operators cannot manage other users
@@ -446,7 +406,7 @@ class EntityScopingService:
         if role_type == "Employee":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
-            elif role_name == "Management":
+            elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
                 # Employee Operators should be blocked in route layer

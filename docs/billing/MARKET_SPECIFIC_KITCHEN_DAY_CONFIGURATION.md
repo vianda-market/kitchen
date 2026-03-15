@@ -137,6 +137,20 @@ python app/services/cron/billing_events.py multi_market
 */5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import run_kitchen_day_closure_billing; run_kitchen_day_closure_billing('PE')" >> /var/log/kitchen/peru_billing.log 2>&1
 ```
 
+### **Kitchen Start Promotion (Lock-at-Kitchen-Start)**
+
+Promotes locked plate selections to live (creates plate_pickup_live + restaurant_transaction) at kitchen start (11:30 AM local). Run every 5–15 minutes during business hours:
+
+```bash
+# All markets
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion; run_kitchen_start_promotion()" >> /var/log/kitchen/kitchen_start_promotion.log 2>&1
+
+# Single market (e.g. AR)
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion; run_kitchen_start_promotion('AR')" >> /var/log/kitchen/kitchen_start_ar.log 2>&1
+```
+
+Or via billing_events CLI: `python app/services/cron/billing_events.py kitchen_start [AR]`
+
 ---
 
 ## 🎯 **Business Logic Flow**

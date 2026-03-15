@@ -6,7 +6,7 @@ This service provides geocoding (address → coordinates) and reverse geocoding
 
 Setup:
 1. Get API key from Google Cloud Console (see docs/ENV_SETUP.md)
-2. Add to .env: GOOGLE_MAPS_API_KEY=your_api_key_here
+2. Add to .env: GOOGLE_API_KEY_DEV=... (or _STAGING/_PROD per environment; local uses _DEV)
 3. Enable Geocoding API in Google Cloud Console
 4. For development: Set DEV_MODE=true to use mock responses
 
@@ -21,6 +21,7 @@ https://developers.google.com/maps/documentation/geocoding/overview
 from typing import Optional, Dict, Any
 from math import radians, cos, sin, asin, sqrt
 
+from app.config.settings import get_google_api_key
 from app.gateways.google_maps_gateway import get_google_maps_gateway
 from app.gateways.base_gateway import ExternalServiceError
 from app.utils.log import log_info, log_warning, log_error
@@ -44,7 +45,7 @@ class GeolocationService:
         # In dev mode, it's always "configured" (uses mocks)
         if self.gateway.dev_mode:
             return True
-        return bool(self.gateway.settings.GOOGLE_MAPS_API_KEY)
+        return bool(get_google_api_key())
     
     def geocode_address(
         self,
@@ -303,17 +304,18 @@ def call_geocode_api(full_address: str) -> dict:
     Use geolocation_service.geocode_address() instead.
     """
     log_warning("call_geocode_api() is deprecated. Use geolocation_service.geocode_address()")
-    
-    result = geolocation_service.geocode_address(full_address)
-    
-    if result:
-        return {
-            'lat': result['latitude'],
-            'lng': result['longitude'],
-            'formatted_address': result['formatted_address']
-        }
-    
-    return {}
+    try:
+        result = geolocation_service.geocode_address(full_address)
+        if result:
+            return {
+                'lat': result['latitude'],
+                'lng': result['longitude'],
+                'formatted_address': result['formatted_address']
+            }
+        return {}
+    except Exception as e:
+        log_warning(f"Error calling geocode API: {e}")
+        return {}
 
 
 def get_timezone_from_location(country: str, city: str) -> str:
@@ -331,11 +333,11 @@ def get_timezone_from_address(country_code: str, province: str, db) -> str:
     Deduce timezone from country_code and province/state.
     
     This function uses the TimezoneService to automatically deduce timezone:
-    - For single-timezone countries (ARG, PER, CHL): uses market_info default
-    - For multi-timezone countries (USA, BRA, CAN): uses province mapping
+    - For single-timezone countries (AR, PE, CL): uses market_info default
+    - For multi-timezone countries (US, BR, CA): uses province mapping
     
     Args:
-        country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA", "BRA")
+        country_code: ISO 3166-1 alpha-2 country code (e.g., "AR", "US", "BR")
         province: Province/state name or code (e.g., "California", "CA", "Buenos Aires")
         db: Database connection
         

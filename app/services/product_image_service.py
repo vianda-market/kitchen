@@ -6,7 +6,7 @@ Designed to mirror the QR code service structure for easy migration to S3 later.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Tuple, Optional
 from uuid import UUID
@@ -40,6 +40,7 @@ class ProductImageService:
 
         # Image processing configuration
         self.max_dimension = int(os.getenv("PRODUCT_IMAGE_MAX_DIMENSION", "1024"))
+        self.thumbnail_dimension = int(os.getenv("PRODUCT_IMAGE_THUMBNAIL_DIMENSION", "300"))
         self.output_format = os.getenv("PRODUCT_IMAGE_FORMAT", "PNG").upper()
         self.allowed_content_types = {"image/png", "image/jpeg", "image/webp"}
 
@@ -50,9 +51,9 @@ class ProductImageService:
         image_bytes: bytes,
         content_type: str,
         expected_checksum: Optional[str] = None,
-    ) -> Tuple[str, str, str]:
+    ) -> Tuple[str, str, str, str, str]:
         """
-        Persist an uploaded image and return storage metadata.
+        Persist an uploaded image (full-size + thumbnail) and return storage metadata.
 
         Args:
             product_id: Product identifier to namespace the image.
@@ -60,7 +61,7 @@ class ProductImageService:
             content_type: Original content type for validation.
 
         Returns:
-            Tuple of (storage_path, url_path, checksum).
+            Tuple of (storage_path, url_path, thumbnail_storage_path, thumbnail_url_path, checksum).
         """
         if not image_bytes:
             raise HTTPException(status_code=400, detail="Uploaded image is empty")
@@ -93,21 +94,24 @@ class ProductImageService:
         except Exception:
             raise HTTPException(status_code=400, detail="Unable to read image file")
 
-        # Normalize image
+        # Normalize image to RGB
         image = image.convert("RGB")
-        if max(image.size) > self.max_dimension:
-            image.thumbnail((self.max_dimension, self.max_dimension), Image.LANCZOS)
 
-        buffer = BytesIO()
-        image.save(buffer, format=self.output_format, optimize=True)
-        processed_bytes = buffer.getvalue()
+        # Full-size: resize to max_dimension (1024) if larger
+        image_full = image.copy()
+        if max(image_full.size) > self.max_dimension:
+            image_full.thumbnail((self.max_dimension, self.max_dimension), Image.LANCZOS)
 
-        # Note: We compute checksum from original bytes, not processed bytes
-        # This ensures the checksum matches what the client sent
+        # Thumbnail: resize to thumbnail_dimension (e.g. 300x300)
+        image_thumb = image.copy()
+        if max(image_thumb.size) > self.thumbnail_dimension:
+            image_thumb.thumbnail((self.thumbnail_dimension, self.thumbnail_dimension), Image.LANCZOS)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         year_month = f"{now.year}/{now.month:02d}"
-        filename = f"{product_id}.{self.output_format.lower()}"
+        ext = self.output_format.lower()
+        filename = f"{product_id}.{ext}"
+        thumb_filename = f"{product_id}_thumb.{ext}"
 
         if self.storage_mode != "local":
             log_error("Only local storage mode is implemented for product images")
@@ -118,34 +122,41 @@ class ProductImageService:
 
         storage_dir = os.path.join(self.local_storage_path, year_month)
         os.makedirs(storage_dir, exist_ok=True)
-        absolute_path = os.path.join(storage_dir, filename)
 
-        with open(absolute_path, "wb") as file:
-            file.write(processed_bytes)
+        # Save full-size
+        buffer_full = BytesIO()
+        image_full.save(buffer_full, format=self.output_format, optimize=True)
+        absolute_path_full = os.path.join(storage_dir, filename)
+        with open(absolute_path_full, "wb") as file:
+            file.write(buffer_full.getvalue())
 
-        # Normalize path with forward slashes for DB storage
+        # Save thumbnail
+        buffer_thumb = BytesIO()
+        image_thumb.save(buffer_thumb, format=self.output_format, optimize=True)
+        absolute_path_thumb = os.path.join(storage_dir, thumb_filename)
+        with open(absolute_path_thumb, "wb") as file:
+            file.write(buffer_thumb.getvalue())
+
+        # Normalize paths with forward slashes for DB storage
         storage_path = os.path.join(self.local_storage_path, year_month, filename).replace("\\", "/")
         url_path = f"{self.base_url}/{year_month}/{filename}"
+        thumbnail_storage_path = os.path.join(self.local_storage_path, year_month, thumb_filename).replace("\\", "/")
+        thumbnail_url_path = f"{self.base_url}/{year_month}/{thumb_filename}"
 
-        log_info(f"Product image saved: {storage_path}")
-        # Return original checksum (matches client expectation), not processed checksum
-        return storage_path, url_path, original_checksum
+        log_info(f"Product image saved: {storage_path}, thumbnail: {thumbnail_storage_path}")
+        return storage_path, url_path, thumbnail_storage_path, thumbnail_url_path, original_checksum
 
-    def delete_image(self, storage_path: str) -> None:
-        """Remove an image from storage (ignoring placeholder)."""
-        if not storage_path or self.is_placeholder(storage_path):
-            return
-
-        try:
-            absolute_path = storage_path
-            if not os.path.isabs(absolute_path):
-                absolute_path = os.path.abspath(storage_path)
-
-            if os.path.exists(absolute_path):
-                os.remove(absolute_path)
-                log_info(f"Product image deleted: {absolute_path}")
-        except Exception as exc:
-            log_error(f"Failed to delete product image {storage_path}: {exc}")
+    def delete_image(self, storage_path: str, thumbnail_storage_path: Optional[str] = None) -> None:
+        """Remove an image (and optionally its thumbnail) from storage (ignoring placeholder)."""
+        paths_to_delete = [p for p in (storage_path, thumbnail_storage_path) if p and not self.is_placeholder(p)]
+        for p in paths_to_delete:
+            try:
+                absolute_path = p if os.path.isabs(p) else os.path.abspath(p)
+                if os.path.exists(absolute_path):
+                    os.remove(absolute_path)
+                    log_info(f"Product image deleted: {absolute_path}")
+            except Exception as exc:
+                log_error(f"Failed to delete product image {p}: {exc}")
 
     def is_placeholder(self, storage_path: str) -> bool:
         """Check whether the provided storage path points to the placeholder image."""

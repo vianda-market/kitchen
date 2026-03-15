@@ -28,9 +28,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         # For local testing, generate a UUID for the dummy admin and static attributes.
         return {
             "user_id": uuid.UUID(DUMMY_ADMIN_USER_ID),
-            "role_type": "client",           # Adjust as needed for local testing
-            "role_name": "Unknown",          # Default for local testing
-            "institution_id": uuid.UUID("00000000-0000-0000-0000-000000000000")  # Replace with dummy institution UUID
+            "role_type": "client",
+            "role_name": "Unknown",
+            "institution_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "credit_worth": None,
+            "subscription_market_id": None,
         }
     
     try:
@@ -67,13 +69,17 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
                 detail="Token payload is missing required fields."
             )
         
-        # Return the full user payload including role_name.
-        return {
+        # Return the full user payload including role_name and optional credit_worth/subscription_market_id (single subscription per user).
+        out = {
             "user_id": user_id,
             "role_type": role_type,
             "role_name": role_name,
-            "institution_id": institution_id
+            "institution_id": institution_id,
         }
+        if "credit_worth" in payload and "subscription_market_id" in payload:
+            out["credit_worth"] = payload["credit_worth"]
+            out["subscription_market_id"] = payload["subscription_market_id"]
+        return out
     
     except jwt.PyJWTError:
         raise HTTPException(
@@ -145,8 +151,8 @@ def get_client_user(current_user: dict = Depends(get_current_user)):
     """
     Verify user has Customer role_type for client-only operations.
     
-    Customer users (role_type='Customer') can view certain resources like fintech links
-    for payment processing. This is used for iOS/Android app access.
+    Customer users (role_type='Customer') can view certain resources for payment processing.
+    This is used for iOS/Android app access.
     
     Args:
         current_user: Current user from get_current_user dependency
@@ -197,6 +203,31 @@ def get_client_or_employee_user(current_user: dict = Depends(get_current_user)):
     )
 
 
+def get_client_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
+    """
+    Verify user has Customer, Employee, or Supplier role_type.
+    
+    Used for reference data (countries, provinces, cities) that all authenticated users
+    need for address forms—Customers (B2C), Employees (back-office), and Suppliers (B2B).
+    
+    Args:
+        current_user: Current user from get_current_user dependency
+        
+    Returns:
+        Current user if Customer, Employee, or Supplier
+        
+    Raises:
+        HTTPException: If user has unrecognized role_type
+    """
+    role_type = current_user.get("role_type")
+    if role_type in ["Customer", "Employee", "Supplier"]:
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Customer, Employee, or Supplier access required for this operation"
+    )
+
+
 def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)):
     """
     Verify user is Employee or Customer, explicitly blocking Suppliers.
@@ -238,6 +269,31 @@ def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)
     )
 
 
+def get_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
+    """
+    Verify user is Employee or Supplier, blocking Customers.
+    
+    Used for resources that Suppliers and Employees can access but Customers cannot,
+    e.g. reading assignable roles for user create/edit forms.
+    
+    Args:
+        current_user: Current user from get_current_user dependency
+        
+    Returns:
+        Current user if Employee or Supplier
+        
+    Raises:
+        HTTPException(403): If user is Customer
+    """
+    role_type = current_user.get("role_type")
+    if role_type in ["Employee", "Supplier"]:
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Forbidden: only Employees and Suppliers can access this resource"
+    )
+
+
 def get_admin_user(current_user: dict = Depends(get_current_user)):
     """
     Verify user has admin or super-admin role for discretionary credit operations.
@@ -266,3 +322,34 @@ def get_admin_user(current_user: dict = Depends(get_current_user)):
         status_code=status.HTTP_403_FORBIDDEN, 
         detail="Admin access required for discretionary credit operations"
     )
+
+
+def require_supplier_admin(current_user: dict = Depends(get_current_user)):
+    """
+    Verify user is Supplier Admin.
+    """
+    from app.security.field_policies import ensure_supplier_admin_only
+    ensure_supplier_admin_only(current_user)
+    return current_user
+
+
+def require_supplier_admin_or_employee_admin(current_user: dict = Depends(get_current_user)):
+    """
+    Verify user is Supplier Admin or Employee Admin/Super Admin.
+    Used for institution entities (and formerly institution bank accounts).
+    """
+    role_type = (current_user.get("role_type") or "").strip()
+    role_name = (current_user.get("role_name") or "").strip()
+    allowed = (
+        (role_type == "Supplier" and role_name == "Admin")
+        or (role_type == "Employee" and role_name in ("Admin", "Super Admin"))
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Institution entities are accessible only to "
+                "Supplier Admin and to Employee Admin or Super Admin."
+            ),
+        )
+    return current_user

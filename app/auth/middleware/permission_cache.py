@@ -53,4 +53,11 @@ class PermissionCacheMiddleware(BaseHTTPMiddleware):
                 if hasattr(request.state, "permissions") and request.state.permissions is not None:
                     permission_cache[user_id] = (request.state.permissions, time.time())
 
+        # Prune expired entries when cache is large to prevent unbounded growth
+        if len(permission_cache) > 1000:
+            now = time.time()
+            expired = [uid for uid, (_, ts) in permission_cache.items() if now - ts >= self.cache_ttl]
+            for uid in expired:
+                permission_cache.pop(uid, None)
+
         return response

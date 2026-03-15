@@ -6,12 +6,14 @@ This module contains all validation functions for plate selection,
 extracted from the main route to improve testability and maintainability.
 """
 
+from datetime import timedelta
 from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException
 from app.dto.models import PlateDTO, RestaurantDTO
 from app.utils.log import log_info, log_warning
 from app.config import Status
+from app.services.kitchen_day_service import VALID_KITCHEN_DAYS
 
 
 def validate_plate_selection_data(payload: dict) -> None:
@@ -58,6 +60,56 @@ def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
         raise HTTPException(
             status_code=403,
             detail=f"Restaurant '{restaurant.name}' {status_message} and cannot accept new orders. Please try another restaurant."
+        )
+
+
+def validate_pickup_time_range(
+    country_code: str,
+    kitchen_day: str,
+    target_date: "date",
+    pickup_time_range: str,
+) -> None:
+    """
+    Validate that pickup_time_range is within the market's allowed pickup windows
+    for the given kitchen day.
+
+    Uses get_pickup_windows_for_kitchen_day to obtain allowed windows and rejects
+    values outside that list.
+
+    Args:
+        country_code: ISO country code (e.g. AR, US, PE)
+        kitchen_day: Weekday name (Monday–Friday)
+        target_date: The date for the kitchen day
+        pickup_time_range: User-provided window in "HH:MM-HH:MM" format
+
+    Raises:
+        HTTPException: If pickup_time_range is not in the allowed windows
+    """
+    from datetime import date
+    from app.services.restaurant_explorer_service import get_pickup_windows_for_kitchen_day
+
+    if not pickup_time_range or not pickup_time_range.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="pickup_time_range is required and must be in HH:MM-HH:MM format (e.g. 11:30-11:45)",
+        )
+    date_obj = target_date if isinstance(target_date, date) else date.fromisoformat(str(target_date))
+    allowed = get_pickup_windows_for_kitchen_day(
+        (country_code or "").strip().upper(),
+        kitchen_day,
+        date_obj,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No pickup windows available for {kitchen_day} in this market. Please select another day.",
+        )
+    normalized = pickup_time_range.strip()
+    if normalized not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"pickup_time_range '{pickup_time_range}' is not a valid pickup window for {kitchen_day}. "
+            f"Allowed windows: {', '.join(allowed[:5])}{'...' if len(allowed) > 5 else ''}",
         )
 
 
@@ -115,7 +167,8 @@ def determine_target_kitchen_day(
     current_day: str,
     available_kitchen_days: list,
     country_code: str = None,
-    db=None
+    db=None,
+    timezone_str: Optional[str] = None
 ) -> str:
     """
     Determine the target kitchen day for the plate selection.
@@ -133,25 +186,55 @@ def determine_target_kitchen_day(
         HTTPException if no valid target day can be determined
     """
     if target_day:
-        return _validate_customer_specified_day(target_day, available_kitchen_days, current_day)
+        return _validate_customer_specified_day(
+            target_day, available_kitchen_days, current_day, timezone_str=timezone_str
+        )
     else:
-        return _find_next_available_day(available_kitchen_days, current_day, country_code, db)
+        return _find_next_available_day(available_kitchen_days, current_day, country_code, db, timezone_str)
+
+
+def _is_target_day_within_order_window(target_day: str, timezone_str: Optional[str]) -> bool:
+    """
+    Check if the target day's next occurrence is within the allowed order window (today through today+7 days).
+
+    Args:
+        target_day: Target weekday name (Monday–Friday)
+        timezone_str: IANA timezone for date resolution
+
+    Returns:
+        True if the next occurrence of target_day is within the window, False otherwise
+    """
+    if not timezone_str:
+        return False
+    try:
+        from app.services.restaurant_explorer_service import resolve_weekday_to_next_occurrence
+        target_date = resolve_weekday_to_next_occurrence(target_day, timezone_str)
+    except ValueError:
+        return False
+    from datetime import datetime
+    try:
+        import pytz
+        today = datetime.now(pytz.timezone(timezone_str)).date()
+    except Exception:
+        today = datetime.now().date()
+    return today <= target_date <= today + timedelta(days=7)
 
 
 def _validate_customer_specified_day(
     target_day: str,
     available_kitchen_days: list,
-    current_day: str
+    current_day: str,
+    *,
+    timezone_str: Optional[str] = None
 ) -> str:
     """
     Validate a customer-specified target day.
     """
     # Check if the target day is valid for kitchen operations (weekdays only)
-    valid_kitchen_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    if target_day not in valid_kitchen_days:
+    if target_day not in VALID_KITCHEN_DAYS:
         raise HTTPException(
             status_code=400, 
-            detail=f"Kitchen is not operational on {target_day}. Available days: {', '.join(valid_kitchen_days)}"
+            detail=f"Kitchen is not operational on {target_day}. Available days: {', '.join(VALID_KITCHEN_DAYS)}"
         )
     
     # Check if the target day is in the plate's available kitchen days
@@ -161,26 +244,26 @@ def _validate_customer_specified_day(
             detail=f"Plate is not available for {target_day}. Available days: {', '.join(available_kitchen_days)}"
         )
     
-    # Check if the target day is in the remainder of the week
-    if not _is_day_in_remainder_of_week(current_day, target_day):
+    # Check if the target day is within the 1-week-ahead order window
+    if not _is_target_day_within_order_window(target_day, timezone_str):
         raise HTTPException(
             status_code=400, 
-            detail=f"Cannot order for {target_day} from {current_day}. Orders are only allowed for the remainder of the current week."
+            detail=f"Cannot order for {target_day} from {current_day}. Orders are only allowed up to 1 week ahead."
         )
     
     return target_day
 
 
-def _find_next_available_day(available_kitchen_days: list, current_day: str, country_code: str = None, db=None) -> str:
+def _find_next_available_day(available_kitchen_days: list, current_day: str, country_code: str = None, db=None, timezone_str: Optional[str] = None) -> str:
     """
-    Find the next available kitchen day in the remainder of the week.
+    Find the next available kitchen day within the next 7 calendar days.
     """
-    target_day = _find_next_available_kitchen_day_in_week(current_day, available_kitchen_days, country_code, db)
+    target_day = _find_next_available_kitchen_day_in_week(current_day, available_kitchen_days, country_code, db, timezone_str)
     
     if not target_day:
         raise HTTPException(
             status_code=400, 
-            detail=f"No available kitchen days found for the remainder of the week. Available days: {', '.join(available_kitchen_days)}"
+            detail=f"No available kitchen days found within the next week. Available days: {', '.join(available_kitchen_days)}"
         )
     
     # Log the decision if it's different from current day
@@ -188,30 +271,6 @@ def _find_next_available_day(available_kitchen_days: list, current_day: str, cou
         log_info(f"Customer ordering on {current_day} for future day {target_day}")
     
     return target_day
-
-
-def _is_day_in_remainder_of_week(current_day: str, target_day: str) -> bool:
-    """
-    Check if the target day is in the remainder of the current week.
-    
-    Args:
-        current_day: Current day of the week
-        target_day: Target day to check
-        
-    Returns:
-        True if target day is in the remainder of the week, False otherwise
-    """
-    days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    
-    try:
-        current_index = days_of_week.index(current_day)
-        target_index = days_of_week.index(target_day)
-        
-        # Target day is valid if it's today or later in the week
-        return target_index >= current_index
-    except ValueError:
-        # Invalid day names
-        return False
 
 
 def _is_date_national_holiday(date_str: str, country_code: str, db) -> bool:
@@ -263,75 +322,51 @@ def _is_date_national_holiday(date_str: str, country_code: str, db) -> bool:
         return False
 
 
-def _find_next_available_kitchen_day_in_week(current_day: str, available_kitchen_days: list, country_code: str = None, db=None) -> Optional[str]:
+def _find_next_available_kitchen_day_in_week(current_day: str, available_kitchen_days: list, country_code: str = None, db=None, timezone_str: Optional[str] = None) -> Optional[str]:
     """
-    Find the next available kitchen day in the remainder of the current week.
-    If we're on a weekend, look ahead to next week.
+    Find the next available kitchen day within the next 7 calendar days.
     Considers national holidays when selecting the next available day.
     
     Args:
-        current_day: Current day of the week
+        current_day: Current day of the week (unused; kept for API compatibility)
         available_kitchen_days: List of available kitchen days for the plate
         country_code: Country code to check for national holidays
         db: Database connection for holiday checks
+        timezone_str: Optional IANA timezone for timezone-aware today
         
     Returns:
         The next available kitchen day or None if none found
     """
     from datetime import datetime, timedelta
-    
-    days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    
-    # Get current date
-    today = datetime.now()
-    
-    try:
-        current_index = days_of_week.index(current_day)
-        
-        # Look for the next available day starting from today
-        for i in range(current_index, len(days_of_week)):
-            day = days_of_week[i]
-            if day in available_kitchen_days:
-                # Check if this day is a national holiday
-                if country_code and db:
-                    # Calculate the date for this day of the week
-                    days_ahead = i - current_index
-                    target_date = today + timedelta(days=days_ahead)
-                    date_str = target_date.strftime('%Y-%m-%d')
-                    
-                    if _is_date_national_holiday(date_str, country_code, db):
-                        continue  # Skip this day if it's a holiday
-                
-                return day
-        
-        return None
-    except ValueError:
-        # Current day is not a weekday (Saturday/Sunday), look ahead to next week
-        # Find the first available kitchen day of next week, skipping holidays
-        for i, day in enumerate(days_of_week):
-            if day in available_kitchen_days:
-                # Check if this day is a national holiday
-                if country_code and db:
-                    # Calculate the date for this day of next week
-                    # If today is Saturday (index 5), next Monday is in 2 days
-                    # If today is Sunday (index 6), next Monday is in 1 day
-                    current_weekday = today.weekday()  # Monday=0, Sunday=6
-                    if current_weekday == 5:  # Saturday
-                        days_ahead = 2 + i
-                    elif current_weekday == 6:  # Sunday
-                        days_ahead = 1 + i
-                    else:
-                        days_ahead = (7 - current_weekday) + i
-                    
-                    target_date = today + timedelta(days=days_ahead)
-                    date_str = target_date.strftime('%Y-%m-%d')
-                    
-                    if _is_date_national_holiday(date_str, country_code, db):
-                        continue  # Skip this day if it's a holiday
-                
-                return day
-        
-        return None
+    from app.services.kitchen_day_service import VALID_KITCHEN_DAYS
+
+    weekday_names = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+
+    # Get current date (timezone-aware when timezone_str provided)
+    if timezone_str:
+        try:
+            import pytz
+            today = datetime.now(pytz.timezone(timezone_str)).date()
+        except Exception:
+            today = datetime.now().date()
+    else:
+        today = datetime.now().date()
+
+    # Iterate over the next 7 calendar days
+    for days_ahead in range(8):  # 0 through 7 inclusive
+        d = today + timedelta(days=days_ahead)
+        if d.weekday() >= 5:  # Saturday=5, Sunday=6 - skip weekends
+            continue
+        day_name = weekday_names[d.weekday()]
+        if day_name not in available_kitchen_days:
+            continue
+        if country_code and db:
+            date_str = d.strftime('%Y-%m-%d')
+            if _is_date_national_holiday(date_str, country_code, db):
+                continue
+        return day_name
+
+    return None
 
 
 def _is_date_restaurant_holiday(

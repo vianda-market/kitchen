@@ -19,13 +19,14 @@ class TestEnumService(unittest.TestCase):
         self.assertGreater(len(enums), 0, "Enums dictionary should not be empty")
 
     def test_all_enums_have_values(self):
-        """Test that all enum types have at least one value"""
+        """Test that all enum types have at least one value (institution_type_assignable can be empty when no user context)"""
         enums = enum_service.get_all_enums()
         
         for enum_name, enum_values in enums.items():
             with self.subTest(enum=enum_name):
                 self.assertIsInstance(enum_values, list, f"{enum_name} should be a list")
-                self.assertGreater(len(enum_values), 0, f"{enum_name} should have at least one value")
+                if enum_name != "institution_type_assignable":
+                    self.assertGreater(len(enum_values), 0, f"{enum_name} should have at least one value")
                 # Ensure all values are strings
                 for value in enum_values:
                     self.assertIsInstance(value, str, f"All values in {enum_name} should be strings")
@@ -37,6 +38,21 @@ class TestEnumService(unittest.TestCase):
         self.assertIsInstance(status_values, list)
         self.assertIn('Active', status_values)
         self.assertIn('Inactive', status_values)
+
+    def test_get_enum_by_name_with_context_user(self):
+        """Test that status with context=user returns only Active and Inactive"""
+        status_values = enum_service.get_enum_by_name('status', context='user')
+        self.assertIsInstance(status_values, list)
+        self.assertEqual(set(status_values), {'Active', 'Inactive'})
+        self.assertNotIn('Arrived', status_values)
+
+    def test_get_enum_by_name_with_context_restaurant(self):
+        """Test that status with context=restaurant returns only Active, Pending, Inactive"""
+        status_values = enum_service.get_enum_by_name('status', context='restaurant')
+        self.assertIsInstance(status_values, list)
+        self.assertEqual(set(status_values), {'Active', 'Pending', 'Inactive'})
+        self.assertNotIn('Arrived', status_values)
+        self.assertNotIn('Processed', status_values)
 
     def test_get_enum_by_name_invalid(self):
         """Test that invalid enum name raises ValueError"""
@@ -50,8 +66,8 @@ class TestEnumService(unittest.TestCase):
         enums = enum_service.get_all_enums()
         status_values = enums['status']
         
-        # Check for expected status values
-        expected_statuses = ['Active', 'Inactive', 'Pending', 'Cancelled']
+        # Check for expected status values (general: Active, Pending, Inactive)
+        expected_statuses = ['Active', 'Pending', 'Inactive']
         for status in expected_statuses:
             self.assertIn(status, status_values, f"Status enum should include '{status}'")
 
@@ -61,27 +77,37 @@ class TestEnumService(unittest.TestCase):
         subscription_status_values = enums['subscription_status']
         
         # Check for expected subscription status values
-        expected_statuses = ['Active', 'On Hold', 'Pending', 'Expired', 'Cancelled']
+        expected_statuses = ['Active', 'On Hold', 'Pending', 'Cancelled']
         for status in expected_statuses:
             self.assertIn(status, subscription_status_values, 
                          f"Subscription status enum should include '{status}'")
+
+    def test_portion_size_display_values(self):
+        """Test that portion_size_display enum has expected values"""
+        enums = enum_service.get_all_enums()
+        self.assertIn('portion_size_display', enums)
+        portion_values = enums['portion_size_display']
+        expected = ['light', 'standard', 'large', 'insufficient_reviews']
+        self.assertEqual(set(portion_values), set(expected),
+                         "portion_size_display should have light, standard, large, insufficient_reviews")
 
     def test_all_enums_keys_match_spec(self):
         """Test that all enum keys match the frontend specification"""
         enums = enum_service.get_all_enums()
         
-        # Expected enum keys from frontend spec
+        # Expected enum keys from frontend spec (includes context-scoped status keys)
         expected_keys = {
-            'status', 'address_type', 'role_type', 'role_name',
-            'subscription_status', 'method_type', 'account_type',
+            'status', 'status_user', 'status_restaurant', 'status_discretionary', 'status_plate_pickup', 'status_bill',
+            'address_type', 'role_type', 'institution_type', 'institution_type_assignable', 'role_name',
+            'subscription_status', 'method_type',
             'transaction_type', 'street_type', 'kitchen_day',
-            'pickup_type', 'discretionary_reason'
+            'pickup_type', 'discretionary_reason', 'portion_size_display', 'bill_resolution', 'favorite_entity_type'
         }
         
         actual_keys = set(enums.keys())
         
         # All expected keys should be present
-        self.assertEqual(expected_keys, actual_keys, 
+        self.assertEqual(expected_keys, actual_keys,
                         "Enum keys should match frontend specification")
 
     def test_role_type_values(self):
@@ -111,12 +137,12 @@ class TestEnumService(unittest.TestCase):
                          f"Kitchen day enum should include '{day}'")
 
     def test_payment_method_type_values(self):
-        """Test that method_type enum includes expected payment methods"""
+        """Test that method_type enum includes expected payment method providers"""
         enums = enum_service.get_all_enums()
         method_type_values = enums['method_type']
         
-        # Check for expected payment methods
-        expected_methods = ['Credit Card', 'Debit Card', 'Bank Transfer', 'Cash', 'Mercado Pago']
+        # Check for expected payment method providers (Stripe, Mercado Pago, PayU)
+        expected_methods = ['Stripe', 'Mercado Pago', 'PayU']
         for method in expected_methods:
             self.assertIn(method, method_type_values, 
                          f"Payment method type enum should include '{method}'")
@@ -131,6 +157,32 @@ class TestEnumService(unittest.TestCase):
         for street_type in expected_types:
             self.assertIn(street_type, street_type_values, 
                          f"Street type enum should include '{street_type}'")
+
+    def test_get_assignable_institution_types_super_admin(self):
+        """Super Admin gets all four institution types."""
+        result = EnumService.get_assignable_institution_types({
+            "role_type": "Employee",
+            "role_name": "Super Admin",
+        })
+        self.assertEqual(set(result), {"Employee", "Supplier", "Customer", "Employer"})
+
+    def test_get_assignable_institution_types_admin(self):
+        """Admin gets Supplier, Employer only (no Employee, no Customer)."""
+        result = EnumService.get_assignable_institution_types({
+            "role_type": "Employee",
+            "role_name": "Admin",
+        })
+        self.assertEqual(set(result), {"Supplier", "Employer"})
+        self.assertNotIn("Employee", result)
+        self.assertNotIn("Customer", result)
+
+    def test_get_assignable_institution_types_supplier(self):
+        """Supplier gets empty list (cannot create institutions)."""
+        result = EnumService.get_assignable_institution_types({
+            "role_type": "Supplier",
+            "role_name": "Admin",
+        })
+        self.assertEqual(result, [])
 
     def test_enum_service_singleton_consistency(self):
         """Test that enum service returns consistent results across calls"""

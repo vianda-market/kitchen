@@ -2,13 +2,60 @@
 Database tests for market-based subscription constraints
 
 Tests the unique constraint that prevents duplicate subscriptions
-per user per market.
+per user per market. Uses minimal seed (superadmin, Global market only);
+creates plan(s) in-test as needed.
 """
 
 import pytest
 import psycopg2
 from uuid import uuid4
 from app.tests.database.conftest import db_transaction
+from app.tests.database.test_data.expected_seed_data import (
+    SEED_INSTITUTION_CUSTOMERS_ID,
+    SEED_SUPERADMIN_USER_ID,
+)
+
+# Argentina and Peru for plan/subscription tests (plans cannot use Global Marketplace)
+ARGENTINA_MARKET_ID = "00000000-0000-0000-0000-000000000002"
+PERU_MARKET_ID = "00000000-0000-0000-0000-000000000003"
+
+
+def _make_subscription_user(cursor, admin_id: str) -> str:
+    """Create a unique Customer user for subscription tests. Avoids idx_user_market_active collision with committed data from other tests."""
+    user_id = str(uuid4())
+    h = user_id[:8]
+    cursor.execute(
+        """
+        INSERT INTO user_info (
+            user_id, institution_id, role_type, role_name, username, email,
+            hashed_password, market_id, modified_by
+        ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+            %s, %s, 'hash', %s::uuid, %s)
+        """,
+        (
+            user_id,
+            str(SEED_INSTITUTION_CUSTOMERS_ID),
+            f"market_test_{h}",
+            f"market_test_{h}@example.com",
+            ARGENTINA_MARKET_ID,
+            admin_id,
+        ),
+    )
+    return user_id
+
+
+def _ensure_plan_for_market(cursor, market_id, modified_by, plan_id=None):
+    """Insert one plan for the given market if none exists; return plan_id."""
+    cursor.execute("SELECT plan_id FROM plan_info WHERE market_id = %s LIMIT 1", (market_id,))
+    row = cursor.fetchone()
+    if row:
+        return row[0]
+    pid = plan_id or str(uuid4())
+    cursor.execute("""
+        INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by, modified_date)
+        VALUES (%s, %s, 'Test Plan', 10, 100.0, 10.0, TRUE, FALSE, 'Active'::status_enum, %s, CURRENT_TIMESTAMP)
+    """, (pid, market_id, modified_by))
+    return pid
 
 
 class TestMarketSubscriptionConstraints:
@@ -22,41 +69,13 @@ class TestMarketSubscriptionConstraints:
         Business Rule: A user can only have ONE active subscription per market.
         """
         cursor = db_transaction.cursor()
-        
+        modified_by = str(SEED_SUPERADMIN_USER_ID)
+        user_id = _make_subscription_user(cursor, modified_by)
+
         try:
-            # Use admin user for test (we'll only insert into this transaction, no conflict with seed data)
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'admin' 
-                LIMIT 1
-            """)
-            user_id = cursor.fetchone()[0]
-            
-            # Use Chile market (admin doesn't have a subscription there yet)
-            cursor.execute("""
-                SELECT market_id FROM market_info 
-                WHERE country_code = 'CHL' 
-                LIMIT 1
-            """)
-            market_result = cursor.fetchone()
-            market_id = market_result[0]
-            
-            # Get a plan for this market
-            cursor.execute("""
-                SELECT plan_id FROM plan_info 
-                WHERE market_id = %s 
-                LIMIT 1
-            """, (market_id,))
-            plan_id = cursor.fetchone()[0]
-            
-            # Get modified_by user (use admin)
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'admin' 
-                LIMIT 1
-            """)
-            modified_by = cursor.fetchone()[0]
-            
+            plan_id = _ensure_plan_for_market(cursor, ARGENTINA_MARKET_ID, modified_by)
+            market_id = ARGENTINA_MARKET_ID
+
             # Create first subscription (should succeed)
             subscription_id_1 = str(uuid4())
             cursor.execute("""
@@ -83,8 +102,6 @@ class TestMarketSubscriptionConstraints:
             # Verify the error is about the unique constraint
             assert 'idx_user_market_active' in str(exc_info.value)
             
-            # Note: Cleanup not needed - fixture auto-rollbacks after test
-            
         except Exception as e:
             db_transaction.rollback()
             raise e
@@ -94,52 +111,18 @@ class TestMarketSubscriptionConstraints:
     def test_user_can_subscribe_to_multiple_markets(self, db_transaction):
         """
         Test that a user CAN have multiple subscriptions across different markets.
-        
-        Business Rule: Users can subscribe to multiple markets simultaneously.
+        Uses Argentina and Peru (plans cannot use Global Marketplace).
         """
         cursor = db_transaction.cursor()
-        
+        modified_by = str(SEED_SUPERADMIN_USER_ID)
+        user_id = _make_subscription_user(cursor, modified_by)
+
         try:
-            # Use admin user for test
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'admin' 
-                LIMIT 1
-            """)
-            user_id = cursor.fetchone()[0]
-            
-            # Get two different markets (use Peru and Chile, admin only has Argentina)
-            cursor.execute("""
-                SELECT market_id FROM market_info 
-                WHERE country_code IN ('PER', 'CHL')
-                ORDER BY country_code
-            """)
-            markets = cursor.fetchall()
-            market_id_1 = markets[1][0]  # Chile
-            market_id_2 = markets[0][0]  # Peru
-            
-            # Get plans for each market
-            cursor.execute("""
-                SELECT plan_id FROM plan_info 
-                WHERE market_id = %s 
-                LIMIT 1
-            """, (market_id_1,))
-            plan_id_1 = cursor.fetchone()[0]
-            
-            cursor.execute("""
-                SELECT plan_id FROM plan_info 
-                WHERE market_id = %s 
-                LIMIT 1
-            """, (market_id_2,))
-            plan_id_2 = cursor.fetchone()[0]
-            
-            # Get modified_by user
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'admin' 
-                LIMIT 1
-            """)
-            modified_by = cursor.fetchone()[0]
+            # Use two country markets (plans cannot be for Global Marketplace)
+            plan_id_1 = _ensure_plan_for_market(cursor, ARGENTINA_MARKET_ID, modified_by)
+            market_id_1 = ARGENTINA_MARKET_ID
+            plan_id_2 = _ensure_plan_for_market(cursor, PERU_MARKET_ID, modified_by)
+            market_id_2 = PERU_MARKET_ID
             
             # Create subscription in Market 1 (should succeed)
             subscription_id_1 = str(uuid4())
@@ -174,8 +157,6 @@ class TestMarketSubscriptionConstraints:
             count = cursor.fetchone()[0]
             assert count == 2, f"Expected 2 subscriptions, found {count}"
             
-            # Note: Cleanup not needed - fixture auto-rollbacks after test
-            
         except Exception as e:
             db_transaction.rollback()
             raise e
@@ -185,43 +166,15 @@ class TestMarketSubscriptionConstraints:
     def test_archived_subscriptions_do_not_block_new_ones(self, db_transaction):
         """
         Test that archived subscriptions do not prevent creating new ones.
-        
-        Business Rule: The unique constraint only applies to non-archived subscriptions.
+        Uses unique user and Argentina market; creates plan in-test.
         """
         cursor = db_transaction.cursor()
-        
+        modified_by = str(SEED_SUPERADMIN_USER_ID)
+        user_id = _make_subscription_user(cursor, modified_by)
+
         try:
-            # Use superadmin user for test (has Peru subscription, but not Argentina)
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'superadmin' 
-                LIMIT 1
-            """)
-            user_id = cursor.fetchone()[0]
-            
-            # Use Argentina market (superadmin doesn't have a subscription there)
-            cursor.execute("""
-                SELECT market_id FROM market_info 
-                WHERE country_code = 'ARG' 
-                LIMIT 1
-            """)
-            market_id = cursor.fetchone()[0]
-            
-            # Get a plan
-            cursor.execute("""
-                SELECT plan_id FROM plan_info 
-                WHERE market_id = %s 
-                LIMIT 1
-            """, (market_id,))
-            plan_id = cursor.fetchone()[0]
-            
-            # Get modified_by user
-            cursor.execute("""
-                SELECT user_id FROM user_info 
-                WHERE username = 'admin' 
-                LIMIT 1
-            """)
-            modified_by = cursor.fetchone()[0]
+            plan_id = _ensure_plan_for_market(cursor, ARGENTINA_MARKET_ID, modified_by)
+            market_id = ARGENTINA_MARKET_ID
             
             # Create and archive first subscription
             subscription_id_1 = str(uuid4())

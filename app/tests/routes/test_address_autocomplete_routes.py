@@ -1,5 +1,5 @@
 """
-Integration tests for address autocomplete routes (GET /suggest, POST /validate).
+Integration tests for address autocomplete routes (GET /suggest).
 """
 
 import pytest
@@ -13,10 +13,10 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 @pytest.fixture
 def mock_current_user():
     return {
-        "user_id": "11111111-1111-1111-1111-111111111111",
+        "user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
         "role_type": "Employee",
-        "role_name": "Admin",
-        "institution_id": "22222222-2222-2222-2222-222222222222",
+        "role_name": "Super Admin",
+        "institution_id": "11111111-1111-1111-1111-111111111111",
     }
 
 
@@ -43,17 +43,8 @@ class TestAddressSuggestRoute:
     def test_suggest_returns_200_and_suggestions(self, mock_svc, client_with_auth):
         mock_svc.suggest.return_value = [
             {
-                "street_name": "Corrientes",
-                "street_type": "Ave",
-                "building_number": "1234",
-                "apartment_unit": None,
-                "floor": None,
-                "city": "Buenos Aires",
-                "province": "CABA",
-                "postal_code": "C1043AAZ",
-                "country_code": "ARG",
-                "country_name": None,
-                "formatted_address": "Av. Corrientes 1234, CABA, Argentina",
+                "place_id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+                "display_text": "Av. Corrientes 1234, CABA, Argentina",
             }
         ]
         resp = client_with_auth.get("/api/v1/addresses/suggest?q=Av.+Corrientes")
@@ -61,7 +52,8 @@ class TestAddressSuggestRoute:
         data = resp.json()
         assert "suggestions" in data
         assert len(data["suggestions"]) == 1
-        assert data["suggestions"][0]["country_code"] == "ARG"
+        assert data["suggestions"][0]["place_id"] == "ChIJB_KWWvXKvJURs8VJkFcGiNE"
+        assert data["suggestions"][0]["display_text"] == "Av. Corrientes 1234, CABA, Argentina"
         mock_svc.suggest.assert_called_once()
 
     def test_suggest_requires_auth(self):
@@ -69,56 +61,21 @@ class TestAddressSuggestRoute:
             resp = client.get("/api/v1/addresses/suggest?q=test")
             assert resp.status_code == 401
 
-
-class TestAddressValidateRoute:
     @patch("app.routes.address.address_autocomplete_service")
-    def test_validate_returns_200_and_result(self, mock_svc, client_with_auth):
-        mock_svc.validate.return_value = {
-            "is_valid": True,
-            "normalized": {
-                "street_name": "Corrientes",
-                "street_type": "Ave",
-                "building_number": "1234",
-                "apartment_unit": None,
-                "floor": None,
-                "city": "Buenos Aires",
-                "province": "CABA",
-                "postal_code": "C1043AAZ",
-                "country_code": "ARG",
-            },
-            "formatted_address": "Av. Corrientes 1234, CABA, Argentina",
-            "confidence": "high",
-            "message": None,
-        }
-        body = {
-            "street_name": "Corrientes",
-            "street_type": "Ave",
-            "building_number": "1234",
-            "city": "Buenos Aires",
-            "province": "CABA",
-            "postal_code": "C1043",
-            "country_code": "ARG",
-        }
-        resp = client_with_auth.post("/api/v1/addresses/validate", json=body)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["is_valid"] is True
-        assert data["normalized"]["country_code"] == "ARG"
-        assert "formatted_address" in data
-        mock_svc.validate.assert_called_once()
+    def test_suggest_returns_429_when_rate_limited(self, mock_svc, client_with_auth):
+        """After 60 requests per user, 61st returns 429."""
+        mock_svc.suggest.return_value = []
+        # Reset rate limit state for this test
+        from app.routes.address import _suggest_rate_limit_timestamps
+        user_id = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+        _suggest_rate_limit_timestamps[user_id] = []
 
-    def test_validate_requires_auth(self):
-        with TestClient(app) as client:
-            resp = client.post(
-                "/api/v1/addresses/validate",
-                json={
-                    "street_name": "Test",
-                    "street_type": "St",
-                    "building_number": "1",
-                    "city": "City",
-                    "province": "State",
-                    "postal_code": "12345",
-                    "country_code": "ARG",
-                },
-            )
-            assert resp.status_code == 401
+        # Exhaust rate limit (60 requests)
+        for _ in range(60):
+            resp = client_with_auth.get("/api/v1/addresses/suggest?q=x")
+            assert resp.status_code == 200, "Expected 200 before limit exceeded"
+
+        # 61st request returns 429
+        resp = client_with_auth.get("/api/v1/addresses/suggest?q=x")
+        assert resp.status_code == 429
+        assert "Too many" in resp.json().get("detail", "")

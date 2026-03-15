@@ -19,7 +19,7 @@ def entity_not_found(entity_name: str, entity_id: UUID = None) -> HTTPException:
     Generate a standardized "entity not found" error.
     
     Args:
-        entity_name: The name of the entity (e.g., "User", "Bank account")
+        entity_name: The name of the entity (e.g., "User", "Institution entity")
         entity_id: Optional entity ID for more specific error messages
         
     Returns:
@@ -90,9 +90,6 @@ def entity_deletion_failed(entity_name: str) -> HTTPException:
 def user_not_found(user_id: UUID = None):
     return entity_not_found("User", user_id)
 
-def bank_account_not_found(account_id: UUID = None):
-    return entity_not_found("Bank account", account_id)
-
 def employer_not_found(employer_id: UUID = None):
     return entity_not_found("Employer", employer_id)
 
@@ -141,7 +138,9 @@ def handle_database_exception(error: Exception, operation_type: str = "database 
     
     # Handle specific database constraint violations
     if 'duplicate key value violates unique constraint' in error_message:
-        if 'currency_code' in error_message:
+        if 'market_info_country_name' in error_message or ('market_info' in error_message and 'country_name' in error_message):
+            return HTTPException(status_code=409, detail="Market already exists for this country")
+        elif 'currency_code' in error_message:
             return HTTPException(status_code=409, detail="Credit currency with this code already exists")
         elif 'email' in error_message:
             return HTTPException(status_code=409, detail="User with this email already exists")

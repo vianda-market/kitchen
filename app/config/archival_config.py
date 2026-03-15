@@ -88,22 +88,20 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     # FINANCIAL CRITICAL (7 years - legal compliance)
     "user_info": ArchivalCategory.FINANCIAL_CRITICAL,
     "client_bill_info": ArchivalCategory.FINANCIAL_CRITICAL,
-    "institution_payment_attempt": ArchivalCategory.FINANCIAL_CRITICAL,
     
     # FINANCIAL OPERATIONAL (1 year - financial operations)  
     "client_transaction": ArchivalCategory.FINANCIAL_OPERATIONAL,
     "restaurant_transaction": ArchivalCategory.FINANCIAL_OPERATIONAL,
-    "fintech_link_assignment": ArchivalCategory.FINANCIAL_OPERATIONAL,
     "subscription_info": ArchivalCategory.FINANCIAL_OPERATIONAL,
     "payment_method": ArchivalCategory.FINANCIAL_OPERATIONAL,
     
     # CUSTOMER SERVICE (3 months - support window)
     "plate_pickup_live": ArchivalCategory.CUSTOMER_SERVICE,
-    "client_payment_attempt": ArchivalCategory.CUSTOMER_SERVICE,
-    "plate_selection": ArchivalCategory.CUSTOMER_SERVICE,
+    "plate_selection_info": ArchivalCategory.CUSTOMER_SERVICE,
     "restaurant_holidays": ArchivalCategory.CUSTOMER_SERVICE,
     "credential_recovery": ArchivalCategory.CUSTOMER_SERVICE,
-    
+    "pending_customer_signup": ArchivalCategory.CUSTOMER_SERVICE,
+
     # OPERATIONAL DATA (6 months - business operations)
     "restaurant_info": ArchivalCategory.OPERATIONAL_DATA,
     "institution_entity_info": ArchivalCategory.OPERATIONAL_DATA, 
@@ -111,7 +109,7 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     "address_info": ArchivalCategory.OPERATIONAL_DATA,
     "geolocation_info": ArchivalCategory.OPERATIONAL_DATA,
     "restaurant_balance_info": ArchivalCategory.OPERATIONAL_DATA,
-    "institution_bank_account": ArchivalCategory.OPERATIONAL_DATA,
+    "institution_settlement": ArchivalCategory.FINANCIAL_OPERATIONAL,
     "discretionary_info": ArchivalCategory.OPERATIONAL_DATA,
     "discretionary_history": ArchivalCategory.OPERATIONAL_DATA,
     "discretionary_resolution_info": ArchivalCategory.OPERATIONAL_DATA,
@@ -124,13 +122,8 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     "qr_code": ArchivalCategory.REFERENCE_DATA,
     "credit_currency_info": ArchivalCategory.REFERENCE_DATA,
     "plate_kitchen_days": ArchivalCategory.REFERENCE_DATA,
-    "fintech_link_info": ArchivalCategory.REFERENCE_DATA,
-    "fintech_wallet": ArchivalCategory.REFERENCE_DATA,
-    "fintech_wallet_auth": ArchivalCategory.REFERENCE_DATA,
-    "credit_card": ArchivalCategory.REFERENCE_DATA,
-    "bank_account": ArchivalCategory.REFERENCE_DATA,
-    "appstore_account": ArchivalCategory.REFERENCE_DATA,
-    
+    "external_payment_method": ArchivalCategory.REFERENCE_DATA,
+
     # SYSTEM CONFIGURATION (never archived)
     # role_info, status_info, transaction_type_info removed - enums stored directly on entities
     
@@ -138,7 +131,6 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     # role_history, status_history, transaction_type_history removed - tables deprecated
     "client_bill_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "credit_currency_history": ArchivalCategory.SYSTEM_CONFIGURATION,
-    "fintech_link_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "geolocation_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "institution_entity_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "institution_history": ArchivalCategory.SYSTEM_CONFIGURATION,

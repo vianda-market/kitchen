@@ -24,49 +24,10 @@ class ClientBillBusinessService:
     def __init__(self):
         pass
     
-    def create_client_bill(
-        self, 
-        bill_data: Dict[str, Any], 
-        current_user: Dict[str, Any], 
-        db: psycopg2.extensions.connection
-    ) -> ClientBillDTO:
-        """
-        Create a new client bill with currency resolution.
-        
-        Args:
-            bill_data: Client bill data dictionary
-            current_user: Current user information
-            db: Database connection
-            
-        Returns:
-            Created client bill DTO
-            
-        Raises:
-            HTTPException: For validation or creation failures
-        """
-        # Validate bill data
-        self._validate_bill_data(bill_data)
-        
-        # Set modified_by field
-        bill_data["modified_by"] = current_user["user_id"]
-        
-        # Resolve currency code from credit currency
-        self._resolve_currency_code(bill_data, db)
-        
-        # Apply business rules
-        self._apply_bill_creation_rules(bill_data)
-        
-        # Create the client bill
-        client_bill = client_bill_service.create(bill_data, db)
-        if not client_bill:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                detail="Failed to create client bill"
-            )
-        
-        log_info(f"Client bill created: {client_bill}")
-        return client_bill
-    
+    # Client bills are not created via this service. They are created only when a payment
+    # completes via subscription_payment (create_and_process_bill_for_subscription_payment in
+    # subscription_action_service). Every bill is linked to a subscription_payment_id.
+
     def update_client_bill(
         self, 
         bill_id: UUID, 
@@ -263,28 +224,6 @@ class ClientBillBusinessService:
         """
         resolve_currency_code(bill_data, db)
     
-    def _apply_bill_creation_rules(self, bill_data: Dict[str, Any]) -> None:
-        """
-        Apply business rules for bill creation.
-        
-        Args:
-            bill_data: Bill data dictionary (modified in place)
-        """
-        # Set default values
-        bill_data.setdefault("status", Status.PENDING)
-        bill_data.setdefault("is_archived", False)
-        
-        # Ensure amount is properly formatted
-        if "amount" in bill_data:
-            bill_data["amount"] = float(bill_data["amount"])
-        
-        # Set creation timestamp if not provided
-        if "created_date" not in bill_data:
-            from datetime import datetime
-            bill_data["created_date"] = datetime.utcnow()
-        
-        log_info("Applied bill creation business rules")
-    
     def _apply_bill_update_rules(self, bill_data: Dict[str, Any]) -> None:
         """
         Apply business rules for bill updates.
@@ -297,8 +236,8 @@ class ClientBillBusinessService:
             bill_data["amount"] = float(bill_data["amount"])
         
         # Set update timestamp
-        from datetime import datetime
-        bill_data["modified_date"] = datetime.utcnow()
+        from datetime import datetime, timezone
+        bill_data["modified_date"] = datetime.now(timezone.utc)
         
         log_info("Applied bill update business rules")
     

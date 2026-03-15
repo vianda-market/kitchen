@@ -1,0 +1,1524 @@
+{
+	"info": {
+		"_postman_id": "discretionary-credit-system-2026-v1",
+		"name": "001 DISCRETIONARY_CREDIT_SYSTEM",
+		"description": "002 – Run after DB rebuild. Flow: (1) Login Super Admin (seeded superadmin/SuperAdmin1!), (2) Create Admin User (creates shared admin: username=admin, password=Admin123!), (3) Login Admin. Sets env and globals: adminUsername, adminPassword, adminUserId, username, password, adminAuthToken, authToken, superAdminAuthToken for downstream collections (003, 004, etc.). All discretionary endpoints use /api/v1/ prefix.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Login Super Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has access_token\", function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set(\"superAdminAuthToken\", response.access_token);",
+									"pm.environment.set(\"superAdminAuthToken\", response.access_token);",
+									"pm.globals.set(\"superAdminAuthToken\", response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{superAdminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{superAdminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "token"]
+						}
+					}
+				},
+				{
+					"name": "Create Admin User",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const username = 'admin';",
+									"const email = 'admin@example.com';",
+									"const password = 'Admin123!';",
+									"pm.collectionVariables.set('adminUsername', username);",
+									"pm.collectionVariables.set('adminPassword', password);",
+									"const body = {",
+									"    username: username,",
+									"    email: email,",
+									"    password: password,",
+									"    role_type: 'Employee',",
+									"    role_name: 'Admin',",
+									"    institution_id: '11111111-1111-1111-1111-111111111111',",
+									"    market_id: '00000000-0000-0000-0000-000000000001',",
+									"    first_name: 'Admin',",
+									"    last_name: 'User',",
+									"    cellphone: '5550000000'",
+									"};",
+									"pm.request.body.raw = JSON.stringify(body);",
+									"const token = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!token) throw new Error('Run \\'Login Super Admin\\' first.');",
+									"pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+									"const r = pm.response.json();",
+									"if (r.user_id) {",
+									"    pm.collectionVariables.set('adminUserId', r.user_id);",
+									"    pm.environment.set('adminUserId', r.user_id);",
+									"    pm.environment.set('adminUsername', 'admin');",
+									"    pm.environment.set('adminPassword', 'Admin123!');",
+									"    pm.environment.set('username', 'admin');",
+									"    pm.environment.set('password', 'Admin123!');",
+									"    pm.globals.set('adminUserId', r.user_id);",
+									"    pm.globals.set('adminUsername', 'admin');",
+									"    pm.globals.set('adminPassword', 'Admin123!');",
+									"    pm.globals.set('username', 'admin');",
+									"    pm.globals.set('password', 'Admin123!');",
+									"    console.log('✅ Admin user created: user_id=', r.user_id, '(env and globals set for downstream collections)');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json", "type": "text"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"email\": \"admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"Employee\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\",\n    \"first_name\": \"Admin\",\n    \"last_name\": \"User\",\n    \"cellphone\": \"5550000000\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users"]
+						}
+					}
+				},
+				{
+					"name": "Login Vianda Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has access_token\", function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set(\"adminAuthToken\", response.access_token);",
+									"pm.environment.set(\"adminAuthToken\", response.access_token);",
+									"pm.environment.set(\"authToken\", response.access_token);",
+									"pm.globals.set(\"adminAuthToken\", response.access_token);",
+									"pm.globals.set(\"authToken\", response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{adminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{adminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "token"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer User ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"",
+									"// Debug: Log response structure",
+									"if (response && response.length > 0) {",
+									"    console.log('📋 Sample user structure:', JSON.stringify(response[0], null, 2));",
+									"}",
+									"",
+									"// Find first customer user (enriched endpoint includes role_type)",
+									"if (Array.isArray(response)) {",
+									"    const customerUser = response.find(user => {",
+									"        const isCustomer = user.role_type === 'Customer';",
+									"        const notArchived = !user.is_archived;",
+									"        return isCustomer && notArchived;",
+									"    });",
+									"    ",
+									"    if (customerUser) {",
+									"        const userId = customerUser.user_id;",
+									"        // Set in both collection and environment variables",
+									"        pm.collectionVariables.set('testUserId', userId);",
+									"        pm.environment.set('testUserId', userId);",
+									"        ",
+									"        console.log('✅ Found customer user:');",
+									"        console.log('   user_id:', userId);",
+									"        console.log('   username:', customerUser.username);",
+									"        console.log('   email:', customerUser.email);",
+									"        console.log('   role_type:', customerUser.role_type);",
+									"        console.log('   role_name:', customerUser.role_name);",
+									"        ",
+									"        // Verify it was set",
+									"        const verifyEnv = pm.environment.get('testUserId');",
+									"        const verifyColl = pm.collectionVariables.get('testUserId');",
+									"        console.log('🔍 Verification - Environment:', verifyEnv);",
+									"        console.log('🔍 Verification - Collection:', verifyColl);",
+									"    } else {",
+									"        console.warn('⚠️ No customer user found in response.');",
+									"        console.warn('   Response length:', response.length);",
+									"        if (response.length > 0) {",
+									"            console.warn('   Available role_types:', [...new Set(response.map(u => u.role_type))]);",
+									"        }",
+									"        console.warn('   You may need to create a customer first (run 000 Client Setup).');",
+									"        // Unset stale testUserId so we don't use a deleted user from a previous run",
+									"        pm.collectionVariables.unset('testUserId');",
+									"        pm.environment.unset('testUserId');",
+									"    }",
+									"} else {",
+									"    console.error('⚠️ Response is not an array:', typeof response);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/enriched/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users", "enriched", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Restaurant ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"",
+									"// Debug: Log response structure",
+									"if (response && response.length > 0) {",
+									"    console.log('📋 Sample restaurant structure:', JSON.stringify(response[0], null, 2));",
+									"}",
+									"",
+									"// Find first non-archived restaurant",
+									"if (Array.isArray(response)) {",
+									"    const restaurant = response.find(r => !r.is_archived);",
+									"    ",
+									"    if (restaurant) {",
+									"        const restaurantId = restaurant.restaurant_id;",
+									"        // Set in both collection and environment variables",
+									"        pm.collectionVariables.set('testRestaurantId', restaurantId);",
+									"        pm.environment.set('testRestaurantId', restaurantId);",
+									"        ",
+									"        console.log('✅ Found restaurant:');",
+									"        console.log('   restaurant_id:', restaurantId);",
+									"        console.log('   name:', restaurant.name);",
+									"        console.log('   institution_id:', restaurant.institution_id);",
+									"        ",
+									"        // Verify it was set",
+									"        const verifyEnv = pm.environment.get('testRestaurantId');",
+									"        const verifyColl = pm.collectionVariables.get('testRestaurantId');",
+									"        console.log('🔍 Verification - Environment:', verifyEnv);",
+									"        console.log('🔍 Verification - Collection:', verifyColl);",
+									"    } else {",
+									"        console.warn('⚠️ No restaurant found in response.');",
+									"        console.warn('   Response length:', response.length);",
+									"        console.warn('   You may need to create a restaurant first.');",
+									"    }",
+									"} else {",
+									"    console.error('⚠️ Response is not an array:', typeof response);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurants/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "restaurants", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👤 Admin Operations",
+			"item": [
+				{
+					"name": "Create Client Credit Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate testUserId is set - use testUserId from Get Customer User ID, or customerUserId from 000",
+									"let testUserId = pm.collectionVariables.get('testUserId') || pm.environment.get('testUserId');",
+									"if (!testUserId) {",
+									"    testUserId = pm.collectionVariables.get('customerUserId') || pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
+									"}",
+									"",
+									"if (!testUserId || testUserId === '' || testUserId === 'null' || testUserId === 'undefined') {",
+									"    throw new Error('testUserId/customerUserId not set. Run \"Get Customer User ID\" first (and run 000 Client Setup so a customer exists), or run 000 then 001 with same environment.');",
+									"}",
+									"",
+									"console.log('📝 Creating client credit request for user:', testUserId);",
+									"",
+									"// Inject userId directly into request body to avoid environment variable override",
+									"const requestBody = JSON.parse(pm.request.body.raw);",
+									"requestBody.user_id = testUserId;",
+									"pm.request.body.raw = JSON.stringify(requestBody);",
+									"",
+									"// Ensure variable is set in both places",
+									"pm.collectionVariables.set('testUserId', testUserId);",
+									"pm.environment.set('testUserId', testUserId);",
+									"",
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has discretionary_id\", function () {",
+									"    pm.expect(response).to.have.property('discretionary_id');",
+									"});",
+									"pm.test(\"Status is Pending\", function () {",
+									"    pm.expect(response.status).to.eql('Pending');",
+									"});",
+									"pm.test(\"Category is Marketing Campaign\", function () {",
+									"    pm.expect(response.category).to.eql('Marketing Campaign');",
+									"});",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
+									"});",
+									"",
+									"pm.environment.set(\"clientCreditRequestId\", response.discretionary_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Marketing campaign credit for new customer\",\n    \"amount\": 15.50,\n    \"comment\": \"Additional context for admin review\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Restaurant Credit Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate testRestaurantId is set",
+									"// Priority: collection variable first, then environment variable",
+									"let testRestaurantId = pm.collectionVariables.get('testRestaurantId');",
+									"if (!testRestaurantId) {",
+									"    testRestaurantId = pm.environment.get('testRestaurantId');",
+									"}",
+									"",
+									"// Check for empty string, null, undefined, or old hardcoded values",
+									"const oldHardcodedIds = ['9a409c16-e35b-4c67-bc16-473ed90fa77c', '456e7890-e89b-12d3-a456-426614174000'];",
+									"if (!testRestaurantId || testRestaurantId === '' || testRestaurantId === 'null' || testRestaurantId === 'undefined' || oldHardcodedIds.includes(testRestaurantId)) {",
+									"    console.warn('⚠️ No valid testRestaurantId found.');",
+									"    console.warn('   Collection variable:', pm.collectionVariables.get('testRestaurantId'));",
+									"    console.warn('   Environment variable:', pm.environment.get('testRestaurantId'));",
+									"    throw new Error('testRestaurantId is not set or is invalid. Please run \"Get Restaurant ID\" first.');",
+									"}",
+									"",
+									"console.log('📝 Creating restaurant credit request for restaurant:', testRestaurantId);",
+									"console.log('   Note: user_id is not required for Supplier requests');",
+									"",
+									"// Inject restaurantId directly into request body to avoid environment variable override",
+									"const requestBody = JSON.parse(pm.request.body.raw);",
+									"requestBody.restaurant_id = testRestaurantId;",
+									"pm.request.body.raw = JSON.stringify(requestBody);",
+									"",
+									"// Ensure variable is set in both places",
+									"pm.collectionVariables.set('testRestaurantId', testRestaurantId);",
+									"pm.environment.set('testRestaurantId', testRestaurantId);",
+									"",
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has discretionary_id\", function () {",
+									"    pm.expect(response).to.have.property('discretionary_id');",
+									"});",
+									"pm.test(\"Status is Pending\", function () {",
+									"    pm.expect(response.status).to.eql('Pending');",
+									"});",
+									"pm.test(\"Category is Full Order Refund\", function () {",
+									"    pm.expect(response.category).to.eql('Full Order Refund');",
+									"});",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
+									"});",
+									"",
+									"pm.environment.set(\"restaurantCreditRequestId\", response.discretionary_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"restaurant_id\": \"{{testRestaurantId}}\",\n    \"category\": \"Full Order Refund\",\n    \"reason\": \"Full refund for order incorrectly processed by restaurant\",\n    \"amount\": 25.00,\n    \"comment\": \"Additional notes for admin review\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Pending Client Request (Leave Open for UI)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate testUserId is set",
+									"let testUserId = pm.collectionVariables.get('testUserId') || pm.environment.get('testUserId');",
+									"if (!testUserId) testUserId = pm.collectionVariables.get('customerUserId') || pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
+									"if (!testUserId || testUserId === 'null' || testUserId === 'undefined') {",
+									"    throw new Error('testUserId/customerUserId not set. Run \"Get Customer User ID\" first (run 000 so a customer exists).');",
+									"}",
+									"",
+									"console.log('📝 Creating pending client request for user:', testUserId);",
+									"",
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has discretionary_id\", function () {",
+									"    pm.expect(response).to.have.property('discretionary_id');",
+									"});",
+									"pm.test(\"Status is Pending\", function () {",
+									"    pm.expect(response.status).to.eql('Pending');",
+									"});",
+									"pm.test(\"Category is Credit Refund\", function () {",
+									"    pm.expect(response.category).to.eql('Credit Refund');",
+									"});",
+									"pm.test(\"Reason is provided\", function () {",
+									"    pm.expect(response).to.have.property('reason');",
+									"    pm.expect(response.reason).to.be.a('string');",
+									"});",
+									"",
+									"pm.environment.set(\"pendingClientRequestId\", response.discretionary_id);",
+									"",
+									"console.log(\"✅ Created pending request for UI testing:\", response.discretionary_id);",
+									"console.log(\"   This request will remain in Pending status for UI display\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Credit Refund\",\n    \"reason\": \"Customer requested refund for service issue\",\n    \"amount\": 20.00,\n    \"comment\": \"Credit refund request - leave pending for UI testing\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Admin Requests",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"pm.test(\"Has at least 2 requests\", function () {",
+									"    pm.expect(response.length).to.be.at.least(2);",
+									"});",
+									"",
+									"// Verify our created requests are in the list",
+									"if (Array.isArray(response)) {",
+									"    const clientRequest = response.find(req => req.discretionary_id === pm.environment.get('clientCreditRequestId'));",
+									"    const restaurantRequest = response.find(req => req.discretionary_id === pm.environment.get('restaurantCreditRequestId'));",
+									"    ",
+									"    pm.test(\"Client request found in admin list\", function () {",
+									"        pm.expect(clientRequest).to.not.be.undefined;",
+									"});",
+									"    pm.test(\"Restaurant request found in admin list\", function () {",
+									"        pm.expect(restaurantRequest).to.not.be.undefined;",
+									"});",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Pending Requests (Super-Admin Enriched)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Super-admin (or admin) token required",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Super Admin\" or \"Login Admin\" first.');",
+									"}",
+									"",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"pm.test(\"Enriched items have created_by and created_by_name\", function () {",
+									"    if (response.length > 0) {",
+									"        const item = response[0];",
+									"        pm.expect(item).to.have.property('created_by');",
+									"        pm.expect(item).to.have.property('created_by_name');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/pending-requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "pending-requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Pending Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Accept either admin or super admin token",
+									"let authToken = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+									"if (!authToken) {",
+									"    authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"}",
+									"if (!authToken) {",
+									"    throw new Error('No auth token found. Please run \"Login Admin\" or \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Amount updated to 20.00\", function () {",
+									"    pm.expect(Number(response.amount)).to.eql(20);",
+									"});",
+									"pm.test(\"Comment updated\", function () {",
+									"    pm.expect(response.comment).to.eql('Updated amount based on customer feedback');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 20.00,\n    \"comment\": \"Updated amount based on customer feedback\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/{{clientCreditRequestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", "{{clientCreditRequestId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔍 Super Admin Operations",
+			"item": [
+				{
+					"name": "Get Pending Requests",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// This endpoint requires super admin token",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    throw new Error('superAdminAuthToken is not set. Please run \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"pm.test(\"Has at least 2 pending requests\", function () {",
+									"    pm.expect(response.length).to.be.at.least(2);",
+									"});",
+									"",
+									"// Verify all requests are pending",
+									"if (Array.isArray(response)) {",
+									"    response.forEach(request => {",
+									"        pm.test(`Request ${request.discretionary_id} is pending`, function () {",
+									"            pm.expect(request.status).to.eql('Pending');",
+									"        });",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "pending-requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Request Details",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate clientCreditRequestId is set",
+									"const clientCreditRequestId = pm.environment.get('clientCreditRequestId');",
+									"if (!clientCreditRequestId || clientCreditRequestId === 'null' || clientCreditRequestId === 'undefined') {",
+									"    throw new Error('clientCreditRequestId is not set. Please run \"Create Client Credit Request\" first.');",
+									"}",
+									"",
+									"console.log('📝 Getting request details for:', clientCreditRequestId);",
+									"",
+									"// This endpoint requires super admin token",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    throw new Error('superAdminAuthToken is not set. Please run \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has all required fields\", function () {",
+									"    pm.expect(response).to.have.property('discretionary_id');",
+									"    pm.expect(response).to.have.property('user_id');",
+									"    pm.expect(response).to.have.property('category');",
+									"    pm.expect(response).to.have.property('reason');",
+									"    pm.expect(response).to.have.property('amount');",
+									"    pm.expect(response).to.have.property('status');",
+									"});",
+									"pm.test(\"Status is Pending\", function () {",
+									"    pm.expect(response.status).to.eql('Pending');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}"]
+						}
+					}
+				},
+				{
+					"name": "Approve Client Credit Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate clientCreditRequestId is set",
+									"const clientCreditRequestId = pm.environment.get('clientCreditRequestId');",
+									"if (!clientCreditRequestId || clientCreditRequestId === 'null' || clientCreditRequestId === 'undefined') {",
+									"    throw new Error('clientCreditRequestId is not set. Please run \"Create Client Credit Request\" first.');",
+									"}",
+									"",
+									"console.log('📝 Approving request:', clientCreditRequestId);",
+									"",
+									"// This endpoint requires super admin token",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    throw new Error('superAdminAuthToken is not set. Please run \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has approval_id\", function () {",
+									"    pm.expect(response).to.have.property('approval_id');",
+									"});",
+									"pm.test(\"Resolution is Approved\", function () {",
+									"    pm.expect(response.resolution).to.eql('Approved');",
+									"});",
+									"pm.test(\"Status is Active\", function () {",
+									"    pm.expect(response.status).to.eql('Active');",
+									"});",
+									"",
+									"pm.environment.set(\"clientApprovalResolutionId\", response.approval_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"resolution_comment\": \"Request approved based on customer service logs and delivery confirmation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}/approve",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}", "approve"]
+						}
+					}
+				},
+				{
+					"name": "Reject Restaurant Credit Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate restaurantCreditRequestId is set",
+									"const restaurantCreditRequestId = pm.environment.get('restaurantCreditRequestId');",
+									"if (!restaurantCreditRequestId || restaurantCreditRequestId === 'null' || restaurantCreditRequestId === 'undefined') {",
+									"    throw new Error('restaurantCreditRequestId is not set. Please run \"Create Restaurant Credit Request\" first.');",
+									"}",
+									"",
+									"console.log('📝 Rejecting request:', restaurantCreditRequestId);",
+									"",
+									"// This endpoint requires super admin token",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    throw new Error('superAdminAuthToken is not set. Please run \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response has approval_id\", function () {",
+									"    pm.expect(response).to.have.property('approval_id');",
+									"});",
+									"pm.test(\"Resolution is Rejected\", function () {",
+									"    pm.expect(response.resolution).to.eql('Rejected');",
+									"});",
+									"pm.test(\"Has rejection reason\", function () {",
+									"    pm.expect(response.resolution_comment).to.include('Insufficient evidence');",
+									"});",
+									"",
+									"pm.environment.set(\"restaurantRejectionResolutionId\", response.approval_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"resolution_comment\": \"Insufficient evidence provided for the quality complaint. Please provide delivery timestamps and customer photos.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{restaurantCreditRequestId}}/reject",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{restaurantCreditRequestId}}", "reject"]
+						}
+					}
+				},
+				{
+					"name": "Get All Requests Overview",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// This endpoint requires super admin token",
+									"let authToken = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
+									"if (!authToken) {",
+									"    throw new Error('superAdminAuthToken is not set. Please run \"Login Super Admin\" first.');",
+									"}",
+									"",
+									"// Set Authorization header directly",
+									"pm.request.headers.add({",
+									"    key: 'Authorization',",
+									"    value: 'Bearer ' + authToken",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"",
+									"// Find our test requests",
+									"if (Array.isArray(response)) {",
+									"    const clientRequest = response.find(req => req.discretionary_id === pm.environment.get('clientCreditRequestId'));",
+									"    const restaurantRequest = response.find(req => req.discretionary_id === pm.environment.get('restaurantCreditRequestId'));",
+									"    ",
+									"    pm.test(\"Client request is approved\", function () {",
+									"        pm.expect(clientRequest.status).to.eql('Approved');",
+									"        pm.expect(clientRequest.resolved_date).to.not.be.null;",
+									"    });",
+									"    pm.test(\"Restaurant request is rejected\", function () {",
+									"        pm.expect(restaurantRequest.status).to.eql('Rejected');",
+									"        pm.expect(restaurantRequest.resolved_date).to.not.be.null;",
+									"    });",
+									"} else {",
+									"    console.error('⚠️ Response is not an array:', typeof response);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "❌ Error Scenarios",
+			"item": [
+				{
+					"name": "Create Request - Invalid Amount",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", function () {",
+									"    pm.response.to.have.status(422);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Error message mentions amount\", function () {",
+									"    // Pydantic validation errors can be in detail string or array format",
+									"    const errorText = JSON.stringify(response);",
+									"    pm.expect(errorText.toLowerCase()).to.include('amount');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Invalid negative amount test\",\n    \"amount\": -5.00,\n    \"comment\": \"This should fail validation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Request - Invalid Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", function () {",
+									"    pm.response.to.have.status(422);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Error message mentions category\", function () {",
+									"    // Pydantic validation errors can be in detail string or array format",
+									"    const errorText = JSON.stringify(response);",
+									"    pm.expect(errorText.toLowerCase()).to.include('category');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"invalid_category\",\n    \"reason\": \"This should fail because category is not a valid enum value\",\n    \"amount\": 10.00,\n    \"comment\": \"Invalid category test\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Approve Non-Existent Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Error message mentions not found\", function () {",
+									"    pm.expect(response.detail).to.include('Discretionary request');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"resolution_comment\": \"Testing non-existent request\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/00000000-0000-0000-0000-000000000000/approve",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "00000000-0000-0000-0000-000000000000", "approve"]
+						}
+					}
+				},
+				{
+					"name": "Approve Already Processed Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test(\"Error message mentions status\", function () {",
+									"    pm.expect(response.detail).to.include('Cannot approve request with status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"resolution_comment\": \"Trying to approve already approved request\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}/approve",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}", "approve"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔒 Authorization Tests",
+			"item": [
+				{
+					"name": "Admin Access Pending Requests Endpoint",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "pending-requests", ""]
+						}
+					}
+				},
+				{
+					"name": "Unauthorized Access",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401\", function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
+						}
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set default values if not already set",
+					"if (!pm.environment.get('baseUrl')) {",
+					"    pm.environment.set('baseUrl', 'http://localhost:8000');",
+					"}",
+					"",
+					"// testUserId will be set by 'Get Customer User ID' request",
+					"// testRestaurantId will be set by 'Get Restaurant ID' request",
+					"// No need to set fallbacks - the requests will validate they're set"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test cleanup and validation",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"pm.test('Response has proper content type', function () {",
+					"    if (pm.response.code !== 204) {",
+					"        pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"    }",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "superAdminUsername",
+			"value": "superadmin",
+			"type": "string",
+			"description": "Seeded super admin (minimal seed)"
+		},
+		{
+			"key": "superAdminPassword",
+			"value": "SuperAdmin1!",
+			"type": "string"
+		},
+		{
+			"key": "adminUsername",
+			"value": "",
+			"type": "string",
+			"description": "Set by 'Create Admin User' request"
+		},
+		{
+			"key": "adminPassword",
+			"value": "",
+			"type": "string",
+			"description": "Set by 'Create Admin User' request (e.g. Admin123!)"
+		},
+		{
+			"key": "adminUserId",
+			"value": "",
+			"type": "string",
+			"description": "Set by 'Create Admin User' request"
+		},
+		{
+			"key": "testUserId",
+			"value": "",
+			"type": "string",
+			"description": "Set automatically by 'Get Customer User ID' request"
+		},
+		{
+			"key": "testRestaurantId",
+			"value": "",
+			"type": "string",
+			"description": "Set automatically by 'Get Restaurant ID' request"
+		}
+	]
+}

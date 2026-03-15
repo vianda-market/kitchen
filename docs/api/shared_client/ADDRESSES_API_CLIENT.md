@@ -1,0 +1,834 @@
+# Address API – Client Guide (B2C and B2B)
+
+**Document Version**: 2.0  
+**Date**: March 2026  
+**For**: Frontend Team (Web, iOS, Android)
+
+---
+
+## Overview
+
+The Address API provides **address autocomplete** (suggest) and **create** endpoints. All clients call the same REST API; no Google API keys or SDKs on the client.
+
+**Address creation flows**:
+1. **Place ID flow** (recommended): User selects from suggest → client sends `place_id` on create → backend fetches Place Details and stores full address + geolocation.
+2. **Structured flow**: Client sends full address fields (street_name, city, province, country_code, etc.) → backend geocodes for restaurant/customer addresses.
+
+**Key principles**:
+- **Timezone** is auto-calculated from `country_code` and `province`; users do not enter it.
+- **Address display** varies by market; use `address_display` or `formatted_address` from the API.
+- **country_code** is ISO 3166-1 alpha-2 only (e.g. `AR`, `US`). Case-insensitive input is normalized to uppercase.
+
+---
+
+## Address Autocomplete (Suggest)
+
+### Endpoint
+
+```http
+GET /api/v1/addresses/suggest?q=...&country=...&limit=5
+```
+
+**Query parameters**
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `q`       | string | Yes      | Partial address input (e.g. `"Av. Corrientes 1"`). Minimum 3 characters recommended. |
+| `country` | string | No       | Country code (alpha-2, e.g. `AR`) or country name (e.g. `Argentina`) to restrict/bias results |
+| `province`| string | No       | Province/state to narrow results (use with country and city) |
+| `city`    | string | No       | City name to bias relevance (optional). Suggestions are not restricted to city bounds; they cover the entire country. |
+| `limit`   | int    | No       | Max suggestions (default 5, max 10) |
+
+**Response**
+
+```json
+{
+  "suggestions": [
+    {
+      "place_id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+      "display_text": "Av. Corrientes 1234, C1043 CABA, Argentina"
+    }
+  ]
+}
+```
+
+- **place_id**: Google Place ID. Send this on `POST /api/v1/addresses/` when the user selects a suggestion.
+- **display_text**: Human-readable text for the dropdown (e.g. "123 Main St, City, Country").
+
+**Rate limiting**: 60 requests per user per 60 seconds. On 429, detail: `"Too many address search requests. Please try again in 60 seconds."` Clients should debounce and avoid unnecessary calls.
+
+**Client flow** (place ID path):
+1. User focuses the address field and types (debounce ~300ms, min 3 chars).
+2. Call `GET /api/v1/addresses/suggest?q=...&country=...`.
+3. Show `display_text` in a dropdown.
+4. On selection, store `place_id`.
+5. On submit, send `POST /api/v1/addresses/` with `place_id` (and context: institution_id, user_id for B2B; omit for B2C). **Do not send coordinates**; the backend fetches Place Details.
+
+**Validate endpoint removed** (March 2026): `POST /api/v1/addresses/validate` no longer exists. All address creation uses suggest → place_id → create, or structured create with full fields.
+
+---
+
+## Country Input
+
+**Who provides the country?** The client sends it in the request. The backend resolves name → alpha-2 and sends it to Google.
+
+- **Dropdown (recommended)**: Use **GET /api/v1/markets** (or GET /api/v1/countries) for the list. When the user picks e.g. "Argentina", send `country_code: "AR"` (alpha-2).
+- **Free-text**: For suggest, send the typed value as the `country` query param (e.g. `country=Argentina`). The backend resolves names to codes.
+
+---
+
+## Create Address
+
+```http
+POST /api/v1/addresses/
+```
+
+**Two paths**:
+
+1. **Place ID path** (recommended, required in production): Send `place_id` from suggest; optionally `country` to bias/resolve. Backend fetches Place Details and creates address + geolocation. No coordinates needed from client.
+2. **Structured path** (development only): Send full address fields (`street_name`, `city`, `province`, `country_code`, etc.). Backend geocodes for restaurant/customer addresses. **In production** (`DEV_MODE=false`), the API returns **403** for create requests without `place_id`. Use the place ID flow for production. Timezone is **NOT** required; it is derived from `country_code` and `province`.
+
+**Request Body** — Place ID path example:
+
+```json
+{
+  "place_id": "ChIJB_KWWvXKvJURs8VJkFcGiNE",
+  "country": "AR"
+}
+```
+
+**Request Body** — Structured path (timezone is **NOT** required). Provide **either** `country_code` **or** `country` (country name):
+
+**B2C (Customer only):** You may **omit** `institution_id` and `user_id`. The backend sets both from the authenticated user (JWT). For **Comensal** creating home or billing (no employer_id), `user_id` is set from the current user. For employer addresses, `user_id` is not set. Your user must have `institution_id` in the token (e.g. Vianda Customers); otherwise the API returns **400**.
+
+**B2B (Supplier / Employee):** You **must** send `institution_id`. `user_id` is **optional** — Supplier/Employee may omit it for restaurant, entity, or employer addresses.
+
+Example with both set (B2B or optional B2C):
+
+```json
+{
+  "institution_id": "uuid",
+  "user_id": "uuid",
+  "address_type": ["Restaurant"],
+  "country_code": "AR",
+  "province": "Buenos Aires",
+  "city": "Buenos Aires",
+  "postal_code": "C1000",
+  "street_type": "Ave",
+  "street_name": "Corrientes",
+  "building_number": "1234",
+  "apartment_unit": "5A",
+  "floor": "5"
+}
+```
+
+If your form has only a **country** field (e.g. "Argentina"), send **`country`** instead of `country_code`; the backend derives the code from the name.
+
+#### `address_type` is **never** a parameter (derived only)
+
+**Clients must NOT send `address_type` on create or update.** The backend derives it exclusively from linkages. The API ignores it if sent. Responses include `address_type` for display only.
+
+**Derivation rules:**
+
+| Linkage / flow | Derived type(s) |
+|----------------|-----------------|
+| Restaurant (address assigned by Supplier) | Restaurant |
+| Institution entity | Entity Address, Entity Billing |
+| Employer (employer_info.address_id or employer_id on address) | Customer Employer |
+| Payment method (billing) | Customer Billing |
+| Comensal home flow (no employer/pm link) | Customer Home |
+
+In the UI, show `address_type` as read-only.
+
+#### Why `address_type` is an array in responses
+
+One address can have **multiple types** when it serves several roles (e.g. same address used as Customer Home and Customer Billing). The backend computes the list from linkages.
+
+**Valid values** (from the enum): `"Restaurant"`, `"Entity Billing"`, `"Entity Address"`, `"Customer Home"`, `"Customer Billing"`, `"Customer Employer"`.
+
+**street_type** must be a value from `GET /api/v1/enums/` `street_type` (e.g. `St`, `Ave`, `Blvd`, `Rd`, `Dr`, `Ln`, `Way`, `Ct`, `Pl`, `Cir`).
+
+#### Customer Employer addresses: floor and apartment_unit (per-user)
+
+Employer addresses **support** `floor` and `apartment_unit`. They are stored per-user in `address_subpremise`; the address core (street, city, etc.) remains shared for coworker scoping (e.g. "Offer to pick up" lists coworkers at the same office).
+
+**Client behavior:**
+- **Show** floor and apartment unit fields for the user's assigned employer address. Use them for pickup instructions (e.g. "Floor 5, Unit 5A").
+- **Set at assign time:** `PUT /api/v1/users/me/employer` accepts optional `floor` and `apartment_unit` in the request body with `employer_id` and `address_id`.
+- **Update later:** `PUT /api/v1/addresses/{address_id}` with body `{ "floor": "...", "apartment_unit": "..." }` when the address is the user's assigned employer address. Customers can only edit subpremise fields (floor, unit, is_default) on their employer address; address core edits remain forbidden.
+
+**user_id** on address: Required only for Customer Comensal creating home or billing. For employer addresses (B2C or B2B) and for Supplier/Employee creating restaurant/entity addresses, `user_id` is optional and often null. Responses may include `user_id: null` for such addresses.
+
+**User and institution**: When `user_id` is provided, it must belong to the same institution as the address (`institution_id`). The backend returns **400** if they do not match.
+
+- **B2C (Customer):** Do **not** send `institution_id` or `user_id`; the backend sets them per rules above. If the user's JWT has no `institution_id` (misconfiguration), the API returns **400**.
+- **B2B (Supplier/Employee):** Send `institution_id` (required). `user_id` is optional.
+
+#### Address types by role (form UX)
+
+The backend **enforces** which address types each role can create or update. To avoid **403** and poor UX, **only show the allowed types** in your create/edit address form.
+
+| Role | Allowed address types | Form behavior |
+|------|----------------------|----------------|
+| **Customer** (Comensal, Employer) | **Customer Home**, **Customer Billing**, **Customer Employer** only | B2C: Show only "Home", "Billing", "Employer" (or combined). Do **not** offer "Restaurant" or entity types. Sending `Restaurant` or entity types returns **403**. |
+| **Supplier** (Admin, Manager) | **Restaurant**, **Entity Billing**, **Entity Address**; in employer-address flows also **Customer Employer** | B2B: For restaurant/entity forms, show only Restaurant, Entity Billing, Entity Address. For employer-address flows, also allow Customer Employer. Supplier Operator cannot create/edit addresses (read-only). |
+| **Employee** | All types | B2B admin: Can show all types when creating/editing addresses on behalf of any context. |
+
+#### Address types by institution type
+
+**Customer Home**, **Customer Billing**, and **Customer Employer** are allowed **only for Customer institutions** (e.g. Vianda Customers). They are **not** allowed for Supplier or Employee institutions (e.g. institutions that own restaurants). The backend returns **400** if you send these types with an institution that is not a Customer institution.
+
+**Restaurant**, **Entity Billing**, and **Entity Address** are allowed only for **Supplier or Employee** institutions. They are **not** allowed for Customer institutions. The backend returns **400** if you send these types with a Customer institution.
+
+So: when creating/editing an address, ensure the **address_type** list matches the **institution type** of the address’s `institution_id` (Customer institution → customer address types only; Supplier/Employee institution → entity/restaurant types only).
+
+- **B2C**: Restrict the address-type selector to **Customer Home**, **Customer Billing**, **Customer Employer**. One address can have multiple of these (e.g. Home + Billing). Never send `Restaurant` or entity types for a logged-in Customer.
+- **B2B**: For Supplier users, restrict to the allowed types above. For Employee users, you may offer all types when the context requires it.
+
+#### Customer Employer: floor and apartment_unit (per-user)
+
+Employer addresses support per-user `floor` and `apartment_unit` stored in `address_subpremise`. Building-level grouping for coworker scoping is preserved: users in the same building share the same `employer_address_id` and can see each other in the "Offer to pick up" coworker list. See "Customer Employer addresses: floor and apartment_unit (per-user)" above for how to set and update these fields.
+
+**Client behavior:**
+- **Assign:** When assigning via `PUT /users/me/employer`, optionally send `floor` and `apartment_unit` in the body to store them for the current user at that address.
+- **Update:** When the address is the user's assigned employer address, `PUT /addresses/{address_id}` with `floor` and/or `apartment_unit` to update the user's subpremise data.
+- **Display:** Show floor and apartment_unit fields for the user's assigned employer address; responses include them when stored.
+
+**Other address types** (Customer Home, Customer Billing, Restaurant, etc.) continue to accept and store `floor` and `apartment_unit` as before.
+
+**Use home address as billing address:**  
+When the user checks “Also use this address for billing”, send **both** types in the array:
+
+```json
+"address_type": ["Customer Home", "Customer Billing"]
+```
+
+- **Create / Update:** Do **not** send `address_type`. The backend derives it from linkages and returns it in responses for display only. In the UI, show `address_type` as read-only.
+
+No separate “billing address” record is required when home and billing are the same; one address with two types is enough.
+
+**Response** (timezone is auto-calculated):
+
+```json
+{
+  "address_id": "uuid",
+  "institution_id": "uuid",
+  "user_id": "uuid",
+  "address_type": ["Restaurant"],
+  "country_code": "AR",
+  "country_name": "Argentina",
+  "province": "Buenos Aires",
+  "city": "Buenos Aires",
+  "postal_code": "C1000",
+  "street_type": "Ave",
+  "street_name": "Corrientes",
+  "building_number": "1234",
+  "apartment_unit": "5A",
+  "floor": "5",
+  "timezone": "America/Argentina/Buenos_Aires",
+  "is_default": false,
+  "is_archived": false,
+  "status": "Active",
+  "created_date": "2026-02-10T12:00:00Z",
+  "modified_date": "2026-02-10T12:00:00Z"
+}
+```
+
+### Update Address
+
+```http
+PUT /api/v1/addresses/{address_id}
+```
+
+**Address core is immutable.** Street, city, province, country, etc. cannot be changed after create. To change the street or location, create a new address and delete/archive the old one.
+
+**Only these fields are editable** (stored per-user in `address_subpremise`):
+- `floor`
+- `apartment_unit`
+- `is_default`
+
+**Request Body** (all optional):
+
+```json
+{
+  "floor": "5",
+  "apartment_unit": "5A",
+  "is_default": true
+}
+```
+
+**Default address:** Optional. Eligible for default: Customer Home, Customer Employer (work), or one "Customer Other". **Customer Billing is NOT eligible.** At most one `is_default=true` per user (Comensal only).
+
+**City fallback:** When a Comensal has no default address, Explore uses the city default location (lat/lng per supported city) for map center. App use is never blocked due to missing default.
+
+#### Employer address protection (Customers)
+
+**Customers cannot edit or delete employer-owned addresses.** An address is employer-owned when `employer_id` is set (e.g. created via `POST /employers/` or `POST /employers/{id}/addresses`).
+
+- **PUT /api/v1/addresses/{address_id}** — If the address has `employer_id` and the user is a Customer → **403 Forbidden**
+- **DELETE /api/v1/addresses/{address_id}** — If the address has `employer_id` and the user is a Customer → **403 Forbidden**
+
+**403 response:**
+```json
+{
+  "detail": "Customers cannot edit or delete employer addresses. Employer addresses are shared and managed by the employer."
+}
+```
+
+**UI:** Do not show Edit/Delete for employer addresses when the user is a Customer. Employees and Suppliers (Admin, Manager) can edit/delete employer addresses. See [EMPLOYER_MANAGEMENT_B2C.md](../b2c_client/EMPLOYER_MANAGEMENT_B2C.md) (B2C) and [EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md](../b2b_client/EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md) (B2B).
+
+---
+
+## List and fetch addresses
+
+### GET /addresses/ and GET /addresses/enriched/
+
+```http
+GET /api/v1/addresses/?include_archived=false
+GET /api/v1/addresses/enriched/?include_archived=false
+```
+
+**Customers:** The API returns addresses using role-specific logic:
+
+| Address type | What is returned |
+|--------------|------------------|
+| **Home and billing** | Addresses created by the user (`user_id` = current user). |
+| **Employer** | **Only** the address assigned as `employer_address_id` (from `user_info`). If the user picked an employer address created by someone else, it **is** included. If the user changed their employer address, the previous one is **excluded** (no longer shown). |
+
+**Why this matters:** Previously, the list only returned addresses where `user_id` matched the current user. When a Customer picked an employer address created by another user (e.g. during employer assignment), that address did not appear in their list. The API now includes the user's assigned `employer_address_id` even when they did not create it, and excludes employer addresses they created but no longer use.
+
+**Client implementation note:** The employer address in the list is determined by `user_info.employer_address_id`. After a successful `PUT /users/me/employer`, refetch `user_info` (e.g. `GET /users/me` or your auth/user-info endpoint) before calling `GET /addresses/`. Otherwise the newly assigned employer address may not appear until the next refresh.
+
+**B2B (Supplier/Employee):** The list is scoped by institution. Use `institution_id` query param to filter when needed.
+
+### GET /addresses/{address_id}
+
+```http
+GET /api/v1/addresses/{address_id}
+```
+
+**Customers:** Access is allowed when:
+- The address was created by the current user (`user_id` = current user), or
+- The address is the user's assigned employer address (`address_id` = user's `employer_address_id` from `user_info`).
+
+So a Customer can fetch their employer address by ID even if another user created it.
+
+### Employer address picker: GET /employers/{employer_id}/addresses
+
+When the user selects an employer and needs to **pick which address** to assign, use:
+
+```http
+GET /api/v1/employers/{employer_id}/addresses?city_id={city_id}
+```
+
+**Returns:** All addresses linked to that employer. Optional `city_id` filters to addresses in that city. Each item includes `address_id`, `street_name`, `city`, `province`, `postal_code`, etc.
+
+**Use case:** During employer assignment, the user selects an employer, then picks one address from this list. The client must pass the selected `address_id` to `PUT /api/v1/users/me/employer` with body `{ "employer_id": "...", "address_id": "..." }`. See [EMPLOYER_MANAGEMENT_B2C.md](../b2c_client/EMPLOYER_MANAGEMENT_B2C.md).
+
+**Important:** The address the user picks from this list may have been created by another user. After assignment, that address becomes the user's `employer_address_id` and will appear in `GET /addresses/` and `GET /addresses/enriched/` for that user.
+
+---
+
+## Address Display Formatting Per Market
+
+Address display order differs by market. The backend provides pre-formatted strings so clients display addresses correctly without building them from raw parts.
+
+### Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **`address_display`** | Pre-formatted **street line only** (street_type, street_name, building_number in market order). Use for single-line street display. | `"123 Main St"` or `"Av Santa Fe 100"` |
+| **`formatted_address`** | Full address: street + city + postal_code, joined with ` · `. Use for pickers, dropdowns, or full-address display. | `"123 Main St · San Francisco · 94103"` |
+
+### Market conventions
+
+| Market | Street order | Example |
+|--------|--------------|---------|
+| **US** | building_number, street_name, street_type | `123 Main St` |
+| **AR, PE** | street_type, street_name, building_number | `Av Santa Fe 100` |
+
+Other markets use a default order (street_name, building_number, street_type) if not explicitly configured.
+
+### Where these fields appear
+
+| Endpoint / context | `address_display` | `formatted_address` |
+|--------------------|------------------|---------------------|
+| `GET /restaurants/by-city` (restaurant list/map) | ✅ | — |
+| `GET /addresses/enriched/` | — | ✅ |
+| Employer enriched | ✅ | — |
+| `GET /plates/enriched/` and `GET /plates/enriched/{id}` | ✅ | — |
+| `GET /plate-pickup/pending` (enriched) | ✅ | — |
+
+**Client guidance:** Prefer `address_display` or `formatted_address` over building addresses from `street_type`, `street_name`, `building_number` manually. The backend applies market-specific ordering.
+
+---
+
+## View on Map (Latitude / Longitude)
+
+**B2C clients** (e.g. Explore, plate detail): Plates and restaurants include `latitude` and `longitude` when geolocation exists. Use them to implement "View on map" or similar actions.
+
+| Endpoint / context | Fields |
+|--------------------|--------|
+| `GET /plates/enriched/` and `GET /plates/enriched/{id}` | `latitude`, `longitude` |
+| `GET /restaurants/by-city` | `latitude`, `longitude` |
+
+**URL format** for opening Google Maps:
+
+```
+https://www.google.com/maps?q={latitude},{longitude}
+```
+
+Example: `https://www.google.com/maps?q=-34.6037,-58.3816`
+
+When `latitude` or `longitude` is `null`, do not show a map link. See [PLATE_API_CLIENT.md](PLATE_API_CLIENT.md#enriched-plate-endpoint) for the enriched plate response structure.
+
+---
+
+## Timezone Deduction Logic
+
+### Single-Timezone Countries
+
+For countries with one timezone, the backend uses the default timezone from the `market_info` table.
+
+**Examples**:
+- **Argentina (AR)**: All provinces → `America/Argentina/Buenos_Aires`
+- **Peru (PE)**: All provinces → `America/Lima`
+- **Chile (CL)**: All provinces → `America/Santiago`
+
+**Frontend Behavior**:
+- User selects `country_code` (e.g., "AR")
+- User enters `province` (e.g., "Buenos Aires")
+- Backend automatically sets timezone to country default
+- ✅ No additional user input needed
+
+### Multi-Timezone Countries
+
+For countries with multiple timezones, the backend uses province/state mappings.
+
+**Examples**:
+
+**United States (US)**:
+- `province: "California"` → `America/Los_Angeles` (Pacific Time)
+- `province: "New York"` → `America/New_York` (Eastern Time)
+- `province: "Texas"` → `America/Chicago` (Central Time)
+- `province: "Arizona"` → `America/Phoenix` (Mountain Time, no DST)
+
+**Brazil (BR)**:
+- `province: "Sao Paulo"` → `America/Sao_Paulo`
+- `province: "Amazonas"` → `America/Manaus`
+- `province: "Bahia"` → `America/Bahia`
+
+**Canada (CA)**:
+- `province: "Ontario"` → `America/Toronto` (Eastern Time)
+- `province: "British Columbia"` → `America/Vancouver` (Pacific Time)
+- `province: "Alberta"` → `America/Edmonton` (Mountain Time)
+
+**Frontend Behavior**:
+- User selects `country_code` (e.g., "US")
+- User enters `province` (e.g., "California" or "CA")
+- Backend automatically sets timezone to province-specific value
+- ✅ No additional user input needed
+
+---
+
+## Province Name Normalization
+
+The backend accepts multiple formats for province names:
+
+**State Full Names**:
+- "California", "New York", "Texas"
+
+**State Codes**:
+- "CA", "NY", "TX"
+
+**Case Insensitive**:
+- "california", "CALIFORNIA", "California" → all resolve to `America/Los_Angeles`
+
+**With/Without Suffixes**:
+- "New York State" → normalized to "New York"
+- "Texas State" → normalized to "Texas"
+
+---
+
+## Edge Cases
+
+### 1. Province Not Found
+
+**Scenario**: User enters an invalid or unrecognized province for a multi-timezone country.
+
+**Backend Behavior**:
+- Returns the country's **default timezone**
+- Logs a warning (not visible to frontend)
+- Address is **still created successfully**
+
+**Example**:
+
+```json
+{
+  "country_code": "US",
+  "province": "InvalidProvince"
+}
+```
+
+**Response**:
+
+```json
+{
+  "country_code": "US",
+  "province": "InvalidProvince",
+  "timezone": "America/New_York"
+}
+```
+
+**Frontend Behavior**:
+- ✅ Address creation succeeds
+- Display timezone in UI (read-only)
+- Consider showing validation message if province doesn't match known values
+
+### 2. Province Not Provided (Multi-Timezone Country)
+
+**Scenario**: User creates address for multi-timezone country without specifying province.
+
+**Backend Behavior**:
+- Returns the country's **default timezone**
+- Logs a warning
+- Address is **still created successfully**
+
+**Example**:
+
+```json
+{
+  "country_code": "US",
+  "province": ""
+}
+```
+
+**Response**:
+
+```json
+{
+  "country_code": "US",
+  "province": "",
+  "timezone": "America/New_York"
+}
+```
+
+**Frontend Behavior**:
+- ⚠️ Consider making `province` a required field in UI for multi-timezone countries
+- If province is optional in UI, timezone will default to country's default
+
+### 3. Country Not Found
+
+**Scenario**: User provides invalid `country_code`.
+
+**Backend Behavior**:
+- Returns `400 Bad Request`
+- Error message: `"Invalid country_code: {code}. Market not found in market_info."`
+
+**Frontend Behavior**:
+- Validate `country_code` against available markets before submission
+- Use Markets API (`GET /api/v1/markets/`) to fetch valid country codes
+- Display error message to user if invalid code is provided
+
+---
+
+## Frontend Integration
+
+### Web (React/TypeScript)
+
+```typescript
+// Fetch available markets for country dropdown
+const markets = await apiClient.get('/api/v1/markets/');
+
+// User selects country
+const selectedCountry = markets.find(m => m.country_code === 'US');
+
+// Create address (no timezone field)
+const addressData = {
+  institution_id: institutionId,
+  user_id: userId,
+  address_type: ['Restaurant'],
+  country_code: 'US',
+  province: 'California',  // User enters province
+  city: 'San Francisco',
+  postal_code: '94103',
+  street_type: 'St',
+  street_name: 'Market',
+  building_number: '123'
+};
+
+const response = await apiClient.post('/api/v1/addresses/', addressData);
+
+// Display auto-calculated timezone (read-only)
+console.log(`Timezone: ${response.timezone}`); // "America/Los_Angeles"
+```
+
+### iOS (SwiftUI)
+
+```swift
+struct CreateAddressView: View {
+    @State private var countryCode: String = "US"
+    @State private var province: String = ""
+    @State private var calculatedTimezone: String = ""
+    
+    var body: some View {
+        Form {
+            // Country picker (from Markets API)
+            Picker("Country", selection: $countryCode) {
+                ForEach(markets) { market in
+                    Text(market.countryName).tag(market.countryCode)
+                }
+            }
+            
+            // Province text field
+            TextField("Province/State", text: $province)
+            
+            // Display calculated timezone (read-only)
+            Text("Timezone: \(calculatedTimezone)")
+                .foregroundColor(.secondary)
+        }
+        .onSubmit {
+            createAddress()
+        }
+    }
+    
+    func createAddress() async {
+        let addressData = [
+            "country_code": countryCode,
+            "province": province,
+            // ... other fields
+        ]
+        
+        let response = try await apiClient.post("/api/v1/addresses/", body: addressData)
+        calculatedTimezone = response.timezone // "America/Los_Angeles"
+    }
+}
+```
+
+### Android (Jetpack Compose)
+
+```kotlin
+@Composable
+fun CreateAddressScreen(viewModel: AddressViewModel) {
+    var countryCode by remember { mutableStateOf("US") }
+    var province by remember { mutableStateOf("") }
+    var calculatedTimezone by remember { mutableStateOf("") }
+    
+    Column {
+        // Country dropdown (from Markets API)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            // Country options from markets API
+        }
+        
+        // Province text field
+        OutlinedTextField(
+            value = province,
+            onValueChange = { province = it },
+            label = { Text("Province/State") }
+        )
+        
+        // Display calculated timezone (read-only)
+        if (calculatedTimezone.isNotEmpty()) {
+            Text(
+                text = "Timezone: $calculatedTimezone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+        
+        Button(onClick = {
+            viewModel.createAddress(
+                countryCode = countryCode,
+                province = province,
+                // ... other fields
+            )
+        }) {
+            Text("Create Address")
+        }
+    }
+}
+```
+
+---
+
+## UI/UX Recommendations
+
+### 1. Country Selection
+
+- Use dropdown/picker populated from Markets API (`GET /api/v1/markets/`)
+- Display both country name and code (e.g., "Argentina (AR)")
+- Make it a required field
+
+### 2. Province/State Field
+
+- Use text input (not dropdown, too many options)
+- Make it a required field for multi-timezone countries
+- Consider showing placeholder text (e.g., "California", "Buenos Aires")
+- Accept both full names and codes ("CA", "California")
+
+### 3. Timezone Display
+
+- Show the auto-calculated timezone in UI (read-only)
+- Display it after user enters province (optional: live update)
+- Use descriptive format: `"Pacific Time (America/Los_Angeles)"`
+- Do NOT allow manual timezone editing
+
+### 4. Validation
+
+- Validate `country_code` against available markets before submission
+- Consider warning if province doesn't match known values (optional)
+- Handle 400 errors gracefully with user-friendly messages
+
+---
+
+## Supported Countries
+
+### Single-Timezone Countries
+
+Backend automatically uses default from `market_info`:
+
+- **AR** (Argentina): `America/Argentina/Buenos_Aires`
+- **PE** (Peru): `America/Lima`
+- **CL** (Chile): `America/Santiago`
+
+### Multi-Timezone Countries
+
+Backend uses province mappings:
+
+- **US** (United States): 50 states + territories, 6 main timezones
+- **BR** (Brazil): 27 states, 4 main timezones
+- **CA** (Canada): 13 provinces/territories, 6 main timezones
+- **MX** (Mexico): 32 states, 4 main timezones
+
+---
+
+## Common Questions
+
+### Q: Can users manually override the timezone?
+
+**A:** No. Timezone is automatically calculated and read-only. This ensures data consistency and prevents user errors.
+
+### Q: What if the auto-calculated timezone is wrong?
+
+**A:** This indicates either:
+1. Invalid `country_code` (user should select from Markets API)
+2. Invalid `province` (user should double-check spelling)
+3. Missing province mapping (contact backend team to add)
+
+### Q: Do I need to store timezone on the frontend?
+
+**A:** No. Always fetch timezone from the API response. The backend is the source of truth.
+
+### Q: How do I know which countries have multiple timezones?
+
+**A:** Use this rule:
+- **AR, PE, CL**: Single timezone (province is informational only)
+- **US, BR, CA, MX**: Multiple timezones (province determines timezone)
+
+You can also query the backend for this information if needed (future enhancement).
+
+### Q: What happens if I update the province?
+
+**A:** The timezone is automatically recalculated when you update `country_code` or `province` via `PUT /api/v1/addresses/{id}`.
+
+---
+
+## Error Handling
+
+### 403 Forbidden - Manual address create (production)
+
+In production (`DEV_MODE=false`), creating an address **without** `place_id` (i.e. using the structured/manual path) returns **403**:
+
+```json
+{
+  "detail": "Address creation via manual entry is only available in development. Use the address search (place_id) for production."
+}
+```
+
+**Frontend action**: Use the suggest → place_id → create flow. Do not offer manual address entry in production builds.
+
+### 403 Forbidden - Disallowed address type
+
+If the client sends an `address_type` not allowed for the current user's role, the backend returns **403**:
+
+```json
+{
+  "detail": "Customers may only use address types: Customer Home, Customer Billing, Customer Employer. Disallowed: Restaurant."
+}
+```
+
+**Frontend action**: Restrict the address-type options in the form to the allowed types for the current role (see [Address types by role (form UX)](#address-types-by-role-form-ux)). Do not offer or send Restaurant or entity types for Customers, or customer-only types for Suppliers (except Customer Employer in employer context).
+
+### 400 Bad Request - Address type and institution type mismatch
+
+If you send **Customer Home**, **Customer Billing**, or **Customer Employer** for an institution that is **not** a Customer institution (e.g. a Supplier institution that owns restaurants), the backend returns **400**:
+
+```json
+{
+  "detail": "Address types Customer Home, Customer Billing, and Customer Employer are only allowed for Customer institutions (e.g. Vianda Customers). This institution is not a Customer institution."
+}
+```
+
+If you send **Restaurant**, **Entity Billing**, or **Entity Address** for a **Customer** institution, the backend returns **400** with a message that those types are not allowed for Customer institutions.
+
+**Frontend action**: When creating/editing an address, only offer **Customer Home**, **Customer Billing**, **Customer Employer** when the selected institution is a Customer institution (e.g. Vianda Customers). Only offer **Restaurant**, **Entity Billing**, **Entity Address** when the institution is Supplier or Employee. See [Address types by institution type](#address-types-by-institution-type).
+
+### 400 Bad Request - Invalid Country Code
+
+```json
+{
+  "detail": "Invalid country_code: XYZ. Market not found in market_info."
+}
+```
+
+**Frontend Action**: Validate country code before submission using Markets API.
+
+### 400 Bad Request - Missing Country Code
+
+```json
+{
+  "detail": "country_code is required"
+}
+```
+
+**Frontend Action**: Make `country_code` a required field in UI.
+
+---
+
+## Testing Checklist
+
+- [ ] Create address with single-timezone country (AR) → timezone auto-set
+- [ ] Create address with multi-timezone country + valid province (USA, "California") → timezone auto-set
+- [ ] Create address with multi-timezone country + invalid province → timezone defaults, address created
+- [ ] Create address with multi-timezone country + no province → timezone defaults, address created
+- [ ] Update address province → timezone automatically updated
+- [ ] Update address country_code → timezone automatically updated
+- [ ] Display timezone in UI (read-only)
+- [ ] Handle 400 error for invalid country_code gracefully
+
+---
+
+## Migration Notes
+
+**Existing Addresses**: No action needed. Existing addresses keep their current timezones. Only new addresses and updates will use the new auto-deduction logic.
+
+**API Compatibility**: The `timezone` field is still present in responses (read-only). Frontend code doesn't need immediate changes, but should stop sending `timezone` in requests.
+
+---
+
+## Related Documentation
+
+- [Market scope for clients](./MARKET_SCOPE_FOR_CLIENTS.md) - Fetching available countries
+- [Enum Service API](./ENUM_SERVICE_API.md) - Fetching address types and other enums
+- [API Permissions by Role](./API_PERMISSIONS_BY_ROLE.md) - Who can create/update addresses
+- [Employer Management B2C](../b2c_client/EMPLOYER_MANAGEMENT_B2C.md) - Employer search, assign, and address picker flow
+- [Feedback: Employer search and assign](../b2c_client/feedback_for_backend_employer_search_and_assign.md) - Backend implementation status, GET addresses logic for Customers, and troubleshooting
+
+---
+
+**Document Status**: Ready for Frontend Implementation  
+**Backend Implementation**: Complete  
+**Next Steps**: Update frontend to use country_code + province (stop sending timezone)

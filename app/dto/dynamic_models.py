@@ -6,7 +6,7 @@ This demonstrates how to leverage Pydantic's create_model functionality
 to reduce boilerplate and keep DTOs in sync with schemas.
 """
 
-from pydantic import create_model, BaseModel
+from pydantic import ConfigDict, Field, create_model, BaseModel
 from typing import Any, Dict, Type
 from app.schemas.consolidated_schemas import ProductCreateSchema
 
@@ -24,22 +24,24 @@ def create_dto_from_schema(schema_class: Type[BaseModel], table_name: str, id_co
         New DTO class with orm_mode enabled
     """
     
-    # Get field information from schema
+    # Get field information from schema (model_fields in Pydantic v2)
+    from pydantic_core import PydanticUndefined
     fields = {}
-    for field_name, field_info in schema_class.__fields__.items():
+    for field_name, field_info in schema_class.model_fields.items():
+        ann = field_info.annotation
         # Handle optional fields
-        if field_info.default is not None:
-            fields[field_name] = (field_info.type_, field_info.default)
+        if field_info.default is not PydanticUndefined and field_info.default is not None:
+            fields[field_name] = (ann, field_info.default)
         elif field_info.default_factory is not None:
-            fields[field_name] = (field_info.type_, field_info.default_factory())
+            fields[field_name] = (ann, Field(default_factory=field_info.default_factory))
         else:
-            fields[field_name] = (field_info.type_, ...)
+            fields[field_name] = (ann, ...)
     
     # Create the DTO class
     dto_class = create_model(
         f"{schema_class.__name__}DTO",
         **fields,
-        __config__=type('Config', (), {'orm_mode': True})()
+        __config__=ConfigDict(from_attributes=True)
     )
     
     # Add documentation
@@ -64,9 +66,16 @@ def create_extended_dto(base_dto: Type[BaseModel], **additional_fields) -> Type[
     """
     
     # Get existing fields
+    from pydantic_core import PydanticUndefined
     fields = {}
-    for field_name, field_info in base_dto.__fields__.items():
-        fields[field_name] = (field_info.type_, field_info.default)
+    for field_name, field_info in base_dto.model_fields.items():
+        ann = field_info.annotation
+        if field_info.default is not PydanticUndefined and field_info.default is not None:
+            fields[field_name] = (ann, field_info.default)
+        elif field_info.default_factory is not None:
+            fields[field_name] = (ann, Field(default_factory=field_info.default_factory))
+        else:
+            fields[field_name] = (ann, ...)
     
     # Add additional fields
     fields.update(additional_fields)
@@ -75,7 +84,7 @@ def create_extended_dto(base_dto: Type[BaseModel], **additional_fields) -> Type[
     extended_dto = create_model(
         f"Extended{base_dto.__name__}",
         **fields,
-        __config__=type('Config', (), {'orm_mode': True})()
+        __config__=ConfigDict(from_attributes=True)
     )
     
     return extended_dto

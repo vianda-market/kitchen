@@ -17,6 +17,13 @@ load_dotenv()  # This loads environment variables from .env file
 # Track enum registration status per connection
 _enum_registration_cache = {}  # connection_id -> bool
 
+
+def clear_enum_registration_cache() -> None:
+    """Clear the enum registration cache. Call when the connection pool is closed."""
+    global _enum_registration_cache
+    _enum_registration_cache.clear()
+
+
 class EnumArrayAdapter:
     """
     Custom adapter for PostgreSQL enum arrays.
@@ -151,20 +158,16 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('restaurant_holidays_history', 'status'): 'status_enum',
         ('client_transaction', 'status'): 'status_enum',
         ('restaurant_transaction', 'status'): 'status_enum',
-        ('client_payment_attempt', 'status'): 'status_enum',
-        ('institution_payment_attempt', 'status'): 'status_enum',
-        ('discretionary_info', 'status'): 'status_enum',
-        ('discretionary_history', 'status'): 'status_enum',
+        ('discretionary_info', 'status'): 'discretionary_status_enum',
+        ('discretionary_history', 'status'): 'discretionary_status_enum',
         ('discretionary_resolution_info', 'status'): 'status_enum',
+        ('discretionary_resolution_info', 'resolution'): 'discretionary_status_enum',
         ('discretionary_resolution_history', 'status'): 'status_enum',
-        ('fintech_link_info', 'status'): 'status_enum',
-        ('fintech_link_assignment', 'status'): 'status_enum',
+        ('discretionary_resolution_history', 'resolution'): 'discretionary_status_enum',
         ('subscription_info', 'status'): 'status_enum',
         ('subscription_history', 'status'): 'status_enum',
         ('client_bill_info', 'status'): 'status_enum',
         ('client_bill_history', 'status'): 'status_enum',
-        ('institution_bank_account', 'status'): 'status_enum',
-        ('institution_bank_account_history', 'status'): 'status_enum',
         ('geolocation_info', 'status'): 'status_enum',
         ('geolocation_history', 'status'): 'status_enum',
         ('employer_info', 'status'): 'status_enum',
@@ -181,19 +184,29 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('user_info', 'role_name'): 'role_name_enum',
         ('user_history', 'role_type'): 'role_type_enum',
         ('user_history', 'role_name'): 'role_name_enum',
+        ('institution_info', 'institution_type'): 'institution_type_enum',
+        ('institution_history', 'institution_type'): 'institution_type_enum',
         # Transaction type enum - stored directly on transaction tables
         ('restaurant_transaction', 'transaction_type'): 'transaction_type_enum',
         # Kitchen day enum
         ('plate_kitchen_days', 'kitchen_day'): 'kitchen_day_enum',
         ('plate_kitchen_days_history', 'kitchen_day'): 'kitchen_day_enum',
-        ('plate_selection', 'kitchen_day'): 'kitchen_day_enum',
+        ('plate_selection_info', 'kitchen_day'): 'kitchen_day_enum',
         # Pickup type enum
         ('pickup_preferences', 'pickup_type'): 'pickup_type_enum',
+        # Street type enum
+        ('address_info', 'street_type'): 'street_type_enum',
+        ('address_history', 'street_type'): 'street_type_enum',
         # Audit operation enum
         ('restaurant_holidays_history', 'operation'): 'audit_operation_enum',
         ('plate_kitchen_days_history', 'operation'): 'audit_operation_enum',
         ('discretionary_history', 'operation'): 'audit_operation_enum',
         ('discretionary_resolution_history', 'operation'): 'audit_operation_enum',
+        # Bill resolution enum (institution_bill_info, institution_bill_history)
+        ('institution_bill_info', 'resolution'): 'bill_resolution_enum',
+        ('institution_bill_history', 'resolution'): 'bill_resolution_enum',
+        # Favorite entity type enum
+        ('user_favorite_info', 'entity_type'): 'favorite_entity_type_enum',
     }
     
     # Handle enum arrays for address_type (special case - must come before scalar enum handling)
@@ -222,7 +235,12 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
     # Convert UUID to string
     if isinstance(value, UUID):
         return str(value)
-    
+
+    # JSONB columns: psycopg2 cannot adapt Python dict; use Json() for JSONB
+    jsonb_columns = {("geolocation_info", "viewport"), ("geolocation_history", "viewport")}
+    if (table, column) in jsonb_columns and isinstance(value, dict):
+        return psycopg2.extras.Json(value)
+
     return value
 
 def get_db_connection():
@@ -238,42 +256,40 @@ def close_db_connection(conn):
 PRIMARY_KEY_MAPPING = {
     "institution_info": "institution_id",
     "user_info": "user_id",
-    "credential_recovery": "token",
+    "user_messaging_preferences": "user_id",
+    "credential_recovery": "credential_recovery_id",
     "address_info": "address_id",
+    "address_subpremise": "subpremise_id",
     "employer_info": "employer_id",
     "institution_entity_info": "institution_entity_id",
     "restaurant_info": "restaurant_id",
     "qr_code": "qr_code_id",
-    "institution_bank_account": "bank_account_id",
     "discretionary_info": "discretionary_id",
     "discretionary_history": "history_id",
     "discretionary_resolution_info": "approval_id",
     "discretionary_resolution_history": "history_id",
     "product_info": "product_id",
     "plate_info": "plate_id",
-    "plate_selection": "plate_selection_id",
+    "plate_selection_info": "plate_selection_id",
     "plate_pickup_live": "plate_pickup_id",
+    "plate_review_info": "plate_review_id",
+    "user_favorite_info": "favorite_id",
     "plan_info": "plan_id",
     "client_transaction": "transaction_id",
     "subscription_info": "subscription_id",
+    "subscription_payment": "subscription_payment_id",
     "client_bill_info": "client_bill_id",
     "payment_method": "payment_method_id",
-    "credit_card": "credit_card_id",
-    "bank_account": "bank_account_id",
-    "appstore_account": "appstore_account_id",
-    "fintech_wallet": "fintech_wallet_id",
-    "client_payment_attempt": "payment_id",
+    "external_payment_method": "external_payment_method_id",
     "credit_currency_info": "credit_currency_id",
     "restaurant_transaction": "transaction_id",
     "restaurant_balance_info": "restaurant_id",
     "institution_bill_info": "institution_bill_id",
-    "institution_payment_attempt": "payment_id",
+    "institution_settlement": "settlement_id",
     "geolocation_info": "geolocation_id",
-    "fintech_link_info": "fintech_link_id",
     "plate_kitchen_days": "plate_kitchen_day_id",
     "restaurant_holidays": "holiday_id",
-    "fintech_link_assignment": "fintech_link_assignment_id",
-    # role_info, status_info, transaction_type_info tables removed
+    # role_info, status_info, transaction_type_info removed
 }
 
 def _build_insert_sql(table: str, data: dict, connection=None) -> Tuple[str, tuple, str]:
@@ -478,17 +494,31 @@ def _build_update_sql(table: str, data: dict, where: dict, connection=None) -> T
     Returns:
         Tuple of (sql, values)
     """
-    # Build the SET clause - enum casting handled by psycopg2 if types are registered
-    # If not registered, _prepare_value_for_db will handle fallback
-    set_clause = ', '.join(f"{column} = %s" for column in data.keys())
+    # Build the SET clause - use explicit cast for address_info.address_type (enum array)
+    set_parts = []
+    for column in data.keys():
+        if table == 'address_info' and column == 'address_type':
+            set_parts.append('address_type = %s::address_type_enum[]')
+        else:
+            set_parts.append(f'{column} = %s')
+    set_clause = ', '.join(set_parts)
     
     # Build the WHERE clause using the placeholder record
     where_clause = ' AND '.join(f"{column} = %s" for column in where.keys())
     
     sql = f"UPDATE {table} SET {set_clause} WHERE {where_clause}"
     
-    # Prepare values: handle enum arrays and UUIDs properly
-    data_values = tuple(_prepare_value_for_db(v, table, col, connection) for col, v in data.items())
+    # Prepare values: handle enum arrays (address_type) and other types
+    data_values = []
+    for col, v in data.items():
+        if table == 'address_info' and col == 'address_type':
+            if isinstance(v, list):
+                data_values.append([item.value if isinstance(item, Enum) else item for item in v])
+            else:
+                data_values.append(v)
+        else:
+            data_values.append(_prepare_value_for_db(v, table, col, connection))
+    data_values = tuple(data_values)
     where_values = tuple(_prepare_value_for_db(v, table, col, connection) for col, v in where.items())
     values = data_values + where_values
     

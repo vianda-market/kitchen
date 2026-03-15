@@ -300,8 +300,6 @@ CREATE INDEX idx_table_id_archived ON table(record_id, is_archived);
 - ✅ `institution_payment_attempt` - Soft delete implemented
 - ✅ `institution_bill` - Soft delete implemented  
 - ✅ `client_payment_attempt` - Soft delete implemented
-- ✅ `fintech_link` - Soft delete implemented
-- ✅ `fintech_link_transaction` - Soft delete implemented
 - ✅ `plate_pickup` - Soft delete implemented
 - ✅ `plate_selection` - Soft delete implemented
 - ✅ All other routes - Already had DELETE endpoints

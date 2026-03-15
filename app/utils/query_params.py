@@ -9,36 +9,6 @@ from fastapi import Query
 from typing import Optional
 from uuid import UUID
 
-def include_archived_query(entity_name: str = "records") -> bool:
-    """
-    Standard include_archived query parameter for GET endpoints.
-    
-    Args:
-        entity_name: The name of the entity for the description
-        
-    Returns:
-        Query parameter for including archived records
-    """
-    return Query(
-        False, 
-        description=f"Include archived {entity_name} if true"
-    )
-
-def include_archived_optional_query(entity_name: str = "records") -> Optional[bool]:
-    """
-    Optional include_archived query parameter for GET endpoints.
-    
-    Args:
-        entity_name: The name of the entity for the description
-        
-    Returns:
-        Optional query parameter for including archived records
-    """
-    return Query(
-        False, 
-        description=f"Include archived {entity_name}"
-    )
-
 # Common filter query parameters
 def institution_entity_filter() -> Optional[UUID]:
     """Filter by institution entity ID"""
@@ -55,6 +25,14 @@ def restaurant_filter() -> Optional[UUID]:
 def status_filter() -> Optional[str]:
     """Filter by status"""
     return Query(None, description="Filter by status")
+
+def market_filter() -> Optional[UUID]:
+    """Filter by market ID"""
+    return Query(None, description="Filter by market ID")
+
+def currency_code_filter() -> Optional[str]:
+    """Filter by currency code (e.g. ARS, USD)"""
+    return Query(None, description="Filter by currency code (e.g. ARS, USD)")
 
 def limit_query(default: int = 10, min_val: int = 1, max_val: int = 100) -> int:
     """

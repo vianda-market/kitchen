@@ -108,43 +108,38 @@ def handle_get_by_id(
     entity_id: UUID,
     db: psycopg2.extensions.connection,
     entity_name: str,
-    include_archived: bool = False,
     extra_kwargs: Optional[dict] = None
 ) -> Optional[T]:
     """
     Handle get_by_id operations with consistent error handling.
-    
+    Always returns only non-archived records.
+
     Args:
         service_func: The get_by_id service function
         entity_id: ID of the entity to fetch
         db: Database connection
         entity_name: Name of the entity (e.g., "user", "product")
-        include_archived: Whether to include archived records
-        
+        extra_kwargs: Optional kwargs to pass to service_func (e.g. scope)
+
     Returns:
         Entity DTO or None if not found
-        
+
     Raises:
         HTTPException with 404 status if entity not found
     """
     extra_kwargs = extra_kwargs or {}
 
     try:
-        if include_archived:
-            entity = service_func(entity_id, db, **extra_kwargs)
-            log_info(f"Queried {entity_name} by id (including archived): {entity_id}")
-        else:
-            # Use get_by_id_non_archived if available, otherwise use get_by_id
-            if hasattr(service_func, '__self__'):
-                # Method call - try to get non-archived version
-                service_instance = service_func.__self__
-                if hasattr(service_instance, 'get_by_id_non_archived'):
-                    entity = service_instance.get_by_id_non_archived(entity_id, db, **extra_kwargs)
-                else:
-                    entity = service_func(entity_id, db, **extra_kwargs)
+        # Use get_by_id_non_archived if available, otherwise use get_by_id
+        if hasattr(service_func, '__self__'):
+            service_instance = service_func.__self__
+            if hasattr(service_instance, 'get_by_id_non_archived'):
+                entity = service_instance.get_by_id_non_archived(entity_id, db, **extra_kwargs)
             else:
                 entity = service_func(entity_id, db, **extra_kwargs)
-            log_info(f"Queried non-archived {entity_name} by id: {entity_id}")
+        else:
+            entity = service_func(entity_id, db, **extra_kwargs)
+        log_info(f"Queried non-archived {entity_name} by id: {entity_id}")
         
         if entity is None:
             raise HTTPException(status_code=404, detail=f"{entity_name.title()} not found")
@@ -161,28 +156,26 @@ def handle_get_by_id(
 def handle_get_all(
     service_func: Callable[[psycopg2.extensions.connection], list[T]],
     db: psycopg2.extensions.connection,
-    entity_name: str,
-    include_archived: bool = False
+    entity_name: str
 ) -> list[T]:
     """
     Handle get_all operations with consistent error handling.
-    
+    Always returns only non-archived records.
+
     Args:
         service_func: The get_all service function
         db: Database connection
         entity_name: Name of the entity (e.g., "users", "products")
-        include_archived: Whether to include archived records
-        
+
     Returns:
         List of entity DTOs
-        
+
     Raises:
         HTTPException with 500 status if error occurs
     """
     try:
         entities = service_func(db)
-        log_context = "all" if include_archived else "non-archived"
-        log_info(f"Retrieved {log_context} {entity_name}")
+        log_info(f"Retrieved non-archived {entity_name}")
         return entities
     except Exception as e:
         log_error(f"Error retrieving {entity_name}: {e}")

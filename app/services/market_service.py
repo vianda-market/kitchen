@@ -6,6 +6,7 @@ Markets define the countries where the platform operates, each with its own
 currency, timezone, and subscription plans.
 """
 
+from datetime import time
 from typing import List, Optional
 from uuid import UUID
 from fastapi import HTTPException
@@ -14,6 +15,38 @@ from psycopg2.extras import RealDictCursor
 from app.utils.db_pool import get_db_pool
 from app.utils.log import logger
 from app.config import Status
+
+# Sentinel market for global scope (Employee Admin, Super Admin, Supplier Admin). Seeded in seed.sql; editable only by Super Admin.
+GLOBAL_MARKET_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+
+def is_global_market(market_id: Optional[UUID]) -> bool:
+    """Return True if market_id is the Global Marketplace sentinel."""
+    return market_id is not None and market_id == GLOBAL_MARKET_ID
+
+
+def reject_global_market_for_entity(market_id: Optional[UUID], entity_name: str) -> None:
+    """
+    Raise HTTP 400 if market_id is the Global Marketplace sentinel.
+    Global Marketplace is only valid for user assignment (unrestricted query scope);
+    it must not be assigned to plans, subscriptions, or other entities.
+    """
+    if market_id is not None and market_id == GLOBAL_MARKET_ID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Global Marketplace cannot be assigned to {entity_name}. Use a market from GET /api/v1/markets/available.",
+        )
+
+
+def _serialize_market(market: dict) -> dict:
+    """Convert kitchen_close_time (time) to HH:MM string for API responses."""
+    if not market:
+        return market
+    m = dict(market)
+    kct = m.get("kitchen_close_time")
+    if kct is not None and hasattr(kct, "strftime"):
+        m["kitchen_close_time"] = kct.strftime("%H:%M")
+    return m
 
 
 class MarketService:
@@ -48,6 +81,7 @@ class MarketService:
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
+                        m.kitchen_close_time,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -71,7 +105,7 @@ class MarketService:
                 markets = cur.fetchall()
                 
                 logger.info(f"Retrieved {len(markets)} markets (include_archived={include_archived}, status={status})")
-                return [dict(market) for market in markets]
+                return [_serialize_market(dict(market)) for market in markets]
                 
         except Exception as e:
             logger.error(f"Error retrieving markets: {str(e)}")
@@ -103,6 +137,7 @@ class MarketService:
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
+                        m.kitchen_close_time,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -116,7 +151,7 @@ class MarketService:
                 
                 if market:
                     logger.info(f"Retrieved market: {market['country_name']} ({market_id})")
-                    return dict(market)
+                    return _serialize_market(dict(market))
                 else:
                     logger.warning(f"Market not found: {market_id}")
                     return None
@@ -132,7 +167,7 @@ class MarketService:
         Retrieve a market by country code.
         
         Args:
-            country_code: ISO 3166-1 alpha-3 country code (e.g., 'ARG', 'PER')
+            country_code: ISO 3166-1 alpha-2 country code (e.g., 'AR', 'PE')
             
         Returns:
             Market dictionary or None if not found
@@ -151,6 +186,7 @@ class MarketService:
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
+                        m.kitchen_close_time,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -164,7 +200,7 @@ class MarketService:
                 
                 if market:
                     logger.info(f"Retrieved market by country code: {market['country_name']} ({country_code})")
-                    return dict(market)
+                    return _serialize_market(dict(market))
                 else:
                     logger.warning(f"Market not found for country code: {country_code}")
                     return None
@@ -182,18 +218,20 @@ class MarketService:
         credit_currency_id: UUID,
         timezone: str,
         modified_by: UUID,
-        status: Status = Status.ACTIVE
+        status: Status = Status.ACTIVE,
+        kitchen_close_time: Optional[time] = None
     ) -> dict:
         """
         Create a new market.
         
         Args:
             country_name: Full country name
-            country_code: ISO 3166-1 alpha-3 country code
+            country_code: ISO 3166-1 alpha-2 country code
             credit_currency_id: FK to credit_currency_info
             timezone: Timezone for this market
             modified_by: User ID creating the market
             status: Market status (default: Active)
+            kitchen_close_time: Order cutoff time (default: 13:30)
             
         Returns:
             Created market dictionary with enriched currency info
@@ -202,6 +240,7 @@ class MarketService:
         conn = pool.get_connection()
         
         try:
+            kct = kitchen_close_time if kitchen_close_time is not None else time(13, 30)
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     INSERT INTO market_info (
@@ -209,16 +248,18 @@ class MarketService:
                         country_code,
                         credit_currency_id,
                         timezone,
+                        kitchen_close_time,
                         status,
                         modified_by
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING 
                         market_id,
                         country_name,
                         country_code,
                         credit_currency_id,
                         timezone,
+                        kitchen_close_time,
                         is_archived,
                         status,
                         created_date,
@@ -228,6 +269,7 @@ class MarketService:
                     country_code.upper(),
                     str(credit_currency_id),
                     timezone,
+                    kct,
                     status.value,
                     str(modified_by)
                 ))
@@ -245,6 +287,7 @@ class MarketService:
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
+                        m.kitchen_close_time,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -257,12 +300,15 @@ class MarketService:
                 enriched_market = cur.fetchone()
                 
                 logger.info(f"Created market: {country_name} ({country_code}) - {market['market_id']}")
-                return dict(enriched_market)
+                return _serialize_market(dict(enriched_market))
                 
+        except HTTPException:
+            conn.rollback()
+            raise
         except Exception as e:
             conn.rollback()
-            logger.error(f"Error creating market: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error creating market: {str(e)}")
+            from app.utils.error_messages import handle_database_exception
+            raise handle_database_exception(e, "create market")
         finally:
             pool.return_connection(conn)
 
@@ -274,6 +320,7 @@ class MarketService:
         country_code: Optional[str] = None,
         credit_currency_id: Optional[UUID] = None,
         timezone: Optional[str] = None,
+        kitchen_close_time: Optional[time] = None,
         status: Optional[Status] = None,
         is_archived: Optional[bool] = None
     ) -> Optional[dict]:
@@ -287,6 +334,7 @@ class MarketService:
             country_code: Optional new country code
             credit_currency_id: Optional new FK to credit_currency_info
             timezone: Optional new timezone
+            kitchen_close_time: Optional new order cutoff time
             status: Optional new status
             is_archived: Optional archive status
             
@@ -316,6 +364,10 @@ class MarketService:
             if timezone is not None:
                 updates.append("timezone = %s")
                 params.append(timezone)
+            
+            if kitchen_close_time is not None:
+                updates.append("kitchen_close_time = %s")
+                params.append(kitchen_close_time)
             
             if status is not None:
                 updates.append("status = %s")

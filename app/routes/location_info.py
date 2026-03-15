@@ -15,6 +15,7 @@ import psycopg2.extensions
 from app.services.timezone_service import TimezoneService
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning
+from app.utils.country import normalize_country_code
 
 router = APIRouter(
     prefix="/location-info",
@@ -41,12 +42,13 @@ def get_provinces_for_country(country_code: str):
     Get list of supported provinces/states for a multi-timezone country.
     
     Args:
-        country_code: ISO 3166-1 alpha-3 country code (e.g., "USA", "BRA", "CAN")
+        country_code: ISO 3166-1 alpha-2 country code (e.g., "US", "BR", "CA")
         
     Returns:
         List of province/state names and codes. Empty list for single-timezone countries.
     """
-    provinces = TimezoneService.get_supported_provinces(country_code.upper())
+    country = normalize_country_code(country_code)
+    provinces = TimezoneService.get_supported_provinces(country)
     log_info(f"Returning {len(provinces)} provinces for {country_code}")
     return provinces
 

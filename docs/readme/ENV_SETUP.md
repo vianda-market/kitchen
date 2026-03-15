@@ -27,16 +27,26 @@ SMTP_PASSWORD=your-gmail-app-specific-password
 FROM_EMAIL=your-email@gmail.com
 FROM_NAME=Kitchen Backend
 
-# Frontend URL (for password reset links)
-FRONTEND_URL=http://localhost:3000
+# Frontend URLs (B2C on 8081, B2B on 5173 for local dev)
+FRONTEND_URL=http://localhost:8081
+B2B_FRONTEND_URL=http://localhost:5173
 
-# External API Keys
-GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+# External API Keys (Google: per environment; local uses GOOGLE_API_KEY_DEV)
+GOOGLE_API_KEY_DEV=your_google_api_key_for_dev
+# GOOGLE_API_KEY_STAGING=
+# GOOGLE_API_KEY_PROD=
 MERCADOPAGO_CLIENT_ID=your_mercadopago_client_id_here
 MERCADOPAGO_CLIENT_SECRET=your_mercadopago_client_secret_here
 
-# Application Settings
-ENVIRONMENT=dev
+# Stripe (subscription payments; use test keys for sandbox)
+# When PAYMENT_PROVIDER=stripe: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET required
+PAYMENT_PROVIDER=mock
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+# Application Settings (local, dev, staging, prod; local uses GOOGLE_API_KEY_DEV for geocoding/autocomplete)
+ENVIRONMENT=local
 DEBUG=true
 LOG_LEVEL=INFO
 ```
@@ -71,6 +81,10 @@ SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=xxxx xxxx xxxx xxxx  # The 16-char app password (spaces optional)
 FROM_EMAIL=your-email@gmail.com
 ```
+
+### Email tracking logs (optional)
+
+Set `LOG_EMAIL_TRACKING=1` (or `true`/`yes`) to enable email-related logs: SMTP connect, send success, and send failures. **Leave unset (or false) in production**; turn on when debugging email delivery.
 
 ### Gmail Limits
 
@@ -134,8 +148,13 @@ JWT_SECRET=your_generated_secret_here
 
 ### Step 5: Add to `.env`
 
+Use environment-specific keys. For local development, set `GOOGLE_API_KEY_DEV`:
+
 ```bash
-GOOGLE_MAPS_API_KEY=AIza... (your API key)
+ENVIRONMENT=local
+GOOGLE_API_KEY_DEV=AIza... (your API key for dev/local)
+# GOOGLE_API_KEY_STAGING=... (for staging deployments)
+# GOOGLE_API_KEY_PROD=... (for production)
 ```
 
 ### Google Maps Pricing
@@ -172,6 +191,52 @@ MERCADOPAGO_ACCESS_TOKEN=your_access_token
 ```
 
 **Note**: Currently blocked by permissions issue. This will be resolved post-UAT.
+
+---
+
+## 💳 Stripe API Setup (Subscription Payments)
+
+### Step 1: Create Stripe Account
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/)
+2. Sign up or log in
+3. Toggle **Test mode** (top-right) for sandbox development
+
+### Step 2: Get API Keys
+
+1. Go to **Developers → API keys**
+2. Copy **Secret key** (`sk_test_...`) → `STRIPE_SECRET_KEY` in `.env`
+3. Copy **Publishable key** (`pk_test_...`) → `STRIPE_PUBLISHABLE_KEY` (optional; for client-side Stripe Elements)
+
+### Step 3: Webhook (Local Development)
+
+Stripe cannot reach localhost directly. Use the Stripe CLI:
+
+```bash
+stripe listen --forward-to localhost:8000/api/v1/webhooks/stripe
+```
+
+The CLI prints a webhook signing secret (`whsec_...`). Add it to `.env` as `STRIPE_WEBHOOK_SECRET`.
+
+### Step 4: Webhook (Deployed Environment)
+
+1. Go to **Developers → Webhooks → Add endpoint**
+2. **Endpoint URL:** `https://your-api-domain.com/api/v1/webhooks/stripe`
+3. **Events:** Select `payment_intent.succeeded`
+4. Copy the **Signing secret** → `STRIPE_WEBHOOK_SECRET` for that environment
+
+### Step 5: Add to `.env`
+
+```bash
+PAYMENT_PROVIDER=stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+### Test Cards
+
+Use [Stripe test cards](https://stripe.com/docs/testing), e.g. `4242 4242 4242 4242` for success. No real charges in test mode.
 
 ---
 
@@ -218,7 +283,8 @@ The application will automatically fetch credentials from Secrets Manager.
 ENVIRONMENT=dev
 DEBUG=true
 LOG_LEVEL=DEBUG
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:8081
+B2B_FRONTEND_URL=http://localhost:5173
 ```
 
 ### Staging
@@ -228,6 +294,7 @@ ENVIRONMENT=staging
 DEBUG=false
 LOG_LEVEL=INFO
 FRONTEND_URL=https://staging.kitchen.com
+B2B_FRONTEND_URL=https://b2b-staging.kitchen.com
 ```
 
 ### Production
@@ -237,6 +304,7 @@ ENVIRONMENT=prod
 DEBUG=false
 LOG_LEVEL=WARNING
 FRONTEND_URL=https://app.kitchen.com
+B2B_FRONTEND_URL=https://b2b.kitchen.com
 USE_AWS_SECRETS=true
 ```
 
@@ -277,7 +345,7 @@ Check server logs for any configuration errors.
 ## 📚 Related Documentation
 
 - [Start Server Guide](START_SERVER.md)
-- [AWS Infrastructure Setup](infrastructure/AWS_INFRASTRUCTURE_SETUP.md)
+- [Infrastructure Documentation](../infrastructure/README.md)
 - [Technical Roadmap](roadmap/TECHNICAL_ROADMAP_2026.md)
 
 ---

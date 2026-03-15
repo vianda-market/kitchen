@@ -32,8 +32,7 @@
 
 ### **High Priority Financial Tables** ✅
 - `client_bill_info` → 365 days retention
-- `client_transaction` → 90 days retention  
-- `fintech_link_transaction` → 180 days retention
+- `client_transaction` → 90 days retention
 
 ### **Medium Priority Operational Tables** ✅
 - `plate_selection` → 60 days retention

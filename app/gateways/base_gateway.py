@@ -11,7 +11,7 @@ Provides common functionality for all external API gateways:
 import json
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -94,7 +94,7 @@ class BaseGateway(ABC):
         Raises:
             ExternalServiceError: If the request fails
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         try:
             if self.dev_mode:
@@ -154,7 +154,7 @@ class BaseGateway(ABC):
             error: Error message if call failed
             **kwargs: Additional context (parameters, etc.)
         """
-        duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         
         log_data = {
             "service": self.service_name,

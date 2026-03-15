@@ -15,10 +15,10 @@ from app.utils.db import db_read
 class TimezoneService:
     """Service for managing timezone assignments based on country_code and province"""
     
-    # Mapping for multi-timezone countries only (country_code -> province -> timezone)
-    # Single-timezone countries (ARG, PER, CHL, etc.) use market_info table
+    # Mapping for multi-timezone countries only (country_code alpha-2 -> province -> timezone)
+    # Single-timezone countries (AR, PE, CL, etc.) use market_info table
     PROVINCE_TIMEZONE_MAPPING = {
-        "USA": {
+        "US": {
             # States by full name
             "Alabama": "America/Chicago",
             "Alaska": "America/Anchorage",
@@ -152,7 +152,7 @@ class TimezoneService:
             "Sergipe": "America/Maceio",
             "Tocantins": "America/Araguaina",
         },
-        "CAN": {
+        "CA": {
             # Canadian provinces by name
             "Alberta": "America/Edmonton",
             "British Columbia": "America/Vancouver",
@@ -182,7 +182,7 @@ class TimezoneService:
             "SK": "America/Regina",
             "YT": "America/Whitehorse",
         },
-        "MEX": {
+        "MX": {
             # Mexican states by name
             "Aguascalientes": "America/Mexico_City",
             "Baja California": "America/Tijuana",
@@ -234,7 +234,7 @@ class TimezoneService:
            - If province not found or not provided → return market default + log warning
         
         Args:
-            country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA", "BRA")
+            country_code: ISO 3166-1 alpha-2 country code (e.g., "AR", "US", "BR")
             province: Province/state name or code (optional for single-TZ countries)
             db: Database connection
             
@@ -247,7 +247,7 @@ class TimezoneService:
         if not country_code:
             raise HTTPException(status_code=400, detail="country_code is required for timezone deduction")
         
-        country_code = country_code.strip().upper()
+        # Callers (route, address_service) pass already-normalized country_code.
         
         # Query market_info for default timezone
         market_data = cls._get_market_timezone(country_code, db)
@@ -300,7 +300,7 @@ class TimezoneService:
         Query market_info table for country's default timezone.
         
         Args:
-            country_code: ISO 3166-1 alpha-3 country code
+            country_code: ISO 3166-1 alpha-2 country code
             db: Database connection
             
         Returns:
@@ -350,7 +350,7 @@ class TimezoneService:
         Get list of country codes with multiple timezones.
         
         Returns:
-            List of country codes (e.g., ["USA", "BRA", "CAN", "MEX"])
+            List of country codes alpha-2 (e.g., ["US", "BR", "CA", "MX"])
         """
         return list(cls.PROVINCE_TIMEZONE_MAPPING.keys())
     
@@ -360,7 +360,7 @@ class TimezoneService:
         Get list of supported provinces/states for a multi-timezone country.
         
         Args:
-            country_code: ISO 3166-1 alpha-3 country code
+            country_code: ISO 3166-1 alpha-2 country code
             
         Returns:
             List of province names/codes, or empty list if single-timezone country
@@ -389,7 +389,7 @@ def deduce_timezone_from_address(country_code: str, province: Optional[str], db:
     Convenience function that delegates to TimezoneService.deduce_timezone().
     
     Args:
-        country_code: ISO 3166-1 alpha-3 country code (e.g., "ARG", "USA")
+        country_code: ISO 3166-1 alpha-2 country code (e.g., "AR", "US")
         province: Province/state name or code (optional for single-TZ countries)
         db: Database connection
         

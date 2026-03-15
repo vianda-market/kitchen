@@ -77,7 +77,7 @@ RestaurantTransaction.process_no_show_balance_update(transaction_id, system_user
 
 **What happens:**
 1. For orders still "Pending" at end of day (customer never arrived)
-2. Restaurant gets **discounted amount** based on `no_show_discount`
+2. Restaurant gets **discounted amount** based on `no_show_discount` (configured at institution level, applied per transaction)
 3. Transaction marked as "No-Show"
 4. Example: 20% discount → restaurant gets 80% of original amount
 

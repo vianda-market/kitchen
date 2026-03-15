@@ -12,16 +12,25 @@
    source venv/bin/activate
    ```
 
-3. **Start the server:**
+3. **Start the server:** Run one of these (not both):
+
    ```bash
-   uvicorn application:app --host 0.0.0.0 --port 8000 --reload
+   # Baseline (localhost only) or untrusted networks:
+   uvicorn application:app --reload
    ```
+
+   For trusted networks (home, office) where you need LAN access (e.g. physical device testing), use instead:
+   ```bash
+   ./run_dev_trusted.sh
+   ```
+
+   The run script replaces the uvicorn command; it starts the server with the right binding. See [feedback_for_backend_local_mobile_dev.md](../api/b2c_client/feedback_for_backend_local_mobile_dev.md).
 
 ## What You'll See
 
 The server will start and you'll see output like:
 ```
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process [xxxxx] using WatchFiles
 INFO:     Started server process [xxxxx]
 INFO:     Waiting for application startup.

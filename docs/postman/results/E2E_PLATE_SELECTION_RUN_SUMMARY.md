@@ -8,7 +8,7 @@ From **E2E Plate Selection.postman_test_run.json** (run 2026-02-12): **104 passe
 
 - **Create Customer Subscription (500):** Backend now resolves `market_id` from the plan when creating a subscription (`app/services/crud_service.py`), so POST /subscriptions no longer fails with missing `market_id`.
 - **Get Bills:** Collection updated to use `institutionId` (not `institutionEntityId`) for the `institution_id` query parameter.
-- **Record Manual Payment:** Pre-request script added to throw a clear error when `entityBillId` is not a valid UUID (e.g. `NO_BILLS_FOUND`), so the flow fails fast with a helpful message.
+- **Record Manual Payment:** Replaced with **Get institution bill by ID (payment via pipeline)**. The `POST .../record-payment` and `POST .../mark-paid` endpoints were removed; supplier payment is now via the settlement→bill→payout pipeline (see docs/api/internal/SUPPLIER_INSTITUTION_PAYMENT.md). The step now uses `GET .../institution-bills/{{entityBillId}}` to verify the bill.
 - **Register plate selection:** Pre-request script now ensures a valid `plate_id` is set (from `plateSelectionId` from List Plates for Customer, or fallback `plateId` from Register Supplier Plate).
 
 ---
@@ -24,10 +24,10 @@ From **E2E Plate Selection.postman_test_run.json** (run 2026-02-12): **104 passe
 
 ---
 
-## 2. Fintech Link Assignment — **403 Forbidden**
+## 2. ~~Fintech Link Assignment~~ — **REMOVED**
 
 - **Request:** `POST {{baseUrl}}/api/v1/fintech-link-assignment`
-- **Effect:** All 4 tests fail (Status 201, fintech_link_assignment_id, method_type_id, status).
+- **Effect:** All 4 tests fail (endpoint removed; payment methods use Stripe/external_payment_method).
 - **Likely cause:** Endpoint may require admin or a different role; current request uses customer auth.
 
 **Next step:** Ensure the request uses the **customer** auth token (same as for Register Payment Method as Link). If the token is from a different user than the payment method’s `user_id`, the backend returns 403.
@@ -76,13 +76,11 @@ From **E2E Plate Selection.postman_test_run.json** (run 2026-02-12): **104 passe
 
 ---
 
-## 7. Record Manual Payment — **422 Unprocessable Entity**
+## 7. Get institution bill by ID (formerly Record Manual Payment)
 
-- **Request:** `POST {{baseUrl}}/api/v1/institution-bills/NO_BILLS_FOUND/record-payment`
-- **Cause:** URL uses literal `NO_BILLS_FOUND` (or empty `clientBillId`), set when no bills are found earlier (e.g. Get Bills / Issue bills). Register Client Bill and Issue bills failed, so no valid bill ID is available.
-- **Effect:** Server rejects invalid bill id.
-
-**Next step:** Depends on fixing bill flow (1 → 3, then Issue bills). Ensure Record Manual Payment uses a valid bill id from collection/environment (e.g. from Get Bills or Issue bills).
+- **Request:** `GET {{baseUrl}}/api/v1/institution-bills/{{entityBillId}}`
+- **Note:** The record-payment and mark-paid endpoints were removed. This step now only verifies the bill exists. Supplier payment is done via the settlement→bill→payout pipeline (cron / `run_daily_settlement_bill_and_payout`).
+- If this step fails with 404 or 422, ensure `entityBillId` is set from Get Bills or Issue bills (valid UUID).
 
 ---
 
@@ -91,8 +89,8 @@ From **E2E Plate Selection.postman_test_run.json** (run 2026-02-12): **104 passe
 | Root / early failure     | Dependent failures |
 |--------------------------|--------------------|
 | (1) Create Customer Subscription 500 | (3) Register Client Bill 422 → (4) Update Subscription Balance 422 |
-| (3) No clientBillId      | (7) Record Manual Payment 422 (bad bill id) |
-| (6) Issue bills 400      | (7) No valid bills for payment |
+| (3) No clientBillId      | (7) Get bill may 404/422 if entityBillId invalid |
+| (6) Issue bills 400      | (7) No valid bills → entityBillId not set |
 
 **Suggested order to fix:**  
 1) Resolve **Create Customer Subscription** 500 (backend + variables).  

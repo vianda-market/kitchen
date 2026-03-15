@@ -3,7 +3,7 @@
 
 \echo 'Creating table: archival_config'
 CREATE TABLE IF NOT EXISTS archival_config (
-    config_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    config_id UUID PRIMARY KEY DEFAULT uuidv7(),
     table_name VARCHAR(100) NOT NULL UNIQUE,
     category VARCHAR(50) NOT NULL CHECK (category IN (
         'financial_critical',
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_archival_config_category ON archival_config(categ
 -- Archival Configuration History Table
 \echo 'Creating table: archival_config_history'
 CREATE TABLE IF NOT EXISTS archival_config_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     config_id UUID NOT NULL,
     table_name VARCHAR(100) NOT NULL,
     category VARCHAR(50) NOT NULL,
@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_archival_config_history_current ON archival_confi
 CREATE OR REPLACE FUNCTION archival_config_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    new_event_id UUID := uuid_generate_v4();
+    new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark previous version as no longer current

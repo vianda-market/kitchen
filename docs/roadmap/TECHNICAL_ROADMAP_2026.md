@@ -156,6 +156,7 @@ def recommend_plates(user_id, max_distance_km=5):
 **Estimated Effort**: 2 days
 
 **Future Enhancement** (Post-UAT - ML-Powered):
+- **Ingredient-based recommendations:** Recommend plates that share a significant overlap of ingredients with plates the user has favorited (e.g. user favorites plates with tomato, basil, mozzarella → boost plates with similar ingredient profiles). **Prerequisite:** Option A tabular schema (`ingredient_info`, `product_ingredient`) — see Phase 3.2.
 - NoSQL DB (DynamoDB) for user preferences:
   - Cuisine preferences
   - Ingredient preferences
@@ -300,8 +301,13 @@ cd infra
   - Ingredient preferences
   - Restaurant preferences
   - Walk distance preference
-- [ ] Build ingredient/cuisine database (NoSQL):
-  - Plate ingredients mapping
+- [ ] **Option A: Tabular ingredient schema** (ingredient_info, product_ingredient):
+  - Create `ingredient_info` and `product_ingredient` tables
+  - Build ETL/cron to parse existing `product_info.ingredients` (comma-separated) and populate junction table (with normalization: lowercase, singular/plural handling)
+  - Add admin UI or API for suppliers to manage product-ingredient links (optional; can start with ETL-only)
+  - Update recommendation service to query `product_ingredient` for overlap scoring (e.g. `WHERE ingredient_id IN (SELECT ingredient_id FROM product_ingredient WHERE product_id IN (user_favorited_plate_products))`)
+  - Keep `product_info.ingredients` for backward compatibility and display; ML reads from tabular tables
+- [ ] Build cuisine database (NoSQL):
   - Cuisine categories
   - Allergen information
 - [ ] ML model development:
@@ -363,8 +369,7 @@ cd infra
 - Need separate release cycles
 
 **See**:
-- `docs/infrastructure/INFRASTRUCTURE_IMPLEMENTATION_PLAN.md`
-- `docs/infrastructure/DATABASE_REPOSITORY_STRUCTURE.md`
+- `docs/infrastructure/feedback_for_infra.md` - Infrastructure requirements and recommendations
 
 ---
 
@@ -452,10 +457,9 @@ cd infra
 ## 📚 Documentation
 
 ### Infrastructure
-- `infra/README.md` - AWS deployment guide
-- `docs/infrastructure/AWS_INFRASTRUCTURE_SETUP.md` - Detailed AWS setup
-- `docs/infrastructure/INFRASTRUCTURE_IMPLEMENTATION_PLAN.md` - Full implementation plan
-- `docs/infrastructure/DATABASE_REPOSITORY_STRUCTURE.md` - Future DB repo structure
+- `infra/README.md` - AWS deployment guide (CloudFormation; infra moving to separate Pulumi repo)
+- `docs/infrastructure/README.md` - Infrastructure documentation index
+- `docs/infrastructure/feedback_for_infra.md` - Requirements for the new infrastructure repo
 
 ### Backend
 - `docs/START_SERVER.md` - Local development setup

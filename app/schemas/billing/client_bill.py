@@ -5,16 +5,8 @@ from uuid import UUID
 from app.config import Status
 
 # Use UUID (not UUID4) so IDs from seed/DB work (seed uses non-RFC-4122-v4 UUIDs e.g. aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)
-
-
-class ClientBillCreateSchema(BaseModel):
-    payment_id: UUID
-    subscription_id: UUID
-    user_id: UUID
-    plan_id: UUID
-    credit_currency_id: UUID
-    amount: float
-    # Status field removed - will be automatically set by database default
+# Client bills are created only when a payment completes (subscription_payment; atomic flow).
+# There is no public create endpoint, so no ClientBillCreateSchema.
 
 
 class ClientBillUpdateSchema(BaseModel):
@@ -26,7 +18,7 @@ class ClientBillUpdateSchema(BaseModel):
 
 class ClientBillResponseSchema(BaseModel):
     client_bill_id: UUID
-    payment_id: UUID
+    subscription_payment_id: UUID
     subscription_id: UUID
     user_id: UUID
     plan_id: UUID

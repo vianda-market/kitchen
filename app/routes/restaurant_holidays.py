@@ -106,7 +106,6 @@ def _validate_not_national_holiday(
 @router.get("/", response_model=List[RestaurantHolidayResponseSchema])
 def list_restaurant_holidays(
     restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
-    include_archived: bool = Query(False, description="Include archived holidays"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -123,8 +122,7 @@ def list_restaurant_holidays(
         conditions = []
         params = []
         
-        if not include_archived:
-            conditions.append("restaurant_holidays.is_archived = FALSE")
+        conditions.append("restaurant_holidays.is_archived = FALSE")
         
         if restaurant_id:
             conditions.append("restaurant_holidays.restaurant_id = %s")
@@ -155,11 +153,10 @@ def list_restaurant_holidays(
 @router.get("/{holiday_id}", response_model=RestaurantHolidayResponseSchema)
 def get_restaurant_holiday(
     holiday_id: UUID,
-    include_archived: bool = Query(False, description="Include archived holidays"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get a single restaurant holiday by ID"""
+    """Get a single restaurant holiday by ID. Non-archived only."""
     scope = _get_scope_for_entity(current_user)
     
     def get_operation(connection: psycopg2.extensions.connection):
@@ -167,7 +164,7 @@ def get_restaurant_holiday(
         if not holiday:
             raise HTTPException(status_code=404, detail=f"Restaurant holiday not found: {holiday_id}")
         
-        if not include_archived and holiday.is_archived:
+        if holiday.is_archived:
             raise HTTPException(status_code=404, detail=f"Restaurant holiday not found: {holiday_id}")
         
         return holiday
@@ -433,7 +430,6 @@ def delete_restaurant_holiday(
 @router.get("/enriched/", response_model=List[RestaurantHolidayEnrichedResponseSchema])
 def list_enriched_restaurant_holidays(
     restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
-    include_archived: bool = Query(False, description="Include archived holidays"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -456,7 +452,7 @@ def list_enriched_restaurant_holidays(
             restaurant_id=restaurant_id,
             db=connection,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
     
     return handle_business_operation(get_operation, "enriched restaurant holidays retrieval", None, db)
@@ -465,7 +461,6 @@ def list_enriched_restaurant_holidays(
 @router.get("/enriched/{restaurant_id}", response_model=List[RestaurantHolidayEnrichedResponseSchema])
 def get_enriched_restaurant_holidays_by_restaurant(
     restaurant_id: UUID,
-    include_archived: bool = Query(False, description="Include archived holidays"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -483,7 +478,7 @@ def get_enriched_restaurant_holidays_by_restaurant(
             restaurant_id=restaurant_id,
             db=connection,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
     
     return handle_business_operation(get_operation, "enriched restaurant holidays retrieval by restaurant", None, db)

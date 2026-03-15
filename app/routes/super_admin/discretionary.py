@@ -18,10 +18,12 @@ from app.schemas.consolidated_schemas import (
     DiscretionarySummarySchema
 )
 from app.services.discretionary_service import DiscretionaryService
+from app.services.entity_service import get_enriched_discretionary_requests
 from app.auth.dependencies import get_super_admin_user, get_admin_user
 from app.dependencies.database import get_db
 from app.services.error_handling import handle_business_operation
 from app.utils.log import log_info
+from app.config import Status
 
 router = APIRouter(
     prefix="/super-admin/discretionary",
@@ -112,35 +114,35 @@ def get_pending_discretionary_requests(
 ):
     """
     Get all pending discretionary requests for super-admin dashboard.
-    
-    Returns all requests with status 'Pending' for approval/rejection.
-    Available to Admin and Super Admin employees (role_type='Employee' AND role_name IN ('Admin', 'Super Admin')).
+
+    Returns enriched summary with created_by, created_by_name, and recipient (user_full_name, user_username, restaurant_name).
+    Available to Admin and Super Admin employees.
     """
     log_info(f"Super-admin {current_user['user_id']} retrieving pending discretionary requests")
-    
-    # Delegate to service layer
-    pending_requests = discretionary_service.get_pending_requests(db)
-    
-    # Convert to summary format for dashboard
-    summary_requests = []
-    for request in pending_requests:
-        summary_requests.append(DiscretionarySummarySchema(
-            discretionary_id=request.discretionary_id,
-            user_id=request.user_id,
-            restaurant_id=request.restaurant_id,
-            category=request.category,
-            reason=request.reason,
-            amount=request.amount,
-            status=request.status,
-            created_date=request.created_date,
+    all_enriched = get_enriched_discretionary_requests(db, include_archived=False)
+    pending = [r for r in all_enriched if (getattr(r.status, "value", r.status) or "") == "Pending"]
+    summary_requests = [
+        DiscretionarySummarySchema(
+            discretionary_id=r.discretionary_id,
+            user_id=r.user_id,
+            restaurant_id=r.restaurant_id,
+            category=r.category,
+            reason=r.reason,
+            amount=r.amount,
+            status=r.status,
+            created_date=r.created_date,
             resolved_date=None,
             resolved_by=None,
-            resolution_comment=None
-        ))
-    
-    # Sort by creation date (newest first)
+            resolution_comment=None,
+            created_by=r.created_by,
+            created_by_name=r.created_by_name,
+            user_full_name=r.user_full_name,
+            user_username=r.user_username,
+            restaurant_name=r.restaurant_name,
+        )
+        for r in pending
+    ]
     summary_requests.sort(key=lambda x: x.created_date, reverse=True)
-    
     return summary_requests
 
 
@@ -151,47 +153,41 @@ def get_all_discretionary_requests(
 ):
     """
     Get all discretionary requests for admin overview.
-    
-    Returns all requests regardless of status for comprehensive view.
+
+    Returns enriched summary with created_by, created_by_name, recipient, and resolution details.
     Available to Admin and Super Admin employees.
     """
     log_info(f"Admin {current_user['user_id']} retrieving all discretionary requests")
-    
-    # Delegate to service layer
-    from app.services.crud_service import discretionary_service as crud_service
-    all_requests = crud_service.get_all(db)
-    
-    # Convert to summary format
+    all_enriched = get_enriched_discretionary_requests(db, include_archived=False)
+    from app.services.crud_service import discretionary_resolution_service
     summary_requests = []
-    for request in all_requests:
-        # Get resolution details if exists
+    for r in all_enriched:
         resolved_date = None
         resolved_by = None
         resolution_comment = None
-        
-        if request.approval_id:
-            from app.services.crud_service import discretionary_resolution_service
-            resolution = discretionary_resolution_service.get_by_id(request.approval_id, db)
+        if r.approval_id:
+            resolution = discretionary_resolution_service.get_by_id(r.approval_id, db)
             if resolution:
-                resolved_date = resolution.resolved_date
-                resolved_by = resolution.resolved_by
-                resolution_comment = resolution.resolution_comment
-        
+                resolved_date = getattr(resolution, "resolved_date", None)
+                resolved_by = getattr(resolution, "resolved_by", None)
+                resolution_comment = getattr(resolution, "resolution_comment", None)
         summary_requests.append(DiscretionarySummarySchema(
-            discretionary_id=request.discretionary_id,
-            user_id=request.user_id,
-            restaurant_id=request.restaurant_id,
-            category=request.category,
-            reason=request.reason,
-            amount=request.amount,
-            status=request.status,
-            created_date=request.created_date,
+            discretionary_id=r.discretionary_id,
+            user_id=r.user_id,
+            restaurant_id=r.restaurant_id,
+            category=r.category,
+            reason=r.reason,
+            amount=r.amount,
+            status=r.status,
+            created_date=r.created_date,
             resolved_date=resolved_date,
             resolved_by=resolved_by,
-            resolution_comment=resolution_comment
+            resolution_comment=resolution_comment,
+            created_by=r.created_by,
+            created_by_name=r.created_by_name,
+            user_full_name=r.user_full_name,
+            user_username=r.user_username,
+            restaurant_name=r.restaurant_name,
         ))
-    
-    # Sort by creation date (newest first)
     summary_requests.sort(key=lambda x: x.created_date, reverse=True)
-    
     return summary_requests

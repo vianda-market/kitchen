@@ -1,0 +1,317 @@
+{
+	"info": {
+		"_postman_id": "restaurant-explorer-b2c-2026",
+		"name": "004 RESTAURANT_EXPLORER_B2C",
+		"description": "Tests for the B2C restaurant explorer: GET /restaurants/cities (dropdown) and GET /restaurants/by-city (list/map). Both require Bearer auth. No institution scope; filter by country_code and city. Only Active restaurants with at least one active plate_kitchen_day are returned. See docs/api/b2c_client/feedback_from_client/RESTAURANT_EXPLORE_B2C.md and docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Use admin from 001 (env or globals) when available",
+					"const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+					"if (u) pm.collectionVariables.set('adminUsername', u);",
+					"const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+					"if (p) pm.collectionVariables.set('adminPassword', p);",
+					"const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+					"if (t) pm.collectionVariables.set('authToken', t);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "adminUsername",
+			"value": "admin",
+			"type": "string"
+		},
+		{
+			"key": "adminPassword",
+			"value": "Admin123!",
+			"type": "string"
+		},
+		{
+			"key": "sampleCountryCode",
+			"value": "AR",
+			"type": "string"
+		},
+		{
+			"key": "sampleCity",
+			"value": "Buenos Aires",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login (get Bearer token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has access_token', function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set('authToken', response.access_token);",
+									"pm.environment.set('authToken', response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{adminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{adminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "token"]
+						},
+						"description": "Obtain access_token for Explorer endpoints. Run this first or use an environment authToken."
+					}
+				}
+			]
+		},
+		{
+			"name": "Restaurant Explorer (by city)",
+			"item": [
+				{
+					"name": "GET cities (country_code=AR)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has cities array', function () {",
+									"        pm.expect(body).to.have.property('cities');",
+									"        pm.expect(body.cities).to.be.an('array');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurants/cities?country_code={{sampleCountryCode}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "restaurants", "cities"],
+							"query": [
+								{
+									"key": "country_code",
+									"value": "{{sampleCountryCode}}"
+								}
+							]
+						},
+						"description": "List cities that have at least one restaurant in the given country. Used to populate the explore dropdown."
+					}
+				},
+				{
+					"name": "GET cities (default country US)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has cities array', function () {",
+									"        pm.expect(body).to.have.property('cities');",
+									"        pm.expect(body.cities).to.be.an('array');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurants/cities",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "restaurants", "cities"]
+						},
+						"description": "country_code omitted; backend defaults to US."
+					}
+				},
+				{
+					"name": "GET by-city (city + country_code)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has requested_city and city', function () {",
+									"        pm.expect(body).to.have.property('requested_city');",
+									"        pm.expect(body).to.have.property('city');",
+									"    });",
+									"    pm.test('Response has restaurants array', function () {",
+									"        pm.expect(body).to.have.property('restaurants');",
+									"        pm.expect(body.restaurants).to.be.an('array');",
+									"    });",
+									"    if (body.restaurants && body.restaurants.length > 0) {",
+									"        const r = body.restaurants[0];",
+									"        pm.test('Restaurant item has restaurant_id, name', function () {",
+									"            pm.expect(r).to.have.property('restaurant_id');",
+									"            pm.expect(r).to.have.property('name');",
+									"        });",
+									"        pm.test('Restaurant item may have cuisine, lat, lng, postal_code, city', function () {",
+									"            pm.expect(r).to.have.property('cuisine');",
+									"            pm.expect(r).to.have.property('lat');",
+									"            pm.expect(r).to.have.property('lng');",
+									"            pm.expect(r).to.have.property('postal_code');",
+									"            pm.expect(r).to.have.property('city');",
+									"        });",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurants/by-city?city={{sampleCity}}&country_code={{sampleCountryCode}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "restaurants", "by-city"],
+							"query": [
+								{
+									"key": "city",
+									"value": "{{sampleCity}}"
+								},
+								{
+									"key": "country_code",
+									"value": "{{sampleCountryCode}}"
+								}
+							]
+						},
+						"description": "Restaurants in the given city (name, cuisine, lat/lng). City matched case-insensitively. Use a city from the cities dropdown."
+					}
+				},
+				{
+					"name": "GET by-city (default country US)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has restaurants array', function () {",
+									"        pm.expect(body).to.have.property('restaurants');",
+									"        pm.expect(body.restaurants).to.be.an('array');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/restaurants/by-city?city=New+York",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "restaurants", "by-city"],
+							"query": [
+								{
+									"key": "city",
+									"value": "New York"
+								}
+							]
+						},
+						"description": "country_code omitted; backend defaults to US."
+					}
+				}
+			]
+		}
+	]
+}

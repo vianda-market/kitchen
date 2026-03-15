@@ -45,6 +45,25 @@ This Postman collection tests the employee-only access control system, verifying
 ### ❌ Employee Admin - Approve Test (Should Fail)
 - **Discretionary - Approve (Employee Admin)** - Regular Employee Admin should be denied (only Super Admin can approve)
 
+### 👤 Employer Assignment Workflow
+- **Login Customer (refresh token before employer assign)** - Refresh customer token
+- **GET /cities/** - List supported cities (for employer address creation)
+- **GET /employers/** - List all employers
+- **POST /employers/** - Create new employer with address (sets `testEmployerAddressId`)
+- **GET /employers/{employer_id}/addresses** - Get employer addresses
+- **POST /employers/{employer_id}/addresses** - Add address to employer
+- **PUT /users/me/employer** - Assign employer to customer user
+- **PUT /users/me/terminate** - Terminate account (cleanup)
+
+**Important**: This workflow sets `testEmployerAddressId`, which is required by the Customer Comensal employer address tests below.
+
+### ❌ Customer Comensal - Employer Address Edit/Delete (Should Fail 403)
+Verifies that a Customer Comensal cannot edit or delete employer-owned addresses:
+- **PUT /addresses/{employerAddressId}** - Customer tries to update employer address (e.g. `{"floor": "2"}`) → expects 403
+- **DELETE /addresses/{employerAddressId}** - Customer tries to delete employer address → expects 403
+
+**Execution order**: Run **after** the Employer Assignment Workflow so `testEmployerAddressId` is set. Both tests use `customerAuthToken` and assert 403 with an error message mentioning "employer", "forbidden", or "cannot".
+
 ## Environment Variables
 
 ### Required Environment Variables
@@ -95,11 +114,11 @@ These variables are automatically created and stored by the collection during ex
 
 **Auto-Generated Test Users** (created by collection):
 - ✅ **Supplier**: Created automatically with unique `test_supplier_<timestamp>` username
-  - Institution: `11111111-1111-1111-1111-111111111111` (La Parrilla Argentina)
+  - Institution: `33333333-3333-3333-3333-333333333333` (La Parrilla Argentina)
   - Role: `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` (Supplier - Admin)
   - Password: `SupplierPassword123!`
 - ✅ **Customer**: Created automatically with unique `test_customer_<timestamp>` username
-  - Institution: `44444444-4444-4444-4444-444444444444` (Vianda Customers)
+  - Institution: `22222222-2222-2222-2222-222222222222` (Vianda Customers)
   - Role: `cccccccc-cccc-cccc-cccc-cccccccccccc` (Customer - Comensal)
   - Password: `CustomerPassword123!`
 
@@ -114,6 +133,7 @@ These variables are automatically created and stored by the collection during ex
 ### ❌ Access Denied Indicators (403)
 - Suppliers cannot access any system configuration APIs
 - Customers cannot POST/PUT/DELETE Fintech Links
+- Customers cannot edit or delete employer-owned addresses (PUT/DELETE /addresses/{employerAddressId})
 - Employee Admins cannot approve discretionary requests (only Super Admin can)
 
 ### Error Messages
@@ -137,6 +157,8 @@ All 403 errors should include clear messages indicating why access was denied:
 - [ ] Customer is denied POST/PUT/DELETE on Fintech Links (403)
 - [ ] Super Admin can approve discretionary requests (200/201)
 - [ ] Employee Admin cannot approve discretionary requests (403)
+- [ ] Customer Comensal cannot edit employer address (PUT → 403)
+- [ ] Customer Comensal cannot delete employer address (DELETE → 403)
 - [ ] Error messages are clear and consistent
 
 ## Running the Tests
@@ -156,13 +178,16 @@ All 403 errors should include clear messages indicating why access was denied:
    - No manual user creation needed!
    - **If you get 401 "Not authenticated"**: Make sure you ran the login request first and wait for it to complete before running user creation requests
 
-3. **Run the remaining test folders**:
+3. **Run the remaining test folders** (in order; Employer Assignment Workflow must run before Customer Comensal employer address tests):
    - **🔐 Authentication** - Manual login endpoints (optional, for testing)
    - **✅ Employee Access Tests** - Should return 200/201
    - **❌ Supplier Access Tests** - Should return 403
    - **✅ Customer Access Tests** - GET should return 200, POST should return 403
    - **✅ Super Admin Access Tests** - Should return 200/201
-   - **❌ Employee Admin - Approve Test** - Should return 403
+   - **🔍 Employee Role Scope Tests** - Institution and self-only scope
+   - **👤 Employer Assignment Workflow** - Creates employer, sets `testEmployerAddressId`
+   - **❌ Customer Comensal - Employer Address Edit/Delete** - Should return 403 (run after Employer Assignment Workflow)
+   - **❌ Vianda Admin - Approve Test** - Should return 403
 
 4. **Verify error messages** are clear and helpful
 
@@ -179,6 +204,11 @@ This error occurs when the `employeeAuthToken` collection variable is not set be
 5. **Check console**: The pre-request script will log an error if the token is missing
 
 **Alternative**: If running requests individually, manually check that the `employeeAuthToken` collection variable exists and contains a valid JWT token after the login request completes.
+
+### "testEmployerAddressId not set" for Customer Comensal Employer Address Tests
+The Customer Comensal employer address tests (PUT/DELETE on employer address) require `testEmployerAddressId`, which is set when **POST /employers/ - Create New Employer** runs in the Employer Assignment Workflow.
+
+**Solution**: Run the **👤 Employer Assignment Workflow** folder first (or run the full collection in order). The Customer Comensal folder is placed after Employer Assignment Workflow in the collection so it runs in the correct sequence.
 
 ### 403 Errors When Expected to Succeed
 - ✅ Check that the user has the correct `role_type` in the database

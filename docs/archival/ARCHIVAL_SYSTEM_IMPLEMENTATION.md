@@ -216,6 +216,8 @@ Check logs for warnings about failed model imports. Ensure all models inherit fr
 ## **🔮 Future Enhancements**
 
 ### **Phase 2 Features** (Not Yet Implemented)
+- [ ] **Product Image Blob Cleanup**: When `product_info` records are archived, delete their image files (full-size + thumbnail) from `static/product_images/` via `ProductImageService.delete_image()`. Skip placeholder paths. See [ARCHIVAL_CRON_STRATEGY.md](ARCHIVAL_CRON_STRATEGY.md) for details.
+- [ ] **QR Code Blob Cleanup**: When `qr_code` records are archived, delete their image files from `static/qr_codes/`.
 - [ ] **Soft Delete Recovery**: Ability to unarchive records
 - [ ] **Archival Audit Log**: Track who archived what and when
 - [ ] **Bulk Operations UI**: Web interface for bulk archival

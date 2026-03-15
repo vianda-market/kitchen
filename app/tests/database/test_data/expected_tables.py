@@ -18,13 +18,13 @@ BASE_TABLES = [
     'plan_info',
     'payment_method',
     'qr_code',
-    'plate_selection',
+    'plate_selection_info',
     'client_bill_info',
     'subscription_info',
     'institution_bill_info',
-    'institution_bank_account',
     'geolocation_info',
     'credential_recovery',
+    'pending_customer_signup',
     'restaurant_balance_info',
     'discretionary_resolution_info',
     'employer_info',
@@ -53,27 +53,25 @@ HISTORY_TABLES = [
     'national_holidays_history',
     'restaurant_holidays_history',
     'plate_kitchen_days_history',
+    'plate_selection_history',
 ]
 
 # Child Tables (dependent tables)
 CHILD_TABLES = [
-    'credit_card',
-    'bank_account',
-    'appstore_account',
-    'fintech_wallet',
-    'fintech_wallet_auth',
-    'fintech_link_info',
-    'fintech_link_assignment',
-    'fintech_link_history',
-    'client_payment_attempt',
+    'address_subpremise',
+    'institution_settlement',
+    'external_payment_method',
+    'subscription_payment',
     'restaurant_transaction',
-    'institution_payment_attempt',
     'discretionary_info',
     'client_transaction',
     'plate_pickup_live',
+    'plate_review_info',
     'pickup_preferences',
     'restaurant_holidays',
     'plate_kitchen_days',
+    'coworker_pickup_notification',
+    'user_messaging_preferences',
 ]
 
 # All expected tables (combined list)
@@ -82,9 +80,10 @@ ALL_EXPECTED_TABLES = BASE_TABLES + HISTORY_TABLES + CHILD_TABLES
 # Tables that should have critical columns
 # Format: (table_name, [column_name, ...])
 TABLES_WITH_CRITICAL_COLUMNS = {
-    'payment_method': ['address_id'],  # Payment methods can have addresses
-    'credit_card': ['payment_method_id'],  # Credit cards belong to payment methods
-    'bank_account': ['payment_method_id'],  # Bank accounts belong to payment methods
+    'payment_method': ['address_id'],
+    'external_payment_method': ['payment_method_id'],
+    'user_info': ['stripe_customer_id'],
+    'user_history': ['stripe_customer_id'],
 }
 
 

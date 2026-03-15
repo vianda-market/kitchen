@@ -8,7 +8,7 @@ that are shared across all test modules.
 import pytest
 from unittest.mock import Mock, MagicMock
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone, date
 from decimal import Decimal
 import psycopg2.extensions
 
@@ -42,6 +42,12 @@ def mock_db_with_transaction():
 # User Fixtures
 # =============================================================================
 
+# US market UUID (must match seed / GET /markets/available)
+SAMPLE_MARKET_ID = UUID("66666666-6666-6666-6666-666666666666")
+# Sample city UUID (non-Global; must match market country for customer signup)
+SAMPLE_CITY_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+
+
 @pytest.fixture
 def sample_user_data():
     """Sample user data for testing."""
@@ -50,7 +56,9 @@ def sample_user_data():
         "password": "plaintext123",
         "first_name": "John",
         "last_name": "Doe",
-        "username": "johndoe"
+        "username": "johndoe",
+        "market_id": SAMPLE_MARKET_ID,
+        "city_id": SAMPLE_CITY_ID,
     }
 
 
@@ -79,11 +87,12 @@ def sample_user_dto():
         first_name="John",
         last_name="Doe",
         email="test@example.com",
+        market_id=uuid4(),
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.utcnow(),
+        created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
-        modified_date=datetime.utcnow()
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -140,7 +149,7 @@ def sample_customer_user():
     """Customer user (role_type='Customer', role_name='Comensal') for testing.
     
     Customers access iOS/Android apps only and have limited backoffice access
-    (e.g., viewing plans and fintech links).
+    (e.g., viewing plans).
     """
     return {
         "user_id": uuid4(),
@@ -168,9 +177,9 @@ def sample_pickup_record():
         qr_code_payload="QR123456",
         is_archived=False,
         status="Pending",
-        created_date=datetime.utcnow(),
+        created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
-        modified_date=datetime.utcnow()
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -187,9 +196,9 @@ def sample_qr_code():
         qr_code_checksum="19f3c0f4f064b2fb601b53f1f4a6a3a053217a81d8427a7201da7dda4dd5c6d2",
         is_archived=False,
         status="Active",
-        created_date=datetime.utcnow(),
+        created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
-        modified_date=datetime.utcnow()
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -203,8 +212,8 @@ def sample_restaurant():
         institution_id=uuid4(),
         is_archived=False,
         status="Active",
-        created_date=datetime.utcnow(),
-        modified_date=datetime.utcnow()
+        created_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -212,30 +221,44 @@ def sample_restaurant():
 def sample_plate_selection():
     """Sample PlateSelectionDTO for testing."""
     from app.dto.models import PlateSelectionDTO
+    from app.config import Status
     return PlateSelectionDTO(
         plate_selection_id=uuid4(),
         user_id=uuid4(),
         plate_id=uuid4(),
         restaurant_id=uuid4(),
+        product_id=uuid4(),
+        qr_code_id=uuid4(),
+        credit=1,
+        kitchen_day="Monday",
+        pickup_date=date.today(),
+        pickup_time_range="12:00-12:15",
+        pickup_intent="self",
         is_archived=False,
-        created_date=datetime.utcnow(),
-        modified_date=datetime.utcnow()
+        status=Status.PENDING,
+        created_date=datetime.now(timezone.utc),
+        modified_by=uuid4(),
+        modified_date=datetime.now(timezone.utc)
     )
 
 
 @pytest.fixture
 def sample_plate():
-    """Sample PlateDTO for testing."""
+    """Sample PlateDTO for testing. no_show_discount is at institution level."""
     from app.dto.models import PlateDTO
+    from app.config import Status
     return PlateDTO(
         plate_id=uuid4(),
-        name="Test Plate",
-        credit=5.0,
+        product_id=uuid4(),
+        restaurant_id=uuid4(),
+        price=Decimal("10.0"),
+        credit=5,
         delivery_time_minutes=15,
-        no_show_discount=10.0,
         is_archived=False,
-        created_date=datetime.utcnow(),
-        modified_date=datetime.utcnow()
+        status=Status.ACTIVE,
+        created_date=datetime.now(timezone.utc),
+        modified_by=uuid4(),
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -250,7 +273,7 @@ def sample_restaurant_transaction():
         discretionary_id=None,
         credit_currency_id=uuid4(),
         was_collected=False,
-        ordered_timestamp=datetime.utcnow(),
+        ordered_timestamp=datetime.now(timezone.utc),
         collected_timestamp=None,
         arrival_time=None,
         completion_time=None,
@@ -262,9 +285,9 @@ def sample_restaurant_transaction():
         final_amount=Decimal("5.0"),
         is_archived=False,
         status="Pending",
-        created_date=datetime.utcnow(),
+        created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
-        modified_date=datetime.utcnow()
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -293,9 +316,9 @@ def sample_credit_currency_dto():
         credit_value=Decimal("1.0"),
         is_archived=False,
         status="Active",
-        created_date=datetime.utcnow(),
+        created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
-        modified_date=datetime.utcnow()
+        modified_date=datetime.now(timezone.utc)
     )
 
 
@@ -309,17 +332,6 @@ def sample_address_data():
         "province": "NY",
         "country": "US",
         "address_type": "restaurant"
-    }
-
-
-@pytest.fixture
-def sample_bank_account_data():
-    """Sample bank account data for testing."""
-    return {
-        "routing_number": "123456789",
-        "account_number": "987654321",
-        "institution_entity_id": str(uuid4()),
-        "account_type": "Checking"
     }
 
 
@@ -406,12 +418,17 @@ def mock_restaurant_service():
 # Test Utilities
 # =============================================================================
 
+
+
+
+
+
 def create_mock_dto(dto_class, **kwargs):
     """Create a mock DTO with default values."""
     defaults = {
         "is_archived": False,
-        "created_date": datetime.utcnow(),
-        "modified_date": datetime.utcnow()
+        "created_date": datetime.now(timezone.utc),
+        "modified_date": datetime.now(timezone.utc)
     }
     defaults.update(kwargs)
     return dto_class(**defaults)

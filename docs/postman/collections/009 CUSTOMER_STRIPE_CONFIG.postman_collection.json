@@ -1,0 +1,270 @@
+{
+  "info": {
+    "_postman_id": "customer-stripe-config-2026",
+    "name": "009 CUSTOMER_STRIPE_CONFIG",
+    "description": "E2E Customer Stripe payment method management (Phase 2 mock). Requires Customer auth (clientUserAuthToken). Run after E2E Client Setup (Customer Signup, Login Customer User) or set clientUserAuthToken. Endpoints: GET list, POST setup-session, POST mock-add, PUT default, DELETE. See docs/api/b2c_client/CUSTOMER_PAYMENT_METHODS_B2C.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "const token = pm.environment.get('clientUserAuthToken') || pm.globals.get('clientUserAuthToken') || pm.environment.get('authToken') || pm.globals.get('authToken');",
+          "if (token) pm.collectionVariables.set('customerAuthToken', token);",
+          "const base = pm.environment.get('baseUrl') || pm.globals.get('baseUrl') || 'http://localhost:8000';",
+          "pm.collectionVariables.set('baseUrl', base);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8000", "type": "string"},
+    {"key": "customerAuthToken", "value": "", "type": "string"},
+    {"key": "customerUsername", "value": "customer", "type": "string"},
+    {"key": "customerPassword", "value": "Customer123!", "type": "string"},
+    {"key": "paymentMethodId", "value": "", "type": "string"},
+    {"key": "mockAddSkipped", "value": "false", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "Prerequisites",
+      "item": [
+        {
+          "name": "Login Customer User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has access_token', () => pm.expect(body).to.have.property('access_token'));",
+                  "pm.collectionVariables.set('customerAuthToken', body.access_token);",
+                  "pm.environment.set('clientUserAuthToken', body.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {"key": "username", "value": "{{customerUsername}}"},
+                {"key": "password", "value": "{{customerPassword}}"}
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/auth/token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Payment Methods",
+      "item": [
+        {
+          "name": "GET payment methods (empty)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has payment_methods array', () => pm.expect(body).to.have.property('payment_methods'));",
+                  "pm.expect(body.payment_methods).to.be.an('array');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+          }
+        },
+        {
+          "name": "POST setup-session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has setup_url', () => pm.expect(body).to.have.property('setup_url'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{customerAuthToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {"mode": "raw", "raw": "{}"},
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/setup-session"
+          }
+        },
+        {
+          "name": "POST mock-add (create mock card)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response;",
+                  "const body = res.code === 200 ? res.json() : (res.json ? res.json() : {});",
+                  "if (res.code === 400 && body.detail && body.detail.includes('PAYMENT_PROVIDER=mock')) {",
+                  "    pm.collectionVariables.set('mockAddSkipped', 'true');",
+                  "    pm.test('Skipped: mock-add requires PAYMENT_PROVIDER=mock', () => pm.expect(true).to.be.true);",
+                  "    console.warn('Set PAYMENT_PROVIDER=mock in .env to run full Customer Payment Methods flow.');",
+                  "} else {",
+                  "    pm.collectionVariables.set('mockAddSkipped', 'false');",
+                  "    pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "    pm.test('Has payment_method_id', () => pm.expect(body).to.have.property('payment_method_id'));",
+                  "    pm.collectionVariables.set('paymentMethodId', body.payment_method_id);",
+                  "    pm.test('Has last4', () => pm.expect(body.last4).to.equal('4242'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/mock-add"
+          }
+        },
+        {
+          "name": "GET payment methods (has 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const skipped = pm.collectionVariables.get('mockAddSkipped') === 'true';",
+                  "if (skipped) {",
+                  "    pm.test('Skipped: mock-add was skipped (PAYMENT_PROVIDER=stripe)', () => pm.expect(true).to.be.true);",
+                  "} else {",
+                  "    pm.test('Has 1 payment method', () => pm.expect(body.payment_methods || []).to.have.lengthOf(1));",
+                  "    pm.test('Has last4 4242', () => pm.expect((body.payment_methods && body.payment_methods[0]) ? body.payment_methods[0].last4 : undefined).to.equal('4242'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+          }
+        },
+        {
+          "name": "PUT set default",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const id = pm.collectionVariables.get('paymentMethodId');",
+                  "if (!id && pm.collectionVariables.get('mockAddSkipped') !== 'true') throw new Error('Run POST mock-add first to set paymentMethodId');",
+                  "if (!id) pm.collectionVariables.set('paymentMethodId', '00000000-0000-0000-0000-000000000000');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response;",
+                  "const skipped = pm.collectionVariables.get('mockAddSkipped') === 'true';",
+                  "if (skipped && (res.code === 404 || res.code === 400)) {",
+                  "    pm.test('Skipped: mock-add requires PAYMENT_PROVIDER=mock', () => pm.expect(true).to.be.true);",
+                  "} else {",
+                  "    pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}/default"
+          }
+        },
+        {
+          "name": "DELETE payment method",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const id = pm.collectionVariables.get('paymentMethodId');",
+                  "if (!id && pm.collectionVariables.get('mockAddSkipped') !== 'true') throw new Error('Run POST mock-add first to set paymentMethodId');",
+                  "if (!id) pm.collectionVariables.set('paymentMethodId', '00000000-0000-0000-0000-000000000000');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response;",
+                  "const skipped = pm.collectionVariables.get('mockAddSkipped') === 'true';",
+                  "if (skipped && (res.code === 404 || res.code === 400)) {",
+                  "    pm.test('Skipped: mock-add requires PAYMENT_PROVIDER=mock', () => pm.expect(true).to.be.true);",
+                  "} else {",
+                  "    pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}"
+          }
+        },
+        {
+          "name": "GET payment methods (empty after delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Empty after delete', () => pm.expect(body.payment_methods).to.have.lengthOf(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+          }
+        }
+      ]
+    }
+  ]
+}

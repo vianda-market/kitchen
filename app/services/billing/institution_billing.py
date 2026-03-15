@@ -4,11 +4,16 @@ from uuid import UUID
 from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from fastapi import HTTPException
-from app.dto.models import InstitutionBillDTO
+from app.dto.models import InstitutionBillDTO, InstitutionSettlementDTO
 from app.services.crud_service import (
     institution_bill_service,
+    institution_settlement_service,
     get_institution_id_by_restaurant,
-    get_institution_entity_by_institution
+    get_institution_entity_by_institution,
+    get_settlement_by_restaurant_and_period,
+    get_settlements_by_entity_and_period,
+    get_settlements_by_run_id,
+    get_institution_id_by_entity,
 )
 from app.dto.models import RestaurantBalanceDTO, RestaurantDTO, CreditCurrencyDTO
 from app.services.crud_service import (
@@ -19,8 +24,9 @@ from app.services.crud_service import (
 )
 from app.config.market_config import MarketConfiguration
 from app.config import Status
+from app.config.enums import BillResolution
 from app.utils.log import log_info, log_warning, log_error
-from app.utils.db import db_read
+from app.utils.db import db_read, get_db_connection, close_db_connection
 from app.dto.models import RestaurantTransactionDTO, PlatePickupLiveDTO
 from app.services.crud_service import (
     restaurant_transaction_service,
@@ -154,7 +160,7 @@ class InstitutionBillingService:
         try:
             # Update transaction to complete status (billed)
             update_data = {
-                "status": Status.COMPLETE,  # Mark as complete (billed)
+                "status": Status.COMPLETED,  # Mark as complete (billed)
                 "was_collected": False,  # Keep as false (not collected)
                 "modified_by": system_user_id
             }
@@ -171,280 +177,461 @@ class InstitutionBillingService:
             return False
     
     @staticmethod
-    def create_bill_for_restaurant(restaurant_id: UUID, period_start: datetime, period_end: datetime, 
-                                 system_user_id: UUID, status: Status = Status.PENDING, resolution: str = "Pending", 
-                                 connection=None) -> Optional[InstitutionBillDTO]:
+    def create_settlement_for_restaurant(
+        restaurant_id: UUID,
+        period_start: datetime,
+        period_end: datetime,
+        kitchen_day: str,
+        country_code: str,
+        settlement_number: str,
+        system_user_id: UUID,
+        *,
+        settlement_run_id: Optional[UUID] = None,
+        connection=None
+    ) -> Optional[InstitutionSettlementDTO]:
         """
-        Create a bill for a single restaurant using the unified logic.
-        This method encapsulates the same logic as the create_institution_bill API endpoint.
-        
-        Args:
-            restaurant_id: The restaurant to create a bill for
-            period_start: Start of the billing period
-            period_end: End of the billing period
-            system_user_id: User ID for system operations
-            status: Bill status (default: "Pending")
-            resolution: Bill resolution (default: "Pending")
-            connection: Database connection
-            
-        Returns:
-            Created bill or None if failed
+        Create one settlement for a restaurant (only when balance > 0).
+        Closes uncollected transactions/pickups, captures balance, resets restaurant balance.
+        Idempotent: returns existing settlement if one exists for this restaurant and period.
         """
         try:
-            # Get institution and entity IDs based on restaurant
             institution_id = get_institution_id_by_restaurant(restaurant_id, connection)
             if not institution_id:
                 log_error(f"Institution not found for restaurant {restaurant_id}")
                 return None
-            
             institution_entity_id = get_institution_entity_by_institution(institution_id, connection)
             if not institution_entity_id:
                 log_error(f"Institution entity not found for institution {institution_id}")
                 return None
             
-            # Get restaurant balance data
             balance_record = restaurant_balance_service.get_by_restaurant(restaurant_id, connection)
             if not balance_record:
                 log_error(f"Restaurant balance not found for restaurant {restaurant_id}")
                 return None
-            
             if balance_record.balance <= 0:
-                log_warning(f"Restaurant {restaurant_id} has no balance to bill")
+                log_warning(f"Restaurant {restaurant_id} has no balance; skip settlement")
                 return None
             
-            # Create bill data using current balance
-            bill_data = {
-                "institution_id": institution_id,
-                "institution_entity_id": institution_entity_id,
-                "restaurant_id": restaurant_id,
-                "credit_currency_id": balance_record.credit_currency_id,
-                "transaction_count": balance_record.transaction_count,
-                "amount": balance_record.balance,  # Use current balance
-                "currency_code": balance_record.currency_code,
-                "period_start": period_start,
-                "period_end": period_end,
-                "status": status,
-                "resolution": resolution,
-                "modified_by": system_user_id
-            }
+            existing = get_settlement_by_restaurant_and_period(
+                restaurant_id, period_start, period_end, connection
+            )
+            if existing:
+                log_info(f"Settlement already exists for restaurant {restaurant_id} period {period_start}–{period_end}")
+                return existing
             
-            # ============================================================
-            # ATOMIC OPERATIONS: All use commit=False, single commit at end
-            # ============================================================
-            
-            # 1. Get uncollected transactions for this period
             uncollected_transactions = InstitutionBillingService._get_uncollected_transactions(
                 restaurant_id, period_start, period_end, connection
             )
-            
-            # 2. Close uncollected pickup records (commit=False for atomic transaction)
             for transaction in uncollected_transactions:
                 if transaction.plate_selection_id:
                     success = InstitutionBillingService._close_pickup_record(
-                        transaction.plate_selection_id,
-                        system_user_id,
-                        connection,
-                        commit=False
+                        transaction.plate_selection_id, system_user_id, connection, commit=False
                     )
                     if not success:
                         connection.rollback()
-                        log_error(f"Failed to close pickup record for transaction {transaction.transaction_id}")
+                        log_error(f"Failed to close pickup for transaction {transaction.transaction_id}")
                         return None
-            
-            # 3. Close uncollected transactions (commit=False for atomic transaction)
             for transaction in uncollected_transactions:
                 success = InstitutionBillingService._close_transaction(
-                    transaction.transaction_id,
-                    system_user_id,
-                    connection,
-                    commit=False
+                    transaction.transaction_id, system_user_id, connection, commit=False
                 )
                 if not success:
                     connection.rollback()
                     log_error(f"Failed to close transaction {transaction.transaction_id}")
                     return None
             
-            # 4. Create the bill (commit=False for atomic transaction)
-            bill_record = institution_bill_service.create(bill_data, connection, commit=False)
-            if not bill_record:
+            balance_event_id = restaurant_balance_service.get_current_event_id(restaurant_id, connection)
+            settlement_data = {
+                "institution_entity_id": institution_entity_id,
+                "restaurant_id": restaurant_id,
+                "period_start": period_start,
+                "period_end": period_end,
+                "kitchen_day": kitchen_day,
+                "amount": balance_record.balance,
+                "currency_code": balance_record.currency_code,
+                "credit_currency_id": balance_record.credit_currency_id,
+                "transaction_count": balance_record.transaction_count,
+                "balance_event_id": balance_event_id,
+                "settlement_number": settlement_number,
+                "settlement_run_id": settlement_run_id,
+                "country_code": country_code,
+                "status": Status.ACTIVE,
+                "modified_by": system_user_id,
+            }
+            settlement_record = institution_settlement_service.create(
+                settlement_data, connection, commit=False
+            )
+            if not settlement_record:
                 connection.rollback()
-                log_error(f"Failed to create institution bill for restaurant {restaurant_id}")
+                log_error(f"Failed to create settlement for restaurant {restaurant_id}")
                 return None
             
-            # 5. Get the current balance event_id BEFORE reset (this is the event that had the balance)
-            balance_event_id_before_reset = restaurant_balance_service.get_current_event_id(restaurant_id, connection)
-            
-            # 6. Update the bill with the balance_event_id (commit=False for atomic transaction)
-            if balance_event_id_before_reset:
-                bill_update_data = {"balance_event_id": balance_event_id_before_reset}
-                success = institution_bill_service.update(
-                    bill_record.institution_bill_id,
-                    bill_update_data,
-                    connection,
-                    commit=False
-                )
-                if not success:
-                    connection.rollback()
-                    log_error(f"Failed to update bill {bill_record.institution_bill_id} with balance_event_id")
-                    return None
-                log_info(f"Updated bill {bill_record.institution_bill_id} with balance_event_id {balance_event_id_before_reset} (balance before reset, commit deferred)")
-            
-            # 7. Reset restaurant balance to zero (commit=False for atomic transaction)
-            balance_reset = restaurant_balance_service.reset_balance(restaurant_id, connection, commit=False)
+            balance_reset = restaurant_balance_service.reset_balance(
+                restaurant_id, connection, commit=False
+            )
             if not balance_reset:
                 connection.rollback()
                 log_error(f"Failed to reset restaurant balance for restaurant {restaurant_id}")
                 return None
             
-            # 8. Commit all operations atomically
             connection.commit()
-            
             log_info(
-                f"Created bill {bill_record.institution_bill_id} for restaurant {restaurant_id}, "
-                f"closed {len(uncollected_transactions)} uncollected transactions/pickups, "
-                f"balance reset to $0.00 (atomic transaction)"
+                f"Created settlement {settlement_record.settlement_id} for restaurant {restaurant_id}, "
+                f"amount={settlement_record.amount} {settlement_record.currency_code}"
             )
-            return bill_record
-            
+            return settlement_record
         except Exception as e:
-            log_error(f"Error creating bill for restaurant {restaurant_id}: {e}")
+            log_error(f"Error creating settlement for restaurant {restaurant_id}: {e}")
+            if connection:
+                connection.rollback()
             return None
-
+    
     @staticmethod
-    def generate_daily_bills(bill_date: date, system_user_id: UUID, country_code: Optional[str] = None, connection=None) -> Dict:
+    def run_phase1_settlements(
+        bill_date: date,
+        system_user_id: UUID,
+        country_code: Optional[str] = None,
+        connection=None
+    ) -> Dict:
         """
-        Generate institution bills for all restaurants for a specific date.
-        Bills are generated when kitchen days close, not at midnight.
-        Country is automatically detected from restaurant address if not provided.
-        
-        Args:
-            bill_date: The date to generate bills for
-            system_user_id: User ID for system operations
-            country_code: Optional country code override (if not provided, detected from restaurant address)
-            
-        Returns:
-            Dict with statistics: {"bills_created": int, "total_amount": Decimal, "restaurants_processed": int}
+        Phase 1: Create one settlement per restaurant with balance > 0 for the period.
+        No global balance reset; each restaurant's balance is reset when its settlement is created.
+        Returns dict with settlements_created, total_amount, settlement_run_id, kitchen_day, etc.
         """
+        from uuid import uuid4
         try:
-            # Get the kitchen day for this date
             kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(bill_date)
-            
-            # Note: Bill generation is allowed on any day (including weekends)
-            # Weekend restrictions only apply to customer ordering, not backend billing operations
-            log_info(f"Generating bills for kitchen day: {kitchen_day}")
-            
-            # Get all restaurants with balance data FIRST (before resetting balances)
+            log_info(f"Phase 1 settlements: kitchen day {kitchen_day}, date {bill_date}")
             restaurants = InstitutionBillingService._get_restaurants_with_balances(connection=connection)
-            
-            # Reset restaurant balances to 0 at the start of a new kitchen day
-            # This ensures clean daily accounting and prevents balance accumulation
-            # Skip reset in development mode to allow testing with existing balances
-            from app.config.settings import settings
-            if not settings.DEV_OVERRIDE_DAY:
-                InstitutionBillingService._reset_restaurant_balances_for_new_day(bill_date, system_user_id, connection=connection)
-            else:
-                log_info("🔧 DEV MODE: Skipping restaurant balance reset to allow testing with existing balances")
-            
-            # Aggregate restaurants by institution_entity_id
+            log_info(f"Phase 1: Found {len(restaurants) if restaurants else 0} restaurants with balance > 0")
+            if not restaurants:
+                log_info("Phase 1: No restaurants with balance > 0")
+                return {
+                    "settlements_created": 0,
+                    "total_amount": 0.0,
+                    "settlement_run_id": None,
+                    "kitchen_day": kitchen_day,
+                    "country_code": country_code,
+                }
+            settlement_run_id = uuid4()
             entity_aggregates = InstitutionBillingService._aggregate_restaurants_by_entity(restaurants)
-            
-            bills_created = 0
+            settlements_created = 0
             total_amount = Decimal('0.00')
-            restaurants_processed = 0
-            
+            period_start, period_end = None, None
             for entity_data in entity_aggregates:
                 try:
-                    # Auto-detect country from entity address if not provided
                     entity_country = country_code
                     if not entity_country:
                         from app.services.market_detection import MarketDetectionService
                         entity_country = MarketDetectionService.get_country_from_entity(
                             entity_data["institution_entity_id"], connection
                         )
-                        
                         if not entity_country:
                             log_warning(f"Could not detect country for entity {entity_data['institution_entity_id']}, skipping")
                             continue
-                    
-                    # Check if kitchen day is enabled for this market
-                    # For weekend billing, use Friday's configuration as fallback
-                    if not MarketConfiguration.is_kitchen_day_enabled(entity_country, kitchen_day):
-                        if kitchen_day in ['Saturday', 'Sunday']:
-                            # Use Friday's configuration for weekend billing
-                            fallback_day = 'Friday'
-                            if MarketConfiguration.is_kitchen_day_enabled(entity_country, fallback_day):
-                                log_info(f"Kitchen day '{kitchen_day}' not configured for {entity_country}, using {fallback_day} configuration for billing")
-                                kitchen_day = fallback_day
+                    day_to_use = kitchen_day
+                    if not MarketConfiguration.is_kitchen_day_enabled(entity_country, day_to_use):
+                        if day_to_use in ('Saturday', 'Sunday'):
+                            if MarketConfiguration.is_kitchen_day_enabled(entity_country, 'Friday'):
+                                day_to_use = 'Friday'
+                                log_info(f"Using Friday config for {entity_country} weekend billing")
                             else:
-                                log_info(f"Kitchen day '{kitchen_day}' is disabled for market {entity_country} and no fallback available")
                                 continue
                         else:
-                            log_info(f"Kitchen day '{kitchen_day}' is disabled for market {entity_country}")
                             continue
-                    
-                    # Check for national holidays for this specific entity's country
                     from app.services.crud_service import national_holiday_service
                     if is_holiday(entity_country, bill_date, connection):
-                        log_info(f"Date {bill_date} is a national holiday for {entity_country}, skipping entity {entity_data['institution_entity_id']}")
+                        log_info(f"National holiday for {entity_country} on {bill_date}, skipping entity")
                         continue
-                    
-                    # Define period based on market-specific kitchen day closure
                     period_start, period_end = InstitutionBillingService._get_market_kitchen_day_period(
-                        bill_date, kitchen_day, entity_country
+                        bill_date, day_to_use, entity_country
                     )
-                    
-                    # Process each restaurant individually using the unified logic
                     for restaurant_id in entity_data["restaurant_ids"]:
-                        bill = InstitutionBillingService.create_bill_for_restaurant(
-                            restaurant_id, period_start, period_end, system_user_id, connection=connection
+                        settlement_number = f"SETT-{bill_date.isoformat()}-{str(restaurant_id)[:8]}"
+                        settlement = InstitutionBillingService.create_settlement_for_restaurant(
+                            restaurant_id,
+                            period_start,
+                            period_end,
+                            day_to_use,
+                            entity_country,
+                            settlement_number,
+                            system_user_id,
+                            settlement_run_id=settlement_run_id,
+                            connection=connection,
                         )
-                        
-                        if bill:
-                            bills_created += 1
-                            if bill.amount:
-                                total_amount += bill.amount
-                            restaurants_processed += 1
-                            
-                            log_info(f"Created bill {bill.institution_bill_id} for restaurant {restaurant_id} "
-                                   f"in market {entity_country}: ${bill.amount} {bill.currency_code}")
-                
+                        if settlement:
+                            settlements_created += 1
+                            if settlement.amount:
+                                total_amount += settlement.amount
                 except Exception as e:
-                    log_error(f"Error creating bill for entity {entity_data['institution_entity_id']}: {e}")
+                    log_error(f"Error creating settlements for entity {entity_data['institution_entity_id']}: {e}")
                     continue
-            
-            log_info(f"Kitchen day '{kitchen_day}' bill generation complete: {bills_created} bills created, "
-                   f"${total_amount} total, {restaurants_processed} restaurants processed")
-            
+            log_info(f"Phase 1 complete: {settlements_created} settlements, total {total_amount}")
+            return {
+                "settlements_created": settlements_created,
+                "total_amount": float(total_amount),
+                "settlement_run_id": str(settlement_run_id),
+                "kitchen_day": kitchen_day,
+                "country_code": country_code,
+                "period_start": period_start.isoformat() if period_start else None,
+                "period_end": period_end.isoformat() if period_end else None,
+            }
+        except Exception as e:
+            log_error(f"Error in Phase 1 settlements: {e}")
+            if connection:
+                connection.rollback()
+            return {
+                "settlements_created": 0,
+                "total_amount": 0.0,
+                "settlement_run_id": None,
+                "kitchen_day": None,
+                "country_code": country_code,
+                "error": str(e),
+            }
+    
+    @staticmethod
+    def run_phase2_bills_and_payout(
+        settlement_run_id: UUID,
+        system_user_id: UUID,
+        connection=None
+    ) -> Dict:
+        """
+        Phase 2: For each entity that has settlements in this run, create one bill
+        (amount = sum of that entity's settlements), link settlements to the bill,
+        then later tax doc + payout (stub for now).
+        No bill for entities with zero settlements (Phase 1 already created only balance > 0).
+        """
+        try:
+            settlements = get_settlements_by_run_id(settlement_run_id, connection)
+            if not settlements:
+                log_info("Phase 2: No settlements for this run")
+                return {"bills_created": 0, "total_amount": 0.0}
+            by_entity: Dict[UUID, List[InstitutionSettlementDTO]] = {}
+            for s in settlements:
+                by_entity.setdefault(s.institution_entity_id, []).append(s)
+            bills_created = 0
+            total_amount = Decimal('0.00')
+            for institution_entity_id, entity_settlements in by_entity.items():
+                institution_id = get_institution_id_by_entity(institution_entity_id, connection)
+                if not institution_id:
+                    log_warning(f"Institution not found for entity {institution_entity_id}, skipping")
+                    continue
+                amount = sum(s.amount for s in entity_settlements)
+                transaction_count = sum(s.transaction_count for s in entity_settlements)
+                first = entity_settlements[0]
+                bill_data = {
+                    "institution_id": institution_id,
+                    "institution_entity_id": institution_entity_id,
+                    "credit_currency_id": first.credit_currency_id,
+                    "transaction_count": transaction_count,
+                    "amount": amount,
+                    "currency_code": first.currency_code,
+                    "period_start": first.period_start,
+                    "period_end": first.period_end,
+                    "status": Status.PENDING,
+                    "resolution": BillResolution.PENDING.value,
+                    "modified_by": system_user_id,
+                }
+                commit = connection is None
+                bill = institution_bill_service.create(bill_data, connection, commit=commit)
+                if not bill:
+                    log_error(f"Failed to create bill for entity {institution_entity_id}")
+                    continue
+                for s in entity_settlements:
+                    institution_settlement_service.update(
+                        s.settlement_id,
+                        {"institution_bill_id": bill.institution_bill_id},
+                        connection,
+                        commit=commit,
+                    )
+                bills_created += 1
+                total_amount += amount
+                log_info(f"Created bill {bill.institution_bill_id} for entity {institution_entity_id}, amount={amount}")
+            log_info(f"Phase 2 complete: {bills_created} bills created, total {total_amount}")
             return {
                 "bills_created": bills_created,
                 "total_amount": float(total_amount),
-                "restaurants_processed": restaurants_processed,
-                "kitchen_day": kitchen_day,
-                "country_code": country_code,
-                "period_start": period_start.isoformat() if 'period_start' in locals() else None,
-                "period_end": period_end.isoformat() if 'period_end' in locals() else None
             }
-            
         except Exception as e:
-            log_error(f"Error in daily bill generation: {e}")
-            return {"bills_created": 0, "total_amount": 0.0, "restaurants_processed": 0}
-
+            log_error(f"Error in Phase 2 bills: {e}")
+            if connection:
+                connection.rollback()
+            return {"bills_created": 0, "total_amount": 0.0, "error": str(e)}
+    
+    @staticmethod
+    def run_daily_settlement_bill_and_payout(
+        bill_date: date,
+        system_user_id: UUID,
+        country_code: Optional[str] = None,
+        connection=None
+    ) -> Dict:
+        """
+        Full pipeline: Phase 1 (settlements per restaurant), Phase 2 (one bill per entity),
+        then for each bill: issue tax doc stub, trigger payout (mock/live), set payout fields, mark_paid.
+        Uses one connection; commits after each mark_paid (or once at end if no bills).
+        """
+        from app.services.billing.tax_doc_service import issue_tax_doc_for_bill
+        from app.services.supplier_payout import trigger_payout
+        own_conn = connection is None
+        if own_conn:
+            connection = get_db_connection()
+        try:
+            phase1 = InstitutionBillingService.run_phase1_settlements(
+                bill_date=bill_date,
+                system_user_id=system_user_id,
+                country_code=country_code,
+                connection=connection,
+            )
+            if phase1.get("error"):
+                return {"phase": "phase1", "error": phase1["error"], "settlements_created": 0}
+            if phase1.get("settlements_created", 0) == 0:
+                if own_conn:
+                    connection.commit()
+                return {
+                    "settlements_created": 0,
+                    "bills_created": 0,
+                    "bills_paid": 0,
+                    "settlement_run_id": phase1.get("settlement_run_id"),
+                    "message": "No restaurants had balance > 0. Check restaurant_balance_info has balance > 0 for at least one restaurant (e.g. after Post QR Code Scan).",
+                }
+            try:
+                settlement_run_id = UUID(phase1["settlement_run_id"]) if phase1.get("settlement_run_id") else None
+            except (KeyError, TypeError, ValueError) as e:
+                log_error(f"Invalid settlement_run_id from Phase 1: {e}")
+                if own_conn:
+                    connection.rollback()
+                return {"phase": "phase1", "error": f"Invalid settlement_run_id: {e}", "settlements_created": phase1.get("settlements_created", 0)}
+            phase2 = InstitutionBillingService.run_phase2_bills_and_payout(
+                settlement_run_id=settlement_run_id,
+                system_user_id=system_user_id,
+                connection=connection,
+            )
+            if phase2.get("error"):
+                return {"phase": "phase2", "error": phase2["error"], "settlements_created": phase1["settlements_created"]}
+            # Commit Phase 1 + Phase 2 so settlements and bills are persisted (API uses shared connection that does not auto-commit)
+            if not own_conn:
+                connection.commit()
+            settlements = get_settlements_by_run_id(settlement_run_id, connection)
+            bill_ids = [s.institution_bill_id for s in settlements if s.institution_bill_id]
+            cc = phase1.get("country_code") or country_code or "US"
+            bills_paid = 0
+            paid_bill_details: List[Dict] = []
+            for bill_id in bill_ids:
+                bill = institution_bill_service.get_by_id(bill_id, connection)
+                if not bill:
+                    continue
+                issue_tax_doc_for_bill(bill_id, cc, connection)
+                payout_result = trigger_payout(
+                    bill_id,
+                    bill.amount or Decimal("0"),
+                    bill.currency_code or "USD",
+                )
+                if not payout_result.get("success"):
+                    log_warning(f"Payout failed for bill {bill_id}: {payout_result.get('error')}")
+                    continue
+                institution_bill_service.update(
+                    bill_id,
+                    {
+                        "stripe_payout_id": payout_result.get("stripe_payout_id"),
+                        "payout_completed_at": datetime.now(timezone.utc),
+                    },
+                    connection,
+                    commit=False,
+                )
+                institution_bill_service.mark_paid(bill_id, system_user_id, connection)
+                bills_paid += 1
+                paid_bill_details.append({
+                    "institution_bill_id": str(bill_id),
+                    "stripe_payout_id": payout_result.get("stripe_payout_id"),
+                    "payout_completed_at": datetime.now(timezone.utc).isoformat(),
+                })
+            if own_conn:
+                connection.commit()
+            return {
+                "settlements_created": phase1["settlements_created"],
+                "bills_created": phase2.get("bills_created", 0),
+                "bills_paid": bills_paid,
+                "bill_ids": [str(b) for b in bill_ids],
+                "paid_bills": paid_bill_details,
+                "settlement_run_id": phase1.get("settlement_run_id"),
+                "total_amount": phase2.get("total_amount", 0.0),
+            }
+        except Exception as e:
+            log_error(f"Pipeline error: {e}")
+            if connection:
+                connection.rollback()
+            raise
+        finally:
+            if own_conn and connection:
+                close_db_connection(connection)
+    
+    @staticmethod
+    def get_settlement_report_by_run_id(
+        settlement_run_id: UUID,
+        connection=None
+    ) -> Dict:
+        """
+        Minimal settlement report for a run: list of settlements (per restaurant) and
+        per-entity summary. JSON-serializable payload; PDF/formal report can be added later.
+        """
+        settlements = get_settlements_by_run_id(settlement_run_id, connection)
+        if not settlements:
+            return {"settlement_run_id": str(settlement_run_id), "settlements": [], "by_entity": {}}
+        by_entity: Dict[str, List[Dict]] = {}
+        total_amount = Decimal('0.00')
+        for s in settlements:
+            total_amount += s.amount
+            row = {
+                "settlement_id": str(s.settlement_id),
+                "restaurant_id": str(s.restaurant_id),
+                "institution_entity_id": str(s.institution_entity_id),
+                "period_start": s.period_start.isoformat() if s.period_start else None,
+                "period_end": s.period_end.isoformat() if s.period_end else None,
+                "amount": float(s.amount),
+                "currency_code": s.currency_code,
+                "settlement_number": s.settlement_number,
+                "institution_bill_id": str(s.institution_bill_id) if s.institution_bill_id else None,
+            }
+            key = str(s.institution_entity_id)
+            by_entity.setdefault(key, []).append(row)
+        by_entity_summary = {
+            eid: {"count": len(rows), "amount": sum(r["amount"] for r in rows)}
+            for eid, rows in by_entity.items()
+        }
+        return {
+            "settlement_run_id": str(settlement_run_id),
+            "settlements": [{"settlement_id": str(s.settlement_id), "restaurant_id": str(s.restaurant_id), "amount": float(s.amount), "currency_code": s.currency_code, "settlement_number": s.settlement_number, "institution_bill_id": str(s.institution_bill_id) if s.institution_bill_id else None} for s in settlements],
+            "by_entity": by_entity_summary,
+            "total_settlements": len(settlements),
+            "total_amount": float(total_amount),
+        }
+    
+    @staticmethod
+    def get_settlement_report_by_bill_id(
+        institution_bill_id: UUID,
+        connection=None
+    ) -> Dict:
+        """Minimal report for one bill: its settlements (restaurant-level lines)."""
+        query = """
+            SELECT * FROM institution_settlement
+            WHERE institution_bill_id = %s
+            ORDER BY restaurant_id
+        """
+        results = db_read(query, (str(institution_bill_id),), connection=connection)
+        if not results:
+            return {"institution_bill_id": str(institution_bill_id), "settlements": []}
+        total = sum(float(r["amount"]) for r in results)
+        return {
+            "institution_bill_id": str(institution_bill_id),
+            "settlements": [{"settlement_id": str(r["settlement_id"]), "restaurant_id": str(r["restaurant_id"]), "amount": float(r["amount"]), "currency_code": r.get("currency_code"), "settlement_number": r.get("settlement_number")} for r in results],
+            "total_amount": total,
+        }
+    
     @staticmethod
     def _get_kitchen_day_for_date(target_date: date) -> str:
-        """Get the kitchen day name for a given date"""
-        # Check for dev override first
-        from app.config.settings import settings
-        if settings.DEV_OVERRIDE_DAY and settings.DEV_OVERRIDE_DAY.strip():
-            override_day = settings.DEV_OVERRIDE_DAY.strip().title()
-            valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            if override_day in valid_days:
-                log_info(f"🔧 DEV OVERRIDE: Using {override_day} instead of actual day for date {target_date}")
-                return override_day
-        
-        # Map date to day of week
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        day_index = target_date.weekday()  # Monday = 0, Sunday = 6
-        return day_names[day_index]
+        """Get the kitchen day name for a given date. Delegates to kitchen_day_service."""
+        from app.services.kitchen_day_service import date_to_kitchen_day
+        return date_to_kitchen_day(target_date)
 
     @staticmethod
     def _get_market_kitchen_day_period(target_date: date, kitchen_day: str, country_code: str) -> tuple[datetime, datetime]:
@@ -541,11 +728,12 @@ class InstitutionBillingService:
                     r.restaurant_id,
                     r.institution_id,
                     r.institution_entity_id,
-                    r.credit_currency_id,
+                    ie.credit_currency_id,
                     rb.transaction_count,
                     rb.balance,
                     rb.currency_code
                 FROM restaurant_info r
+                INNER JOIN institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
                 INNER JOIN restaurant_balance_info rb ON r.restaurant_id = rb.restaurant_id
                 WHERE r.is_archived = %s 
                 AND rb.is_archived = %s
@@ -555,75 +743,39 @@ class InstitutionBillingService:
             
             results = db_read(query, (False, False), connection=connection)
             if results:
-                return [
-                    {
-                        "restaurant_id": UUID(row[0]),
-                        "institution_id": UUID(row[1]),
-                        "institution_entity_id": UUID(row[2]),
-                        "credit_currency_id": UUID(row[3]),
-                        "transaction_count": row[4],
-                        "balance": Decimal(str(row[5])),
-                        "currency_code": row[6]
-                    }
-                    for row in results
-                ]
+                out = []
+                for row in results:
+                    try:
+                        if isinstance(row, dict):
+                            out.append({
+                                "restaurant_id": row["restaurant_id"] if isinstance(row.get("restaurant_id"), UUID) else UUID(str(row["restaurant_id"])),
+                                "institution_id": row["institution_id"] if isinstance(row.get("institution_id"), UUID) else UUID(str(row["institution_id"])),
+                                "institution_entity_id": row["institution_entity_id"] if isinstance(row.get("institution_entity_id"), UUID) else UUID(str(row["institution_entity_id"])),
+                                "credit_currency_id": row["credit_currency_id"] if isinstance(row.get("credit_currency_id"), UUID) else UUID(str(row["credit_currency_id"])),
+                                "transaction_count": row["transaction_count"],
+                                "balance": Decimal(str(row["balance"])),
+                                "currency_code": row["currency_code"]
+                            })
+                        else:
+                            # fallback if row is tuple (e.g. legacy path)
+                            out.append({
+                                "restaurant_id": row[0] if isinstance(row[0], UUID) else UUID(str(row[0])),
+                                "institution_id": row[1] if isinstance(row[1], UUID) else UUID(str(row[1])),
+                                "institution_entity_id": row[2] if isinstance(row[2], UUID) else UUID(str(row[2])),
+                                "credit_currency_id": row[3] if isinstance(row[3], UUID) else UUID(str(row[3])),
+                                "transaction_count": row[4],
+                                "balance": Decimal(str(row[5])),
+                                "currency_code": row[6]
+                            })
+                    except (KeyError, TypeError, IndexError) as e:
+                        log_error(f"Error parsing restaurant row (dict={isinstance(row, dict)}): {e}")
+                        continue
+                return out
             return []
             
         except Exception as e:
             log_error(f"Error getting restaurants with balances: {e}")
             return []
-
-    @staticmethod
-    def _create_bill_for_entity(entity_data: Dict, period_start: datetime, 
-                               period_end: datetime, system_user_id: UUID, connection=None) -> Optional[InstitutionBillDTO]:
-        """
-        Create a bill for an institution entity's aggregated balance during a specific period.
-        
-        Args:
-            entity_data: Aggregated entity data including total balance and transaction count
-            period_start: Start of billing period
-            period_end: End of billing period
-            system_user_id: User ID for system operations
-            
-        Returns:
-            InstitutionBill instance or None if creation failed
-        """
-        try:
-            # Check if a bill already exists for this entity and period
-            existing_bill = institution_bill_service.get_by_entity_and_period(
-                entity_data["institution_entity_id"], period_start, period_end, connection
-            )
-            
-            if existing_bill:
-                log_info(f"Bill already exists for entity {entity_data['institution_entity_id']} "
-                        f"period {period_start} to {period_end}")
-                return existing_bill
-            
-            # Create new bill for the institution entity
-            bill_data = {
-                "institution_id": entity_data["institution_id"],
-                "institution_entity_id": entity_data["institution_entity_id"],
-                "restaurant_id": entity_data["restaurant_ids"][0],  # Use first restaurant as primary
-                "credit_currency_id": entity_data["credit_currency_id"],
-                "period_start": period_start,
-                "period_end": period_end,
-                "amount": entity_data["total_balance"],
-                "currency_code": entity_data["currency_code"],
-                "transaction_count": entity_data["total_transactions"],
-                "status": Status.PENDING,
-                "resolution": "Pending",
-                "modified_by": system_user_id
-            }
-            
-            bill = institution_bill_service.create(bill_data, connection)
-            log_info(f"Created bill {bill.institution_bill_id} for entity {entity_data['institution_entity_id']}: "
-                    f"${bill.amount} ({bill.transaction_count} transactions, {entity_data['restaurant_count']} restaurants)")
-            
-            return bill
-            
-        except Exception as e:
-            log_error(f"Error creating bill for entity {entity_data['institution_entity_id']}: {e}")
-            return None
 
     @staticmethod
     def _aggregate_restaurants_by_entity(restaurants: List[Dict]) -> List[Dict]:
@@ -685,93 +837,6 @@ class InstitutionBillingService:
             return []
 
     @staticmethod
-    def mark_bill_paid(bill_id: UUID, payment_id: UUID, modified_by: UUID, connection=None) -> bool:
-        """Mark a bill as paid"""
-        try:
-            return institution_bill_service.mark_paid(bill_id, payment_id, modified_by, connection)
-        except Exception as e:
-            log_error(f"Error marking bill {bill_id} as paid: {e}")
-            return False
-    
-    @staticmethod
-    def record_manual_payment(bill_id: UUID, bank_account_id: UUID, external_transaction_id: str, transaction_result: str, user_id: UUID, connection=None) -> Dict:
-        """
-        Record a manual payment for a bill (MVP - manual bank payments).
-        Creates payment_attempt and marks bill as paid atomically.
-        
-        Args:
-            bill_id: UUID of the bill to mark as paid
-            bank_account_id: UUID of the bank account used for payment
-            external_transaction_id: Transaction ID from the bank
-            transaction_result: Result of the transaction (default "Approved")
-            user_id: User ID performing the operation
-            connection: Database connection
-            
-        Returns:
-            Dict with payment_id and updated bill info
-        """
-        from app.services.crud_service import institution_payment_attempt_service, institution_bill_service
-        from datetime import datetime
-        
-        try:
-            # 1. Validate bill exists and is not already paid/cancelled
-            bill = institution_bill_service.get_by_id(bill_id, connection)
-            if not bill:
-                raise HTTPException(status_code=404, detail=f"Bill {bill_id} not found")
-            
-            if bill.status == Status.PROCESSED:
-                raise HTTPException(status_code=400, detail="Bill is already paid")
-            
-            if bill.status == Status.CANCELLED:
-                raise HTTPException(status_code=400, detail="Cannot pay a cancelled bill")
-            
-            # 2. Create payment attempt record
-            payment_data = {
-                "institution_entity_id": bill.institution_entity_id,
-                "bank_account_id": bank_account_id,
-                "institution_bill_id": bill_id,
-                "credit_currency_id": bill.credit_currency_id,
-                "amount": bill.amount,
-                "currency_code": bill.currency_code,
-                "transaction_result": transaction_result,
-                "external_transaction_id": external_transaction_id,
-                "status": Status.COMPLETE,
-                "resolution_date": datetime.utcnow()
-            }
-            
-            payment_attempt = institution_payment_attempt_service.create(payment_data, connection)
-            if not payment_attempt:
-                raise HTTPException(status_code=500, detail="Failed to create payment attempt")
-            
-            # 3. Update bill to mark as paid
-            bill_update_data = {
-                "status": Status.PROCESSED,
-                "resolution": "Paid",
-                "payment_id": payment_attempt.payment_id,
-                "modified_by": user_id
-            }
-            
-            updated_bill = institution_bill_service.update(bill_id, bill_update_data, connection)
-            if not updated_bill:
-                raise HTTPException(status_code=500, detail="Failed to update bill")
-            
-            log_info(f"Recorded manual payment for bill {bill_id}: payment_id={payment_attempt.payment_id}, external_txn={external_transaction_id}")
-            
-            return {
-                "payment_id": payment_attempt.payment_id,
-                "bill_id": bill_id,
-                "status": Status.PROCESSED.value,  # Return enum value as string
-                "resolution": "Paid",
-                "external_transaction_id": external_transaction_id
-            }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            log_error(f"Error recording manual payment for bill {bill_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to record payment: {str(e)}")
-    
-    @staticmethod
     def cancel_bill(bill_id: UUID, user_id: UUID, connection=None) -> Dict:
         """
         Cancel a bill (MVP - for administrative corrections).
@@ -799,10 +864,10 @@ class InstitutionBillingService:
             if bill.status == Status.CANCELLED:
                 raise HTTPException(status_code=400, detail="Bill is already cancelled")
             
-            # 2. Update bill to cancelled status
+            # 2. Update bill to cancelled/rejected status
             bill_update_data = {
                 "status": Status.CANCELLED,
-                "resolution": "Cancelled",
+                "resolution": BillResolution.REJECTED.value,
                 "modified_by": user_id
             }
             
@@ -815,7 +880,7 @@ class InstitutionBillingService:
             return {
                 "bill_id": bill_id,
                 "status": Status.CANCELLED.value,  # Return enum value as string
-                "resolution": "Cancelled",
+                "resolution": BillResolution.REJECTED.value,
                 "message": "Bill cancelled successfully"
             }
             
@@ -943,10 +1008,17 @@ class InstitutionBillingService:
             total_reset_amount = Decimal('0.00')
             
             for row in results:
-                restaurant_id = row[0]
-                current_balance = Decimal(str(row[1]))
-                currency_code = row[2]
-                credit_currency_id = row[3]
+                # db_read returns list of dicts (column names as keys)
+                if isinstance(row, dict):
+                    restaurant_id = row["restaurant_id"] if isinstance(row.get("restaurant_id"), UUID) else UUID(str(row["restaurant_id"]))
+                    current_balance = Decimal(str(row["balance"]))
+                    currency_code = row["currency_code"]
+                    credit_currency_id = row["credit_currency_id"] if isinstance(row.get("credit_currency_id"), UUID) else UUID(str(row["credit_currency_id"]))
+                else:
+                    restaurant_id = row[0]
+                    current_balance = Decimal(str(row[1]))
+                    currency_code = row[2]
+                    credit_currency_id = row[3]
                 
                 try:
                     # Reset balance to 0
