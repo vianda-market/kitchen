@@ -141,43 +141,9 @@ def get_city_metrics(
     restaurant_count = int(count_row["cnt"]) if count_row else 0
     has_coverage = restaurant_count > 0
 
-    # 4) Optional center: avg lat/lng from geolocation for addresses in matched_city (Active + plate_kitchen_days)
-    center: Optional[dict] = None
-    if matched_city and has_coverage:
-        query_center = """
-            SELECT AVG(g.latitude) AS lat, AVG(g.longitude) AS lng
-            FROM geolocation_info g
-            INNER JOIN address_info a ON g.address_id = a.address_id
-            INNER JOIN restaurant_info r ON r.address_id = a.address_id
-            WHERE a.country_code = %s
-              AND TRIM(a.city) = %s
-              AND a.is_archived = FALSE
-              AND r.is_archived = FALSE
-              AND r.status = 'Active'
-              AND EXISTS (
-                SELECT 1 FROM plate_info p
-                INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
-                WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
-              )
-              AND EXISTS (
-                SELECT 1 FROM qr_code qc
-                WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
-              )
-              AND g.is_archived = FALSE
-        """
-        center_row = db_read(
-            query_center,
-            (country, matched_city),
-            connection=db,
-            fetch_one=True,
-        )
-        if center_row and center_row.get("lat") is not None and center_row.get("lng") is not None:
-            center = {"lat": float(center_row["lat"]), "lng": float(center_row["lng"])}
-
     return {
         "requested_city": requested or "",
         "matched_city": matched_city or requested or "",
         "restaurant_count": restaurant_count,
         "has_coverage": has_coverage,
-        "center": center,
     }

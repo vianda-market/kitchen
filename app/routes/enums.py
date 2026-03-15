@@ -18,7 +18,7 @@ from app.utils.log import log_info, log_error
 router = APIRouter(prefix="/enums", tags=["Enums"])
 
 
-@router.get("/")
+@router.get("")
 async def get_all_enums(
     current_user: dict = Depends(get_current_user)
 ):

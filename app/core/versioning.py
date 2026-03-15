@@ -220,7 +220,7 @@ from app.core.versioning import create_versioned_router, get_current_version, AP
 # Create versioned router
 router = create_versioned_router("plans", ["Plans"], APIVersion.V1)
 
-@router.get("/")
+@router.get("")
 def get_plans(version: APIVersion = Depends(get_current_version)):
     # Handle version-specific logic
     pass

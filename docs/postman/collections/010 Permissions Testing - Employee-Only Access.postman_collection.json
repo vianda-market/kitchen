@@ -495,7 +495,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/employers/",
+							"raw": "{{baseUrl}}/api/v1/employers",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -596,7 +596,7 @@
 							"raw": "{\n  \"name\": \"Test Employer\",\n  \"address\": {\n    \"institution_id\": \"{{institutionAId}}\",\n    \"user_id\": \"{{customerUserId}}\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country_code\": \"AR\",\n    \"province\": \"Ciudad Aut\u00f3noma de Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"St\",\n    \"street_name\": \"Test Street\",\n    \"building_number\": \"123\"\n  }\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/employers/",
+							"raw": "{{baseUrl}}/api/v1/employers",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -671,7 +671,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/employers/{{testEmployerId}}/addresses",
+							"raw": "{{baseUrl}}/api/v1/employers{{testEmployerId}}/addresses",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -759,7 +759,7 @@
 							"raw": "{\n  \"institution_id\": \"{{institutionAId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\"Customer Employer\"],\n  \"country_code\": \"AR\",\n  \"province\": \"C\u00f3rdoba\",\n  \"city\": \"Cordoba\",\n  \"postal_code\": \"5000\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Col\u00f3n\",\n  \"building_number\": \"456\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/employers/{{testEmployerId}}/addresses",
+							"raw": "{{baseUrl}}/api/v1/employers{{testEmployerId}}/addresses",
 							"host": [
 								"{{baseUrl}}"
 							],

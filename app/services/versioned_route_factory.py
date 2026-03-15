@@ -77,7 +77,7 @@ def create_versioned_crud_routes(
     router = create_versioned_router(config.prefix, config.tags, version)
     
     # Add version-aware endpoints
-    @router.get("/", response_model=List[response_schema])
+    @router.get("", response_model=List[response_schema])
     def get_all_entities(
         current_version: APIVersion = Depends(get_current_version)
     ):
@@ -96,7 +96,7 @@ def create_versioned_crud_routes(
         # Add version info to response
         return add_version_info_to_response({}, current_version)
     
-    @router.post("/", response_model=response_schema)
+    @router.post("", response_model=response_schema)
     def create_entity(
         create_data: create_schema,
         current_version: APIVersion = Depends(get_current_version)

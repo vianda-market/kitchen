@@ -154,8 +154,8 @@ def create_crud_routes(
             extra_kwargs={"scope": scope} if config.institution_scoped else None
         )
     
-    # GET /
-    @router.get("/", response_model=List[response_schema])
+    # GET (collection root - no trailing slash per REST convention)
+    @router.get("", response_model=List[response_schema])
     def get_all_entities(
         current_user: dict = Depends(get_current_user),
         db: psycopg2.extensions.connection = Depends(get_db)
@@ -174,17 +174,8 @@ def create_crud_routes(
 
         return handle_get_all(service_callable, db, config.entity_name_plural)
     
-    # GET (without trailing slash) - alias
-    @router.get("", response_model=List[response_schema])
-    def get_all_entities_no_trailing_slash(
-        current_user: dict = Depends(get_current_user),
-        db: psycopg2.extensions.connection = Depends(get_db)
-    ):
-        """Alias for get_all_entities endpoint without trailing slash"""
-        return get_all_entities(current_user, db)
-    
-    # POST /
-    @router.post("/", response_model=response_schema, status_code=status.HTTP_201_CREATED)
+    # POST (collection root - no trailing slash per REST convention)
+    @router.post("", response_model=response_schema, status_code=status.HTTP_201_CREATED)
     def create_entity(
         create_data: create_schema,
         current_user: dict = Depends(get_current_user),
@@ -214,16 +205,6 @@ def create_crud_routes(
             return service.create(payload, connection, scope=scope)
 
         return handle_create(create_callable, data, db, config.entity_name)
-    
-    # POST (without trailing slash) - alias
-    @router.post("", response_model=response_schema, status_code=status.HTTP_201_CREATED)
-    def create_entity_no_trailing_slash(
-        create_data: create_schema,
-        current_user: dict = Depends(get_current_user),
-        db: psycopg2.extensions.connection = Depends(get_db)
-    ):
-        """Alias for create_entity endpoint without trailing slash"""
-        return create_entity(create_data, current_user, db)
     
     # PUT /{entity_id} - Only include if entity allows modification
     if allows_modification:
@@ -378,7 +359,7 @@ def create_product_routes() -> APIRouter:
     product_image_service = ProductImageService()
 
     def _product_custom_routes(router: APIRouter) -> None:
-        @router.post("/", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
+        @router.post("", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_product_with_image_validation(
             create_data: ProductCreateSchema,
             current_user: dict = Depends(get_current_user),
@@ -445,7 +426,7 @@ def create_product_routes() -> APIRouter:
                 product_image_service.delete_image(product.image_storage_path, old_thumb)
             return updated_product
 
-        @router.get("/enriched/", response_model=List[ProductEnrichedResponseSchema])
+        @router.get("/enriched", response_model=List[ProductEnrichedResponseSchema])
         def list_enriched_products(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -521,7 +502,7 @@ def create_plan_routes() -> APIRouter:
     )
     
     # Define GET endpoints first with proper access control (Clients and Employees only, not Suppliers)
-    @router.get("/", response_model=List[PlanResponseSchema])
+    @router.get("", response_model=List[PlanResponseSchema])
     def get_all_plans(
         current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
         db: psycopg2.extensions.connection = Depends(get_db)
@@ -550,7 +531,7 @@ def create_plan_routes() -> APIRouter:
         )
     
     # Override POST/PUT/DELETE endpoints to be Employee-only
-    @router.post("/", response_model=PlanResponseSchema, status_code=status.HTTP_201_CREATED)
+    @router.post("", response_model=PlanResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_plan(
         create_data: PlanCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Employee-only
@@ -605,7 +586,7 @@ def create_plan_routes() -> APIRouter:
     # ENRICHED PLAN ENDPOINTS (with currency_name and currency_code)
     # =============================================================================
     
-    @router.get("/enriched/", response_model=List[PlanEnrichedResponseSchema])
+    @router.get("/enriched", response_model=List[PlanEnrichedResponseSchema])
     def list_enriched_plans(
         market_id: Optional[UUID] = market_filter(),
         status: Optional[str] = status_filter(),
@@ -682,7 +663,7 @@ def create_credit_currency_routes() -> APIRouter:
     )
     
     # Define all endpoints with Employee-only access (Suppliers use credit_currency data via plates, but can't access API directly)
-    @router.get("/", response_model=List[CreditCurrencyResponseSchema])
+    @router.get("", response_model=List[CreditCurrencyResponseSchema])
     def get_all_credit_currencies(
         current_user: dict = Depends(get_employee_user),  # Employee-only
         db: psycopg2.extensions.connection = Depends(get_db)
@@ -709,7 +690,7 @@ def create_credit_currency_routes() -> APIRouter:
             extra_kwargs={"scope": scope} if config.institution_scoped else None
         )
     
-    @router.post("/", response_model=CreditCurrencyResponseSchema, status_code=status.HTTP_201_CREATED)
+    @router.post("", response_model=CreditCurrencyResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_credit_currency(
         create_data: CreditCurrencyCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Employee-only
@@ -805,7 +786,7 @@ def create_subscription_routes() -> APIRouter:
     )
     
     def _subscription_custom_routes(router: APIRouter) -> None:
-        @router.get("/", response_model=List[SubscriptionResponseSchema])
+        @router.get("", response_model=List[SubscriptionResponseSchema])
         def list_subscriptions_override(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -883,7 +864,7 @@ def create_subscription_routes() -> APIRouter:
                 raise HTTPException(status_code=401, detail="User ID not found in token")
             return resume_subscription(subscription_id, user_id, db)
 
-        @router.get("/enriched/", response_model=List[SubscriptionEnrichedResponseSchema])
+        @router.get("/enriched", response_model=List[SubscriptionEnrichedResponseSchema])
         def list_enriched_subscriptions(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -970,7 +951,7 @@ def create_institution_routes() -> APIRouter:
     
     def _institution_custom_routes(router: APIRouter) -> None:
         """Custom institution routes — registered first so they take precedence over generic CRUD."""
-        @router.get("/", response_model=List[InstitutionResponseSchema])
+        @router.get("", response_model=List[InstitutionResponseSchema])
         def get_all_institutions(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -980,14 +961,6 @@ def create_institution_routes() -> APIRouter:
             def service_callable(connection: psycopg2.extensions.connection):
                 return institution_service.get_all(connection, scope=scope, include_archived=False)
             return handle_get_all(service_callable, db, "institutions")
-        
-        @router.get("", response_model=List[InstitutionResponseSchema])
-        def get_all_institutions_no_trailing(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """Alias for get_all_institutions"""
-            return get_all_institutions(current_user, db)
         
         @router.get("/{entity_id}", response_model=InstitutionResponseSchema)
         def get_institution(
@@ -1064,7 +1037,7 @@ def create_institution_routes() -> APIRouter:
             handle_delete(delete_callable, entity_id, db, "institution")
             return {"detail": "Institution deleted successfully"}
         
-        @router.post("/", response_model=InstitutionResponseSchema, status_code=status.HTTP_201_CREATED)
+        @router.post("", response_model=InstitutionResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_institution(
             create_data: InstitutionCreateSchema,
             current_user: dict = Depends(get_admin_user),
@@ -1121,7 +1094,7 @@ def create_payment_method_routes() -> APIRouter:
         from app.utils.log import log_info
         from app.utils.db import db_read
         
-        @router.post("/", response_model=PaymentMethodResponseSchema, status_code=status.HTTP_201_CREATED)
+        @router.post("", response_model=PaymentMethodResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_payment_method(
             create_data: PaymentMethodCreateSchema,
             current_user: dict = Depends(get_current_user),
@@ -1153,16 +1126,7 @@ def create_payment_method_routes() -> APIRouter:
                 )
             return handle_business_operation(_create_payment_method, "payment method creation", "Payment method created successfully")
 
-        @router.post("", response_model=PaymentMethodResponseSchema, status_code=status.HTTP_201_CREATED)
-        def create_payment_method_no_trailing_slash(
-            create_data: PaymentMethodCreateSchema,
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """Alias for create_payment_method endpoint without trailing slash"""
-            return create_payment_method(create_data, current_user, db)
-
-        @router.get("/enriched/", response_model=List[PaymentMethodEnrichedResponseSchema])
+        @router.get("/enriched", response_model=List[PaymentMethodEnrichedResponseSchema])
         def list_enriched_payment_methods(
             current_user: dict = Depends(get_employee_or_customer_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -1224,7 +1188,7 @@ def create_plate_routes() -> APIRouter:
     )
     
     def _plate_custom_routes(router: APIRouter) -> None:
-        @router.get("/", response_model=List[PlateResponseSchema])
+        @router.get("", response_model=List[PlateResponseSchema])
         def get_all_plates(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
@@ -1257,7 +1221,7 @@ def create_plate_routes() -> APIRouter:
                 extra_kwargs={"scope": scope} if scope else None
             )
 
-        @router.get("/enriched/", response_model=List[PlateEnrichedResponseSchema])
+        @router.get("/enriched", response_model=List[PlateEnrichedResponseSchema])
         def list_enriched_plates(
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)

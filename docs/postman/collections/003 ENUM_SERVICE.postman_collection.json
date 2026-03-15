@@ -175,7 +175,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/",
+							"raw": "{{baseUrl}}/api/v1/enums",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", ""]
 						}
@@ -222,7 +222,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/status",
+							"raw": "{{baseUrl}}/api/v1/enumsstatus",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", "status"]
 						}
@@ -265,7 +265,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/subscription_status",
+							"raw": "{{baseUrl}}/api/v1/enumssubscription_status",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", "subscription_status"]
 						}
@@ -304,7 +304,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/role_type",
+							"raw": "{{baseUrl}}/api/v1/enumsrole_type",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", "role_type"]
 						}
@@ -356,7 +356,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/",
+							"raw": "{{baseUrl}}/api/v1/enums",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", ""]
 						}
@@ -397,7 +397,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/invalid_enum_name",
+							"raw": "{{baseUrl}}/api/v1/enumsinvalid_enum_name",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", "invalid_enum_name"]
 						}
@@ -422,7 +422,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/enums/",
+							"raw": "{{baseUrl}}/api/v1/enums",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", ""]
 						}
@@ -472,7 +472,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines/",
+							"raw": "{{baseUrl}}/api/v1/cuisines",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "cuisines", ""]
 						}

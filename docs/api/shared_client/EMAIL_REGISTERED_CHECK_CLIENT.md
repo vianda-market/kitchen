@@ -23,7 +23,7 @@ This endpoint lets the frontend **check on first input** (after city/zipcode) so
 
 **Authentication**: None (public). Same as other lead endpoints (city-metrics, cities).
 
-**Rate limiting**: Maximum **5 requests per 60 seconds per IP** (shared with all lead endpoints: cities, city-metrics, zipcode-metrics, email-registered). The **6th request** returns **429** and the user must wait **60 seconds** before retrying. After cooldown, a **human check** (e.g. CAPTCHA) may be required in a future release—see roadmap.
+**Rate limiting**: Maximum **10 requests per minute per IP** for this endpoint. Other lead endpoints (cities, city-metrics, zipcode-metrics) have separate limits (20/min). When exceeded, the API returns **429 Too Many Requests**. After cooldown, a **human check** (e.g. CAPTCHA) may be required in a future release—see roadmap.
 
 ### Query parameters
 
@@ -55,7 +55,7 @@ or
 | Status | When | Body |
 |--------|------|------|
 | **400** | Invalid or missing `email` (empty or no `@`) | `{ "detail": "Valid email is required" }` |
-| **429** | Rate limit exceeded (6th request within 60s) | `{ "detail": "Too many requests. Please try again in 60 seconds." }` |
+| **429** | Rate limit exceeded (10/min per IP) | `{ "detail": "Rate limit exceeded." }` |
 
 ---
 
@@ -63,7 +63,7 @@ or
 
 Returning “registered” vs “not registered” does allow **email enumeration**. Mitigations in place:
 
-- **Rate limiting**: 5 requests per 60 seconds per IP (all lead endpoints share this limit). On the 6th request the user is blocked for 60 seconds. **Roadmap**: after cooldown, require a human check (e.g. CAPTCHA) before allowing further requests—see [LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md](../../roadmap/LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md).
+- **Rate limiting**: 10 requests per minute per IP for this endpoint. When exceeded, 429 is returned. **Roadmap**: after cooldown, require a human check (e.g. CAPTCHA) before allowing further requests—see [LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md](../../roadmap/LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md).
 
 The B2C app typically calls this once per “See restaurants near you” submission. If the endpoint is unavailable (e.g. 404/501), the client can treat the result as “not registered” and still show “Continue to register”.
 
@@ -90,6 +90,6 @@ The B2C app typically calls this once per “See restaurants near you” submiss
 | Auth       | None |
 | Query      | `email` (required) |
 | Response   | `{ "registered": boolean }` |
-| Rate limit | 5 req / 60 s per IP (all lead endpoints). 6th request → 429 for 60s. |
+| Rate limit | 10 req/min per IP. Exceeded → 429. |
 | Purpose    | Route user to login vs signup on first input; do not ask to register when email is already known. |
 | Roadmap    | Human check (e.g. CAPTCHA) after cooldown—see [LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md](../../roadmap/LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md). |

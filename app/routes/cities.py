@@ -19,7 +19,7 @@ from app.config.supported_cities import GLOBAL_CITY_ID
 router = APIRouter(prefix="/cities", tags=["Cities"])
 
 
-@router.get("/", response_model=List[CityResponseSchema])
+@router.get("", response_model=List[CityResponseSchema])
 async def list_cities(
     country_code: Optional[str] = Query(None, description="Filter by ISO 3166-1 alpha-2 country code (e.g. AR, PE)"),
     province_code: Optional[str] = Query(None, description="Filter by province/state code (e.g. WA, FL). Use with country_code for cascading dropdown."),

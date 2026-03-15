@@ -51,7 +51,7 @@ def _restaurant_transaction_not_found() -> HTTPException:
 
 
 # GET /restaurant-transactions/ – Get all restaurant transactions (read-only)
-@router.get("/", response_model=List[RestaurantTransactionResponseSchema])
+@router.get("", response_model=List[RestaurantTransactionResponseSchema])
 def get_all_restaurant_transactions(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -129,7 +129,7 @@ def get_restaurant_transaction(
 
 
 # GET /restaurant-transactions/enriched/ – Get all enriched restaurant transactions (read-only)
-@router.get("/enriched/", response_model=List[RestaurantTransactionEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[RestaurantTransactionEnrichedResponseSchema])
 def get_all_enriched_restaurant_transactions(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

@@ -30,7 +30,7 @@ router = APIRouter(
 discretionary_service = DiscretionaryService()
 
 
-@router.post("/requests/", response_model=DiscretionaryResponseSchema)
+@router.post("/requests", response_model=DiscretionaryResponseSchema)
 def create_discretionary_request(
     request: DiscretionaryCreateSchema,
     current_user: dict = Depends(get_employee_user),
@@ -55,7 +55,7 @@ def create_discretionary_request(
     return discretionary_request
 
 
-@router.get("/requests/", response_model=List[DiscretionaryResponseSchema])
+@router.get("/requests", response_model=List[DiscretionaryResponseSchema])
 def get_discretionary_requests(
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -133,7 +133,7 @@ def update_discretionary_request(
     return updated_request
 
 
-@router.get("/pending-requests/", response_model=List[DiscretionarySummarySchema])
+@router.get("/pending-requests", response_model=List[DiscretionarySummarySchema])
 def get_pending_discretionary_requests(
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
     db: psycopg2.extensions.connection = Depends(get_db)

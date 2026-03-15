@@ -182,7 +182,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{testInstitutionId}}\",\n  \"user_id\": \"{{testUserId}}\",\n  \"address_type\": [\"Restaurant\"],\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1000\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"1234\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				}
 			]
@@ -228,7 +228,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{testInstitutionId}}\",\n  \"user_id\": \"{{testUserId}}\",\n  \"address_type\": [\"Restaurant\"],\n  \"country_code\": \"XX\",\n  \"province\": \"SomeProvince\",\n  \"city\": \"SomeCity\",\n  \"postal_code\": \"00000\",\n  \"street_type\": \"St\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"777\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				}
 			]

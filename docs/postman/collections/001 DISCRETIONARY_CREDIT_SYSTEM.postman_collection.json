@@ -278,7 +278,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/users/enriched/",
+							"raw": "{{baseUrl}}/api/v1/users/enriched",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "users", "enriched", ""]
 						}
@@ -364,7 +364,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/restaurants/",
+							"raw": "{{baseUrl}}/api/v1/restaurants",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "restaurants", ""]
 						}
@@ -462,7 +462,7 @@
 							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Marketing campaign credit for new customer\",\n    \"amount\": 15.50,\n    \"comment\": \"Additional context for admin review\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -562,7 +562,7 @@
 							"raw": "{\n    \"restaurant_id\": \"{{testRestaurantId}}\",\n    \"category\": \"Full Order Refund\",\n    \"reason\": \"Full refund for order incorrectly processed by restaurant\",\n    \"amount\": 25.00,\n    \"comment\": \"Additional notes for admin review\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -647,7 +647,7 @@
 							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Credit Refund\",\n    \"reason\": \"Customer requested refund for service issue\",\n    \"amount\": 20.00,\n    \"comment\": \"Credit refund request - leave pending for UI testing\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -715,7 +715,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -773,7 +773,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/pending-requests/",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/pending-requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "pending-requests", ""]
 						}
@@ -837,7 +837,7 @@
 							"raw": "{\n    \"amount\": 20.00,\n    \"comment\": \"Updated amount based on customer feedback\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/{{clientCreditRequestId}}",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests{{clientCreditRequestId}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", "{{clientCreditRequestId}}"]
 						}
@@ -903,7 +903,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "pending-requests", ""]
 						}
@@ -968,7 +968,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests{{clientCreditRequestId}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}"]
 						}
@@ -1042,7 +1042,7 @@
 							"raw": "{\n    \"resolution_comment\": \"Request approved based on customer service logs and delivery confirmation\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}/approve",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests{{clientCreditRequestId}}/approve",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}", "approve"]
 						}
@@ -1116,7 +1116,7 @@
 							"raw": "{\n    \"resolution_comment\": \"Insufficient evidence provided for the quality complaint. Please provide delivery timestamps and customer photos.\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{restaurantCreditRequestId}}/reject",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests{{restaurantCreditRequestId}}/reject",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{restaurantCreditRequestId}}", "reject"]
 						}
@@ -1182,7 +1182,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", ""]
 						}
@@ -1232,7 +1232,7 @@
 							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"Marketing Campaign\",\n    \"reason\": \"Invalid negative amount test\",\n    \"amount\": -5.00,\n    \"comment\": \"This should fail validation\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -1277,7 +1277,7 @@
 							"raw": "{\n    \"user_id\": \"{{testUserId}}\",\n    \"category\": \"invalid_category\",\n    \"reason\": \"This should fail because category is not a valid enum value\",\n    \"amount\": 10.00,\n    \"comment\": \"Invalid category test\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}
@@ -1320,7 +1320,7 @@
 							"raw": "{\n    \"resolution_comment\": \"Testing non-existent request\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/00000000-0000-0000-0000-000000000000/approve",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests00000000-0000-0000-0000-000000000000/approve",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", "00000000-0000-0000-0000-000000000000", "approve"]
 						}
@@ -1363,7 +1363,7 @@
 							"raw": "{\n    \"resolution_comment\": \"Trying to approve already approved request\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests/{{clientCreditRequestId}}/approve",
+							"raw": "{{baseUrl}}/api/v1/super-admin/discretionary/requests{{clientCreditRequestId}}/approve",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "super-admin", "discretionary", "requests", "{{clientCreditRequestId}}", "approve"]
 						}
@@ -1403,7 +1403,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/pending-requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "pending-requests", ""]
 						}
@@ -1428,7 +1428,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests/",
+							"raw": "{{baseUrl}}/api/v1/admin/discretionary/requests",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "admin", "discretionary", "requests", ""]
 						}

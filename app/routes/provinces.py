@@ -26,7 +26,7 @@ class SupportedProvinceSchema(BaseModel):
     country_code: str = Field(..., description="ISO 3166-1 alpha-2 country code (e.g. US)")
 
 
-@router.get("/", response_model=List[SupportedProvinceSchema])
+@router.get("", response_model=List[SupportedProvinceSchema])
 async def list_supported_provinces(
     country_code: Optional[str] = Query(
         None,

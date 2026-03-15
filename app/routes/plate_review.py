@@ -28,7 +28,7 @@ router = APIRouter(
 # Customer-only: use get_client_user
 
 
-@router.post("/", response_model=PlateReviewResponseSchema, status_code=201)
+@router.post("", response_model=PlateReviewResponseSchema, status_code=201)
 def create_plate_review(
     payload: PlateReviewCreateSchema,
     current_user: dict = Depends(get_client_user),

@@ -94,7 +94,7 @@
 									"const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl') || 'http://localhost:8000';",
 									"const token = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken');",
 									"pm.sendRequest({",
-									"    url: baseUrl + '/api/v1/addresses/',",
+									"    url: baseUrl + '/api/v1/addresses',",
 									"    method: 'GET',",
 									"    header: {",
 									"        'Authorization': 'Bearer ' + token",
@@ -148,7 +148,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/",
+							"raw": "{{baseUrl}}/api/v1/addresses",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "addresses", ""],
 							"query": []
@@ -197,7 +197,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/{{testAddressId}}",
+							"raw": "{{baseUrl}}/api/v1/addresses{{testAddressId}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "addresses", "{{testAddressId}}"]
 						}

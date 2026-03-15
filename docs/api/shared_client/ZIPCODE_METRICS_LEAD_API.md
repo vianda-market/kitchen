@@ -55,7 +55,6 @@ JSON body with this shape:
 | `matched_zipcode`    | string  | Zipcode used for the count (exact match if available, otherwise a fallback in the country). |
 | `restaurant_count`   | number  | Number of restaurants in the matched zipcode (in that country). |
 | `has_coverage`       | boolean | `true` if `restaurant_count > 0`. |
-| `center`             | object or null | Optional `{ "lat": number, "lng": number }` for the matched area; may be `null`. |
 
 **Example**
 
@@ -64,11 +63,7 @@ JSON body with this shape:
   "requested_zipcode": "90210",
   "matched_zipcode": "90210",
   "restaurant_count": 5,
-  "has_coverage": true,
-  "center": {
-    "lat": 34.0901,
-    "lng": -118.4065
-  }
+  "has_coverage": true
 }
 ```
 
@@ -77,8 +72,7 @@ JSON body with this shape:
   "requested_zipcode": "99999",
   "matched_zipcode": "90210",
   "restaurant_count": 0,
-  "has_coverage": false,
-  "center": null
+  "has_coverage": false
 }
 ```
 

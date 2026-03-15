@@ -103,7 +103,7 @@ def _validate_not_national_holiday(
         )
 
 
-@router.get("/", response_model=List[RestaurantHolidayResponseSchema])
+@router.get("", response_model=List[RestaurantHolidayResponseSchema])
 def list_restaurant_holidays(
     restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
     current_user: dict = Depends(get_current_user),
@@ -172,7 +172,7 @@ def get_restaurant_holiday(
     return handle_business_operation(get_operation, "restaurant holiday retrieval", None, db)
 
 
-@router.post("/", response_model=RestaurantHolidayResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=RestaurantHolidayResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_restaurant_holiday(
     payload: RestaurantHolidayCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -427,7 +427,7 @@ def delete_restaurant_holiday(
     return None
 
 
-@router.get("/enriched/", response_model=List[RestaurantHolidayEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[RestaurantHolidayEnrichedResponseSchema])
 def list_enriched_restaurant_holidays(
     restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant ID"),
     current_user: dict = Depends(get_current_user),

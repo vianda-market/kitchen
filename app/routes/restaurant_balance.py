@@ -50,7 +50,7 @@ def _restaurant_balance_not_found() -> HTTPException:
 
 
 # GET /restaurant-balances/ – Get all restaurant balances (read-only)
-@router.get("/", response_model=List[RestaurantBalanceResponseSchema])
+@router.get("", response_model=List[RestaurantBalanceResponseSchema])
 def get_all_restaurant_balances(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -129,7 +129,7 @@ def get_restaurant_balance(
 
 
 # GET /restaurant-balances/enriched/ – Get all enriched restaurant balances (read-only)
-@router.get("/enriched/", response_model=List[RestaurantBalanceEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[RestaurantBalanceEnrichedResponseSchema])
 def get_all_enriched_restaurant_balances(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

@@ -291,18 +291,24 @@ class UserEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CustomerSignupSchema(BaseModel):
-    """Schema for customer signup. market_id required. Provide city_id OR city_name (backend resolves city_name to city_id)."""
+    """Schema for customer signup. country_code required (from GET /api/v1/markets/available). Provide city_id OR city_name (backend resolves city_name to city_id)."""
     username: str = Field(..., min_length=3, max_length=100)
     password: str = Field(..., min_length=8, max_length=255)
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     email: EmailStr
     cellphone: Optional[str] = Field(None, max_length=20)
-    market_id: UUID = Field(..., description="Market (country) selected by user; required. Must be from GET /api/v1/markets/available.")
+    country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/markets/available. Backend resolves to market.")
     city_id: Optional[UUID] = Field(None, description="City UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
     city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_id.")
     is_archived: Optional[bool] = False
     status: Optional[Status] = Field(default=Status.ACTIVE)
+
+    @field_validator("country_code")
+    @classmethod
+    def normalize_country_to_alpha2(cls, v: str) -> str:
+        """Normalize to alpha-2 uppercase."""
+        return normalize_country_code(v) if v else v
 
     @model_validator(mode="after")
     def require_city_id_or_name(self):
@@ -1813,8 +1819,14 @@ class MarketResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MarketPublicMinimalSchema(BaseModel):
+    """Minimal schema for public GET /markets/available (no auth). country_code + country_name only; no internal IDs or business logic."""
+    country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
+    country_name: str = Field(..., description="Full country name (e.g. Argentina)")
+
+
 class MarketPublicResponseSchema(BaseModel):
-    """Minimal market schema for public GET /markets/available (no auth). Source of truth for UI dropdown."""
+    """Full market schema for authenticated endpoints. For unauthenticated /markets/available use MarketPublicMinimalSchema."""
     market_id: UUID = Field(..., description="Unique identifier for the market")
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
@@ -1907,12 +1919,11 @@ RestaurantsByCityResponseSchema.model_rebuild()
 
 
 class ZipcodeMetricsResponseSchema(BaseModel):
-    """Response for GET /api/v1/leads/zipcode-metrics (unauthenticated lead flow)."""
+    """Response for GET /api/v1/leads/zipcode-metrics (unauthenticated lead flow). Geolocation (center) removed for unauthenticated endpoints."""
     requested_zipcode: str = Field(..., description="Zipcode the lead entered")
     matched_zipcode: str = Field(..., description="Zipcode used for the count (exact or closest match)")
     restaurant_count: int = Field(..., description="Number of restaurants in the matched zipcode")
     has_coverage: bool = Field(..., description="True if restaurant_count > 0")
-    center: Optional[ZipcodeCenterSchema] = Field(None, description="Optional lat/lng center for the matched area")
 
 
 class LeadsCitiesResponseSchema(BaseModel):
@@ -1926,12 +1937,11 @@ class EmailRegisteredResponseSchema(BaseModel):
 
 
 class CityMetricsResponseSchema(BaseModel):
-    """Response for GET /api/v1/leads/city-metrics (unauthenticated lead flow, city-first)."""
+    """Response for GET /api/v1/leads/city-metrics (unauthenticated lead flow, city-first). Geolocation (center) removed for unauthenticated endpoints."""
     requested_city: str = Field(..., description="City name the lead entered")
     matched_city: str = Field(..., description="City used for the count (case-insensitive match or same as requested)")
     restaurant_count: int = Field(..., description="Number of restaurants in the matched city")
     has_coverage: bool = Field(..., description="True if restaurant_count > 0")
-    center: Optional[ZipcodeCenterSchema] = Field(None, description="Optional lat/lng center for the matched city")
 
 
 # =============================================================================

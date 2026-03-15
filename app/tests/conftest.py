@@ -50,14 +50,14 @@ SAMPLE_CITY_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 
 @pytest.fixture
 def sample_user_data():
-    """Sample user data for testing."""
+    """Sample user data for testing. Uses country_code (resolved to market_id by signup service)."""
     return {
         "email": "test@example.com",
         "password": "plaintext123",
         "first_name": "John",
         "last_name": "Doe",
         "username": "johndoe",
-        "market_id": SAMPLE_MARKET_ID,
+        "country_code": "US",
         "city_id": SAMPLE_CITY_ID,
     }
 

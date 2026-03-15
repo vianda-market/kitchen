@@ -19,7 +19,7 @@ async def get_db():
     4. Connections are reused efficiently
     
     Usage:
-        @router.post("/")
+        @router.post("")
         async def my_endpoint(db: psycopg2.extensions.connection = Depends(get_db)):
             # Use db connection for all database operations
             result = db_read("SELECT * FROM table", connection=db)

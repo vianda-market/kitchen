@@ -38,7 +38,7 @@ class ArchivalConfigResponse(BaseModel):
     modified_by: UUID
     modified_date: str
 
-@router.get("/", response_model=List[ArchivalConfigResponse])
+@router.get("", response_model=List[ArchivalConfigResponse])
 async def get_all_archival_configs(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -97,7 +97,7 @@ async def get_table_config(
     
     return handle_business_operation(_get_table_config, "table configuration retrieval")
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post("", response_model=Dict[str, Any])
 async def create_archival_config(
     config: ArchivalConfigRequest, 
     current_user: dict = Depends(get_current_user),

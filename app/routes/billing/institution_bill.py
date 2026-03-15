@@ -23,7 +23,7 @@ import psycopg2.extensions
 
 router = APIRouter(prefix="/institution-bills", tags=["Institution Bills"])
 
-@router.get("/", response_model=List[InstitutionBillResponseSchema])
+@router.get("", response_model=List[InstitutionBillResponseSchema])
 def get_institution_bills(
     institution_id: Optional[UUID] = None,
     restaurant_id: Optional[UUID] = None,
@@ -66,7 +66,7 @@ def get_institution_bills(
     
     return handle_business_operation(_get_institution_bills, "institution bills retrieval")
 
-@router.get("/enriched/", response_model=List[InstitutionBillEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[InstitutionBillEnrichedResponseSchema])
 def get_enriched_institution_bills_endpoint(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

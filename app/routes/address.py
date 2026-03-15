@@ -124,8 +124,8 @@ def get_address(
         extra_kwargs={"scope": scope}
     )
 
-# GET /addresses/
-@router.get("/", response_model=List[AddressResponseSchema])
+# GET /addresses
+@router.get("", response_model=List[AddressResponseSchema])
 def get_all_addresses(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
@@ -156,7 +156,7 @@ def get_all_addresses(
     return handle_get_all(fetch, db, "addresses")
 
 
-@router.post("/", response_model=AddressResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AddressResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_address(
     addr_create: AddressCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -322,7 +322,7 @@ def delete_address(
 # =============================================================================
 
 # GET /addresses/enriched/ - List all addresses with enriched data
-@router.get("/enriched/", response_model=List[AddressEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[AddressEnrichedResponseSchema])
 def list_enriched_addresses(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
@@ -356,7 +356,7 @@ def list_enriched_addresses(
     )
 
 # GET /addresses/search/ - Search addresses by institution and optional text (for B2B restaurant address picker)
-@router.get("/search/", response_model=List[AddressEnrichedResponseSchema])
+@router.get("/search", response_model=List[AddressEnrichedResponseSchema])
 def search_enriched_addresses(
     institution_id: Optional[UUID] = Query(None, description="Restrict to addresses for this institution"),
     q: Optional[str] = Query(None, description="Text search (street_name, city, postal_code, province)"),

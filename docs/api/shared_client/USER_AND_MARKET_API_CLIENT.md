@@ -87,12 +87,12 @@ Enriched user list: each item has `market_id` and `market_ids` as above.
 
 | Need | Source | Notes |
 |------|--------|-------|
-| **Market selector list** | **GET /api/v1/markets/available** | No auth; use for dropdown. Do **not** use GET /users/me for the list. |
+| **Market selector list** | **GET /api/v1/markets/available** | No auth; returns `country_code` and `country_name` only. Use for signup country dropdown. For plans/subscriptions (need `market_id`), use GET /markets/enriched/ after login. |
 | **Restore selected market after login** | **GET /api/v1/users/me** → `market_id` or `market_ids[0]` | Resolve this UUID against the list from `/markets/available` and set `selectedMarket` (or preferred market). If the user’s market is not in the public list (e.g. Global), ignore for B2C selector. |
 | **Plans / subscriptions** | Use `selectedMarket.market_id` (from selector or from GET /users/me) | Pass to GET /plans/enriched/?market_id=… and for subscription creation. **Do not send** `market_id` when empty (omit param); sending `''` returns **422**. Prefer calling plans only when you have a valid market_id; when none selected, show “Select a country to see plans” and do not call. Do not use Global Marketplace for plan create/update (backend returns 400). See [MARKET_SCOPE_FOR_CLIENTS.md](./MARKET_SCOPE_FOR_CLIENTS.md). |
 | **Leads / explore (cities, by-city)** | Use `selectedMarket.country_code` | Pass as `country_code` to leads and restaurant endpoints. |
 
-**Customer signup**: Backend assigns a default market (e.g. US). After signup, GET /users/me returns that user’s `market_id`; B2C can set the initial market selector from it.
+**Customer signup**: Client sends `country_code` (from GET /markets/available) in signup request; backend resolves to market. After signup, GET /users/me returns that user’s `market_id`; B2C can set the initial market selector from it.
 
 ---
 

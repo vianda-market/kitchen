@@ -67,7 +67,7 @@ router = APIRouter(
     tags=["Restaurants"],
 )
 
-@router.post("/", response_model=RestaurantResponseSchema)
+@router.post("", response_model=RestaurantResponseSchema)
 def create_restaurant(
     restaurant_data: RestaurantCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -174,7 +174,7 @@ def _restaurant_to_response(restaurant, db: psycopg2.extensions.connection) -> d
     return d
 
 
-@router.get("/", response_model=List[RestaurantResponseSchema])
+@router.get("", response_model=List[RestaurantResponseSchema])
 def get_restaurants(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -191,7 +191,7 @@ def get_restaurants(
 
 # GET /restaurants/search/ - Search restaurants by name (e.g. discretionary recipient picker)
 # Defined before GET /{restaurant_id} so that "/search" is not interpreted as restaurant_id.
-@router.get("/search/", response_model=RestaurantSearchResponseSchema)
+@router.get("/search", response_model=RestaurantSearchResponseSchema)
 def search_restaurants_route(
     q: str = Query("", description="Search string (substring match on name)"),
     search_by: str = Query("name", description="Field to search (only 'name' supported)"),
@@ -638,7 +638,7 @@ def create_balance_for_restaurant(
 # =============================================================================
 
 # GET /restaurants/enriched/ - List all restaurants with enriched data
-@router.get("/enriched/", response_model=List[RestaurantEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[RestaurantEnrichedResponseSchema])
 def list_enriched_restaurants(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
