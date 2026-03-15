@@ -33,6 +33,13 @@ kenv/
 # Local-only documentation (credentials, notes)
 docs/local/
 
+# Archived documentation (deprecated, kept out of version control)
+docs/zArchive/
+
+# macOS/Finder duplicate files (e.g. "File 2.ext")
+* 2.*
+* 2
+
 # Testing and Coverage
 .coverage
 .coverage.*
