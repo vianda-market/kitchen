@@ -85,7 +85,7 @@
           "request": {
             "method": "GET",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods"
           }
         },
         {
@@ -110,7 +110,7 @@
               {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {"mode": "raw", "raw": "{}"},
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/setup-session"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methodssetup-session"
           }
         },
         {
@@ -141,7 +141,7 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/mock-add"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methodsmock-add"
           }
         },
         {
@@ -168,7 +168,7 @@
           "request": {
             "method": "GET",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods"
           }
         },
         {
@@ -204,7 +204,7 @@
           "request": {
             "method": "PUT",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}/default"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods{{paymentMethodId}}/default"
           }
         },
         {
@@ -240,7 +240,7 @@
           "request": {
             "method": "DELETE",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods{{paymentMethodId}}"
           }
         },
         {
@@ -261,7 +261,7 @@
           "request": {
             "method": "GET",
             "header": [{"key": "Authorization", "value": "Bearer {{customerAuthToken}}"}],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods/"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods"
           }
         }
       ]

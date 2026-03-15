@@ -35,3 +35,6 @@ Pillow>=12.0.0         # Python Imaging Library; 12.0+ for Python 3.14 compatibi
 
 # Stripe (subscription payments, test mode: sk_test_/pk_test_)
 stripe>=8.0.0,<9.0.0
+
+# Rate limiting (unauthenticated endpoints)
+slowapi>=0.1.9

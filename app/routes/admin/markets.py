@@ -6,6 +6,7 @@ Markets define the countries where the platform operates.
 """
 
 from datetime import datetime
+import time
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -15,7 +16,7 @@ from app.auth.dependencies import get_current_user, get_employee_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     MarketResponseSchema,
-    MarketPublicResponseSchema,
+    MarketPublicMinimalSchema,
     MarketCreateSchema,
     MarketUpdateSchema
 )
@@ -24,6 +25,7 @@ from app.services.entity_service import get_enriched_markets, get_enriched_marke
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
 from app.utils.country import resolve_country_name
+from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/markets", tags=["Markets"])
 
@@ -31,51 +33,22 @@ router = APIRouter(prefix="/markets", tags=["Markets"])
 # -----------------------------------------------------------------------------
 # Public markets endpoint (no auth): rate limit and cache
 # -----------------------------------------------------------------------------
-import time
-from collections import defaultdict
-
 _available_markets_cache: Optional[List[dict]] = None
 _available_markets_cache_expiry: float = 0
 CACHE_TTL_SECONDS = 600  # 10 minutes
-RATE_LIMIT_REQUESTS = 60
-RATE_LIMIT_WINDOW_SECONDS = 60
-_rate_limit_counts: dict = defaultdict(list)
 
 
-def _rate_limit_available(request: Request) -> None:
-    """Allow at most RATE_LIMIT_REQUESTS per IP per RATE_LIMIT_WINDOW_SECONDS."""
-    ip = request.client.host if request.client else "unknown"
-    now = time.time()
-    # Prune old entries and evict stale keys to prevent unbounded growth
-    for k, v in list(_rate_limit_counts.items()):
-        pruned = [t for t in v if now - t < RATE_LIMIT_WINDOW_SECONDS]
-        if pruned:
-            _rate_limit_counts[k] = pruned
-        else:
-            del _rate_limit_counts[k]
-    if len(_rate_limit_counts.get(ip, [])) >= RATE_LIMIT_REQUESTS:
-        raise HTTPException(status_code=429, detail="Too many requests")
-    _rate_limit_counts.setdefault(ip, []).append(now)
-
-
-def _get_available_markets_cached() -> List[MarketPublicResponseSchema]:
-    """Return active non-archived markets (excluding Global Marketplace); use in-memory cache with TTL."""
+def _get_available_markets_cached() -> List[MarketPublicMinimalSchema]:
+    """Return active non-archived markets (excluding Global Marketplace); country_code + country_name only for unauthenticated."""
     global _available_markets_cache, _available_markets_cache_expiry
     now = time.time()
     if _available_markets_cache is not None and now < _available_markets_cache_expiry:
-        return [MarketPublicResponseSchema(**m) for m in _available_markets_cache]
+        return [MarketPublicMinimalSchema(**m) for m in _available_markets_cache]
     raw = market_service.get_all(include_archived=False, status=Status.ACTIVE)
     # Exclude Global Marketplace from public list (B2C selector); it is for assignment only.
+    # Return only country_code + country_name (no market_id, timezone, currency, etc.)
     slim = [
-        {
-            "market_id": m["market_id"],
-            "country_code": m["country_code"],
-            "country_name": m["country_name"],
-            "timezone": m["timezone"],
-            "kitchen_close_time": m.get("kitchen_close_time", "13:30"),
-            "currency_code": m.get("currency_code"),
-            "currency_name": m.get("currency_name"),
-        }
+        {"country_code": m["country_code"], "country_name": m["country_name"]}
         for m in raw
         if not is_global_market(m.get("market_id"))
     ]
@@ -83,10 +56,11 @@ def _get_available_markets_cached() -> List[MarketPublicResponseSchema]:
     if slim:
         _available_markets_cache = slim
         _available_markets_cache_expiry = now + CACHE_TTL_SECONDS
-    return [MarketPublicResponseSchema(**m) for m in slim]
+    return [MarketPublicMinimalSchema(**m) for m in slim]
 
 
-@router.get("/available", response_model=List[MarketPublicResponseSchema])
+@router.get("/available", response_model=List[MarketPublicMinimalSchema])
+@limiter.limit("60/minute")
 async def list_available_markets_public(request: Request):
     """
     Public (no auth) list of active markets for UI dropdown.
@@ -94,11 +68,10 @@ async def list_available_markets_public(request: Request):
     Source of truth for which countries clients can operate in. Rate-limited and cached.
     Use for market selector (e.g. default by browser country, fallback to US).
     """
-    _rate_limit_available(request)
     return _get_available_markets_cached()
 
 
-@router.get("/", response_model=List[MarketResponseSchema])
+@router.get("", response_model=List[MarketResponseSchema])
 async def list_markets(
     status: Optional[Status] = Query(None, description="Filter by status"),
     current_user: dict = Depends(get_current_user)
@@ -150,7 +123,7 @@ async def get_market(
     return market
 
 
-@router.post("/", response_model=MarketResponseSchema, status_code=201)
+@router.post("", response_model=MarketResponseSchema, status_code=201)
 async def create_market(
     market_data: MarketCreateSchema,
     current_user: dict = Depends(get_employee_user)
@@ -310,7 +283,7 @@ async def archive_market(
 # ENRICHED MARKET ENDPOINTS (with currency_name and currency_code)
 # =============================================================================
 
-@router.get("/enriched/", response_model=List[MarketResponseSchema])
+@router.get("/enriched", response_model=List[MarketResponseSchema])
 async def list_enriched_markets(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

@@ -12,6 +12,9 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from app.auth.middleware.permission_cache import PermissionCacheMiddleware
 from app.utils.db_pool import get_db_pool
+from app.utils.rate_limit import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 
 from app.routes.main import router as main_router
@@ -141,7 +144,11 @@ OPENAPI_TAGS = [
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Kitchen API", lifespan=lifespan, openapi_tags=OPENAPI_TAGS)
+    app = FastAPI(title="Kitchen API", lifespan=lifespan, openapi_tags=OPENAPI_TAGS, redirect_slashes=False)
+
+    # Rate limiting (slowapi) - must be set before routes that use @limiter.limit()
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Add CORS middleware
     app.add_middleware(
@@ -178,10 +185,10 @@ def create_app() -> FastAPI:
         """Health check endpoint for load balancers and monitoring tools"""
         return {"status": "healthy"}
     
-    @app.get("/api/", include_in_schema=False)
+    @app.get("/api", include_in_schema=False)
     async def api_root():
         """Redirect to current API version"""
-        return RedirectResponse(url="/api/v1/", status_code=307)
+        return RedirectResponse(url="/api/v1", status_code=307)
     
     # Infrastructure/monitoring routes (non-versioned)
     # main_router includes: /pool-stats (database connection pool monitoring)

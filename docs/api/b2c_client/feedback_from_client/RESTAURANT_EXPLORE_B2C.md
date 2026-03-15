@@ -42,7 +42,7 @@ When the lead picks a city, the app shows a short summary (e.g. “We have N res
 | `city`         | Yes      | City name (e.g. "Buenos Aires"). Case-insensitive match. |
 | `country_code` | No       | ISO 3166-1 alpha-2. **Default: `US`**. Normalized to uppercase. |
 
-**Metrics:** Restaurant count, `has_coverage` (count > 0), matched city, optional `center` (lat/lng).
+**Metrics:** Restaurant count, `has_coverage` (count > 0), matched city. No geolocation data (e.g. `center`) in the unauthenticated response.
 
 **Response example:**
 
@@ -51,8 +51,7 @@ When the lead picks a city, the app shows a short summary (e.g. “We have N res
   "requested_city": "Buenos Aires",
   "matched_city": "Buenos Aires",
   "restaurant_count": 12,
-  "has_coverage": true,
-  "center": { "lat": -34.6037, "lng": -58.3816 }
+  "has_coverage": true
 }
 ```
 

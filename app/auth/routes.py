@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from app.auth.security import create_access_token, verify_token, verify_password
+from app.utils.rate_limit import limiter
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning
@@ -16,7 +17,9 @@ router = APIRouter(
 )
 
 @router.post("/token")
+@limiter.limit("20/minute")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):

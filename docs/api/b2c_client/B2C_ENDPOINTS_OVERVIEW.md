@@ -11,7 +11,7 @@ This document summarizes APIs that **Customers** can access. For full matrices, 
 
 | API | Methods | Notes |
 |-----|---------|-------|
-| **Lead encouragement (zipcode metrics)** | **GET** `/api/v1/leads/zipcode-metrics` | Pre-signup: pass `zip` and optional `country_code`; returns restaurant count, has_coverage, matched_zipcode, optional center. **No auth**; rate-limited. **Use this exact path.** Full spec: [../shared_client/ZIPCODE_METRICS_LEAD_API.md](../shared_client/ZIPCODE_METRICS_LEAD_API.md). |
+| **Lead encouragement (zipcode metrics)** | **GET** `/api/v1/leads/zipcode-metrics` | Pre-signup: pass `zip` and optional `country_code`; returns restaurant count, has_coverage, matched_zipcode. **No auth**; rate-limited. Full spec: [../shared_client/ZIPCODE_METRICS_LEAD_API.md](../shared_client/ZIPCODE_METRICS_LEAD_API.md). |
 | **Restaurant explore (authorized)** | **GET** `/api/v1/restaurants/cities`, **GET** `/api/v1/restaurants/by-city`, **GET** `/api/v1/restaurants/explore/kitchen-days`, **GET** `/api/v1/restaurants/explore/pickup-windows`, **GET** `/api/v1/restaurants/{id}/coworker-pickup-windows` | City dropdown then list/map + plates. **Auth required.** When using a market, **`kitchen_day` is required** (Monday–Friday); omit → 400. **kitchen-days**: allowed kitchen days for dropdown (closest first). **pickup-windows**: 15-min windows for "Select pickup window" modal. **has_volunteer**, **has_coworker_offer**, **has_coworker_request**: per restaurant when kitchen_day set. **coworker-pickup-windows**: pickup time ranges from coworkers (offer/request); call only when has_coworker_offer or has_coworker_request. **is_already_reserved**, **existing_plate_selection_id**: per plate. **Plates**: lean payload (plate_id, product_name, image_url thumbnail, credit, savings, badges). **GET /plates/enriched/{plate_id}?kitchen_day=** adds coworker flags for Reservations-flow modal. Full spec: [RESTAURANT_EXPLORE_B2C.md](./RESTAURANT_EXPLORE_B2C.md), [POST_RESERVATION_PICKUP_B2C.md](./POST_RESERVATION_PICKUP_B2C.md). |
 | **Auth** | POST `/api/v1/auth/token` | Login |
 | **Username recovery** | POST `/api/v1/auth/forgot-username` | Forgot username; optional "also send password reset". **Full spec**: [../shared_client/USERNAME_RECOVERY.md](../shared_client/USERNAME_RECOVERY.md). |
@@ -39,7 +39,7 @@ Customer registration uses a **two-step flow** so that a row in `user_info` is c
 
 | Step | Endpoint | Purpose |
 |------|----------|---------|
-| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, cellphone, first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). |
+| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, **country_code**, city_id or city_name, cellphone, first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). Use GET /markets/available for `country_code` values. |
 | 2 | `POST /api/v1/customers/signup/verify` | Send `{"token": "..."}` (from the link in the email). Backend creates the user, marks the token used, and returns the user object plus `access_token` so the client can log the user in immediately. |
 
 **UI flow**

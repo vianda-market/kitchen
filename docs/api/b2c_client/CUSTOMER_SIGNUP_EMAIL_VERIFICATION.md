@@ -14,7 +14,7 @@ This document describes the **two-step customer registration flow** with email v
 ┌─────────────┐     POST /signup/request      ┌─────────┐     Store pending     ┌──────────┐
 │   B2C App   │ ─────────────────────────────► │   API   │ ────────────────────► │  Email   │
 │ (signup     │  (username, password, email,  │         │  Send 6-digit         │  (SMTP)  │
-│  form)      │   market_id, cellphone,       │         │  verification code    │          │
+│  form)      │   country_code, cellphone,    │         │  verification code    │          │
 │             │   first_name, last_name)      │         │                       │          │
 └─────────────┘                                └─────────┘                       └────┬─────┘
        │                                          │ 201 + generic message              │
@@ -78,9 +78,9 @@ Content-Type: application/json
 | `username` | string | Yes | 3–100 chars | Unique; must not already exist in the system |
 | `password` | string | Yes | min 8 chars | Sent in plain text over HTTPS; backend hashes before storing |
 | `email` | string | Yes | Valid email format | Unique; stored and compared in lowercase |
-| `market_id` | UUID | **Yes** | Valid market UUID | Market (country) the user selected. Must be from `GET /api/v1/markets/available`. The UI must collect the user's market/country selection before submitting signup. |
+| `country_code` | string | **Yes** | ISO 3166-1 alpha-2 (e.g. US, AR) | Country the user selected. Must be from `GET /api/v1/markets/available`. Backend resolves to market internally. |
 | `city_id` | UUID | One of city_id or city_name | Valid city UUID | City UUID. Use when you have it (e.g. from `GET /api/v1/cities/`). Optional if `city_name` is provided. |
-| `city_name` | string | One of city_id or city_name | City name from API | City name the user selected. Must be from `GET /api/v1/leads/cities?country_code={market_country}`. Backend resolves to city_id. **Preferred for B2C** (no auth needed for cities list). |
+| `city_name` | string | One of city_id or city_name | City name from API | City name the user selected. Must be from `GET /api/v1/leads/cities?country_code={country_code}`. Backend resolves to city_id. **Preferred for B2C** (no auth needed for cities list). |
 | `cellphone` | string | No | max 20 chars | Optional; users can add later in profile. |
 | `first_name` | string | No | max 50 chars | |
 | `last_name` | string | No | max 50 chars | |
@@ -92,7 +92,7 @@ Content-Type: application/json
   "username": "jane_doe",
   "password": "securePass123",
   "email": "jane.doe@example.com",
-  "market_id": "66666666-6666-6666-6666-666666666666",
+  "country_code": "US",
   "city_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
   "cellphone": "+5491112345678",
   "first_name": "Jane",
@@ -100,15 +100,13 @@ Content-Type: application/json
 }
 ```
 
-Use the `market_id` value from the markets/available response (e.g. US market UUID above; client should use the value from the API). Do not submit signup without `market_id`. Use the `city_id` from `GET /api/v1/cities/?country_code={market_country}&exclude_global=true` (e.g. for US market, use `country_code=US`). Do not submit signup without `city_id`; the Global city cannot be assigned to B2C customers.
+Use the `country_code` value from the markets/available response (e.g. `US`, `AR`). Do not submit signup without `country_code`. Use the `city_id` from `GET /api/v1/cities/?country_code={country_code}&exclude_global=true`. Do not submit signup without `city_id` (or `city_name`); the Global city cannot be assigned to B2C customers.
 
-### Market selection
+### Country selection
 
-The app must call **`GET /api/v1/markets/available`** (no auth) to get the list of markets (e.g. US, Argentina). The user selects one in the UI; send its `market_id` in the signup request body. `market_id` is **required**; do not submit signup without it. See [Markets API](../../shared_client/MARKETS_API_CLIENT.md) or B2C overview for the markets endpoint.
+The app must call **`GET /api/v1/markets/available`** (no auth) to get the list of countries. The response returns `country_code` and `country_name` only. The user selects one in the UI; send its `country_code` in the signup request body. `country_code` is **required**. See [MARKET_SELECTION_AT_SIGNUP.md](MARKET_SELECTION_AT_SIGNUP.md) and [Markets API](../../b2b_client/MARKETS_API_CLIENT.md).
 
-**Important:** Do not persist or reuse a stored `market_id` for signup — if that market is later archived or UUIDs change (e.g. after a backend rebuild), signup will fail with "Invalid or archived market_id". Always use GET /markets/available as the single source of truth for the signup dropdown and refresh it when the user enters the signup flow. See [MARKET_SELECTION_AT_SIGNUP.md](MARKET_SELECTION_AT_SIGNUP.md) for the full issue description and long-term solution.
-
-**City selection:** Call `GET /api/v1/leads/cities?country_code={market_country}` (no auth) to get city names for the signup picker. Returns only supported cities (from city_info) that have at least one restaurant. Use the market's `country_code` (e.g. `US` for US market). Send the selected `city_name` in the signup body; the backend resolves it to `city_id`. Alternatively, use `GET /api/v1/cities/?country_code=...&exclude_global=true` (auth required) to get `city_id` directly. One of `city_id` or `city_name` is **required** at signup.
+**City selection:** Call `GET /api/v1/leads/cities?country_code={country_code}` (no auth) to get city names for the signup picker. Send the selected `city_name` in the signup body; the backend resolves it to `city_id`. One of `city_id` or `city_name` is **required** at signup.
 
 When `cellphone` is optional (backend support), it can be omitted or sent as `null`.
 
@@ -284,7 +282,7 @@ GET /api/v1/customers/signup/dev-pending-token?email=<email>
 
 | Item | Value |
 |------|--------|
-| Step 1 | `POST /api/v1/customers/signup/request` with `username`, `password`, `email`, `cellphone`, `first_name`, `last_name` |
+| Step 1 | `POST /api/v1/customers/signup/request` with `username`, `password`, `email`, `country_code`, `city_id` or `city_name`, `cellphone`, `first_name`, `last_name` |
 | Step 1 success | 201; show “Check your email”; same message even if email already registered |
 | Step 2 | User opens link → app gets `token` from URL → `POST /api/v1/customers/signup/verify` with `{"token": "..."}` |
 | Step 2 success | 201; body has `user` and `access_token`; store token and treat user as logged in |

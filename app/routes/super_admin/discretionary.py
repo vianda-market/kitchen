@@ -107,7 +107,7 @@ def reject_discretionary_request(
     return resolution
 
 
-@router.get("/pending-requests/", response_model=List[DiscretionarySummarySchema])
+@router.get("/pending-requests", response_model=List[DiscretionarySummarySchema])
 def get_pending_discretionary_requests(
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -146,7 +146,7 @@ def get_pending_discretionary_requests(
     return summary_requests
 
 
-@router.get("/requests/", response_model=List[DiscretionarySummarySchema])
+@router.get("/requests", response_model=List[DiscretionarySummarySchema])
 def get_all_discretionary_requests(
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
     db: psycopg2.extensions.connection = Depends(get_db)

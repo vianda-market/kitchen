@@ -22,7 +22,7 @@ class SupportedCurrencySchema(BaseModel):
     currency_code: str = Field(..., description="ISO 4217 code (e.g. USD)")
 
 
-@router.get("/", response_model=List[SupportedCurrencySchema])
+@router.get("", response_model=List[SupportedCurrencySchema])
 async def list_supported_currencies(
     current_user: dict = Depends(get_employee_user),
 ):

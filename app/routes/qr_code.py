@@ -31,7 +31,7 @@ router = APIRouter(prefix="/qr-codes", tags=["QR Codes"])
 # Initialize atomic service
 atomic_qr_service = AtomicQRCodeService()
 
-@router.post("/", response_model=QRCodeResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=QRCodeResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_qr_code_atomic(
     payload: QRCodeCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -62,7 +62,7 @@ def create_qr_code_atomic(
         "QR code created successfully with image"
     )
 
-@router.get("/", response_model=List[QRCodeResponseSchema])
+@router.get("", response_model=List[QRCodeResponseSchema])
 def get_all_qr_codes(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -177,7 +177,7 @@ def get_qr_code_by_restaurant(
 # =============================================================================
 
 # GET /qr-codes/enriched/ - List all QR codes with enriched data
-@router.get("/enriched/", response_model=List[QRCodeEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[QRCodeEnrichedResponseSchema])
 def list_enriched_qr_codes(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

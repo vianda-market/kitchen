@@ -959,6 +959,15 @@ async def list_markets():
 4. **Consistency**: This ensures all API endpoints follow the same versioning pattern
 5. **Future-Proof**: Easy to add v2 routes alongside v1 when needed
 
+#### Trailing Slash Convention (REST Standard)
+
+**CRITICAL RULE**: All collection endpoints use **no trailing slash**. This is the industry standard for REST APIs and avoids 307 redirects that break mobile POST clients.
+
+- **Canonical**: `/api/v1/employers`, `/api/v1/employers/enriched`, `/api/v1/markets`
+- **Avoid**: `/api/v1/employers/`, `/api/v1/employers/enriched/`
+
+The app is configured with `redirect_slashes=False`. Routes are registered with `""` for collection roots and `"/enriched"` (not `"/enriched/"`) for enriched subpaths.
+
 #### Exceptions (Non-Versioned Routes)
 
 Only these routes are allowed without versioned wrappers:

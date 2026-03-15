@@ -85,7 +85,7 @@ def _check_unique_constraint(
         result = db_read(query, (str(plate_id), kitchen_day), connection=db, fetch_one=True)
     return result is not None
 
-@router.get("/", response_model=List[PlateKitchenDayResponseSchema])
+@router.get("", response_model=List[PlateKitchenDayResponseSchema])
 def list_plate_kitchen_days(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),
@@ -132,7 +132,7 @@ def get_plate_kitchen_day(
     
     return kitchen_day
 
-@router.post("/", response_model=List[PlateKitchenDayResponseSchema], status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=List[PlateKitchenDayResponseSchema], status_code=status.HTTP_201_CREATED)
 def create_plate_kitchen_day(
     payload: PlateKitchenDayCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -275,7 +275,7 @@ def delete_plate_kitchen_day(
     handle_business_operation(delete_operation, "delete plate kitchen day", None, db)
     return None
 
-@router.get("/enriched/", response_model=List[PlateKitchenDayEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[PlateKitchenDayEnrichedResponseSchema])
 def list_enriched_plate_kitchen_days(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),

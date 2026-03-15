@@ -30,7 +30,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=FavoriteResponseSchema, status_code=201)
+@router.post("", response_model=FavoriteResponseSchema, status_code=201)
 def create_favorite(
     payload: FavoriteCreateSchema,
     current_user: dict = Depends(get_client_user),

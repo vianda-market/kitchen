@@ -106,7 +106,7 @@ def _get_payment_method_owner(payment_method_id: UUID, db: psycopg2.extensions.c
     return UUID(str(rows[0]["user_id"]))
 
 
-@router.get("/", response_model=CustomerPaymentMethodListResponseSchema)
+@router.get("", response_model=CustomerPaymentMethodListResponseSchema)
 def list_customer_payment_methods(
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),

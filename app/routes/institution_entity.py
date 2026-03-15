@@ -27,7 +27,7 @@ router = APIRouter(
 # =============================================================================
 
 # GET /institution-entities/enriched/ - List all institution entities with enriched data
-@router.get("/enriched/", response_model=List[InstitutionEntityEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[InstitutionEntityEnrichedResponseSchema])
 def list_enriched_institution_entities(
     institution_id: Optional[UUID] = institution_filter(),
     current_user: dict = Depends(get_current_user),

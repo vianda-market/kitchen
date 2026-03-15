@@ -22,8 +22,9 @@ After a refresh or when the issue occurs, the page appears stuck in this state.
 
 1. **Markets**
    - On app load, `MarketContext` calls **GET `/api/v1/markets/available`** (no `Authorization` header — user is not authenticated).
-   - On success: client parses the list, selects a market (from stored ID, device locale, or default e.g. US) and shows its flag in the header.
-   - On failure (e.g. throw): client sets `selectedMarket = null`, `markets = []`, and shows the global (🌐) icon. The flag picker modal then lists `markets` (excluding Global Marketplace); if the list is empty, the user has nothing to select.
+   - Response: `[{ "country_code": "AR", "country_name": "Argentina" }, ...]` — `country_code` and `country_name` only (no `market_id`).
+   - On success: client parses the list, selects a country (from stored `country_code`, device locale, or default e.g. US) and shows its flag in the header.
+   - On failure (e.g. throw): client sets `selectedMarket = null`, `markets = []`, and shows the global (🌐) icon. The flag picker modal then lists `markets`; if the list is empty, the user has nothing to select.
 
 2. **Cities**
    - When the selected market (or its `country_code`) is available, the client calls **GET `/api/v1/leads/cities`** with query **`country_code=<alpha2>`** (e.g. `AR`, `US`). No auth.
@@ -60,7 +61,7 @@ So the observed behaviour is consistent with:
 
 | Endpoint | Auth | Used on unauthenticated home | Expected |
 |----------|------|------------------------------|----------|
-| GET `/api/v1/markets/available` | None | Yes | 200, list of markets (country options for selector). |
+| GET `/api/v1/markets/available` | None | Yes | 200, list of `{ country_code, country_name }` (country options for selector). |
 | GET `/api/v1/leads/cities` | None | Yes, with `country_code` from selected market (or without if no market) | 200, list of city names; or defined behaviour when `country_code` is missing. |
 
 ---

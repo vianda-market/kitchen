@@ -22,7 +22,7 @@ class SupportedCountrySchema(BaseModel):
     country_name: str = Field(..., description="Official country name (e.g. Argentina)")
 
 
-@router.get("/", response_model=List[SupportedCountrySchema])
+@router.get("", response_model=List[SupportedCountrySchema])
 async def list_supported_countries(
     current_user: dict = Depends(get_client_employee_or_supplier_user),
 ):

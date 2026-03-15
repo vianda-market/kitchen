@@ -1,5 +1,3 @@
-import time
-from collections import defaultdict
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status, Depends, Request
@@ -14,6 +12,7 @@ from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_password_recovery_debug
 from app.utils.db import db_read
 from app.config.settings import settings
+from app.utils.rate_limit import limiter
 import psycopg2.extensions
 
 
@@ -87,7 +86,9 @@ SIGNUP_CONSTANTS = user_signup_service.get_signup_constants()
         },
     },
 )
+@limiter.limit("10/minute")
 def signup_request(
+    request: Request,
     user: CustomerSignupSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -122,7 +123,9 @@ def signup_request(
     status_code=status.HTTP_201_CREATED,
     summary="Verify email and complete customer signup",
 )
+@limiter.limit("20/minute")
 def signup_verify(
+    request: Request,
     body: VerifySignupRequest,
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -231,27 +234,6 @@ def signup_customer(
 # USERNAME RECOVERY (forgot username) - rate limited, no auth
 # =============================================================================
 
-RATE_LIMIT_USERNAME_REQUESTS = 60
-RATE_LIMIT_USERNAME_WINDOW_SECONDS = 60
-_username_recovery_rate_limit: dict = defaultdict(list)
-
-
-def _rate_limit_username_recovery(request: Request) -> None:
-    """Allow at most RATE_LIMIT_USERNAME_REQUESTS per IP per window."""
-    ip = request.client.host if request.client else "unknown"
-    now = time.time()
-    # Prune old entries and evict stale keys to prevent unbounded growth
-    for k, v in list(_username_recovery_rate_limit.items()):
-        pruned = [t for t in v if now - t < RATE_LIMIT_USERNAME_WINDOW_SECONDS]
-        if pruned:
-            _username_recovery_rate_limit[k] = pruned
-        else:
-            del _username_recovery_rate_limit[k]
-    if len(_username_recovery_rate_limit.get(ip, [])) >= RATE_LIMIT_USERNAME_REQUESTS:
-        raise HTTPException(status_code=429, detail="Too many requests")
-    _username_recovery_rate_limit.setdefault(ip, []).append(now)
-
-
 class ForgotUsernameRequest(BaseModel):
     """Request for POST /auth/forgot-username."""
     email: EmailStr = Field(..., description="Email address of the account")
@@ -299,6 +281,7 @@ class PasswordRecoveryResponse(BaseModel):
     Always returns the same generic message to prevent email enumeration.
     """
 )
+@limiter.limit("10/minute")
 def forgot_username(
     request: Request,
     body: ForgotUsernameRequest,
@@ -306,7 +289,6 @@ def forgot_username(
 ):
     """Request username recovery; optionally also trigger password reset email."""
     log_password_recovery_debug(f"POST /forgot-username received email={body.email!r} send_password_reset={body.send_password_reset}")
-    _rate_limit_username_recovery(request)
     result = password_recovery_service.request_username_recovery(
         email=body.email,
         send_password_reset=body.send_password_reset,
@@ -333,8 +315,10 @@ def forgot_username(
     4. User clicks link and provides new password
     """
 )
+@limiter.limit("10/minute")
 def forgot_password(
-    request: ForgotPasswordRequest,
+    request: Request,
+    body: ForgotPasswordRequest,
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
@@ -342,10 +326,10 @@ def forgot_password(
 
     An email with a password reset link will be sent if the account exists.
     """
-    log_password_recovery_debug(f"POST /forgot-password received email={request.email!r}")
+    log_password_recovery_debug(f"POST /forgot-password received email={body.email!r}")
     def _request_password_reset():
         return password_recovery_service.request_password_reset(
-            email=request.email,
+            email=body.email,
             db=db
         )
     
@@ -376,20 +360,22 @@ def forgot_password(
     - Weak password (handled by validation)
     """
 )
+@limiter.limit("20/minute")
 def reset_password(
-    request: ResetPasswordRequest,
+    request: Request,
+    body: ResetPasswordRequest,
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
     Reset password using valid reset code (or legacy token) from email.
     Code can only be used once and expires after 24 hours.
     """
-    code_or_token = (request.code and request.code.strip()) or (request.token and request.token.strip()) or ""
+    code_or_token = (body.code and body.code.strip()) or (body.token and body.token.strip()) or ""
     log_password_recovery_debug("POST /reset-password received (code/token and new_password present)")
     def _reset_password():
         return password_recovery_service.reset_password(
             code=code_or_token,
-            new_password=request.new_password,
+            new_password=body.new_password,
             db=db
         )
     

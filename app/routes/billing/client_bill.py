@@ -38,7 +38,7 @@ def get_client_bill(
         "client bill"
     )
 
-@router.get("/", response_model=List[ClientBillResponseSchema])
+@router.get("", response_model=List[ClientBillResponseSchema])
 def list_client_bills(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

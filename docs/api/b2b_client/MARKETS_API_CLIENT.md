@@ -40,22 +40,16 @@ Markets represent the countries where the platform operates. Each market has its
 
 **Authorization**: None (public).
 
-**Response**: Array of minimal market objects (active, non-archived only).
+**Response**: Array of minimal objects with **`country_code`** and **`country_name`** only. No `market_id`, timezone, or currency. This keeps the unauthenticated response minimal for pre-signup flows (e.g. B2C country selector, lead flow).
 
 ```json
 [
-  {
-    "market_id": "11111111-1111-1111-1111-111111111111",
-    "country_code": "AR",
-    "country_name": "Argentina",
-    "timezone": "America/Argentina/Buenos_Aires",
-    "currency_code": "ARS",
-    "currency_name": "Argentine Peso"
-  }
+  { "country_code": "AR", "country_name": "Argentina" },
+  { "country_code": "US", "country_name": "United States" }
 ]
 ```
 
-**Use Case**: Market dropdown; default selection by browser country (match `country_code`), fallback to US; store `market_id` (and/or `country_code`) for subsequent authenticated API calls (plans, subscriptions).
+**Use Case**: Country dropdown for signup (send `country_code` in signup request) or lead flow. For authenticated flows that need `market_id`, timezone, or currency, use **GET /api/v1/markets/enriched/**.
 
 **Rate limit**: 429 Too Many Requests if exceeded (e.g. 60 req/min per IP).
 

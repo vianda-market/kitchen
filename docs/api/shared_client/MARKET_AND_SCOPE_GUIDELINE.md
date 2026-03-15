@@ -19,7 +19,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 ### 1.2 Single market for Customer Comensal (B2C)
 
-- **Signup:** The B2C client **must** send **market_id** (required) in `POST /api/v1/customers/signup/request`. The user selects their market (country) in the UI before submitting; the value must come from `GET /api/v1/markets/available`. The backend stores it and uses it when creating the user at verify.
+- **Signup:** The B2C client **must** send **`country_code`** (required, ISO 3166-1 alpha-2) in `POST /api/v1/customers/signup/request`. The user selects their country in the UI before submitting; the value must come from `GET /api/v1/markets/available` (which returns only `country_code` and `country_name`). The backend resolves `country_code` to `market_id` and uses it when creating the user at verify.
 - **Non-editable after signup:** Customer Comensal (and Customer Employer) **cannot change** their market via profile update. The backend strips `market_id` and `market_ids` on `PUT /users/me` and on admin `PUT /users/{user_id}` when the target user is a Customer. B2C clients must not show or send market as editable in profile; the user is locked to the market chosen at registration until a future paid upgrade flow.
 - **Restore selection after login:** Use `GET /users/me` and set the app’s selected market from `market_id` (or `market_ids[0]`) so the market selector matches the user’s assigned market.
 
@@ -33,7 +33,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 | Actor | Market at creation | Editable later? | Source of market_id |
 |-------|--------------------|-----------------|----------------------|
-| **Customer Comensal** | Required at signup (client sends in signup request) | No | User selection from GET /markets/available |
+| **Customer Comensal** | Required at signup (client sends `country_code` in signup request) | No | User selection from GET /markets/available (`country_code`) |
 | **Customer Employer** | Must match institution’s market | No | Institution’s market_id |
 | **Supplier user** | Must match institution’s market | No | Institution’s market_id |
 | **Institution (Supplier)** | Required at create | No (for Supplier institutions) | From GET /markets/available |
@@ -45,8 +45,8 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 ### 2.1 Public: GET /api/v1/markets/available
 
 - **Auth:** None (public). Rate-limited (e.g. 60 req/min). Cached on server.
-- **Response:** Active, non-archived markets **excluding Global Marketplace**. Use as the **single source** for market selectors and for **plan/entity market dropdowns** so Global is never sent.
-- **Shape:** `{ market_id, country_code, country_name, timezone, currency_code, currency_name }` (ISO 3166-1 **alpha-2** for `country_code`).
+- **Response:** Active, non-archived countries **excluding Global Marketplace**. Use as the **single source** for the signup country selector and lead flow.
+- **Shape:** `{ country_code, country_name }` only (no `market_id`, timezone, or currency). ISO 3166-1 **alpha-2** for `country_code`. For authenticated flows that need `market_id`, use **GET /api/v1/markets/enriched/**.
 
 ### 2.2 Authenticated endpoints
 
@@ -81,7 +81,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 ### 3.1 Data source and state
 
 - **Fetch:** `GET /api/v1/markets/available` on load; cache with short TTL.
-- **State:** Store `selectedMarket` as `{ market_id, country_code, country_name }` (or equivalent). B2C: one global selection; B2B: may use assigned market from GET /users/me.
+- **State:** B2C (pre-auth): store `{ country_code, country_name }` from GET /markets/available for signup. B2C (post-auth) and B2B: store `{ market_id, country_code, country_name }` from GET /users/me or enriched markets.
 - **Persistence:** B2C (mobile) — AsyncStorage/SecureStore (e.g. `selected_market_id`). B2B (web) — localStorage. After login, restore from GET /users/me `market_id` / `market_ids[0]`.
 
 ### 3.2 Country flag

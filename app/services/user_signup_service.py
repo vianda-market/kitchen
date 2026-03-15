@@ -31,6 +31,7 @@ from app.config.settings import get_vianda_customers_institution_id, get_vianda_
 from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
 from app.services.crud_service import city_service
 from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
+from app.utils.country import normalize_country_code
 
 
 class UserSignupService:
@@ -90,10 +91,13 @@ class UserSignupService:
         # Validate signup data
         self._validate_signup_data(user_data)
         
+        # Resolve country_code to market_id (B2C signup uses country_code)
+        self._resolve_country_code_to_market_id(user_data, db)
+        
         # Process password security
         self._process_password_security(user_data)
         
-        # Apply business rules for customer signup (market_id must be in user_data for this path)
+        # Apply business rules for customer signup (market_id must be in user_data at this point)
         self._apply_customer_signup_rules(user_data, db)
         
         # Create user with validation
@@ -280,33 +284,39 @@ class UserSignupService:
             log_info(f"   Hash length: {len(hashed_pwd)}")
             log_info(f"   Hash starts with: {hashed_pwd[:20]}...")
     
-    def _validate_and_resolve_market_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
+    def _resolve_country_code_to_market_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
         """
-        Require and validate market_id for B2C signup request. B2C customers must not get Global market.
+        Resolve country_code to market_id for B2C signup. Requires active, non-archived, non-Global market.
         Raises HTTPException 400 if missing, invalid, archived, or Global.
         """
-        market_id_raw = user_data.get("market_id")
-        if market_id_raw is None:
+        country_code_raw = user_data.get("country_code")
+        if not country_code_raw or not str(country_code_raw).strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required. Use GET /api/v1/markets/available to get valid market UUIDs.",
+                detail="country_code is required. Use GET /api/v1/markets/available for valid country codes.",
             )
-        market_id = market_id_raw if isinstance(market_id_raw, UUID) else UUID(str(market_id_raw))
-        if is_global_market(market_id):
+        country_code = normalize_country_code(country_code_raw)
+        if not country_code:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Global Marketplace cannot be assigned to B2C customers. Use a market from GET /api/v1/markets/available.",
+                detail="Invalid country_code. Use GET /api/v1/markets/available for valid country codes.",
             )
-        market = market_service.get_by_id(market_id)
+        market = market_service.get_by_country_code(country_code)
         if not market:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived market_id. Use GET /api/v1/markets/available to get valid market UUIDs.",
+                detail=f"No market found for country {country_code}. Use GET /api/v1/markets/available for supported countries.",
             )
         if market.get("is_archived"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived market_id. Use GET /api/v1/markets/available to get valid market UUIDs.",
+                detail=f"Market for {country_code} is archived. Use GET /api/v1/markets/available for active countries.",
+            )
+        market_id = market["market_id"] if isinstance(market["market_id"], UUID) else UUID(str(market["market_id"]))
+        if is_global_market(market_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Global Marketplace cannot be assigned to B2C customers. Use a country from GET /api/v1/markets/available.",
             )
         user_data["market_id"] = market_id
 
@@ -764,7 +774,7 @@ class UserSignupService:
         If username is already taken, raise 400.
         """
         self._validate_signup_data(user_data)
-        self._validate_and_resolve_market_id(user_data, db)
+        self._resolve_country_code_to_market_id(user_data, db)
         self._validate_and_resolve_city_id(user_data, db)
         self._process_password_security(user_data)
         email = user_data.get("email", "").strip().lower()

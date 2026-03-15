@@ -138,7 +138,7 @@ router = APIRouter(
 )
 
 # 1. List all users
-@router.get("/", response_model=List[UserResponseSchema])
+@router.get("", response_model=List[UserResponseSchema])
 def list_users(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
@@ -194,9 +194,9 @@ def get_user_by_lookup(
     return handle_business_operation(_lookup_user, "user lookup by username/email")
 
 
-# GET /users/search/ - Search users by name, username, or email (e.g. discretionary recipient picker)
+# GET /users/search - Search users by name, username, or email (e.g. discretionary recipient picker)
 # Defined before GET /{user_id} so that "/search" is not interpreted as user_id.
-@router.get("/search/", response_model=UserSearchResponseSchema)
+@router.get("/search", response_model=UserSearchResponseSchema)
 def search_users_route(
     q: str = Query("", description="Search string (substring match)"),
     search_by: str = Query(..., description="Field to search: name, username, or email"),
@@ -633,7 +633,7 @@ def get_user_by_id(
     return _user_dto_to_response(user, db)
 
 # POST /users - Create a new user
-@router.post("/", response_model=UserResponseSchema, status_code=201)
+@router.post("", response_model=UserResponseSchema, status_code=201)
 def create(
     user: UserCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -1012,7 +1012,7 @@ def delete_user(
 # =============================================================================
 
 # GET /users/enriched/ - List all users with enriched data
-@router.get("/enriched/", response_model=List[UserEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[UserEnrichedResponseSchema])
 def list_enriched_users(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

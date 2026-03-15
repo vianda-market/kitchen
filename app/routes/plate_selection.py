@@ -26,7 +26,7 @@ router = APIRouter(
     tags=["Plate Selections"],
 )
 
-@router.post("/", response_model=PlateSelectionResponseSchema, status_code=201)
+@router.post("", response_model=PlateSelectionResponseSchema, status_code=201)
 def create_plate_selection(
     payload: Dict[str, Any],
     current_user: dict = Depends(get_current_user),
@@ -97,7 +97,7 @@ def get_plate_selection(
     plate_pickup_id = get_plate_pickup_id_for_selection(plate_selection_id, db)
     return PlateSelectionResponseSchema(**data, plate_pickup_id=plate_pickup_id, editable_until=editable_until)
 
-@router.get("/", response_model=list[PlateSelectionResponseSchema])
+@router.get("", response_model=list[PlateSelectionResponseSchema])
 def list_plate_selections(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)

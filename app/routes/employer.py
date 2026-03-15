@@ -186,7 +186,7 @@ def get_employer(
     )
 
 # GET /employers/enriched/ - Get all employers with enriched address data
-@router.get("/enriched/", response_model=List[EmployerEnrichedResponseSchema])
+@router.get("/enriched", response_model=List[EmployerEnrichedResponseSchema])
 def get_all_employers_enriched(
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -212,7 +212,7 @@ def get_employer_enriched(
     return handle_business_operation(_get_enriched_employer, "enriched employer retrieval")
 
 # GET /employers/
-@router.get("/", response_model=List[EmployerResponseSchema])
+@router.get("", response_model=List[EmployerResponseSchema])
 def get_all_employers(
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -223,7 +223,7 @@ def get_all_employers(
 
 
 # POST /employers/ – Create a new employer with address
-@router.post("/", response_model=EmployerResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EmployerResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_employer(
     employer_create: EmployerCreateSchema,
     current_user: dict = Depends(get_current_user),

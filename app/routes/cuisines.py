@@ -21,7 +21,7 @@ class SupportedCuisineSchema(BaseModel):
     cuisine_name: str = Field(..., description="Cuisine name for dropdown and restaurant.cuisine value")
 
 
-@router.get("/", response_model=List[SupportedCuisineSchema])
+@router.get("", response_model=List[SupportedCuisineSchema])
 async def list_supported_cuisines(
     current_user: dict = Depends(get_client_employee_or_supplier_user),
 ):

@@ -29,7 +29,7 @@ router = APIRouter(
 )
 
 
-@router.get("/", response_model=List[NationalHolidayResponseSchema])
+@router.get("", response_model=List[NationalHolidayResponseSchema])
 def list_national_holidays(
     country_code: Optional[str] = Query(None, description="Filter by country code"),
     current_user: dict = Depends(get_employee_user),
@@ -94,7 +94,7 @@ def get_national_holiday(
     return handle_business_operation(get_operation, "national holiday retrieval", None, db)
 
 
-@router.post("/", response_model=NationalHolidayResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NationalHolidayResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_national_holiday(
     payload: NationalHolidayCreateSchema,
     current_user: dict = Depends(get_employee_user),

@@ -173,7 +173,7 @@
 					"request": {
 						"method": "GET",
 						"header": [{"key": "Authorization", "value": "Bearer {{supplierToken}}"}],
-						"url": "{{baseUrl}}/api/v1/users/me"
+						"url": "{{baseUrl}}/api/v1/usersme"
 					}
 				},
 				{
@@ -192,7 +192,7 @@
 					"request": {
 						"method": "GET",
 						"header": [{"key": "Authorization", "value": "Bearer {{supplierToken}}"}],
-						"url": "{{baseUrl}}/api/v1/institutions/{{supplierInstitutionId}}"
+						"url": "{{baseUrl}}/api/v1/institutions{{supplierInstitutionId}}"
 					}
 				}
 			]
@@ -223,7 +223,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\"Restaurant\"],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"St\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				},
 				{
@@ -256,7 +256,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\"Customer Home\"],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"St\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				}
 			]
@@ -288,7 +288,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\"Customer Home\"],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"St\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				},
 				{
@@ -322,7 +322,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\"Restaurant\"],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"St\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/addresses/"
+						"url": "{{baseUrl}}/api/v1/addresses"
 					}
 				}
 			]
@@ -354,7 +354,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"role_type\": \"Supplier\",\n  \"role_name\": \"Admin\",\n  \"username\": \"newsupplier_{{$timestamp}}\",\n  \"email\": \"newsupplier_{{$timestamp}}@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"9999999999\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/users/"
+						"url": "{{baseUrl}}/api/v1/users"
 					}
 				},
 				{
@@ -381,7 +381,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"newcustomer\",\n  \"email\": \"newcustomer@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"8888888888\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Customer\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/users/"
+						"url": "{{baseUrl}}/api/v1/users"
 					}
 				}
 			]
@@ -412,7 +412,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"another\",\n  \"email\": \"another@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"7777777777\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/users/"
+						"url": "{{baseUrl}}/api/v1/users"
 					}
 				}
 			]
@@ -443,7 +443,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"no_show_discount\": 20\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/institutions/{{supplierInstitutionId}}"
+						"url": "{{baseUrl}}/api/v1/institutions{{supplierInstitutionId}}"
 					}
 				},
 				{
@@ -469,7 +469,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"no_show_discount\": 25\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/institutions/{{supplierInstitutionId}}"
+						"url": "{{baseUrl}}/api/v1/institutions{{supplierInstitutionId}}"
 					}
 				},
 				{
@@ -499,7 +499,7 @@
 							"mode": "raw",
 							"raw": "{\n  \"name\": \"Test Supplier No Discount\",\n  \"institution_type\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
 						},
-						"url": "{{baseUrl}}/api/v1/institutions/"
+						"url": "{{baseUrl}}/api/v1/institutions"
 					}
 				}
 			]
