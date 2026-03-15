@@ -783,6 +783,56 @@ def create_subscription_routes() -> APIRouter:
     )
     
     def _subscription_custom_routes(router: APIRouter) -> None:
+        # Enriched routes MUST be before /{subscription_id} so /enriched is not parsed as subscription_id
+        @router.get("/enriched", response_model=List[SubscriptionEnrichedResponseSchema])
+        def list_enriched_subscriptions(
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db)
+        ):
+            """List subscriptions with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            role_type = current_user.get("role_type")
+            if role_type == "Supplier":
+                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+            if role_type == "Customer":
+                user_id = current_user.get("user_id")
+                if not user_id:
+                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                def _get_enriched_subscriptions():
+                    return get_enriched_subscriptions(db, scope=None, include_archived=False, user_id=user_id)
+            else:
+                def _get_enriched_subscriptions():
+                    return get_enriched_subscriptions(db, scope=None, include_archived=False)
+            return handle_business_operation(_get_enriched_subscriptions, "enriched subscription list retrieval")
+
+        @router.get("/enriched/{subscription_id}", response_model=SubscriptionEnrichedResponseSchema)
+        def get_enriched_subscription_by_id_route(
+            subscription_id: UUID,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db)
+        ):
+            """Get subscription by ID with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            role_type = current_user.get("role_type")
+            if role_type == "Supplier":
+                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+            if role_type == "Customer":
+                user_id = current_user.get("user_id")
+                if not user_id:
+                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                def _get_enriched_subscription():
+                    sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
+                    if not sub:
+                        raise HTTPException(status_code=404, detail="Subscription not found")
+                    if sub.user_id != user_id:
+                        raise HTTPException(status_code=404, detail="Subscription not found")
+                    return sub
+            else:
+                def _get_enriched_subscription():
+                    sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
+                    if not sub:
+                        raise HTTPException(status_code=404, detail="Subscription not found")
+                    return sub
+            return handle_business_operation(_get_enriched_subscription, "enriched subscription retrieval")
+
         @router.get("", response_model=List[SubscriptionResponseSchema])
         def list_subscriptions_override(
             current_user: dict = Depends(get_current_user),
@@ -860,55 +910,6 @@ def create_subscription_routes() -> APIRouter:
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found in token")
             return resume_subscription(subscription_id, user_id, db)
-
-        @router.get("/enriched", response_model=List[SubscriptionEnrichedResponseSchema])
-        def list_enriched_subscriptions(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """List subscriptions with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
-            role_type = current_user.get("role_type")
-            if role_type == "Supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
-                user_id = current_user.get("user_id")
-                if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
-                def _get_enriched_subscriptions():
-                    return get_enriched_subscriptions(db, scope=None, include_archived=False, user_id=user_id)
-            else:
-                def _get_enriched_subscriptions():
-                    return get_enriched_subscriptions(db, scope=None, include_archived=False)
-            return handle_business_operation(_get_enriched_subscriptions, "enriched subscription list retrieval")
-
-        @router.get("/enriched/{subscription_id}", response_model=SubscriptionEnrichedResponseSchema)
-        def get_enriched_subscription_by_id_route(
-            subscription_id: UUID,
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """Get subscription by ID with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
-            role_type = current_user.get("role_type")
-            if role_type == "Supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
-                user_id = current_user.get("user_id")
-                if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
-                def _get_enriched_subscription():
-                    sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
-                    if not sub:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
-                    if sub.user_id != user_id:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
-                    return sub
-            else:
-                def _get_enriched_subscription():
-                    sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
-                    if not sub:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
-                    return sub
-            return handle_business_operation(_get_enriched_subscription, "enriched subscription retrieval")
 
     router = create_crud_routes(
         config=config,
@@ -1308,7 +1309,9 @@ def create_geolocation_routes() -> APIRouter:
 
 def create_institution_entity_routes() -> APIRouter:
     """Create routes for InstitutionEntity entity. Supplier Admin and Employee Admin/Super Admin can access (GET, POST, PUT, DELETE).
-    credit_currency_id is derived from address.country_code -> market (Option A); client does not send it."""
+    credit_currency_id is derived from address.country_code -> market (Option A); client does not send it.
+    Note: Enriched endpoints (/enriched, /enriched/{entity_id}) are in app/routes/institution_entity.py,
+    registered before this router so /enriched matches before /{entity_id}."""
     from app.services.crud_service import institution_entity_service
     from app.schemas.consolidated_schemas import InstitutionEntityCreateSchema, InstitutionEntityUpdateSchema, InstitutionEntityResponseSchema
     from app.auth.dependencies import require_supplier_admin_or_employee_admin
