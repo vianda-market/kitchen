@@ -62,7 +62,11 @@ All active documentation has been consolidated into:
 - **docs/api/SCOPING_SYSTEM.md**: Unified scoping and access control documentation
 - **docs/api/API_PERMISSIONS_BY_ROLE.md**: Permission matrix reference
 
+### API Documentation (February 2026)
+
+**docs/zArchive/api/** – Superseded api/ docs and historical client docs. See [api/README.md](./api/README.md) for details.
+
 ## Archive Date
 
-2025-11-23
+2025-11-23 (original); 2026-02-10 (api additions)
 

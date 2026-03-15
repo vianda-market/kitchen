@@ -8,10 +8,10 @@ from enum import Enum
 
 
 class PickupType(str, Enum):
-    """Valid pickup types - fixed at compile time"""
+    """Valid pickup types - fixed at compile time. offer=user offers to pick up for others; request=user requests someone to pick up; self=user picks up own."""
     SELF = "self"
-    FOR_OTHERS = "for_others"
-    BY_OTHERS = "by_others"
+    OFFER = "offer"
+    REQUEST = "request"
 
     @classmethod
     def values(cls) -> list[str]:

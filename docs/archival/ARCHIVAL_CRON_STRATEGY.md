@@ -58,7 +58,7 @@ Instead of individual table configurations, we use **business-logical categories
 "address_info": ArchivalCategory.OPERATIONAL_DATA,
 
 # REFERENCE DATA (2 years - product/catalog data)
-"product_info": ArchivalCategory.REFERENCE_DATA,
+"product_info": ArchivalCategory.REFERENCE_DATA,  # + blob cleanup: delete image files when archived
 "plate_info": ArchivalCategory.REFERENCE_DATA,
 "plan_info": ArchivalCategory.REFERENCE_DATA,
 "qr_code_info": ArchivalCategory.REFERENCE_DATA,
@@ -131,6 +131,17 @@ The cron processes tables in **business priority order**:
 3. **Customer Service** (orders, payment attempts) - Priority 3
 4. **Operational Data** (restaurants, addresses) - Priority 4
 5. **Reference Data** (products, plans) - Priority 5
+
+### Product Image Blob Cleanup
+
+When **`product_info`** records are archived, their image blobs must be deleted from storage:
+
+- **Local dev:** Delete files at `image_storage_path` and `image_thumbnail_storage_path` (skip placeholder)
+- **Prod (S3):** Delete the corresponding objects in the product-image bucket
+
+Use `ProductImageService.delete_image(storage_path, thumbnail_storage_path)` before or after setting `is_archived = true`. The archival pipeline should invoke this for each archived product (excluding those still using the placeholder path).
+
+Likewise, when **`qr_code`** records are archived, delete their image files from `static/qr_codes/` (or S3 when using cloud storage).
 
 ## ⚡ **BUSINESS AGILITY BENEFITS**
 

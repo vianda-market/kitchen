@@ -13,9 +13,9 @@ Tests the generic CRUD service functionality including:
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from fastapi import HTTPException
 
 from app.services.crud_service import CRUDService
@@ -34,9 +34,7 @@ class MockDirectScopingDTO(BaseModel):
     created_date: datetime
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
-        extra = "forbid"
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 # Test DTO for JOIN-based scoping
@@ -48,9 +46,7 @@ class MockJoinScopingDTO(BaseModel):
     created_date: datetime
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
-        extra = "forbid"
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 @pytest.fixture
@@ -238,9 +234,9 @@ class TestGetAllWithJoinScoping:
                 'kitchen_day': 'Monday',
                 'status': Status.ACTIVE,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
+                'created_date': datetime.now(timezone.utc),
                 'modified_by': uuid4(),
-                'modified_date': datetime.utcnow()
+                'modified_date': datetime.now(timezone.utc)
             }
         ]
         
@@ -264,9 +260,9 @@ class TestGetAllWithJoinScoping:
                 'kitchen_day': 'Monday',
                 'status': Status.ACTIVE,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
+                'created_date': datetime.now(timezone.utc),
                 'modified_by': uuid4(),
-                'modified_date': datetime.utcnow()
+                'modified_date': datetime.now(timezone.utc)
             }
         ]
         
@@ -288,9 +284,9 @@ class TestGetAllWithJoinScoping:
                 'kitchen_day': 'Monday',
                 'status': Status.ACTIVE,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
+                'created_date': datetime.now(timezone.utc),
                 'modified_by': uuid4(),
-                'modified_date': datetime.utcnow()
+                'modified_date': datetime.now(timezone.utc)
             }
         ]
         
@@ -337,9 +333,9 @@ class TestGetByIdWithJoinScoping:
             'kitchen_day': 'Monday',
             'status': Status.ACTIVE,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
+            'created_date': datetime.now(timezone.utc),
             'modified_by': uuid4(),
-            'modified_date': datetime.utcnow()
+            'modified_date': datetime.now(timezone.utc)
         }
         
         result = multi_join_scoping_service.get_by_id(record_id, mock_db, scope=None)
@@ -363,9 +359,9 @@ class TestGetByIdWithJoinScoping:
             'kitchen_day': 'Monday',
             'status': Status.ACTIVE,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
+            'created_date': datetime.now(timezone.utc),
             'modified_by': uuid4(),
-            'modified_date': datetime.utcnow()
+            'modified_date': datetime.now(timezone.utc)
         }
         
         result = multi_join_scoping_service.get_by_id(record_id, mock_db, scope=supplier_scope)
@@ -400,8 +396,8 @@ class TestBackwardCompatibility:
                 'name': 'Test',
                 'institution_id': supplier_scope.institution_id,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
-                'modified_date': datetime.utcnow()
+                'created_date': datetime.now(timezone.utc),
+                'modified_date': datetime.now(timezone.utc)
             }
         ]
         
@@ -422,8 +418,8 @@ class TestBackwardCompatibility:
             'name': 'Test',
             'institution_id': supplier_scope.institution_id,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
-            'modified_date': datetime.utcnow()
+            'created_date': datetime.now(timezone.utc),
+            'modified_date': datetime.now(timezone.utc)
         }
         
         result = direct_scoping_service.get_by_id(record_id, mock_db, scope=supplier_scope)
@@ -543,9 +539,9 @@ class TestCreateWithJoinScoping:
             'kitchen_day': 'Monday',
             'status': Status.ACTIVE,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
+            'created_date': datetime.now(timezone.utc),
             'modified_by': uuid4(),
-            'modified_date': datetime.utcnow()
+            'modified_date': datetime.now(timezone.utc)
         }
         
         data = {
@@ -606,9 +602,9 @@ class TestUpdateWithJoinScoping:
                 'kitchen_day': 'Monday',
                 'status': Status.ACTIVE,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
+                'created_date': datetime.now(timezone.utc),
                 'modified_by': uuid4(),
-                'modified_date': datetime.utcnow()
+                'modified_date': datetime.now(timezone.utc)
             },
             {  # Second call: get_by_id after update
                 'plate_kitchen_day_id': record_id,
@@ -616,9 +612,9 @@ class TestUpdateWithJoinScoping:
                 'kitchen_day': 'Tuesday',
                 'status': Status.ACTIVE,
                 'is_archived': False,
-                'created_date': datetime.utcnow(),
+                'created_date': datetime.now(timezone.utc),
                 'modified_by': uuid4(),
-                'modified_date': datetime.utcnow()
+                'modified_date': datetime.now(timezone.utc)
             }
         ]
         
@@ -655,9 +651,9 @@ class TestUpdateWithJoinScoping:
             'kitchen_day': 'Monday',
             'status': Status.ACTIVE,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
+            'created_date': datetime.now(timezone.utc),
             'modified_by': uuid4(),
-            'modified_date': datetime.utcnow()
+            'modified_date': datetime.now(timezone.utc)
         }
         
         data = {
@@ -688,9 +684,9 @@ class TestSoftDeleteWithJoinScoping:
             'kitchen_day': 'Monday',
             'status': Status.ACTIVE,
             'is_archived': False,
-            'created_date': datetime.utcnow(),
+            'created_date': datetime.now(timezone.utc),
             'modified_by': uuid4(),
-            'modified_date': datetime.utcnow()
+            'modified_date': datetime.now(timezone.utc)
         }
         
         mock_db_update.return_value = 1

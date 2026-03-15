@@ -44,32 +44,5 @@
         { "longText": "C1043AAZ", "shortText": "C1043AAZ", "types": ["postal_code"] }
       ]
     }
-  },
-  "validate_address": {
-    "result": {
-      "verdict": {
-        "addressComplete": true,
-        "validationGranularity": "PREMISE"
-      },
-      "address": {
-        "formattedAddress": "Av. Santa Fe 2567, C1425 CABA, Argentina",
-        "addressComponents": [
-          { "componentName": { "text": "2567" }, "componentType": "street_number" },
-          { "componentName": { "text": "Avenida Santa Fe" }, "componentType": "route" },
-          { "componentName": { "text": "Buenos Aires" }, "componentType": "locality" },
-          { "componentName": { "text": "Ciudad Autónoma de Buenos Aires" }, "componentType": "administrative_area_level_1" },
-          { "componentName": { "text": "Argentina" }, "componentType": "country", "confirmationLevel": "CONFIRMED" }
-        ]
-      }
-    }
-  },
-  "validate_address_invalid": {
-    "result": {
-      "verdict": {
-        "addressComplete": false,
-        "validationGranularity": "OTHER"
-      },
-      "address": null
-    }
   }
 }

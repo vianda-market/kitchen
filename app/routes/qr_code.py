@@ -21,10 +21,9 @@ from app.schemas.consolidated_schemas import (
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db
 from app.services.error_handling import handle_business_operation, handle_get_by_id
-from app.utils.query_params import include_archived_optional_query, include_archived_query
 from app.utils.error_messages import entity_not_found
 from app.utils.log import log_error
-from app.security.entity_scoping import EntityScopingService, ENTITY_QR_CODE
+from app.security.entity_scoping import EntityScopingService, ENTITY_QR_CODE, ENTITY_RESTAURANT
 import psycopg2.extensions
 
 router = APIRouter(prefix="/qr-codes", tags=["QR Codes"])
@@ -40,10 +39,14 @@ def create_qr_code_atomic(
 ):
     """Create QR code with automatic image generation"""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
+    restaurant_scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
 
-    restaurant = restaurant_service.get_by_id(payload.restaurant_id, db, scope=scope)
+    restaurant = restaurant_service.get_by_id(payload.restaurant_id, db, scope=restaurant_scope)
     if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not found for QR code creation")
+        raise HTTPException(
+            status_code=404,
+            detail="Restaurant not found for QR code creation. Ensure the restaurant exists and you have access to it (check institution scope).",
+        )
 
     def _create_qr_code():
         return atomic_qr_service.create_qr_code_atomic(
@@ -61,34 +64,30 @@ def create_qr_code_atomic(
 
 @router.get("/", response_model=List[QRCodeResponseSchema])
 def get_all_qr_codes(
-    include_archived: bool = False,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get all QR codes with optional archived records"""
+    """Get all QR codes. Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
 
     def _get_qr_codes():
-        # CRUD service get_all already filters non-archived; include_archived retained for signature compatibility
-        return qr_code_service.get_all(db, scope=scope)
+        return qr_code_service.get_all(db, scope=scope, include_archived=False)
     
     return handle_business_operation(_get_qr_codes, "QR codes retrieval")
 
 @router.get("/{qr_code_id}", response_model=QRCodeResponseSchema)
 def get_qr_code(
     qr_code_id: UUID,
-    include_archived: bool = False,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get QR code by ID with optional archived records"""
+    """Get QR code by ID. Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
     return handle_get_by_id(
         qr_code_service.get_by_id,
         qr_code_id,
         db,
         "QR code",
-        include_archived,
         extra_kwargs={"scope": scope}
     )
 
@@ -118,7 +117,7 @@ def update_qr_code(
             )
         else:
             # For other updates, use standard CRUD service
-            data = payload.dict(exclude_unset=True)
+            data = payload.model_dump(exclude_unset=True)
             data["modified_by"] = current_user["user_id"]
             return qr_code_service.update(qr_code_id, data, db, scope=scope)
     
@@ -162,8 +161,9 @@ def get_qr_code_by_restaurant(
 ):
     """Get QR code by restaurant ID"""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
+    restaurant_scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
 
-    restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=scope)
+    restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=restaurant_scope)
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
@@ -179,17 +179,16 @@ def get_qr_code_by_restaurant(
 # GET /qr-codes/enriched/ - List all QR codes with enriched data
 @router.get("/enriched/", response_model=List[QRCodeEnrichedResponseSchema])
 def list_enriched_qr_codes(
-    include_archived: Optional[bool] = include_archived_optional_query("qr codes"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all QR codes with enriched data (institution_name, restaurant_name, address details)"""
+    """List all QR codes with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
         enriched_qr_codes = get_enriched_qr_codes(
             db,
             scope=scope,
-            include_archived=include_archived or False
+            include_archived=False
         )
         return enriched_qr_codes
     except HTTPException:
@@ -202,18 +201,17 @@ def list_enriched_qr_codes(
 @router.get("/enriched/{qr_code_id}", response_model=QRCodeEnrichedResponseSchema)
 def get_enriched_qr_code_by_id_route(
     qr_code_id: UUID,
-    include_archived: bool = include_archived_query("qr codes"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get a single QR code by ID with enriched data (institution_name, restaurant_name, address details)"""
+    """Get a single QR code by ID with enriched data (institution_name, restaurant_name, address details). Non-archived only."""
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
         enriched_qr_code = get_enriched_qr_code_by_id(
             qr_code_id,
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         if not enriched_qr_code:
             raise entity_not_found("QR code", qr_code_id)

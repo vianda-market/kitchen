@@ -26,7 +26,7 @@ uvicorn application:app --reload --host 0.0.0.0 --port 8000
 ### 3. Import Postman Collection
 1. Open Postman
 2. Click **"Import"**
-3. Select `docs/postman/DISCRETIONARY_CREDIT_SYSTEM.postman_collection.json`
+3. Select `docs/postman/collections/DISCRETIONARY_CREDIT_SYSTEM.postman_collection.json`
 4. Import the collection
 
 ### 4. Set Up Environment Variables

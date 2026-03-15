@@ -1,0 +1,155 @@
+{
+	"info": {
+		"_postman_id": "zipcode-lead-metrics-2026",
+		"name": "006 ZIPCODE_LEAD_METRICS",
+		"description": "Tests for the unauthenticated lead zipcode-metrics endpoint. Used to encourage signup by showing restaurant presence in a given zipcode. No Authorization header. See docs/api/b2c_client/feedback_from_client/RESTAURANTS_BY_ZIPCODE.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Zipcode metrics (no auth)",
+			"item": [
+				{
+					"name": "GET zipcode-metrics (zip + country_code)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has requested_zipcode', function () { pm.expect(body).to.have.property('requested_zipcode'); });",
+									"    pm.test('Response has matched_zipcode', function () { pm.expect(body).to.have.property('matched_zipcode'); });",
+									"    pm.test('Response has restaurant_count', function () { pm.expect(body).to.have.property('restaurant_count'); });",
+									"    pm.test('Response has has_coverage', function () { pm.expect(body).to.have.property('has_coverage'); });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip={{sampleZip}}&country_code={{sampleCountryCode}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "zipcode-metrics"],
+							"query": [
+								{
+									"key": "zip",
+									"value": "{{sampleZip}}"
+								},
+								{
+									"key": "country_code",
+									"value": "{{sampleCountryCode}}"
+								}
+							]
+						},
+						"description": "Lead flow: get metrics for a zipcode. No auth. Rate-limited per IP (e.g. 60/min); 429 when exceeded."
+					}
+				},
+				{
+					"name": "GET zipcode-metrics (zip only, default country)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has restaurant_count and has_coverage', function () {",
+									"        pm.expect(body).to.have.property('restaurant_count');",
+									"        pm.expect(body).to.have.property('has_coverage');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=10001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "zipcode-metrics"],
+							"query": [
+								{
+									"key": "zip",
+									"value": "10001"
+								}
+							]
+						},
+						"description": "country_code omitted; backend should default to US."
+					}
+				},
+				{
+					"name": "GET zipcode-metrics (AR)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=C1430&country_code=AR",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "zipcode-metrics"],
+							"query": [
+								{
+									"key": "zip",
+									"value": "C1430"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						},
+						"description": "Example for Argentina (country_code=AR)."
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "sampleZip",
+			"value": "10001",
+			"type": "string"
+		},
+		{
+			"key": "sampleCountryCode",
+			"value": "US",
+			"type": "string"
+		}
+	]
+}

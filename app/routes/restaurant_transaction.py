@@ -32,7 +32,6 @@ from app.services.entity_service import (
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.log import log_info
-from app.utils.query_params import include_archived_query
 from app.services.error_handling import handle_business_operation
 from app.security.institution_scope import InstitutionScope
 from app.security.entity_scoping import EntityScopingService, ENTITY_RESTAURANT_TRANSACTION
@@ -54,7 +53,6 @@ def _restaurant_transaction_not_found() -> HTTPException:
 # GET /restaurant-transactions/ – Get all restaurant transactions (read-only)
 @router.get("/", response_model=List[RestaurantTransactionResponseSchema])
 def get_all_restaurant_transactions(
-    include_archived: bool = include_archived_query("restaurant transactions"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -78,7 +76,7 @@ def get_all_restaurant_transactions(
         transactions = restaurant_transaction_service.get_all(
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         log_info(f"Retrieved {len(transactions)} restaurant transactions")
         return transactions
@@ -93,7 +91,6 @@ def get_all_restaurant_transactions(
 @router.get("/{transaction_id}", response_model=RestaurantTransactionResponseSchema)
 def get_restaurant_transaction(
     transaction_id: UUID,
-    include_archived: bool = include_archived_query("restaurant transactions"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -119,7 +116,7 @@ def get_restaurant_transaction(
         if not transaction:
             raise _restaurant_transaction_not_found()
         
-        if not include_archived and transaction.is_archived:
+        if transaction.is_archived:
             raise _restaurant_transaction_not_found()
         
         log_info(f"Retrieved restaurant transaction: {transaction_id}")
@@ -134,7 +131,6 @@ def get_restaurant_transaction(
 # GET /restaurant-transactions/enriched/ – Get all enriched restaurant transactions (read-only)
 @router.get("/enriched/", response_model=List[RestaurantTransactionEnrichedResponseSchema])
 def get_all_enriched_restaurant_transactions(
-    include_archived: bool = include_archived_query("restaurant transactions"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -157,7 +153,7 @@ def get_all_enriched_restaurant_transactions(
         transactions = get_enriched_restaurant_transactions(
             db,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         log_info(f"Retrieved {len(transactions)} enriched restaurant transactions")
         return transactions
@@ -172,7 +168,6 @@ def get_all_enriched_restaurant_transactions(
 @router.get("/enriched/{transaction_id}", response_model=RestaurantTransactionEnrichedResponseSchema)
 def get_enriched_restaurant_transaction(
     transaction_id: UUID,
-    include_archived: bool = include_archived_query("restaurant transactions"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -196,7 +191,7 @@ def get_enriched_restaurant_transaction(
             db,
             transaction_id,
             scope=scope,
-            include_archived=include_archived
+            include_archived=False
         )
         
         if not transaction:

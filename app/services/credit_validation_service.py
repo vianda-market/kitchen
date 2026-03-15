@@ -70,7 +70,7 @@ def validate_sufficient_credits(
             log_error(f"Subscription not found for user {user_id}")
             raise HTTPException(
                 status_code=404, 
-                detail="User subscription not found. Please contact support."
+                detail="User subscription not found. Please go to Plan and subscribe before reserving a plate."
             )
         
         from decimal import Decimal

@@ -8,7 +8,7 @@ WHERE completion_time IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_plate_pickup_archival_eligible 
 ON plate_pickup_live(is_archived, status, completion_time) 
-WHERE is_archived = FALSE AND status = 'Complete';
+WHERE is_archived = FALSE AND status = 'Completed';
 
 -- Transactions (restaurant_transaction) archival indexes  
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_archival
@@ -17,7 +17,7 @@ WHERE completion_time IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_archival_eligible
 ON restaurant_transaction(is_archived, status, completion_time)
-WHERE is_archived = FALSE AND status = 'Complete';
+WHERE is_archived = FALSE AND status = 'Completed';
 
 -- Client transactions archival indexes
 CREATE INDEX IF NOT EXISTS idx_client_transaction_archival
@@ -25,14 +25,6 @@ ON client_transaction(status, created_date, is_archived);
 
 CREATE INDEX IF NOT EXISTS idx_client_transaction_archival_eligible
 ON client_transaction(is_archived, status, created_date)
-WHERE is_archived = FALSE;
-
--- Payment attempts archival indexes
-CREATE INDEX IF NOT EXISTS idx_client_payment_attempt_archival
-ON client_payment_attempt(status, created_date, is_archived);
-
-CREATE INDEX IF NOT EXISTS idx_client_payment_attempt_archival_eligible
-ON client_payment_attempt(is_archived, status, created_date)
 WHERE is_archived = FALSE;
 
 -- Subscriptions archival indexes

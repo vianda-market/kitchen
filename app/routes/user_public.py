@@ -3,12 +3,13 @@ from collections import defaultdict
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status, Depends, Request
-from pydantic import BaseModel, EmailStr, Field, root_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from app.dto.models import UserDTO
 from app.services.user_signup_service import user_signup_service
 from app.services.password_recovery_service import password_recovery_service
 from app.services.error_handling import handle_business_operation
-from app.schemas.consolidated_schemas import CustomerSignupSchema, UserResponseSchema
+from app.schemas.consolidated_schemas import CustomerSignupSchema, UserResponseSchema, UserEnrichedResponseSchema
+from app.services.entity_service import get_enriched_user_by_id
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_password_recovery_debug
 from app.utils.db import db_read
@@ -31,18 +32,18 @@ class VerifySignupRequest(BaseModel):
     code: Optional[str] = Field(None, description="6-digit verification code from email")
     token: Optional[str] = Field(None, description="Legacy verification token (use code instead)")
 
-    @root_validator
-    def require_code_or_token(cls, values):
-        code = (values.get("code") or "").strip()
-        token = (values.get("token") or "").strip()
+    @model_validator(mode="after")
+    def require_code_or_token(self):
+        code = (self.code or "").strip()
+        token = (self.token or "").strip()
         if not code and not token:
             raise ValueError("Either code or token is required")
-        return values
+        return self
 
 
 class VerifySignupResponse(BaseModel):
-    """Response for POST /customers/signup/verify: user and optional JWT."""
-    user: UserResponseSchema
+    """Response for POST /customers/signup/verify: enriched user (incl. city_name for B2C search) and JWT."""
+    user: UserEnrichedResponseSchema
     access_token: str
 
 router = APIRouter(
@@ -95,7 +96,7 @@ def signup_request(
     Returns 409 when the email is already registered so the frontend can prompt the user to log in.
     """
     def _request():
-        return user_signup_service.request_customer_signup(user.dict(), db)
+        return user_signup_service.request_customer_signup(user.model_dump(), db)
 
     result = handle_business_operation(
         _request,
@@ -143,7 +144,14 @@ def signup_verify(
             detail="Invalid or expired verification code",
         )
     user_dto, access_token = result
-    return VerifySignupResponse(user=user_dto, access_token=access_token)
+    # Return enriched user (city_name, market_name, etc.) for B2C search box and profile display
+    enriched_user = get_enriched_user_by_id(user_dto.user_id, db, scope=None, include_archived=False)
+    if not enriched_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User created but failed to retrieve profile",
+        )
+    return VerifySignupResponse(user=enriched_user, access_token=access_token)
 
 
 class DevPendingTokenResponse(BaseModel):
@@ -173,7 +181,7 @@ def get_dev_pending_token(
         """
         SELECT verification_code FROM pending_customer_signup
         WHERE email = %s AND used = FALSE AND token_expiry > CURRENT_TIMESTAMP
-        ORDER BY created_at DESC LIMIT 1
+        ORDER BY pending_id DESC LIMIT 1
         """,
         (email.strip().lower(),),
         connection=db,
@@ -203,7 +211,7 @@ def signup_customer(
     Creates a customer user immediately without email verification.
     """
     def _process_customer_signup():
-        user_data = user.dict()
+        user_data = user.model_dump()
         return user_signup_service.process_customer_signup(user_data, db)
 
     result = handle_business_operation(
@@ -232,13 +240,16 @@ def _rate_limit_username_recovery(request: Request) -> None:
     """Allow at most RATE_LIMIT_USERNAME_REQUESTS per IP per window."""
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    _username_recovery_rate_limit[ip] = [
-        t for t in _username_recovery_rate_limit[ip]
-        if now - t < RATE_LIMIT_USERNAME_WINDOW_SECONDS
-    ]
-    if len(_username_recovery_rate_limit[ip]) >= RATE_LIMIT_USERNAME_REQUESTS:
+    # Prune old entries and evict stale keys to prevent unbounded growth
+    for k, v in list(_username_recovery_rate_limit.items()):
+        pruned = [t for t in v if now - t < RATE_LIMIT_USERNAME_WINDOW_SECONDS]
+        if pruned:
+            _username_recovery_rate_limit[k] = pruned
+        else:
+            del _username_recovery_rate_limit[k]
+    if len(_username_recovery_rate_limit.get(ip, [])) >= RATE_LIMIT_USERNAME_REQUESTS:
         raise HTTPException(status_code=429, detail="Too many requests")
-    _username_recovery_rate_limit[ip].append(now)
+    _username_recovery_rate_limit.setdefault(ip, []).append(now)
 
 
 class ForgotUsernameRequest(BaseModel):
@@ -262,13 +273,13 @@ class ResetPasswordRequest(BaseModel):
     token: Optional[str] = Field(None, description="Legacy reset token (use code instead)")
     new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
 
-    @root_validator
-    def require_code_or_token(cls, values):
-        code = (values.get("code") or "").strip()
-        token = (values.get("token") or "").strip()
+    @model_validator(mode="after")
+    def require_code_or_token(self):
+        code = (self.code or "").strip()
+        token = (self.token or "").strip()
         if not code and not token:
             raise ValueError("Either code or token is required")
-        return values
+        return self
 
 
 class PasswordRecoveryResponse(BaseModel):

@@ -13,12 +13,10 @@ Documentation related to data archival strategies and cron jobs.
 
 ### 🧪 [Postman](./postman/)
 Postman collection documentation, scripts, and testing guides.
-- `INSTITUTION_BANK_ACCOUNT_POSTMAN_SCRIPTS.md` - Bank account API testing scripts
 - `POSTMAN_COLLECTION_FIXES.md` - Fixes and updates for Postman collections
 - `POSTMAN_E2E_API_CALLS.md` - **Complete E2E API workflow with collection variables**
-- `POSTMAN_INSTITUTION_BANK_ACCOUNT_SCRIPTS.md` - Institution bank account testing
 - `POSTMAN_INSTITUTION_ENTITY_SCRIPTS.md` - Institution entity API testing
-- `POSTMAN_INSTITUTION_PAYMENT_ATTEMPT_SCRIPTS.md` - Payment attempt testing scripts
+- `POSTMAN_INSTITUTION_PAYMENT_ATTEMPT_SCRIPTS.md` - Removed payment-attempt endpoints; settlement pipeline only
 
 ### ⏰ [Cron](./cron/)
 Cron job setup, configuration, and maintenance documentation.

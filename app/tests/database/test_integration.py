@@ -14,7 +14,7 @@ from uuid import uuid4, UUID
 from app.tests.database.conftest import (
     db_transaction, count_rows, record_exists
 )
-from app.tests.database.test_data.expected_seed_data import SEED_ADMIN_USER_ID
+from app.tests.database.test_data.expected_seed_data import SEED_SUPERADMIN_USER_ID
 
 
 class TestSupplierOnboarding:
@@ -23,13 +23,13 @@ class TestSupplierOnboarding:
     def test_institution_crud_workflow(self, db_transaction):
         """Test creating, updating an institution and verifying history."""
         institution_id = uuid4()
-        admin_user_id = str(SEED_ADMIN_USER_ID)
+        admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution
+            # Create institution (Supplier requires no_show_discount)
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by)
-                VALUES (%s, 'Test Supplier Inc.', %s)
+                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
+                VALUES (%s, 'Test Supplier Inc.', %s, 0)
             """, (str(institution_id), admin_user_id))
             
             # Verify creation
@@ -67,22 +67,23 @@ class TestSupplierOnboarding:
         """Test creating and updating a user with history tracking."""
         user_id = uuid4()
         institution_id = uuid4()
-        admin_user_id = str(SEED_ADMIN_USER_ID)
+        admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution first (required for user)
+            # Create institution first (required for user; Supplier requires no_show_discount)
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by)
-                VALUES (%s, 'Test Institution', %s)
+                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
+                VALUES (%s, 'Test Institution', %s, 0)
             """, (str(institution_id), admin_user_id))
             
-            # Create user
+            # Create user (market_id required; use Global Marketplace from seed)
             cur.execute("""
                 INSERT INTO user_info (
                     user_id, institution_id, role_type, role_name, 
-                    username, email, hashed_password, cellphone, modified_by
+                    username, email, hashed_password, cellphone, market_id, modified_by
                 ) VALUES (%s, %s, 'Supplier'::role_type_enum, 'Admin'::role_name_enum,
-                    'supplier_user', 'supplier@example.com', 'hashedpwd', '555-1234', %s)
+                    'supplier_user', 'supplier_crud_test@example.com', 'hashedpwd', '555-1234',
+                    '00000000-0000-0000-0000-000000000001'::uuid, %s)
             """, (str(user_id), str(institution_id), admin_user_id))
             
             # Verify creation
@@ -118,17 +119,17 @@ class TestSupplierOnboarding:
     def test_history_table_triggers(self, db_transaction):
         """Test that history tables are automatically populated on inserts/updates."""
         institution_id = uuid4()
-        admin_user_id = str(SEED_ADMIN_USER_ID)
+        admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
             # Get initial history count
             cur.execute("SELECT COUNT(*) FROM institution_history")
             initial_count = cur.fetchone()[0]
             
-            # Create institution
+            # Create institution (Supplier requires no_show_discount)
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by)
-                VALUES (%s, 'Test Institution', %s)
+                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
+                VALUES (%s, 'Test Institution', %s, 0)
             """, (str(institution_id), admin_user_id))
             
             # Verify history count increased

@@ -38,14 +38,14 @@ class TestGoogleMapsGatewayGeocoding:
         assert lat == -34.5880634  # From mock data
         assert lng == -58.4023328  # From mock data
     
+    @patch('app.config.settings.get_google_api_key', return_value="test_api_key")
     @patch('app.gateways.base_gateway.get_settings')
     @patch('requests.get')
-    def test_geocode_calls_google_api_in_prod_mode(self, mock_requests_get, mock_get_settings):
+    def test_geocode_calls_google_api_in_prod_mode(self, mock_requests_get, mock_get_settings, mock_get_google_api_key):
         """Test that geocode makes real API call in production mode"""
         # Arrange
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = "test_api_key"
         mock_get_settings.return_value = mock_settings
         
         mock_response = Mock()
@@ -70,21 +70,20 @@ class TestGoogleMapsGatewayGeocoding:
         mock_requests_get.assert_called_once()
     
     @patch('app.gateways.base_gateway.get_settings')
-    def test_geocode_raises_error_when_api_key_missing(self, mock_get_settings):
-        """Test that geocode raises error when API key not configured"""
-        # Arrange
+    @patch('app.config.settings.get_google_api_key')
+    def test_geocode_raises_error_when_api_key_missing(self, mock_get_google_api_key, mock_get_settings):
+        """Test that geocode raises error when API key not configured (prod mode, no key)."""
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = ""
         mock_get_settings.return_value = mock_settings
+        mock_get_google_api_key.return_value = ""
         
         gateway = GoogleMapsGateway()
         
-        # Act & Assert
         with pytest.raises(ExternalServiceError) as exc_info:
             gateway.geocode("Some address")
         
-        assert "GOOGLE_MAPS_API_KEY not configured" in str(exc_info.value)
+        assert "GOOGLE_API_KEY not configured" in str(exc_info.value) or "not configured" in str(exc_info.value).lower()
 
 
 class TestGoogleMapsGatewayReverseGeocoding:
@@ -108,14 +107,14 @@ class TestGoogleMapsGatewayReverseGeocoding:
         assert len(address) > 0
         assert "Santa Fe" in address or "Buenos Aires" in address  # From mock data
     
+    @patch('app.config.settings.get_google_api_key', return_value="test_api_key")
     @patch('app.gateways.base_gateway.get_settings')
     @patch('requests.get')
-    def test_reverse_geocode_calls_google_api_in_prod_mode(self, mock_requests_get, mock_get_settings):
+    def test_reverse_geocode_calls_google_api_in_prod_mode(self, mock_requests_get, mock_get_settings, mock_get_google_api_key):
         """Test that reverse geocode makes real API call in production mode"""
         # Arrange
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = "test_api_key"
         mock_get_settings.return_value = mock_settings
         
         mock_response = Mock()
@@ -159,14 +158,14 @@ class TestGoogleMapsGatewayAddressComponents:
         assert "route" in components
         assert "country" in components
     
+    @patch('app.config.settings.get_google_api_key', return_value="test_api_key")
     @patch('app.gateways.base_gateway.get_settings')
     @patch('requests.get')
-    def test_get_address_components_parses_api_response(self, mock_requests_get, mock_get_settings):
+    def test_get_address_components_parses_api_response(self, mock_requests_get, mock_get_settings, mock_get_google_api_key):
         """Test that address components are parsed from API response"""
         # Arrange
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = "test_api_key"
         mock_get_settings.return_value = mock_settings
         
         mock_response = Mock()
@@ -249,14 +248,14 @@ class TestGoogleMapsGatewaySingleton:
 class TestGoogleMapsGatewayErrorHandling:
     """Test error handling"""
     
+    @patch('app.config.settings.get_google_api_key', return_value="test_api_key")
     @patch('app.gateways.base_gateway.get_settings')
     @patch('requests.get')
-    def test_handles_api_error_status(self, mock_requests_get, mock_get_settings):
+    def test_handles_api_error_status(self, mock_requests_get, mock_get_settings, mock_get_google_api_key):
         """Test that API error statuses are handled properly"""
         # Arrange
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = "test_api_key"
         mock_get_settings.return_value = mock_settings
         
         mock_response = Mock()
@@ -275,14 +274,14 @@ class TestGoogleMapsGatewayErrorHandling:
         # Error message is wrapped by BaseGateway, so check for the status
         assert "ZERO_RESULTS" in str(exc_info.value) or "No results found" in str(exc_info.value)
     
+    @patch('app.config.settings.get_google_api_key', return_value="test_api_key")
     @patch('app.gateways.base_gateway.get_settings')
     @patch('requests.get')
-    def test_handles_network_errors(self, mock_requests_get, mock_get_settings):
+    def test_handles_network_errors(self, mock_requests_get, mock_get_settings, mock_get_google_api_key):
         """Test that network errors are wrapped properly"""
         # Arrange
         mock_settings = Mock()
         mock_settings.DEV_MODE = False
-        mock_settings.GOOGLE_MAPS_API_KEY = "test_api_key"
         mock_get_settings.return_value = mock_settings
         
         mock_requests_get.side_effect = Exception("Network error")

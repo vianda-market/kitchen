@@ -290,7 +290,7 @@ async def get_config_history(
                modified_date, is_current, valid_until, change_reason
         FROM archival_config_history
         WHERE config_id = %s
-        ORDER BY modified_date DESC
+        ORDER BY event_id DESC
         """
         
         results = db_read(query, (config_id,), fetch_one=False, connection=db)

@@ -24,7 +24,9 @@ from app.services.crud_service import (
 )
 from app.utils.log import log_info, log_warning, log_error
 from app.utils.error_messages import entity_not_found
-from app.config import Status, DiscretionaryReason
+from app.config import DiscretionaryReason
+from app.config.enums import Status, DiscretionaryStatus
+from app.services.market_service import market_service
 
 
 class DiscretionaryService:
@@ -57,6 +59,8 @@ class DiscretionaryService:
             # Validate request data
             self._validate_discretionary_request_data(request_data)
             
+            target_user = None
+            restaurant = None
             # Validate target user exists (only for Client requests)
             if request_data.get("user_id"):
                 target_user = user_service.get_by_id(request_data["user_id"], db)
@@ -69,8 +73,43 @@ class DiscretionaryService:
                 if not restaurant:
                     raise entity_not_found("Restaurant", request_data["restaurant_id"])
             
+            # Optional: validate selected user/restaurant belongs to requested institution/market
+            req_institution_id = request_data.get("institution_id")
+            req_market_id = request_data.get("market_id")
+            if request_data.get("user_id") and target_user:
+                if req_institution_id is not None and str(target_user.institution_id) != str(req_institution_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Selected user is not in the specified institution",
+                    )
+                if req_market_id is not None and str(target_user.market_id) != str(req_market_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Selected user is not in the specified market",
+                    )
+            if request_data.get("restaurant_id") and restaurant:
+                if req_institution_id is not None and str(restaurant.institution_id) != str(req_institution_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Selected restaurant is not in the specified institution",
+                    )
+                if req_market_id is not None:
+                    market = market_service.get_by_id(req_market_id)
+                    if not market:
+                        raise HTTPException(status_code=400, detail="Market not found")
+                    from app.services.entity_service import get_credit_currency_id_for_restaurant
+                    entity_credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
+                    if str(entity_credit_currency_id) != str(market.get("credit_currency_id")):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Selected restaurant is not in the specified market",
+                        )
+            
+            # Remove validation-only fields before persisting
+            request_data = {k: v for k, v in request_data.items() if k not in ("institution_id", "market_id")}
+            
             # Prepare request data
-            request_data["status"] = Status.PENDING
+            request_data["status"] = DiscretionaryStatus.PENDING
             request_data["modified_by"] = admin_user["user_id"]
             
             # Create discretionary request
@@ -120,16 +159,16 @@ class DiscretionaryService:
                 raise entity_not_found("Discretionary request", discretionary_id)
             
             # Validate request is pending
-            if discretionary_request.status != Status.PENDING:
+            if discretionary_request.status != DiscretionaryStatus.PENDING:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Cannot approve request with status: {discretionary_request.status}"
+                    detail=f"Cannot approve request with status: {getattr(discretionary_request.status, 'value', discretionary_request.status)}"
                 )
             
             # Create resolution record
             resolution_data = {
                 "discretionary_id": discretionary_id,
-                "resolution": "Approved",
+                "resolution": DiscretionaryStatus.APPROVED,
                 "resolved_by": super_admin["user_id"],
                 "status": Status.ACTIVE
             }
@@ -139,7 +178,7 @@ class DiscretionaryService:
             # Update discretionary request status
             discretionary_service.update(
                 discretionary_id,
-                {"status": Status.PROCESSED, "approval_id": resolution.approval_id},
+                {"status": DiscretionaryStatus.APPROVED, "approval_id": resolution.approval_id},
                 db
             )
             
@@ -184,16 +223,16 @@ class DiscretionaryService:
                 raise entity_not_found("Discretionary request", discretionary_id)
             
             # Validate request is pending
-            if discretionary_request.status != Status.PENDING:
+            if discretionary_request.status != DiscretionaryStatus.PENDING:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Cannot reject request with status: {discretionary_request.status}"
+                    detail=f"Cannot reject request with status: {getattr(discretionary_request.status, 'value', discretionary_request.status)}"
                 )
             
             # Create resolution record
             resolution_data = {
                 "discretionary_id": discretionary_id,
-                "resolution": "Rejected",
+                "resolution": DiscretionaryStatus.REJECTED,
                 "resolved_by": super_admin["user_id"],
                 "resolution_comment": reason,
                 "status": Status.ACTIVE
@@ -204,7 +243,7 @@ class DiscretionaryService:
             # Update discretionary request status
             discretionary_service.update(
                 discretionary_id,
-                {"status": Status.CANCELLED, "approval_id": resolution.approval_id},
+                {"status": DiscretionaryStatus.REJECTED, "approval_id": resolution.approval_id},
                 db
             )
             
@@ -232,7 +271,7 @@ class DiscretionaryService:
         """
         try:
             all_requests = discretionary_service.get_all(db)
-            pending_requests = [req for req in all_requests if req.status == Status.PENDING]
+            pending_requests = [req for req in all_requests if req.status == DiscretionaryStatus.PENDING]
             
             # Sort by creation date (oldest first)
             pending_requests.sort(key=lambda x: x.created_date)

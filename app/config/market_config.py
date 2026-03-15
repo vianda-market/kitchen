@@ -1,8 +1,11 @@
 # app/config/market_config.py
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import time, datetime
 from zoneinfo import ZoneInfo
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+# Address display: order of street components by market (USA: number, name, type; AR/PE: type, name, number)
+DEFAULT_ADDRESS_STREET_ORDER = ["street_name", "building_number", "street_type"]
 
 class MarketKitchenConfig(BaseModel):
     """Configuration for kitchen operations in a specific market"""
@@ -12,6 +15,12 @@ class MarketKitchenConfig(BaseModel):
     market_name: str = Field(..., description="Human readable market name")
     country_code: str = Field(..., description="ISO country code (AR, PE, etc.)")
     timezone: str = Field(..., description="IANA timezone (America/Argentina/Buenos_Aires)")
+    
+    # Address display: order of street components for format_street_display
+    address_street_order: List[str] = Field(
+        default_factory=lambda: list(DEFAULT_ADDRESS_STREET_ORDER),
+        description="Order of street_type, street_name, building_number for address display"
+    )
     
     # Kitchen day configuration (in LOCAL time)
     kitchen_day_config: Dict[str, Dict[str, Any]] = Field(..., description="Kitchen day settings")
@@ -23,10 +32,7 @@ class MarketKitchenConfig(BaseModel):
     billing_delay_minutes: int = Field(..., description="Minutes after kitchen close to run billing")
     reservation_opens_delay_minutes: int = Field(..., description="Minutes after kitchen close to open reservations")
     
-    class Config:
-        json_encoders = {
-            time: lambda v: v.strftime("%H:%M")
-        }
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class MarketConfiguration:
     """Centralized market configuration management"""
@@ -38,95 +44,144 @@ class MarketConfiguration:
             market_name="Argentina",
             country_code="AR",
             timezone="America/Argentina/Buenos_Aires",
+            address_street_order=["street_type", "street_name", "building_number"],
             kitchen_day_config={
                 "Monday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Tuesday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Wednesday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Thursday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Friday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 }
             },
             business_hours={
-                "Monday": {"open": time(8, 0), "close": time(14, 30)},
-                "Tuesday": {"open": time(8, 0), "close": time(14, 30)},
-                "Wednesday": {"open": time(8, 0), "close": time(14, 30)},
-                "Thursday": {"open": time(8, 0), "close": time(14, 30)},
-                "Friday": {"open": time(8, 0), "close": time(14, 30)}
+                "Monday": {"open": time(11, 30), "close": time(13, 30)},
+                "Tuesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Wednesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Thursday": {"open": time(11, 30), "close": time(13, 30)},
+                "Friday": {"open": time(11, 30), "close": time(13, 30)}
             },
             billing_delay_minutes=90,      # 1.5 hours after kitchen close
             reservation_opens_delay_minutes=150  # 2.5 hours after kitchen close
         ),
-        
         "PE": MarketKitchenConfig(
             market_id="PE",
             market_name="Peru",
             country_code="PE",
             timezone="America/Lima",
+            address_street_order=["street_type", "street_name", "building_number"],
             kitchen_day_config={
                 "Monday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Tuesday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Wednesday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Thursday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 },
                 "Friday": {
-                    "kitchen_close": time(14, 30),      # 2:30 PM local
-                    "billing_run": time(16, 0),         # 4:00 PM local
-                    "reservations_open": time(17, 0),   # 5:00 PM local
+                    "kitchen_close": time(13, 30),      # 1:30 PM local (order cutoff)
+                    "billing_run": time(15, 0),         # 3:00 PM local (90 min after kitchen close)
+                    "reservations_open": time(16, 0),   # 4:00 PM local (2.5h after kitchen close)
                     "enabled": True
                 }
             },
             business_hours={
-                "Monday": {"open": time(8, 0), "close": time(14, 30)},
-                "Tuesday": {"open": time(8, 0), "close": time(14, 30)},
-                "Wednesday": {"open": time(8, 0), "close": time(14, 30)},
-                "Thursday": {"open": time(8, 0), "close": time(14, 30)},
-                "Friday": {"open": time(8, 0), "close": time(14, 30)}
+                "Monday": {"open": time(11, 30), "close": time(13, 30)},
+                "Tuesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Wednesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Thursday": {"open": time(11, 30), "close": time(13, 30)},
+                "Friday": {"open": time(11, 30), "close": time(13, 30)}
             },
             billing_delay_minutes=90,      # 1.5 hours after kitchen close
             reservation_opens_delay_minutes=150  # 2.5 hours after kitchen close
+        ),
+        "US": MarketKitchenConfig(
+            market_id="US",
+            market_name="United States",
+            country_code="US",
+            timezone="America/New_York",
+            address_street_order=["building_number", "street_name", "street_type"],
+            kitchen_day_config={
+                "Monday": {
+                    "kitchen_close": time(13, 30),
+                    "billing_run": time(15, 0),
+                    "reservations_open": time(16, 0),
+                    "enabled": True
+                },
+                "Tuesday": {
+                    "kitchen_close": time(13, 30),
+                    "billing_run": time(15, 0),
+                    "reservations_open": time(16, 0),
+                    "enabled": True
+                },
+                "Wednesday": {
+                    "kitchen_close": time(13, 30),
+                    "billing_run": time(15, 0),
+                    "reservations_open": time(16, 0),
+                    "enabled": True
+                },
+                "Thursday": {
+                    "kitchen_close": time(13, 30),
+                    "billing_run": time(15, 0),
+                    "reservations_open": time(16, 0),
+                    "enabled": True
+                },
+                "Friday": {
+                    "kitchen_close": time(13, 30),
+                    "billing_run": time(15, 0),
+                    "reservations_open": time(16, 0),
+                    "enabled": True
+                }
+            },
+            business_hours={
+                "Monday": {"open": time(11, 30), "close": time(13, 30)},
+                "Tuesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Wednesday": {"open": time(11, 30), "close": time(13, 30)},
+                "Thursday": {"open": time(11, 30), "close": time(13, 30)},
+                "Friday": {"open": time(11, 30), "close": time(13, 30)}
+            },
+            billing_delay_minutes=90,
+            reservation_opens_delay_minutes=150
         )
     }
     

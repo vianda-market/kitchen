@@ -1,5 +1,5 @@
 """
-Unit tests for AddressAutocompleteService (suggest and validate).
+Unit tests for AddressAutocompleteService (suggest - autocomplete only, returns place_id and display_text).
 """
 
 import pytest
@@ -17,7 +17,7 @@ class TestAddressAutocompleteServiceSuggest:
         mock_get_gateway.assert_called_once()
 
     @patch("app.services.address_autocomplete_service.get_google_places_gateway")
-    def test_suggest_calls_gateway_and_maps_results(self, mock_get_gateway):
+    def test_suggest_calls_autocomplete_only_returns_place_id_display_text(self, mock_get_gateway):
         mock_gateway = MagicMock()
         mock_gateway.places_autocomplete.return_value = {
             "suggestions": [
@@ -29,27 +29,16 @@ class TestAddressAutocompleteServiceSuggest:
                 },
             ]
         }
-        mock_gateway.place_details.return_value = {
-            "formattedAddress": "Av. Santa Fe 2567, C1425 CABA, Argentina",
-            "addressComponents": [
-                {"longText": "2567", "types": ["street_number"]},
-                {"longText": "Avenida Santa Fe", "types": ["route"]},
-                {"longText": "Buenos Aires", "types": ["locality"]},
-                {"longText": "Buenos Aires", "types": ["administrative_area_level_1"]},
-                {"longText": "Argentina", "shortText": "AR", "types": ["country"]},
-                {"longText": "C1425", "types": ["postal_code"]},
-            ],
-        }
         mock_get_gateway.return_value = mock_gateway
 
         svc = AddressAutocompleteService()
         result = svc.suggest(q="Av. Santa Fe", limit=5)
 
         assert len(result) == 1
-        assert result[0]["country_code"] == "ARG"
-        assert result[0]["building_number"] == "2567"
+        assert result[0]["place_id"] == "ChIJB_KWWvXKvJURs8VJkFcGiNE"
+        assert result[0]["display_text"] == "Av. Santa Fe 2567, CABA, Argentina"
         mock_gateway.places_autocomplete.assert_called_once()
-        mock_gateway.place_details.assert_called_once_with("ChIJB_KWWvXKvJURs8VJkFcGiNE")
+        mock_gateway.place_details.assert_not_called()
 
     @patch("app.services.address_autocomplete_service.get_google_places_gateway")
     def test_suggest_respects_limit(self, mock_get_gateway):
@@ -60,22 +49,12 @@ class TestAddressAutocompleteServiceSuggest:
                 for i in range(5)
             ]
         }
-        mock_gateway.place_details.return_value = {
-            "addressComponents": [
-                {"longText": "1", "types": ["street_number"]},
-                {"longText": "Main St", "types": ["route"]},
-                {"longText": "City", "types": ["locality"]},
-                {"longText": "State", "types": ["administrative_area_level_1"]},
-                {"longText": "US", "types": ["country"]},
-                {"longText": "12345", "types": ["postal_code"]},
-            ],
-        }
         mock_get_gateway.return_value = mock_gateway
 
         svc = AddressAutocompleteService()
         result = svc.suggest(q="Main", limit=2)
         assert len(result) <= 2
-        assert mock_gateway.place_details.call_count == min(2, len(result))
+        mock_gateway.place_details.assert_not_called()
 
     @patch("app.services.address_autocomplete_service.get_google_places_gateway")
     def test_suggest_passes_country_as_region(self, mock_get_gateway):
@@ -89,45 +68,27 @@ class TestAddressAutocompleteServiceSuggest:
         call_kw = mock_gateway.places_autocomplete.call_args[1]
         assert call_kw["included_region_codes"] == ["AR"]
 
-
-class TestAddressAutocompleteServiceValidate:
     @patch("app.services.address_autocomplete_service.get_google_places_gateway")
-    def test_validate_returns_result_shape(self, mock_get_gateway):
+    def test_suggest_resolves_country_name_to_region(self, mock_get_gateway):
         mock_gateway = MagicMock()
-        mock_gateway.validate_address.return_value = {
-            "result": {
-                "verdict": {"addressComplete": True},
-                "address": {
-                    "formattedAddress": "Av. Santa Fe 2567, CABA, Argentina",
-                    "addressComponents": [
-                        {"componentName": {"text": "2567"}, "componentType": "street_number"},
-                        {"componentName": {"text": "Avenida Santa Fe"}, "componentType": "route"},
-                        {"componentName": {"text": "Buenos Aires"}, "componentType": "locality"},
-                        {"componentName": {"text": "CABA"}, "componentType": "administrative_area_level_1"},
-                        {"componentName": {"text": "Argentina"}, "componentType": "country"},
-                        {"componentName": {"text": "C1425"}, "componentType": "postal_code"},
-                    ],
-                },
-            },
-        }
+        mock_gateway.places_autocomplete.return_value = {"suggestions": []}
         mock_get_gateway.return_value = mock_gateway
 
         svc = AddressAutocompleteService()
-        body = {
-            "street_name": "Santa Fe",
-            "street_type": "Ave",
-            "building_number": "2567",
-            "city": "Buenos Aires",
-            "province": "CABA",
-            "postal_code": "C1425",
-            "country_code": "ARG",
-        }
-        result = svc.validate(body)
+        svc.suggest(q="test", country="Argentina")
+        mock_gateway.places_autocomplete.assert_called_once()
+        call_kw = mock_gateway.places_autocomplete.call_args[1]
+        assert call_kw["included_region_codes"] == ["AR"]
 
-        assert "is_valid" in result
-        assert "normalized" in result
-        assert "formatted_address" in result
-        assert "confidence" in result
-        assert "message" in result
-        assert result["is_valid"] is True
-        assert result["normalized"]["country_code"] == "ARG"
+    @patch("app.services.address_autocomplete_service.get_google_places_gateway")
+    def test_suggest_does_not_pass_location_restriction(self, mock_get_gateway):
+        """Suggest returns addresses anywhere in the country; no city bounds restriction."""
+        mock_gateway = MagicMock()
+        mock_gateway.places_autocomplete.return_value = {"suggestions": []}
+        mock_get_gateway.return_value = mock_gateway
+
+        svc = AddressAutocompleteService()
+        svc.suggest(q="Av. Corrientes", country="AR", city="CABA", limit=5)
+        mock_gateway.places_autocomplete.assert_called_once()
+        call_kw = mock_gateway.places_autocomplete.call_args[1]
+        assert call_kw.get("location_restriction") is None

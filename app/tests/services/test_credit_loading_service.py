@@ -55,14 +55,13 @@ class TestCreditLoadingService:
     
     @pytest.fixture
     def sample_restaurant_dto(self):
-        """Sample RestaurantDTO for testing"""
+        """Sample RestaurantDTO for testing (credit_currency from institution_entity)"""
         return RestaurantDTO(
             restaurant_id=uuid4(),
             institution_id=uuid4(),
             institution_entity_id=uuid4(),
-            credit_currency_id=uuid4(),
-            name="Test Restaurant",
             address_id=uuid4(),
+            name="Test Restaurant",
             cuisine=None,
             is_archived=False,
             status=Status.ACTIVE,
@@ -164,6 +163,7 @@ class TestCreditLoadingService:
                 subscription_id=uuid4(),
                 user_id=sample_user_id,
                 plan_id=uuid4(),
+                market_id=uuid4(),
                 balance=Decimal("10.0"),
                 renewal_date=datetime.now(),
                 is_archived=False,
@@ -280,10 +280,12 @@ class TestCreditLoadingService:
         mock_restaurant.restaurant_id = sample_restaurant_id
         mock_transaction = sample_restaurant_transaction_dto
         
+        expected_cc_id = sample_credit_currency_dto.credit_currency_id
+        
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
+             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=expected_cc_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
-            
             mock_restaurant_service.get_by_id.return_value = mock_restaurant
             mock_currency_service.get_by_id.return_value = sample_credit_currency_dto
             mock_create_with_balance.return_value = mock_transaction
@@ -296,7 +298,7 @@ class TestCreditLoadingService:
             # Assert
             assert result == mock_transaction
             mock_restaurant_service.get_by_id.assert_called_once_with(sample_restaurant_id, mock_db)
-            mock_currency_service.get_by_id.assert_called_once_with(mock_restaurant.credit_currency_id, mock_db)
+            mock_currency_service.get_by_id.assert_called_once_with(expected_cc_id, mock_db)
             mock_create_with_balance.assert_called_once()
             
             # Verify transaction data
@@ -391,6 +393,7 @@ class TestCreditLoadingService:
         mock_restaurant = sample_restaurant_dto
         
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
+             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=sample_credit_currency_dto.credit_currency_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
             
@@ -436,6 +439,7 @@ class TestCreditLoadingService:
                 subscription_id=uuid4(),
                 user_id=sample_user_id,
                 plan_id=uuid4(),
+                market_id=uuid4(),
                 balance=Decimal("10.0"),
                 renewal_date=datetime.now(),
                 is_archived=False,
@@ -477,9 +481,9 @@ class TestCreditLoadingService:
         mock_transaction = sample_restaurant_transaction_dto
         
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
+             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=sample_credit_currency_dto.credit_currency_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
-            
             mock_restaurant_service.get_by_id.return_value = mock_restaurant
             mock_currency_service.get_by_id.return_value = sample_credit_currency_dto
             mock_create_with_balance.return_value = mock_transaction

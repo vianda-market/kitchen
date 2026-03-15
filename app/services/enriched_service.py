@@ -45,15 +45,15 @@ class EnrichedService(Generic[T]):
         *,
         institution_column: Optional[str] = None,
         institution_table_alias: Optional[str] = None,
-        default_order_by: str = "created_date DESC"
+        default_order_by: Optional[str] = None
     ):
         """
         Initialize the enriched service for a specific entity.
         
         Args:
-            base_table: Name of the main database table (e.g., "institution_bank_account")
-            table_alias: Alias for the main table in queries (e.g., "iba")
-            id_column: Name of the primary key column (e.g., "bank_account_id")
+            base_table: Name of the main database table (e.g., "institution_entity_info")
+            table_alias: Alias for the main table in queries (e.g., "ie")
+            id_column: Name of the primary key column (e.g., "institution_entity_id")
             schema_class: The Pydantic schema class for responses
             institution_column: Column name for institution_id filtering (e.g., "institution_id").
                 Used for WHERE clause filtering (institution scoping), NOT for selecting columns.
@@ -62,7 +62,7 @@ class EnrichedService(Generic[T]):
                 - If institution_id is on the base table: use table_alias (e.g., "u" for user_info)
                 - If institution_id is on a joined table: use the joined table alias (e.g., "ie" for institution_entity_info)
                 - If institution_column is None: this is ignored
-            default_order_by: Default ORDER BY clause
+            default_order_by: Default ORDER BY clause (defaults to table_alias.id_column DESC for newest first)
         """
         self.base_table = base_table
         self.table_alias = table_alias
@@ -70,7 +70,7 @@ class EnrichedService(Generic[T]):
         self.schema_class = schema_class
         self.institution_column = institution_column
         self.institution_table_alias = institution_table_alias or table_alias
-        self.default_order_by = default_order_by
+        self.default_order_by = default_order_by if default_order_by is not None else f"{table_alias}.{id_column} DESC"
     
     def _build_where_clause(
         self,
@@ -106,7 +106,8 @@ class EnrichedService(Generic[T]):
             for condition, param in additional_conditions:
                 conditions.append(condition)
                 if param is not None:
-                    params.append(param)
+                    # psycopg2 can't adapt uuid.UUID; convert to str for query params
+                    params.append(str(param) if isinstance(param, UUID) else param)
         
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         return where_clause, params
@@ -182,7 +183,7 @@ class EnrichedService(Generic[T]):
         
         Args:
             db: Database connection
-            select_fields: List of SELECT fields (e.g., ["iba.bank_account_id", "i.name as institution_name"])
+            select_fields: List of SELECT fields (e.g., ["user_id", "i.name as institution_name"])
             joins: List of JOIN clauses as (table, alias, condition) tuples
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records

@@ -3,13 +3,72 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import psycopg2.extensions
 from app.dto.models import ClientBillDTO, SubscriptionDTO, CreditCurrencyDTO
-from app.services.crud_service import client_bill_service, subscription_service, credit_currency_service
+from app.services.crud_service import (
+    client_bill_service,
+    subscription_service,
+    credit_currency_service,
+    update_balance,
+)
 from app.utils.log import log_info, log_warning
 from app.config import Status
 
+
+def process_client_bill_internal(
+    client_bill_id: UUID,
+    db: psycopg2.extensions.connection,
+    modified_by: UUID,
+    *,
+    commit: bool = True,
+) -> bool:
+    """
+    Process a client bill: add credits to subscription balance, set renewal_date, mark bill Processed.
+    Idempotent: no-op if bill is already Processed. Use commit=False for atomic multi-step transactions.
+    """
+    bill = client_bill_service.get_by_id(client_bill_id, db)
+    if not bill:
+        return False
+    if bill.status == Status.PROCESSED:
+        log_info(f"Client bill {client_bill_id} already Processed, skipping")
+        return True
+
+    subscription = subscription_service.get_by_id(bill.subscription_id, db)
+    if not subscription:
+        raise Exception("Subscription not found")
+
+    credit_currency = credit_currency_service.get_by_id(bill.credit_currency_id, db)
+    if not credit_currency:
+        raise Exception("Credit currency not found")
+
+    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value))
+    renewal_date = subscription.renewal_date
+    if renewal_date.tzinfo is None:
+        renewal_date = renewal_date.replace(tzinfo=timezone.utc)
+    else:
+        renewal_date = renewal_date.astimezone(timezone.utc)
+    new_renewal_date = renewal_date + timedelta(days=30)
+
+    update_balance(bill.subscription_id, float(credits_to_add), db, commit=commit)
+    subscription_service.update(
+        bill.subscription_id,
+        {"renewal_date": new_renewal_date},
+        db,
+        commit=commit,
+    )
+    client_bill_service.update(
+        client_bill_id,
+        {"status": Status.PROCESSED, "modified_by": modified_by},
+        db,
+        commit=commit,
+    )
+    log_info(
+        f"Processed client bill {client_bill_id}: added {credits_to_add} credits to subscription {bill.subscription_id}"
+    )
+    return True
+
+
 def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     bill = client_bill_service.get_by_id(bill_id, db)
-    if not bill or bill.status != Status.COMPLETE:
+    if not bill or bill.status != Status.COMPLETED:
         return
 
     subscription = subscription_service.get_by_id(bill.subscription_id, db)

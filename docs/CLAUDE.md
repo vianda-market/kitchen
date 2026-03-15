@@ -3,6 +3,10 @@
 ## Mission
 Maximize developer velocity while guaranteeing data integrity in PostgreSQL-backed FastAPI applications
 
+## Architecture Reference
+
+**Keep in context:** [CLAUDE_ARCHITECTURE.md](./CLAUDE_ARCHITECTURE.md) — Directory structure, route registration, data flow, key entry points. Use it to quickly locate modules without exploratory searches.
+
 ## Permission Model and Role-Based Access Control
 
 ### Role Type vs Role Name
@@ -93,8 +97,8 @@ get_current_user() (base authentication)
 ### Testing Permissions
 
 - **Unit Tests**: `app/tests/auth/test_auth_dependencies.py` - Tests all dependency functions
-- **Postman Collection**: `docs/postman/Permissions Testing - Employee-Only Access.postman_collection.json`
-- **Test Guide**: `docs/postman/PERMISSIONS_TESTING_GUIDE.md`
+- **Postman Collection**: `docs/postman/collections/Permissions Testing - Employee-Only Access.postman_collection.json`
+- **Test Guide**: `docs/postman/guidelines/PERMISSIONS_TESTING_GUIDE.md`
 
 ## Core Engineering Standards
 
@@ -207,6 +211,31 @@ grep -r "WEDNESDAY" app/services/  # Find the uppercase usage
 6. **Try statements as separate functions** - Error handling logic should be extracted into dedicated functions
 7. **Data Transfer Objects (DTOs)** - Pure data structures with no functions, separate from business logic
 
+### Function Naming
+
+**Pattern:** `verb_entity_by_context()`
+
+```python
+# ✅ GOOD: Clear and descriptive
+get_plates_by_restaurant_address()
+get_payment_attempts_by_institution_entity()
+get_institution_entities_by_institution()
+get_active_plates_today_by_user_city()
+
+# ❌ BAD: Too generic
+get_by_institution()  # Ambiguous - what entity?
+get_all()             # Too vague
+
+# ❌ BAD: Misleading
+get_all_by_user_address_city()  # By address or by city?
+```
+
+**Naming Rules:**
+1. **Be Specific**: Include entity type in name
+2. **Describe Return**: Name should indicate what's returned
+3. **Include Context**: Specify the filtering/lookup context
+4. **Avoid Ambiguity**: If two functions could have same name, they're named wrong
+
 ### Testing Standards
 
 #### Unit Tests (Python `pytest`) - For Non-Service Code Only
@@ -278,7 +307,7 @@ pm.sendRequest({
 // Pre-request script
 // 1. Query for ANY active restaurant
 pm.sendRequest({
-    url: pm.environment.get("baseUrl") + "/api/v1/restaurants/?include_archived=false",
+    url: pm.environment.get("baseUrl") + "/api/v1/restaurants/",
     method: "GET",
     header: {"Authorization": "Bearer " + pm.environment.get("authToken")}
 }, (err, res) => {
@@ -312,7 +341,7 @@ pm.sendRequest({
             "exec": [
                 "// Option 1: Query existing address",
                 "pm.sendRequest({",
-                "    url: pm.environment.get('baseUrl') + '/api/v1/addresses/?include_archived=false',",
+                "    url: pm.environment.get('baseUrl') + '/api/v1/addresses/',",
                 "    method: 'GET',",
                 "    header: {'Authorization': 'Bearer ' + pm.environment.get('authToken')}",
                 "}, (err, res) => {",
@@ -346,7 +375,7 @@ pm.sendRequest({
 }
 ```
 
-**Reference**: See `docs/postman/` for existing collections following this pattern.
+**Reference**: See `docs/postman/collections/` for existing collections following this pattern.
 
 ### Service vs Utils Architecture
 1. **Services contain business logic** - Domain rules, complex operations, orchestration logic
@@ -382,10 +411,26 @@ def log_info(message: str):
     logger.info(message)
 
 # ❌ BAD: Utils - Framework configuration, no testing needed
-# app/utils/query_params.py
-def include_archived_query(entity_name: str) -> bool:
-    """FastAPI Query parameter - framework handles validation"""
-    return Query(False, description=f"Include archived {entity_name}")
+# app/utils/query_params.py - (include_archived was removed from production APIs)
+```
+
+### Service Classes vs Standalone Functions
+
+**Use Service Classes When:**
+- Operating on a specific database table/entity (e.g., `institution_entity_service.get_by_id()`)
+- Sharing configuration across operations (e.g., `CRUDService` with `table_name`, `dto_class`)
+- Standard CRUD operations - all entities should have a `CRUDService` instance
+
+**Use Standalone Functions When:**
+- **Cross-entity lookups**: `get_institution_id_by_restaurant(restaurant_id, db)`
+- **Pure validation utilities**: `validate_routing_number(routing_number: str) -> bool`
+- **Complex business logic spanning multiple entities**: `mark_plate_selection_complete_with_balance_update(...)`
+
+**Anti-Pattern - Redundant Standalone:**
+```python
+# ❌ BAD: Redundant with service class
+institution_entity_service = CRUDService(...)  # Has get_by_id()
+def get_institution_entity_by_id(...):  # Just use the service instead
 ```
 
 ### Testing Patterns
@@ -525,6 +570,19 @@ def handle_employer_creation_transaction(
 ```
 
 ## PostgreSQL-Specific Principles
+
+### UUID Handling for psycopg2
+
+**CRITICAL RULE**: Always convert UUID to string when passing to psycopg2 queries.
+
+```python
+# ✅ GOOD
+query = "SELECT * FROM table WHERE id = %s"
+db_read(query, (str(uuid_value),), connection=db)
+
+# ❌ BAD - causes "can't adapt type 'UUID'" error
+db_read(query, (uuid_value,), connection=db)
+```
 
 ### Database Schema Change Management
 
@@ -741,6 +799,18 @@ def update_user_balance(user_id: UUID, credit_amount: int):
     pass
 ```
 
+### In-Memory Caches and Rate Limits
+
+**CRITICAL RULE**: In-memory caches and rate limit structures must not grow unbounded. Unbounded growth leads to memory exhaustion in long-running processes.
+
+**Eviction Rules:**
+- **Rate limit dicts:** After pruning old timestamps per key, remove keys whose lists are empty. Prune and evict across the whole dict periodically so keys for inactive IPs/users are cleaned up.
+- **TTL caches:** Prune expired entries when the cache exceeds a size threshold (e.g. 1000 entries) or periodically. Never rely on "remove on next access" alone for caches that store per-user or per-IP state.
+- **Keyed caches:** Prefer a max size (LRU/LFU) or TTL eviction. Document and enforce eviction.
+- **Connection-scoped caches:** Clear when the underlying resource (e.g. connection pool) is closed.
+
+**Before Adding a New Cache:** Confirm it has eviction and will not grow unbounded.
+
 ### Query Optimization Practices
 ```python
 # Good: Explicit, optimized queries
@@ -933,6 +1003,34 @@ routes = [route.path for route in app.routes]
 # NOT: /markets/, /markets/{market_id}
 ```
 
+### Auto-Generated vs Manual Routes
+
+**Use `create_crud_routes()` when:**
+- ✅ Standard CRUD with no custom logic
+- ✅ Only needs `include_archived` parameter
+- ✅ No complex query parameters
+- ✅ Direct service method calls
+
+**Create manual routes when:**
+- ✅ Custom filtering parameters (e.g., `institution_entity_id`)
+- ✅ Complex business logic in endpoints
+- ✅ Non-standard operations
+- ✅ Multiple query parameters
+
+**Route Registration Order Matters!**
+
+⚠️ **FastAPI uses the FIRST matching route**
+
+```python
+# ❌ BAD: Manual route will NEVER be called
+app.include_router(auto_generated_router)  # Registered FIRST
+app.include_router(manual_router)          # Never reached!
+
+# ✅ GOOD: Manual route takes precedence
+app.include_router(manual_router)          # Registered FIRST
+# Don't register auto-generated if manual exists
+```
+
 ### Schema Design
 ```python
 # Good: Clear, validated schemas
@@ -1049,23 +1147,21 @@ institution_service = CRUDService("institution_info", InstitutionDTO, "instituti
 # Generic route service (app/services/route_service.py)
 class GenericRouteService:
     @staticmethod
-    def get_by_id(entity_type: str, entity_id: UUID, include_archived: bool, db):
+    def get_by_id(entity_type: str, entity_id: UUID, db):
         service = get_service_for_entity(entity_type)
-        if include_archived:
-            return service.get_by_id(entity_id, db)
         return service.get_by_id_non_archived(entity_id, db)
 
-# Route factory (app/routes/generic_router.py)
+# Route factory (app/routes/generic_router.py) - include_archived removed from production APIs
 def create_crud_routes(entity_type: str, schemas: dict, service):
     router = APIRouter(prefix=f"/{entity_type}s", tags=[entity_type.title()])
     
     @router.get("/{entity_id}", response_model=schemas['response'])
-    def get_entity(entity_id: UUID, include_archived: bool = Query(False), db = Depends(get_db)):
-        return GenericRouteService.get_by_id(entity_type, entity_id, include_archived, db)
+    def get_entity(entity_id: UUID, db = Depends(get_db)):
+        return GenericRouteService.get_by_id(entity_type, entity_id, db)
     
     @router.get("/", response_model=List[schemas['response']])
-    def get_all_entities(include_archived: bool = Query(False), db = Depends(get_db)):
-        return GenericRouteService.get_all(entity_type, include_archived, db)
+    def get_all_entities(db = Depends(get_db)):
+        return GenericRouteService.get_all(entity_type, db)
     
     return router
 
@@ -1227,6 +1323,29 @@ log_data_change_event(
 7. Models with both data structures and CRUD logic (separate into DTOs + services)
 8. Business logic in utils (move to services and add comprehensive tests)
 9. Infrastructure code in services (move to utils, no testing needed)
+
+### Migration Strategy for Refactoring
+
+When refactoring existing code (e.g., renaming functions):
+
+1. **Add new correctly-named function**
+2. **Update callers incrementally**
+3. **Mark old function as deprecated** with comment
+4. **Remove old function** after all callers updated
+
+```python
+# Step 1: Add new function
+def get_institution_entities_by_institution(...):
+    pass
+
+# Step 2: Deprecate old (if it exists)
+def get_by_institution(...):
+    """DEPRECATED: Use get_institution_entities_by_institution() instead"""
+    return get_institution_entities_by_institution(...)
+
+# Step 3: Update callers over time
+# Step 4: Remove deprecated function
+```
 
 ## Performance Optimization
 
@@ -1430,24 +1549,22 @@ def get_enriched_users(
 # 3. Create enriched endpoints (app/routes/user.py)
 @router.get("/enriched/", response_model=List[UserEnrichedResponseSchema])
 def list_enriched_users(
-    include_archived: Optional[bool] = include_archived_optional_query("users"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all users with enriched data (role_name, role_type, institution_name)"""
+    """List all users with enriched data (role_name, role_type, institution_name). Non-archived only."""
     scope = get_institution_scope(current_user)
-    return get_enriched_users(db, scope=scope, include_archived=include_archived or False)
+    return get_enriched_users(db, scope=scope, include_archived=False)
 
 @router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema)
 def get_enriched_user_by_id_route(
     user_id: UUID,
-    include_archived: bool = include_archived_query("users"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get a single user by ID with enriched data"""
+    """Get a single user by ID with enriched data. Non-archived only."""
     scope = get_institution_scope(current_user)
-    enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=include_archived)
+    enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=False)
     if not enriched_user:
         raise HTTPException(status_code=404, detail="User not found")
     return enriched_user
@@ -1470,6 +1587,31 @@ def get_enriched_user_by_id_route(
 - Enriched endpoints: `/users/enriched/`, `/users/enriched/{id}`
 - Response schemas: `UserResponseSchema` vs `UserEnrichedResponseSchema`
 
+## Code Review Checklist
+
+### Before Submitting PR
+
+- [ ] Function names are clear and descriptive (`verb_entity_by_context`)
+- [ ] No duplicate function names (same name, different logic)
+- [ ] UUID values converted to string for database queries
+- [ ] Institution scoping applied where needed
+- [ ] No business logic in route handlers
+- [ ] In-memory caches have eviction (TTL, size limit, or key cleanup)
+- [ ] Tests written/updated (unit for gateways/utils/security; Postman for services)
+- [ ] Postman collections updated if API changed
+- [ ] No linter errors
+- [ ] Documentation updated if needed
+
+### Red Flags
+
+- ❌ Generic function names (`get_by_id`, `get_all` outside service classes)
+- ❌ Multiple functions with same name
+- ❌ Business logic in route files
+- ❌ Database queries without scoping
+- ❌ UUID passed directly to psycopg2
+- ❌ Hardcoded values (use config/enums)
+- ❌ Missing error handling
+
 ## Focus Areas
 
 1. **Query optimization** - Better indexes for pickup matching
@@ -1483,6 +1625,9 @@ def get_enriched_user_by_id_route(
 🎯 **Goal: Simple, fast, maintainable PostgreSQL + FastAPI codebase**
 
 ## API Documentation
+
+### Architecture
+- **Architecture Reference**: [docs/CLAUDE_ARCHITECTURE.md](CLAUDE_ARCHITECTURE.md) — Repo structure, route flow, entry points
 
 ### Versioning Strategy
 - **API Versioning Guide**: [docs/api/API_VERSIONING_GUIDE.md](api/API_VERSIONING_GUIDE.md)
@@ -1521,13 +1666,13 @@ def get_enriched_user_by_id_route(
 ### When to Rename
 
 ✅ **Rename ONLY when collision exists or is expected:**
-- `plan.status` → `plan_status` (collision with `fintech_link_info.status`)
+- `plan.status` → `plan_status` (collision with another table in the JOIN that has `status`)
 - `user.name` → `user_name` (if another table in the JOIN has a `name` column)
 - `restaurant.name` → `restaurant_name` (collision with `institution_info.name`)
 
 ❌ **DO NOT rename when no collision exists:**
-- `plan.price` → Keep as `price` (no collision with `fintech_link_info`)
-- `plan.credit` → Keep as `credit` (no collision with `fintech_link_info`)
+- `plan.price` → Keep as `price` (no collision in JOIN)
+- `plan.credit` → Keep as `credit` (no collision in JOIN)
 - `user.email` → Keep as `email` (no collision - base table doesn't have `email`)
 - `user.username` → Keep as `username` (no collision - base table doesn't have `username`)
 - `user.cellphone` → Keep as `cellphone` (no collision - base table doesn't have `cellphone`)
@@ -1535,7 +1680,7 @@ def get_enriched_user_by_id_route(
 
 **Example of incorrect renaming (DO NOT DO THIS):**
 ```python
-# ❌ WRONG: Renaming user fields when fintech_link_transaction table has no collision
+# ❌ WRONG: Renaming user fields when joined table has no collision
 "u.username as user_username",  # Base table has no 'username' field - NO RENAME NEEDED
 "u.email as user_email",         # Base table has no 'email' field - NO RENAME NEEDED
 "u.cellphone as user_cellphone", # Base table has no 'cellphone' field - NO RENAME NEEDED
@@ -1589,9 +1734,9 @@ When creating enriched endpoints:
 **Good (collision avoided):**
 ```python
 select_fields=[
-    "pl.price",  # No collision - fintech_link_info doesn't have 'price'
-    "pl.credit",  # No collision - fintech_link_info doesn't have 'credit'
-    "pl.status as plan_status",  # Collision with fl.status - rename required
+    "pl.price",  # No collision in JOIN
+    "pl.credit",  # No collision in JOIN
+    "pl.status as plan_status",  # Collision with another table's status - rename required
     "pl.name as plan_name",  # Descriptive, clarifies source table
 ]
 ```

@@ -3,9 +3,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Uncomment and install pgtap if you need to run database tests:
 -- CREATE EXTENSION IF NOT EXISTS pgtap;
 
--- Note: PostgreSQL 18+ includes native uuidv7() function
--- If using PostgreSQL 18+, use the native function instead of custom implementation
--- Custom uuid7_function.sql has been removed in favor of native PostgreSQL 18+ support
+-- UUID7: All new rows use uuidv7() for time-ordered IDs.
+-- PostgreSQL 18+: native uuid_generate_v7() exists; add wrapper if needed: CREATE OR REPLACE FUNCTION uuidv7() RETURNS uuid AS $$ SELECT uuid_generate_v7(); $$ LANGUAGE sql;
+-- PostgreSQL < 18: run app/db/uuid7_function.sql before this schema to create uuidv7().
 
 -- =============================================================================
 -- DROP TABLES FIRST (with CASCADE to handle dependencies)
@@ -28,6 +28,7 @@ DROP TABLE IF EXISTS discretionary_resolution_info CASCADE;
 DROP TABLE IF EXISTS restaurant_balance_history CASCADE;
 DROP TABLE IF EXISTS plate_history CASCADE;
 DROP TABLE IF EXISTS market_history CASCADE;
+DROP TABLE IF EXISTS city_info CASCADE;
 DROP TABLE IF EXISTS market_info CASCADE;
 DROP TABLE IF EXISTS credit_currency_history CASCADE;
 DROP TABLE IF EXISTS role_history CASCADE;
@@ -39,41 +40,50 @@ DROP TABLE IF EXISTS transaction_type_history CASCADE;
 DROP TABLE IF EXISTS employer_history CASCADE;
 
 -- Drop tables that are children of other base tables
-DROP TABLE IF EXISTS credit_card CASCADE;
-DROP TABLE IF EXISTS bank_account CASCADE;
-DROP TABLE IF EXISTS appstore_account CASCADE;
-DROP TABLE IF EXISTS fintech_wallet CASCADE;
+-- credit_card, bank_account, fintech_wallet, fintech_wallet_auth, appstore_account removed (Stripe/aggregator-only)
 DROP TABLE IF EXISTS client_payment_attempt CASCADE;
 DROP TABLE IF EXISTS restaurant_transaction CASCADE;
 DROP TABLE IF EXISTS institution_payment_attempt CASCADE;
 DROP TABLE IF EXISTS discretionary_history CASCADE;
 DROP TABLE IF EXISTS discretionary_info CASCADE;
 DROP TABLE IF EXISTS client_transaction CASCADE;
+DROP TABLE IF EXISTS user_favorite_info CASCADE;
+DROP TABLE IF EXISTS user_favorite_info CASCADE;
+DROP TABLE IF EXISTS user_favorite_info CASCADE;
+DROP TABLE IF EXISTS plate_review_info CASCADE;
 DROP TABLE IF EXISTS plate_pickup_live CASCADE;
 DROP TABLE IF EXISTS fintech_wallet_auth CASCADE;
-DROP TABLE IF EXISTS fintech_link_assignment CASCADE;
-DROP TABLE IF EXISTS fintech_link_info CASCADE;
 
 -- Drop remaining base/parent tables
+DROP TABLE IF EXISTS coworker_pickup_notification CASCADE;
+DROP TABLE IF EXISTS plate_selection_history CASCADE;
+DROP TABLE IF EXISTS plate_selection_info CASCADE;
 DROP TABLE IF EXISTS plate_selection CASCADE;
 DROP TABLE IF EXISTS plate_info CASCADE;
 DROP TABLE IF EXISTS client_bill_info CASCADE;
+DROP TABLE IF EXISTS subscription_payment CASCADE;
 DROP TABLE IF EXISTS subscription_info CASCADE;
+DROP TABLE IF EXISTS external_payment_method CASCADE;
 DROP TABLE IF EXISTS payment_method CASCADE;
 DROP TABLE IF EXISTS product_info CASCADE;
 DROP TABLE IF EXISTS plan_info CASCADE;
 DROP TABLE IF EXISTS restaurant_info CASCADE;
 DROP TABLE IF EXISTS credit_currency_info CASCADE;
+DROP TABLE IF EXISTS institution_settlement_history CASCADE;
+DROP TABLE IF EXISTS institution_settlement CASCADE;
 DROP TABLE IF EXISTS institution_bill_info CASCADE;
 DROP TABLE IF EXISTS restaurant_balance_info CASCADE;
-DROP TABLE IF EXISTS institution_bank_account CASCADE;
 DROP TABLE IF EXISTS geolocation_info CASCADE;
+DROP TABLE IF EXISTS address_subpremise CASCADE;
 DROP TABLE IF EXISTS address_info CASCADE;
 DROP TABLE IF EXISTS qr_code CASCADE;
 DROP TABLE IF EXISTS institution_entity_info CASCADE;
 DROP TABLE IF EXISTS institution_info CASCADE;
+DROP TABLE IF EXISTS user_market_assignment CASCADE;
+DROP TABLE IF EXISTS user_messaging_preferences CASCADE;
 DROP TABLE IF EXISTS user_info CASCADE;
 DROP TABLE IF EXISTS employer_info CASCADE;
+DROP TABLE IF EXISTS pending_customer_signup CASCADE;
 DROP TABLE IF EXISTS credential_recovery CASCADE;
 DROP TABLE IF EXISTS role_info CASCADE;
 
@@ -88,8 +98,13 @@ DROP TYPE IF EXISTS kitchen_day_enum CASCADE;
 DROP TYPE IF EXISTS transaction_type_enum CASCADE;
 DROP TYPE IF EXISTS role_name_enum CASCADE;
 DROP TYPE IF EXISTS role_type_enum CASCADE;
+DROP TYPE IF EXISTS institution_type_enum CASCADE;
+DROP TYPE IF EXISTS discretionary_status_enum CASCADE;
 DROP TYPE IF EXISTS status_enum CASCADE;
+DROP TYPE IF EXISTS bill_resolution_enum CASCADE;
 DROP TYPE IF EXISTS address_type_enum CASCADE;
+DROP TYPE IF EXISTS street_type_enum CASCADE;
+DROP TYPE IF EXISTS favorite_entity_type_enum CASCADE;
 
 -- =============================================================================
 -- CREATE ENUM TYPES (before creating tables that use them)
@@ -111,9 +126,24 @@ CREATE TYPE status_enum AS ENUM (
     'Inactive',
     'Pending',
     'Arrived',
-    'Complete',
+    'Completed',
     'Cancelled',
     'Processed'
+);
+
+\echo 'Creating enum type: discretionary_status_enum'
+CREATE TYPE discretionary_status_enum AS ENUM (
+    'Pending',
+    'Cancelled',
+    'Approved',
+    'Rejected'
+);
+
+\echo 'Creating enum type: bill_resolution_enum'
+CREATE TYPE bill_resolution_enum AS ENUM (
+    'Pending',
+    'Paid',
+    'Rejected'
 );
 
 \echo 'Creating enum type: role_type_enum'
@@ -123,13 +153,23 @@ CREATE TYPE role_type_enum AS ENUM (
     'Customer'
 );
 
+\echo 'Creating enum type: institution_type_enum'
+CREATE TYPE institution_type_enum AS ENUM (
+    'Employee',
+    'Customer',
+    'Supplier',
+    'Employer'
+);
+
 \echo 'Creating enum type: role_name_enum'
 CREATE TYPE role_name_enum AS ENUM (
     'Admin',
     'Super Admin',
-    'Management',
+    'Manager',
     'Operator',
-    'Comensal'
+    'Comensal',
+    'Employer',
+    'Global Manager'
 );
 
 \echo 'Creating enum type: transaction_type_enum'
@@ -153,9 +193,23 @@ CREATE TYPE kitchen_day_enum AS ENUM (
 
 \echo 'Creating enum type: pickup_type_enum'
 CREATE TYPE pickup_type_enum AS ENUM (
-    'self',
-    'for_others',
-    'by_others'
+    'offer',
+    'request',
+    'self'
+);
+
+\echo 'Creating enum type: street_type_enum'
+CREATE TYPE street_type_enum AS ENUM (
+    'St',
+    'Ave',
+    'Blvd',
+    'Rd',
+    'Dr',
+    'Ln',
+    'Way',
+    'Ct',
+    'Pl',
+    'Cir'
 );
 
 \echo 'Creating enum type: audit_operation_enum'
@@ -174,13 +228,19 @@ CREATE TYPE discretionary_reason_enum AS ENUM (
     'Full Order Refund'
 );
 
+\echo 'Creating enum type: favorite_entity_type_enum'
+CREATE TYPE favorite_entity_type_enum AS ENUM (
+    'plate',
+    'restaurant'
+);
+
 -- =============================================================================
 -- CREATE TABLES (enum types now exist)
 -- =============================================================================
 
 -- National holidays table to prevent kitchen operations on these days
 CREATE TABLE IF NOT EXISTS national_holidays (
-    holiday_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    holiday_id UUID PRIMARY KEY DEFAULT uuidv7(),
     country_code VARCHAR(3) NOT NULL,
     holiday_name VARCHAR(100) NOT NULL,
     holiday_date DATE NOT NULL,
@@ -190,6 +250,7 @@ CREATE TABLE IF NOT EXISTS national_holidays (
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     is_archived BOOLEAN DEFAULT FALSE,
     created_date TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ DEFAULT NOW()
 );
@@ -200,7 +261,7 @@ CREATE INDEX IF NOT EXISTS idx_national_holidays_recurring ON national_holidays(
 
 -- National holidays history table
 CREATE TABLE IF NOT EXISTS national_holidays_history (
-    history_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    history_id UUID PRIMARY KEY DEFAULT uuidv7(),
     holiday_id UUID NOT NULL,
     country_code VARCHAR(3) NOT NULL,
     holiday_name VARCHAR(100) NOT NULL,
@@ -211,6 +272,7 @@ CREATE TABLE IF NOT EXISTS national_holidays_history (
     status status_enum NOT NULL,
     is_archived BOOLEAN DEFAULT FALSE,
     created_date TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ DEFAULT NOW(),
     history_date TIMESTAMPTZ DEFAULT NOW()
@@ -221,37 +283,41 @@ CREATE TABLE IF NOT EXISTS national_holidays_history (
 
 \echo 'Creating table: institution_info'
 CREATE TABLE institution_info (
-    institution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(50) NOT NULL,
+    institution_type institution_type_enum NOT NULL DEFAULT 'Supplier'::institution_type_enum,
+    no_show_discount INTEGER NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_institution_no_show_discount CHECK (
+        (institution_type <> 'Supplier'::institution_type_enum) OR
+        (no_show_discount IS NOT NULL AND no_show_discount >= 0 AND no_show_discount <= 100)
+    )
 );
 
 \echo 'Creating table: address_info'
 CREATE TABLE address_info (
-    address_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    address_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
-    user_id UUID NOT NULL,
+    user_id UUID NULL,  -- Required only for Customer Comensal home/other; nullable for Supplier, Employee, Employer
     employer_id UUID NULL,  -- Links address to employer (nullable)
     address_type address_type_enum[] NOT NULL,
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    floor VARCHAR(50), -- Floor number or 'Main Floor' or null
-    country_name VARCHAR(100) NOT NULL,
-    country_code VARCHAR(3) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,  -- ISO 3166-1 alpha-2 (AR, PE, CL); country_name from market_info via JOIN
     province VARCHAR(50) NOT NULL,
     city VARCHAR(50) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
-    street_type VARCHAR(50) NOT NULL,
+    street_type street_type_enum NOT NULL DEFAULT 'St'::street_type_enum,
     street_name VARCHAR(100) NOT NULL,
     building_number VARCHAR(20) NOT NULL,
-    apartment_unit VARCHAR(20),
     timezone VARCHAR(50) NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT
@@ -259,47 +325,49 @@ CREATE TABLE address_info (
     -- with employer_info -> address_info -> user_info dependency chain
     -- Note: employer_id foreign key will be added after employer_info table is created
     -- Note: country_code foreign key will be added after market_info table is created
+    -- Note: floor, apartment_unit, is_default moved to address_subpremise
 );
 
 \echo 'Creating table: address_history'
+-- Use case: address_info still has updates (address_type from linkages, is_archived, status, modified_by/date).
+-- Address core (street, city, province, etc.) is immutable; subpremise edits (floor, unit, is_default) are in address_subpremise.
 CREATE TABLE address_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     address_id UUID NOT NULL,
     institution_id UUID NOT NULL,
-    user_id UUID NOT NULL,
+    user_id UUID NULL,
     employer_id UUID NULL,  -- Track employer_id in history
     address_type address_type_enum[],
-    is_default BOOLEAN DEFAULT FALSE,
-    floor VARCHAR(50),
-    country_name VARCHAR(100),
-    country_code VARCHAR(3),
+    country_code VARCHAR(2),
     province VARCHAR(50),
     city VARCHAR(50),
     postal_code VARCHAR(20),
-    street_type VARCHAR(50),
+    street_type street_type_enum,
     street_name VARCHAR(100),
     building_number VARCHAR(20),
-    apartment_unit VARCHAR(20),
     timezone VARCHAR(50),
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT
     -- Note: modified_by foreign key removed to resolve circular dependency
+    -- Note: floor, apartment_unit, is_default in address_subpremise
 );
 
 \echo 'Creating table: employer_info'
 CREATE TABLE employer_info (
-    employer_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    employer_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(100) NOT NULL,
     address_id UUID NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT
@@ -312,13 +380,14 @@ FOREIGN KEY (employer_id) REFERENCES employer_info(employer_id) ON DELETE SET NU
 
 \echo 'Creating table: employer_history'
 CREATE TABLE employer_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     employer_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     address_id UUID NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -328,35 +397,53 @@ CREATE TABLE employer_history (
 
 \echo 'Creating table: user_info'
 CREATE TABLE user_info (
-    user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     role_type role_type_enum NOT NULL,
     role_name role_name_enum NOT NULL,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(100) NOT NULL UNIQUE,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
     hashed_password VARCHAR(255) NOT NULL,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
-    cellphone VARCHAR(20) NOT NULL,
+    cellphone VARCHAR(20),
     -- Employer tracking fields (only applicable to Customer role_type)
     employer_id UUID NULL, -- For end-customers: links to their employer
+    employer_address_id UUID NULL REFERENCES address_info(address_id) ON DELETE SET NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employer_id) REFERENCES employer_info(employer_id) ON DELETE SET NULL
 );
 
+\echo 'Creating table: address_subpremise'
+CREATE TABLE address_subpremise (
+    subpremise_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    address_id UUID NOT NULL REFERENCES address_info(address_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES user_info(user_id) ON DELETE CASCADE,
+    floor VARCHAR(50) NULL,
+    apartment_unit VARCHAR(20) NULL,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (address_id, user_id)
+);
+
 \echo 'Creating table: credit_currency_info'
 CREATE TABLE credit_currency_info (
-    credit_currency_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    currency_name VARCHAR(20) NOT NULL,
+    credit_currency_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    currency_name VARCHAR(50) NOT NULL,
     currency_code VARCHAR(10) NOT NULL UNIQUE,
     credit_value NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
@@ -365,14 +452,15 @@ CREATE TABLE credit_currency_info (
 
 \echo 'Creating table: credit_currency_history'
 CREATE TABLE credit_currency_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     credit_currency_id UUID NOT NULL,
-    currency_name VARCHAR(20) NOT NULL,
+    currency_name VARCHAR(50) NOT NULL,
     currency_code VARCHAR(10) NOT NULL,
     credit_value NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -382,14 +470,16 @@ CREATE TABLE credit_currency_history (
 
 \echo 'Creating table: market_info'
 CREATE TABLE market_info (
-    market_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    market_id UUID PRIMARY KEY DEFAULT uuidv7(),
     country_name VARCHAR(100) NOT NULL UNIQUE,
-    country_code VARCHAR(3) NOT NULL UNIQUE,  -- ISO 3166-1 alpha-3: ARG, PER, CHL
+    country_code VARCHAR(2) NOT NULL UNIQUE,  -- ISO 3166-1 alpha-2: AR, PE, CL
     credit_currency_id UUID NOT NULL,         -- FK to credit_currency_info
     timezone VARCHAR(50) NOT NULL,            -- e.g., 'America/Argentina/Buenos_Aires'
+    kitchen_close_time TIME NOT NULL DEFAULT '13:30',  -- Order cutoff local time (e.g. 1:30 PM); B2B manageable
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
@@ -402,15 +492,17 @@ ALTER TABLE address_info ADD CONSTRAINT fk_address_country_code FOREIGN KEY (cou
 
 \echo 'Creating table: market_history'
 CREATE TABLE market_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     market_id UUID NOT NULL,
     country_name VARCHAR(100) NOT NULL,
-    country_code VARCHAR(3) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
     credit_currency_id UUID NOT NULL,
     timezone VARCHAR(50) NOT NULL,
+    kitchen_close_time TIME NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -420,14 +512,76 @@ CREATE TABLE market_history (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
+\echo 'Creating table: city_info'
+CREATE TABLE city_info (
+    city_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    name VARCHAR(100) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
+    province_code VARCHAR(10),
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (country_code) REFERENCES market_info(country_code) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Adding user_info.market_id (required: one market per user, v1)'
+ALTER TABLE user_info ADD COLUMN market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE RESTRICT;
+CREATE INDEX idx_user_info_market_id ON user_info(market_id);
+
+\echo 'Adding user_info.stripe_customer_id (Stripe Customer for saved payment methods)'
+ALTER TABLE user_info ADD COLUMN stripe_customer_id VARCHAR(255) NULL;
+
+CREATE INDEX idx_city_info_country_code ON city_info(country_code) WHERE NOT is_archived;
+
+\echo 'Adding user_info.city_id (user primary city for scoping; NOT NULL, default Global for B2B)'
+ALTER TABLE user_info ADD COLUMN city_id UUID NOT NULL DEFAULT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' REFERENCES city_info(city_id) ON DELETE RESTRICT;
+CREATE INDEX idx_user_info_city_id ON user_info(city_id);
+
+\echo 'Adding institution_info.market_id (required: every institution has a market — Global, single, or multi; default Global for backfill)'
+ALTER TABLE institution_info ADD COLUMN market_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES market_info(market_id) ON DELETE RESTRICT;
+CREATE INDEX idx_institution_info_market_id ON institution_info(market_id);
+
+\echo 'Creating table: user_market_assignment (v2: multi-market per user)'
+CREATE TABLE user_market_assignment (
+    assignment_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL REFERENCES user_info(user_id) ON DELETE CASCADE,
+    market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE CASCADE,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, market_id)
+);
+CREATE INDEX idx_user_market_assignment_user_id ON user_market_assignment(user_id);
+CREATE INDEX idx_user_market_assignment_market_id ON user_market_assignment(market_id);
+
+\echo 'Creating table: user_messaging_preferences'
+CREATE TABLE user_messaging_preferences (
+    user_id UUID PRIMARY KEY REFERENCES user_info(user_id) ON DELETE CASCADE,
+    notify_coworker_pickup_alert BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_plate_readiness_alert BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_promotions_push BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_promotions_email BOOLEAN NOT NULL DEFAULT TRUE,
+    coworkers_can_see_my_orders BOOLEAN NOT NULL DEFAULT TRUE,
+    can_participate_in_plate_pickups BOOLEAN NOT NULL DEFAULT TRUE,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 \echo 'Creating table: institution_history'
 CREATE TABLE institution_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     name VARCHAR(50) NOT NULL,
+    institution_type institution_type_enum NOT NULL,
+    market_id UUID,
+    no_show_discount INTEGER NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_current BOOLEAN DEFAULT TRUE,
@@ -437,7 +591,7 @@ CREATE TABLE institution_history (
 
 \echo 'Creating table: user_history'
 CREATE TABLE user_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     institution_id UUID NOT NULL,
     role_type role_type_enum NOT NULL,
@@ -449,38 +603,71 @@ CREATE TABLE user_history (
     last_name VARCHAR(50),
     cellphone VARCHAR(20),
     employer_institution_id UUID NULL, -- For end-customers: links to their employer's institution
+    market_id UUID NOT NULL,
+    city_id UUID NOT NULL,
+    stripe_customer_id VARCHAR(255) NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: credential_recovery'
 CREATE TABLE credential_recovery (
-    token UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    credential_recovery_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
-    creation_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expiration_timestamp TIMESTAMPTZ,
-    used BOOLEAN DEFAULT FALSE,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    recovery_code VARCHAR(10) NOT NULL,
+    token_expiry TIMESTAMPTZ NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    used_date TIMESTAMPTZ,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
+CREATE UNIQUE INDEX idx_credential_recovery_code ON credential_recovery(recovery_code);
+CREATE INDEX idx_credential_recovery_user_id ON credential_recovery(user_id);
+
+\echo 'Creating table: pending_customer_signup'
+CREATE TABLE pending_customer_signup (
+    pending_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    email VARCHAR(100) NOT NULL,
+    verification_code VARCHAR(10) NOT NULL,
+    token_expiry TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    username VARCHAR(100) NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    cellphone VARCHAR(20),
+    market_id UUID NOT NULL REFERENCES market_info(market_id) ON DELETE RESTRICT,
+    city_id UUID NOT NULL REFERENCES city_info(city_id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX idx_pending_customer_signup_code ON pending_customer_signup(verification_code);
+CREATE UNIQUE INDEX idx_pending_customer_signup_email_active ON pending_customer_signup(email) WHERE used = FALSE;
+CREATE INDEX idx_pending_customer_signup_expiry ON pending_customer_signup(token_expiry);
 
 \echo 'Creating table: geolocation_info'
 CREATE TABLE geolocation_info (
-    geolocation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    geolocation_id UUID PRIMARY KEY DEFAULT uuidv7(),
     address_id UUID NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
+    place_id VARCHAR(255) NULL,
+    viewport JSONB NULL,
+    formatted_address_google VARCHAR(500) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE CASCADE,
@@ -489,14 +676,18 @@ CREATE TABLE geolocation_info (
 
 \echo 'Creating table: geolocation_history'
 CREATE TABLE geolocation_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     geolocation_id UUID NOT NULL,
     address_id UUID NOT NULL,
     latitude DECIMAL(10, 8) NOT NULL,
     longitude DECIMAL(11, 8) NOT NULL,
+    place_id VARCHAR(255) NULL,
+    viewport JSONB NULL,
+    formatted_address_google VARCHAR(500) NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -506,32 +697,37 @@ CREATE TABLE geolocation_history (
 
 \echo 'Creating table: institution_entity_info'
 CREATE TABLE institution_entity_info (
-    institution_entity_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_entity_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     address_id UUID NOT NULL,
+    credit_currency_id UUID NOT NULL,
     tax_id VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT,
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT,
+    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: institution_entity_history'
 CREATE TABLE institution_entity_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_entity_id UUID NOT NULL,
     institution_id UUID,
     address_id UUID NOT NULL,
+    credit_currency_id UUID NOT NULL,
     tax_id VARCHAR(50),
     name VARCHAR(100),
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -542,38 +738,39 @@ CREATE TABLE institution_entity_history (
 
 \echo 'Creating table: restaurant_info'
 CREATE TABLE restaurant_info (
-    restaurant_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    restaurant_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
     address_id UUID NOT NULL,
-    credit_currency_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     cuisine VARCHAR (50),
+    pickup_instructions VARCHAR(500),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT,
     FOREIGN KEY (institution_entity_id) REFERENCES institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT,
-    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: restaurant_history'
 CREATE TABLE restaurant_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
     address_id UUID NOT NULL,
-    credit_currency_id UUID NOT NULL,
     name VARCHAR(100),
     cuisine VARCHAR (50),
+    pickup_instructions VARCHAR(500),
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -584,7 +781,7 @@ CREATE TABLE restaurant_history (
 
 \echo 'Creating table: qr_code'
 CREATE TABLE qr_code (
-    qr_code_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    qr_code_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     qr_code_payload VARCHAR(255) NOT NULL,
     qr_code_image_url VARCHAR(500) NOT NULL,
@@ -593,6 +790,7 @@ CREATE TABLE qr_code (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
@@ -601,7 +799,7 @@ CREATE TABLE qr_code (
 
 \echo 'Creating table: product_info'
 CREATE TABLE product_info (
-    product_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     ingredients VARCHAR(255),
@@ -611,7 +809,10 @@ CREATE TABLE product_info (
     image_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
     image_checksum VARCHAR(128) NOT NULL DEFAULT '7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c',
     image_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
+    image_thumbnail_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
+    image_thumbnail_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT,
@@ -620,7 +821,7 @@ CREATE TABLE product_info (
 
 \echo 'Creating table: product_history'
 CREATE TABLE product_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     product_id UUID NOT NULL,
     institution_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -631,7 +832,10 @@ CREATE TABLE product_history (
     image_storage_path VARCHAR(500) NOT NULL,
     image_checksum VARCHAR(128) NOT NULL,
     image_url VARCHAR(500) NOT NULL,
+    image_thumbnail_storage_path VARCHAR(500) NOT NULL,
+    image_thumbnail_url VARCHAR(500) NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -642,17 +846,16 @@ CREATE TABLE product_history (
 
 \echo 'Creating table: plate_info'
 CREATE TABLE plate_info (
-    plate_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plate_id UUID PRIMARY KEY DEFAULT uuidv7(),
     product_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     price DOUBLE PRECISION NOT NULL,
     credit INTEGER NOT NULL,
-    savings INTEGER CHECK (savings BETWEEN 0 AND 100) NOT NULL,
-    no_show_discount INTEGER NOT NULL,
     delivery_time_minutes INTEGER NOT NULL DEFAULT 15,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES product_info(product_id) ON DELETE RESTRICT,
@@ -662,7 +865,7 @@ CREATE TABLE plate_info (
 
 \echo 'Creating table: restaurant_holidays'
 CREATE TABLE restaurant_holidays (
-    holiday_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    holiday_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     country VARCHAR(100) NOT NULL,
     holiday_date DATE NOT NULL,
@@ -672,16 +875,17 @@ CREATE TABLE restaurant_holidays (
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
-    UNIQUE(restaurant_id, holiday_date)
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+    -- Uniqueness (restaurant_id, holiday_date) enforced only for non-archived rows via partial unique index in index.sql
 );
 
 \echo 'Creating table: restaurant_holidays_history'
 CREATE TABLE restaurant_holidays_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     holiday_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     country VARCHAR(100) NOT NULL,
@@ -692,6 +896,7 @@ CREATE TABLE restaurant_holidays_history (
     status status_enum NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     operation audit_operation_enum NOT NULL,
@@ -701,28 +906,30 @@ CREATE TABLE restaurant_holidays_history (
 
 \echo 'Creating table: plate_kitchen_days'
 CREATE TABLE plate_kitchen_days (
-    plate_kitchen_day_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plate_kitchen_day_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plate_id) REFERENCES plate_info(plate_id) ON DELETE CASCADE,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
-    UNIQUE(plate_id, kitchen_day)
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+    -- Uniqueness (plate_id, kitchen_day) enforced only for non-archived rows via partial unique index in index.sql
 );
 
 \echo 'Creating table: plate_kitchen_days_history'
 CREATE TABLE plate_kitchen_days_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_kitchen_day_id UUID NOT NULL,
     plate_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     operation audit_operation_enum NOT NULL,
@@ -732,17 +939,16 @@ CREATE TABLE plate_kitchen_days_history (
 
 \echo 'Creating table: plate_history'
 CREATE TABLE plate_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_id UUID NOT NULL,
     product_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     price DOUBLE PRECISION NOT NULL,
     credit INTEGER NOT NULL,
-    savings INTEGER CHECK (savings BETWEEN 0 AND 100) NOT NULL,
-    no_show_discount INTEGER NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -751,9 +957,9 @@ CREATE TABLE plate_history (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
-\echo 'Creating table: plate_selection'
-CREATE TABLE plate_selection (
-    plate_selection_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+\echo 'Creating table: plate_selection_info'
+CREATE TABLE plate_selection_info (
+    plate_selection_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     plate_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
@@ -761,12 +967,25 @@ CREATE TABLE plate_selection (
     qr_code_id UUID NOT NULL,
     credit INTEGER NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
+    pickup_date DATE NOT NULL,
     pickup_time_range VARCHAR(50) NOT NULL,
+    pickup_intent VARCHAR(20) NOT NULL DEFAULT 'self' CHECK (pickup_intent IN ('offer', 'request', 'self')),
+    flexible_on_time BOOLEAN NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_plate_selection_pickup_date_weekday CHECK (
+        EXTRACT(ISODOW FROM pickup_date) = CASE kitchen_day
+            WHEN 'Monday' THEN 1
+            WHEN 'Tuesday' THEN 2
+            WHEN 'Wednesday' THEN 3
+            WHEN 'Thursday' THEN 4
+            WHEN 'Friday' THEN 5
+        END
+    ),
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (product_id) REFERENCES product_info(product_id) ON DELETE RESTRICT,
@@ -775,9 +994,52 @@ CREATE TABLE plate_selection (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
+\echo 'Creating table: plate_selection_history'
+CREATE TABLE plate_selection_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    plate_selection_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    plate_id UUID NOT NULL,
+    restaurant_id UUID NOT NULL,
+    product_id UUID NOT NULL,
+    qr_code_id UUID NOT NULL,
+    credit INTEGER NOT NULL,
+    kitchen_day kitchen_day_enum NOT NULL,
+    pickup_date DATE NOT NULL,
+    pickup_time_range VARCHAR(50) NOT NULL,
+    pickup_intent VARCHAR(20) NOT NULL DEFAULT 'self',
+    flexible_on_time BOOLEAN NULL,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN NOT NULL DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_plate_selection_history_plate_selection ON plate_selection_history(plate_selection_id) WHERE is_current = TRUE;
+
+\echo 'Creating table: coworker_pickup_notification'
+CREATE TABLE coworker_pickup_notification (
+    notification_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    plate_selection_id UUID NOT NULL,
+    notifier_user_id UUID NOT NULL,
+    notified_user_id UUID NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (notifier_user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (notified_user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_coworker_pickup_notification_plate_selection ON coworker_pickup_notification(plate_selection_id);
+
 \echo 'Creating table: plate_pickup_live'
 CREATE TABLE plate_pickup_live (
-    plate_pickup_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plate_pickup_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
@@ -793,19 +1055,50 @@ CREATE TABLE plate_pickup_live (
     expected_completion_time TIMESTAMPTZ,
     confirmation_code VARCHAR(10),
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (plate_id) REFERENCES plate_info(plate_id) ON DELETE RESTRICT,
     FOREIGN KEY (product_id) REFERENCES product_info(product_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (qr_code_id) REFERENCES qr_code(qr_code_id) ON DELETE RESTRICT
 );
 
+\echo 'Creating table: plate_review_info'
+CREATE TABLE plate_review_info (
+    plate_review_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL,
+    plate_id UUID NOT NULL,
+    plate_pickup_id UUID NOT NULL,
+    stars_rating INTEGER NOT NULL CHECK (stars_rating >= 1 AND stars_rating <= 5),
+    portion_size_rating INTEGER NOT NULL CHECK (portion_size_rating >= 1 AND portion_size_rating <= 3),
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_id) REFERENCES plate_info(plate_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_pickup_id) REFERENCES plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_plate_review_plate_id ON plate_review_info(plate_id) WHERE NOT is_archived;
+
+\echo 'Creating table: user_favorite_info'
+CREATE TABLE user_favorite_info (
+    favorite_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL,
+    entity_type favorite_entity_type_enum NOT NULL,
+    entity_id UUID NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, entity_type, entity_id),
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_user_favorite_user_entity ON user_favorite_info(user_id, entity_type);
+
 \echo 'Creating table: pickup_preferences'
 CREATE TABLE pickup_preferences (
-    preference_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    preference_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
     pickup_type pickup_type_enum NOT NULL,
@@ -816,9 +1109,10 @@ CREATE TABLE pickup_preferences (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (matched_with_preference_id) REFERENCES pickup_preferences(preference_id) ON DELETE SET NULL,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
@@ -826,38 +1120,40 @@ CREATE TABLE pickup_preferences (
 
 \echo 'Creating table: plan_info'
 CREATE TABLE plan_info (
-    plan_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_id UUID PRIMARY KEY DEFAULT uuidv7(),
     market_id UUID NOT NULL,
-    credit_currency_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     credit INTEGER NOT NULL,
     price DOUBLE PRECISION NOT NULL,
+    credit_worth DOUBLE PRECISION NOT NULL,
     rollover BOOLEAN NOT NULL DEFAULT TRUE,
     rollover_cap NUMERIC,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
-    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT
+    CONSTRAINT chk_plan_info_not_global_market CHECK (market_id != '00000000-0000-0000-0000-000000000001'::uuid)
 );
 
 \echo 'Creating table: plan_history'
 CREATE TABLE plan_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plan_id UUID NOT NULL,
     market_id UUID NOT NULL,
-    credit_currency_id UUID NOT NULL,
     name VARCHAR(100),
     credit INTEGER NOT NULL,
     price DOUBLE PRECISION NOT NULL,
+    credit_worth DOUBLE PRECISION NOT NULL,
     rollover BOOLEAN NOT NULL,
     rollover_cap NUMERIC,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -867,43 +1163,9 @@ CREATE TABLE plan_history (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
-\echo 'Creating table: fintech_link_info'
-CREATE TABLE fintech_link_info (
-    fintech_link_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    plan_id UUID NOT NULL,
-    provider VARCHAR(50) NOT NULL, -- e.g., "MercadoPago"
-    fintech_link VARCHAR(100) NOT NULL, -- the link to MercadoPago for the plan
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plan_id) REFERENCES plan_info(plan_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: fintech_link_history'
-CREATE TABLE fintech_link_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    fintech_link_id UUID NOT NULL,
-    plan_id UUID NOT NULL,
-    provider VARCHAR(50) NOT NULL,
-    fintech_link VARCHAR(100) NOT NULL,
-    is_archived BOOLEAN NOT NULL,
-    status status_enum NOT NULL,
-    created_date TIMESTAMPTZ NOT NULL,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL,
-    operation audit_operation_enum NOT NULL,
-    FOREIGN KEY (fintech_link_id) REFERENCES fintech_link_info(fintech_link_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plan_id) REFERENCES plan_info(plan_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
-);
-
-
 \echo 'Creating table: discretionary_info'
 CREATE TABLE discretionary_info (
-    discretionary_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    discretionary_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
     restaurant_id UUID,  -- NULL for Client requests, required for Supplier requests
     approval_id UUID,
@@ -912,8 +1174,9 @@ CREATE TABLE discretionary_info (
     amount NUMERIC,
     comment TEXT,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
+    status discretionary_status_enum NOT NULL DEFAULT 'Pending'::discretionary_status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_by UUID NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
@@ -925,7 +1188,7 @@ CREATE TABLE discretionary_info (
 
 \echo 'Creating table: discretionary_history'
 CREATE TABLE discretionary_history (
-    history_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    history_id UUID PRIMARY KEY DEFAULT uuidv7(),
     discretionary_id UUID NOT NULL,
     user_id UUID,  -- NULL for Supplier requests, required for Client requests
     restaurant_id UUID,  -- NULL for Client requests, required for Supplier requests
@@ -935,8 +1198,9 @@ CREATE TABLE discretionary_history (
     amount NUMERIC,
     comment TEXT,
     is_archived BOOLEAN NOT NULL,
-    status status_enum NOT NULL,
+    status discretionary_status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_date TIMESTAMPTZ,
     modified_by UUID,
     operation audit_operation_enum NOT NULL,
@@ -947,9 +1211,9 @@ CREATE TABLE discretionary_history (
 
 \echo 'Creating table: discretionary_resolution_info'
 CREATE TABLE discretionary_resolution_info (
-    approval_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    approval_id UUID PRIMARY KEY DEFAULT uuidv7(),
     discretionary_id UUID NOT NULL,
-    resolution VARCHAR(20) NOT NULL DEFAULT 'Pending',
+    resolution discretionary_status_enum NOT NULL DEFAULT 'Pending'::discretionary_status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     resolved_by UUID NOT NULL,
@@ -962,10 +1226,10 @@ CREATE TABLE discretionary_resolution_info (
 
 \echo 'Creating table: discretionary_resolution_history'
 CREATE TABLE discretionary_resolution_history (
-    history_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    history_id UUID PRIMARY KEY DEFAULT uuidv7(),
     approval_id UUID NOT NULL,
     discretionary_id UUID NOT NULL,
-    resolution VARCHAR(20) NOT NULL,
+    resolution discretionary_status_enum NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     resolved_by UUID NOT NULL,
@@ -1000,6 +1264,7 @@ BEGIN
             is_archived,
             status,
             created_date,
+            created_by,
             modified_date,
             modified_by,
             operation,
@@ -1016,6 +1281,7 @@ BEGIN
             NEW.is_archived,
             NEW.status,
             NEW.created_date,
+            NEW.created_by,
             NEW.modified_date,
             NEW.modified_by,
             v_operation,
@@ -1037,6 +1303,7 @@ BEGIN
             is_archived,
             status,
             created_date,
+            created_by,
             modified_date,
             modified_by,
             operation,
@@ -1053,6 +1320,7 @@ BEGIN
             NEW.is_archived,
             NEW.status,
             NEW.created_date,
+            NEW.created_by,
             NEW.modified_date,
             NEW.modified_by,
             v_operation,
@@ -1074,6 +1342,7 @@ BEGIN
             is_archived,
             status,
             created_date,
+            created_by,
             modified_date,
             modified_by,
             operation,
@@ -1090,6 +1359,7 @@ BEGIN
             OLD.is_archived,
             OLD.status,
             OLD.created_date,
+            OLD.created_by,
             OLD.modified_date,
             OLD.modified_by,
             v_operation,
@@ -1210,7 +1480,7 @@ FOR EACH ROW EXECUTE FUNCTION discretionary_resolution_info_history_trigger();
 
 \echo 'Creating table: client_transaction'
 CREATE TABLE client_transaction (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     source VARCHAR(50) NOT NULL,  -- e.g., 'plate_selection' or 'discretionary_promotion'
     plate_selection_id UUID, -- references a plate_selection record when source = 'order'
@@ -1219,28 +1489,30 @@ CREATE TABLE client_transaction (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (discretionary_id) REFERENCES discretionary_info(discretionary_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: subscription_info'
 CREATE TABLE subscription_info (
-    subscription_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    subscription_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
     market_id UUID NOT NULL,
     plan_id UUID NOT NULL,
     renewal_date TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'),
     balance NUMERIC DEFAULT 0,
-    subscription_status VARCHAR(20) NOT NULL DEFAULT 'Pending',  -- 'Active', 'On Hold', 'Pending', 'Expired', 'Cancelled'
+    subscription_status VARCHAR(20) NOT NULL DEFAULT 'Pending',  -- 'Active', 'On Hold', 'Pending', 'Cancelled'
     hold_start_date TIMESTAMPTZ,  -- When subscription was put on hold
     hold_end_date TIMESTAMPTZ,    -- When subscription will resume (NULL = indefinite)
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Pending'::status_enum,  -- Keep for backward compatibility
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
@@ -1261,7 +1533,7 @@ CREATE INDEX idx_subscription_market
 
 \echo 'Creating table: subscription_history'
 CREATE TABLE subscription_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_id UUID  NOT NULL,
     user_id UUID  NOT NULL,
     market_id UUID NOT NULL,
@@ -1274,6 +1546,7 @@ CREATE TABLE subscription_history (
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
@@ -1283,17 +1556,33 @@ CREATE TABLE subscription_history (
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
+\echo 'Creating table: subscription_payment'
+CREATE TABLE subscription_payment (
+    subscription_payment_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    subscription_id UUID NOT NULL,
+    payment_provider VARCHAR(50) NOT NULL DEFAULT 'stripe',
+    external_payment_id VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    amount_cents INTEGER NOT NULL,
+    currency VARCHAR(10) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscription_info(subscription_id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_subscription_payment_subscription_id ON subscription_payment(subscription_id);
+CREATE INDEX idx_subscription_payment_external_id ON subscription_payment(external_payment_id);
+
 \echo 'Creating table: payment_method'
 CREATE TABLE payment_method (
-    payment_method_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    payment_method_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
-    method_type VARCHAR(20) NOT NULL,
+    method_type VARCHAR(50) NOT NULL,
     method_type_id UUID,
     address_id UUID,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
@@ -1301,111 +1590,27 @@ CREATE TABLE payment_method (
     FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT
 );
 
-\echo 'Creating table: credit_Card'
-CREATE TABLE credit_card (
-    credit_card_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    card_holder_name VARCHAR(100),
-    card_number_last_4 VARCHAR(4),
-    card_brand VARCHAR(50),
-    expiry_date VARCHAR(5),
-    credit_card_token VARCHAR(100),
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+\echo 'Creating table: external_payment_method'
+CREATE TABLE external_payment_method (
+    external_payment_method_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    payment_method_id UUID NOT NULL UNIQUE,
+    provider VARCHAR(50) NOT NULL,
+    external_id VARCHAR(255) NOT NULL,
+    last4 VARCHAR(4),
+    brand VARCHAR(50),
+    provider_customer_id VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_external_payment_method_provider_external UNIQUE (provider, external_id),
     FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT
 );
-
-\echo 'Creating table: bank_account'
-CREATE TABLE bank_account (
-    bank_account_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    account_holder_name VARCHAR(100),
-    account_number_last_4 VARCHAR(4),
-    bank_name VARCHAR(100),
-    routing_number VARCHAR(50),
-    account_type VARCHAR(50),
-    bank_account_token VARCHAR(100),
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: appstore_account'
-CREATE TABLE appstore_account (
-    appstore_account_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    platform VARCHAR(50),
-    account_identifier VARCHAR(100),
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: fintech_link_assignment'
-CREATE TABLE fintech_link_assignment (
-    fintech_link_assignment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    fintech_link_id UUID NOT NULL,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT,
-    FOREIGN KEY (fintech_link_id) REFERENCES fintech_link_info(fintech_link_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: fintech_wallet'
-CREATE TABLE fintech_wallet (
-    fintech_wallet_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    provider VARCHAR(50),
-    username VARCHAR(50),
-    wallet_id VARCHAR(100),
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: fintech_wallet_auth'
-CREATE TABLE fintech_wallet_auth (
-    fintech_wallet_auth_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    fintech_wallet_id UUID NOT NULL,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT NOT NULL,
-    token_expiry TIMESTAMPTZ NOT NULL, -- when access_token expires
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (fintech_wallet_id) REFERENCES fintech_wallet(fintech_wallet_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: client_payment_attempt'
-CREATE TABLE client_payment_attempt (
-    payment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_method_id UUID NOT NULL,
-    credit_currency_id UUID NOT NULL,
-    currency_code VARCHAR(10) NOT NULL,
-    amount NUMERIC NOT NULL,
-    transaction_result VARCHAR(50) NOT NULL,
-    external_transaction_id VARCHAR(255),
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resolution_date TIMESTAMPTZ,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_method(payment_method_id) ON DELETE RESTRICT,
-    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT
-);
+CREATE INDEX idx_external_payment_method_payment_method_id ON external_payment_method(payment_method_id);
+CREATE INDEX idx_external_payment_method_provider ON external_payment_method(provider);
 
 \echo 'Creating table: client_bill_info'
 CREATE TABLE client_bill_info (
-    client_bill_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    payment_id UUID NOT NULL,
+    client_bill_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    subscription_payment_id UUID NOT NULL,
     subscription_id UUID NOT NULL,
     user_id UUID NOT NULL,
     plan_id UUID NOT NULL,
@@ -1415,21 +1620,22 @@ CREATE TABLE client_bill_info (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (subscription_id) REFERENCES subscription_info(subscription_id) ON DELETE RESTRICT,
     FOREIGN KEY (plan_id) REFERENCES plan_info(plan_id) ON DELETE RESTRICT,
     FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
-    FOREIGN KEY (payment_id) REFERENCES client_payment_attempt(payment_id) ON DELETE RESTRICT,
+    FOREIGN KEY (subscription_payment_id) REFERENCES subscription_payment(subscription_payment_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: client_bill_history'
 CREATE TABLE client_bill_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     client_bill_id UUID NOT NULL,
-    payment_id UUID NOT NULL,
+    subscription_payment_id UUID NOT NULL,
     subscription_id UUID NOT NULL,
     user_id UUID NOT NULL,
     plan_id UUID NOT NULL,
@@ -1439,6 +1645,7 @@ CREATE TABLE client_bill_history (
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN,
@@ -1448,7 +1655,7 @@ CREATE TABLE client_bill_history (
 
 \echo 'Creating table: restaurant_transaction'
 CREATE TABLE restaurant_transaction (
-    transaction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     plate_selection_id UUID,
     discretionary_id UUID,
@@ -1467,10 +1674,11 @@ CREATE TABLE restaurant_transaction (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
     created_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (plate_selection_id) REFERENCES plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (discretionary_id) REFERENCES discretionary_info(discretionary_id) ON DELETE RESTRICT,
     FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
@@ -1486,6 +1694,7 @@ CREATE TABLE restaurant_balance_info (
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
@@ -1494,7 +1703,7 @@ CREATE TABLE restaurant_balance_info (
 
 \echo 'Creating table: restaurant_balance_history'
 CREATE TABLE restaurant_balance_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
     transaction_count INTEGER NOT NULL,
@@ -1503,6 +1712,7 @@ CREATE TABLE restaurant_balance_history (
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN,
@@ -1512,100 +1722,120 @@ CREATE TABLE restaurant_balance_history (
 
 \echo 'Creating table: institution_bill_info'
 CREATE TABLE institution_bill_info (
-    institution_bill_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_bill_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
-    restaurant_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
-    payment_id UUID,
     transaction_count INTEGER,
     amount NUMERIC,
     currency_code VARCHAR(10),
-    balance_event_id UUID,
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    resolution VARCHAR(20) NOT NULL,
+    resolution bill_resolution_enum NOT NULL DEFAULT 'Pending'::bill_resolution_enum,
+    tax_doc_external_id VARCHAR(255),
+    stripe_payout_id VARCHAR(255),
+    payout_completed_at TIMESTAMPTZ,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT,
     FOREIGN KEY (institution_entity_id) REFERENCES institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
-    FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
-    FOREIGN KEY (balance_event_id) REFERENCES restaurant_balance_history(event_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: institution_bill_history'
 CREATE TABLE institution_bill_history (
-    event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_bill_id UUID NOT NULL,
     institution_id UUID NOT NULL,
     institution_entity_id UUID NOT NULL,
-    restaurant_id UUID NOT NULL,
     credit_currency_id UUID NOT NULL,
-    payment_id UUID,
     transaction_count INTEGER,
     amount NUMERIC,
     currency_code VARCHAR(10),
-    balance_event_id UUID,
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
-    resolution VARCHAR(20) NOT NULL,
+    resolution bill_resolution_enum NOT NULL,
+    tax_doc_external_id VARCHAR(255),
+    stripe_payout_id VARCHAR(255),
+    payout_completed_at TIMESTAMPTZ,
     created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (institution_bill_id) REFERENCES institution_bill_info(institution_bill_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Creating table: institution_settlement'
+CREATE TABLE institution_settlement (
+    settlement_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    institution_entity_id UUID NOT NULL,
+    restaurant_id UUID NOT NULL,
+    period_start TIMESTAMPTZ NOT NULL,
+    period_end TIMESTAMPTZ NOT NULL,
+    kitchen_day VARCHAR(20) NOT NULL,
+    amount NUMERIC NOT NULL,
+    currency_code VARCHAR(10) NOT NULL,
+    credit_currency_id UUID NOT NULL,
+    transaction_count INTEGER NOT NULL,
+    balance_event_id UUID,
+    settlement_number VARCHAR(50) NOT NULL,
+    settlement_run_id UUID,
+    institution_bill_id UUID,
+    country_code VARCHAR(10) NOT NULL,
+    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (institution_entity_id) REFERENCES institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
+    FOREIGN KEY (restaurant_id) REFERENCES restaurant_info(restaurant_id) ON DELETE RESTRICT,
+    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
+    FOREIGN KEY (balance_event_id) REFERENCES restaurant_balance_history(event_id) ON DELETE RESTRICT,
+    FOREIGN KEY (institution_bill_id) REFERENCES institution_bill_info(institution_bill_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_institution_settlement_entity_period ON institution_settlement(institution_entity_id, period_start, period_end);
+CREATE INDEX idx_institution_settlement_restaurant_period ON institution_settlement(restaurant_id, period_start, period_end);
+CREATE INDEX idx_institution_settlement_bill ON institution_settlement(institution_bill_id);
+
+\echo 'Creating table: institution_settlement_history'
+CREATE TABLE institution_settlement_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    settlement_id UUID NOT NULL,
+    institution_entity_id UUID NOT NULL,
+    restaurant_id UUID NOT NULL,
+    period_start TIMESTAMPTZ NOT NULL,
+    period_end TIMESTAMPTZ NOT NULL,
+    kitchen_day VARCHAR(20) NOT NULL,
+    amount NUMERIC NOT NULL,
+    currency_code VARCHAR(10) NOT NULL,
+    credit_currency_id UUID NOT NULL,
+    transaction_count INTEGER NOT NULL,
+    balance_event_id UUID,
+    settlement_number VARCHAR(50) NOT NULL,
+    settlement_run_id UUID,
+    institution_bill_id UUID,
+    country_code VARCHAR(10) NOT NULL,
+    status status_enum NOT NULL,
+    is_archived BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (settlement_id) REFERENCES institution_settlement(settlement_id) ON DELETE RESTRICT,
     FOREIGN KEY (balance_event_id) REFERENCES restaurant_balance_history(event_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
 );
-
-\echo 'Creating table: institution_bank_account'
-CREATE TABLE institution_bank_account (
-    bank_account_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    institution_entity_id UUID NOT NULL,
-    address_id UUID NOT NULL,
-    account_holder_name VARCHAR(100) NOT NULL,
-    bank_name VARCHAR(100) NOT NULL,
-    account_type VARCHAR(50) NOT NULL,
-    routing_number VARCHAR(50) NOT NULL,
-    account_number VARCHAR(50) NOT NULL,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    modified_by UUID NOT NULL,
-    FOREIGN KEY (institution_entity_id) REFERENCES institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
-    FOREIGN KEY (address_id) REFERENCES address_info(address_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
-);
-
-\echo 'Creating table: institution_payment_attempt'
-CREATE TABLE institution_payment_attempt (
-    payment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    institution_entity_id UUID NOT NULL,
-    bank_account_id UUID NOT NULL,
-    institution_bill_id UUID,
-    credit_currency_id UUID NOT NULL,
-    amount NUMERIC NOT NULL,
-    currency_code VARCHAR(10) NOT NULL,
-    transaction_result VARCHAR(50),
-    external_transaction_id VARCHAR(100),
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resolution_date TIMESTAMPTZ NOT NULL,
-    FOREIGN KEY (institution_entity_id) REFERENCES institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
-    FOREIGN KEY (institution_bill_id) REFERENCES institution_bill_info(institution_bill_id) ON DELETE RESTRICT,
-    FOREIGN KEY (credit_currency_id) REFERENCES credit_currency_info(credit_currency_id) ON DELETE RESTRICT,
-    FOREIGN KEY (bank_account_id) REFERENCES institution_bank_account(bank_account_id) ON DELETE RESTRICT
-);
-
--- Create indexes for balance_event_id foreign keys
-CREATE INDEX idx_institution_bill_balance_event_id ON institution_bill_info(balance_event_id);
-CREATE INDEX idx_institution_bill_history_balance_event_id ON institution_bill_history(balance_event_id);

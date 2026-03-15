@@ -194,8 +194,7 @@ Resources:
           JWT_SECRET=$(echo $API_SECRET | jq -r '.jwt_secret')
           JWT_ALGORITHM=HS256
           
-          # External API Keys
-          GOOGLE_MAPS_API_KEY=$(echo $API_SECRET | jq -r '.google_maps_api_key')
+          # External API Keys (env-specific; app uses GOOGLE_API_KEY_DEV/_STAGING/_PROD per ENVIRONMENT)
           MERCADOPAGO_CLIENT_ID=$(echo $API_SECRET | jq -r '.mercadopago_client_id')
           MERCADOPAGO_CLIENT_SECRET=$(echo $API_SECRET | jq -r '.mercadopago_client_secret')
           
@@ -211,6 +210,16 @@ Resources:
           DEBUG=false
           LOG_LEVEL=INFO
           EOF
+          
+          # Set env-specific Google API key (dev/staging/prod)
+          GOOGLE_KEY_VAL=$(echo $API_SECRET | jq -r '.google_maps_api_key')
+          if [ "${Environment}" = "dev" ]; then
+            echo "GOOGLE_API_KEY_DEV=$GOOGLE_KEY_VAL" >> /opt/kitchen-backend/.env
+          elif [ "${Environment}" = "staging" ]; then
+            echo "GOOGLE_API_KEY_STAGING=$GOOGLE_KEY_VAL" >> /opt/kitchen-backend/.env
+          else
+            echo "GOOGLE_API_KEY_PROD=$GOOGLE_KEY_VAL" >> /opt/kitchen-backend/.env
+          fi
           
           # Configure Supervisor
           echo "Configuring Supervisor..."

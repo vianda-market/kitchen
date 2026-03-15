@@ -8,7 +8,7 @@ handle balance updates automatically when transactions are created.
 
 from uuid import UUID
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 import psycopg2.extensions
 from fastapi import HTTPException
 
@@ -139,17 +139,19 @@ class CreditLoadingService:
             restaurant = restaurant_service.get_by_id(restaurant_id, db)
             if not restaurant:
                 raise entity_not_found("Restaurant", restaurant_id)
-            currency = credit_currency_service.get_by_id(restaurant.credit_currency_id, db)
+            from app.services.entity_service import get_credit_currency_id_for_restaurant
+            credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
+            currency = credit_currency_service.get_by_id(credit_currency_id, db)
             if not currency:
                 raise HTTPException(status_code=404, detail="Credit currency not found for restaurant")
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             
             transaction_data = {
                 "restaurant_id": restaurant_id,
                 "plate_selection_id": None,
                 "discretionary_id": discretionary_id,
-                "credit_currency_id": restaurant.credit_currency_id,
+                "credit_currency_id": credit_currency_id,
                 "was_collected": False,
                 "ordered_timestamp": now,
                 "collected_timestamp": None,

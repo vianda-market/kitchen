@@ -32,9 +32,6 @@ from app.services.route_factory import (
     create_plate_routes,
     create_geolocation_routes,
     create_institution_entity_routes,
-    # Immutable entity routes
-    create_institution_payment_attempt_routes,
-    create_institution_bank_account_routes
 )
 
 # Create consolidated router
@@ -54,10 +51,6 @@ crud_router.include_router(create_plate_routes())
 crud_router.include_router(create_geolocation_routes())
 crud_router.include_router(create_institution_entity_routes())
 
-# Add immutable entity routes (no modification allowed)
-crud_router.include_router(create_institution_payment_attempt_routes())
-# Note: institution_bank_account_routes moved to custom router in application.py (needs custom filtering)
-# crud_router.include_router(create_institution_bank_account_routes())
 
 # Export the consolidated router
 __all__ = ["crud_router"]

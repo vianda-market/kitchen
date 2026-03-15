@@ -2,7 +2,8 @@
 Payment Method Service - Business Logic for Payment Method Linking
 
 This service handles linking payment methods to their type-specific records
-(e.g., fintech_link_id, credit_card_id, bank_account_id) and activating them.
+(e.g. stripe_customer_id) and activating them. Payment methods use aggregators
+(Stripe, Mercado Pago, PayU) only; credit_card, bank_account tables removed.
 """
 
 from uuid import UUID
@@ -14,11 +15,8 @@ from app.dto.models import PaymentMethodDTO
 from app.config import Status
 from app.security.institution_scope import InstitutionScope
 
-# Payment method types that require address
-PAYMENT_METHODS_REQUIRING_ADDRESS = {"Credit Card", "Bank Account"}
-
-# Payment method types that do NOT require address
-PAYMENT_METHODS_NOT_REQUIRING_ADDRESS = {"Fintech Link"}
+# Payment method types that require address (empty: Stripe/Mercado Pago/PayU store via aggregator APIs)
+PAYMENT_METHODS_REQUIRING_ADDRESS: set[str] = set()
 
 
 def link_payment_method_to_type(
@@ -45,7 +43,7 @@ def link_payment_method_to_type(
     Args:
         payment_method_id: The payment method to link
         method_type: The payment method type (must match payment_method.method_type)
-        type_id: The ID of the type-specific record (fintech_link_id, credit_card_id, etc.)
+        type_id: The ID of the type-specific record (stripe_customer_id etc.)
         current_user_id: User performing the action (for modified_by)
         db: Database connection
         
@@ -143,8 +141,7 @@ def create_payment_method_with_address(
     Create payment method with address (atomic transaction).
     
     Validation rules:
-    - credit_card and bank_account: address_id OR address_data is REQUIRED
-    - fintech_link: address_id and address_data are OPTIONAL (can be None)
+    - Aggregator payment methods (Stripe, etc.): address_id and address_data are OPTIONAL
     
     Args:
         payment_method_data: Payment method data (method_type, is_default, etc.)
@@ -186,6 +183,13 @@ def create_payment_method_with_address(
         # Option 1: Create new address (atomic, commit=False)
         if address_data:
             log_info(f"Creating new address for payment method type '{method_type}'")
+            # Ensure institution_id and user_id are set from context when missing (B2C/B2B safeguard)
+            if address_data.get("institution_id") is None and scope and scope.institution_id:
+                address_data["institution_id"] = scope.institution_id
+            elif address_data.get("institution_id") is None and current_user.get("institution_id"):
+                address_data["institution_id"] = current_user["institution_id"]
+            if address_data.get("user_id") is None:
+                address_data["user_id"] = current_user["user_id"]
             address = address_business_service.create_address_with_geocoding(
                 address_data,
                 current_user,
@@ -198,7 +202,7 @@ def create_payment_method_with_address(
             # Option 2: Use existing address_id
             log_info(f"Using existing address {address_id} for payment method type '{method_type}'")
             resolved_address_id = address_id
-        # Option 3: No address (only valid for fintech_link)
+        # Option 3: No address (for types that do not require address)
         else:
             log_info(f"Payment method type '{method_type}' created without address (not required)")
         
@@ -221,6 +225,9 @@ def create_payment_method_with_address(
         
         # Commit once at end (both address and payment_method committed together)
         db.commit()
+        if resolved_address_id:
+            from app.services.address_service import update_address_type_from_linkages
+            update_address_type_from_linkages(resolved_address_id, db)
         log_info(f"Payment method {payment_method.payment_method_id} created successfully with address {resolved_address_id}")
         
         return payment_method

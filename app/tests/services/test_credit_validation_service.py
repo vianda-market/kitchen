@@ -33,6 +33,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -68,6 +69,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -103,6 +105,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -138,6 +141,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -177,6 +181,7 @@ class TestCreditValidationService:
             
             assert exc_info.value.status_code == 404
             assert "User subscription not found" in str(exc_info.value.detail)
+            assert "Please go to Plan and subscribe before reserving a plate" in str(exc_info.value.detail)
 
     def test_validate_sufficient_credits_handles_database_error(self, mock_db):
         """Test that validation handles database errors gracefully."""
@@ -242,6 +247,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -250,7 +256,7 @@ class TestCreditValidationService:
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
         )
-        
+
         with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
             
@@ -299,6 +305,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
@@ -330,6 +337,7 @@ class TestCreditValidationService:
             subscription_id=uuid4(),
             user_id=user_id,
             plan_id=uuid4(),
+            market_id=uuid4(),
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,

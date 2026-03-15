@@ -39,13 +39,24 @@ CREATE SCHEMA public;
 \i app/db/seed.sql
 SQL
 
-# 2) Run database tests via pytest (if venv is available)
+# 2) Run all database integration tests via pytest (if venv is available)
+# Includes: schema, seed, integration workflows, customer payment methods, market subscription
+# constraints, subscription payment table and flow. Export DB_NAME/DB_USER so the app's
+# connection pool (used by some code paths) connects to the same DB.
 if [ -f "venv/bin/activate" ]; then
-  echo "→ Running database tests with pytest…"
-  source venv/bin/activate
-  pytest app/tests/database/ -v --tb=short || echo "⚠️  Some tests failed (non-blocking)"
+  _VENV="venv/bin/activate"
+elif [ -f ".venv/bin/activate" ]; then
+  _VENV=".venv/bin/activate"
 else
-  echo "⚠️  Skipping pytest - venv not found. Run: source venv/bin/activate && pytest app/tests/database/"
+  _VENV=""
+fi
+if [ -n "${_VENV}" ]; then
+  echo "→ Running database tests with pytest (schema, seed, integration, subscription payment, etc.)…"
+  source "${_VENV}"
+  export DB_NAME DB_USER
+  pytest app/tests/database/ -v --tb=short
+else
+  echo "⚠️  Skipping pytest - venv not found. Create one and run: source venv/bin/activate && pytest app/tests/database/"
 fi
 
 # 3) Re-seed so your app sees the final state

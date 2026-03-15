@@ -1,7 +1,8 @@
 """
 Google Maps API Gateway
 
-Handles all interactions with Google Maps Geocoding API:
+Handles all interactions with Google Maps Geocoding API.
+Uses GOOGLE_API_KEY_DEV/_STAGING/_PROD per ENVIRONMENT from .env (never commit).
 - Address to coordinates (geocoding)
 - Coordinates to address (reverse geocoding)
 - Distance calculations
@@ -48,12 +49,13 @@ class GoogleMapsGateway(BaseGateway):
         Raises:
             ExternalServiceError: If request fails
         """
-        if not self.settings.GOOGLE_MAPS_API_KEY:
+        from app.config.settings import get_google_api_key
+        api_key = get_google_api_key()
+        if not api_key:
             raise ExternalServiceError(
-                "GOOGLE_MAPS_API_KEY not configured. Set it in .env file."
+                "Google API key not configured. Set GOOGLE_API_KEY_DEV (or _STAGING/_PROD) in .env file."
             )
-        
-        params = {"key": self.settings.GOOGLE_MAPS_API_KEY}
+        params = {"key": api_key}
         
         if operation == "geocode":
             if "address" not in kwargs:

@@ -8,7 +8,7 @@ and activating them.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from app.services.payment_method_service import link_payment_method_to_type
@@ -35,14 +35,14 @@ class TestPaymentMethodService:
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Fintech Link",
+            method_type="Stripe",
             method_type_id=None,
             is_archived=False,
             status="Pending",
             is_default=False,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
     
     @pytest.fixture
@@ -51,37 +51,37 @@ class TestPaymentMethodService:
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Fintech Link",
+            method_type="Stripe",
             method_type_id=uuid4(),
             is_archived=False,
             status="Active",
             is_default=False,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
     
     @pytest.fixture
     def sample_payment_method_wrong_type(self):
-        """Sample payment method with wrong method_type"""
+        """Sample payment method with wrong method_type (Mercado Pago when we expect Stripe)"""
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Credit Card",
+            method_type="Mercado Pago",
             method_type_id=None,
             is_archived=False,
             status="Pending",
             is_default=False,
-            created_date=datetime.utcnow(),
+            created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
-            modified_date=datetime.utcnow()
+            modified_date=datetime.now(timezone.utc)
         )
     
     def test_link_payment_method_success(
         self, mock_db, sample_payment_method_pending
     ):
-        """Test successful linking of payment method to fintech link"""
-        fintech_link_id = uuid4()
+        """Test successful linking of payment method to type-specific record (e.g. credit card)"""
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -93,8 +93,8 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_pending.payment_method_id,
-                method_type="Fintech Link",
-                type_id=fintech_link_id,
+                method_type="Stripe",
+                type_id=type_id,
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -106,14 +106,14 @@ class TestPaymentMethodService:
             call_args = mock_cursor.execute.call_args
             # Handle potential leading whitespace/newlines in SQL query
             assert call_args[0][0].strip().startswith("UPDATE payment_method")
-            assert str(fintech_link_id) in call_args[0][1]
+            assert str(type_id) in call_args[0][1]
             assert str(user_id) in call_args[0][1]
     
     def test_link_payment_method_idempotent_already_linked(
         self, mock_db, sample_payment_method_active
     ):
         """Test idempotent behavior when payment method is already linked"""
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -121,8 +121,8 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_active.payment_method_id,
-                method_type="Fintech Link",
-                type_id=fintech_link_id,
+                method_type="Stripe",
+                type_id=type_id,
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -134,7 +134,7 @@ class TestPaymentMethodService:
         self, mock_db, sample_payment_method_pending
     ):
         """Test idempotent behavior when payment method status is not 'Pending'"""
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         # Create payment method with status != 'Pending'
@@ -156,8 +156,8 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=payment_method.payment_method_id,
-                method_type="Fintech Link",
-                type_id=fintech_link_id,
+                method_type="Stripe",
+                type_id=type_id,
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -168,7 +168,7 @@ class TestPaymentMethodService:
     def test_link_payment_method_not_found(self, mock_db):
         """Test error when payment method not found"""
         payment_method_id = uuid4()
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -177,8 +177,8 @@ class TestPaymentMethodService:
             with pytest.raises(ValueError, match="not found"):
                 link_payment_method_to_type(
                     payment_method_id=payment_method_id,
-                    method_type="Fintech Link",
-                    type_id=fintech_link_id,
+                    method_type="Stripe",
+                    type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
                 )
@@ -187,7 +187,7 @@ class TestPaymentMethodService:
         self, mock_db, sample_payment_method_wrong_type
     ):
         """Test error when payment method type doesn't match"""
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -196,15 +196,15 @@ class TestPaymentMethodService:
             with pytest.raises(ValueError, match="type mismatch"):
                 link_payment_method_to_type(
                     payment_method_id=sample_payment_method_wrong_type.payment_method_id,
-                    method_type="Fintech Link",
-                    type_id=fintech_link_id,
+                    method_type="Stripe",
+                    type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
                 )
     
     def test_link_payment_method_database_error(self, mock_db, sample_payment_method_pending):
         """Test error handling when database update fails"""
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -216,8 +216,8 @@ class TestPaymentMethodService:
             with pytest.raises(Exception):
                 link_payment_method_to_type(
                     payment_method_id=sample_payment_method_pending.payment_method_id,
-                    method_type="Fintech Link",
-                    type_id=fintech_link_id,
+                    method_type="Stripe",
+                    type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
                 )
@@ -228,7 +228,7 @@ class TestPaymentMethodService:
         self, mock_db, sample_payment_method_pending
     ):
         """Test handling when UPDATE returns 0 rows (concurrent update)"""
-        fintech_link_id = uuid4()
+        type_id = uuid4()
         user_id = uuid4()
         
         with patch('app.services.payment_method_service.payment_method_service') as mock_service:
@@ -240,8 +240,8 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_pending.payment_method_id,
-                method_type="Fintech Link",
-                type_id=fintech_link_id,
+                method_type="Stripe",
+                type_id=type_id,
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -252,15 +252,15 @@ class TestPaymentMethodService:
     def test_link_payment_method_different_types(
         self, mock_db, sample_payment_method_pending
     ):
-        """Test linking works for different payment method types"""
-        credit_card_id = uuid4()
+        """Test linking works for different payment method types (Stripe, etc.)"""
+        type_id = uuid4()
         user_id = uuid4()
         
-        # Create payment method with Credit Card type
+        # Create payment method with Stripe type (aggregator)
         payment_method = PaymentMethodDTO(
             payment_method_id=sample_payment_method_pending.payment_method_id,
             user_id=sample_payment_method_pending.user_id,
-            method_type="Credit Card",
+            method_type="Stripe",
             method_type_id=sample_payment_method_pending.method_type_id,
             is_archived=sample_payment_method_pending.is_archived,
             status=sample_payment_method_pending.status,
@@ -279,8 +279,8 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=payment_method.payment_method_id,
-                method_type="Credit Card",
-                type_id=credit_card_id,
+                method_type="Stripe",
+                type_id=type_id,
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -288,5 +288,5 @@ class TestPaymentMethodService:
             assert result is True
             # Verify method_type was checked in UPDATE query
             call_args = mock_cursor.execute.call_args
-            assert "Credit Card" in call_args[0][1]
+            assert "Stripe" in call_args[0][1]
 

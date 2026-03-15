@@ -11,10 +11,10 @@ import psycopg2.extensions
 
 from app.dto.models import DiscretionaryDTO
 from app.schemas.consolidated_schemas import (
-    DiscretionaryCreateSchema, 
+    DiscretionaryCreateSchema,
     DiscretionaryResponseSchema,
     DiscretionaryUpdateSchema,
-    DiscretionarySummarySchema
+    DiscretionarySummarySchema,
 )
 from app.services.discretionary_service import DiscretionaryService
 from app.auth.dependencies import get_employee_user, get_admin_user
@@ -45,7 +45,7 @@ def create_discretionary_request(
     log_info(f"Admin {current_user['user_id']} creating discretionary request for user {request.user_id}")
     
     # Convert Pydantic model to dict for service layer
-    request_data = request.dict()
+    request_data = request.model_dump()
     
     # Delegate to service layer
     discretionary_request = discretionary_service.create_discretionary_request(
@@ -62,14 +62,14 @@ def get_discretionary_requests(
 ):
     """
     Get all discretionary requests created by the current admin.
-    
+
     Returns requests created by the authenticated admin user.
     """
     log_info(f"Admin {current_user['user_id']} retrieving their discretionary requests")
-    
+
     # Delegate to service layer
     requests = discretionary_service.get_requests_by_admin(current_user["user_id"], db)
-    
+
     return requests
 
 
@@ -124,7 +124,7 @@ def update_discretionary_request(
         )
     
     # Convert Pydantic model to dict for service layer
-    update_data = request_update.dict(exclude_unset=True)
+    update_data = request_update.model_dump(exclude_unset=True)
     
     # Delegate to service layer
     from app.services.crud_service import discretionary_service as crud_service

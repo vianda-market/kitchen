@@ -125,7 +125,7 @@ class TestPlatePickupServiceSimple:
         # Mock pickup record with wrong status
         mock_pickup = Mock()
         mock_pickup.user_id = sample_current_user["user_id"]
-        mock_pickup.status = Status.COMPLETE  # Wrong status for completion
+        mock_pickup.status = Status.COMPLETED  # Wrong status for completion
         
         with patch('app.services.plate_pickup_service.plate_pickup_live_service') as mock_service:
             mock_service.get_by_id.return_value = mock_pickup
@@ -214,7 +214,7 @@ class TestPlatePickupServiceSimple:
             
             # Assert
             assert result["detail"] == "Plate pickup record deleted successfully"
-            mock_service.soft_delete.assert_called_once_with(pickup_id, mock_db)
+            mock_service.soft_delete.assert_called_once_with(pickup_id, sample_current_user["user_id"], mock_db)
 
     def test_validate_qr_code_handles_not_found(self, mock_db):
         """Test that QR code validation handles not found case."""

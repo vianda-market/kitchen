@@ -1,5 +1,5 @@
 # app/schemas/address_geolocation.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -35,11 +35,13 @@ class GeolocationResponseSchema(BaseModel):
     address_id: UUID
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
+    place_id: Optional[str] = Field(None, description="Google Place ID for deduplication")
+    viewport: Optional[dict] = Field(None, description="Bounding box {low:{lat,lng},high:{lat,lng}} for map zoom")
+    formatted_address_google: Optional[str] = Field(None, description="Google's formatted address")
     is_archived: bool
     status: Status
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

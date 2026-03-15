@@ -263,8 +263,8 @@ See the [Token Management Pattern](#-token-management-pattern-critical) section 
 - `otherUserId` - Test user for Operator blocking tests
 
 ### Institution IDs Needed:
-- Institution A: Use existing institution (e.g., `33333333-3333-3333-3333-333333333333` - Vianda Enterprises)
-- Institution B: Use different institution (e.g., `11111111-1111-1111-1111-111111111111` - La Parrilla Argentina)
+- Institution A: Use existing institution (e.g., `11111111-1111-1111-1111-111111111111` - Vianda Enterprises)
+- Institution B: Use different institution (e.g., `33333333-3333-3333-3333-333333333333` - La Parrilla Argentina)
 
 ## Test Execution Order
 

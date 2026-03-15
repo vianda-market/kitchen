@@ -13,7 +13,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 from uuid import UUID, uuid4
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from fastapi import HTTPException
 
 from app.services.enriched_service import EnrichedService
@@ -28,8 +28,7 @@ class MockEnrichedSchema(BaseModel):
     institution_id: str
     is_archived: bool
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class MockEnrichedSchemaOptional(BaseModel):
@@ -39,8 +38,7 @@ class MockEnrichedSchemaOptional(BaseModel):
     institution_id: Optional[str] = None
     is_archived: bool = False
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 @pytest.fixture

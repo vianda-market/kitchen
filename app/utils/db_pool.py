@@ -30,11 +30,15 @@ def _register_enum_types(conn: psycopg2.extensions.connection):
         'status_enum',            # CRITICAL - used by all tables
         'role_type_enum',         # CRITICAL - permission system
         'role_name_enum',         # CRITICAL - permission system
+        'institution_type_enum',  # Employee / Customer / Supplier / Employer - must match user role_type (Customer can be in Customer or Employer institution)
         'transaction_type_enum',  # CRITICAL - transaction system
         'kitchen_day_enum',       # New
         'pickup_type_enum',       # New
+        'street_type_enum',       # Address street type (St, Ave, Blvd, etc.)
         'audit_operation_enum',   # New
         'discretionary_reason_enum',  # New - discretionary request reasons
+        'discretionary_status_enum',  # Discretionary lifecycle: Pending, Cancelled, Approved, Rejected
+        'bill_resolution_enum',   # Institution bill resolution: Pending, Paid, Rejected
     ]
     
     registered_count = 0
@@ -177,6 +181,8 @@ class DatabasePool:
     
     def close_pool(self):
         """Close the connection pool"""
+        from app.utils.db import clear_enum_registration_cache
+        clear_enum_registration_cache()
         if self._pool:
             try:
                 self._pool.closeall()

@@ -1,0 +1,188 @@
+# Database Rebuild Persistence Guide
+
+## **🎯 Key Principle: All Changes Must Be in Repository Files**
+
+Since the database is frequently torn down and rebuilt, **ALL** changes must be made to repository files, never to the live database directly.
+
+## **✅ Files Modified for Archival System Persistence**
+
+### **1. Database Structure Files**
+```
+app/db/
+├── schema.sql              ✅ Schema (enums on entities, no status_info/transaction_type_info)
+├── index.sql               ✅ Standard indexes
+├── trigger.sql             ✅ History triggers
+├── archival_indexes.sql    ✅ 15 archival performance indexes
+├── seed.sql                ✅ Reference data
+└── build_kitchen_db_dev.sh ✅ Build script (includes archival_indexes.sql)
+```
+
+### **2. Application Code Files**
+```
+app/
+├── services/
+│   ├── archival.py             ✅ Archival logic (uses archival_config)
+│   └── cron/archival_job.py     ✅ Scheduled archival jobs
+├── routes/admin/
+│   ├── archival.py             ✅ Admin archival endpoints
+│   └── archival_config.py      ✅ Archival config endpoints
+├── config/
+│   ├── archival_config.py      ✅ Table→category mapping, retention (source of truth)
+│   └── settings.py             ✅ RETENTION_PERIODS (legacy/UI)
+└── utils/log.py                ✅ Logging
+```
+
+### **3. Documentation Files**
+```
+docs/
+├── archival/
+│   ├── ARCHIVAL_STRATEGY.md              Strategic framework
+│   ├── ARCHIVAL_SYSTEM_IMPLEMENTATION.md Technical details
+│   ├── ARCHIVAL_ENHANCEMENT_SUMMARY.md   Completion summary
+│   └── ARCHIVAL_CRON_STRATEGY.md         Cron job strategy
+├── api/internal/
+│   └── LOGGING_STRATEGY.md               Logging analysis
+└── database/
+    └── DATABASE_REBUILD_PERSISTENCE.md   This file
+```
+
+## **🔧 Build Process Integration**
+
+### **Updated Build Script**
+The `app/db/build_kitchen_db_dev.sh` now includes:
+```bash
+\i app/db/schema.sql
+\i app/db/index.sql
+\i app/db/trigger.sql
+\i app/db/archival_indexes.sql  # ← NEW: Archival performance indexes
+\i app/db/seed.sql
+```
+
+### **What Happens on Rebuild**
+1. ✅ **Schema**: All tables created (enums stored on entities, no status_info/transaction_type_info)
+2. ✅ **Indexes**: Standard indexes + 15 archival performance indexes
+3. ✅ **Triggers**: History logging triggers
+4. ✅ **Data**: Reference data from seed.sql
+5. ✅ **Tests**: Pytest runs database integration tests
+
+## **🚨 Critical Changes Made Persistent**
+
+### **1. Archival Performance Indexes (15 total)**
+```sql
+-- Orders (plate_pickup_live)
+idx_plate_pickup_archival, idx_plate_pickup_archival_eligible
+
+-- Transactions (restaurant_transaction)
+idx_restaurant_transaction_archival, idx_restaurant_transaction_archival_eligible
+
+-- Client transactions
+idx_client_transaction_archival, idx_client_transaction_archival_eligible
+
+-- Subscriptions, User, Restaurant
+idx_subscription_archival, idx_subscription_archival_eligible
+idx_user_archival, idx_user_archival_eligible
+idx_restaurant_archival, idx_restaurant_archival_eligible
+
+-- Statistics
+idx_plate_pickup_stats, idx_restaurant_transaction_stats, idx_client_transaction_stats
+```
+
+### **2. Archival Configuration**
+Archival is configured in `app/config/archival_config.py` via `TABLE_CATEGORY_MAPPING` and `ArchivalCategory`. Tables are assigned retention periods by category (e.g. FINANCIAL_CRITICAL, CUSTOMER_SERVICE). Retention periods and grace periods are defined in `CATEGORY_SLA_CONFIG`.
+
+### **3. Reference Data**
+Status and transaction-type values are stored as PostgreSQL enums on entities (e.g. `status_enum`, `transaction_type_enum` in schema.sql). No separate status_info or transaction_type_info tables.
+
+## **🔍 Validation After Rebuild**
+
+### **Quick Verification Commands**
+```bash
+# 1. Verify archival indexes exist
+psql -d kitchen_db_dev -c "
+SELECT count(*) FROM pg_indexes 
+WHERE indexname LIKE '%archival%' OR indexname LIKE '%stats%';"
+# Expected: 15
+
+# 2. Verify core tables exist
+psql -d kitchen_db_dev -c "
+SELECT table_name FROM information_schema.tables 
+WHERE table_name IN ('user_info', 'plate_pickup_live', 'client_transaction', 'restaurant_info');"
+# Expected: 4 rows
+
+# 3. Run database tests
+source venv/bin/activate && pytest app/tests/database/ -v --tb=short
+```
+
+### **Application Verification**
+```python
+# Test archival config loads
+from app.config.archival_config import get_archival_priority_order, get_table_archival_config
+
+tables = get_archival_priority_order()
+print(f"Archival config: {len(tables)} tables")
+
+# Verify a table has config
+config = get_table_archival_config("plate_pickup_live")
+assert config.retention_days > 0
+```
+
+## **⚠️ Things to Never Do**
+
+### **❌ Direct Database Changes**
+```bash
+# NEVER do this - changes will be lost on rebuild
+psql -d kitchen_db_dev -c "CREATE INDEX some_index ON some_table(column);"
+```
+
+### **❌ Manual Data Updates**
+```bash
+# NEVER do this - data will be lost on rebuild  
+psql -d kitchen_db_dev -c "INSERT INTO some_table VALUES (...);"
+```
+
+### **✅ Always Do This Instead**
+```bash
+# Add to app/db/archival_indexes.sql
+echo "CREATE INDEX some_index ON some_table(column);" >> app/db/archival_indexes.sql
+
+# Add to app/db/seed.sql
+echo "INSERT INTO some_table (...) VALUES (...);" >> app/db/seed.sql
+
+# Then rebuild
+./app/db/build_kitchen_db_dev.sh
+```
+
+## **🎯 Rebuild Test Checklist**
+
+After any database rebuild, verify:
+
+- [ ] **15 archival indexes** created
+- [ ] **Core tables** exist (user_info, plate_pickup_live, client_transaction, etc.)
+- [ ] **Database tests** pass: `pytest app/tests/database/`
+- [ ] **Archival config** loads: `get_archival_priority_order()` returns tables
+- [ ] **Admin endpoints** accessible at `/admin/archival/*` and `/admin/archival-config/*`
+
+## **🚀 Future Additions**
+
+When adding new features that require database changes:
+
+1. **Schema changes** → Add to `app/db/schema.sql`
+2. **New indexes** → Add to `app/db/index.sql` or `app/db/archival_indexes.sql`
+3. **New triggers** → Add to `app/db/trigger.sql`
+4. **Reference data** → Add to `app/db/seed.sql`
+5. **New entity archival** → Add table to `TABLE_CATEGORY_MAPPING` in `app/config/archival_config.py`
+
+**Remember: Every change must survive `./app/db/build_kitchen_db_dev.sh`**
+
+---
+
+## **✅ Current Status: FULLY PERSISTENT**
+
+All archival system changes are in repository files and persist across database rebuilds:
+
+- **15 archival indexes** in `app/db/archival_indexes.sql` for query performance
+- **Category-based retention** via `app/config/archival_config.py` (TABLE_CATEGORY_MAPPING)
+- **Admin endpoints** for archival and config at `/admin/archival/*` and `/admin/archival-config/*`
+- **Documentation** in `docs/archival/` and `docs/api/internal/`
+
+**Next rebuild will automatically include all enhancements!** 🎉

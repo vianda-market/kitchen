@@ -91,7 +91,7 @@ def update(
         if role_type == "Employee" and role_name in ["Admin", "Super Admin"]:
             # Employee Admin: Global scope
             scope = None  # No institution filtering
-        elif role_type == "Employee" and role_name == "Management":
+        elif role_type == "Employee" and role_name == "Manager":
             # Employee Management: Institution scope
             scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
         else:
@@ -173,6 +173,24 @@ def terminate_my_account(
 ```
 
 **Note**: `DELETE /users/{user_id}` remains admin-only for hard deletes (if implemented) or soft deletes of other users.
+
+### 5. `PUT /users/{user_id}/password` - Admin reset user password
+**Status**: ⚠️ **DEPRECATE WHEN POSTMAN MIGRATED**
+
+**Current Behavior**:
+- Admins (Employee Admin/Manager, Supplier Admin/Manager) can set a new password for another user.
+- B2B site no longer uses this; it uses the invite flow (`POST /users/` without password, then `POST /users/{user_id}/resend-invite` if needed).
+
+**Reason for Deprecation**:
+- B2B site uses invite-only flow. Admin reset is retained only for Postman collection testing.
+
+**Migration Path**:
+1. Enhance Postman collections to use invite flow (create user without password, resend-invite if needed) instead of admin reset.
+2. Once Postman no longer depends on it: add `deprecated=True`, log warnings, then eventually remove.
+
+**Replacement**: `POST /users/{user_id}/resend-invite` — resends the B2B invite email with set-password link. See [CHANGE_PASSWORD_AND_ADMIN_RESET.md](../api/b2b_client/CHANGE_PASSWORD_AND_ADMIN_RESET.md).
+
+---
 
 ## Endpoints to Keep (Admin Operations Only)
 

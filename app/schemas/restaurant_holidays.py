@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from datetime import datetime, date
 from uuid import UUID
 from typing import Optional, List
@@ -12,10 +12,11 @@ class RestaurantHolidayCreateSchema(BaseModel):
     holiday_name: Optional[str] = Field(None, max_length=100)
     is_recurring: bool = False
     recurring_month_day: Optional[str] = Field(None, max_length=10, description="MM-DD format for recurring holidays")
-    status: Optional[Status] = Field(default=Status.ACTIVE, description="Status of the holiday (default: 'Active')")
+    status: Optional[Status] = Field(default=None, description="Optional; omit or null and backend assigns default (Active)")
 
-    @validator('recurring_month_day')
-    def validate_recurring_month_day(cls, v, values):
+    @field_validator('recurring_month_day')
+    @classmethod
+    def validate_recurring_month_day(cls, v, info: ValidationInfo):
         if v is not None:
             # Validate MM-DD format
             try:
@@ -28,11 +29,9 @@ class RestaurantHolidayCreateSchema(BaseModel):
                     raise ValueError("Day must be between 01 and 31")
             except ValueError:
                 raise ValueError("recurring_month_day must be in MM-DD format (e.g., '12-25')")
-            
             # If is_recurring is True, recurring_month_day should be set
-            if values.get('is_recurring') and not v:
+            if info.data.get('is_recurring') and not v:
                 raise ValueError("recurring_month_day is required when is_recurring is True")
-        
         return v
 
 # --- For updating an existing restaurant holiday ---
@@ -45,7 +44,8 @@ class RestaurantHolidayUpdateSchema(BaseModel):
     recurring_month_day: Optional[str] = Field(None, max_length=10, description="MM-DD format for recurring holidays")
     status: Optional[Status] = Field(None, description="Status of the holiday")
 
-    @validator('recurring_month_day')
+    @field_validator('recurring_month_day')
+    @classmethod
     def validate_recurring_month_day(cls, v):
         if v is not None:
             # Validate MM-DD format
@@ -76,15 +76,15 @@ class RestaurantHolidayResponseSchema(BaseModel):
     modified_by: UUID
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- For bulk creating restaurant holidays ---
 class RestaurantHolidayBulkCreateSchema(BaseModel):
     """Schema for bulk creating restaurant holidays"""
-    holidays: List[RestaurantHolidayCreateSchema] = Field(..., min_items=1, description="List of holidays to create")
+    holidays: List[RestaurantHolidayCreateSchema] = Field(..., min_length=1, description="List of holidays to create")
     
-    @validator('holidays')
+    @field_validator('holidays')
+    @classmethod
     def validate_holidays_not_empty(cls, v):
         """Ensure at least one holiday is provided"""
         if not v:
@@ -137,5 +137,4 @@ class RestaurantHolidayEnrichedResponseSchema(BaseModel):
     # Editability flag (for client UI)
     is_editable: bool = Field(..., description="True if this holiday can be edited by suppliers (restaurant holidays), False if it's a national holiday (read-only)")
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

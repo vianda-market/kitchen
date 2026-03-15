@@ -17,7 +17,7 @@ from uuid import UUID
 import psycopg2.extensions
 from collections import defaultdict
 
-from app.services.date_service import get_effective_current_day
+from app.services.kitchen_day_service import get_kitchen_day_for_date
 from app.services.crud_service import restaurant_service
 from app.utils.log import log_info, log_warning
 from app.utils.db import db_read
@@ -57,7 +57,15 @@ def get_daily_orders(
     
     # 1. Determine kitchen_day from date (using first restaurant's timezone)
     kitchen_day = _get_kitchen_day_for_date(order_date, user_institution_entity_id, db)
-    
+
+    # kitchen_day_enum only has Monday-Friday; weekends have no kitchen days
+    if kitchen_day not in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'):
+        log_info(f"No kitchen days on {kitchen_day}; returning empty orders for date={order_date}")
+        return {
+            "order_date": order_date,
+            "restaurants": []
+        }
+
     log_info(f"Fetching daily orders for institution_entity_id={user_institution_entity_id}, "
              f"date={order_date}, kitchen_day={kitchen_day}, restaurant_id={restaurant_id}")
     
@@ -75,7 +83,7 @@ def get_daily_orders(
             r.restaurant_id,
             r.name AS restaurant_name
         FROM plate_pickup_live ppl
-        INNER JOIN plate_selection ps ON ppl.plate_selection_id = ps.plate_selection_id
+        INNER JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id AND ps.is_archived = FALSE
         INNER JOIN user_info u ON ppl.user_id = u.user_id
         INNER JOIN plate_info pl ON ppl.plate_id = pl.plate_id
         INNER JOIN product_info prod ON pl.product_id = prod.product_id
@@ -107,6 +115,12 @@ def get_daily_orders(
     
     # 4. Group orders by restaurant and calculate summary statistics
     restaurants_data = _group_orders_by_restaurant(rows)
+
+    # 5. Add reservations_by_plate and live_locked_count per restaurant
+    _add_reservations_and_live_metrics(
+        restaurants_data, user_institution_entity_id, order_date,
+        kitchen_day, restaurant_id, db
+    )
     
     log_info(f"Retrieved {len(rows)} orders across {len(restaurants_data)} restaurant(s)")
     
@@ -133,9 +147,9 @@ def _get_kitchen_day_for_date(
         Uppercase day name (e.g., 'TUESDAY')
     """
     
-    # Get timezone from first restaurant in this institution_entity
+    # Get timezone and country_code from first restaurant's address
     query = """
-        SELECT a.timezone
+        SELECT a.timezone, a.country_code
         FROM restaurant_info r
         INNER JOIN address_info a ON r.address_id = a.address_id
         WHERE r.institution_entity_id = %s
@@ -152,16 +166,9 @@ def _get_kitchen_day_for_date(
     else:
         timezone_str = result[0]['timezone']
     
-    # If order_date is today, use get_effective_current_day
-    # Otherwise, just get the day name from the date
-    if order_date == date.today():
-        kitchen_day = get_effective_current_day(timezone_str)
-    else:
-        # For past/future dates, just use the weekday name
-        kitchen_day = order_date.strftime('%A')
+    country_code = result[0].get('country_code') if result else None
     
-    # Return as Title Case to match kitchen_day enum ('Monday', 'Tuesday', etc.)
-    return kitchen_day.title()
+    return get_kitchen_day_for_date(order_date, timezone_str, country_code)
 
 
 def _group_orders_by_restaurant(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -217,15 +224,18 @@ def _group_orders_by_restaurant(rows: List[Dict[str, Any]]) -> List[Dict[str, An
         summary['total_orders'] += 1
         
         # Categorize by status
-        status = row['status'].lower()
-        if status == 'active' and row['arrival_time'] is None:
+        status = (row['status'] or '').lower()
+        if status == 'pending':
+            summary['pending'] += 1
+        elif status == 'arrived':
+            summary['arrived'] += 1
+        elif status in ('complete', 'completed'):
+            summary['completed'] += 1
+        elif status == 'active' and row['arrival_time'] is None:
             summary['pending'] += 1
         elif status == 'active' and row['arrival_time'] is not None:
             summary['arrived'] += 1
-        elif status == 'completed':
-            summary['completed'] += 1
         else:
-            # Default to pending for unknown statuses
             summary['pending'] += 1
     
     # Convert to list and maintain alphabetical order by restaurant name
@@ -233,3 +243,53 @@ def _group_orders_by_restaurant(rows: List[Dict[str, Any]]) -> List[Dict[str, An
     restaurants_list.sort(key=lambda x: x['restaurant_name'])
     
     return restaurants_list
+
+
+def _add_reservations_and_live_metrics(
+    restaurants_data: List[Dict[str, Any]],
+    institution_entity_id: UUID,
+    order_date: date,
+    kitchen_day: str,
+    restaurant_id: Optional[UUID],
+    db: psycopg2.extensions.connection
+) -> None:
+    """Add reservations_by_plate and live_locked_count to each restaurant."""
+    if not restaurants_data:
+        return
+
+    for rest in restaurants_data:
+        rid = rest['restaurant_id']
+        # reservations_by_plate: count from plate_selection_info for this restaurant, kitchen_day, pickup_date
+        res_query = """
+            SELECT pl.plate_id, prod.name AS plate_name, COUNT(*) AS count
+            FROM plate_selection_info ps
+            JOIN plate_info pl ON ps.plate_id = pl.plate_id
+            JOIN product_info prod ON pl.product_id = prod.product_id
+            WHERE ps.restaurant_id = %s
+              AND ps.kitchen_day = %s
+              AND ps.pickup_date = %s
+              AND ps.is_archived = FALSE
+            GROUP BY pl.plate_id, prod.name
+        """
+        res_rows = db_read(res_query, (str(rid), kitchen_day, order_date.isoformat()), connection=db)
+        rest['reservations_by_plate'] = [
+            {"plate_id": str(r["plate_id"]), "plate_name": r["plate_name"], "count": r["count"]}
+            for r in (res_rows or [])
+        ]
+        # live_locked_count: count of plate_pickup_live for this restaurant (today's promoted orders)
+        live_query = """
+            SELECT COUNT(*) AS count
+            FROM plate_pickup_live ppl
+            JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id AND ps.is_archived = FALSE
+            WHERE ppl.restaurant_id = %s
+              AND ps.kitchen_day = %s
+              AND ps.pickup_date = %s
+              AND ppl.is_archived = FALSE
+        """
+        live_row = db_read(
+            live_query,
+            (str(rid), kitchen_day, order_date.isoformat()),
+            connection=db,
+            fetch_one=True
+        )
+        rest['live_locked_count'] = live_row['count'] if live_row else 0

@@ -1,4 +1,5 @@
 import logging
+import os
 
 # Create a custom logger
 logger = logging.getLogger("my_app")
@@ -44,3 +45,76 @@ def log_critical(message: str):
     Log a critical message.
     """
     logger.critical(message)
+
+
+def _is_password_recovery_debug_enabled() -> bool:
+    """True if DEBUG_PASSWORD_RECOVERY env is set to 1, true, or yes (case-insensitive)."""
+    val = os.environ.get("DEBUG_PASSWORD_RECOVERY", "").strip().lower()
+    return val in ("1", "true", "yes")
+
+
+def log_password_recovery_debug(message: str) -> None:
+    """
+    Log a message only when DEBUG_PASSWORD_RECOVERY is enabled (env var 1/true/yes).
+    Use for password/username recovery workflow debugging; leave off in production.
+    """
+    if _is_password_recovery_debug_enabled():
+        logger.info(f"[PasswordRecovery] {message}")
+
+
+def _is_email_tracking_enabled() -> bool:
+    """True if LOG_EMAIL_TRACKING env is set to 1, true, or yes (case-insensitive)."""
+    val = os.environ.get("LOG_EMAIL_TRACKING", "").strip().lower()
+    return val in ("1", "true", "yes")
+
+
+def log_email_tracking(message: str, level: str = "info") -> None:
+    """
+    Log an email-related message only when LOG_EMAIL_TRACKING is enabled.
+    Enable: set LOG_EMAIL_TRACKING=1 (or true/yes) in .env. Disable: leave unset or set to 0/false.
+    Use for email send/tracking (SMTP connect, success, failures). Off by default to avoid noisy logs.
+    """
+    if not _is_email_tracking_enabled():
+        return
+    if level == "warning":
+        logger.warning(message)
+    elif level == "error":
+        logger.error(message)
+    else:
+        logger.info(message)
+
+
+def _is_employer_assign_debug_enabled() -> bool:
+    """True if LOG_EMPLOYER_ASSIGN is set to 1, true, or yes (case-insensitive). Checks os.environ first (load_dotenv), then Settings."""
+    val = os.environ.get("LOG_EMPLOYER_ASSIGN", "").strip().lower()
+    if val:
+        return val in ("1", "true", "yes")
+    try:
+        from app.config.settings import get_settings
+        val = (get_settings().LOG_EMPLOYER_ASSIGN or "").strip().lower()
+        return val in ("1", "true", "yes")
+    except Exception:
+        return False
+
+
+def log_deprecated_endpoint_usage(endpoint: str, user_id: str, role_type: str, role_name: str = "") -> None:
+    """
+    Log usage of deprecated endpoint for monitoring (Phase 4 of API deprecation plan).
+    Use when a user hits a deprecated path for self-operations (e.g. PUT /users/{id} for self-update).
+    Enables grepping logs for "DEPRECATED ENDPOINT USAGE" to track migration progress.
+    """
+    role_info = f"{role_type}/{role_name}" if role_name else role_type
+    logger.warning(
+        f"DEPRECATED ENDPOINT USAGE: {endpoint} by {role_info} user {user_id}. "
+        f"Timestamp: {__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}"
+    )
+
+
+def log_employer_assign_debug(message: str) -> None:
+    """
+    Log a message only when LOG_EMPLOYER_ASSIGN is enabled (env var 1/true/yes).
+    Use for PUT /users/me/employer (employer assignment) debugging; leave off in production.
+    Enable: set LOG_EMPLOYER_ASSIGN=1 in .env. Disable: leave unset or set to 0/false.
+    """
+    if _is_employer_assign_debug_enabled():
+        logger.info(f"[EmployerAssign] {message}")

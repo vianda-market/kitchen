@@ -12,7 +12,6 @@ class SubscriptionStatus(str, Enum):
     ACTIVE = "Active"
     ON_HOLD = "On Hold"
     PENDING = "Pending"
-    EXPIRED = "Expired"
     CANCELLED = "Cancelled"
 
     @classmethod

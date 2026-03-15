@@ -22,6 +22,16 @@ from fastapi import HTTPException
 from app.utils.db import db_read, db_insert, db_update, db_delete
 from app.utils.log import log_info, log_warning, log_error
 from app.security.institution_scope import InstitutionScope
+from app.config import Status
+from app.config.restricted_institutions import (
+    RESTRICTED_INSTITUTION_TABLES,
+    TABLE_CONTEXT_FOR_MESSAGE,
+    validate_institution_assignable,
+)
+
+# Tables that use resolved_by/resolved_date instead of modified_by/modified_date (no created_by)
+TABLES_WITHOUT_MODIFIED_BY = ("discretionary_resolution_info",)
+TABLES_WITHOUT_MODIFIED_DATE = ("discretionary_resolution_info",)
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -95,7 +105,7 @@ class CRUDService(Generic[T]):
             include_archived: Whether to include archived records
             additional_conditions: List of (condition, param) tuples for custom conditions
             select_fields: Custom SELECT fields (defaults to base table.*)
-            order_by: Custom ORDER BY clause (defaults to created_date DESC)
+            order_by: Custom ORDER BY clause (defaults to primary key DESC for newest first)
             
         Returns:
             Tuple of (query, params)
@@ -137,11 +147,11 @@ class CRUDService(Generic[T]):
         
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         
-        # Build ORDER BY
+        # Build ORDER BY (UUID7 PK gives newest-first when DESC)
         if order_by:
             order_clause = f"ORDER BY {order_by}"
         else:
-            order_clause = "ORDER BY created_date DESC"
+            order_clause = f"ORDER BY {self.table_name}.{self.id_column} DESC"
         
         # Combine query
         query = f"""
@@ -176,13 +186,11 @@ class CRUDService(Generic[T]):
             Filtered data dictionary with only valid database fields (fields that exist in DTO)
         """
         # Get all field names from DTO class
-        # Pydantic v1 uses __fields__, v2 uses model_fields
-        if hasattr(self.dto_class, '__fields__'):
-            # Pydantic v1
-            dto_fields = set(self.dto_class.__fields__.keys())
-        elif hasattr(self.dto_class, 'model_fields'):
-            # Pydantic v2
+        # Pydantic v2 uses model_fields; v1 used __fields__ (deprecated)
+        if hasattr(self.dto_class, 'model_fields'):
             dto_fields = set(self.dto_class.model_fields.keys())
+        elif hasattr(self.dto_class, '__fields__'):
+            dto_fields = set(self.dto_class.__fields__.keys())
         else:
             # Fallback: if we can't determine fields, log warning and return data as-is
             log_warning(f"Could not determine DTO fields for {self.dto_class.__name__}, skipping control parameter filtering")
@@ -196,7 +204,7 @@ class CRUDService(Generic[T]):
         if filtered_out:
             # Check if any filtered fields are system-added fields (modified_by, modified_date, created_date)
             # These should be in the DTO - if they're being filtered, it indicates a DTO mismatch
-            system_fields = {'modified_by', 'modified_date', 'created_date'}
+            system_fields = {'modified_by', 'modified_date', 'created_date', 'created_by'}
             filtered_system_fields = filtered_out & system_fields
             if filtered_system_fields:
                 log_warning(
@@ -346,6 +354,15 @@ class CRUDService(Generic[T]):
                 # For restaurant_holidays: restaurant_id -> restaurant_info -> institution_id
                 self._validate_join_based_scope(db, scope, "restaurant_id", data.get("restaurant_id"))
             # Add more foreign key validations as needed for other entities
+
+        # Vianda Customers and Vianda Enterprises must not be assigned to products, institution entities, or restaurants
+        if self.institution_column and self.table_name in RESTRICTED_INSTITUTION_TABLES:
+            inst_id = data.get(self.institution_column)
+            if inst_id is not None:
+                validate_institution_assignable(
+                    inst_id,
+                    context=TABLE_CONTEXT_FOR_MESSAGE.get(self.table_name, "record"),
+                )
     
     def get_by_id(
         self,
@@ -377,17 +394,32 @@ class CRUDService(Generic[T]):
                 )
                 result = db_read(query, tuple(params), connection=db, fetch_one=True)
             else:
-                # Direct column scoping
-                conditions = [f"{self.id_column} = %s", "is_archived = FALSE"]
-                values: List[Any] = [str(record_id)]
-                if scope and not scope.is_global and self.institution_column and scope.institution_id:
-                    conditions.append(f"{self.institution_column} = %s")
-                    values.append(scope.institution_id)
-                query = f"""
-                    SELECT * FROM {self.table_name} 
-                    WHERE {' AND '.join(conditions)}
-                """
-                result = db_read(query, tuple(values), connection=db, fetch_one=True)
+                # address_info: resolve country_name via market_info (column not stored on address)
+                if self.table_name == "address_info":
+                    conditions = [f"a.{self.id_column} = %s", "a.is_archived = FALSE"]
+                    values: List[Any] = [str(record_id)]
+                    if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                        conditions.append(f"a.{self.institution_column} = %s")
+                        values.append(scope.institution_id)
+                    query = f"""
+                        SELECT a.*, m.country_name
+                        FROM address_info a
+                        LEFT JOIN market_info m ON a.country_code = m.country_code
+                        WHERE {' AND '.join(conditions)}
+                    """
+                    result = db_read(query, tuple(values), connection=db, fetch_one=True)
+                else:
+                    # Direct column scoping
+                    conditions = [f"{self.id_column} = %s", "is_archived = FALSE"]
+                    values = [str(record_id)]
+                    if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                        conditions.append(f"{self.institution_column} = %s")
+                        values.append(scope.institution_id)
+                    query = f"""
+                        SELECT * FROM {self.table_name}
+                        WHERE {' AND '.join(conditions)}
+                    """
+                    result = db_read(query, tuple(values), connection=db, fetch_one=True)
             
             dto = self.dto_class(**result) if result else None
             return self._enforce_scope_on_dto(dto, scope)
@@ -416,6 +448,17 @@ class CRUDService(Generic[T]):
             List of DTO instances
         """
         try:
+            # #region agent log
+            if self.table_name == "institution_info":
+                try:
+                    import json
+                    _s = None if scope is None else {"is_global": getattr(scope, "is_global", None), "institution_id": str(scope.institution_id) if scope and getattr(scope, "institution_id", None) else None}
+                    _add = bool(scope and not getattr(scope, "is_global", True) and self.institution_column and getattr(scope, "institution_id", None))
+                    with open("/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen/.cursor/debug.log", "a") as _f:
+                        _f.write(json.dumps({"location": "crud_service.get_all.institution_info", "message": "CRUD_GET_ALL", "data": {"scope": _s, "institution_column": self.institution_column, "will_add_filter": _add}, "hypothesisId": "H4", "runId": "pre-fix", "timestamp": __import__("time").time() * 1000}) + "\n")
+                except Exception:
+                    pass
+            # #endregion
             # Use JOIN-based query if institution_join_path is configured
             if self.institution_join_path:
                 query, params = self._build_join_query_with_scope(
@@ -432,30 +475,54 @@ class CRUDService(Generic[T]):
                     connection=db
                 )
             else:
-                # Direct column scoping
-                params: List[Any] = []
-                clauses = []
-                if not include_archived:
-                    clauses.append("is_archived = FALSE")
-                if scope and not scope.is_global and self.institution_column and scope.institution_id:
-                    clauses.append(f"{self.institution_column} = %s")
-                    params.append(scope.institution_id)
-
-                where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-                query = f"""
-                    SELECT * FROM {self.table_name} 
-                    {where_clause}
-                    ORDER BY created_date DESC
-                """
-                if limit:
-                    query += " LIMIT %s"
-                    params.append(limit)
-                
-                results = db_read(
-                    query,
-                    tuple(params) if params else None,
-                    connection=db
-                )
+                # address_info: resolve country_name via market_info (column not stored on address)
+                if self.table_name == "address_info":
+                    params = []
+                    clauses = []
+                    if not include_archived:
+                        clauses.append("a.is_archived = FALSE")
+                    if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                        clauses.append(f"a.{self.institution_column} = %s")
+                        params.append(scope.institution_id)
+                    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+                    query = f"""
+                        SELECT a.*, m.country_name
+                        FROM address_info a
+                        LEFT JOIN market_info m ON a.country_code = m.country_code
+                        {where_clause}
+                        ORDER BY a.{self.id_column} DESC
+                    """
+                    if limit:
+                        query += " LIMIT %s"
+                        params.append(limit)
+                    results = db_read(
+                        query,
+                        tuple(params) if params else None,
+                        connection=db
+                    )
+                else:
+                    # Direct column scoping
+                    params = []
+                    clauses = []
+                    if not include_archived:
+                        clauses.append("is_archived = FALSE")
+                    if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                        clauses.append(f"{self.institution_column} = %s")
+                        params.append(scope.institution_id)
+                    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+                    query = f"""
+                        SELECT * FROM {self.table_name}
+                        {where_clause}
+                        ORDER BY {self.id_column} DESC
+                    """
+                    if limit:
+                        query += " LIMIT %s"
+                        params.append(limit)
+                    results = db_read(
+                        query,
+                        tuple(params) if params else None,
+                        connection=db
+                    )
             
             dtos = [self.dto_class(**result) for result in results] if results else []
             # Additional scope enforcement for direct column scoping (redundant but safe)
@@ -526,17 +593,29 @@ class CRUDService(Generic[T]):
             The DTO instance if found, None otherwise
         """
         try:
-            query = f"""
-                SELECT * FROM {self.table_name} 
-                WHERE {field_name} = %s AND is_archived = FALSE
-            """
-            params: List[Any] = [str(field_value)]
-
-            if scope and not scope.is_global and self.institution_column:
-                query += f" AND {self.institution_column} = %s"
-                params.append(str(scope.institution_id))
-
-            result = db_read(query, tuple(params), connection=db, fetch_one=True)
+            if self.table_name == "address_info":
+                params: List[Any] = [str(field_value)]
+                conditions = [f"a.{field_name} = %s", "a.is_archived = FALSE"]
+                if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                    conditions.append(f"a.{self.institution_column} = %s")
+                    params.append(str(scope.institution_id))
+                query = f"""
+                    SELECT a.*, COALESCE(m.country_name, '') as country_name
+                    FROM address_info a
+                    LEFT JOIN market_info m ON a.country_code = m.country_code
+                    WHERE {' AND '.join(conditions)}
+                """
+                result = db_read(query, tuple(params), connection=db, fetch_one=True)
+            else:
+                query = f"""
+                    SELECT * FROM {self.table_name} 
+                    WHERE {field_name} = %s AND is_archived = FALSE
+                """
+                params = [str(field_value)]
+                if scope and not scope.is_global and self.institution_column:
+                    query += f" AND {self.institution_column} = %s"
+                    params.append(str(scope.institution_id))
+                result = db_read(query, tuple(params), connection=db, fetch_one=True)
             return self.dto_class(**result) if result else None
         except Exception as e:
             log_error(f"Error getting {self.table_name} by {field_name}: {e}")
@@ -562,19 +641,31 @@ class CRUDService(Generic[T]):
             List of DTO instances
         """
         try:
-            query = f"""
-                SELECT * FROM {self.table_name} 
-                WHERE {field_name} = %s AND is_archived = FALSE
-            """
-            params: List[Any] = [str(field_value)]
-
-            if scope and not scope.is_global and self.institution_column:
-                query += f" AND {self.institution_column} = %s"
-                params.append(str(scope.institution_id))
-
-            query += " ORDER BY created_date DESC"
-
-            results = db_read(query, tuple(params), connection=db)
+            if self.table_name == "address_info":
+                params: List[Any] = [str(field_value)]
+                conditions = [f"a.{field_name} = %s", "a.is_archived = FALSE"]
+                if scope and not scope.is_global and self.institution_column and scope.institution_id:
+                    conditions.append(f"a.{self.institution_column} = %s")
+                    params.append(str(scope.institution_id))
+                query = f"""
+                    SELECT a.*, COALESCE(m.country_name, '') as country_name
+                    FROM address_info a
+                    LEFT JOIN market_info m ON a.country_code = m.country_code
+                    WHERE {' AND '.join(conditions)}
+                    ORDER BY a.{self.id_column} DESC
+                """
+                results = db_read(query, tuple(params), connection=db)
+            else:
+                query = f"""
+                    SELECT * FROM {self.table_name} 
+                    WHERE {field_name} = %s AND is_archived = FALSE
+                """
+                params = [str(field_value)]
+                if scope and not scope.is_global and self.institution_column:
+                    query += f" AND {self.institution_column} = %s"
+                    params.append(str(scope.institution_id))
+                query += f" ORDER BY {self.id_column} DESC"
+                results = db_read(query, tuple(params), connection=db)
             return [self.dto_class(**result) for result in results] if results else []
         except Exception as e:
             log_error(f"Error getting {self.table_name} by {field_name}: {e}")
@@ -643,15 +734,27 @@ class CRUDService(Generic[T]):
             data["created_date"] = datetime.now()
             
             # Only add modified_date if the table supports it
-            # Some tables don't have modified_date column
-            tables_without_modified_date = ["institution_bank_account", "fintech_link_assignment", "client_payment_attempt", "institution_payment_attempt", "discretionary_resolution_info"]
-            if self.table_name not in tables_without_modified_date:
+            if self.table_name not in TABLES_WITHOUT_MODIFIED_DATE:
                 data["modified_date"] = datetime.now()
+
+            # Set created_by from modified_by when DTO supports it (all mutable tables except discretionary_resolution_info)
+            dto_fields = getattr(self.dto_class, "model_fields", None)
+            if dto_fields is None:
+                dto_fields = getattr(self.dto_class, "__fields__", {})
+            if dto_fields and "created_by" in dto_fields and "created_by" not in data and "modified_by" in data:
+                if self.table_name not in TABLES_WITHOUT_MODIFIED_BY:
+                    data["created_by"] = data["modified_by"]
+
+            # Assign default status when the entity has a status column and none was provided (clients may omit status on create)
+            dto_annotations = getattr(self.dto_class, "__annotations__", {})
+            if "status" in dto_annotations and data.get("status") is None:
+                if self.table_name == "payment_method":
+                    data["status"] = Status.PENDING  # Payment methods start Pending until linked (external_payment_method, etc.)
+                else:
+                    data["status"] = Status.ACTIVE
             
-            # Some tables don't have modified_by column
             # Remove modified_by if the table doesn't support it
-            tables_without_modified_by = ["fintech_link_assignment", "client_payment_attempt", "institution_payment_attempt", "discretionary_resolution_info"]
-            if self.table_name in tables_without_modified_by and "modified_by" in data:
+            if self.table_name in TABLES_WITHOUT_MODIFIED_BY and "modified_by" in data:
                 del data["modified_by"]
             
             log_info(f"[CRUDService.create] Data keys before db_insert: {list(data.keys())}")
@@ -664,6 +767,16 @@ class CRUDService(Generic[T]):
             # Insert record with filtered data (only database fields)
             record_id = db_insert(self.table_name, filtered_data, connection=db, commit=commit)
             if record_id:
+                # When creating an institution entity, update the address's address_type from linkages
+                # so the address is correctly marked as Entity Address/Entity Billing (used for country detection in settlement pipeline).
+                if self.table_name == "institution_entity_info" and filtered_data.get("address_id"):
+                    from app.services.address_service import update_address_type_from_linkages
+                    addr_id = filtered_data["address_id"]
+                    update_address_type_from_linkages(
+                        addr_id if isinstance(addr_id, UUID) else UUID(str(addr_id)),
+                        db,
+                        commit=commit,
+                    )
                 return self.get_by_id(record_id, db, scope=scope)
             return None
         except HTTPException:
@@ -701,29 +814,31 @@ class CRUDService(Generic[T]):
                 return None
 
             # Validate institution scoping for updates
-            if scope and not scope.is_global:
-                # Direct column scoping
-                if self.institution_column and self.institution_column in data:
+            if self.institution_column and self.institution_column in data:
+                # Vianda Customers and Vianda Enterprises must not be assigned to products, institution entities, or restaurants
+                if self.table_name in RESTRICTED_INSTITUTION_TABLES:
+                    validate_institution_assignable(
+                        data[self.institution_column],
+                        context=TABLE_CONTEXT_FOR_MESSAGE.get(self.table_name, "record"),
+                    )
+                if scope and not scope.is_global:
                     if not scope.matches(data[self.institution_column]):
                         raise HTTPException(
                             status_code=403,
                             detail="Forbidden: cannot transfer resource to another institution"
                         )
+            elif scope and not scope.is_global and self.institution_join_path:
                 # JOIN-based scoping: validate foreign key changes
-                elif self.institution_join_path:
-                    # If foreign keys are being updated, validate them
-                    if "plate_id" in data:
-                        self._validate_join_based_scope(db, scope, "plate_id", data.get("plate_id"))
-                    # Add more foreign key validations as needed
+                if "plate_id" in data:
+                    self._validate_join_based_scope(db, scope, "plate_id", data.get("plate_id"))
+                # Add more foreign key validations as needed
 
             # Add modification timestamp only if table supports it
-            tables_without_modified_date = ["institution_bank_account", "fintech_link_assignment", "client_payment_attempt", "institution_payment_attempt", "discretionary_resolution_info"]
-            if self.table_name not in tables_without_modified_date:
+            if self.table_name not in TABLES_WITHOUT_MODIFIED_DATE:
                 data["modified_date"] = datetime.now()
             
             # Remove modified_by if the table doesn't support it
-            tables_without_modified_by = ["fintech_link_assignment", "client_payment_attempt", "institution_payment_attempt", "discretionary_resolution_info"]
-            if self.table_name in tables_without_modified_by and "modified_by" in data:
+            if self.table_name in TABLES_WITHOUT_MODIFIED_BY and "modified_by" in data:
                 del data["modified_by"]
             
             # Filter out control parameters using DTO fields as whitelist
@@ -776,10 +891,11 @@ class CRUDService(Generic[T]):
                 "modified_by": modified_by,
                 "modified_date": datetime.now()
             }
-            tables_without_modified_by = ["fintech_link_assignment", "client_payment_attempt", "institution_payment_attempt", "discretionary_resolution_info"]
-            if self.table_name in tables_without_modified_by:
+            if self.table_name in TABLES_WITHOUT_MODIFIED_BY:
                 update_data.pop("modified_by", None)
-            
+            if self.table_name in TABLES_WITHOUT_MODIFIED_DATE:
+                update_data.pop("modified_date", None)
+
             row_count = db_update(
                 self.table_name,
                 update_data,
@@ -912,32 +1028,24 @@ class CRUDService(Generic[T]):
     def mark_paid(
         self,
         bill_id: UUID,
-        payment_id: UUID,
         modified_by: UUID,
         db: psycopg2.extensions.connection
     ) -> bool:
-        """Mark bill as paid.
+        """Mark bill as paid (resolution only; no payment_attempt link).
         
         This method is specific to institution_bill_service.
-        
-        Args:
-            bill_id: Bill UUID
-            payment_id: Payment attempt UUID
-            modified_by: User making the change
-            db: Database connection
-            
-        Returns:
-            True if successful, False otherwise
+        institution_bill_info no longer has payment_id; payments are atomic elsewhere.
         """
         try:
             with db.cursor() as cursor:
+                from app.config.enums import BillResolution
                 query = f"""
                     UPDATE {self.table_name}
-                    SET status = 'Paid', resolution = 'Paid', payment_id = %s, 
+                    SET status = 'Processed', resolution = %s,
                         modified_by = %s, modified_date = CURRENT_TIMESTAMP
                     WHERE {self.id_column} = %s AND is_archived = FALSE
                 """
-                cursor.execute(query, (str(payment_id), str(modified_by), str(bill_id)))
+                cursor.execute(query, (BillResolution.PAID.value, str(modified_by), str(bill_id)))
                 db.commit()
                 return cursor.rowcount > 0
         except Exception as e:
@@ -976,188 +1084,6 @@ class CRUDService(Generic[T]):
         results = db_read(query, (str(institution_id), period_start, period_end), 
                         connection=db)
         return [self.dto_class(**row) for row in results]
-    
-    # =========================================================================
-    # SPECIALIZED METHODS FOR INSTITUTION_PAYMENT_ATTEMPT_SERVICE
-    # =========================================================================
-    # These methods are specific to institution payment attempts and extend
-    # the generic CRUD operations.
-    
-    def get_by_institution_bill(
-        self,
-        institution_bill_id: UUID,
-        db: psycopg2.extensions.connection,
-        *,
-        scope: Optional[InstitutionScope] = None
-    ) -> List[T]:
-        """Get payment attempts for a specific bill.
-        
-        This method is specific to institution_payment_attempt_service.
-        
-        Args:
-            institution_bill_id: Bill UUID
-            db: Database connection
-            scope: Optional institution scope for filtering
-            
-        Returns:
-            List of payment attempts for the bill
-        """
-        query = f"""
-            SELECT * FROM {self.table_name}
-            WHERE institution_bill_id = %s AND is_archived = FALSE
-        """
-        results = db_read(query, (str(institution_bill_id),), connection=db)
-        attempts = [self.dto_class(**row) for row in results]
-        
-        # Apply scope filtering if needed
-        if scope and not scope.is_global:
-            from app.services.crud_service import institution_entity_service
-            filtered: List[T] = []
-            cache: dict[UUID, bool] = {}
-            for attempt in attempts:
-                entity_id = attempt.institution_entity_id
-                if entity_id in cache:
-                    allowed = cache[entity_id]
-                else:
-                    entity = institution_entity_service.get_by_id(entity_id, db, scope=scope)
-                    allowed = entity is not None
-                    cache[entity_id] = allowed
-                if allowed:
-                    filtered.append(attempt)
-            return filtered
-        
-        return attempts
-    
-    def get_pending_by_institution_entity(
-        self,
-        institution_entity_id: UUID,
-        db: psycopg2.extensions.connection,
-        *,
-        scope: Optional[InstitutionScope] = None
-    ) -> List[T]:
-        """Get pending payment attempts for an entity.
-        
-        This method is specific to institution_payment_attempt_service.
-        
-        Args:
-            institution_entity_id: Entity UUID
-            db: Database connection
-            scope: Optional institution scope for filtering
-            
-        Returns:
-            List of pending payment attempts for the entity
-        """
-        # Check scope access
-        if scope and not scope.is_global:
-            from app.services.crud_service import institution_entity_service
-            entity = institution_entity_service.get_by_id(institution_entity_id, db, scope=scope)
-            if not entity:
-                return []
-        
-        query = f"""
-            SELECT * FROM {self.table_name}
-            WHERE institution_entity_id = %s 
-            AND status = 'Pending' 
-            AND is_archived = FALSE
-        """
-        results = db_read(query, (str(institution_entity_id),), connection=db)
-        return [self.dto_class(**row) for row in results]
-    
-    def mark_complete(
-        self,
-        payment_id: UUID,
-        db: psycopg2.extensions.connection
-    ) -> bool:
-        """Mark payment attempt as complete.
-        
-        This method is specific to institution_payment_attempt_service.
-        
-        Args:
-            payment_id: Payment attempt UUID
-            db: Database connection
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            with db.cursor() as cursor:
-                query = f"""
-                    UPDATE {self.table_name}
-                    SET status = 'Completed', 
-                        modified_date = CURRENT_TIMESTAMP
-                    WHERE payment_id = %s AND is_archived = FALSE
-                """
-                cursor.execute(query, (str(payment_id),))
-                db.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            db.rollback()
-            log_error(f"Error marking payment {payment_id} as complete: {e}")
-            return False
-    
-    def mark_failed(
-        self,
-        payment_id: UUID,
-        db: psycopg2.extensions.connection
-    ) -> bool:
-        """Mark payment attempt as failed.
-        
-        This method is specific to institution_payment_attempt_service.
-        
-        Args:
-            payment_id: Payment attempt UUID
-            db: Database connection
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            with db.cursor() as cursor:
-                query = f"""
-                    UPDATE {self.table_name}
-                    SET status = 'Failed', 
-                        modified_date = CURRENT_TIMESTAMP
-                    WHERE payment_id = %s AND is_archived = FALSE
-                """
-                cursor.execute(query, (str(payment_id),))
-                db.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            db.rollback()
-            log_error(f"Error marking payment {payment_id} as failed: {e}")
-            return False
-    
-    def undelete(
-        self,
-        payment_id: UUID,
-        db: psycopg2.extensions.connection
-    ) -> bool:
-        """Restore archived payment attempt.
-        
-        This method is specific to institution_payment_attempt_service.
-        
-        Args:
-            payment_id: Payment attempt UUID
-            db: Database connection
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            with db.cursor() as cursor:
-                query = f"""
-                    UPDATE {self.table_name}
-                    SET is_archived = FALSE, 
-                        modified_date = CURRENT_TIMESTAMP
-                    WHERE payment_id = %s
-                """
-                cursor.execute(query, (str(payment_id),))
-                db.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            db.rollback()
-            log_error(f"Error undeleting payment {payment_id}: {e}")
-            return False
     
     # =========================================================================
     # SPECIALIZED METHODS FOR RESTAURANT_BALANCE_SERVICE
@@ -1246,7 +1172,7 @@ class CRUDService(Generic[T]):
             SELECT event_id 
             FROM restaurant_balance_history 
             WHERE restaurant_id = %s AND is_current = TRUE
-            ORDER BY modified_date DESC 
+            ORDER BY event_id DESC 
             LIMIT 1
         """
         result = db_read(query, (str(restaurant_id),), connection=db, fetch_one=True)
@@ -1572,29 +1498,6 @@ class CRUDService(Generic[T]):
         result = db_read(query, (str(user_id),), connection=db, fetch_one=True)
         return self.dto_class(**result) if result else None
     
-    def get_by_payment(
-        self,
-        payment_id: UUID,
-        db: psycopg2.extensions.connection
-    ) -> Optional[T]:
-        """Get record by payment ID.
-        
-        Used by client_bill_service.
-        
-        Args:
-            payment_id: Payment UUID
-            db: Database connection
-            
-        Returns:
-            DTO if found, None otherwise
-        """
-        query = f"""
-            SELECT * FROM {self.table_name}
-            WHERE payment_id = %s AND is_archived = FALSE
-        """
-        result = db_read(query, (str(payment_id),), connection=db, fetch_one=True)
-        return self.dto_class(**result) if result else None
-    
     def get_by_address(
         self,
         address_id: UUID,
@@ -1627,15 +1530,13 @@ class CRUDService(Generic[T]):
 
 from app.dto.models import (
     UserDTO, InstitutionDTO, ProductDTO, PlateDTO, RestaurantDTO,
-    InstitutionBillDTO, ClientBillDTO, CreditCurrencyDTO,
-    AddressDTO, EmployerDTO, GeolocationDTO,
+    InstitutionBillDTO, InstitutionSettlementDTO, ClientBillDTO, CreditCurrencyDTO,
+    AddressDTO, EmployerDTO, CityDTO, GeolocationDTO,
     RestaurantTransactionDTO, ClientTransactionDTO,
     PlateSelectionDTO, PickupPreferencesDTO,
-    InstitutionPaymentAttemptDTO, ClientPaymentAttemptDTO,
     SubscriptionDTO, PlanDTO,
-    InstitutionEntityDTO, InstitutionBankAccountDTO,
+    InstitutionEntityDTO,
     PaymentMethodDTO, QRCodeDTO,
-    FintechLinkDTO, FintechLinkAssignmentDTO,
     RestaurantBalanceDTO, RestaurantHolidaysDTO, NationalHolidayDTO,
     PlateKitchenDaysDTO, PlatePickupLiveDTO,
     DiscretionaryDTO, DiscretionaryResolutionDTO
@@ -1651,12 +1552,14 @@ restaurant_service = CRUDService("restaurant_info", RestaurantDTO, "restaurant_i
 
 # Billing services
 institution_bill_service = CRUDService("institution_bill_info", InstitutionBillDTO, "institution_bill_id")
+institution_settlement_service = CRUDService("institution_settlement", InstitutionSettlementDTO, "settlement_id")
 client_bill_service = CRUDService("client_bill_info", ClientBillDTO, "client_bill_id")
 credit_currency_service = CRUDService("credit_currency_info", CreditCurrencyDTO, "credit_currency_id")
 
 # Address and location services
 address_service = CRUDService("address_info", AddressDTO, "address_id", institution_column="institution_id")
 employer_service = CRUDService("employer_info", EmployerDTO, "employer_id")
+city_service = CRUDService("city_info", CityDTO, "city_id")
 geolocation_service = CRUDService("geolocation_info", GeolocationDTO, "geolocation_id")
 
 # Transaction services
@@ -1671,13 +1574,24 @@ restaurant_transaction_service = CRUDService(
 )
 client_transaction_service = CRUDService("client_transaction", ClientTransactionDTO, "transaction_id")
 
-# Plate selection and pickup services
-plate_selection_service = CRUDService("plate_selection", PlateSelectionDTO, "plate_selection_id")
-pickup_preferences_service = CRUDService("pickup_preferences_info", PickupPreferencesDTO, "preference_id")
 
-# Payment services
-institution_payment_attempt_service = CRUDService("institution_payment_attempt", InstitutionPaymentAttemptDTO, "payment_id")
-client_payment_attempt_service = CRUDService("client_payment_attempt", ClientPaymentAttemptDTO, "payment_id")
+def get_client_charge_by_plate_selection(
+    plate_selection_id: UUID, db: psycopg2.extensions.connection
+) -> Optional[ClientTransactionDTO]:
+    """Get the charge transaction (source='plate_selection') for a plate selection, if promoted. Returns None if not yet charged."""
+    result = db_read(
+        """SELECT * FROM client_transaction
+           WHERE plate_selection_id = %s AND source = 'plate_selection' AND is_archived = FALSE""",
+        (str(plate_selection_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    return ClientTransactionDTO(**result) if result else None
+
+
+# Plate selection and pickup services
+plate_selection_service = CRUDService("plate_selection_info", PlateSelectionDTO, "plate_selection_id")
+pickup_preferences_service = CRUDService("pickup_preferences_info", PickupPreferencesDTO, "preference_id")
 
 # Subscription and plan services
 subscription_service = CRUDService("subscription_info", SubscriptionDTO, "subscription_id")
@@ -1685,17 +1599,12 @@ plan_service = CRUDService("plan_info", PlanDTO, "plan_id")
 
 # Institution entity services
 institution_entity_service = CRUDService("institution_entity_info", InstitutionEntityDTO, "institution_entity_id", institution_column="institution_id")
-institution_bank_account_service = CRUDService("institution_bank_account", InstitutionBankAccountDTO, "bank_account_id")
 
 # Additional core services
 # status_service removed - status_info table deprecated, status stored directly on entities as enum
 # transaction_type_service removed - transaction_type_info table deprecated, transaction_type stored directly on transaction tables as enum
 payment_method_service = CRUDService("payment_method", PaymentMethodDTO, "payment_method_id")
 qr_code_service = CRUDService("qr_code", QRCodeDTO, "qr_code_id")
-
-# Fintech services
-fintech_link_service = CRUDService("fintech_link_info", FintechLinkDTO, "fintech_link_id")
-fintech_link_assignment_service = CRUDService("fintech_link_assignment", FintechLinkAssignmentDTO, "fintech_link_assignment_id")
 
 # Restaurant and plate services
 restaurant_balance_service = CRUDService(
@@ -1729,18 +1638,143 @@ plate_kitchen_days_service = CRUDService(
 )
 plate_pickup_live_service = CRUDService("plate_pickup_live", PlatePickupLiveDTO, "plate_pickup_id")
 
+
+def get_plate_pickup_id_for_selection(
+    plate_selection_id: UUID, db: psycopg2.extensions.connection
+) -> Optional[UUID]:
+    """Get plate_pickup_id for a plate selection if it has been promoted to live. Returns None if not yet promoted."""
+    row = db_read(
+        "SELECT plate_pickup_id FROM plate_pickup_live WHERE plate_selection_id = %s AND is_archived = FALSE",
+        (str(plate_selection_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    return UUID(str(row["plate_pickup_id"])) if row else None
+
+
+def soft_delete_plate_pickups_by_plate_selection(
+    plate_selection_id: UUID, modified_by: UUID, db: psycopg2.extensions.connection
+) -> int:
+    """Soft-delete all plate_pickup_live records for the given plate_selection_id. Returns count deleted."""
+    rows = db_read(
+        "SELECT plate_pickup_id FROM plate_pickup_live WHERE plate_selection_id = %s AND is_archived = FALSE",
+        (str(plate_selection_id),),
+        connection=db,
+    )
+    count = 0
+    for row in (rows or []):
+        plate_pickup_live_service.soft_delete(row["plate_pickup_id"], modified_by, db)
+        count += 1
+    return count
+
+
+# Additional methods for institution_settlement_service
+def get_settlement_by_restaurant_and_period(
+    restaurant_id: UUID,
+    period_start: datetime,
+    period_end: datetime,
+    connection=None
+) -> Optional[InstitutionSettlementDTO]:
+    """Get settlement for a restaurant and period (idempotency: skip if exists)."""
+    query = """
+        SELECT * FROM institution_settlement
+        WHERE restaurant_id = %s AND period_start = %s AND period_end = %s
+    """
+    result = db_read(query, (str(restaurant_id), period_start, period_end), connection=connection, fetch_one=True)
+    return InstitutionSettlementDTO(**result) if result else None
+
+
+def get_settlements_by_entity_and_period(
+    institution_entity_id: UUID,
+    period_start: datetime,
+    period_end: datetime,
+    connection=None
+) -> List[InstitutionSettlementDTO]:
+    """Get all settlements for an entity and period (for aggregating into one bill)."""
+    query = """
+        SELECT * FROM institution_settlement
+        WHERE institution_entity_id = %s AND period_start = %s AND period_end = %s
+        ORDER BY restaurant_id
+    """
+    results = db_read(query, (str(institution_entity_id), period_start, period_end), connection=connection)
+    return [InstitutionSettlementDTO(**row) for row in results] if results else []
+
+
+def get_settlements_by_run_id(
+    settlement_run_id: UUID,
+    connection=None
+) -> List[InstitutionSettlementDTO]:
+    """Get all settlements for a run (Phase 2: aggregate by entity and create bills)."""
+    query = """
+        SELECT * FROM institution_settlement
+        WHERE settlement_run_id = %s
+        ORDER BY institution_entity_id, restaurant_id
+    """
+    results = db_read(query, (str(settlement_run_id),), connection=connection)
+    return [InstitutionSettlementDTO(**row) for row in results] if results else []
+
+
+def get_settlements_by_bill_id(institution_bill_id: UUID, connection=None) -> List[InstitutionSettlementDTO]:
+    """Get all settlements linked to a bill (for dashboard: restaurant count per bill)."""
+    query = """
+        SELECT s.* FROM institution_settlement s
+        WHERE s.institution_bill_id = %s AND s.is_archived = FALSE
+        ORDER BY s.restaurant_id
+    """
+    results = db_read(query, (str(institution_bill_id),), connection=connection)
+    return [InstitutionSettlementDTO(**row) for row in results] if results else []
+
+
+def get_bills_by_restaurant_and_period(
+    restaurant_id: UUID,
+    period_start: datetime,
+    period_end: datetime,
+    connection=None
+) -> List[InstitutionBillDTO]:
+    """Get bills that have a settlement for this restaurant in the given period (bills no longer have restaurant_id)."""
+    query = """
+        SELECT ibi.* FROM institution_bill_info ibi
+        INNER JOIN institution_settlement s ON s.institution_bill_id = ibi.institution_bill_id
+        WHERE s.restaurant_id = %s AND s.is_archived = FALSE
+          AND ibi.is_archived = FALSE
+          AND s.period_start < %s AND s.period_end > %s
+    """
+    results = db_read(query, (str(restaurant_id), period_end, period_start), connection=connection)
+    return [InstitutionBillDTO(**row) for row in results] if results else []
+
+
 # Additional methods for institution_bill_service
 def get_institution_id_by_restaurant(restaurant_id: UUID, connection=None) -> Optional[UUID]:
     """Get institution ID for a restaurant"""
     query = "SELECT institution_id FROM restaurant_info WHERE restaurant_id = %s AND is_archived = FALSE"
-    result = db_read(query, (str(restaurant_id),), connection=connection)
-    return result[0]['institution_id'] if result else None
+    result = db_read(query, (str(restaurant_id),), connection=connection, fetch_one=True)
+    return UUID(result["institution_id"]) if result and result.get("institution_id") else None
+
+
+def get_institution_id_by_entity(institution_entity_id: UUID, connection=None) -> Optional[UUID]:
+    """Get institution ID for an institution entity"""
+    query = "SELECT institution_id FROM institution_entity_info WHERE institution_entity_id = %s AND is_archived = FALSE"
+    result = db_read(query, (str(institution_entity_id),), connection=connection, fetch_one=True)
+    return UUID(result["institution_id"]) if result and result.get("institution_id") else None
 
 def get_institution_entity_by_institution(institution_id: UUID, connection=None) -> Optional[UUID]:
     """Get institution entity ID for an institution"""
     query = "SELECT institution_entity_id FROM institution_entity_info WHERE institution_id = %s AND is_archived = FALSE"
     result = db_read(query, (str(institution_id),), connection=connection)
     return result[0]['institution_entity_id'] if result else None
+
+
+def get_credit_worth_of_most_expensive_plan_for_market(market_id: UUID, connection=None) -> Optional[float]:
+    """Return credit_worth of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
+    query = """
+        SELECT credit_worth FROM plan_info
+        WHERE market_id = %s AND is_archived = FALSE AND status = 'Active'
+        ORDER BY price DESC
+        LIMIT 1
+    """
+    row = db_read(query, (str(market_id),), connection=connection, fetch_one=True)
+    return float(row["credit_worth"]) if row and row.get("credit_worth") is not None else None
+
 
 def get_by_entity_and_period(entity_id: UUID, period_start: datetime, period_end: datetime, connection=None) -> Optional[InstitutionBillDTO]:
     """DEPRECATED: Use institution_bill_service.get_by_entity_and_period() instead.
@@ -1776,22 +1810,19 @@ def get_pending_bills(connection=None) -> List[InstitutionBillDTO]:
             close_db_connection(connection)
     return institution_bill_service.get_pending(connection)
 
-def mark_paid(bill_id: UUID, payment_id: UUID, modified_by: UUID, connection=None) -> bool:
+def mark_paid(bill_id: UUID, modified_by: UUID, connection=None) -> bool:
     """DEPRECATED: Use institution_bill_service.mark_paid() instead.
     
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_bill_service
-        institution_bill_service.mark_paid(bill_id, payment_id, modified_by, db)
+    Marks institution bill as paid (resolution only; no payment_id).
     """
     from app.utils.db import get_db_connection, close_db_connection
     if connection is None:
         connection = get_db_connection()
         try:
-            return institution_bill_service.mark_paid(bill_id, payment_id, modified_by, connection)
+            return institution_bill_service.mark_paid(bill_id, modified_by, connection)
         finally:
             close_db_connection(connection)
-    return institution_bill_service.mark_paid(bill_id, payment_id, modified_by, connection)
+    return institution_bill_service.mark_paid(bill_id, modified_by, connection)
 
 def get_by_institution_and_period(institution_id: UUID, period_start: datetime, period_end: datetime, connection=None) -> List[InstitutionBillDTO]:
     """DEPRECATED: Use institution_bill_service.get_by_institution_and_period() instead.
@@ -1851,67 +1882,6 @@ def get_by_code(currency_code: str, db: psycopg2.extensions.connection) -> Optio
     """
     return credit_currency_service.get_by_code(currency_code, db)
 
-# Additional methods for institution_bank_account_service
-def get_by_institution_entity(
-    institution_entity_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionBankAccountDTO]:
-    """Get bank accounts by institution entity"""
-    if scope and not scope.is_global:
-        entity = institution_entity_service.get_by_id(institution_entity_id, db, scope=scope)
-        if not entity:
-            return []
-
-    query = "SELECT * FROM institution_bank_account WHERE institution_entity_id = %s AND is_archived = FALSE"
-    results = db_read(query, (str(institution_entity_id),), connection=db)
-    return [InstitutionBankAccountDTO(**row) for row in results]
-
-def get_by_institution(
-    institution_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionBankAccountDTO]:
-    """Get bank accounts by institution"""
-    if scope and not scope.is_global and not scope.matches(institution_id):
-        return []
-
-    query = """
-        SELECT iba.* FROM institution_bank_account iba
-        JOIN institution_entity_info ie ON iba.institution_entity_id = ie.institution_entity_id
-        WHERE ie.institution_id = %s AND iba.is_archived = FALSE
-    """
-    results = db_read(query, (str(institution_id),), connection=db)
-    return [InstitutionBankAccountDTO(**row) for row in results]
-
-def get_active_accounts(
-    institution_entity_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionBankAccountDTO]:
-    """Get active bank accounts by institution entity"""
-    if scope and not scope.is_global:
-        entity = institution_entity_service.get_by_id(institution_entity_id, db, scope=scope)
-        if not entity:
-            return []
-
-    query = "SELECT * FROM institution_bank_account WHERE institution_entity_id = %s AND status = 'Active' AND is_archived = FALSE"
-    results = db_read(query, (str(institution_entity_id),), connection=db)
-    return [InstitutionBankAccountDTO(**row) for row in results]
-
-def validate_routing_number(routing_number: str) -> bool:
-    """Validate routing number format"""
-    import re
-    return bool(re.match(r'^\d{9}$', routing_number))
-
-def validate_account_number(account_number: str) -> bool:
-    """Validate account number format"""
-    import re
-    return bool(re.match(r'^\d{4,17}$', account_number))
-
 # Additional methods for QR code service
 def get_by_restaurant_id(restaurant_id: UUID, db: psycopg2.extensions.connection) -> Optional[QRCodeDTO]:
     """DEPRECATED: Use qr_code_service.get_by_restaurant() instead.
@@ -1926,11 +1896,29 @@ def get_by_restaurant_id(restaurant_id: UUID, db: psycopg2.extensions.connection
 # Additional methods for plate selection service
 def get_all_by_user(user_id: UUID, db: psycopg2.extensions.connection) -> List[PlateSelectionDTO]:
     """Get all plate selections by user"""
-    query = "SELECT * FROM plate_selection_info WHERE user_id = %s AND is_archived = FALSE ORDER BY created_date DESC"
+    query = "SELECT * FROM plate_selection_info WHERE user_id = %s AND is_archived = FALSE ORDER BY plate_selection_id DESC"
     results = db_read(query, (str(user_id),), connection=db)
     return [PlateSelectionDTO(**row) for row in results]
 
 # Additional methods for subscription service
+def get_subscription_by_user_and_market(
+    user_id: UUID,
+    market_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> Optional[SubscriptionDTO]:
+    """
+    Get the non-archived subscription for a user in a given market, if any.
+    At most one exists per (user_id, market_id) due to unique index.
+    """
+    query = """
+        SELECT * FROM subscription_info
+        WHERE user_id = %s AND market_id = %s AND is_archived = FALSE
+        LIMIT 1
+    """
+    result = db_read(query, (str(user_id), str(market_id)), connection=db, fetch_one=True)
+    return SubscriptionDTO(**result) if result else None
+
+
 def get_by_user_id(user_id: UUID, db: psycopg2.extensions.connection) -> Optional[SubscriptionDTO]:
     """DEPRECATED: Use subscription_service.get_by_user() instead.
     
@@ -1990,7 +1978,7 @@ def mark_plate_selection_complete(transaction_id: UUID, modified_by: UUID, db: p
         cursor.execute(
             """
             UPDATE client_transaction 
-            SET status = 'Complete',
+            SET status = 'Completed',
                 modified_by = %s,
                 modified_date = CURRENT_TIMESTAMP
             WHERE transaction_id = %s AND is_archived = FALSE
@@ -2174,93 +2162,18 @@ def mark_collected_with_balance_update(transaction_id: UUID, restaurant_id: UUID
     
     return transaction_updated
 
-# Additional methods for client bill service
-def get_by_payment_id(payment_id: UUID, db: psycopg2.extensions.connection) -> Optional[ClientBillDTO]:
-    """DEPRECATED: Use client_bill_service.get_by_payment() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import client_bill_service
-        client_bill_service.get_by_payment(payment_id, db)
-    """
-    return client_bill_service.get_by_payment(payment_id, db)
-
-# Additional methods for institution payment attempt service
-def get_payment_attempts_by_institution_entity(
-    institution_entity_id: UUID,
+def get_client_bill_by_subscription_payment(
+    subscription_payment_id: UUID,
     db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionPaymentAttemptDTO]:
-    """Get payment attempts by institution entity"""
-    if scope and not scope.is_global:
-        entity = institution_entity_service.get_by_id(institution_entity_id, db, scope=scope)
-        if not entity:
-            return []
-
-    query = "SELECT * FROM institution_payment_attempt_info WHERE institution_entity_id = %s AND is_archived = FALSE"
-    results = db_read(query, (str(institution_entity_id),), connection=db)  # Fixed: Convert UUID to string
-    return [InstitutionPaymentAttemptDTO(**row) for row in results]
-
-def get_by_institution_bill(
-    institution_bill_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionPaymentAttemptDTO]:
-    """DEPRECATED: Use institution_payment_attempt_service.get_by_institution_bill() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_payment_attempt_service
-        institution_payment_attempt_service.get_by_institution_bill(bill_id, db, scope=scope)
-    """
-    return institution_payment_attempt_service.get_by_institution_bill(institution_bill_id, db, scope=scope)
-
-def get_pending_by_institution_entity(
-    institution_entity_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None
-) -> List[InstitutionPaymentAttemptDTO]:
-    """DEPRECATED: Use institution_payment_attempt_service.get_pending_by_institution_entity() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_payment_attempt_service
-        institution_payment_attempt_service.get_pending_by_institution_entity(entity_id, db, scope=scope)
-    """
-    return institution_payment_attempt_service.get_pending_by_institution_entity(institution_entity_id, db, scope=scope)
-
-def mark_complete(payment_id: UUID, db: psycopg2.extensions.connection) -> bool:
-    """DEPRECATED: Use institution_payment_attempt_service.mark_complete() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_payment_attempt_service
-        institution_payment_attempt_service.mark_complete(payment_id, db)
-    """
-    return institution_payment_attempt_service.mark_complete(payment_id, db)
-
-def mark_failed(payment_id: UUID, db: psycopg2.extensions.connection) -> bool:
-    """DEPRECATED: Use institution_payment_attempt_service.mark_failed() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_payment_attempt_service
-        institution_payment_attempt_service.mark_failed(payment_id, db)
-    """
-    return institution_payment_attempt_service.mark_failed(payment_id, db)
-
-def undelete(payment_id: UUID, db: psycopg2.extensions.connection) -> bool:
-    """DEPRECATED: Use institution_payment_attempt_service.undelete() instead.
-    
-    This function will be removed in a future version.
-    Please update your code to use the service method:
-        from app.services.crud_service import institution_payment_attempt_service
-        institution_payment_attempt_service.undelete(payment_id, db)
-    """
-    return institution_payment_attempt_service.undelete(payment_id, db)
+) -> Optional[ClientBillDTO]:
+    """Get client bill by subscription_payment_id (for idempotency in confirm-payment/webhook)."""
+    result = db_read(
+        "SELECT * FROM client_bill_info WHERE subscription_payment_id = %s AND is_archived = FALSE",
+        (str(subscription_payment_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    return ClientBillDTO(**result) if result else None
 
 # Additional methods for restaurant balance service
 def get_by_restaurant(restaurant_id: UUID, db: psycopg2.extensions.connection) -> Optional[RestaurantBalanceDTO]:
@@ -2343,8 +2256,8 @@ def get_institution_entities_by_institution(institution_id: UUID, db: psycopg2.e
 
 # Additional methods for national holiday service
 def is_holiday(country: str, date, db: psycopg2.extensions.connection) -> bool:
-    """Check if date is a national holiday for country"""
-    query = "SELECT * FROM national_holiday_info WHERE country = %s AND holiday_date = %s AND is_archived = FALSE"
+    """Check if date is a national holiday for country (uses national_holidays.country_code)."""
+    query = "SELECT 1 FROM national_holidays WHERE country_code = %s AND holiday_date = %s AND is_archived = FALSE"
     result = db_read(query, (country, date), connection=db, fetch_one=True)
     return result is not None
 
@@ -2367,7 +2280,7 @@ def get_plates_by_user_city(user_address_id: UUID, db: psycopg2.extensions.conne
     
     # Query plates for restaurants in that city
     query = """
-        SELECT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.savings, p.no_show_discount, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
+        SELECT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
         FROM plate_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
@@ -2395,7 +2308,7 @@ def get_active_plates_today_by_user_city(address_id: UUID, db: psycopg2.extensio
     
     # Get all plates for the current day
     query = """
-        SELECT DISTINCT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.savings, p.no_show_discount, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
+        SELECT DISTINCT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
         FROM plate_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id

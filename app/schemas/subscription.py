@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -13,6 +13,22 @@ class SubscriptionCreateSchema(BaseModel):
     balance: Optional[Decimal] = Field(default=0, description="Initial balance")
     is_archived: Optional[bool] = False
     # Status field removed - will be automatically set to 'Pending' by base model
+
+
+class SubscriptionWithPaymentRequestSchema(BaseModel):
+    """Request body for POST /subscriptions/with-payment (atomic subscription + payment)."""
+    plan_id: UUID
+    return_url: Optional[str] = Field(None, description="URL to redirect after payment (e.g. Stripe Checkout)")
+
+
+class SubscriptionWithPaymentResponseSchema(BaseModel):
+    """Response of POST /subscriptions/with-payment. Client uses client_secret for payment UI, then confirm-payment or poll GET subscription."""
+    subscription_id: UUID
+    payment_id: UUID
+    external_payment_id: str
+    client_secret: str
+    amount_cents: int
+    currency: str
 
 
 class SubscriptionUpdateSchema(BaseModel):
@@ -31,9 +47,29 @@ class SubscriptionResponseSchema(BaseModel):
     balance: Decimal
     is_archived: bool
     status: Status
+    subscription_status: Optional[str] = None
+    hold_start_date: Optional[datetime] = None
+    hold_end_date: Optional[datetime] = None
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubscriptionHoldRequestSchema(BaseModel):
+    """Request body for PUT subscription on hold. hold_start_date = today; hold_end_date = user-selected resume date (max 3 months)."""
+    hold_start_date: datetime
+    hold_end_date: datetime
+
+    @model_validator(mode="after")
+    def validate_hold_dates(self):
+        start = self.hold_start_date
+        end = self.hold_end_date
+        if start and end:
+            if end <= start:
+                raise ValueError("hold_end_date must be after hold_start_date")
+            delta = end - start
+            if delta.days > 90:
+                raise ValueError("Hold duration cannot exceed 3 months")
+        return self

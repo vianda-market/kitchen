@@ -74,7 +74,7 @@ class InstitutionScope:
         
         Employee users can have different access levels:
         - Admin/Super Admin: Global access
-        - Management: Institution-scoped access
+        - Manager: Institution-scoped access
         - Operator: Self-updates only
         """
         return self.role_type == "Employee"
@@ -95,6 +95,31 @@ class InstitutionScope:
             status_code=403,
             detail="Forbidden: institution mismatch"
         )
+
+
+def resolve_institution_filter(
+    request_institution_id: Optional[UUID],
+    scope: Optional[InstitutionScope]
+) -> Optional[UUID]:
+    """
+    Validate that the current user may filter list results by the given institution_id.
+    Used by list/enriched endpoints that accept optional institution_id query parameter.
+
+    - If request_institution_id is None, returns None (no extra filter).
+    - If scope is None or scope.is_global, returns request_institution_id (allowed).
+    - If not scope.is_global and scope.matches(request_institution_id), returns request_institution_id.
+    - Otherwise raises HTTPException 403 Forbidden.
+    """
+    if request_institution_id is None:
+        return None
+    if scope is None or scope.is_global:
+        return request_institution_id
+    if scope.matches(request_institution_id):
+        return request_institution_id
+    raise HTTPException(
+        status_code=403,
+        detail="Forbidden: institution mismatch"
+    )
 
 
 @dataclass
@@ -185,7 +210,7 @@ class UserScope:
             return True
         
         # Employee Management: institution-scoped (handled in route/service layer)
-        if self.role_type == "Employee" and self.role_name == "Management":
+        if self.role_type == "Employee" and self.role_name == "Manager":
             return True  # Institution validation happens in route/service layer
         
         return False
@@ -245,7 +270,7 @@ class UserScope:
             return _normalize(target_user_institution_id) == self.institution_id
         
         # Employee Management: institution-scoped
-        if self.role_type == "Employee" and self.role_name == "Management":
+        if self.role_type == "Employee" and self.role_name == "Manager":
             return _normalize(target_user_institution_id) == self.institution_id
         
         return False
@@ -386,7 +411,7 @@ class EmployeeCustomerAccessControl:
             role_name = current_user.get("role_name")
             if role_name in ["Admin", "Super Admin"]:
                 return None, None  # Global access
-            elif role_name == "Management":
+            elif role_name == "Manager":
                 # Employee Management: institution-scoped (handled via scope in route)
                 return None, None  # Scope applied in route layer
             elif role_name == "Operator":
@@ -456,7 +481,7 @@ class EmployeeCustomerAccessControl:
             role_name = current_user.get("role_name")
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
-            elif role_name == "Management":
+            elif role_name == "Manager":
                 # Employee Management: institution-scoped (validation happens in route)
                 return None  # Institution validation in route layer
             elif role_name == "Operator":

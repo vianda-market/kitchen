@@ -33,7 +33,7 @@
 
 ```bash
 # Navigate to your project
-cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen"git ni
+cd ~/Desktop/local/kitchen
 
 # Initialize Git
 git init
@@ -276,7 +276,7 @@ git commit -m "Resolve merge conflicts"
 - Database schemas and seed files (`app/db/*.sql`)
 - Documentation (`docs/`)
 - Static assets for testing (`static/placeholders/`)
-- Postman collections (`docs/postman/*.json`)
+- Postman collections (`docs/postman/collections/*.json`)
 - CI/CD workflows (`.github/workflows/`)
 
 ### ❌ EXCLUDE from Git (in `.gitignore`)

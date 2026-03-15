@@ -12,6 +12,12 @@ kenv/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
+
+# Postman
+*.postman_test_run.json
+*local*.postman_environment.json
 
 # macOS specific files
 .DS_Store
@@ -46,6 +52,19 @@ nosetests.xml
 # Log files
 *.log
 logs/
+qr_scan_error.log
+
+# Ephemeral / cache (reduce PR noise)
+.ruff_cache/
+docs/performance/sql_query_stats.json
+
+.hypothesis/
+.bandit
+.pytest-xdist/
+junit.xml
+*.swp
+*.swo
+*.swn
 
 # Temporary files
 *.tmp
@@ -95,6 +114,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
 
 # Database backup files (sensitive - production data)
 *_backup.sql
