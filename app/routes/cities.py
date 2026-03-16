@@ -30,7 +30,7 @@ async def list_cities(
     """
     List supported cities for user onboarding and employer address scoping.
 
-    **Authorization**: Customer, Employee, or Supplier.
+    **Authorization**: Customer, Internal, or Supplier.
 
     **Returns**: JSON array of `{ city_id, name, country_code, province_code }` sorted by country_code, province_code, name.
     Use for "City" dropdown in user profile and employer address filter.

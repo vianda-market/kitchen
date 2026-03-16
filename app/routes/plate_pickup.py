@@ -107,7 +107,7 @@ def get_enriched_plate_pickups_endpoint(
     Use completed_only=true for the customer order history page (pickups they have collected).
     
     Scoping:
-    - Employees: See all plate pickups
+    - Internal: See all plate pickups
     - Suppliers: See plate pickups for restaurants in their institution
     - Customers: See only their own plate pickups"""
     from app.security.entity_scoping import EntityScopingService, ENTITY_PLATE_PICKUP_LIVE

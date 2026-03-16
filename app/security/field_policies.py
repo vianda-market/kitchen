@@ -19,11 +19,15 @@ CUSTOMER_ALLOWED_ADDRESS_TYPES = {"Customer Home", "Customer Billing", "Customer
 
 # Customer address types are allowed for institutions with institution_type = Customer or Employer
 CUSTOMER_INSTITUTION_ADDRESS_TYPES = {"Customer Home", "Customer Billing", "Customer Employer"}
-# Entity/restaurant address types are for Supplier or Employee institutions only (not Customer/Employer)
+# Entity/restaurant address types are for Supplier or Internal institutions only (not Customer/Employer)
 ENTITY_INSTITUTION_ADDRESS_TYPES = {"Restaurant", "Entity Billing", "Entity Address"}
 
-# Supplier may create/update users with these role_types only (Supplier only, not Employee or Customer)
+# Supplier may create/update users with these role_types only (Supplier only, not Internal or Customer)
 SUPPLIER_ALLOWED_USER_ROLE_TYPES = {"Supplier"}
+
+# B2B POST /users: Customers cannot be created here; they must self-register via POST /customers/signup/request and /verify.
+# Internal creates Internal, Supplier, Employer; Supplier creates Supplier only.
+B2B_CREATABLE_ROLE_TYPES = {"Internal", "Supplier", "Employer"}
 
 # Supplier may assign these role_names only (excludes Super Admin, Comensal)
 SUPPLIER_ALLOWED_ROLE_NAMES = {"Admin", "Manager", "Operator"}
@@ -37,7 +41,7 @@ SUPPLIER_USER_MUTATION_ROLES = {"Admin", "Manager"}
 # Institution bank accounts and institution entities: only Supplier Admin can access (GET, POST, PUT, DELETE)
 SUPPLIER_ADMIN_ONLY_ROLES = {"Admin"}
 
-# Institution no_show_discount: only Employee Manager, Global Manager, Admin, or Super Admin can edit
+# Institution no_show_discount: only Internal Manager, Global Manager, Admin, or Super Admin can edit
 INSTITUTION_NO_SHOW_DISCOUNT_EDIT_ROLES = {"Manager", "Global Manager", "Admin", "Super Admin"}
 
 
@@ -45,10 +49,10 @@ def ensure_can_edit_institution_no_show_discount(current_user: dict) -> None:
     """Raise 403 if user cannot edit no_show_discount on institution."""
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
-    if role_type != "Employee":
+    if role_type != "Internal":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Employees with Manager, Global Manager, Admin, or Super Admin role can edit no_show_discount.",
+            detail="Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit no_show_discount.",
         )
     if role_name not in INSTITUTION_NO_SHOW_DISCOUNT_EDIT_ROLES:
         raise HTTPException(
@@ -68,13 +72,13 @@ def ensure_address_type_allowed(
 
     - Supplier: only Restaurant, Entity Billing, Entity Address; when employer_context=True,
       Customer Employer is also allowed (for employer addresses).
-    - Customer: only Customer Home, Customer Billing, Customer Employer (Comensal/Employer cannot create Restaurant or entity addresses).
-    - Employee: no restriction.
+    - Customer: only Customer Home, Customer Billing, Customer Employer (Comensal cannot create Restaurant or entity addresses).
+    - Internal: no restriction.
     """
     if not address_type_list:
         return
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type == "Employee":
+    if role_type == "Internal":
         return
     if role_type == "Supplier":
         allowed = set(SUPPLIER_ALLOWED_ADDRESS_TYPES)
@@ -114,8 +118,8 @@ def ensure_address_type_matches_institution_type(
     Raise 400 if address types are used with the wrong institution type.
 
     - Customer Home, Customer Billing, Customer Employer: only allowed when institution_type is 'Customer' or 'Employer'
-      (e.g. Vianda Customers or benefits-program Employer institutions). Not allowed for Supplier or Employee institutions.
-    - Restaurant, Entity Billing, Entity Address: only allowed when institution_type is 'Supplier' or 'Employee'.
+      (e.g. Vianda Customers or Employer institutions). Not allowed for Supplier or Internal institutions.
+    - Restaurant, Entity Billing, Entity Address: only allowed when institution_type is 'Supplier' or 'Internal'.
       Not allowed for Customer or Employer institutions.
     """
     if not address_type_list or not institution_type:
@@ -137,7 +141,7 @@ def ensure_address_type_matches_institution_type(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "Address types Restaurant, Entity Billing, and Entity Address are not allowed "
-                "for Customer or Employer institutions. Use a Supplier or Employee institution for those address types."
+                "for Customer or Employer institutions. Use a Supplier or Internal institution for those address types."
             ),
         )
 
@@ -150,15 +154,15 @@ def ensure_user_role_type_allowed(
     """
     Raise 403 if the current user is not allowed to create/update a user with the given role_type.
 
-    - Supplier: may only set role_type to Supplier (cannot create/assign Employee or Customer).
-    - Employee: may set any role_type.
+    - Supplier: may only set role_type to Supplier (cannot create/assign Internal or Customer).
+    - Internal: may set any role_type (Internal, Supplier, Employer).
     - Customer: cannot create users (enforced at route level).
     """
     if not role_type:
         return
     role_type_str = role_type if isinstance(role_type, str) else getattr(role_type, "value", str(role_type))
     actor_role = (current_user.get("role_type") or "").strip()
-    if actor_role == "Employee":
+    if actor_role == "Internal":
         return
     if actor_role == "Supplier":
         allowed = set(SUPPLIER_ALLOWED_USER_ROLE_TYPES)
@@ -166,7 +170,7 @@ def ensure_user_role_type_allowed(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    "Suppliers cannot create or update users to Employee or Customer. "
+                    "Suppliers cannot create or update users to Internal or Customer. "
                     "Allowed role types: Supplier only."
                 ),
             )
@@ -182,14 +186,14 @@ def ensure_user_role_name_allowed(
     Raise 403 if the current user is not allowed to create/update a user with the given role_name.
 
     - Supplier: may only set role_name to Admin, Manager, or Operator (cannot assign Super Admin).
-    - Employee: may set any role_name (further restricted by ensure_can_assign_role_name).
+    - Internal: may set any role_name (further restricted by ensure_can_assign_role_name).
     - Customer: cannot create users (enforced at route level).
     """
     if not role_name:
         return
     role_name_str = role_name if isinstance(role_name, str) else getattr(role_name, "value", str(role_name))
     actor_role = (current_user.get("role_type") or "").strip()
-    if actor_role == "Employee":
+    if actor_role == "Internal":
         return
     if actor_role == "Supplier":
         if role_name_str not in SUPPLIER_ALLOWED_ROLE_NAMES:
@@ -206,7 +210,7 @@ def ensure_operator_cannot_create_users(current_user: dict) -> None:
     """
     Raise 403 if the current user is an Operator who cannot create users.
 
-    - Employee Operator: Cannot create users (403).
+    - Internal Operator: Cannot create users (403).
     - Supplier Operator: Cannot create users (403; also blocked by ensure_supplier_can_create_edit_users).
     - All other roles: No restriction.
     """
@@ -231,13 +235,14 @@ def ensure_can_assign_role_name(
     """
     Raise 403 if the actor cannot assign the given role_name to a user.
 
-    Rules (for Employee and Supplier users):
-    1. Super Admin: Only Super Admin (Employee) can assign Super Admin.
+    Rules (for Internal and Supplier users):
+    1. Super Admin: Only Super Admin (Internal) can assign Super Admin.
     2. Admin: Only Admin or Super Admin can assign Admin.
     3. Manager: Only Admin, Super Admin, or Manager can assign Manager.
     4. Operator: Only Admin, Super Admin, or Manager can assign Operator.
 
-    Customer role_names (Comensal, Employer) are not validated here; only Employee can create Customer users.
+    Customer role_names (Comensal only) and Employer role_names (Admin, Manager, Comensal) are validated
+    by ensure_user_role_name_allowed; only Internal can create Customer and Employer users.
     """
     def _str(v: Any) -> str:
         if v is None:
@@ -251,12 +256,12 @@ def ensure_can_assign_role_name(
     actor_rn = _str(actor_role_name)
     target_rt = _str(target_role_type)
 
-    # Customer role_names: only Employee creates Customer users; no further restriction here
-    if target_rt == "Customer" or target_str in ("Comensal", "Employer"):
+    # Customer (Comensal only) and Employer (Admin, Manager, Comensal): only Internal creates these; no further restriction here
+    if target_rt == "Customer" or target_rt == "Employer" or target_str == "Comensal":
         return
 
     if target_str == "Super Admin":
-        if not (actor_rt == "Employee" and actor_rn == "Super Admin"):
+        if not (actor_rt == "Internal" and actor_rn == "Super Admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Super Admin can assign another user as Super Admin.",
@@ -321,13 +326,13 @@ def ensure_can_edit_user(
     target_rt = _str(target_role_type)
     target_rn = _str(target_role_name)
 
-    # Only apply to Employee and Supplier targets (hierarchy applies to these role types)
-    if target_rt not in ("Employee", "Supplier"):
+    # Only apply to Internal, Supplier, and Employer targets (hierarchy applies to these role types)
+    if target_rt not in ("Internal", "Supplier", "Employer"):
         return
 
-    # Target Super Admin: only Super Admin can edit
+    # Target Super Admin: only Super Admin can edit (Internal only)
     if target_rn == "Super Admin":
-        if not (actor_rt == "Employee" and actor_rn == "Super Admin"):
+        if not (actor_rt == "Internal" and actor_rn == "Super Admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Super Admin can edit a Super Admin user.",
@@ -394,7 +399,7 @@ def ensure_supplier_can_create_edit_addresses(current_user: dict) -> None:
 
     - Supplier Admin, Supplier Manager: Can create/edit/delete addresses (full management).
     - Supplier Operator: Cannot create/edit/delete addresses (403); read-only.
-    - Employees and Customers: No restriction (handled by other logic).
+    - Internal and Customers: No restriction (handled by other logic).
     """
     role_type = (current_user.get("role_type") or "").strip()
     if role_type != "Supplier":
@@ -455,7 +460,7 @@ def ensure_supplier_can_reset_user_password(current_user: dict) -> None:
 
     - Supplier Admin, Supplier Manager: Can reset passwords for users in their institution scope.
     - Supplier Operator: Cannot reset other users' passwords (403), even within scope.
-    - Employees and Customers: No restriction (Customers/Operators only for self, enforced in route).
+    - Internal and Customers: No restriction (Customers/Operators only for self, enforced in route).
     """
     role_type = (current_user.get("role_type") or "").strip()
     if role_type != "Supplier":
@@ -488,11 +493,12 @@ def ensure_institution_type_matches_role_type(
 ) -> None:
     """
     Raise 400 if the institution's institution_type does not match the user's role_type.
-    When creating a user: Employee users must be in an Employee institution,
-    Customer users in a Customer or Employer institution, Supplier users in a Supplier institution.
+    When creating a user: Internal users must be in an Internal institution,
+    Customer users in a Customer or Employer institution, Supplier users in a Supplier institution,
+    Employer users in an Employer institution.
 
     - institution_type and role_type must be compatible (data-driven, not hardcoded names).
-    - Customer users may be in institution_type Customer (e.g. Vianda Customers) or Employer (benefits-program).
+    - Customer users may be in institution_type Customer (e.g. Vianda Customers) or Employer.
     - Call this after resolving institution_id to its institution_type (e.g. from DB).
     """
     if institution_type is None:
@@ -505,13 +511,15 @@ def ensure_institution_type_matches_role_type(
     # Customer users may be in Customer or Employer institutions; others must match exactly
     if role_str == "Customer" and inst_str in ("Customer", "Employer"):
         return
+    if role_str == "Employer" and inst_str == "Employer":
+        return
     if role_str != inst_str:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Institution type ({inst_str}) does not match user role type ({role_str}). "
-                "Employee users must be in an Employee institution, Customer users in a Customer or Employer institution, "
-                "Supplier users in a Supplier institution."
+                "Internal users must be in an Internal institution, Customer users in a Customer or Employer institution, "
+                "Supplier users in a Supplier institution, Employer users in an Employer institution."
             ),
         )
 
@@ -527,7 +535,7 @@ def ensure_supplier_user_institution_only(
     is not their own institution. Suppliers may only create users for their own institution.
 
     - Supplier: institution_id must equal current_user's institution_id.
-    - Employee: No restriction.
+    - Internal: No restriction.
     - Customer: Cannot create users (enforced at route level).
     """
     role_type = (current_user.get("role_type") or "").strip()
@@ -558,17 +566,17 @@ def ensure_employer_not_for_supplier_employee(
     context: str = "create",
 ) -> None:
     """
-    Raise 400 if employer_id is set for a user with role_type Supplier or Employee.
-    Supplier and Employee users do not have an Employer; only Customers do.
+    Raise 400 if employer_id is set for a user with role_type Supplier, Internal, or Employer.
+    Supplier, Internal, and Employer users do not have an employer_id; only Customer (Comensal) can.
 
-    - Supplier, Employee: employer_id must be null/omitted.
+    - Supplier, Internal, Employer: employer_id must be null/omitted.
     - Customer: employer_id is allowed.
     """
     if employer_id is None:
         return
     role_str = role_type.value if hasattr(role_type, "value") else str(role_type)
-    if role_str in ("Supplier", "Employee"):
+    if role_str in ("Supplier", "Internal", "Employer"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Employer is not applicable to Supplier or Employee users. Only Customer users can have an employer.",
+            detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer (Comensal) users can have an employer.",
         )

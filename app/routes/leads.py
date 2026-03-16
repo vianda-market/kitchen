@@ -5,16 +5,19 @@ Used for the lead/signup flow: city metrics (and zipcode metrics) to show covera
 City-first so coverage grows faster; zipcode refinement can be added later.
 """
 
-from typing import Optional
+import time
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 import psycopg2.extensions
 
+from app.config import Status
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     CityMetricsResponseSchema,
     EmailRegisteredResponseSchema,
     LeadsCitiesResponseSchema,
+    MarketPublicMinimalSchema,
     ZipcodeMetricsResponseSchema,
 )
 from app.services.city_metrics_service import (
@@ -23,10 +26,49 @@ from app.services.city_metrics_service import (
 )
 from app.services.zipcode_metrics_service import get_zipcode_metrics
 from app.services.entity_service import get_user_by_email
+from app.services.market_service import market_service, is_global_market
 from app.utils.country import normalize_country_code
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
+
+# -----------------------------------------------------------------------------
+# Public markets (no auth): rate limit and cache — country_code + country_name only
+# -----------------------------------------------------------------------------
+_available_markets_cache: Optional[List[dict]] = None
+_available_markets_cache_expiry: float = 0
+CACHE_TTL_SECONDS = 600  # 10 minutes
+
+
+def _get_available_markets_cached() -> List[MarketPublicMinimalSchema]:
+    """Return active non-archived markets (excluding Global Marketplace); country_code + country_name only for unauthenticated."""
+    global _available_markets_cache, _available_markets_cache_expiry
+    now = time.time()
+    if _available_markets_cache is not None and now < _available_markets_cache_expiry:
+        return [MarketPublicMinimalSchema(**m) for m in _available_markets_cache]
+    raw = market_service.get_all(include_archived=False, status=Status.ACTIVE)
+    slim = [
+        {"country_code": m["country_code"], "country_name": m["country_name"]}
+        for m in raw
+        if not is_global_market(m.get("market_id"))
+    ]
+    if slim:
+        _available_markets_cache = slim
+        _available_markets_cache_expiry = now + CACHE_TTL_SECONDS
+    return [MarketPublicMinimalSchema(**m) for m in slim]
+
+
+@router.get("/markets", response_model=List[MarketPublicMinimalSchema])
+@limiter.limit("60/minute")
+async def list_leads_markets(request: Request):
+    """
+    Public (no auth) list of active markets for UI dropdown.
+
+    Source of truth for which countries clients can operate in. Rate-limited and cached.
+    Use for B2C signup country dropdown, pre-auth country selector. Returns country_code and country_name only (no market_id).
+    For authenticated flows that need market_id, use GET /api/v1/markets/enriched/.
+    """
+    return _get_available_markets_cached()
 
 
 @router.get("/cities", response_model=LeadsCitiesResponseSchema)
@@ -39,7 +81,7 @@ async def get_leads_cities(
     """
     List city names (from city_info) that have at least one restaurant in the given country.
     Single public API for lead flow, signup picker, and explore. No auth; rate-limited per IP.
-    Use market's country_code (e.g. from GET /markets/available). Client sends selected city_name in signup.
+    Use market's country_code (e.g. from GET /api/v1/leads/markets). Client sends selected city_name in signup.
     """
     country = normalize_country_code(country_code, default="US")
     cities = get_cities_with_coverage(country, db)

@@ -48,7 +48,7 @@ Contains historical/outdated documentation that has been superseded:
 
 ## User create and market_id (v1)
 
-**POST /api/v1/users** requires or defaults **market_id** (UUID of a market from GET /api/v1/markets/ or seed).  
+**POST /api/v1/users** requires or defaults **market_id** (UUID of a market from GET /api/v1/markets/ or GET /api/v1/markets/enriched/ or seed). For unauthenticated country list (country_code only), use GET /api/v1/leads/markets.  
 - **Admin / Super Admin / Supplier Admin**: can omit `market_id` (backend defaults to Global Marketplace `00000000-0000-0000-0000-000000000001`).  
 - **Manager / Operator**: must send `market_id` (e.g. Argentina `11111111-1111-1111-1111-111111111111`); only Super Admin can assign Global.  
 - **Customer**: can omit (backend defaults to US market `66666666-6666-6666-6666-666666666666`).  

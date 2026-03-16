@@ -15,30 +15,30 @@ class TestEnsureCanEditInstitutionNoShowDiscount:
     """Tests for ensure_can_edit_institution_no_show_discount."""
 
     def test_employee_manager_can_edit(self):
-        """Employee Manager can edit no_show_discount."""
+        """Internal Manager can edit no_show_discount."""
         ensure_can_edit_institution_no_show_discount({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Manager",
         })
 
     def test_employee_global_manager_can_edit(self):
         """Employee Global Manager can edit no_show_discount."""
         ensure_can_edit_institution_no_show_discount({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Global Manager",
         })
 
     def test_employee_admin_can_edit(self):
-        """Employee Admin can edit no_show_discount."""
+        """Internal Admin can edit no_show_discount."""
         ensure_can_edit_institution_no_show_discount({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Admin",
         })
 
     def test_employee_super_admin_can_edit(self):
-        """Employee Super Admin can edit no_show_discount."""
+        """Internal Super Admin can edit no_show_discount."""
         ensure_can_edit_institution_no_show_discount({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Super Admin",
         })
 
@@ -53,10 +53,10 @@ class TestEnsureCanEditInstitutionNoShowDiscount:
         assert "no_show_discount" in str(exc_info.value.detail).lower()
 
     def test_employee_operator_cannot_edit(self):
-        """Employee Operator cannot edit no_show_discount."""
+        """Internal Operator cannot edit no_show_discount."""
         with pytest.raises(HTTPException) as exc_info:
             ensure_can_edit_institution_no_show_discount({
-                "role_type": "Employee",
+                "role_type": "Internal",
                 "role_name": "Operator",
             })
         assert exc_info.value.status_code == 403

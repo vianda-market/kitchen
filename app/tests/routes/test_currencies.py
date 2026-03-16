@@ -14,7 +14,7 @@ from app.auth.dependencies import get_employee_user, oauth2_scheme
 def mock_employee_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Employee",
+        "role_type": "Internal",
         "role_name": "Admin",
         "institution_id": str(uuid4()),
     }
@@ -42,7 +42,7 @@ class TestListSupportedCurrencies:
     """GET /api/v1/currencies/ returns supported currencies for dropdown."""
 
     def test_returns_200_and_list_with_currency_name_and_code(self, client_with_employee):
-        """Employee can list supported currencies; each item has currency_name and currency_code."""
+        """Internal can list supported currencies; each item has currency_name and currency_code."""
         resp = client_with_employee.get("/api/v1/currencies/")
         assert resp.status_code == 200
         data = resp.json()

@@ -147,7 +147,7 @@ class TestUserSignupService:
     def test_process_admin_user_creation_validates_institution_required(
         self, mock_city_service, mock_market_service, mock_db
     ):
-        """Test that admin user creation requires institution_id for non-Customer/Employee roles."""
+        """Test that admin user creation requires institution_id for non-Customer/Internal roles."""
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
         # Arrange - Supplier requires institution_id
@@ -197,7 +197,7 @@ class TestUserSignupService:
             "first_name": "John",
             "last_name": "Doe",
             "password": "Password123!",
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Admin"
         }
         mock_create_user.return_value = sample_user_dto
@@ -219,12 +219,12 @@ class TestUserSignupService:
         """Test that admin user creation generates placeholder hash and sends invite email when no password provided."""
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_send_invite.return_value = None
-        # Arrange - no password triggers B2B invite flow; Employee Admin avoids institution/DB cursor
+        # Arrange - no password triggers B2B invite flow; Internal Admin avoids institution/DB cursor
         user_data = {
             "email": "test@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Admin"
         }
         mock_create_user.return_value = sample_user_dto
@@ -258,7 +258,7 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "password": "SecurePass123!",
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Admin"
         }
 

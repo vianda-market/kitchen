@@ -234,10 +234,10 @@ These endpoints remain for **managing OTHER users** (not self-updates):
 - [ ] Identify clients still using deprecated endpoints for self-updates
 
 ### Phase 5: Enforce Deprecation (3-6 months)
-- [ ] Return `410 Gone` for self-updates using deprecated endpoints (all user types)
-- [ ] Keep endpoints available for admin operations (updating OTHER users)
-- [ ] Update error messages to direct users to `/me` endpoints for self-updates
-- [ ] Enforce: `PUT /users/{user_id}` only works when `user_id != current_user["user_id"]`
+- [x] Return `410 Gone` for self-updates using deprecated endpoints (all user types) ✅ **COMPLETED**
+- [x] Keep endpoints available for admin operations (updating OTHER users) ✅ **COMPLETED**
+- [x] Update error messages to direct users to `/me` endpoints for self-updates ✅ **COMPLETED**
+- [x] Enforce: `PUT /users/{user_id}` only works when `user_id != current_user["user_id"]` ✅ **COMPLETED**
 
 ### Phase 6: Complete Removal (6-12 months)
 **Decision**: Should we completely remove path-parameter endpoints?

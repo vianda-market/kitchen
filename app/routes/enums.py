@@ -25,7 +25,7 @@ async def get_all_enums(
     """
     Get all system enum values.
     
-    **Authorization**: All authenticated users (Employee, Supplier, Customer)
+    **Authorization**: All authenticated users (Internal, Supplier, Customer, Employer)
     
     Returns all valid enum values used throughout the system, primarily
     for populating frontend dropdown menus and form validation.
@@ -40,7 +40,7 @@ async def get_all_enums(
     {
         "status": ["Active", "Inactive", "Pending", ...],
         "address_type": ["Restaurant", "Customer Home", ...],
-        "role_type": ["Employee", "Supplier", "Customer"],
+        "role_type": ["Internal", "Supplier", "Customer", "Employer"],
         ...
     }
     ```
@@ -80,8 +80,8 @@ async def get_assignable_institution_types(
 
     **Authorization**: All authenticated users (response filtered by role).
 
-    - **Super Admin**: Employee, Supplier, Customer, Employer (all four)
-    - **Admin**: Supplier, Employer only (Employee and Customer restricted to Super Admin)
+    - **Super Admin**: Internal, Supplier, Customer, Employer (all four)
+    - **Admin**: Supplier, Employer only (Internal and Customer restricted to Super Admin)
     - **Supplier** / **Customer**: [] (cannot create institutions)
 
     **Client recommendation**: Use this for the institution type dropdown in institution create/edit.
@@ -108,16 +108,16 @@ async def get_assignable_roles(
     """
     Get assignable role_type and role_name values for user create/edit forms.
     
-    **Authorization**: Employee and Supplier only (403 for Customer).
+    **Authorization**: Internal and Supplier only (403 for Customer).
     
     Returns role_type and role_name_by_role_type filtered by what the current
     user can assign. Suppliers see only Supplier role_type and Admin/Manager/Operator
-    role_names. Employees see the full set.
+    role_names. Internal users see the full set.
     
     **Response** (Supplier):
     {"role_type": ["Supplier"], "role_name_by_role_type": {"Supplier": ["Admin", "Manager", "Operator"]}}
     
-    **Response** (Employee): Full set per valid role combinations.
+    **Response** (Internal): Full set per valid role combinations.
     """
     try:
         role_type_from_token = current_user.get("role_type")
@@ -144,7 +144,7 @@ async def get_enum_by_name(
     """
     Get values for a specific enum type.
     
-    **Authorization**: All authenticated users (Employee, Supplier, Customer)
+    **Authorization**: All authenticated users (Internal, Supplier, Customer, Employer)
     
     **Path Parameters**:
     - `enum_name`: Name of the enum (e.g., 'status', 'role_type', 'subscription_status')

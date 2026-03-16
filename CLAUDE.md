@@ -20,45 +20,49 @@ Maximize developer velocity while guaranteeing data integrity in PostgreSQL-back
 The permission system uses a two-tier hierarchy:
 
 1. **Role Type** (`role_type`): Determines the user's institutional affiliation
-   - **Employee**: Belongs to Vianda Enterprises (our company), has global access to all institutions
+   - **Internal**: Belongs to Vianda Enterprises (our company), has global access to all institutions
    - **Supplier**: Belongs to a restaurant/institution, can only access data for their `institution_id`
    - **Customer**: End users who access iOS/Android apps only (no backoffice access)
+   - **Employer**: Belongs to a benefit-program institution, institution-scoped (like Supplier)
 
 2. **Role Name** (`name` in `role_info` table): Determines specific permissions within a role type
-   - **Super Admin** (role_type: Employee, name: Super Admin): Can approve discretionary credit requests
-   - **Admin** (role_type: Employee, name: Admin): Can request discretionary credits but cannot approve
+   - **Super Admin** (role_type: Internal, name: Super Admin): Can approve discretionary credit requests
+   - **Admin** (role_type: Internal, name: Admin): Can request discretionary credits but cannot approve
    - **Admin** (role_type: Supplier, name: Admin): Can adjust supplier's information in the platform
+   - **Admin** (role_type: Employer, name: Admin): Can manage employer institution
    - **Comensal** (role_type: Customer, name: Comensal): Regular end user (mobile app access only)
+   - **Comensal** (role_type: Employer, name: Comensal): Benefit-program participant
 
 ### Key Principles
 
-1. **Super Admin is an Employee**: Super Admin users have `role_type='Employee'` and `name='Super Admin'` (NOT `role_type='Super Admin'`)
-   - This allows Super Admins to have global access (via Employee role_type) plus special approval permissions (via role_name)
-   - All checks for Super Admin must verify BOTH: `role_type == "Employee" AND role_name == "Super Admin"`
+1. **Super Admin is Internal**: Super Admin users have `role_type='Internal'` and `name='Super Admin'` (NOT `role_type='Super Admin'`)
+   - This allows Super Admins to have global access (via Internal role_type) plus special approval permissions (via role_name)
+   - All checks for Super Admin must verify BOTH: `role_type == "Internal" AND role_name == "Super Admin"`
 
 2. **Institution Scoping**: 
-   - **Employees**: Have global access (can see all institutions) - `InstitutionScope.is_global = True`
+   - **Internal**: Have global access (can see all institutions) - `InstitutionScope.is_global = True`
    - **Suppliers**: Scoped to their `institution_id` - access is restricted via `InstitutionScope.matches(institution_id)`
+   - **Employer**: Institution-scoped (like Supplier)
    - **Customers**: No backoffice access (mobile apps only)
 
 3. **Permission Checks**:
-   - System configuration APIs (Plan, Credit Currency, etc.) require `role_type == "Employee"` (any employee)
-   - Super Admin operations (discretionary approval) require `role_type == "Employee" AND role_name == "Super Admin"`
+   - System configuration APIs (Plan, Credit Currency, etc.) require `role_type == "Internal"` (any Internal)
+   - Super Admin operations (discretionary approval) require `role_type == "Internal" AND role_name == "Super Admin"`
    - Institution-scoped APIs require `InstitutionScope` validation
 
 ### Files That Handle Permissions
 
 - **`app/auth/dependencies.py`**: Dependency functions for permission checks
   - `get_current_user()`: Base authentication (returns `user_id`, `role_type`, `institution_id`, `role_name`)
-  - `get_super_admin_user()`: Verifies `role_type == "Employee" AND role_name == "Super Admin"` (approve/reject discretionary)
-  - `get_employee_user()`: Verifies `role_type == "Employee"` (any employee - system configuration access)
-  - `get_admin_user()`: Verifies `role_type == "Employee" AND role_name IN ["Admin", "Super Admin"]` (view discretionary requests)
+  - `get_super_admin_user()`: Verifies `role_type == "Internal" AND role_name == "Super Admin"` (approve/reject discretionary)
+  - `get_employee_user()`: Verifies `role_type == "Internal"` (any Internal - system configuration access)
+  - `get_admin_user()`: Verifies `role_type == "Internal" AND role_name IN ["Admin", "Super Admin"]` (view discretionary requests)
   - `get_client_user()`: Verifies `role_type == "Customer"` (view plans, fintech links)
-  - `get_client_or_employee_user()`: Verifies `role_type IN ["Customer", "Employee"]` (view plans - excludes Suppliers)
+  - `get_client_or_employee_user()`: Verifies `role_type IN ["Customer", "Internal"]` (view plans - excludes Suppliers)
 
-- **`app/security/institution_scope.py`**: Institution-based access control
-  - `InstitutionScope.is_global`: Returns `True` for `role_type == "Employee"` (not "Super Admin")
-  - `InstitutionScope.is_employee`: Returns `True` for `role_type == "Employee"`
+- **`app/security/scoping.py`**: Institution-based access control
+  - `InstitutionScope.is_global`: Returns `True` for `role_type == "Internal"`
+  - `InstitutionScope.is_employee`: Returns `True` for `role_type == "Internal"`
   - Used for filtering data based on `institution_id`
 
 - **`app/auth/routes.py`**: JWT token creation
@@ -66,11 +70,11 @@ The permission system uses a two-tier hierarchy:
 
 ### Protected APIs and Access Levels
 
-#### Employee-Only APIs (System Configuration)
-- **Plans** (`/plans/*`): GET (Employees + Customers), POST/PUT/DELETE (Employees only)
-- **Credit Currency** (`/credit-currencies/*`): All operations (Employees only)
-- **Discretionary** (`/admin/discretionary/*`): All operations (Employees only)
-- **Fintech Link** (`/fintech-link/*`): GET (Customers only), POST/PUT/DELETE (Employees only)
+#### Internal-Only APIs (System Configuration)
+- **Plans** (`/plans/*`): GET (Internal + Customers), POST/PUT/DELETE (Internal only)
+- **Credit Currency** (`/credit-currencies/*`): All operations (Internal only)
+- **Discretionary** (`/admin/discretionary/*`): All operations (Internal only)
+- **Fintech Link** (`/fintech-link/*`): GET (Customers only), POST/PUT/DELETE (Internal only)
 
 #### Super Admin-Only APIs
 - **Discretionary Approval** (`/super-admin/discretionary/requests/{id}/approve`): Super Admin only
@@ -84,26 +88,30 @@ The permission system uses a two-tier hierarchy:
 - Suppliers can manage institution-scoped resources (Products, Plates, Restaurants, QR Codes, etc.)
 - Suppliers **cannot** access system configuration APIs (Plans, Credit Currency, Discretionary, Fintech Link)
 
+#### Employer-Accessible APIs
+- Employer users are institution-scoped (like Supplier); access data within their Employer institution
+- **employer_id**: Only Customer (Comensal) can have employer_id; Internal, Supplier, Employer cannot
+
 ### Permission Dependency Chain
 
 ```
 get_current_user() (base authentication)
-    ├─> get_employee_user() (Employee role_type)
-    │   ├─> get_admin_user() (Employee + Admin/Super Admin role_name)
-    │   │   └─> get_super_admin_user() (Employee + Super Admin role_name)
+    ├─> get_employee_user() (Internal role_type)
+    │   ├─> get_admin_user() (Internal + Admin/Super Admin role_name)
+    │   │   └─> get_super_admin_user() (Internal + Super Admin role_name)
     │   └─> Used for: Plans, Credit Currency, Discretionary, Fintech Link (POST/PUT/DELETE)
     │
     ├─> get_client_user() (Customer role_type)
     │   └─> Used for: Fintech Link (GET)
     │
-    └─> get_client_or_employee_user() (Customer OR Employee role_type)
+    └─> get_client_or_employee_user() (Customer OR Internal role_type)
         └─> Used for: Plans (GET)
 ```
 
 ### Testing Permissions
 
 - **Unit Tests**: `app/tests/auth/test_auth_dependencies.py` - Tests all dependency functions
-- **Postman Collection**: `docs/postman/collections/Permissions Testing - Employee-Only Access.postman_collection.json`
+- **Postman Collection**: `docs/postman/collections/010 Permissions Testing - Employee-Only Access.postman_collection.json`
 - **Test Guide**: `docs/postman/guidelines/PERMISSIONS_TESTING_GUIDE.md`
 
 ## Core Engineering Standards
@@ -291,17 +299,18 @@ Each Postman collection testing a service must be **self-contained**:
 ✅ **Option A: Create Test Data** (Preferred for complex scenarios)
 ```javascript
 // Pre-request script
-// 1. Create a test user
+// 1. Create a test user (Customers: use POST /customers/signup/request then /verify; Employees/Suppliers: use POST /users with auth)
 pm.sendRequest({
-    url: pm.environment.get("baseUrl") + "/api/v1/customers/signup",
+    url: pm.environment.get("baseUrl") + "/api/v1/customers/signup/request",
     method: "POST",
     header: {"Content-Type": "application/json"},
     body: {
         mode: "raw",
-        raw: JSON.stringify({username: "test_" + Date.now(), ...})
+        raw: JSON.stringify({username: "test_" + Date.now(), password: "Secure123!", email: "test@example.com", country_code: "US", city_name: "New York", ...})
     }
 }, (err, res) => {
-    pm.collectionVariables.set("testUserId", res.json().user_id);
+    // In DEV_MODE: GET /customers/signup/dev-pending-token?email=... then POST /signup/verify with token; get user_id from verify response
+    pm.collectionVariables.set("testUserId", res.json().user?.user_id);
 });
 
 // 2. Create required entities (restaurants, addresses, etc.)

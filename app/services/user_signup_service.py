@@ -64,11 +64,11 @@ class UserSignupService:
         return rt_str == "Customer" and rn_str == "Comensal"
 
     @staticmethod
-    def _is_employee(user_data: Dict[str, Any]) -> bool:
-        """True if role_type is Employee (enum or string)."""
+    def _is_internal(user_data: Dict[str, Any]) -> bool:
+        """True if role_type is Internal (enum or string)."""
         rt = user_data.get("role_type")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
-        return rt_str == "Employee"
+        return rt_str == "Internal"
 
     def process_customer_signup(
         self, 
@@ -144,10 +144,10 @@ class UserSignupService:
             user_data["institution_id"] = get_vianda_customers_institution_id()
             log_info("Assigned Vianda Customers institution for Customer + Comensal user")
 
-        # Employee: always assign Vianda Enterprises; ignore any client-sent institution_id
-        if self._is_employee(user_data):
+        # Internal: always assign Vianda Enterprises; ignore any client-sent institution_id
+        if self._is_internal(user_data):
             user_data["institution_id"] = get_vianda_enterprises_institution_id()
-            log_info("Assigned Vianda Enterprises institution for Employee user")
+            log_info("Assigned Vianda Enterprises institution for Internal user")
 
         # Enforce institution scope for non-global users
         self._apply_scope_constraints(user_data, scope)
@@ -158,12 +158,12 @@ class UserSignupService:
         market_ids_list = user_data.pop("market_ids", None)
         if market_ids_list:
             user_data["market_id"] = market_ids_list[0]
-        # Supplier and Customer Employer: user's market must be within institution's market(s)
+        # Supplier and Employer: user's market must be within institution's market(s)
         self._ensure_user_market_within_institution(user_data, db)
-        # Employee or Supplier: default city_id to Global when not provided
+        # Internal or Supplier: default city_id to Global when not provided
         rt_str = (user_data.get("role_type").value if hasattr(user_data.get("role_type"), "value") else str(user_data.get("role_type") or "")) if user_data.get("role_type") else ""
         rn_str = (user_data.get("role_name").value if hasattr(user_data.get("role_name"), "value") else str(user_data.get("role_name") or "")) if user_data.get("role_name") else ""
-        if (rt_str == "Employee" or rt_str == "Supplier") and not user_data.get("city_id"):
+        if (rt_str == "Internal" or rt_str == "Supplier") and not user_data.get("city_id"):
             user_data["city_id"] = GLOBAL_CITY_ID
             log_info(f"Defaulted city_id to Global for {rt_str}/{rn_str}")
         # Customer+Comensal created via B2B: require city_id, reject Global
@@ -258,11 +258,11 @@ class UserSignupService:
                 detail="Role type and role name are required for user creation"
             )
 
-        # Customer+Comensal and Employee get institution_id assigned by the backend
-        if not self._is_customer_comensal(user_data) and not self._is_employee(user_data) and not user_data.get("institution_id"):
+        # Customer+Comensal and Internal get institution_id assigned by the backend
+        if not self._is_customer_comensal(user_data) and not self._is_internal(user_data) and not user_data.get("institution_id"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institution ID is required for user creation (except Customer+Comensal and Employee)"
+                detail="Institution ID is required for user creation (except Customer+Comensal and Internal)"
             )
 
     def _process_password_security(self, user_data: Dict[str, Any]) -> None:
@@ -293,30 +293,30 @@ class UserSignupService:
         if not country_code_raw or not str(country_code_raw).strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="country_code is required. Use GET /api/v1/markets/available for valid country codes.",
+                detail="country_code is required. Use GET /api/v1/leads/markets for valid country codes.",
             )
         country_code = normalize_country_code(country_code_raw)
         if not country_code:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid country_code. Use GET /api/v1/markets/available for valid country codes.",
+                detail="Invalid country_code. Use GET /api/v1/leads/markets for valid country codes.",
             )
         market = market_service.get_by_country_code(country_code)
         if not market:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No market found for country {country_code}. Use GET /api/v1/markets/available for supported countries.",
+                detail=f"No market found for country {country_code}. Use GET /api/v1/leads/markets for supported countries.",
             )
         if market.get("is_archived"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Market for {country_code} is archived. Use GET /api/v1/markets/available for active countries.",
+                detail=f"Market for {country_code} is archived. Use GET /api/v1/leads/markets for active countries.",
             )
         market_id = market["market_id"] if isinstance(market["market_id"], UUID) else UUID(str(market["market_id"]))
         if is_global_market(market_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Global Marketplace cannot be assigned to B2C customers. Use a country from GET /api/v1/markets/available.",
+                detail="Global Marketplace cannot be assigned to B2C customers. Use a country from GET /api/v1/leads/markets.",
             )
         user_data["market_id"] = market_id
 
@@ -342,7 +342,7 @@ class UserSignupService:
             if not market:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid market_id. Use GET /api/v1/markets/available.",
+                    detail="Invalid market_id. Use GET /api/v1/leads/markets.",
                 )
             market_country = (market.get("country_code") or "").strip().upper()
             cities = city_service.get_all_by_field("country_code", market_country, db, scope=None)
@@ -565,12 +565,12 @@ class UserSignupService:
         creator_rn = (current_user.get("role_name") or "").value if hasattr(current_user.get("role_name"), "value") else str(current_user.get("role_name") or "")
         creator_is_super_admin = creator_rn == "Super Admin"
 
-        # Admin, Super Admin -> default to Global if not provided. Supplier Admin and Customer Employer -> default to institution's market
-        if rt_str == "Employee" and rn_str in ("Admin", "Super Admin"):
+        # Admin, Super Admin (Internal) -> default to Global if not provided. Supplier Admin and Employer -> default to institution's market
+        if rt_str == "Internal" and rn_str in ("Admin", "Super Admin"):
             if not user_data.get("market_id"):
                 user_data["market_id"] = GLOBAL_MARKET_ID
                 log_info(f"Defaulted market_id to Global for {rt_str}/{rn_str}")
-        elif (rt_str == "Supplier" and rn_str == "Admin") or (rt_str == "Customer" and rn_str == "Customer Employer"):
+        elif (rt_str == "Supplier" and rn_str == "Admin") or rt_str == "Employer":
             if not user_data.get("market_id"):
                 inst_id = user_data.get("institution_id")
                 if inst_id:
@@ -587,12 +587,12 @@ class UserSignupService:
                     else:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="institution_id is required for Supplier and Customer Employer; institution must have a market_id",
+                            detail="institution_id is required for Supplier and Employer; institution must have a market_id",
                         )
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="institution_id is required for Supplier and Customer Employer",
+                        detail="institution_id is required for Supplier and Employer",
                     )
 
         market_id_raw = user_data.get("market_id")
@@ -600,8 +600,8 @@ class UserSignupService:
             market_id_raw = UUID(str(market_id_raw))
         market_id = market_id_raw
 
-        # Manager / Operator: market_id required; cannot be Global unless creator is Super Admin
-        if rt_str == "Employee" and rn_str in ("Manager", "Operator"):
+        # Manager / Operator (Internal): market_id required; cannot be Global unless creator is Super Admin
+        if rt_str == "Internal" and rn_str in ("Manager", "Operator"):
             if not market_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -648,29 +648,29 @@ class UserSignupService:
         db: psycopg2.extensions.connection,
     ) -> None:
         """
-        For Supplier and Customer Employer, ensure user's market_id is within the institution's assigned market(s).
-        Raises 400 if user is Supplier or Customer Employer and market_id does not match institution's market_id (v1: single market).
+        For Supplier and Employer, ensure user's market_id is within the institution's assigned market(s).
+        Raises 400 if user is Supplier or Employer and market_id does not match institution's market_id (v1: single market).
         """
         rt = user_data.get("role_type")
         rn = user_data.get("role_name")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
         rn_str = (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
         is_supplier = rt_str == "Supplier"
-        is_customer_employer = rt_str == "Customer" and rn_str == "Customer Employer"
-        if not is_supplier and not is_customer_employer:
+        is_employer = rt_str == "Employer"
+        if not is_supplier and not is_employer:
             return
         institution_id = user_data.get("institution_id")
         if not institution_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="institution_id is required for Supplier and Customer Employer",
+                detail="institution_id is required for Supplier and Employer",
             )
         institution_id = institution_id if isinstance(institution_id, UUID) else UUID(str(institution_id))
         market_id = user_data.get("market_id")
         if not market_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required for Supplier and Customer Employer and must match the institution's market",
+                detail="market_id is required for Supplier and Employer and must match the institution's market",
             )
         market_id = market_id if isinstance(market_id, UUID) else UUID(str(market_id))
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -690,7 +690,7 @@ class UserSignupService:
         if market_id != inst_market_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Supplier and Customer Employer users must be assigned the same market as their institution. "
+                detail="Supplier and Employer users must be assigned the same market as their institution. "
                        "User market_id does not match institution's market_id.",
             )
 

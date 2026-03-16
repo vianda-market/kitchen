@@ -38,7 +38,7 @@ def get_restaurant_daily_orders(
     
     **Authorization**:
     - Supplier: Can access all restaurants within their institution_entity_id
-    - Employee: Can access all restaurants across all institutions
+    - Internal: Can access all restaurants across all institutions
     
     **Privacy**: Customer names displayed as "First L." format
     
@@ -98,8 +98,8 @@ def get_restaurant_daily_orders(
                         detail="Access denied to this restaurant"
                     )
         
-        elif current_user["role_type"] == "Employee":
-            # Employees can access any restaurant
+        elif current_user["role_type"] == "Internal":
+            # Internal users can access any restaurant
             # If restaurant_id provided, get its institution_entity_id
             if restaurant_id:
                 restaurant = restaurant_service.get_by_id(restaurant_id, db)
@@ -112,12 +112,12 @@ def get_restaurant_daily_orders(
                 #  but that could be a very large result set)
                 raise HTTPException(
                     status_code=400, 
-                    detail="Employee role must specify restaurant_id parameter"
+                    detail="Internal role must specify restaurant_id parameter"
                 )
         else:
             raise HTTPException(
                 status_code=403, 
-                detail="Access denied: Must be Supplier or Employee role"
+                detail="Access denied: Must be Supplier or Internal role"
             )
         
         # 2. Default date to today if not provided

@@ -72,7 +72,7 @@ class EntityScopingService:
         
         This method determines the appropriate scoping based on:
         - Entity type (each entity may have specific rules)
-        - User role type (Employee, Supplier, Customer)
+        - User role type (Internal, Supplier, Customer, Employer)
         - Special cases (e.g., Customer blocking)
         
         Args:
@@ -113,10 +113,10 @@ class EntityScopingService:
         
         Rules:
         - Customers: Blocked (403 Forbidden)
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Blocked (should not reach here - blocked in route)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Blocked (should not reach here - blocked in route)
+        - Suppliers, Employer: Institution-scoped
         """
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
@@ -128,14 +128,18 @@ class EntityScopingService:
                 detail="Forbidden: Customers cannot access plate kitchen days"
             )
         
-        # Employees: check role_name for access level
-        if role_type == "Employee":
+        # Employer: institution-scoped (like Supplier)
+        if role_type == "Employer":
+            return get_institution_scope(current_user)
+        
+        # Internal: check role_name for access level
+        if role_type == "Internal":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
             elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
-                # Employee Operators should be blocked in route layer
+                # Internal Operators should be blocked in route layer
                 # If they reach here, return None and let route handle 403
                 return None
             else:
@@ -158,10 +162,10 @@ class EntityScopingService:
         Scoping rules for restaurant_balance.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -176,10 +180,10 @@ class EntityScopingService:
         Scoping rules for restaurant_transaction.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -194,10 +198,10 @@ class EntityScopingService:
         Scoping rules for plate_pickup_live.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (user-level filtering handled in service)
         
         Note: Customer user-level filtering is handled in the service layer,
@@ -215,10 +219,10 @@ class EntityScopingService:
         Scoping rules for qr_code.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -233,9 +237,9 @@ class EntityScopingService:
         Scoping rules for restaurant.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
         - Suppliers: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
@@ -251,10 +255,10 @@ class EntityScopingService:
         Scoping rules for plate.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: No scoping (can view all plates)
         """
         role_type = current_user.get("role_type")
@@ -263,7 +267,7 @@ class EntityScopingService:
         if role_type == "Customer":
             return None
         
-        # Employees and Suppliers: standard institution scoping
+        # Internal, Suppliers, Employer: standard institution scoping
         # get_institution_scope handles role_name logic automatically
         return get_institution_scope(current_user)
     
@@ -276,10 +280,10 @@ class EntityScopingService:
         Scoping rules for product.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -294,10 +298,10 @@ class EntityScopingService:
         Scoping rules for institution_entity.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -312,10 +316,10 @@ class EntityScopingService:
         Scoping rules for institution_bill.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (typically not used, but allowed)
         """
         # get_institution_scope handles role_name logic automatically
@@ -330,26 +334,29 @@ class EntityScopingService:
         Scoping rules for user.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Blocked from managing others (use /me endpoints)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Blocked from managing others (use /me endpoints)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (user-level filtering handled in route)
         
         Note: Customer user-level filtering is handled in the route layer,
-        not in the scope itself. Employee Operator blocking is handled in route layer.
+        not in the scope itself. Internal Operator blocking is handled in route layer.
         The scope is still returned for consistency.
         """
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
         
-        if role_type == "Employee":
+        if role_type == "Employer":
+            return get_institution_scope(current_user)  # Institution-scoped like Supplier
+        
+        if role_type == "Internal":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
             elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
-                # Employee Operators cannot manage other users
+                # Internal Operators cannot manage other users
                 # They should use /me endpoints for self-updates
                 # For admin operations (managing others), return None and let route handle 403
                 return None  # Will be blocked in route if trying to manage others
@@ -370,10 +377,10 @@ class EntityScopingService:
         Scoping rules for address.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access, self-updates via /me)
-        - Suppliers: Institution-scoped
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access, self-updates via /me)
+        - Suppliers, Employer: Institution-scoped
         - Customers: Standard institution scoping (user-level filtering handled in route)
         
         Note: Customer user-level filtering is handled in the route layer,
@@ -391,10 +398,10 @@ class EntityScopingService:
         Scoping rules for subscription.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
-        - Suppliers: Blocked (should not reach here - blocked in route)
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
+        - Suppliers, Employer: Blocked (should not reach here - blocked in route)
         - Customers: User-level filtering (handled in route, not here)
         
         Note: This method is primarily for base CRUD routes. Enriched endpoints
@@ -403,13 +410,16 @@ class EntityScopingService:
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
         
-        if role_type == "Employee":
+        if role_type == "Employer":
+            return get_institution_scope(current_user)  # Institution-scoped like Supplier
+        
+        if role_type == "Internal":
             if role_name in ["Admin", "Super Admin"]:
                 return None  # Global access
             elif role_name == "Manager":
                 return get_institution_scope(current_user)  # Institution scope
             elif role_name == "Operator":
-                # Employee Operators should be blocked in route layer
+                # Internal Operators should be blocked in route layer
                 # If they reach here, return None and let route handle 403
                 return None
             else:
@@ -432,9 +442,9 @@ class EntityScopingService:
         Scoping rules for restaurant_holiday.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
         - Suppliers: Institution-scoped (via restaurant)
         - Customers: Blocked (403 Forbidden)
         """
@@ -447,7 +457,7 @@ class EntityScopingService:
                 detail="Customers cannot access restaurant holidays"
             )
         
-        # Employees and Suppliers: standard institution scoping
+        # Internal, Suppliers, Employer: standard institution scoping
         # get_institution_scope handles role_name logic automatically
         return get_institution_scope(current_user)
     
@@ -460,9 +470,9 @@ class EntityScopingService:
         Default scoping rule for entities without specific rules.
         
         Rules:
-        - Employee Admin/Super Admin: Global access (None)
-        - Employee Management: Institution-scoped
-        - Employee Operator: Institution-scoped (limited access)
+        - Internal Admin/Super Admin: Global access (None)
+        - Internal Management: Institution-scoped
+        - Internal Operator: Institution-scoped (limited access)
         - Suppliers: Institution-scoped
         - Customers: Standard institution scoping
         """

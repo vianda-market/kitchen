@@ -52,7 +52,7 @@ class EnumService:
             "status_plate_pickup": Status.get_by_context("plate_pickup"),
             "status_bill": Status.get_by_context("bill"),
             "address_type": AddressType.values(),
-            "role_type": [rt.value for rt in RoleType if rt != RoleType.EMPLOYER],  # User role_type: Employee, Customer, Supplier only
+            "role_type": [rt.value for rt in RoleType],  # User role_type: Internal, Supplier, Customer, Employer
             "institution_type": RoleType.values(),  # Institution type: includes Employer (benefits-program institutions)
             "role_name": RoleName.values(),
             "subscription_status": SubscriptionStatus.values(),
@@ -122,7 +122,7 @@ class EnumService:
         """
         Get assignable role_type and role_name values based on the current user.
         
-        - Employee: Full set per RoleName.get_valid_for_role_type()
+        - Internal: Full set per RoleName.get_valid_for_role_type()
         - Supplier: role_type Supplier only; role_name Admin, Manager, Operator
         - Customer: Should not reach (route blocks with 403)
         
@@ -134,22 +134,23 @@ class EnumService:
         raw = str(current_user.get("role_type") or "").strip()
         # Normalize to canonical role: JWT may have different casing; compare case-insensitively
         raw_lower = raw.lower()
-        if raw_lower == "employee":
-            actor_role = "Employee"
+        if raw_lower == "internal":
+            actor_role = "Internal"
         elif raw_lower == "supplier":
             actor_role = "Supplier"
         elif raw_lower == "customer":
             actor_role = "Customer"
+        elif raw_lower == "employer":
+            actor_role = "Employer"
         else:
-            actor_role = raw if raw in ("Employee", "Supplier", "Customer") else (raw.capitalize() if raw else "")
+            actor_role = raw if raw in ("Internal", "Supplier", "Customer", "Employer") else (raw.capitalize() if raw else "")
 
-        if actor_role == "Employee":
-            # User role_type: only Employee, Customer, Supplier (Employer is for institution_type only)
-            role_types = [rt.value for rt in RoleType if rt != RoleType.EMPLOYER]
+        if actor_role == "Internal":
+            # User role_type: Internal, Supplier, Customer, Employer (all four)
+            role_types = [rt.value for rt in RoleType]
             role_name_by_role_type = {
                 rt.value: RoleName.get_valid_for_role_type(rt)
                 for rt in RoleType
-                if rt != RoleType.EMPLOYER
             }
             return {
                 "role_type": role_types,
@@ -175,8 +176,8 @@ class EnumService:
         """
         Get institution types the current user can create/assign when creating or editing institutions.
 
-        - Super Admin: Employee, Supplier, Customer, Employer (all four)
-        - Admin: Supplier, Employer only (Employee and Customer restricted to Super Admin)
+        - Super Admin: Internal, Supplier, Customer, Employer (all four)
+        - Admin: Supplier, Employer only (Internal and Customer restricted to Super Admin)
         - Supplier: [] (Suppliers do not create institutions)
         - Customer: [] (Customers do not create institutions)
 
@@ -185,14 +186,14 @@ class EnumService:
         role_type = str(current_user.get("role_type") or "").strip()
         role_name = str(current_user.get("role_name") or "").strip()
 
-        if role_type != "Employee":
+        if role_type != "Internal":
             return []
 
         if role_name == "Super Admin":
             return RoleType.values()
 
         if role_name == "Admin":
-            return [rt.value for rt in RoleType if rt not in (RoleType.EMPLOYEE, RoleType.CUSTOMER)]
+            return [rt.value for rt in RoleType if rt not in (RoleType.INTERNAL, RoleType.CUSTOMER)]
 
         return []
 

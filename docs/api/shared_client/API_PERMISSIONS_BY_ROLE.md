@@ -155,7 +155,7 @@ This document provides a comprehensive reference for API endpoint permissions or
 | **Admin** | Only Admin or Super Admin (Employee Admin, Employee Super Admin, Supplier Admin) |
 | **Manager** | Only Admin, Super Admin, or Manager |
 | **Operator** | Only Admin, Super Admin, or Manager |
-| **Comensal** / **Employer** | Only Employee (Customer users) |
+| **Comensal** / **Employer** | N/A — Customer users cannot be created via POST /users; they self-register via B2C signup |
 
 **Editing hierarchy** (prevents downgrades):
 - **Manager** cannot edit (update, password reset, or delete) **Admin** or **Super Admin**
@@ -164,8 +164,9 @@ This document provides a comprehensive reference for API endpoint permissions or
 
 **Notes**:
 - **Customers**: Can GET, PUT, DELETE only their own user record (scoped by `user_id`). Change own password via `PUT /users/me/password`.
-- **Suppliers**: Institution scoping. Only **Admin** and **Manager** can create users, update users, or reset another user's password. **Operator** can GET users within their institution only (read-only). Supplier Admin can assign Admin; Admin or Manager can assign Manager or Operator.
-- **Employees**: Global access. **Operator** cannot create or update other users. **Super Admin** can assign Super Admin; **Admin** or Super Admin can assign Admin; **Admin**, Super Admin, or **Manager** can assign Manager or Operator.
+- **Customer creation**: Customer users cannot be created via `POST /users`. They must self-register via `POST /customers/signup/request` and `POST /customers/signup/verify` (B2C flow). `POST /users` with `role_type: Customer` returns 400.
+- **Suppliers**: Institution scoping. Only **Admin** and **Manager** can create users (Employee and Supplier only), update users, or reset another user's password. **Operator** can GET users within their institution only (read-only). Supplier Admin can assign Admin; Admin or Manager can assign Manager or Operator.
+- **Employees**: Global access. **Operator** cannot create or update other users. **Super Admin** can assign Super Admin; **Admin** or Super Admin can assign Admin; **Admin**, Super Admin, or **Manager** can assign Manager or Operator. Employees can create **Employee** and **Supplier** users only; Customer users must self-register.
 - **Operator** (Employee or Supplier): No access to adjust other users, including role assignments.
 
 **Dependencies**: `get_current_user()`, `ensure_operator_cannot_create_users()`, `ensure_supplier_can_create_edit_users()` on POST/PUT for Suppliers, `ensure_can_assign_role_name()` on create/update when role_name is set, `ensure_can_edit_user()` on PUT/DELETE and password reset, `ensure_supplier_can_reset_user_password()` on admin password reset. User scoping for Customers, institution scoping for Suppliers.

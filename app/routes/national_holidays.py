@@ -38,7 +38,7 @@ def list_national_holidays(
     """
     List all national holidays.
     
-    Employee-only endpoint. Supports filtering by country code and archived status.
+    Internal-only endpoint. Supports filtering by country code and archived status.
     """
     def get_operation(connection: psycopg2.extensions.connection):
         conditions = ["is_archived = FALSE"]
@@ -83,7 +83,7 @@ def get_national_holiday(
     """
     Get a single national holiday by ID.
     
-    Employee-only endpoint.
+    Internal-only endpoint.
     """
     def get_operation(connection: psycopg2.extensions.connection):
         holiday = national_holiday_service.get_by_id(holiday_id, connection)
@@ -103,7 +103,7 @@ def create_national_holiday(
     """
     Create a single national holiday.
     
-    Employee-only endpoint.
+    Internal-only endpoint.
     """
     def create_operation(connection: psycopg2.extensions.connection):
         # Prepare data for insert
@@ -137,7 +137,7 @@ def create_national_holidays_bulk(
     """
     Create multiple national holidays atomically.
     
-    Employee-only endpoint. All holidays are created in a single transaction.
+    Internal-only endpoint. All holidays are created in a single transaction.
     If any holiday fails validation, all operations are rolled back.
     """
     def create_bulk_operation(connection: psycopg2.extensions.connection):
@@ -182,7 +182,7 @@ def update_national_holiday(
     """
     Update a national holiday.
     
-    Employee-only endpoint.
+    Internal-only endpoint.
     """
     def update_operation(connection: psycopg2.extensions.connection):
         # Get existing holiday
@@ -236,7 +236,7 @@ def delete_national_holiday(
     """
     Soft delete (archive) a national holiday.
     
-    Employee-only endpoint.
+    Internal-only endpoint.
     """
     def delete_operation(connection: psycopg2.extensions.connection):
         # Get existing holiday

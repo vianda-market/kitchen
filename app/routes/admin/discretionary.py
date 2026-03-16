@@ -142,7 +142,7 @@ def get_pending_discretionary_requests(
     Get all pending discretionary requests for admin dashboard.
     
     Returns all requests with status 'Pending' for approval/rejection.
-    Available to Admin and Super Admin employees (role_type='Employee' AND role_name IN ('Admin', 'Super Admin')).
+    Available to Admin and Super Admin Internal users (role_type='Internal' AND role_name IN ('Admin', 'Super Admin')).
     Admin users can see pending requests to verify their submitted requests have been recorded.
     """
     log_info(f"Admin {current_user['user_id']} retrieving pending discretionary requests")

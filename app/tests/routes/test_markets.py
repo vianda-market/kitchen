@@ -15,7 +15,7 @@ from app.auth.dependencies import get_employee_user, oauth2_scheme
 def mock_employee_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Employee",
+        "role_type": "Internal",
         "role_name": "Admin",
         "institution_id": str(uuid4()),
     }

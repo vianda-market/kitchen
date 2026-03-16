@@ -8,11 +8,11 @@ from enum import Enum
 
 
 class RoleType(str, Enum):
-    """Valid role types - fixed at compile time. Also used for institution_type (Employer = benefits-program institution)."""
-    EMPLOYEE = "Employee"
+    """Valid role types - fixed at compile time. Also used for institution_type. Employer = benefit-program institution and role_type."""
+    INTERNAL = "Internal"
     SUPPLIER = "Supplier"
     CUSTOMER = "Customer"
-    EMPLOYER = "Employer"  # Institution type only: benefits-program company; users in it have role_type Customer
+    EMPLOYER = "Employer"  # Role type (benefit-program managers) and institution_type
 
     @classmethod
     def values(cls) -> list[str]:

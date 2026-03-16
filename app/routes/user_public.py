@@ -6,7 +6,7 @@ from app.dto.models import UserDTO
 from app.services.user_signup_service import user_signup_service
 from app.services.password_recovery_service import password_recovery_service
 from app.services.error_handling import handle_business_operation
-from app.schemas.consolidated_schemas import CustomerSignupSchema, UserResponseSchema, UserEnrichedResponseSchema
+from app.schemas.consolidated_schemas import CustomerSignupSchema, UserEnrichedResponseSchema
 from app.services.entity_service import get_enriched_user_by_id
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_password_recovery_debug
@@ -196,38 +196,6 @@ def get_dev_pending_token(
             detail="No pending signup found for this email",
         )
     return DevPendingTokenResponse(token=row["verification_code"])
-
-
-@router.post(
-    "/signup",
-    response_model=UserResponseSchema,
-    status_code=status.HTTP_201_CREATED,
-    summary="Customer self-registration (deprecated)",
-    deprecated=True,
-)
-def signup_customer(
-    user: CustomerSignupSchema,
-    db: psycopg2.extensions.connection = Depends(get_db),
-):
-    """
-    **Deprecated.** Use POST /signup/request then POST /signup/verify (email verification flow).
-    Creates a customer user immediately without email verification.
-    """
-    def _process_customer_signup():
-        user_data = user.model_dump()
-        return user_signup_service.process_customer_signup(user_data, db)
-
-    result = handle_business_operation(
-        _process_customer_signup,
-        "customer signup",
-        "Customer self-signed up successfully",
-    )
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error signing up customer",
-        )
-    return result
 
 
 # =============================================================================

@@ -16,7 +16,7 @@ from app.utils.db_pool import get_db_pool
 from app.utils.log import logger
 from app.config import Status
 
-# Sentinel market for global scope (Employee Admin, Super Admin, Supplier Admin). Seeded in seed.sql; editable only by Super Admin.
+# Sentinel market for global scope (Internal Admin, Super Admin, Supplier Admin). Seeded in seed.sql; editable only by Super Admin.
 GLOBAL_MARKET_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
@@ -34,7 +34,7 @@ def reject_global_market_for_entity(market_id: Optional[UUID], entity_name: str)
     if market_id is not None and market_id == GLOBAL_MARKET_ID:
         raise HTTPException(
             status_code=400,
-            detail=f"Global Marketplace cannot be assigned to {entity_name}. Use a market from GET /api/v1/markets/available.",
+            detail=f"Global Marketplace cannot be assigned to {entity_name}. Use a market from GET /api/v1/leads/markets.",
         )
 
 

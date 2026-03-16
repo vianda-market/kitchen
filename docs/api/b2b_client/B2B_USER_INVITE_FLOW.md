@@ -55,6 +55,8 @@ Admin (B2B portal)                    Backend                         Invited us
 
 ### POST /api/v1/users/ (create user)
 
+**Restriction**: Customer users cannot be created via this endpoint. They must self-register via `POST /customers/signup/request` and `POST /customers/signup/verify`. Sending `role_type: Customer` returns 400.
+
 **`password` is now optional.**
 
 | Field      | Type   | Required | Description                                                                 |

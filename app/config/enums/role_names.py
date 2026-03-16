@@ -16,7 +16,6 @@ class RoleName(str, Enum):
     MANAGER = "Manager"
     OPERATOR = "Operator"
     COMENSAL = "Comensal"
-    EMPLOYER = "Employer"
     GLOBAL_MANAGER = "Global Manager"
 
     @classmethod
@@ -33,9 +32,10 @@ class RoleName(str, Enum):
     def get_valid_for_role_type(cls, role_type: RoleType) -> list[str]:
         """Get valid role names for a given role type"""
         valid_combinations = {
-            RoleType.EMPLOYEE: [cls.ADMIN, cls.SUPER_ADMIN, cls.MANAGER, cls.OPERATOR, cls.GLOBAL_MANAGER],
+            RoleType.INTERNAL: [cls.ADMIN, cls.SUPER_ADMIN, cls.GLOBAL_MANAGER, cls.MANAGER, cls.OPERATOR],
             RoleType.SUPPLIER: [cls.ADMIN, cls.MANAGER, cls.OPERATOR],
-            RoleType.CUSTOMER: [cls.COMENSAL, cls.EMPLOYER],
+            RoleType.CUSTOMER: [cls.COMENSAL],
+            RoleType.EMPLOYER: [cls.ADMIN, cls.MANAGER, cls.COMENSAL],
         }
         return [rn.value for rn in valid_combinations.get(role_type, [])]
 

@@ -472,7 +472,7 @@ def create_product_routes() -> APIRouter:
 
 
 def create_plan_routes() -> APIRouter:
-    """Create routes for Plan entity with Employee-only access for modifications, Client/Employee access for viewing"""
+    """Create routes for Plan entity with Internal-only access for modifications, Client/Internal access for viewing"""
     from app.services.crud_service import plan_service
     from app.services.market_service import reject_global_market_for_entity, GLOBAL_MARKET_ID
     from app.schemas.consolidated_schemas import PlanCreateSchema, PlanUpdateSchema, PlanResponseSchema, PlanEnrichedResponseSchema
@@ -501,13 +501,13 @@ def create_plan_routes() -> APIRouter:
         dependencies=[Depends(oauth2_scheme)]
     )
     
-    # Define GET endpoints first with proper access control (Clients and Employees only, not Suppliers)
+    # Define GET endpoints first with proper access control (Clients and Internal only, not Suppliers)
     @router.get("", response_model=List[PlanResponseSchema])
     def get_all_plans(
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Get all plans - Available to Clients and Employees only. Excludes plans for Global Marketplace. Non-archived only."""
+        """Get all plans - Available to Clients and Internal only. Excludes plans for Global Marketplace. Non-archived only."""
         scope = None  # Plans are not institution-scoped
         def service_callable(connection: psycopg2.extensions.connection):
             plans = plan_service.get_all(connection, scope=scope, include_archived=False)
@@ -520,7 +520,7 @@ def create_plan_routes() -> APIRouter:
         market_id: Optional[UUID] = market_filter(),
         status: Optional[str] = status_filter(),
         currency_code: Optional[str] = currency_code_filter(),
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
         """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code. Excludes plans for Global Marketplace. Non-archived only."""
@@ -543,10 +543,10 @@ def create_plan_routes() -> APIRouter:
     @router.get("/enriched/{plan_id}", response_model=PlanEnrichedResponseSchema)
     def get_enriched_plan_by_id_route(
         plan_id: UUID,
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Get a single plan by ID with enriched data (currency_name and currency_code) - Available to Clients and Employees only. Non-archived only."""
+        """Get a single plan by ID with enriched data (currency_name and currency_code) - Available to Clients and Internal only. Non-archived only."""
         try:
             enriched_plan = get_enriched_plan_by_id(
                 plan_id,
@@ -565,10 +565,10 @@ def create_plan_routes() -> APIRouter:
     @router.get("/{plan_id}", response_model=PlanResponseSchema)
     def get_plan(
         plan_id: UUID,
-        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Employees can view
+        current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Get a single plan by ID - Available to Clients and Employees only. Non-archived only."""
+        """Get a single plan by ID - Available to Clients and Internal only. Non-archived only."""
         scope = None  # Plans are not institution-scoped
         return handle_get_by_id(
             plan_service.get_by_id,
@@ -578,14 +578,14 @@ def create_plan_routes() -> APIRouter:
             extra_kwargs={"scope": scope} if config.institution_scoped else None
         )
     
-    # Override POST/PUT/DELETE endpoints to be Employee-only
+    # Override POST/PUT/DELETE endpoints to be Internal-only
     @router.post("", response_model=PlanResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_plan(
         create_data: PlanCreateSchema,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Create a new plan - Employee-only"""
+        """Create a new plan - Internal-only"""
         data = create_data.model_dump()
         if "market_id" in data and data["market_id"] is not None:
             reject_global_market_for_entity(data["market_id"], "plan")
@@ -601,10 +601,10 @@ def create_plan_routes() -> APIRouter:
     def update_plan(
         plan_id: UUID,
         update_data: PlanUpdateSchema,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Update an existing plan - Employee-only"""
+        """Update an existing plan - Internal-only"""
         data = update_data.model_dump(exclude_unset=True)
         data.pop("rollover", None)
         data.pop("rollover_cap", None)
@@ -620,10 +620,10 @@ def create_plan_routes() -> APIRouter:
     @router.delete("/{plan_id}", response_model=dict)
     def delete_plan(
         plan_id: UUID,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Delete a plan (soft delete) - Employee-only"""
+        """Delete a plan (soft delete) - Internal-only"""
         scope = None  # Plans are not institution-scoped
         def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
             return plan_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
@@ -640,7 +640,7 @@ def create_restaurant_routes() -> APIRouter:
 
 
 def create_credit_currency_routes() -> APIRouter:
-    """Create routes for CreditCurrency entity with Employee-only access"""
+    """Create routes for CreditCurrency entity with Internal-only access"""
     from app.services.crud_service import credit_currency_service
     from app.schemas.consolidated_schemas import CreditCurrencyCreateSchema, CreditCurrencyUpdateSchema, CreditCurrencyResponseSchema
     from typing import List
@@ -659,13 +659,13 @@ def create_credit_currency_routes() -> APIRouter:
         dependencies=[Depends(oauth2_scheme)]
     )
     
-    # Define all endpoints with Employee-only access (Suppliers use credit_currency data via plates, but can't access API directly)
+    # Define all endpoints with Internal-only access (Suppliers use credit_currency data via plates, but can't access API directly)
     @router.get("", response_model=List[CreditCurrencyResponseSchema])
     def get_all_credit_currencies(
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Get all credit currencies - Employee-only. Non-archived only."""
+        """Get all credit currencies - Internal-only. Non-archived only."""
         scope = None  # Credit currencies are not institution-scoped
         def service_callable(connection: psycopg2.extensions.connection):
             return credit_currency_service.get_all(connection, scope=scope, include_archived=False)
@@ -674,10 +674,10 @@ def create_credit_currency_routes() -> APIRouter:
     @router.get("/{currency_id}", response_model=CreditCurrencyResponseSchema)
     def get_credit_currency(
         currency_id: UUID,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Get a single credit currency by ID - Employee-only. Non-archived only."""
+        """Get a single credit currency by ID - Internal-only. Non-archived only."""
         scope = None  # Credit currencies are not institution-scoped
         return handle_get_by_id(
             credit_currency_service.get_by_id,
@@ -690,10 +690,10 @@ def create_credit_currency_routes() -> APIRouter:
     @router.post("", response_model=CreditCurrencyResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_credit_currency(
         create_data: CreditCurrencyCreateSchema,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Create a new credit currency - Employee-only. Backend assigns currency_code from supported list."""
+        """Create a new credit currency - Internal-only. Backend assigns currency_code from supported list."""
         from app.config.supported_currencies import get_currency_code_by_name
 
         data = create_data.model_dump()
@@ -716,10 +716,10 @@ def create_credit_currency_routes() -> APIRouter:
     def update_credit_currency(
         currency_id: UUID,
         update_data: CreditCurrencyUpdateSchema,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Update an existing credit currency - Employee-only"""
+        """Update an existing credit currency - Internal-only"""
         data = update_data.model_dump(exclude_unset=True)
         if "modified_by" not in data:
             data["modified_by"] = current_user["user_id"]
@@ -731,10 +731,10 @@ def create_credit_currency_routes() -> APIRouter:
     @router.delete("/{currency_id}", response_model=dict)
     def delete_credit_currency(
         currency_id: UUID,
-        current_user: dict = Depends(get_employee_user),  # Employee-only
+        current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Delete a credit currency (soft delete) - Employee-only"""
+        """Delete a credit currency (soft delete) - Internal-only"""
         scope = None  # Credit currencies are not institution-scoped
         def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
             return credit_currency_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
@@ -789,7 +789,7 @@ def create_subscription_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """List subscriptions with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            """List subscriptions with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "Supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
@@ -810,7 +810,7 @@ def create_subscription_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get subscription by ID with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            """Get subscription by ID with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "Supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
@@ -838,7 +838,7 @@ def create_subscription_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """List subscriptions. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            """List subscriptions. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "Supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
@@ -859,7 +859,7 @@ def create_subscription_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get a single subscription by ID. Employees: global. Customers: own only. Suppliers: 403."""
+            """Get a single subscription by ID. Internal: global. Customers: own only. Suppliers: 403."""
             role_type = current_user.get("role_type")
             if role_type == "Supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
@@ -924,8 +924,8 @@ def create_subscription_routes() -> APIRouter:
 
 
 def create_institution_routes() -> APIRouter:
-    """Create routes for Institution entity with POST/PUT/DELETE restricted to Employee Admin and Super Admin only.
-    GET endpoints scoped: Suppliers, Customers, and Employee Management see only their institution."""
+    """Create routes for Institution entity with POST/PUT/DELETE restricted to Internal Admin and Super Admin only.
+    GET endpoints scoped: Suppliers, Customers, and Internal Management see only their institution."""
     from app.services.crud_service import institution_service
     from app.schemas.consolidated_schemas import InstitutionCreateSchema, InstitutionUpdateSchema, InstitutionResponseSchema
     from app.auth.dependencies import get_admin_user
@@ -937,13 +937,13 @@ def create_institution_routes() -> APIRouter:
         tags=["Institutions"],
         entity_name="institution",
         entity_name_plural="institutions",
-        institution_scoped=True  # Suppliers/Customers/Employee Management: own institution only
+        institution_scoped=True  # Suppliers/Customers/Internal Management: own institution only
     )
     
     def _institution_scope(current_user: dict):
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
-        if role_type == "Employee" and role_name in ("Admin", "Super Admin"):
+        if role_type == "Internal" and role_name in ("Admin", "Super Admin"):
             return None  # Global access
         return get_institution_scope(current_user)
     
@@ -954,7 +954,7 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """List institutions. Suppliers, Customers, Employee Management: own institution only. Admin/Super Admin: all. Non-archived only."""
+            """List institutions. Suppliers, Customers, Internal Management: own institution only. Admin/Super Admin: all. Non-archived only."""
             scope = _institution_scope(current_user)
             def service_callable(connection: psycopg2.extensions.connection):
                 return institution_service.get_all(connection, scope=scope, include_archived=False)
@@ -966,7 +966,7 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get institution by ID. Suppliers, Customers, Employee Management: own institution only. Admin/Super Admin: any. Non-archived only."""
+            """Get institution by ID. Suppliers, Customers, Internal Management: own institution only. Admin/Super Admin: any. Non-archived only."""
             scope = _institution_scope(current_user)
             return handle_get_by_id(
                 institution_service.get_by_id,
@@ -994,7 +994,7 @@ def create_institution_routes() -> APIRouter:
             has_no_show = "no_show_discount" in payload_keys
 
             if has_non_no_show:
-                if current_user.get("role_type") != "Employee" or current_user.get("role_name") not in ("Admin", "Super Admin"):
+                if current_user.get("role_type") != "Internal" or current_user.get("role_name") not in ("Admin", "Super Admin"):
                     raise HTTPException(status_code=403, detail="Only Admin or Super Admin can edit institution name, type, or market.")
             if has_no_show:
                 ensure_can_edit_institution_no_show_discount(current_user)
@@ -1007,10 +1007,10 @@ def create_institution_routes() -> APIRouter:
             effective_type_str = (
                 (new_type.value if hasattr(new_type, "value") else str(new_type)) if new_type is not None else inst_type_str
             )
-            if effective_type_str in ("Employee", "Customer") and current_user.get("role_name") != "Super Admin":
+            if effective_type_str in ("Internal", "Customer") and current_user.get("role_name") != "Super Admin":
                 raise HTTPException(
                     status_code=403,
-                    detail="Only Super Admin can set institution_type to Employee or Customer.",
+                    detail="Only Super Admin can set institution_type to Internal or Customer.",
                 )
             if inst_type_str == "Supplier":
                 data.pop("market_id", None)
@@ -1028,7 +1028,7 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_admin_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Delete institution (soft delete) - Employee Admin and Super Admin only."""
+            """Delete institution (soft delete) - Internal Admin and Super Admin only."""
             scope = _institution_scope(current_user)
             def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
                 return institution_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
@@ -1041,17 +1041,17 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_admin_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Create a new institution - Employee Admin and Super Admin only"""
+            """Create a new institution - Internal Admin and Super Admin only"""
             data = create_data.model_dump(exclude_none=True)
             # Only Supplier institutions carry no_show_discount
             inst_type = data.get("institution_type")
             inst_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type) if inst_type else "Supplier"
             if inst_str != "Supplier":
                 data.pop("no_show_discount", None)
-            if inst_str in ("Employee", "Customer") and current_user.get("role_name") != "Super Admin":
+            if inst_str in ("Internal", "Customer") and current_user.get("role_name") != "Super Admin":
                 raise HTTPException(
                     status_code=403,
-                    detail="Only Super Admin can create Employee or Customer-type institutions.",
+                    detail="Only Super Admin can create Internal or Customer-type institutions.",
                 )
             data["modified_by"] = current_user["user_id"]
             scope = None
@@ -1129,7 +1129,7 @@ def create_payment_method_routes() -> APIRouter:
             current_user: dict = Depends(get_employee_or_customer_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """List payment methods with enriched data. Employees: global. Customers: own. Suppliers: 403. Non-archived only."""
+            """List payment methods with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             user_id, error = EmployeeCustomerAccessControl.enforce_access(current_user)
             if error:
                 raise HTTPException(**error)
@@ -1191,7 +1191,7 @@ def create_plate_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get all plates - Customers: all. Employees/Suppliers: institution-scoped. Non-archived only."""
+            """Get all plates - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "Customer":
                 scope = None
             else:
@@ -1206,7 +1206,7 @@ def create_plate_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """List plates with enriched data - Customers: all. Employees/Suppliers: institution-scoped. Non-archived only."""
+            """List plates with enriched data - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 if current_user.get("role_type") == "Customer":
                     scope = None
@@ -1262,7 +1262,7 @@ def create_plate_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get plate by ID - Customers: any. Employees/Suppliers: institution-scoped. Non-archived only."""
+            """Get plate by ID - Customers: any. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "Customer":
                 scope = None
             else:
@@ -1308,7 +1308,7 @@ def create_geolocation_routes() -> APIRouter:
 
 
 def create_institution_entity_routes() -> APIRouter:
-    """Create routes for InstitutionEntity entity. Supplier Admin and Employee Admin/Super Admin can access (GET, POST, PUT, DELETE).
+    """Create routes for InstitutionEntity entity. Supplier Admin and Internal Admin/Super Admin can access (GET, POST, PUT, DELETE).
     credit_currency_id is derived from address.country_code -> market (Option A); client does not send it.
     Note: Enriched endpoints (/enriched, /enriched/{entity_id}) are in app/routes/institution_entity.py,
     registered before this router so /enriched matches before /{entity_id}."""

@@ -13,7 +13,7 @@ This document describes **who can update user profiles**, **which endpoints to u
 | **Self-update** | `PUT /api/v1/users/me` | Any authenticated user updating their own profile |
 | **Update by others** | `PUT /api/v1/users/{user_id}` | Admins (e.g. Employee Admin, Supplier Admin) updating another user’s profile (e.g. from the backend portal) |
 
-**Rule**: Use `/me` for self; use `/{user_id}` only when an admin is updating **another** user. Using `/{user_id}` for self is deprecated. See [USER_SELF_UPDATE_PATTERN.md](./USER_SELF_UPDATE_PATTERN.md) for the /me migration and deprecation details.
+**Rule**: Use `/me` for self; use `/{user_id}` only when an admin is updating **another** user. Using `PUT /users/{user_id}` for self-updates returns **410 Gone** with a message to use `PUT /api/v1/users/me`. See [USER_SELF_UPDATE_PATTERN.md](./USER_SELF_UPDATE_PATTERN.md) for details.
 
 ---
 

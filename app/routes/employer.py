@@ -150,7 +150,7 @@ def add_employer_address(
         # Only Customers can use assign_employer parameter
         if role_type == "Customer":
             assign_to_user = address_create.assign_employer if address_create.assign_employer is not None else True  # Default True
-        # Employees/Suppliers: assign_employer parameter is ignored (always False)
+        # Internal/Suppliers: assign_employer parameter is ignored (always False)
 
         # Prepare address data; address_type is not accepted from client
         address_data = address_create.model_dump()
@@ -240,7 +240,7 @@ def create_employer(
         # Only Customers can use assign_employer parameter
         if role_type == "Customer":
             assign_to_user = employer_create.assign_employer  # Use value from request (default True)
-        # Employees/Suppliers: assign_employer parameter is ignored (always False)
+        # Internal/Suppliers: assign_employer parameter is ignored (always False)
         
         # Prepare employer data
         employer_data = {
@@ -296,7 +296,7 @@ def create_employer(
     
     return result
 
-# PUT /employers/{employer_id} – Update an existing employer (Employees only)
+# PUT /employers/{employer_id} – Update an existing employer (Internal only)
 @router.put("/{employer_id}", response_model=EmployerResponseSchema)
 def update_employer(
     employer_id: UUID,
@@ -331,7 +331,7 @@ def update_employer(
     
     return handle_business_operation(_update_employer, "employer update")
 
-# DELETE /employers/{employer_id} – Soft delete an employer (archive) (Employees only)
+# DELETE /employers/{employer_id} – Soft delete an employer (archive) (Internal only)
 @router.delete("/{employer_id}", response_model=dict)
 def delete_employer(
     employer_id: UUID,

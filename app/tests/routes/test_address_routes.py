@@ -41,7 +41,7 @@ def customer_user_without_institution():
 
 @pytest.fixture
 def b2b_employee_user():
-    """B2B user (Employee); must send institution_id and user_id in body."""
+    """B2B user (Internal); must send institution_id and user_id in body."""
     return {
         "user_id": uuid4(),
         "role_type": "Employee",
@@ -122,7 +122,7 @@ def client_customer_without_institution(customer_user_without_institution, mock_
 
 @pytest.fixture
 def client_b2b_employee(b2b_employee_user, mock_db):
-    """Test client with B2B Employee user."""
+    """Test client with B2B Internal user."""
     def _override_oauth2():
         return "test-token"
 
@@ -206,7 +206,7 @@ class TestAddressCreateInstitutionSafeguard:
         assert "institution" in resp.json().get("detail", "").lower()
 
     def test_b2b_omitting_institution_id_gets_400(self, client_b2b_employee):
-        """B2B (Employee) omitting institution_id or user_id gets 400."""
+        """B2B (Internal) omitting institution_id or user_id gets 400."""
         resp = client_b2b_employee.post(
             "/api/v1/addresses/",
             json=_minimal_address_body(include_institution_and_user=False),

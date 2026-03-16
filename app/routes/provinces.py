@@ -37,7 +37,7 @@ async def list_supported_provinces(
     """
     List supported provinces for address forms and cascading dropdowns.
 
-    **Authorization**: Customer, Employee, or Supplier.
+    **Authorization**: Customer, Internal, or Supplier.
 
     **Returns**: JSON array of `{ province_code, province_name, country_code }`.
     Use for "Province/State" dropdown after user selects country. Pass ?country_code=US

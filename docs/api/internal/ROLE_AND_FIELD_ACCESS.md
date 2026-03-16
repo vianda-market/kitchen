@@ -8,7 +8,7 @@ Route access is enforced by dependencies in `app/auth/dependencies.py`. Each rou
 
 | Route group | Dependency | Effect |
 |-------------|------------|--------|
-| Markets (`/api/v1/markets/`, `/enriched/`) GET (list, get by id) | `get_current_user` | Any authenticated user (Employee, Supplier, Customer) – for country dropdown when creating addresses |
+| Markets (`/api/v1/markets/`, `/enriched/`) GET (list, get by id) | `get_current_user` | Any authenticated user (Employee, Supplier, Customer) – for country dropdown when creating addresses. Public endpoint moved to Leads: `GET /api/v1/leads/markets` (no auth). |
 | Markets POST, PUT, DELETE | `get_employee_user` | Employee only |
 | Credit currencies, National holidays, Fintech admin | `get_employee_user` | Employee only |
 | Plans (GET) | `get_client_or_employee_user` | Employee or Customer; Supplier gets 403 |

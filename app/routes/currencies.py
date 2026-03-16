@@ -29,7 +29,7 @@ async def list_supported_currencies(
     """
     List supported currencies for creating a credit currency.
 
-    **Authorization**: Employee only (same as other back-office endpoints).
+    **Authorization**: Internal only (same as other back-office endpoints).
 
     **Returns**: JSON array of `{ currency_name, currency_code }` sorted by `currency_name`.
     Use for "Currency" dropdown in Create Credit Currency / Create Market flow. When creating

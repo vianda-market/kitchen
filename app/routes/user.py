@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body, status, Response
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, status
 from typing import Optional, List
 from uuid import UUID
 from pydantic import EmailStr
-from app.utils.log import log_info, log_warning, log_employer_assign_debug, log_deprecated_endpoint_usage
+from app.utils.log import log_info, log_warning, log_employer_assign_debug
 from app.dto.models import UserDTO
 from app.services.crud_service import user_service
 from app.services.entity_service import (
@@ -86,7 +86,7 @@ def _validate_user_update_city_id(
 
 
 def _validate_user_update_market_id(update_data: dict, current_user: dict) -> None:
-    """Validate market exists and not archived. Only Admin (Employee Admin, Super Admin, Supplier Admin) can set market_id to Global; Managers and Operators cannot."""
+    """Validate market exists and not archived. Only Admin (Internal Admin, Super Admin, Supplier Admin) can set market_id to Global; Managers and Operators cannot."""
     if "market_id" not in update_data:
         return
     market_id = update_data["market_id"]
@@ -104,7 +104,7 @@ def _validate_user_update_market_id(update_data: dict, current_user: dict) -> No
         raise HTTPException(status_code=400, detail=f"Market is archived: {market_id}")
     role_name = current_user.get("role_name")
     rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-    # Only Admin roles (Super Admin, Employee Admin, Supplier Admin) can assign Global; Manager/Operator cannot
+    # Only Admin roles (Super Admin, Internal Admin, Supplier Admin) can assign Global; Manager/Operator cannot
     if is_global_market(market_id) and rn_str not in ("Super Admin", "Admin"):
         raise HTTPException(
             status_code=403,
@@ -144,7 +144,7 @@ def list_users(
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """List all users. Non-archived only."""
-    # Use institution scope for Employees/Suppliers, user scope for Customers
+    # Use institution scope for Internal users/Suppliers, user scope for Customers
     if current_user.get("role_type") == "Customer":
         # Customers can only see themselves
         def _get_users():
@@ -212,21 +212,21 @@ def search_users_route(
     Search users by name, username, or email with optional role_type filter and pagination.
     Used by the discretionary request modal (Customer picker) and other search-by-select UIs.
     Same auth and institution scoping as other user list endpoints.
-    Optional institution_id and market_id restrict results (Employees may pass any institution; market-scoped Employees only their assigned markets).
+    Optional institution_id and market_id restrict results (Internal users may pass any institution; market-scoped Internal users only their assigned markets).
     """
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
-    # Effective institution: Employees may pass any; non-Employees only their own (resolve_institution_filter).
+    # Effective institution: Internal users may pass any; non-Internal users only their own (resolve_institution_filter).
     if institution_id is not None:
-        if current_user.get("role_type") == "Employee":
+        if current_user.get("role_type") == "Internal":
             effective_institution_id = institution_id
         else:
             effective_institution_id = resolve_institution_filter(institution_id, scope)
     else:
         effective_institution_id = None
 
-    # market_id: market-scoped Employees (Manager, Operator) may only pass one of their assigned markets.
-    if market_id is not None and current_user.get("role_type") == "Employee":
+    # market_id: market-scoped Internal users (Manager, Operator) may only pass one of their assigned markets.
+    if market_id is not None and current_user.get("role_type") == "Internal":
         role_name = current_user.get("role_name")
         rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
         if rn_str in ("Manager", "Operator"):
@@ -457,16 +457,16 @@ def assign_my_employer(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Assign an existing employer and address to current user. Both employer_id and address_id required; address must belong to employer. Only Customer users can have an employer; Supplier and Employee get 403."""
+    """Assign an existing employer and address to current user. Both employer_id and address_id required; address must belong to employer. Only Customer users can have an employer; Supplier and Internal get 403."""
     log_employer_assign_debug(
         f"PUT /users/me/employer received: user_id={current_user.get('user_id')} "
         f"employer_id={body.employer_id} address_id={body.address_id}"
     )
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type in ("Supplier", "Employee"):
+    if role_type in ("Supplier", "Internal", "Employer"):
         raise HTTPException(
             status_code=403,
-            detail="Employer is not applicable to Supplier or Employee users. Only Customer users can assign an employer.",
+            detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign an employer.",
         )
     from app.services.crud_service import employer_service, address_service
     from app.utils.error_messages import employer_not_found
@@ -587,43 +587,28 @@ def list_enriched_users(
     )
 
 # GET /users/enriched/{user_id} - Get a single user with enriched data
-@router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema, deprecated=True)
+@router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema)
 def get_enriched_user_by_id_route(
     user_id: UUID,
-    response: Response,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Get a single user by ID with enriched data (role_name, role_type, institution_name)
-
-    ⚠️ **DEPRECATED for self-reads**: Use `GET /users/me` for reading your own profile (returns enriched data).
-    This endpoint remains available for Admins to read OTHER users' profiles.
+    Get a single user by ID with enriched data (role_name, role_type, institution_name).
+    For reading your own profile, use GET /users/me instead.
     """
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     current_user_id = current_user["user_id"]
 
-    # Detect self-read and log deprecation warning
-    is_self_read = str(user_id) == str(current_user_id)
-    if is_self_read:
-        log_deprecated_endpoint_usage(
-            "GET /api/v1/users/enriched/{user_id} (self-read)",
-            str(current_user_id),
-            role_type or "",
-            role_name or "",
+    if str(user_id) == str(current_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Use GET /api/v1/users/me instead",
         )
-        log_warning(
-            f"DEPRECATED: User {current_user_id} ({role_type}/{role_name}) used GET /users/enriched/{{user_id}} "
-            f"for self-read. Please migrate to GET /users/me"
-        )
-        response.headers["X-Deprecated-Endpoint"] = "true"
-        response.headers["X-Use-Instead"] = "GET /api/v1/users/me"
-        response.headers["X-Deprecation-Date"] = "2024-12-04"
-        response.headers["X-Removal-Date"] = "2026-06-04"
 
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    # Apply user scoping for Customers and Internal Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -654,46 +639,30 @@ def get_enriched_user_by_id_route(
     )
 
 # 3. Get a single user by primary key (user_id)
-@router.get("/{user_id}", response_model=UserResponseSchema, deprecated=True)
+@router.get("/{user_id}", response_model=UserResponseSchema)
 def get_user_by_id(
     user_id: UUID,
-    response: Response,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Get a user by ID with optional archived records
-    
-    ⚠️ **DEPRECATED for self-reads**: Use `GET /users/me` for reading your own profile.
-    This endpoint remains available for Admins to read OTHER users' profiles.
+    Get a user by ID. For reading your own profile, use GET /users/me instead.
     """
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     current_user_id = current_user["user_id"]
-    
-    # Detect self-read and log deprecation warning
-    is_self_read = str(user_id) == str(current_user_id)
-    if is_self_read:
-        log_deprecated_endpoint_usage(
-            "GET /api/v1/users/{user_id} (self-read)",
-            str(current_user_id),
-            role_type or "",
-            role_name or "",
+
+    if str(user_id) == str(current_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Use GET /api/v1/users/me instead",
         )
-        log_warning(
-            f"DEPRECATED: User {current_user_id} ({role_type}/{role_name}) used GET /users/{{user_id}} "
-            f"for self-read. Please migrate to GET /users/me"
-        )
-        response.headers["X-Deprecated-Endpoint"] = "true"
-        response.headers["X-Use-Instead"] = "GET /api/v1/users/me"
-        response.headers["X-Deprecation-Date"] = "2024-12-04"
-        response.headers["X-Removal-Date"] = "2026-06-04"
-    
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+
+    # Apply user scoping for Customers and Internal Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
-        # Customers and Employee Operators can only access their own user_id, so scope is None (no institution filtering needed)
+        # Customers and Internal Operators can only access their own user_id, so scope is None (no institution filtering needed)
         scope = None
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
@@ -728,7 +697,7 @@ def create(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Create a new user - Restricted to Employees and Suppliers (Admin/Manager only)"""
+    """Create a new user - Restricted to Internal users and Suppliers (Admin/Manager only)"""
     # Customers cannot create users
     if current_user.get("role_type") == "Customer":
         raise HTTPException(
@@ -739,8 +708,15 @@ def create(
     ensure_operator_cannot_create_users(current_user)
     ensure_supplier_can_create_edit_users(current_user)
     user_data = user.model_dump()
+    rt = user_data.get("role_type")
+    rt_str = rt.value if hasattr(rt, "value") else str(rt)
+    if rt_str == "Customer":
+        raise HTTPException(
+            status_code=400,
+            detail="Customers must self-register via POST /customers/signup/request and /verify.",
+        )
     ensure_supplier_user_institution_only(user_data.get("institution_id"), current_user, action="create")
-    # Require institution_type == role_type (Employee→Employee, Customer→Customer, Supplier→Supplier)
+    # Require institution_type == role_type (Internal→Internal, Customer→Customer, Supplier→Supplier, Employer→Employer)
     institution_id = user_data.get("institution_id")
     if institution_id:
         institution = institution_service.get_by_id(institution_id, db, scope=None)
@@ -760,9 +736,7 @@ def create(
         user_data.get("role_name"),
     )
     ensure_employer_not_for_supplier_employee(user_data.get("role_type"), user_data.get("employer_id"), context="create")
-    rt = user_data.get("role_type")
-    rt_str = rt.value if hasattr(rt, "value") else str(rt)
-    if rt_str in ("Supplier", "Employee"):
+    if rt_str in ("Supplier", "Internal", "Employer"):
         user_data["employer_id"] = None
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
@@ -784,48 +758,32 @@ def create(
 
 
 # PUT /users/{user_id} - Update an existing user
-@router.put("/{user_id}", response_model=UserResponseSchema, deprecated=True)
+@router.put("/{user_id}", response_model=UserResponseSchema)
 def update(
     user_id: UUID,
     user_update: UserUpdateSchema,
-    response: Response,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Update a user
-    
-    ⚠️ **DEPRECATED for self-updates**: Use `PUT /users/me` for updating your own profile.
-    This endpoint remains available for Admins to update OTHER users' profiles.
+    Update a user. For updating your own profile, use PUT /users/me instead.
     """
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     current_user_id = current_user["user_id"]
-    
-    # Detect self-update and log deprecation warning
-    is_self_update = str(user_id) == str(current_user_id)
-    if is_self_update:
-        log_deprecated_endpoint_usage(
-            "PUT /api/v1/users/{user_id} (self-update)",
-            str(current_user_id),
-            role_type or "",
-            role_name or "",
+
+    if str(user_id) == str(current_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Use PUT /api/v1/users/me instead",
         )
-        log_warning(
-            f"DEPRECATED: User {current_user_id} ({role_type}/{role_name}) used PUT /users/{{user_id}} "
-            f"for self-update. Please migrate to PUT /users/me"
-        )
-        response.headers["X-Deprecated-Endpoint"] = "true"
-        response.headers["X-Use-Instead"] = "PUT /api/v1/users/me"
-        response.headers["X-Deprecation-Date"] = "2024-12-04"
-        response.headers["X-Removal-Date"] = "2026-06-04"
-    
+
     ensure_supplier_can_create_edit_users(current_user)
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    # Apply user scoping for Customers and Internal Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
-        scope = None  # No institution filtering needed for Customers and Employee Operators
+        scope = None  # No institution filtering needed for Customers and Internal Operators
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
         # Check if user exists first (without scope), then check access (with scope)
@@ -872,7 +830,7 @@ def update(
         existing_role_type = existing_role_type.value
     if "employer_id" in update_data:
         ensure_employer_not_for_supplier_employee(existing_role_type, update_data["employer_id"], context="update")
-    if existing_role_type in ("Supplier", "Employee"):
+    if existing_role_type in ("Supplier", "Internal", "Employer"):
         update_data.pop("employer_id", None)
     # When clearing employer, also clear employer_address_id
     if "employer_id" in update_data and update_data["employer_id"] is None:
@@ -941,7 +899,7 @@ def resend_user_invite(
     role_name = current_user.get("role_name")
 
     ensure_supplier_can_reset_user_password(current_user)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -1002,7 +960,7 @@ def reset_user_password(
     current_user_id = current_user["user_id"]
 
     ensure_supplier_can_reset_user_password(current_user)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -1053,11 +1011,11 @@ def delete_user(
     role_name = current_user.get("role_name")
     
     ensure_supplier_can_create_edit_users(current_user)
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    # Apply user scoping for Customers and Internal Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
-        scope = None  # No institution filtering needed for Customers and Employee Operators
+        scope = None  # No institution filtering needed for Customers and Internal Operators
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
         # Check if user exists first (without scope), then check access (with scope)

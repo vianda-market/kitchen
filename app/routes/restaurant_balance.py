@@ -148,7 +148,7 @@ def get_all_restaurant_balances(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
 
     def _get_restaurant_balances():
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         balances = restaurant_balance_service.get_all(
             db,
             scope=scope,
@@ -186,7 +186,7 @@ def get_restaurant_balance(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_BALANCE, current_user)
 
     def _get_restaurant_balance():
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         # Note: restaurant_balance_info uses restaurant_id as the ID column
         balance = restaurant_balance_service.get_by_id(restaurant_id, db, scope=scope)
         

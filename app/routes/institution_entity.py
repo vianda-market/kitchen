@@ -33,7 +33,7 @@ def list_enriched_institution_entities(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all institution entities with enriched data (institution_name, address_country, address_province, address_city). Optional institution_id filters by institution (B2B Employee dropdown scoping). When institution has a local market_id (v1), only entities in that market are returned. Non-archived only."""
+    """List all institution entities with enriched data (institution_name, address_country, address_province, address_city). Optional institution_id filters by institution (B2B Internal dropdown scoping). When institution has a local market_id (v1), only entities in that market are returned. Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
     institution_market_id: Optional[UUID] = None

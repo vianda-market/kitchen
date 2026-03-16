@@ -32,7 +32,6 @@ For plan management (tables and create/edit modals): **do not** add a credit cur
 
 **Global Marketplace** (`market_id` = `00000000-0000-0000-0000-000000000001`) is only for user assignment (unrestricted query scope). It **must not** be used for plans.
 
-- Use **GET /api/v1/markets/available** for the plan market dropdown; it already excludes Global Marketplace.
-- If using **GET /api/v1/markets/** (full list for employees), filter out Global Marketplace before showing it in plan create/edit.
+- Use **GET /api/v1/markets/enriched/** for the plan market dropdown; filter out Global Marketplace before showing it in plan create/edit.
 - The backend returns **400 Bad Request** if you attempt to create or update a plan with `market_id` = Global Marketplace.
 - Plan list endpoints (GET /plans/, GET /plans/enriched/) exclude plans for Global Marketplace.

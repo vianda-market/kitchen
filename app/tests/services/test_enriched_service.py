@@ -105,11 +105,11 @@ class TestBuildWhereClause:
         assert params[0] == institution_id
     
     def test_build_where_clause_global_scope(self, enriched_service):
-        """Test WHERE clause with global scope (Employee Admin)"""
+        """Test WHERE clause with global scope (Internal Admin)"""
         scope = InstitutionScope(
             institution_id=str(uuid4()),
-            role_type="Employee",
-            role_name="Admin"  # Employee Admin has global access
+            role_type="Internal",
+            role_name="Admin"  # Internal Admin has global access
         )
         where_clause, params = enriched_service._build_where_clause(
             scope=scope

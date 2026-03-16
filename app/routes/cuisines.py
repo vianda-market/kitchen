@@ -28,7 +28,7 @@ async def list_supported_cuisines(
     """
     List supported cuisines for restaurant create/edit dropdown.
 
-    **Authorization**: Customer, Employee, or Supplier.
+    **Authorization**: Customer, Internal, or Supplier.
 
     **Returns**: JSON array of `{ cuisine_name }` sorted alphabetically.
     Use for "Cuisine" dropdown in restaurant form. Same values are valid for

@@ -4,7 +4,7 @@ API routes for managing plate kitchen days.
 
 Plate kitchen days define which plates are available on which days of the week.
 This API allows Suppliers to manage kitchen days for plates in their institution,
-and Employees to manage all kitchen days.
+and Internal users to manage all kitchen days.
 """
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import Optional, List
@@ -91,18 +91,18 @@ def list_plate_kitchen_days(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all plate kitchen day assignments. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
+    """List all plate kitchen day assignments. Optional institution_id filters by institution (B2B Internal dropdown scoping)."""
     scope = _get_scope_for_entity(current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
     if effective_institution_id is not None:
         effective_scope = InstitutionScope(
-            institution_id=str(effective_institution_id), role_type="Employee", role_name="Manager"
+            institution_id=str(effective_institution_id), role_type="Internal", role_name="Manager"
         )
     else:
         effective_scope = scope
     
     try:
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         results = plate_kitchen_days_service.get_all(
             db,
             scope=effective_scope,
@@ -120,7 +120,7 @@ def list_enriched_plate_kitchen_days(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Employee dropdown scoping)."""
+    """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Internal dropdown scoping)."""
     scope = _get_scope_for_entity(current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
     

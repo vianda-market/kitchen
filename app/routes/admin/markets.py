@@ -6,17 +6,15 @@ Markets define the countries where the platform operates.
 """
 
 from datetime import datetime
-import time
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 import psycopg2.extensions
 
 from app.auth.dependencies import get_current_user, get_employee_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     MarketResponseSchema,
-    MarketPublicMinimalSchema,
     MarketCreateSchema,
     MarketUpdateSchema
 )
@@ -25,50 +23,8 @@ from app.services.entity_service import get_enriched_markets, get_enriched_marke
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
 from app.utils.country import resolve_country_name
-from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/markets", tags=["Markets"])
-
-
-# -----------------------------------------------------------------------------
-# Public markets endpoint (no auth): rate limit and cache
-# -----------------------------------------------------------------------------
-_available_markets_cache: Optional[List[dict]] = None
-_available_markets_cache_expiry: float = 0
-CACHE_TTL_SECONDS = 600  # 10 minutes
-
-
-def _get_available_markets_cached() -> List[MarketPublicMinimalSchema]:
-    """Return active non-archived markets (excluding Global Marketplace); country_code + country_name only for unauthenticated."""
-    global _available_markets_cache, _available_markets_cache_expiry
-    now = time.time()
-    if _available_markets_cache is not None and now < _available_markets_cache_expiry:
-        return [MarketPublicMinimalSchema(**m) for m in _available_markets_cache]
-    raw = market_service.get_all(include_archived=False, status=Status.ACTIVE)
-    # Exclude Global Marketplace from public list (B2C selector); it is for assignment only.
-    # Return only country_code + country_name (no market_id, timezone, currency, etc.)
-    slim = [
-        {"country_code": m["country_code"], "country_name": m["country_name"]}
-        for m in raw
-        if not is_global_market(m.get("market_id"))
-    ]
-    # Only cache non-empty results so transient empty responses don't stick
-    if slim:
-        _available_markets_cache = slim
-        _available_markets_cache_expiry = now + CACHE_TTL_SECONDS
-    return [MarketPublicMinimalSchema(**m) for m in slim]
-
-
-@router.get("/available", response_model=List[MarketPublicMinimalSchema])
-@limiter.limit("60/minute")
-async def list_available_markets_public(request: Request):
-    """
-    Public (no auth) list of active markets for UI dropdown.
-
-    Source of truth for which countries clients can operate in. Rate-limited and cached.
-    Use for market selector (e.g. default by browser country, fallback to US).
-    """
-    return _get_available_markets_cached()
 
 
 @router.get("", response_model=List[MarketResponseSchema])
@@ -79,7 +35,7 @@ async def list_markets(
     """
     List all markets. Non-archived only.
 
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer). Used for country dropdown when creating addresses.
+    **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer). Used for country dropdown when creating addresses.
 
     Markets represent the countries where the platform operates, each with
     its own currency, timezone, and subscription plans.
@@ -110,7 +66,7 @@ async def list_enriched_markets(
     """
     List all markets with enriched data (currency details). Non-archived only.
 
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer). Used for country dropdown when creating addresses.
+    **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer). Used for country dropdown when creating addresses.
 
     This enriched endpoint returns markets with currency information
     (currency_name and currency_code) from the credit_currency_info table.
@@ -140,7 +96,7 @@ async def get_enriched_market(
     """
     Get a specific market by ID with enriched data (currency details). Non-archived only.
 
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer).
+    **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer).
 
     **Path Parameters**:
     - `market_id`: UUID of the market
@@ -177,7 +133,7 @@ async def get_market(
     """
     Get a specific market by ID.
     
-    **Authorization**: Any authenticated user (Employee, Supplier, Customer).
+    **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer).
     
     **Path Parameters**:
     - `market_id`: UUID of the market
@@ -203,7 +159,7 @@ async def create_market(
     """
     Create a new market.
     
-    **Authorization**: Employee only (system configuration)
+    **Authorization**: Internal only (system configuration)
     
     **Request Body**: Market creation data (country_name is derived from country_code)
     - `country_code`: ISO 3166-1 alpha-2 code (e.g., "AR", "DE")
@@ -250,7 +206,7 @@ async def update_market(
     """
     Update an existing market.
     
-    **Authorization**: Employee only. **Global Marketplace** (market_id = Global) is editable **only by Super Admin**.
+    **Authorization**: Internal only. **Global Marketplace** (market_id = Global) is editable **only by Super Admin**.
     
     **Path Parameters**:
     - `market_id`: UUID of the market to update
@@ -266,7 +222,7 @@ async def update_market(
     
     **Raises**:
     - 400: Invalid country_code
-    - 403: Insufficient permissions (Supplier; or Employee Admin trying to edit Global Marketplace)
+    - 403: Insufficient permissions (Supplier; or Internal Admin trying to edit Global Marketplace)
     - 404: Market not found
     """
     if is_global_market(market_id) and current_user.get("role_name") != "Super Admin":
@@ -313,7 +269,7 @@ async def archive_market(
     """
     Archive a market (soft delete).
     
-    **Authorization**: Employee only. **Global Marketplace** cannot be archived (or only Super Admin could; we disallow archiving it).
+    **Authorization**: Internal only. **Global Marketplace** cannot be archived (or only Super Admin could; we disallow archiving it).
     
     **Path Parameters**:
     - `market_id`: UUID of the market to archive

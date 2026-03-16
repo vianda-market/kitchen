@@ -113,7 +113,7 @@ def list_restaurant_holidays(
     List restaurant holidays.
     
     Suppliers can only see holidays for restaurants in their institution.
-    Employees can see all restaurant holidays.
+    Internal users can see all restaurant holidays.
     """
     scope = _get_scope_for_entity(current_user)
     
@@ -166,7 +166,7 @@ def list_enriched_restaurant_holidays(
     national holidays API.
     
     Suppliers can only see holidays for restaurants in their institution.
-    Employees can see holidays for all restaurants.
+    Internal users can see holidays for all restaurants.
     """
     scope = _get_scope_for_entity(current_user)
     

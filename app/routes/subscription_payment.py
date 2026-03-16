@@ -39,7 +39,7 @@ router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
 
 def _require_customer_or_employee(current_user: dict) -> UUID:
-    """Raise 403 if not Customer or Employee; return user_id."""
+    """Raise 403 if not Customer or Internal; return user_id."""
     role_type = (current_user.get("role_type") or "").strip().lower()
     if role_type not in ("customer", "employee"):
         raise HTTPException(status_code=403, detail="Only customers or employees can use subscription payment.")
