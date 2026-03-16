@@ -72,7 +72,7 @@ GET /api/v1/addresses/suggest?q=...&country=...&limit=5
 
 **Who provides the country?** The client sends it in the request. The backend resolves name → alpha-2 and sends it to Google.
 
-- **Dropdown (recommended)**: Use **GET /api/v1/markets** (or GET /api/v1/countries) for the list. When the user picks e.g. "Argentina", send `country_code: "AR"` (alpha-2).
+- **Dropdown (recommended)**: Use **GET /api/v1/markets/enriched/ or GET /api/v1/leads/markets (country codes only)** (or GET /api/v1/countries) for the list. When the user picks e.g. "Argentina", send `country_code: "AR"` (alpha-2).
 - **Free-text**: For suggest, send the typed value as the `country` query param (e.g. `country=Argentina`). The backend resolves names to codes.
 
 ---
@@ -527,7 +527,7 @@ The backend accepts multiple formats for province names:
 
 **Frontend Behavior**:
 - Validate `country_code` against available markets before submission
-- Use Markets API (`GET /api/v1/markets/`) to fetch valid country codes
+- Use Markets API (`GET /api/v1/markets/enriched/ or GET /api/v1/leads/markets (country codes only)/`) to fetch valid country codes
 - Display error message to user if invalid code is provided
 
 ---
@@ -658,7 +658,7 @@ fun CreateAddressScreen(viewModel: AddressViewModel) {
 
 ### 1. Country Selection
 
-- Use dropdown/picker populated from Markets API (`GET /api/v1/markets/`)
+- Use dropdown/picker populated from Markets API (`GET /api/v1/markets/enriched/ or GET /api/v1/leads/markets (country codes only)/`)
 - Display both country name and code (e.g., "Argentina (AR)")
 - Make it a required field
 

@@ -51,6 +51,7 @@ cp -r docs/api/b2c_client /path/to/kitchen-mobile/docs/api/
 | USERNAME_RECOVERY.md | Username recovery (forgot username), both B2B and B2C |
 | DEBUG_LOGGING_STRATEGY.md | Debug logging: single env var `DEBUG_PASSWORD_RECOVERY` (1/true/yes), same for backend and clients |
 | STATUS_ON_CREATE.md | Status on create: omit or send null; backend assigns default (e.g. Active). Clients can stop sending status on creation. |
+| **LEADS_API_SCOPE.md** | **All unauthenticated endpoints** under `/api/v1/leads/`: markets, cities, city-metrics, zipcode-metrics, email-registered. No auth; rate-limited. |
 | ZIPCODE_METRICS_LEAD_API.md | Lead encouragement: **GET** `/api/v1/leads/zipcode-metrics` (zip, country_code). No auth; rate-limited. Use this path, not zipcode-check or by-zipcode. |
 | **PAYMENT_AND_BILLING_CLIENT_CHANGES.md** | **Payment atomic with billing + Fintech link deprecation:** Remove all fintech link pages/modals and any manual “create bill” / “process bill” flows. Use only subscription with-payment and confirm-payment for subscription payment. |
 | **CUSTOMER_PAYMENT_METHODS_API.md** | **Payment method management:** List, add (setup session), delete, set default. Customer-only. Mock endpoints for UI; live Stripe in roadmap. B2C implements; B2B suppliers use separate payout flow. |

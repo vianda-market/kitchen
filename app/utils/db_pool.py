@@ -30,7 +30,7 @@ def _register_enum_types(conn: psycopg2.extensions.connection):
         'status_enum',            # CRITICAL - used by all tables
         'role_type_enum',         # CRITICAL - permission system
         'role_name_enum',         # CRITICAL - permission system
-        'institution_type_enum',  # Employee / Customer / Supplier / Employer - must match user role_type (Customer can be in Customer or Employer institution)
+        'institution_type_enum',  # Internal / Customer / Supplier / Employer - must match user role_type (Customer can be in Customer or Employer institution)
         'transaction_type_enum',  # CRITICAL - transaction system
         'kitchen_day_enum',       # New
         'pickup_type_enum',       # New

@@ -155,14 +155,15 @@ CREATE TYPE bill_resolution_enum AS ENUM (
 
 \echo 'Creating enum type: role_type_enum'
 CREATE TYPE role_type_enum AS ENUM (
-    'Employee',
+    'Internal',
     'Supplier',
-    'Customer'
+    'Customer',
+    'Employer'
 );
 
 \echo 'Creating enum type: institution_type_enum'
 CREATE TYPE institution_type_enum AS ENUM (
-    'Employee',
+    'Internal',
     'Customer',
     'Supplier',
     'Employer'
@@ -175,7 +176,6 @@ CREATE TYPE role_name_enum AS ENUM (
     'Manager',
     'Operator',
     'Comensal',
-    'Employer',
     'Global Manager'
 );
 

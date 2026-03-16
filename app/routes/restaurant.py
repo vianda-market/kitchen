@@ -206,21 +206,21 @@ def search_restaurants_route(
     Search restaurants by name with pagination.
     Used by the discretionary request modal (Restaurant picker) and other search-by-select UIs.
     Same auth and institution scoping as other restaurant list endpoints.
-    Optional institution_id and market_id restrict results (Employees may pass any institution; market-scoped Employees only their assigned markets).
+    Optional institution_id and market_id restrict results (Internal users may pass any institution; market-scoped Internal users only their assigned markets).
     """
     scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
 
-    # Effective institution: Employees may pass any; non-Employees only their own (resolve_institution_filter).
+    # Effective institution: Internal users may pass any; non-Internal users only their own (resolve_institution_filter).
     if institution_id is not None:
-        if current_user.get("role_type") == "Employee":
+        if current_user.get("role_type") == "Internal":
             effective_institution_id = institution_id
         else:
             effective_institution_id = resolve_institution_filter(institution_id, scope)
     else:
         effective_institution_id = None
 
-    # market_id: market-scoped Employees (Manager, Operator) may only pass one of their assigned markets.
-    if market_id is not None and current_user.get("role_type") == "Employee":
+    # market_id: market-scoped Internal users (Manager, Operator) may only pass one of their assigned markets.
+    if market_id is not None and current_user.get("role_type") == "Internal":
         role_name = current_user.get("role_name")
         rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
         if rn_str in ("Manager", "Operator"):
@@ -252,7 +252,7 @@ def search_restaurants_route(
     return handle_business_operation(_search, "restaurant search")
 
 
-# GET /restaurants/cities — B2C explore: list cities with restaurants for dropdown (Customer or Employee only; no institution scope)
+# GET /restaurants/cities — B2C explore: list cities with restaurants for dropdown (Customer or Internal only; no institution scope)
 @router.get("/cities", response_model=RestaurantExplorerCitiesResponseSchema)
 def get_restaurant_cities(
     country_code: Optional[str] = Query("US", description="ISO 3166-1 alpha-2 (e.g. US, AR)"),
@@ -261,7 +261,7 @@ def get_restaurant_cities(
 ):
     """
     List city names that have at least one restaurant in the given country.
-    Used to populate the explore UI city dropdown. Customer or Employee only; 403 for Supplier. No institution scope.
+    Used to populate the explore UI city dropdown. Customer or Internal only; 403 for Supplier. No institution scope.
     """
     try:
         country = normalize_country_code(country_code, default="US")
@@ -373,7 +373,7 @@ def get_restaurants_by_city_route(
     Return restaurants in the given city (name, cuisine, lat/lng) for list and map.
     When a market is used (market_id or user's primary market), kitchen_day is required to return plates.
     kitchen_day must fall within this week and next week (next week ends Friday); otherwise 400.
-    City is matched case-insensitively. Customer or Employee only; 403 for Supplier. No institution scope.
+    City is matched case-insensitively. Customer or Internal only; 403 for Supplier. No institution scope.
     """
     if kitchen_day is not None and kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
         raise HTTPException(status_code=400, detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday")
@@ -464,7 +464,7 @@ def list_enriched_restaurants(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Employee dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
+    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
         effective_institution_id = resolve_institution_filter(institution_id, scope)

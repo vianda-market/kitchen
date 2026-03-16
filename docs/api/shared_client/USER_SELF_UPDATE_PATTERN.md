@@ -8,7 +8,7 @@ This document describes the **new `/me` endpoint pattern** for user self-updates
 
 ## ⚠️ Important: API Pattern Change
 
-**As of December 2024**, the API has introduced new `/me` endpoints for secure self-updates. The legacy `/{user_id}` endpoints are **deprecated for self-operations** and will be removed in a future version.
+**As of March 2026**, the API enforces `/me` endpoints for self-updates. Using `GET /users/{user_id}`, `PUT /users/{user_id}`, or `GET /users/enriched/{user_id}` when `user_id` equals the current user returns **410 Gone** with a message to use `/me` instead.
 
 ---
 
@@ -36,22 +36,21 @@ This document describes the **new `/me` endpoint pattern** for user self-updates
 
 ---
 
-## Deprecated Pattern: `/{user_id}` Endpoints
+## Self-Use of `/{user_id}` Endpoints: 410 Gone
 
-### ⚠️ Deprecated Endpoints (Self-Operations Only)
+### Endpoints That Return 410 for Self-Use
 
-| Endpoint | Status | Use Instead |
-|----------|--------|-------------|
-| `GET /users/{user_id}` | ⚠️ **DEPRECATED** for self-reads | `GET /users/me` |
-| `PUT /users/{user_id}` | ⚠️ **DEPRECATED** for self-updates | `PUT /users/me` |
-| `GET /users/enriched/{user_id}` | ⚠️ **DEPRECATED** for self-reads | `GET /users/me` |
+| Endpoint | Self-Use Result | Use Instead |
+|----------|-----------------|-------------|
+| `GET /users/{user_id}` | **410 Gone** when `user_id` = current user | `GET /users/me` |
+| `PUT /users/{user_id}` | **410 Gone** when `user_id` = current user | `PUT /users/me` |
+| `GET /users/enriched/{user_id}` | **410 Gone** when `user_id` = current user | `GET /users/me` |
 
 ### Important Notes
 
 - **Still Available for Admin Operations**: These endpoints remain available for **Admins managing OTHER users** (not themselves)
-- **Deprecation Warnings**: Using these endpoints for self-operations will log warnings
-- **OpenAPI/Swagger**: These endpoints are marked as `deprecated=True` in API documentation
-- **Future Removal**: Self-update access via `/{user_id}` will be removed in 6-12 months
+- **410 for Self-Use**: When `user_id == current_user["user_id"]`, the API returns 410 Gone with `{"detail": "Use GET/PUT /api/v1/users/me instead"}`
+- **Use `/me`**: All clients must use `/me` endpoints for self-operations
 
 ---
 

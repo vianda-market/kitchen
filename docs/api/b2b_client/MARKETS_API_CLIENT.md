@@ -19,39 +19,19 @@ Markets represent the countries where the platform operates. Each market has its
 
 ## API Endpoints
 
-### Public Endpoint (No Auth) – Source of Truth for UI
+### Public Endpoint (No Auth) — Leads
 
-- **GET /api/v1/markets/available**: Returns the list of **active, non-archived** markets. **No authentication required.** Use this as the single source of truth for the market dropdown (e.g. default by browser country, fallback to US; user can override).
-- **Rate-limited** (e.g. 60 requests per minute per IP). **Cached** (e.g. 10 minutes) to reduce load.
-- **Write operations** (POST/PUT/DELETE) remain **employee-only**; this endpoint is read-only.
+- **GET /api/v1/leads/markets**: Returns the list of **active, non-archived** markets. **No authentication required.** Returns **`country_code`** and **`country_name`** only (no `market_id`). Use for B2C signup country dropdown and pre-auth country selector.
+- **Rate-limited** (60 req/min per IP). **Cached** (10 min). See [LEADS_API_SCOPE.md](../shared_client/LEADS_API_SCOPE.md).
 
-### Base vs Enriched Endpoints (Authenticated)
+### Authenticated Endpoints — Full Data
 
 - **Base Endpoints** (`/api/v1/markets/`): Returns basic market data (any authenticated user)
-- **Enriched Endpoints** (`/api/v1/markets/enriched/`): Returns market data with currency details (any authenticated user)
+- **Enriched Endpoints** (`/api/v1/markets/enriched/`): Returns full market data with `market_id`, currency details (any authenticated user)
 
-**Recommendation**: For the market selector (including pre-login or first load), use **GET /api/v1/markets/available**. For authenticated flows that need full details, use the enriched endpoints.
-
----
-
-## Public Endpoint: List Available Markets (No Auth)
-
-### GET /api/v1/markets/available
-
-**Authorization**: None (public).
-
-**Response**: Array of minimal objects with **`country_code`** and **`country_name`** only. No `market_id`, timezone, or currency. This keeps the unauthenticated response minimal for pre-signup flows (e.g. B2C country selector, lead flow).
-
-```json
-[
-  { "country_code": "AR", "country_name": "Argentina" },
-  { "country_code": "US", "country_name": "United States" }
-]
-```
-
-**Use Case**: Country dropdown for signup (send `country_code` in signup request) or lead flow. For authenticated flows that need `market_id`, timezone, or currency, use **GET /api/v1/markets/enriched/**.
-
-**Rate limit**: 429 Too Many Requests if exceeded (e.g. 60 req/min per IP).
+**Recommendation**:
+- **Pre-auth / B2C signup**: Use **GET /api/v1/leads/markets** (country_code, country_name only). Send `country_code` in signup request.
+- **Authenticated / B2B forms** (institution create, plan create, admin dropdowns): Use **GET /api/v1/markets/enriched/** (includes `market_id`).
 
 ---
 

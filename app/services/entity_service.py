@@ -591,7 +591,7 @@ def get_enriched_institution_entities(
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records
-        institution_id: Optional institution ID to filter results (B2B Employee dropdown scoping)
+        institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping)
         institution_market_id: Optional market ID when institution is local (v1 bloat control:
             only entities whose address is in this market are returned)
         
@@ -723,7 +723,7 @@ def get_enriched_addresses(
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records
-        institution_id: Optional institution ID to filter results (B2B Employee dropdown scoping)
+        institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping)
         
     Returns:
         List of enriched address schemas with institution name and user details
@@ -994,7 +994,7 @@ def get_enriched_restaurants(
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
-        institution_id: Optional institution ID to filter results (B2B Employee dropdown scoping)
+        institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping)
         institution_market_id: Optional market ID when institution is local (v1 bloat control:
             only restaurants whose address is in this market are returned; pass when
             institution has a non-Global market_id)
@@ -2845,12 +2845,12 @@ def get_enriched_institution_bills(
     Returns an array of enriched institution bill records.
     
     Scoping rules:
-    - If scope is global (Employee): Returns all institution bills
+    - If scope is global (Internal): Returns all institution bills
     - If scope is institution-scoped (Supplier): Returns bills for restaurants in their institution
     
     Args:
         db: Database connection
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
         
     Returns:
@@ -2920,12 +2920,12 @@ def get_enriched_restaurant_balances(
     through transactions and billing operations. They cannot be created or modified via API.**
     
     Scoping rules:
-    - If scope is global (Employee): Returns all restaurant balances
+    - If scope is global (Internal): Returns all restaurant balances
     - If scope is institution-scoped (Supplier): Returns balances for restaurants in their institution
     
     Args:
         db: Database connection
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
         
     Returns:
@@ -2980,13 +2980,13 @@ def get_enriched_restaurant_balance_by_id(
     through transactions and billing operations. They cannot be created or modified via API.**
     
     Scoping rules:
-    - If scope is global (Employee): Returns any restaurant balance
+    - If scope is global (Internal): Returns any restaurant balance
     - If scope is institution-scoped (Supplier): Returns balance only if restaurant belongs to their institution
     
     Args:
         db: Database connection
         restaurant_id: Restaurant ID (primary key of restaurant_balance_info)
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
         
     Returns:
@@ -3056,12 +3056,12 @@ def get_enriched_restaurant_transactions(
     through plate selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
     
     Scoping rules:
-    - If scope is global (Employee): Returns all restaurant transactions
+    - If scope is global (Internal): Returns all restaurant transactions
     - If scope is institution-scoped (Supplier): Returns transactions for restaurants in their institution
     
     Args:
         db: Database connection
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
         
     Returns:
@@ -3131,13 +3131,13 @@ def get_enriched_restaurant_transaction_by_id(
     through plate selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
     
     Scoping rules:
-    - If scope is global (Employee): Returns any restaurant transaction
+    - If scope is global (Internal): Returns any restaurant transaction
     - If scope is institution-scoped (Supplier): Returns transaction only if restaurant belongs to their institution
     
     Args:
         db: Database connection
         transaction_id: Transaction ID
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
         
     Returns:
@@ -3211,13 +3211,13 @@ def get_enriched_plate_pickups(
     Returns an array of enriched plate pickup records.
     
     Scoping rules:
-    - If scope is global (Employee): Returns all plate pickups
+    - If scope is global (Internal): Returns all plate pickups
     - If scope is institution-scoped (Supplier): Returns plate pickups for restaurants in their institution
     - If user_id is provided (Customer): Returns only plate pickups for that specific user
     
     Args:
         db: Database connection
-        scope: Optional institution scope for filtering (for Employees/Suppliers)
+        scope: Optional institution scope for filtering (for Internal/Suppliers)
         user_id: Optional user ID for user-level filtering (for Customers)
         include_archived: Whether to include archived records (default: False)
         
@@ -3380,7 +3380,7 @@ def get_enriched_plate_kitchen_days(
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
-        institution_id: Optional institution ID to filter results (B2B Employee dropdown scoping; filters via restaurant)
+        institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping; filters via restaurant)
         
     Returns:
         List of PlateKitchenDayEnrichedResponseSchema with enriched data
@@ -3487,7 +3487,7 @@ def get_enriched_restaurant_holidays(
     Args:
         restaurant_id: Optional restaurant ID to filter by (if None, returns holidays for all accessible restaurants)
         db: Database connection
-        scope: Optional institution scope for filtering (Suppliers see their restaurants, Employees see all)
+        scope: Optional institution scope for filtering (Suppliers see their restaurants, Internal see all)
         include_archived: Whether to include archived records (default: False)
         
     Returns:

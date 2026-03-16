@@ -76,7 +76,7 @@ GET /api/v1/provinces/
 
 Use the following sequence for address forms:
 
-1. **Country**: Load from `GET /api/v1/markets/` or `GET /api/v1/countries/` (Employee-only). User selects a country.
+1. **Country**: Load from `GET /api/v1/markets/enriched/ or GET /api/v1/leads/markets` or `GET /api/v1/countries/` (Employee-only). User selects a country.
 2. **Province**: On country change, call `GET /api/v1/provinces/?country_code={code}`. Populate province dropdown; clear province and city.
 3. **City**: On province change, call `GET /api/v1/cities/?country_code={code}&province_code={code}`. Populate city dropdown; clear city.
 
@@ -87,7 +87,7 @@ This ensures users only select valid combinations (e.g. Washington + Seattle, no
 | Endpoint                    | Purpose |
 |----------------------------|---------|
 | `GET /api/v1/countries/`   | List supported countries (Employee-only; for Create Market). |
-| `GET /api/v1/markets/`     | List markets with `country_code`, `country_name` (for address country dropdown). |
+| `GET /api/v1/markets/enriched/ or GET /api/v1/leads/markets`     | List markets with `country_code`, `country_name` (for address country dropdown). |
 | `GET /api/v1/provinces/`   | List provinces, optionally filtered by `country_code`. |
 | `GET /api/v1/cities/`      | List cities, optionally filtered by `country_code` and `province_code`. |
 

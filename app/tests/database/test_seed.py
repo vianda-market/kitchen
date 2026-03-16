@@ -136,7 +136,7 @@ class TestSeedDataRecords:
             username, role_type, role_name, email = result
             
             assert username == 'superadmin', f"Super Admin username should be 'superadmin', got '{username}'"
-            assert role_type == 'Employee', f"Super Admin role_type should be 'Employee', got '{role_type}'"
+            assert role_type == 'Internal', f"Super Admin role_type should be 'Internal', got '{role_type}'"
             assert role_name == 'Super Admin', f"Super Admin role_name should be 'Super Admin', got '{role_name}'"
             assert email == 'superadmin@example.com', f"Super Admin email should be 'superadmin@example.com', got '{email}'"
     

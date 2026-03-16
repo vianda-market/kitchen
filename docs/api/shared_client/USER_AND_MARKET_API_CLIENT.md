@@ -73,7 +73,7 @@ Enriched user list: each item has `market_id` and `market_ids` as above.
 
 - **Global Marketplace**  
   - `market_id = 00000000-0000-0000-0000-000000000001`  
-  - **Not** returned by the public **GET /api/v1/markets/available** (it’s for assignment only).  
+  - **Not** returned by the public **GET /api/v1/leads/markets** (it’s for assignment only).  
   - Assigned to Admin, Super Admin, Supplier Admin, and (v2) Global Manager. Backend treats it as “no market filter” / all markets.
 
 - **Global Manager** (v2)  
@@ -87,12 +87,12 @@ Enriched user list: each item has `market_id` and `market_ids` as above.
 
 | Need | Source | Notes |
 |------|--------|-------|
-| **Market selector list** | **GET /api/v1/markets/available** | No auth; returns `country_code` and `country_name` only. Use for signup country dropdown. For plans/subscriptions (need `market_id`), use GET /markets/enriched/ after login. |
-| **Restore selected market after login** | **GET /api/v1/users/me** → `market_id` or `market_ids[0]` | Resolve this UUID against the list from `/markets/available` and set `selectedMarket` (or preferred market). If the user’s market is not in the public list (e.g. Global), ignore for B2C selector. |
+| **Market selector list** | **GET /api/v1/leads/markets** | No auth; returns `country_code` and `country_name` only. Use for signup country dropdown. For plans/subscriptions (need `market_id`), use GET /markets/enriched/ after login. |
+| **Restore selected market after login** | **GET /api/v1/users/me** → `market_id` or `market_ids[0]` | Resolve this UUID against the list from GET /markets/enriched/ and set `selectedMarket` (or preferred market). If the user’s market is not in the public list (e.g. Global), ignore for B2C selector. |
 | **Plans / subscriptions** | Use `selectedMarket.market_id` (from selector or from GET /users/me) | Pass to GET /plans/enriched/?market_id=… and for subscription creation. **Do not send** `market_id` when empty (omit param); sending `''` returns **422**. Prefer calling plans only when you have a valid market_id; when none selected, show “Select a country to see plans” and do not call. Do not use Global Marketplace for plan create/update (backend returns 400). See [MARKET_SCOPE_FOR_CLIENTS.md](./MARKET_SCOPE_FOR_CLIENTS.md). |
 | **Leads / explore (cities, by-city)** | Use `selectedMarket.country_code` | Pass as `country_code` to leads and restaurant endpoints. |
 
-**Customer signup**: Client sends `country_code` (from GET /markets/available) in signup request; backend resolves to market. After signup, GET /users/me returns that user’s `market_id`; B2C can set the initial market selector from it.
+**Customer signup**: Client sends `country_code` (from GET /leads/markets) in signup request; backend resolves to market. After signup, GET /users/me returns that user’s `market_id`; B2C can set the initial market selector from it.
 
 ---
 
@@ -137,6 +137,6 @@ async function restoreSelectedMarket(
 
 ## 8. Related docs
 
-- [MARKET_SCOPE_FOR_CLIENTS.md](./MARKET_SCOPE_FOR_CLIENTS.md) — Markets API and market scope (list, selector, public `/markets/available`, Global rule, B2B/B2C).
+- [MARKET_SCOPE_FOR_CLIENTS.md](./MARKET_SCOPE_FOR_CLIENTS.md) — Markets API and market scope (list, selector, public `/leads/markets`, Global rule, B2B/B2C).
 - [MARKET_BASED_SUBSCRIPTIONS.md](./MARKET_BASED_SUBSCRIPTIONS.md) — Multi-market subscriptions.
 - Backend roadmap: [USER_MARKET_ASSIGNMENT_DESIGN.md](../../roadmap/USER_MARKET_ASSIGNMENT_DESIGN.md), [USER_MARKET_AND_GLOBAL_MANAGER_V2.md](../../roadmap/USER_MARKET_AND_GLOBAL_MANAGER_V2.md).

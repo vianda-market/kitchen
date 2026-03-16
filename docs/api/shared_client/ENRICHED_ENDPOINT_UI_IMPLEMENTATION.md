@@ -34,8 +34,8 @@ The backend provides enriched endpoints for multiple entities. All follow the sa
 
 **Users:**
 - `GET /api/v1/users/enriched/` - List enriched users
-- `GET /api/v1/users/enriched/{user_id}` - Get single enriched user ⚠️ **DEPRECATED for self-reads** (use `GET /api/v1/users/me`)
-- `GET /api/v1/users/me` - Get current user's enriched profile ✅ **NEW: Use this for self-reads**
+- `GET /api/v1/users/enriched/{user_id}` - Get single enriched user (admin use only; self-read returns **410 Gone** — use `GET /api/v1/users/me`)
+- `GET /api/v1/users/me` - Get current user's enriched profile ✅ **Use this for self-reads**
 
 **Restaurants:**
 - `GET /api/v1/restaurants/enriched/` - List enriched restaurants

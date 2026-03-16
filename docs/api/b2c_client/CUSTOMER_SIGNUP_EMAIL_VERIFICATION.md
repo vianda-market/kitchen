@@ -78,7 +78,7 @@ Content-Type: application/json
 | `username` | string | Yes | 3–100 chars | Unique; must not already exist in the system |
 | `password` | string | Yes | min 8 chars | Sent in plain text over HTTPS; backend hashes before storing |
 | `email` | string | Yes | Valid email format | Unique; stored and compared in lowercase |
-| `country_code` | string | **Yes** | ISO 3166-1 alpha-2 (e.g. US, AR) | Country the user selected. Must be from `GET /api/v1/markets/available`. Backend resolves to market internally. |
+| `country_code` | string | **Yes** | ISO 3166-1 alpha-2 (e.g. US, AR) | Country the user selected. Must be from `GET /api/v1/leads/markets`. Backend resolves to market internally. |
 | `city_id` | UUID | One of city_id or city_name | Valid city UUID | City UUID. Use when you have it (e.g. from `GET /api/v1/cities/`). Optional if `city_name` is provided. |
 | `city_name` | string | One of city_id or city_name | City name from API | City name the user selected. Must be from `GET /api/v1/leads/cities?country_code={country_code}`. Backend resolves to city_id. **Preferred for B2C** (no auth needed for cities list). |
 | `cellphone` | string | No | max 20 chars | Optional; users can add later in profile. |
@@ -100,11 +100,11 @@ Content-Type: application/json
 }
 ```
 
-Use the `country_code` value from the markets/available response (e.g. `US`, `AR`). Do not submit signup without `country_code`. Use the `city_id` from `GET /api/v1/cities/?country_code={country_code}&exclude_global=true`. Do not submit signup without `city_id` (or `city_name`); the Global city cannot be assigned to B2C customers.
+Use the `country_code` value from the leads/markets response (e.g. `US`, `AR`). Do not submit signup without `country_code`. Use the `city_id` from `GET /api/v1/cities/?country_code={country_code}&exclude_global=true`. Do not submit signup without `city_id` (or `city_name`); the Global city cannot be assigned to B2C customers.
 
 ### Country selection
 
-The app must call **`GET /api/v1/markets/available`** (no auth) to get the list of countries. The response returns `country_code` and `country_name` only. The user selects one in the UI; send its `country_code` in the signup request body. `country_code` is **required**. See [MARKET_SELECTION_AT_SIGNUP.md](MARKET_SELECTION_AT_SIGNUP.md) and [Markets API](../../b2b_client/MARKETS_API_CLIENT.md).
+The app must call **`GET /api/v1/leads/markets`** (no auth) to get the list of countries. The response returns `country_code` and `country_name` only. The user selects one in the UI; send its `country_code` in the signup request body. `country_code` is **required**. See [MARKET_SELECTION_AT_SIGNUP.md](MARKET_SELECTION_AT_SIGNUP.md) and [Markets API](../../b2b_client/MARKETS_API_CLIENT.md).
 
 **City selection:** Call `GET /api/v1/leads/cities?country_code={country_code}` (no auth) to get city names for the signup picker. Send the selected `city_name` in the signup body; the backend resolves it to `city_id`. One of `city_id` or `city_name` is **required** at signup.
 
@@ -258,13 +258,7 @@ The app must:
 
 ---
 
-## 7. Deprecated endpoint
-
-- **`POST /api/v1/customers/signup`** (single-step signup without verification) is **deprecated**. It may be removed in a future version. New implementations must use the two-step flow above.
-
----
-
-## 8. Dev / E2E only (optional)
+## 7. Dev / E2E only (optional)
 
 When the backend runs with **DEV_MODE** enabled (e.g. staging or local), a **dev-only** endpoint is available for E2E tests or tools that cannot read the email:
 
@@ -288,11 +282,10 @@ GET /api/v1/customers/signup/dev-pending-token?email=<email>
 | Step 2 success | 201; body has `user` and `access_token`; store token and treat user as logged in |
 | Auth | No auth for signup/request and signup/verify; use `access_token` from verify (or login) for all other APIs |
 | Link expiry | 24 hours; one-time use |
-| Deprecated | `POST /api/v1/customers/signup` — do not use for new development |
 
 ---
 
-## 10. Related docs
+## 9. Related docs
 
 - [B2C_ENDPOINTS_OVERVIEW.md](./B2C_ENDPOINTS_OVERVIEW.md) — Table of B2C APIs and short signup summary.
 - [FRONTEND_AGENT_README.md](./FRONTEND_AGENT_README.md) — General B2C client guidance.

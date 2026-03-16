@@ -15,11 +15,11 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 - Every **institution** has exactly one **market_id** (required; Global or a country market). No “no market”; never null.
 - **Supplier institutions:** The institution’s `market_id` is set at creation and is **non-editable** via normal update; only a future paid upgrade flow can add or change markets. B2B clients must not allow editing `market_id` for Supplier institutions in the UI (backend strips it on PUT).
-- **Institution create:** `market_id` is **required** in `POST /api/v1/institutions/`. Use `GET /api/v1/markets/available` for the dropdown (excludes Global; see §3).
+- **Institution create:** `market_id` is **required** in `POST /api/v1/institutions/`. Use `GET /api/v1/leads/markets` for the dropdown (excludes Global; see §3).
 
 ### 1.2 Single market for Customer Comensal (B2C)
 
-- **Signup:** The B2C client **must** send **`country_code`** (required, ISO 3166-1 alpha-2) in `POST /api/v1/customers/signup/request`. The user selects their country in the UI before submitting; the value must come from `GET /api/v1/markets/available` (which returns only `country_code` and `country_name`). The backend resolves `country_code` to `market_id` and uses it when creating the user at verify.
+- **Signup:** The B2C client **must** send **`country_code`** (required, ISO 3166-1 alpha-2) in `POST /api/v1/customers/signup/request`. The user selects their country in the UI before submitting; the value must come from `GET /api/v1/leads/markets` (which returns only `country_code` and `country_name`). The backend resolves `country_code` to `market_id` and uses it when creating the user at verify.
 - **Non-editable after signup:** Customer Comensal (and Customer Employer) **cannot change** their market via profile update. The backend strips `market_id` and `market_ids` on `PUT /users/me` and on admin `PUT /users/{user_id}` when the target user is a Customer. B2C clients must not show or send market as editable in profile; the user is locked to the market chosen at registration until a future paid upgrade flow.
 - **Restore selection after login:** Use `GET /users/me` and set the app’s selected market from `market_id` (or `market_ids[0]`) so the market selector matches the user’s assigned market.
 
@@ -33,16 +33,16 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 | Actor | Market at creation | Editable later? | Source of market_id |
 |-------|--------------------|-----------------|----------------------|
-| **Customer Comensal** | Required at signup (client sends `country_code` in signup request) | No | User selection from GET /markets/available (`country_code`) |
+| **Customer Comensal** | Required at signup (client sends `country_code` in signup request) | No | User selection from GET /leads/markets (`country_code`) |
 | **Customer Employer** | Must match institution’s market | No | Institution’s market_id |
 | **Supplier user** | Must match institution’s market | No | Institution’s market_id |
-| **Institution (Supplier)** | Required at create | No (for Supplier institutions) | From GET /markets/available |
+| **Institution (Supplier)** | Required at create | No (for Supplier institutions) | From GET /markets/enriched/ |
 
 ---
 
 ## 2. Markets API reference
 
-### 2.1 Public: GET /api/v1/markets/available
+### 2.1 Public (Leads): GET /api/v1/leads/markets
 
 - **Auth:** None (public). Rate-limited (e.g. 60 req/min). Cached on server.
 - **Response:** Active, non-archived countries **excluding Global Marketplace**. Use as the **single source** for the signup country selector and lead flow.
@@ -61,7 +61,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 - **Global Marketplace** = `market_id` `00000000-0000-0000-0000-000000000001` (country_code `GL`). It is **only for user assignment** (“this user is not constrained by market when querying”).
 - **Do not** use Global for plans, subscriptions, or any other entity. The backend returns **400** if Global is sent for plan create/update or similar.
-- **Client obligation:** **Exclude Global** from any dropdown used when creating or editing entities that take `market_id`. **GET /markets/available** already excludes Global — use it for those dropdowns.
+- **Client obligation:** **Exclude Global** from any dropdown used when creating or editing entities that take `market_id`. **GET /leads/markets** already excludes Global — use it for those dropdowns.
 
 ### 2.4 Where market_id vs country_code is used
 
@@ -80,8 +80,8 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 ### 3.1 Data source and state
 
-- **Fetch:** `GET /api/v1/markets/available` on load; cache with short TTL.
-- **State:** B2C (pre-auth): store `{ country_code, country_name }` from GET /markets/available for signup. B2C (post-auth) and B2B: store `{ market_id, country_code, country_name }` from GET /users/me or enriched markets.
+- **Fetch:** `GET /api/v1/leads/markets` on load; cache with short TTL.
+- **State:** B2C (pre-auth): store `{ country_code, country_name }` from GET /leads/markets for signup. B2C (post-auth) and B2B: store `{ market_id, country_code, country_name }` from GET /users/me or enriched markets.
 - **Persistence:** B2C (mobile) — AsyncStorage/SecureStore (e.g. `selected_market_id`). B2B (web) — localStorage. After login, restore from GET /users/me `market_id` / `market_ids[0]`.
 
 ### 3.2 Country flag
@@ -115,7 +115,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 ## 5. Enriched responses and TypeScript
 
 - Enriched endpoints (plans, subscriptions, institution-bills, institution-bank-accounts, institution-entities, discretionary) include **market_id**, **market_name**, **country_code**. Add these to your interfaces.
-- **Plan create/update:** Request body must include `market_id` (required); use only values from GET /markets/available (never Global).
+- **Plan create/update:** Request body must include `market_id` (required); use only values from GET /markets/enriched/ (never Global).
 - **Migration:** Existing endpoints remain compatible; new fields are additive. Exclude Global from any dropdown used for plan or other entity `market_id`.
 
 ---

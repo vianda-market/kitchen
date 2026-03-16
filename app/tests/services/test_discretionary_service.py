@@ -42,13 +42,13 @@ class TestDiscretionaryService:
     def sample_super_admin(self):
         """Sample super-admin user for testing
         
-        Super Admin users have role_type='Employee' and role_name='Super Admin'.
-        This allows them to have global access (via Employee role_type) plus special 
+        Super Admin users have role_type='Internal' and role_name='Super Admin'.
+        This allows them to have global access (via Internal role_type) plus special 
         approval permissions (via role_name).
         """
         return {
             "user_id": uuid4(),
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Super Admin",
             "institution_id": uuid4()
         }

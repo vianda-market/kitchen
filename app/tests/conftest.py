@@ -42,7 +42,7 @@ def mock_db_with_transaction():
 # User Fixtures
 # =============================================================================
 
-# US market UUID (must match seed / GET /markets/available)
+# US market UUID (must match seed / GET /leads/markets or /markets/enriched/)
 SAMPLE_MARKET_ID = UUID("66666666-6666-6666-6666-666666666666")
 # Sample city UUID (non-Global; must match market country for customer signup)
 SAMPLE_CITY_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
@@ -102,13 +102,13 @@ def sample_user_dto():
 
 @pytest.fixture
 def sample_employee_user():
-    """Employee user (role_type='Employee', role_name='Admin') for testing.
+    """Internal user (role_type='Internal', role_name='Admin') for testing.
     
-    Employees have global access and can manage system configuration.
+    Internal users have global access and can manage system configuration.
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Employee",
+        "role_type": "Internal",
         "role_name": "Admin",
         "institution_id": uuid4()
     }
@@ -116,14 +116,14 @@ def sample_employee_user():
 
 @pytest.fixture
 def sample_super_admin_user():
-    """Super Admin user (role_type='Employee', role_name='Super Admin') for testing.
+    """Super Admin user (role_type='Internal', role_name='Super Admin') for testing.
     
-    Super Admins have global access (via Employee role_type) plus special
+    Super Admins have global access (via Internal role_type) plus special
     approval permissions (via role_name='Super Admin').
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Employee",
+        "role_type": "Internal",
         "role_name": "Super Admin",
         "institution_id": uuid4()
     }

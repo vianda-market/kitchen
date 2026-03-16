@@ -285,7 +285,7 @@
 									"const response = pm.response.json();",
 									"",
 									"pm.test('Role type enum contains expected values', function () {",
-									"    pm.expect(response).to.include('Employee');",
+									"    pm.expect(response).to.include('Internal');",
 									"    pm.expect(response).to.include('Supplier');",
 									"    pm.expect(response).to.include('Customer');",
 									"    pm.expect(response.length).to.equal(3);",

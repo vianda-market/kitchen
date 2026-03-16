@@ -18,11 +18,11 @@ from app.auth.dependencies import (
 )
 
 
-class TestEmployeeUserAccess:
+class TestInternalUserAccess:
     """Test cases for get_employee_user() dependency"""
     
     def test_allows_employee(self, sample_employee_user):
-        """Test that get_employee_user() allows Employee role_type"""
+        """Test that get_employee_user() allows Internal role_type"""
         # Act
         result = get_employee_user(sample_employee_user)
         
@@ -30,7 +30,7 @@ class TestEmployeeUserAccess:
         assert result == sample_employee_user
     
     def test_allows_super_admin(self, sample_super_admin_user):
-        """Test that get_employee_user() allows Super Admin (Employee role_type)"""
+        """Test that get_employee_user() allows Super Admin (Internal role_type)"""
         # Act
         result = get_employee_user(sample_super_admin_user)
         
@@ -44,7 +44,7 @@ class TestEmployeeUserAccess:
             get_employee_user(sample_supplier_user)
         
         assert exc_info.value.status_code == 403
-        assert "Employee access required" in str(exc_info.value.detail)
+        assert "Internal access required" in str(exc_info.value.detail)
     
     def test_rejects_customer(self, sample_customer_user):
         """Test that get_employee_user() rejects Customer role_type"""
@@ -53,14 +53,14 @@ class TestEmployeeUserAccess:
             get_employee_user(sample_customer_user)
         
         assert exc_info.value.status_code == 403
-        assert "Employee access required" in str(exc_info.value.detail)
+        assert "Internal access required" in str(exc_info.value.detail)
 
 
 class TestSuperAdminUserAccess:
     """Test cases for get_super_admin_user() dependency"""
     
     def test_allows_super_admin(self, sample_super_admin_user):
-        """Test that get_super_admin_user() allows Super Admin (Employee + Super Admin)"""
+        """Test that get_super_admin_user() allows Super Admin (Internal + Super Admin)"""
         # Act
         result = get_super_admin_user(sample_super_admin_user)
         
@@ -68,7 +68,7 @@ class TestSuperAdminUserAccess:
         assert result == sample_super_admin_user
     
     def test_rejects_employee(self, sample_employee_user):
-        """Test that get_super_admin_user() rejects regular Employee (Admin)"""
+        """Test that get_super_admin_user() rejects regular Internal (Admin)"""
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             get_super_admin_user(sample_employee_user)
@@ -99,7 +99,7 @@ class TestAdminUserAccess:
     """Test cases for get_admin_user() dependency"""
     
     def test_allows_employee_admin(self, sample_employee_user):
-        """Test that get_admin_user() allows Employee with Admin role_name"""
+        """Test that get_admin_user() allows Internal with Admin role_name"""
         # Act
         result = get_admin_user(sample_employee_user)
         
@@ -107,7 +107,7 @@ class TestAdminUserAccess:
         assert result == sample_employee_user
     
     def test_allows_super_admin(self, sample_super_admin_user):
-        """Test that get_admin_user() allows Super Admin (Employee + Super Admin)"""
+        """Test that get_admin_user() allows Super Admin (Internal + Super Admin)"""
         # Act
         result = get_admin_user(sample_super_admin_user)
         
@@ -145,7 +145,7 @@ class TestClientUserAccess:
         assert result == sample_customer_user
     
     def test_rejects_employee(self, sample_employee_user):
-        """Test that get_client_user() rejects Employee"""
+        """Test that get_client_user() rejects Internal"""
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             get_client_user(sample_employee_user)
@@ -172,7 +172,7 @@ class TestClientUserAccess:
         assert "Customer access required" in str(exc_info.value.detail)
 
 
-class TestClientOrEmployeeUserAccess:
+class TestClientOrInternalUserAccess:
     """Test cases for get_client_or_employee_user() dependency"""
     
     def test_allows_customer(self, sample_customer_user):
@@ -184,7 +184,7 @@ class TestClientOrEmployeeUserAccess:
         assert result == sample_customer_user
     
     def test_allows_employee(self, sample_employee_user):
-        """Test that get_client_or_employee_user() allows Employee"""
+        """Test that get_client_or_employee_user() allows Internal"""
         # Act
         result = get_client_or_employee_user(sample_employee_user)
         
@@ -192,7 +192,7 @@ class TestClientOrEmployeeUserAccess:
         assert result == sample_employee_user
     
     def test_allows_super_admin(self, sample_super_admin_user):
-        """Test that get_client_or_employee_user() allows Super Admin (Employee)"""
+        """Test that get_client_or_employee_user() allows Super Admin (Internal)"""
         # Act
         result = get_client_or_employee_user(sample_super_admin_user)
         
@@ -206,5 +206,5 @@ class TestClientOrEmployeeUserAccess:
             get_client_or_employee_user(sample_supplier_user)
         
         assert exc_info.value.status_code == 403
-        assert "Customer or Employee access required" in str(exc_info.value.detail)
+        assert "Customer or Internal access required" in str(exc_info.value.detail)
 

@@ -75,7 +75,7 @@ def get_enriched_institution_bills_endpoint(
     Returns an array of enriched institution bill records. Non-archived only.
 
     Scoping:
-    - Employees: See all institution bills
+    - Internal: See all institution bills
     - Suppliers: See bills for restaurants in their institution
     - Customers: See bills for restaurants in their institution (if applicable)"""
     

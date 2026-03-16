@@ -89,9 +89,10 @@ class UserCreateSchema(BaseModel):
             return v
         
         valid_combinations = {
-            RoleType.EMPLOYEE: [RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.MANAGER, RoleName.OPERATOR, RoleName.GLOBAL_MANAGER],
+            RoleType.INTERNAL: [RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.MANAGER, RoleName.OPERATOR, RoleName.GLOBAL_MANAGER],
             RoleType.SUPPLIER: [RoleName.ADMIN, RoleName.MANAGER, RoleName.OPERATOR],
-            RoleType.CUSTOMER: [RoleName.COMENSAL, RoleName.EMPLOYER],
+            RoleType.CUSTOMER: [RoleName.COMENSAL],
+            RoleType.EMPLOYER: [RoleName.ADMIN, RoleName.MANAGER, RoleName.COMENSAL],
         }
         
         if v not in valid_combinations.get(role_type, []):
@@ -204,12 +205,12 @@ class UserResponseSchema(BaseModel):
     @field_validator("employer_id")
     @classmethod
     def employer_null_for_supplier_employee(cls, v, info: ValidationInfo):
-        """Supplier and Employee users do not have an Employer; return None in response."""
+        """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
         role_type = info.data.get("role_type")
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Employee"):
+        if rt in ("Supplier", "Internal", "Employer"):
             return None
         return v
 
@@ -267,38 +268,38 @@ class UserEnrichedResponseSchema(BaseModel):
     @field_validator("employer_id")
     @classmethod
     def employer_null_for_supplier_employee(cls, v, info: ValidationInfo):
-        """Supplier and Employee users do not have an Employer; return None in response."""
+        """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
         role_type = info.data.get("role_type")
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Employee"):
+        if rt in ("Supplier", "Internal", "Employer"):
             return None
         return v
 
     @field_validator("employer_name")
     @classmethod
     def employer_name_null_for_supplier_employee(cls, v, info: ValidationInfo):
-        """Supplier and Employee users do not have an Employer; return None in response."""
+        """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
         role_type = info.data.get("role_type")
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Employee"):
+        if rt in ("Supplier", "Internal", "Employer"):
             return None
         return v
 
     model_config = ConfigDict(from_attributes=True)
 
 class CustomerSignupSchema(BaseModel):
-    """Schema for customer signup. country_code required (from GET /api/v1/markets/available). Provide city_id OR city_name (backend resolves city_name to city_id)."""
+    """Schema for customer signup. country_code required (from GET /api/v1/leads/markets). Provide city_id OR city_name (backend resolves city_name to city_id)."""
     username: str = Field(..., min_length=3, max_length=100)
     password: str = Field(..., min_length=8, max_length=255)
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     email: EmailStr
     cellphone: Optional[str] = Field(None, max_length=20)
-    country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/markets/available. Backend resolves to market.")
+    country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/leads/markets. Backend resolves to market.")
     city_id: Optional[UUID] = Field(None, description="City UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
     city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_id.")
     is_archived: Optional[bool] = False
@@ -320,7 +321,7 @@ class InstitutionCreateSchema(BaseModel):
     """Schema for creating a new institution. market_id is required. no_show_discount required for Supplier."""
     name: str = Field(..., max_length=100)
     institution_type: Optional[RoleType] = None  # Defaults to Supplier in DB if omitted
-    market_id: UUID = Field(..., description="Required: market UUID (e.g. Global Marketplace or a country market from GET /api/v1/markets/available)")
+    market_id: UUID = Field(..., description="Required: market UUID (e.g. Global Marketplace or a country market from GET /api/v1/markets/enriched/)")
     no_show_discount: Optional[int] = Field(None, ge=0, le=100, description="Percentage 0-100; required when institution_type is Supplier")
 
     @model_validator(mode="after")
@@ -340,12 +341,12 @@ class InstitutionUpdateSchema(BaseModel):
     no_show_discount: Optional[int] = Field(None, ge=0, le=100, description="Percentage 0-100; cannot be None for Supplier institutions")
 
 class InstitutionResponseSchema(BaseModel):
-    """Schema for institution response data. market_id is always present (never null). no_show_discount is null for Employee/Customer."""
+    """Schema for institution response data. market_id is always present (never null). no_show_discount is null for Internal/Customer."""
     institution_id: UUID
     name: str
     institution_type: RoleType
     market_id: UUID = Field(..., description="Required: market UUID (Global = all markets, one UUID = local market)")
-    no_show_discount: Optional[int] = Field(None, description="Percentage 0-100; required for Supplier, null for Employee/Customer")
+    no_show_discount: Optional[int] = Field(None, description="Percentage 0-100; required for Supplier, null for Internal/Customer")
     is_archived: bool
     status: Status
     created_date: datetime
@@ -997,7 +998,7 @@ class AddressCreateSchema(BaseModel):
     apartment_unit: Optional[str] = Field(None, max_length=20)
     assign_employer: Optional[bool] = Field(
         True,
-        description="If True (default), assign the employer to the current user when adding address. Only applies to Customers. Employees/Suppliers ignore this parameter. Can be set to False to opt-out of assignment."
+        description="If True (default), assign the employer to the current user when adding address. Only applies to Customers. Internal/Suppliers ignore this parameter. Can be set to False to opt-out of assignment."
     )
     # timezone is automatically assigned based on country_code/city - not required in API
     # country_name is resolved from market_info via country_code (not stored on address)
@@ -1300,7 +1301,7 @@ class EmployerCreateSchema(BaseModel):
     address: 'AddressCreateSchema' = Field(..., description="Complete address information for the employer location")
     assign_employer: bool = Field(
         True,
-        description="If True (default), assign this employer to the current user after creation. Only applies to Customers. Employees/Suppliers ignore this parameter."
+        description="If True (default), assign this employer to the current user after creation. Only applies to Customers. Internal/Suppliers ignore this parameter."
     )
 
 class EmployerUpdateSchema(BaseModel):
@@ -1820,13 +1821,13 @@ class MarketResponseSchema(BaseModel):
 
 
 class MarketPublicMinimalSchema(BaseModel):
-    """Minimal schema for public GET /markets/available (no auth). country_code + country_name only; no internal IDs or business logic."""
+    """Minimal schema for public GET /leads/markets (no auth). country_code + country_name only; no internal IDs or business logic."""
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
 
 
 class MarketPublicResponseSchema(BaseModel):
-    """Full market schema for authenticated endpoints. For unauthenticated /markets/available use MarketPublicMinimalSchema."""
+    """Full market schema for authenticated endpoints. For unauthenticated /leads/markets use MarketPublicMinimalSchema."""
     market_id: UUID = Field(..., description="Unique identifier for the market")
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
@@ -1983,7 +1984,7 @@ class EnumsResponseSchema(BaseModel):
                 "status_plate_pickup": ["Pending", "Arrived", "Completed", "Cancelled"],
                 "status_bill": ["Pending", "Processed", "Cancelled"],
                 "address_type": ["Restaurant", "Entity Billing", "Entity Address", "Customer Home", "Customer Billing", "Customer Employer"],
-                "role_type": ["Employee", "Supplier", "Customer"],
+                "role_type": ["Internal", "Supplier", "Customer", "Employer"],
                 "subscription_status": ["Active", "On Hold", "Pending", "Cancelled"],
                 "bill_resolution": ["Pending", "Paid", "Rejected"]
             }

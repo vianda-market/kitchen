@@ -14,7 +14,7 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 def mock_current_user():
     return {
         "user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-        "role_type": "Employee",
+        "role_type": "Internal",
         "role_name": "Super Admin",
         "institution_id": "11111111-1111-1111-1111-111111111111",
     }

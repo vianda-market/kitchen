@@ -55,9 +55,9 @@ class InstitutionDTO(BaseModel):
     """Pure DTO for institution data"""
     institution_id: UUID
     name: str
-    institution_type: RoleType  # Employee, Customer, Supplier, or Employer (Employer = benefits-program institution; users have role_type Customer)
+    institution_type: RoleType  # Internal, Customer, Supplier, or Employer
     market_id: Optional[UUID] = None  # v1: NULL or Global = all markets; one UUID = local market
-    no_show_discount: Optional[int] = None  # Percentage 0-100; required for Supplier, NULL for Employee/Customer
+    no_show_discount: Optional[int] = None  # Percentage 0-100; required for Supplier, NULL for Internal/Customer
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -243,10 +243,10 @@ class CreditCurrencyDTO(BaseModel):
 # =============================================================================
 
 class AddressDTO(BaseModel):
-    """Pure DTO for address data. user_id nullable (Supplier/Employee/Employer); floor, apartment_unit, is_default from address_subpremise."""
+    """Pure DTO for address data. user_id nullable (Supplier/Internal/Employer); floor, apartment_unit, is_default from address_subpremise."""
     address_id: UUID
     institution_id: UUID
-    user_id: Optional[UUID] = None  # Required only for Customer Comensal home/other; nullable for Supplier, Employee, Employer
+    user_id: Optional[UUID] = None  # Required only for Customer Comensal home/other; nullable for Supplier, Internal, Employer
     employer_id: Optional[UUID] = None  # Links address to employer (nullable)
     address_type: List[str]
     is_default: bool = False

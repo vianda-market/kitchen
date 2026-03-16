@@ -72,7 +72,7 @@ def get_all_restaurant_transactions(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_TRANSACTION, current_user)
 
     def _get_restaurant_transactions():
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         transactions = restaurant_transaction_service.get_all(
             db,
             scope=scope,
@@ -189,7 +189,7 @@ def get_restaurant_transaction(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_TRANSACTION, current_user)
 
     def _get_restaurant_transaction():
-        # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
+        # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         transaction = restaurant_transaction_service.get_by_id(transaction_id, db, scope=scope)
         
         if not transaction:

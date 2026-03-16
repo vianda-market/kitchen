@@ -102,7 +102,7 @@ def list_enriched_addresses(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Employee dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
+    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Internal dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
     if current_user.get("role_type") == "Customer":
         user_scope = get_user_scope(current_user)
 
@@ -216,7 +216,7 @@ def get_all_addresses(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get all addresses. Optional institution_id filters by institution (B2B Employee dropdown scoping). Non-archived only."""
+    """Get all addresses. Optional institution_id filters by institution (B2B Internal dropdown scoping). Non-archived only."""
     # Apply user scoping for Customers
     if current_user.get("role_type") == "Customer":
         user_scope = get_user_scope(current_user)
@@ -231,7 +231,7 @@ def get_all_addresses(
         effective_institution_id = resolve_institution_filter(institution_id, scope)
         if effective_institution_id is not None:
             effective_scope = InstitutionScope(
-                institution_id=str(effective_institution_id), role_type="Employee", role_name="Manager"
+                institution_id=str(effective_institution_id), role_type="Internal", role_name="Manager"
             )
         else:
             effective_scope = scope
@@ -254,7 +254,7 @@ def create_address(
     # address_type is never taken from client; backend derives it from connected objects
     addr_data.pop("address_type", None)
 
-    # B2B: require institution_id; user_id optional (Supplier/Employee may omit)
+    # B2B: require institution_id; user_id optional (Supplier/Internal may omit)
     if not user_scope.is_customer:
         if addr_data.get("institution_id") is None:
             raise HTTPException(
@@ -274,7 +274,7 @@ def create_address(
         if current_user.get("role_name") == "Comensal" and not addr_data.get("employer_id"):
             addr_data["user_id"] = current_user["user_id"]
     else:
-        # For Suppliers/Employees: user_id optional; if provided, validate target user belongs to their institution
+        # For Suppliers/Internal: user_id optional; if provided, validate target user belongs to their institution
         target_user_id = addr_data.get("user_id")
         if target_user_id is not None:
             target_user = user_service.get_by_id(target_user_id, db, scope=None)
@@ -289,7 +289,7 @@ def create_address(
                     detail="The user assigned to the address must belong to the same institution as the address.",
                 )
     
-    # Use institution scope for Suppliers/Employees
+    # Use institution scope for Suppliers/Internal
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user) if not user_scope.is_customer else None
 
     def _create_address_with_geocoding():
@@ -388,11 +388,11 @@ def delete_address(
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     
-    # Apply user scoping for Customers and Employee Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Employee" and role_name == "Operator"):
+    # Apply user scoping for Customers and Internal Operators (self-only access)
+    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(existing_address.user_id)
-        scope = None  # No institution filtering needed for Customers and Employee Operators
+        scope = None  # No institution filtering needed for Customers and Internal Operators
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
 

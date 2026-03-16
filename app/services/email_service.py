@@ -238,7 +238,7 @@ The Vianda Team
             if b2b_url:
                 set_password_url = f"{b2b_url}/set-password?code={reset_code}"
             else:
-                set_password_url = f"https://app.vianda.com/set-password?code={reset_code}"
+                set_password_url = f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
         first_name = user_first_name or "there"
         subject = "You've been invited to Vianda – Set your password"
         body_text = f"""

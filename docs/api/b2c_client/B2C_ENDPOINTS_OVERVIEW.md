@@ -39,7 +39,7 @@ Customer registration uses a **two-step flow** so that a row in `user_info` is c
 
 | Step | Endpoint | Purpose |
 |------|----------|---------|
-| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, **country_code**, city_id or city_name, cellphone, first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). Use GET /markets/available for `country_code` values. |
+| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, **country_code**, city_id or city_name, cellphone, first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). Use GET /leads/markets for `country_code` values. |
 | 2 | `POST /api/v1/customers/signup/verify` | Send `{"token": "..."}` (from the link in the email). Backend creates the user, marks the token used, and returns the user object plus `access_token` so the client can log the user in immediately. |
 
 **UI flow**
@@ -52,10 +52,6 @@ Customer registration uses a **two-step flow** so that a row in `user_info` is c
 **Dev / E2E**
 
 - When `DEV_MODE` is true, `GET /api/v1/customers/signup/dev-pending-token?email=<email>` returns the current verification token for that email so E2E or Postman can run the verify step without reading the email.
-
-**Deprecated**
-
-- `POST /api/v1/customers/signup` (creates user immediately without verification) is **deprecated**. Prefer the request/verify flow above.
 
 ---
 

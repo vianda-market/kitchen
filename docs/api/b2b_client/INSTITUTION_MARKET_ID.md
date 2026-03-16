@@ -69,7 +69,7 @@ Every institution **must** have a **`market_id`** (UUID). The database enforces 
 |-------------------|--------|----------|-------------|
 | `name`            | string | Yes      | Institution name. |
 | `institution_type`| string | No       | One of: `Employee`, `Supplier`, `Customer`, `Employer`. **Use `GET /api/v1/enums/institution-types/assignable`** to populate the dropdown; do not hardcode. |
-| `market_id`       | UUID   | **Yes**  | **Required.** From GET /api/v1/markets/available or enriched; use Global Marketplace UUID for “all markets”. |
+| `market_id`       | UUID   | **Yes**  | **Required.** From GET /api/v1/markets/enriched/; use Global Marketplace UUID for “all markets”. |
 
 ---
 
@@ -115,7 +115,7 @@ The client does **not** send `market_id` on these list endpoints — sending `in
    Use `market_id: string` (never `string | null`) in your Institution type for responses. For create, require `market_id` in the request type.
 
 3. **Institution list / cards**  
-   Show which market an institution uses by resolving `market_id` with **GET /api/v1/markets/available** or **GET /api/v1/markets/enriched/** (match by `market_id` to get `country_code` / `country_name`). Treat Global Marketplace UUID as “All markets”.
+   Show which market an institution uses by resolving `market_id` with **GET /api/v1/markets/enriched/** (match by `market_id` to get `country_code` / `country_name`). Treat Global Marketplace UUID as “All markets”.
 
 4. **Create / Edit institution**  
    **Required:** Include a market selector (or equivalent) and send **`market_id`** in every create request. Use the markets list from the API; for “all markets” use the Global Marketplace UUID. Recommend client agents enforce this so there are no barriers to missing `market_id` (e.g. required field, validation, no default “skip” or “none”).
@@ -146,7 +146,7 @@ interface Institution {
 interface InstitutionCreateRequest {
   name: string;
   institution_type?: string;
-  market_id: string;  // Required; use GET /api/v1/markets/available to get valid UUIDs
+  market_id: string;  // Required; use GET /api/v1/markets/enriched/ to get valid UUIDs
 }
 
 /** Update: market_id optional */

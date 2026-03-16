@@ -58,15 +58,15 @@ INSERT INTO market_info (market_id, country_name, country_code, credit_currency_
 ('00000000-0000-0000-0000-000000000007', 'Brazil', 'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
--- no_show_discount: NULL for Employee/Customer (not applicable); Supplier requires it at create time.
+-- no_show_discount: NULL for Internal/Customer (not applicable); Supplier requires it at create time.
 -- created_by: dddddddd (superadmin) — FK dropped before insert, re-added after users exist.
 INSERT INTO institution_info (institution_id, name, institution_type, market_id, no_show_discount, is_archived, status, created_date, created_by, modified_by, modified_date)
 VALUES (
   '11111111-1111-1111-1111-111111111111',           -- Vianda Enterprises (employees)
   'Vianda Enterprises',
-  'Employee'::institution_type_enum,
+  'Internal'::institution_type_enum,
   '00000000-0000-0000-0000-000000000001',           -- Global Marketplace
-  NULL,                                              -- no_show_discount not applicable for Employee
+  NULL,                                              -- no_show_discount not applicable for Internal
   False,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -128,7 +128,7 @@ INSERT INTO user_info (
   'Super',
   'Admin',
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
-  'Employee'::role_type_enum,
+  'Internal'::role_type_enum,
   'Super Admin'::role_name_enum,
   'superadmin@example.com',
   '5555555555',
@@ -148,7 +148,7 @@ INSERT INTO user_info (
   'System',
   'Bot',
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
-  'Employee'::role_type_enum,
+  'Internal'::role_type_enum,
   'Admin'::role_name_enum,
   'system@internal',
   '0000000000',

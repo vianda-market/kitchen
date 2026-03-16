@@ -19,7 +19,7 @@ B2C app users are Customers. Do NOT call Employee-only or Supplier-only APIs.
 3. [USER_SELF_UPDATE_PATTERN.md](../shared_client/USER_SELF_UPDATE_PATTERN.md)
 4. [ENRICHED_ENDPOINT_PATTERN.md](../shared_client/ENRICHED_ENDPOINT_PATTERN.md)
 5. [ARCHIVED_RECORDS_PATTERN.md](../shared_client/ARCHIVED_RECORDS_PATTERN.md)
-6. [MARKET_SELECTION_AT_SIGNUP.md](./MARKET_SELECTION_AT_SIGNUP.md) — Country dropdown for signup: use GET /markets/available (returns `country_code`, `country_name` only); send `country_code` in signup request. Do not persist or hardcode; refresh when entering signup.
+6. [MARKET_SELECTION_AT_SIGNUP.md](./MARKET_SELECTION_AT_SIGNUP.md) — Country dropdown for signup: use GET /leads/markets (returns `country_code`, `country_name` only); send `country_code` in signup request. Do not persist or hardcode; refresh when entering signup.
 
 ## Subfolders
 

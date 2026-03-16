@@ -116,7 +116,7 @@ class TestEnumService(unittest.TestCase):
         role_type_values = enums['role_type']
         
         # Check for expected role type values
-        expected_roles = ['Employee', 'Supplier', 'Customer']
+        expected_roles = ['Internal', 'Supplier', 'Customer', 'Employer']
         self.assertEqual(len(role_type_values), len(expected_roles), 
                         "Should have exactly 3 role types")
         for role in expected_roles:
@@ -161,19 +161,19 @@ class TestEnumService(unittest.TestCase):
     def test_get_assignable_institution_types_super_admin(self):
         """Super Admin gets all four institution types."""
         result = EnumService.get_assignable_institution_types({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Super Admin",
         })
-        self.assertEqual(set(result), {"Employee", "Supplier", "Customer", "Employer"})
+        self.assertEqual(set(result), {"Internal", "Supplier", "Customer", "Employer"})
 
     def test_get_assignable_institution_types_admin(self):
-        """Admin gets Supplier, Employer only (no Employee, no Customer)."""
+        """Admin gets Supplier, Employer only (no Internal, no Customer)."""
         result = EnumService.get_assignable_institution_types({
-            "role_type": "Employee",
+            "role_type": "Internal",
             "role_name": "Admin",
         })
         self.assertEqual(set(result), {"Supplier", "Employer"})
-        self.assertNotIn("Employee", result)
+        self.assertNotIn("Internal", result)
         self.assertNotIn("Customer", result)
 
     def test_get_assignable_institution_types_supplier(self):

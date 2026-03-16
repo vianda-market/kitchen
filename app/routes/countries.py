@@ -29,7 +29,7 @@ async def list_supported_countries(
     """
     List supported countries for address forms and market creation.
 
-    **Authorization**: Customer, Employee, or Supplier (all need country dropdown for addresses).
+    **Authorization**: Customer, Internal, or Supplier (all need country dropdown for addresses).
 
     **Returns**: JSON array of `{ country_code, country_name }` sorted by `country_name`.
     Use for "Country" dropdown in Create/Edit Market form. Only countries valid for

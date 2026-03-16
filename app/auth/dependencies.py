@@ -92,15 +92,15 @@ def get_super_admin_user(current_user: dict = Depends(get_current_user)):
     """
     Verify user has super-admin role for discretionary credit approval.
     
-    Super Admin users have role_type='Employee' and role_name='Super Admin'.
-    This allows them to have global access (via Employee role_type) plus special 
+    Super Admin users have role_type='Internal' and role_name='Super Admin'.
+    This allows them to have global access (via Internal role_type) plus special 
     approval permissions (via role_name).
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if super-admin (role_type='Employee' AND role_name='Super Admin')
+        Current user if super-admin (role_type='Internal' AND role_name='Super Admin')
         
     Raises:
         HTTPException: If user is not super-admin
@@ -108,8 +108,8 @@ def get_super_admin_user(current_user: dict = Depends(get_current_user)):
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     
-    # Check for positive outcomes: Super Admin must have both Employee role_type AND Super Admin role_name
-    if role_type == "Employee" and role_name == "Super Admin":
+    # Check for positive outcomes: Super Admin must have both Internal role_type AND Super Admin role_name
+    if role_type == "Internal" and role_name == "Super Admin":
         return current_user
     
     raise HTTPException(
@@ -120,30 +120,30 @@ def get_super_admin_user(current_user: dict = Depends(get_current_user)):
 
 def get_employee_user(current_user: dict = Depends(get_current_user)):
     """
-    Verify user has Employee role_type for system configuration access.
+    Verify user has Internal role_type for system configuration access.
     
-    Employee users (role_type='Employee') have global access and can manage system
+    Internal users (role_type='Internal') have global access and can manage system
     configuration such as Plans, Credit Currencies, and Discretionary credits.
-    This includes both Admin and Super Admin users (both are Employees).
+    This includes both Admin and Super Admin users (both are Internal).
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Employee (any role_name: Admin, Super Admin, etc.)
+        Current user if Internal (any role_name: Admin, Super Admin, etc.)
         
     Raises:
-        HTTPException: If user is not an Employee
+        HTTPException: If user is not Internal
     """
     role_type = current_user.get("role_type")
     
-    # Check for positive outcome: Employee role_type required for system configuration
-    if role_type == "Employee":
+    # Check for positive outcome: Internal role_type required for system configuration
+    if role_type == "Internal":
         return current_user
     
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, 
-        detail="Employee access required for system configuration operations"
+        detail="Internal access required for system configuration operations"
     )
 
 
@@ -177,63 +177,63 @@ def get_client_user(current_user: dict = Depends(get_current_user)):
 
 def get_client_or_employee_user(current_user: dict = Depends(get_current_user)):
     """
-    Verify user has Customer or Employee role_type.
+    Verify user has Customer or Internal role_type.
     
-    Used for resources that both Customers (for mobile app) and Employees (for backoffice)
+    Used for resources that both Customers (for mobile app) and Internal users (for backoffice)
     need to access, but Suppliers should not access (e.g., Plans).
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Customer or Employee
+        Current user if Customer or Internal
         
     Raises:
-        HTTPException: If user is not a Customer or Employee
+        HTTPException: If user is not a Customer or Internal
     """
     role_type = current_user.get("role_type")
     
-    # Check for positive outcomes: Customer or Employee role_type required
-    if role_type in ["Customer", "Employee"]:
+    # Check for positive outcomes: Customer or Internal role_type required
+    if role_type in ["Customer", "Internal"]:
         return current_user
     
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, 
-        detail="Customer or Employee access required for this operation"
+        detail="Customer or Internal access required for this operation"
     )
 
 
 def get_client_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
     """
-    Verify user has Customer, Employee, or Supplier role_type.
+    Verify user has Customer, Internal, or Supplier role_type.
     
     Used for reference data (countries, provinces, cities) that all authenticated users
-    need for address forms—Customers (B2C), Employees (back-office), and Suppliers (B2B).
+    need for address forms—Customers (B2C), Internal (back-office), and Suppliers (B2B).
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Customer, Employee, or Supplier
+        Current user if Customer, Internal, or Supplier
         
     Raises:
         HTTPException: If user has unrecognized role_type
     """
     role_type = current_user.get("role_type")
-    if role_type in ["Customer", "Employee", "Supplier"]:
+    if role_type in ["Customer", "Internal", "Supplier"]:
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Customer, Employee, or Supplier access required for this operation"
+        detail="Customer, Internal, or Supplier access required for this operation"
     )
 
 
 def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)):
     """
-    Verify user is Employee or Customer, explicitly blocking Suppliers.
+    Verify user is Internal or Customer, explicitly blocking Suppliers.
     
-    Used for resources that follow the "Employee global + Customer self-scope" pattern:
-    - Employees: Global access (can see all records)
+    Used for resources that follow the "Internal global + Customer self-scope" pattern:
+    - Internal: Global access (can see all records)
     - Customers: Self-scoped access (can only see their own records)
     - Suppliers: Blocked (403 Forbidden)
     
@@ -245,10 +245,10 @@ def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Employee or Customer
+        Current user if Internal or Customer
         
     Raises:
-        HTTPException(403): If user is Supplier or not Employee/Customer
+        HTTPException(403): If user is Supplier or not Internal/Customer
     """
     role_type = current_user.get("role_type")
     
@@ -259,38 +259,38 @@ def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)
             detail="Forbidden: Suppliers cannot access this resource"
         )
     
-    # Allow Employees and Customers
-    if role_type in ["Employee", "Customer"]:
+    # Allow Internal and Customers
+    if role_type in ["Internal", "Customer"]:
         return current_user
     
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Access denied: Employee or Customer access required"
+        detail="Access denied: Internal or Customer access required"
     )
 
 
 def get_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
     """
-    Verify user is Employee or Supplier, blocking Customers.
+    Verify user is Internal or Supplier, blocking Customers.
     
-    Used for resources that Suppliers and Employees can access but Customers cannot,
+    Used for resources that Suppliers and Internal users can access but Customers cannot,
     e.g. reading assignable roles for user create/edit forms.
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Employee or Supplier
+        Current user if Internal or Supplier
         
     Raises:
         HTTPException(403): If user is Customer
     """
     role_type = current_user.get("role_type")
-    if role_type in ["Employee", "Supplier"]:
+    if role_type in ["Internal", "Supplier"]:
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Forbidden: only Employees and Suppliers can access this resource"
+        detail="Forbidden: only Internal and Suppliers can access this resource"
     )
 
 
@@ -298,15 +298,15 @@ def get_admin_user(current_user: dict = Depends(get_current_user)):
     """
     Verify user has admin or super-admin role for discretionary credit operations.
     
-    Admin users (role_type='Employee', role_name='Admin') can create discretionary requests.
-    Super Admin users (role_type='Employee', role_name='Super Admin') can also create requests
+    Admin users (role_type='Internal', role_name='Admin') can create discretionary requests.
+    Super Admin users (role_type='Internal', role_name='Super Admin') can also create requests
     and approve them (approval uses get_super_admin_user).
     
     Args:
         current_user: Current user from get_current_user dependency
         
     Returns:
-        Current user if Employee with role_name='Admin' or 'Super Admin'
+        Current user if Internal with role_name='Admin' or 'Super Admin'
         
     Raises:
         HTTPException: If user is not admin or super-admin
@@ -314,8 +314,8 @@ def get_admin_user(current_user: dict = Depends(get_current_user)):
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
     
-    # Check for positive outcomes: Admin users must be Employee role_type with Admin or Super Admin role_name
-    if role_type == "Employee" and role_name in ["Admin", "Super Admin"]:
+    # Check for positive outcomes: Admin users must be Internal role_type with Admin or Super Admin role_name
+    if role_type == "Internal" and role_name in ["Admin", "Super Admin"]:
         return current_user
     
     raise HTTPException(
@@ -335,21 +335,21 @@ def require_supplier_admin(current_user: dict = Depends(get_current_user)):
 
 def require_supplier_admin_or_employee_admin(current_user: dict = Depends(get_current_user)):
     """
-    Verify user is Supplier Admin or Employee Admin/Super Admin.
+    Verify user is Supplier Admin or Internal Admin/Super Admin.
     Used for institution entities (and formerly institution bank accounts).
     """
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     allowed = (
         (role_type == "Supplier" and role_name == "Admin")
-        or (role_type == "Employee" and role_name in ("Admin", "Super Admin"))
+        or (role_type == "Internal" and role_name in ("Admin", "Super Admin"))
     )
     if not allowed:
         raise HTTPException(
             status_code=403,
             detail=(
                 "Institution entities are accessible only to "
-                "Supplier Admin and to Employee Admin or Super Admin."
+                "Supplier Admin and to Internal Admin or Super Admin."
             ),
         )
     return current_user

@@ -8,7 +8,7 @@ Used by GET /api/v1/cities/ and for city_info seed. Users pick from this list.
 from typing import List, Optional
 from uuid import UUID
 
-# Global city for B2B users (Employee, Supplier). No city filter in queries.
+# Global city for B2B users (Internal, Supplier). No city filter in queries.
 # country_code 'GL' matches Global Marketplace. Seeded in seed.sql.
 GLOBAL_CITY_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 GLOBAL_CITY_COUNTRY_CODE = "GL"

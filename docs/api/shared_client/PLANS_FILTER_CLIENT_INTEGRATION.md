@@ -328,6 +328,6 @@ suspend fun fetchPlans(
 
 ## Related Documentation
 
-- [Market scope for clients](./MARKET_SCOPE_FOR_CLIENTS.md) – Market dropdown data (use GET /markets/available; exclude Global for plan)
+- [Market scope for clients](./MARKET_SCOPE_FOR_CLIENTS.md) – Market dropdown data (use GET /markets/enriched/; exclude Global for plan)
 - [Market-Based Subscriptions](./MARKET_BASED_SUBSCRIPTIONS.md) – Plans and subscriptions flow
 - [Enriched Endpoint Pattern](./ENRICHED_ENDPOINT_PATTERN.md) – Enriched API conventions

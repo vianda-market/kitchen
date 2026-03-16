@@ -99,11 +99,11 @@ def multi_join_scoping_service():
 
 @pytest.fixture
 def global_scope():
-    """InstitutionScope with global access (Employee Admin)"""
+    """InstitutionScope with global access (Internal Admin)"""
     return InstitutionScope(
         institution_id=uuid4(),
-        role_type="Employee",
-        role_name="Admin"  # Employee Admin has global access
+        role_type="Internal",
+        role_name="Admin"  # Internal Admin has global access
     )
 
 
@@ -136,7 +136,7 @@ class TestBuildJoinQueryWithScope:
         assert len(params) == 0
     
     def test_build_join_query_global_scope(self, multi_join_scoping_service, global_scope):
-        """Test query building with global scope (Employee)"""
+        """Test query building with global scope (Internal)"""
         query, params = multi_join_scoping_service._build_join_query_with_scope(
             scope=global_scope,
             include_archived=False
@@ -252,7 +252,7 @@ class TestGetAllWithJoinScoping:
     
     @patch('app.services.crud_service.db_read')
     def test_get_all_global_scope(self, mock_db_read, multi_join_scoping_service, mock_db, global_scope):
-        """Test get_all() with global scope (Employee)"""
+        """Test get_all() with global scope (Internal)"""
         mock_db_read.return_value = [
             {
                 'plate_kitchen_day_id': uuid4(),
