@@ -89,67 +89,77 @@ Billing Period: 00:00 UTC to 19:30 UTC
 
 ---
 
-## 🚀 **How to Use Market-Specific Billing**
+## 🚀 **How to Use Location-Based Billing**
 
-### **1. Single Market Billing:**
+Billing and kitchen start promotion use **location_id** (timezone-region), not country_code. Single-timezone markets (AR, PE) use country as location; US is split by timezone (US-Eastern, US-Central, US-Mountain, US-Pacific).
+
+### **1. Single Location Billing:**
 ```python
-# Argentina
-from app.services.cron.billing_events import run_daily_billing
-result = run_daily_billing(country_code="AR")
+# Argentina (single location)
+from app.services.cron.billing_events import multi_market_billing_entry
+result = multi_market_billing_entry(location_id="AR")
 
-# Peru  
-result = run_daily_billing(country_code="PE")
+# US-Pacific (LA, etc.)
+result = multi_market_billing_entry(location_id="US-Pacific")
 ```
 
-### **2. Multi-Market Billing (Recommended):**
+### **2. Multi-Location Billing (Recommended):**
 ```python
-from app.services.cron.billing_events import run_multi_market_billing
-result = run_multi_market_billing()
-# Automatically processes AR and PE markets
+from app.services.cron.billing_events import multi_market_billing_entry
+result = multi_market_billing_entry()
+# Automatically processes all locations: AR, PE, US-Eastern, US-Central, US-Mountain, US-Pacific
 ```
 
 ### **3. Command Line:**
 ```bash
-# Single market
-python app/services/cron/billing_events.py daily
-
-# Multi-market
+# All locations
 python app/services/cron/billing_events.py multi_market
+
+# Single location
+python app/services/cron/billing_events.py multi_market AR
+python app/services/cron/billing_events.py multi_market US-Pacific
 ```
 
 ---
 
 ## 🔧 **Cron Job Setup for Multiple Markets**
 
-### **Option 1: Multi-Market Cron (Recommended)**
+### **Option 1: Multi-Location Cron (Recommended)**
 ```bash
 # Add to crontab (crontab -e)
-# Run every 5 minutes - automatically handles all markets
+# Run every 5 minutes - automatically handles all locations (AR, PE, US-Eastern, US-Central, US-Mountain, US-Pacific)
 */5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import multi_market_billing_entry; multi_market_billing_entry()" >> /var/log/kitchen/multi_market_billing.log 2>&1
 ```
 
-### **Option 2: Market-Specific Crons**
+### **Option 2: Location-Specific Crons (GCP Cloud Scheduler)**
 ```bash
 # Argentina billing - every 5 minutes
-*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import run_kitchen_day_closure_billing; run_kitchen_day_closure_billing('AR')" >> /var/log/kitchen/argentina_billing.log 2>&1
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import multi_market_billing_entry; multi_market_billing_entry('AR')" >> /var/log/kitchen/billing_ar.log 2>&1
 
-# Peru billing - every 5 minutes  
-*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import run_kitchen_day_closure_billing; run_kitchen_day_closure_billing('PE')" >> /var/log/kitchen/peru_billing.log 2>&1
+# Peru billing - every 5 minutes
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import multi_market_billing_entry; multi_market_billing_entry('PE')" >> /var/log/kitchen/billing_pe.log 2>&1
+
+# US-Pacific (LA, Seattle, etc.) - every 5 minutes
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import multi_market_billing_entry; multi_market_billing_entry('US-Pacific')" >> /var/log/kitchen/billing_us_pacific.log 2>&1
+
+# US-Eastern (NYC, etc.) - every 5 minutes
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import multi_market_billing_entry; multi_market_billing_entry('US-Eastern')" >> /var/log/kitchen/billing_us_eastern.log 2>&1
 ```
 
 ### **Kitchen Start Promotion (Lock-at-Kitchen-Start)**
 
-Promotes locked plate selections to live (creates plate_pickup_live + restaurant_transaction) at kitchen start (11:30 AM local). Run every 5–15 minutes during business hours:
+Promotes locked plate selections to live (creates plate_pickup_live + restaurant_transaction) at kitchen start (11:30 AM local). Run every 5–15 minutes during business hours. Uses **location_id** (filters by address.timezone):
 
 ```bash
-# All markets
-*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion; run_kitchen_start_promotion()" >> /var/log/kitchen/kitchen_start_promotion.log 2>&1
+# All locations
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import kitchen_start_promotion_entry; kitchen_start_promotion_entry()" >> /var/log/kitchen/kitchen_start_promotion.log 2>&1
 
-# Single market (e.g. AR)
-*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion; run_kitchen_start_promotion('AR')" >> /var/log/kitchen/kitchen_start_ar.log 2>&1
+# Single location (e.g. AR or US-Pacific)
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import kitchen_start_promotion_entry; kitchen_start_promotion_entry('AR')" >> /var/log/kitchen/kitchen_start_ar.log 2>&1
+*/5 * * * * cd /path/to/kitchen && /path/to/venv/bin/python -c "from app.services.cron.billing_events import kitchen_start_promotion_entry; kitchen_start_promotion_entry('US-Pacific')" >> /var/log/kitchen/kitchen_start_us_pacific.log 2>&1
 ```
 
-Or via billing_events CLI: `python app/services/cron/billing_events.py kitchen_start [AR]`
+Or via billing_events CLI: `python app/services/cron/billing_events.py kitchen_start [location_id]`
 
 ---
 
@@ -271,16 +281,16 @@ Result: Institution bill created with proper period
 python -c "from app.config.market_config import MarketConfiguration; from datetime import datetime; print('AR Monday close:', MarketConfiguration.get_kitchen_close_utc('AR', datetime.now(), 'Monday')); print('PE Monday close:', MarketConfiguration.get_kitchen_close_utc('PE', datetime.now(), 'Monday'))"
 ```
 
-### **Test Market-Specific Billing:**
+### **Test Location-Specific Billing:**
 ```bash
 # Argentina
-python -c "from app.services.cron.billing_events import run_daily_billing; from datetime import date; result = run_daily_billing(date.today(), 'AR'); print('AR:', result['bills_created'], 'bills, Period:', result['period_start'][:19], 'to', result['period_end'][:19])"
+python app/services/cron/billing_events.py multi_market AR
 
-# Peru
-python -c "from app.services.cron.billing_events import run_daily_billing; from datetime import date; result = run_daily_billing(date.today(), 'PE'); print('PE:', result['bills_created'], 'bills, Period:', result['period_start'][:19], 'to', result['period_end'][:19])"
+# US-Pacific
+python app/services/cron/billing_events.py multi_market US-Pacific
 ```
 
-### **Test Multi-Market Billing:**
+### **Test Multi-Location Billing:**
 ```bash
 python app/services/cron/billing_events.py multi_market
 ```

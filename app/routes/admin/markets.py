@@ -191,7 +191,8 @@ async def create_market(
         timezone=market_data.timezone,
         modified_by=current_user["user_id"],
         status=market_data.status or Status.ACTIVE,
-        kitchen_close_time=kitchen_close_time
+        kitchen_close_time=kitchen_close_time,
+        language=market_data.language,
     )
     
     return market
@@ -252,7 +253,8 @@ async def update_market(
         timezone=market_data.timezone,
         kitchen_close_time=kitchen_close_time,
         status=market_data.status,
-        is_archived=market_data.is_archived
+        is_archived=market_data.is_archived,
+        language=market_data.language,
     )
     
     if not market:

@@ -23,7 +23,7 @@ Benefits:
 """
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, RootModel, ValidationInfo, field_validator, model_validator
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from datetime import datetime, date
 from uuid import UUID
 from decimal import Decimal
@@ -31,6 +31,8 @@ from app.config import Status, RoleType, RoleName, TransactionType, KitchenDay, 
 from app.config.supported_cuisines import is_supported_cuisine
 from app.config.enums import FavoriteEntityType
 from app.utils.country import normalize_country_code
+from app.utils.phone import normalize_mobile_for_schema
+from app.config.settings import settings
 
 # =============================================================================
 # 1. CORE ENTITIES SCHEMAS
@@ -44,13 +46,26 @@ class UserCreateSchema(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     password: Optional[str] = Field(None, min_length=8, description="Optional. Omit to trigger B2B invite flow; user sets password via email link.")
+
+    @field_validator("username", "email", mode="before")
+    @classmethod
+    def normalize_username_email_lowercase(cls, v):
+        """Normalize username and email to lowercase for case-insensitive uniqueness."""
+        if v is None or not isinstance(v, str):
+            return v
+        return v.strip().lower()
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
-    cellphone: Optional[str] = Field(None, max_length=20)
+    mobile_number: Optional[str] = Field(default=None)
     employer_id: Optional[UUID] = None
     market_id: Optional[UUID] = None
     city_id: Optional[UUID] = Field(None, description="Primary city for scoping (must match market's country)")
     market_ids: Optional[List[UUID]] = Field(None, description="v2: list of assigned market IDs (first is primary)")
+
+    @field_validator("mobile_number", mode="before")
+    @classmethod
+    def normalize_mobile_number_create(cls, v):
+        return normalize_mobile_for_schema(v, None)
 
     @field_validator("role_type", mode="before")
     @classmethod
@@ -109,13 +124,38 @@ class UserUpdateSchema(BaseModel):
     email: Optional[EmailStr] = None
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
-    cellphone: Optional[str] = Field(None, max_length=20)
+    mobile_number: Optional[str] = Field(default=None)
     employer_id: Optional[UUID] = None
     market_id: Optional[UUID] = None
     city_id: Optional[UUID] = Field(None, description="Primary city for scoping (must match market's country)")
     market_ids: Optional[List[UUID]] = Field(None, description="v2: replace assigned market IDs (first is primary)")
     status: Optional[Literal["Active", "Inactive"]] = Field(None, description="User status (Active/Inactive only)")
-    
+    locale: Optional[str] = Field(None, min_length=2, max_length=5, description="ISO 639-1 UI locale: en, es, pt")
+
+    @field_validator("locale")
+    @classmethod
+    def validate_locale(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = tuple(settings.SUPPORTED_LOCALES)
+        if v not in allowed:
+            raise ValueError(f"Unsupported locale '{v}'. Must be one of: {', '.join(allowed)}")
+        return v
+
+    @field_validator("mobile_number", mode="before")
+    @classmethod
+    def normalize_mobile_number_update(cls, v):
+        return normalize_mobile_for_schema(v, None)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email_lowercase(cls, v):
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            return v
+        return v.strip().lower()
+
     @field_validator('role_name')
     @classmethod
     def validate_role_combination(cls, v, info: ValidationInfo):
@@ -124,6 +164,11 @@ class UserUpdateSchema(BaseModel):
             return v
         # role_type is not in UserUpdateSchema (immutable) - combination validation done in route using existing_user.role_type
         return v
+
+
+class EmailChangeVerifySchema(BaseModel):
+    """Body for POST /users/me/verify-email-change — 6-digit code from email (or legacy longer token)."""
+    code: str = Field(..., min_length=6, max_length=10, description="Verification code from email")
 
 
 class AssignEmployerRequest(BaseModel):
@@ -191,12 +236,21 @@ class UserResponseSchema(BaseModel):
     email: str
     first_name: Optional[str]
     last_name: Optional[str]
-    cellphone: Optional[str] = None
+    mobile_number: Optional[str] = None
+    mobile_number_verified: bool = False
+    mobile_number_verified_at: Optional[datetime] = None
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
+    email_change_message: Optional[str] = Field(
+        None,
+        description="Set when an email change was requested: verification sent to new address; email field unchanged until verified.",
+    )
     employer_id: Optional[UUID]
     employer_address_id: Optional[UUID] = None
     market_id: UUID
     city_id: Optional[UUID] = None
     market_ids: List[UUID] = Field(default_factory=list, description="v2: all assigned market IDs (primary first)")
+    locale: str = Field("en", description="ISO 639-1 UI locale: en, es, pt")
     is_archived: bool
     status: Status
     created_date: datetime
@@ -251,7 +305,12 @@ class UserEnrichedResponseSchema(BaseModel):
     first_name: Optional[str]
     last_name: Optional[str]
     full_name: str
-    cellphone: Optional[str] = None
+    mobile_number: Optional[str] = None
+    mobile_number_display: Optional[str] = Field(None, description="Internationally formatted display string (e.g. '+54 9 11 2345-6789'). Read-only; computed from mobile_number.")
+    mobile_number_verified: bool = False
+    mobile_number_verified_at: Optional[datetime] = None
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
     employer_id: Optional[UUID]
     employer_address_id: Optional[UUID] = None
     employer_name: Optional[str] = None
@@ -260,6 +319,7 @@ class UserEnrichedResponseSchema(BaseModel):
     city_id: Optional[UUID] = None
     city_name: Optional[str] = None
     market_ids: List[UUID] = Field(default_factory=list, description="v2: all assigned market IDs (primary first)")
+    locale: str = Field("en", description="ISO 639-1 UI locale: en, es, pt")
     is_archived: bool
     status: Status
     created_date: datetime
@@ -298,7 +358,15 @@ class CustomerSignupSchema(BaseModel):
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     email: EmailStr
-    cellphone: Optional[str] = Field(None, max_length=20)
+    mobile_number: Optional[str] = Field(default=None)
+
+    @field_validator("username", "email", mode="before")
+    @classmethod
+    def normalize_username_email_lowercase(cls, v):
+        """Normalize username and email to lowercase for case-insensitive uniqueness."""
+        if v is None or not isinstance(v, str):
+            return v
+        return v.strip().lower()
     country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/leads/markets. Backend resolves to market.")
     city_id: Optional[UUID] = Field(None, description="City UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
     city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_id.")
@@ -312,9 +380,12 @@ class CustomerSignupSchema(BaseModel):
         return normalize_country_code(v) if v else v
 
     @model_validator(mode="after")
-    def require_city_id_or_name(self):
+    def require_city_and_normalize_mobile(self):
         if not self.city_id and not (self.city_name or "").strip():
             raise ValueError("Either city_id or city_name is required")
+        normalized = normalize_mobile_for_schema(self.mobile_number, self.country_code)
+        if normalized != self.mobile_number:
+            return self.model_copy(update={"mobile_number": normalized})
         return self
 
 class InstitutionCreateSchema(BaseModel):
@@ -586,7 +657,7 @@ class ProductEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PlateCreateSchema(BaseModel):
-    """Schema for creating a new plate. Savings are computed on the fly from plan credit_worth. no_show_discount is at institution level."""
+    """Schema for creating a new plate. Savings are computed on the fly from plan credit_cost_local_currency. no_show_discount is at institution level."""
     product_id: UUID
     restaurant_id: UUID
     price: Decimal = Field(..., ge=0)
@@ -608,6 +679,7 @@ class PlateResponseSchema(BaseModel):
     restaurant_id: UUID
     price: Decimal
     credit: int
+    expected_payout_local_currency: Decimal
     delivery_time_minutes: int
     is_archived: bool
     status: Status
@@ -650,6 +722,7 @@ class PlateEnrichedResponseSchema(BaseModel):
     has_image: bool  # Flag indicating if product has a custom uploaded image (TRUE) or default placeholder (FALSE)
     price: Decimal
     credit: int
+    expected_payout_local_currency: Decimal
     no_show_discount: Optional[int] = Field(None, description="From institution; null for non-Supplier")
     delivery_time_minutes: int
     is_archived: bool
@@ -799,22 +872,24 @@ class QRCodeResponseSchema(BaseModel):
 # =============================================================================
 
 class CreditCurrencyCreateSchema(BaseModel):
-    """Schema for creating a new credit currency. Backend assigns currency_code from supported list."""
+    """Schema for creating a new credit currency. Backend assigns currency_code from supported list and fetches currency_conversion_usd from open.er-api.com."""
     currency_name: str = Field(..., max_length=50)
-    credit_value: Decimal = Field(..., gt=0)
+    credit_value_local_currency: Decimal = Field(..., gt=0)
+
 
 class CreditCurrencyUpdateSchema(BaseModel):
-    """Schema for updating credit currency information"""
+    """Schema for updating credit currency information. currency_conversion_usd is cron-managed; do not send."""
     currency_name: Optional[str] = Field(None, max_length=50)
     currency_code: Optional[str] = Field(None, max_length=10)
-    credit_value: Optional[Decimal] = Field(None, gt=0)
+    credit_value_local_currency: Optional[Decimal] = Field(None, gt=0)
 
 class CreditCurrencyResponseSchema(BaseModel):
     """Schema for credit currency response data"""
     credit_currency_id: UUID
     currency_name: str
     currency_code: str
-    credit_value: Decimal
+    credit_value_local_currency: Decimal
+    currency_conversion_usd: Decimal
     is_archived: bool
     status: Status
     created_date: datetime
@@ -827,7 +902,8 @@ class CreditCurrencyEnrichedResponseSchema(BaseModel):
     credit_currency_id: UUID
     currency_name: str
     currency_code: str
-    credit_value: int
+    credit_value_local_currency: Decimal
+    currency_conversion_usd: Decimal
     market_id: UUID  # Market that uses this currency
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
@@ -864,7 +940,8 @@ class PlanResponseSchema(BaseModel):
     name: str
     credit: int
     price: float
-    credit_worth: float  # price / credit (local currency per credit)
+    credit_cost_local_currency: float  # price / credit (local currency per credit)
+    credit_cost_usd: float
     status: Status
     rollover: bool
     rollover_cap: Optional[Decimal]
@@ -886,7 +963,8 @@ class PlanEnrichedResponseSchema(BaseModel):
     name: str
     credit: int
     price: float
-    credit_worth: float  # price / credit (local currency per credit)
+    credit_cost_local_currency: float  # price / credit (local currency per credit)
+    credit_cost_usd: float
     rollover: bool
     rollover_cap: Optional[Decimal]
     is_archived: bool
@@ -904,7 +982,7 @@ class SubscriptionEnrichedResponseSchema(BaseModel):
     user_username: str
     user_email: str
     user_status: Status
-    user_cellphone: Optional[str] = None
+    user_mobile_number: Optional[str] = None
     plan_id: UUID
     plan_name: str
     plan_credit: int
@@ -1164,6 +1242,10 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     city: str
     postal_code: str
     credit_currency_id: UUID
+    market_credit_value_local_currency: Decimal = Field(
+        ...,
+        description="Credit value in local currency for this market; use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_local_currency)",
+    )
     name: str
     cuisine: Optional[str]
     is_archived: bool
@@ -1294,6 +1376,26 @@ class QRCodeEnrichedResponseSchema(BaseModel):
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class QRCodePrintContextSchema(BaseModel):
+    """QR + restaurant + raw address fields for supplier print HTML (image loaded separately)."""
+
+    qr_code_id: UUID
+    restaurant_id: UUID
+    restaurant_name: str
+    country_code: str
+    street_type: Optional[str] = None
+    street_name: Optional[str] = None
+    building_number: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    postal_code: Optional[str] = None
+    country_name: Optional[str] = None
+    image_storage_path: str
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class EmployerCreateSchema(BaseModel):
     """Schema for creating a new employer with embedded address"""
@@ -1642,6 +1744,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     credit_currency_id: UUID
     tax_id: str
     name: str
+    stripe_connect_account_id: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1666,11 +1769,27 @@ class InstitutionEntityEnrichedResponseSchema(BaseModel):
     address_city: str
     tax_id: str
     name: str
+    stripe_connect_account_id: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InstitutionBillPayoutResponseSchema(BaseModel):
+    """Schema for a single payout attempt on an institution bill. Provider transfer details included once created."""
+    bill_payout_id: UUID
+    institution_bill_id: UUID
+    provider: str
+    provider_transfer_id: Optional[str] = None
+    amount: Decimal
+    currency_code: str
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1724,6 +1843,7 @@ class NationalHolidayResponseSchema(BaseModel):
     recurring_day: Optional[int]
     status: Status
     is_archived: bool
+    source: str = Field(..., description="'manual' | 'nager_date' — client creates are always manual")
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
@@ -1741,6 +1861,14 @@ class NationalHolidayBulkCreateSchema(BaseModel):
         if not v:
             raise ValueError("At least one holiday must be provided")
         return v
+
+
+class NationalHolidaySyncFromProviderSchema(BaseModel):
+    """Optional body for POST /national-holidays/sync-from-provider (Nager.Date import)."""
+    years: Optional[List[int]] = Field(
+        None,
+        description="UTC-bounded calendar years to import; omit for default (current + next year, clamped)",
+    )
 
 
 # ============================================================================
@@ -1800,8 +1928,19 @@ class MarketResponseSchema(BaseModel):
     credit_currency_id: UUID = Field(..., description="FK to credit_currency_info")
     currency_code: Optional[str] = Field(None, description="Currency code (enriched from JOIN)")
     currency_name: Optional[str] = Field(None, description="Currency name (enriched from JOIN)")
+    credit_value_local_currency: Optional[Decimal] = Field(
+        None,
+        description="Local currency amount per credit (from credit_currency_info). Use for plan form preview: credit_cost_local_currency = price / credit.",
+    )
+    currency_conversion_usd: Optional[Decimal] = Field(
+        None,
+        description="Local units per 1 USD (from credit_currency_info). Use for plan form preview: credit_cost_usd = credit_cost_local_currency / currency_conversion_usd.",
+    )
     timezone: str = Field(..., description="Timezone for this market (e.g., 'America/Argentina/Buenos_Aires')")
     kitchen_close_time: str = Field(..., description="Order cutoff time (HH:MM local, e.g. 13:30)")
+    language: str = Field("en", description="Default UI locale for this market: en, es, pt")
+    phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix for this market (e.g. '+54'). Use as default country in phone input fields.")
+    phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
     is_archived: bool = Field(..., description="Whether this market is archived")
     status: Status = Field(..., description="Market status (Active/Inactive)")
     created_date: datetime = Field(..., description="When this market was created")
@@ -1821,9 +1960,12 @@ class MarketResponseSchema(BaseModel):
 
 
 class MarketPublicMinimalSchema(BaseModel):
-    """Minimal schema for public GET /leads/markets (no auth). country_code + country_name only; no internal IDs or business logic."""
+    """Minimal schema for public GET /leads/markets (no auth). country_code, country_name, language, and phone prefix for B2C pre-auth locale and signup form."""
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
+    language: str = Field(..., min_length=2, max_length=5, description="Default UI locale for this market: en, es, pt")
+    phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix (e.g. '+54'). Use as default country in phone input fields.")
+    phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
 
 
 class MarketPublicResponseSchema(BaseModel):
@@ -1833,6 +1975,9 @@ class MarketPublicResponseSchema(BaseModel):
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
     timezone: str = Field(..., description="Timezone for this market")
     kitchen_close_time: str = Field(..., description="Order cutoff time (HH:MM local, e.g. 13:30)")
+    language: str = Field("en", description="Default UI locale for this market: en, es, pt")
+    phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix (e.g. '+54'). Use as default country in phone input fields.")
+    phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
     currency_code: Optional[str] = Field(None, description="Currency code")
     currency_name: Optional[str] = Field(None, description="Currency name")
 
@@ -1856,12 +2001,25 @@ class MarketCreateSchema(BaseModel):
     timezone: str = Field(..., description="Timezone (e.g., 'America/Argentina/Buenos_Aires')", max_length=50)
     kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30). Default 13:30 if omitted.")
     status: Optional[Status] = Field(default=None, description="Optional; omit or null and backend assigns default (Active)")
+    language: Optional[str] = Field(None, min_length=2, max_length=5, description="Default UI locale: en, es, pt; derived from country if omitted")
+    phone_dial_code: Optional[str] = Field(None, max_length=6, description="E.164 dial code prefix (e.g. '+54'). Derived from country_code if omitted.")
+    phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code (e.g. 10).")
 
     @field_validator("country_code")
     @classmethod
     def normalize_country_code_create(cls, v):
         """Normalize country_code at API boundary (uppercase, max 2 chars)."""
         return normalize_country_code(v) if v else v
+
+    @field_validator("language")
+    @classmethod
+    def validate_market_language_create(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = tuple(settings.SUPPORTED_LOCALES)
+        if v not in allowed:
+            raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
+        return v
 
     @field_validator("kitchen_close_time")
     @classmethod
@@ -1883,6 +2041,9 @@ class MarketUpdateSchema(BaseModel):
     kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30)")
     status: Optional[Status] = Field(None, description="Market status")
     is_archived: Optional[bool] = Field(None, description="Archive status")
+    language: Optional[str] = Field(None, min_length=2, max_length=5, description="Default UI locale: en, es, pt")
+    phone_dial_code: Optional[str] = Field(None, max_length=6, description="E.164 dial code prefix (e.g. '+54').")
+    phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code (e.g. 10).")
 
     @field_validator("country_code")
     @classmethod
@@ -1892,6 +2053,16 @@ class MarketUpdateSchema(BaseModel):
             return None
         n = normalize_country_code(v)
         return n if n else None
+
+    @field_validator("language")
+    @classmethod
+    def validate_market_language_update(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = tuple(settings.SUPPORTED_LOCALES)
+        if v not in allowed:
+            raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
+        return v
 
     @field_validator("kitchen_close_time")
     @classmethod
@@ -1903,6 +2074,24 @@ class MarketUpdateSchema(BaseModel):
         if not re.match(r"^([01]?\d|2[0-3]):([0-5]\d)$", v.strip()):
             raise ValueError("kitchen_close_time must be HH:MM format (e.g. 13:30)")
         return v.strip()
+
+
+# =============================================================================
+# PHONE VALIDATION (no auth — real-time form feedback)
+# =============================================================================
+
+class PhoneValidateRequestSchema(BaseModel):
+    """Request schema for POST /api/v1/phone/validate."""
+    mobile_number: str = Field(..., description="Raw phone number string (E.164 or local format)")
+    country_code: Optional[str] = Field(None, min_length=2, max_length=3, description="ISO 3166-1 alpha-2 hint (e.g. 'AR'). Helps parse local-format numbers without the dial code.")
+
+
+class PhoneValidateResponseSchema(BaseModel):
+    """Response schema for POST /api/v1/phone/validate. Always returns 200; valid indicates whether the number is valid."""
+    valid: bool = Field(..., description="True if the number is valid and parseable")
+    e164: Optional[str] = Field(None, description="Normalized E.164 form (e.g. '+5491112345678'). Present only when valid=true.")
+    display: Optional[str] = Field(None, description="International display form (e.g. '+54 9 11 2345-6789'). Present only when valid=true.")
+    error: Optional[str] = Field(None, description="Human-readable error message. Present only when valid=false.")
 
 
 # =============================================================================
@@ -1949,44 +2138,26 @@ class CityMetricsResponseSchema(BaseModel):
 # ENUM SERVICE SCHEMAS
 # =============================================================================
 
-class EnumsResponseSchema(BaseModel):
+class EnumLabeledValuesSchema(BaseModel):
+    """Canonical enum codes plus display labels for a given `language` query param."""
+    values: List[str] = Field(..., description="Canonical codes stored in DB / API")
+    labels: Dict[str, str] = Field(..., description="Map of code -> display label for requested language (fallback: en, then code)")
+
+
+class EnumsResponseSchema(RootModel[Dict[str, EnumLabeledValuesSchema]]):
     """
-    Response schema for all system enums.
-    
-    Returns all valid enum values used throughout the system for frontend
-    dropdown population and form validation.
+    All system enums as a map of enum name -> { values, labels }.
+    Keys vary by role (e.g. Customers omit role_type / role_name).
     """
-    status: List[str] = Field(..., description="Valid status values (all)")
-    status_user: List[str] = Field(..., description="Status values for user (Active/Inactive only)")
-    status_restaurant: List[str] = Field(..., description="Status values for restaurant (Active, Pending, Inactive only)")
-    status_discretionary: List[str] = Field(..., description="Status values for discretionary requests")
-    status_plate_pickup: List[str] = Field(..., description="Status values for plate pickup / orders")
-    status_bill: List[str] = Field(..., description="Status values for bills")
-    address_type: List[str] = Field(..., description="Valid address types")
-    role_type: List[str] = Field(..., description="Valid role types")
-    role_name: List[str] = Field(..., description="Valid role names")
-    subscription_status: List[str] = Field(..., description="Valid subscription statuses")
-    method_type: List[str] = Field(..., description="Valid payment method types")
-    transaction_type: List[str] = Field(..., description="Valid transaction types")
-    street_type: List[str] = Field(..., description="Valid street type abbreviations")
-    kitchen_day: List[str] = Field(..., description="Valid kitchen days")
-    pickup_type: List[str] = Field(..., description="Valid pickup types")
-    discretionary_reason: List[str] = Field(..., description="Valid discretionary request reasons")
-    bill_resolution: List[str] = Field(..., description="Institution bill resolution: Pending, Paid, Rejected")
+    root: Dict[str, EnumLabeledValuesSchema]
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "status": ["Active", "Pending", "Inactive"],
-                "status_user": ["Active", "Inactive"],
-                "status_restaurant": ["Active", "Pending", "Inactive"],
-                "status_discretionary": ["Pending", "Cancelled", "Approved", "Rejected"],
-                "status_plate_pickup": ["Pending", "Arrived", "Completed", "Cancelled"],
-                "status_bill": ["Pending", "Processed", "Cancelled"],
-                "address_type": ["Restaurant", "Entity Billing", "Entity Address", "Customer Home", "Customer Billing", "Customer Employer"],
-                "role_type": ["Internal", "Supplier", "Customer", "Employer"],
-                "subscription_status": ["Active", "On Hold", "Pending", "Cancelled"],
-                "bill_resolution": ["Pending", "Paid", "Rejected"]
+                "street_type": {
+                    "values": ["St", "Ave", "Blvd"],
+                    "labels": {"St": "Street", "Ave": "Avenue", "Blvd": "Boulevard"},
+                }
             }
         }
     )

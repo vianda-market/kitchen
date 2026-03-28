@@ -181,7 +181,7 @@ class TestAddressCreateInstitutionSafeguard:
         mock_business_service.create_address_with_geocoding.return_value = mock_dto
 
         resp = client_customer_with_institution.post(
-            "/api/v1/addresses/",
+            "/api/v1/addresses",
             json=_minimal_address_body(include_institution_and_user=False),
         )
 
@@ -199,7 +199,7 @@ class TestAddressCreateInstitutionSafeguard:
     ):
         """Customer with no institution_id in JWT gets 400 when creating address."""
         resp = client_customer_without_institution.post(
-            "/api/v1/addresses/",
+            "/api/v1/addresses",
             json=_minimal_address_body(include_institution_and_user=False),
         )
         assert resp.status_code == 400
@@ -208,7 +208,7 @@ class TestAddressCreateInstitutionSafeguard:
     def test_b2b_omitting_institution_id_gets_400(self, client_b2b_employee):
         """B2B (Internal) omitting institution_id or user_id gets 400."""
         resp = client_b2b_employee.post(
-            "/api/v1/addresses/",
+            "/api/v1/addresses",
             json=_minimal_address_body(include_institution_and_user=False),
         )
         assert resp.status_code == 400

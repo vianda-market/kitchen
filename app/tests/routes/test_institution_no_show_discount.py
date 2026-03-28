@@ -100,7 +100,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_employee_institution_with_no_show_discount_strips_value(
         self, mock_create, client_with_super_admin
     ):
-        """POST /api/v1/institutions/ with Internal + no_show_discount: 20 does not persist it."""
+        """POST /api/v1/institutions with Internal + no_show_discount: 20 does not persist it."""
         created = MagicMock()
         created.institution_id = uuid4()
         created.name = "Test Institution"
@@ -116,7 +116,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
         mock_create.return_value = created
 
         payload = _institution_create_payload("Internal", no_show_discount=20)
-        resp = client_with_super_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_super_admin.post("/api/v1/institutions", json=payload)
 
         assert resp.status_code == 201
         call_args = mock_create.call_args
@@ -128,7 +128,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_customer_institution_with_no_show_discount_strips_value(
         self, mock_create, client_with_super_admin
     ):
-        """POST /api/v1/institutions/ with Customer + no_show_discount: 20 does not persist it."""
+        """POST /api/v1/institutions with Customer + no_show_discount: 20 does not persist it."""
         created = MagicMock()
         created.institution_id = uuid4()
         created.name = "Test Institution"
@@ -144,7 +144,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
         mock_create.return_value = created
 
         payload = _institution_create_payload("Customer", no_show_discount=20)
-        resp = client_with_super_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_super_admin.post("/api/v1/institutions", json=payload)
 
         assert resp.status_code == 201
         call_args = mock_create.call_args
@@ -156,7 +156,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_employer_institution_with_no_show_discount_strips_value(
         self, mock_create, client_with_admin
     ):
-        """POST /api/v1/institutions/ with Employer + no_show_discount: 20 does not persist it."""
+        """POST /api/v1/institutions with Employer + no_show_discount: 20 does not persist it."""
         created = MagicMock()
         created.institution_id = uuid4()
         created.name = "Test Institution"
@@ -172,7 +172,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
         mock_create.return_value = created
 
         payload = _institution_create_payload("Employer", no_show_discount=20)
-        resp = client_with_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_admin.post("/api/v1/institutions", json=payload)
 
         assert resp.status_code == 201
         call_args = mock_create.call_args
@@ -184,10 +184,10 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_employee_institution_as_admin_returns_403(
         self, mock_create, client_with_admin
     ):
-        """POST /api/v1/institutions/ with institution_type=Internal as Admin returns 403."""
+        """POST /api/v1/institutions with institution_type=Internal as Admin returns 403."""
         payload = _institution_create_payload("Internal", no_show_discount=None)
         payload["name"] = "Test Internal Inc"
-        resp = client_with_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_admin.post("/api/v1/institutions", json=payload)
         assert resp.status_code == 403
         assert "Super Admin" in resp.json().get("detail", "")
         mock_create.assert_not_called()
@@ -196,10 +196,10 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_customer_institution_as_admin_returns_403(
         self, mock_create, client_with_admin
     ):
-        """POST /api/v1/institutions/ with institution_type=Customer as Admin returns 403."""
+        """POST /api/v1/institutions with institution_type=Customer as Admin returns 403."""
         payload = _institution_create_payload("Customer", no_show_discount=None)
         payload["name"] = "Test Customer Inc"
-        resp = client_with_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_admin.post("/api/v1/institutions", json=payload)
         assert resp.status_code == 403
         assert "Super Admin" in resp.json().get("detail", "")
         mock_create.assert_not_called()
@@ -208,7 +208,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
     def test_create_supplier_institution_with_no_show_discount_persists_value(
         self, mock_create, client_with_admin
     ):
-        """POST /api/v1/institutions/ with Supplier + no_show_discount: 15 persists it."""
+        """POST /api/v1/institutions with Supplier + no_show_discount: 15 persists it."""
         created = MagicMock()
         created.institution_id = uuid4()
         created.name = "Test Supplier"
@@ -224,7 +224,7 @@ class TestInstitutionCreateNoShowDiscountScoping:
         mock_create.return_value = created
 
         payload = _institution_create_payload("Supplier", no_show_discount=15)
-        resp = client_with_admin.post("/api/v1/institutions/", json=payload)
+        resp = client_with_admin.post("/api/v1/institutions", json=payload)
 
         assert resp.status_code == 201
         call_args = mock_create.call_args
@@ -241,7 +241,7 @@ class TestInstitutionUpdateNoShowDiscountScoping:
     def test_update_employee_institution_with_no_show_discount_clears_value(
         self, mock_update, mock_get_by_id, client_with_super_admin
     ):
-        """PUT /api/v1/institutions/{id} with no_show_discount: 25 on Employee institution clears it."""
+        """PUT /api/v1/institutions{id} with no_show_discount: 25 on Employee institution clears it."""
         inst_id = uuid4()
         mod_by = uuid4()
         existing = MagicMock()

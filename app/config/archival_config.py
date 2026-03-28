@@ -100,6 +100,7 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     "plate_selection_info": ArchivalCategory.CUSTOMER_SERVICE,
     "restaurant_holidays": ArchivalCategory.CUSTOMER_SERVICE,
     "credential_recovery": ArchivalCategory.CUSTOMER_SERVICE,
+    "email_change_request": ArchivalCategory.CUSTOMER_SERVICE,
     "pending_customer_signup": ArchivalCategory.CUSTOMER_SERVICE,
 
     # OPERATIONAL DATA (6 months - business operations)

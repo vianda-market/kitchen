@@ -24,6 +24,7 @@ BASE_TABLES = [
     'institution_bill_info',
     'geolocation_info',
     'credential_recovery',
+    'email_change_request',
     'pending_customer_signup',
     'restaurant_balance_info',
     'discretionary_resolution_info',
@@ -82,8 +83,11 @@ ALL_EXPECTED_TABLES = BASE_TABLES + HISTORY_TABLES + CHILD_TABLES
 TABLES_WITH_CRITICAL_COLUMNS = {
     'payment_method': ['address_id'],
     'external_payment_method': ['payment_method_id'],
-    'user_info': ['stripe_customer_id'],
-    'user_history': ['stripe_customer_id'],
+    'user_info': ['locale'],
+    'user_history': ['locale'],
+    'user_payment_provider': ['user_payment_provider_id', 'user_id', 'provider', 'provider_customer_id'],
+    'user_payment_provider_history': ['event_id', 'user_payment_provider_id', 'is_current'],
+    'market_info': ['language'],
 }
 
 

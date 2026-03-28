@@ -13,6 +13,7 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.dto.models import UserDTO, EmployerDTO, AddressDTO
 from app.config import Status, RoleType, RoleName
+from app.tests.conftest import SAMPLE_CITY_ID
 
 
 @pytest.fixture
@@ -129,6 +130,7 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         modified_by=user_id,
         modified_date=datetime.now(timezone.utc),
     )
+    mid = uuid4()
     updated_user = UserDTO(
         user_id=user_id,
         institution_id=uuid4(),
@@ -139,9 +141,13 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         first_name="Test",
         last_name="User",
         email="test@example.com",
+        mobile_number=None,
+        mobile_number_verified=False,
+        mobile_number_verified_at=None,
         employer_id=employer_id,
         employer_address_id=address_id,
-        market_id=uuid4(),
+        market_id=mid,
+        city_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),
@@ -245,8 +251,8 @@ def test_assign_employer_supplier_forbidden(client_supplier, mock_db):
 # Deprecation tests: self-read/self-update via deprecated /{user_id} endpoints
 # ---------------------------------------------------------------------------
 
-def test_deprecated_get_user_self_read_returns_x_deprecated_header(client_customer, customer_user, mock_db):
-    """GET /users/{user_id} for self-read returns X-Deprecated-Endpoint header."""
+def test_deprecated_get_user_self_read_returns_410_gone(client_customer, customer_user, mock_db):
+    """GET /users/{user_id} for Customer self-read returns 410 Gone with migration hint."""
     user_id = customer_user["user_id"]
     user_dto = UserDTO(
         user_id=user_id,
@@ -268,14 +274,12 @@ def test_deprecated_get_user_self_read_returns_x_deprecated_header(client_custom
     with patch("app.routes.user.user_service") as mock_user:
         mock_user.get_by_id.return_value = user_dto
         response = client_customer.get(f"/api/v1/users/{user_id}")
-    assert response.status_code == 200
-    assert response.headers.get("X-Deprecated-Endpoint") == "true"
-    assert "X-Use-Instead" in response.headers
-    assert "users/me" in response.headers.get("X-Use-Instead", "")
+    assert response.status_code == 410
+    assert "users/me" in (response.json().get("detail") or "")
 
 
-def test_deprecated_put_user_self_update_returns_x_deprecated_header(client_customer, customer_user, mock_db):
-    """PUT /users/{user_id} for self-update returns X-Deprecated-Endpoint header."""
+def test_deprecated_put_user_self_update_returns_410_gone(client_customer, customer_user, mock_db):
+    """PUT /users/{user_id} for Customer self-update returns 410 Gone with migration hint."""
     user_id = customer_user["user_id"]
     user_dto = UserDTO(
         user_id=user_id,
@@ -301,14 +305,12 @@ def test_deprecated_put_user_self_update_returns_x_deprecated_header(client_cust
             f"/api/v1/users/{user_id}",
             json={"first_name": "Updated"},
         )
-    assert response.status_code == 200
-    assert response.headers.get("X-Deprecated-Endpoint") == "true"
-    assert "X-Use-Instead" in response.headers
-    assert "users/me" in response.headers.get("X-Use-Instead", "")
+    assert response.status_code == 410
+    assert "users/me" in (response.json().get("detail") or "")
 
 
-def test_deprecated_get_enriched_user_self_read_returns_x_deprecated_header(client_customer, customer_user, mock_db):
-    """GET /users/enriched/{user_id} for self-read returns X-Deprecated-Endpoint header."""
+def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer, customer_user, mock_db):
+    """GET /users/enriched/{user_id} for Customer self-read returns 410 Gone with migration hint."""
     user_id = customer_user["user_id"]
     inst_id = customer_user["institution_id"]
     market_id = uuid4()
@@ -335,6 +337,129 @@ def test_deprecated_get_enriched_user_self_read_returns_x_deprecated_header(clie
     with patch("app.routes.user.get_enriched_user_by_id") as mock_get:
         mock_get.return_value = enriched
         response = client_customer.get(f"/api/v1/users/enriched/{user_id}")
+    assert response.status_code == 410
+    assert "users/me" in (response.json().get("detail") or "")
+
+
+def test_put_me_mobile_change_resets_verification_flags(client_customer, customer_user, mock_db):
+    """PUT /users/me with a new mobile_number clears mobile_number_verified flags in update payload."""
+    user_id = customer_user["user_id"]
+    market_id = uuid4()
+    inst_id = customer_user["institution_id"]
+    verified_at = datetime.now(timezone.utc)
+    existing = UserDTO(
+        user_id=user_id,
+        institution_id=inst_id,
+        role_type=RoleType.CUSTOMER,
+        role_name=RoleName.COMENSAL,
+        username="customer",
+        hashed_password="hash",
+        first_name="Test",
+        last_name="User",
+        email="test@example.com",
+        mobile_number="+14155552671",
+        mobile_number_verified=True,
+        mobile_number_verified_at=verified_at,
+        employer_id=None,
+        market_id=market_id,
+        city_id=SAMPLE_CITY_ID,
+        is_archived=False,
+        status=Status.ACTIVE,
+        created_date=datetime.now(timezone.utc),
+        modified_by=user_id,
+        modified_date=datetime.now(timezone.utc),
+    )
+    updated = existing.model_copy(
+        update={
+            "mobile_number": "+15005550006",
+            "mobile_number_verified": False,
+            "mobile_number_verified_at": None,
+        }
+    )
+    with patch("app.routes.user.user_service") as mock_user, patch(
+        "app.routes.user.get_assigned_market_ids", return_value=[market_id]
+    ):
+        mock_user.get_by_id.return_value = existing
+        mock_user.update.return_value = updated
+        response = client_customer.put(
+            "/api/v1/users/me",
+            json={"mobile_number": "+15005550006"},
+        )
     assert response.status_code == 200
-    assert response.headers.get("X-Deprecated-Endpoint") == "true"
-    assert "X-Use-Instead" in response.headers
+    update_data = mock_user.update.call_args[0][1]
+    assert update_data["mobile_number_verified"] is False
+    assert update_data["mobile_number_verified_at"] is None
+    assert update_data["mobile_number"] == "+15005550006"
+
+
+def test_put_me_new_email_triggers_verification_flow(client_customer, customer_user, mock_db):
+    """PUT /users/me with new email calls email change service and clears email_verified; response includes message."""
+    user_id = customer_user["user_id"]
+    market_id = uuid4()
+    inst_id = customer_user["institution_id"]
+    existing = UserDTO(
+        user_id=user_id,
+        institution_id=inst_id,
+        role_type=RoleType.CUSTOMER,
+        role_name=RoleName.COMENSAL,
+        username="customer",
+        hashed_password="hash",
+        first_name="Test",
+        last_name="User",
+        email="old@example.com",
+        mobile_number=None,
+        mobile_number_verified=False,
+        mobile_number_verified_at=None,
+        email_verified=True,
+        email_verified_at=datetime.now(timezone.utc),
+        employer_id=None,
+        market_id=market_id,
+        city_id=SAMPLE_CITY_ID,
+        is_archived=False,
+        status=Status.ACTIVE,
+        created_date=datetime.now(timezone.utc),
+        modified_by=user_id,
+        modified_date=datetime.now(timezone.utc),
+    )
+    updated = existing.model_copy(
+        update={
+            "email_verified": False,
+            "email_verified_at": None,
+        }
+    )
+    with patch("app.routes.user.user_service") as mock_user, patch(
+        "app.routes.user.email_change_service.request_email_change"
+    ) as mock_req, patch(
+        "app.routes.user.get_assigned_market_ids", return_value=[market_id]
+    ):
+        mock_user.get_by_id.return_value = existing
+        mock_user.update.return_value = updated
+        response = client_customer.put(
+            "/api/v1/users/me",
+            json={"email": "new@example.com"},
+        )
+    assert response.status_code == 200
+    mock_req.assert_called_once()
+    args = mock_req.call_args[0]
+    assert args[0] == user_id
+    assert args[1] == "new@example.com"
+    data = response.json()
+    assert "new@example.com" in (data.get("email_change_message") or "")
+    assert data["email"] == "old@example.com"
+    ud = mock_user.update.call_args[0][1]
+    assert ud.get("email_verified") is False
+    assert "email" not in ud
+
+
+def test_post_me_verify_email_change_success(client_customer, customer_user, mock_db):
+    """POST /users/me/verify-email-change returns success message."""
+    with patch(
+        "app.routes.user.email_change_service.verify_email_change"
+    ) as mock_verify:
+        response = client_customer.post(
+            "/api/v1/users/me/verify-email-change",
+            json={"code": "123456"},
+        )
+    assert response.status_code == 200
+    assert response.json().get("message")
+    mock_verify.assert_called_once_with(customer_user["user_id"], "123456", mock_db)

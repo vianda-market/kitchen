@@ -176,7 +176,8 @@ class EnrichedService(Generic[T]):
         scope: Optional[InstitutionScope] = None,
         include_archived: bool = False,
         additional_conditions: Optional[List[Tuple[str, Any]]] = None,
-        order_by: Optional[str] = None
+        order_by: Optional[str] = None,
+        row_transform: Optional[Callable[[dict], dict]] = None,
     ) -> List[T]:
         """
         Get all enriched records with JOINs and filtering.
@@ -230,6 +231,8 @@ class EnrichedService(Generic[T]):
             for row in results:
                 row_dict = dict(row)
                 row_dict = self._convert_uuids_to_strings(row_dict)
+                if row_transform:
+                    row_dict = row_transform(row_dict)
                 enriched_items.append(self.schema_class(**row_dict))
             
             return enriched_items
@@ -254,7 +257,8 @@ class EnrichedService(Generic[T]):
         joins: List[Tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
         scope: Optional[InstitutionScope] = None,
         include_archived: bool = False,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None
+        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
+        row_transform: Optional[Callable[[dict], dict]] = None,
     ) -> Optional[T]:
         """
         Get a single enriched record by ID with JOINs and filtering.
@@ -308,6 +312,8 @@ class EnrichedService(Generic[T]):
             # Convert UUIDs and validate schema
             row_dict = dict(results[0])
             row_dict = self._convert_uuids_to_strings(row_dict)
+            if row_transform:
+                row_dict = row_transform(row_dict)
             return self.schema_class(**row_dict)
             
         except HTTPException:

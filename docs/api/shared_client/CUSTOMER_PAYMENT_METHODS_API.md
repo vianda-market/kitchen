@@ -9,10 +9,10 @@
 
 | Status | Description |
 |--------|-------------|
-| **Phase 1 (current)** | **Mock endpoints** — Fully implemented. Returns fixture data or no-op. Use these to build UI now. |
-| **Phase 2** | Database: `stripe_customer_id` on user; repurpose `payment_method` / `external_payment_method`. |
-| **Phase 3** | Live Stripe: Setup Session, webhooks, detach, set default. |
-| **Phase 4** | Subscription integration: reuse saved card for with-payment (skip card form when default exists). |
+| **Phase 1** | **Live** — Mock endpoints. Returns fixture data or no-op. |
+| **Phase 2** | **Live** — Database-backed. `user_payment_provider` table stores payment provider link (replaces `stripe_customer_id` on user). New endpoints: `GET /customer/payment-providers`, `DELETE /customer/payment-providers/{id}`. See [PAYMENT_PROVIDERS_B2C.md](../b2c_client/PAYMENT_PROVIDERS_B2C.md). |
+| **Phase 3** | Planned — Live Stripe: real Setup Session, webhooks, detach, set default. |
+| **Phase 4** | Planned — Subscription integration: reuse saved card for with-payment (skip card form when default exists). |
 
 **Roadmap**: [STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md](../../roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md)
 

@@ -19,7 +19,7 @@ This document describes how restaurant **status**, **plate_kitchen_days**, and *
 ## Create (B2B)
 
 - **POST /api/v1/restaurants** creates a restaurant. The response includes **`status: "Pending"`**. The client must not send `status` on create; the backend sets it.
-- **Do not send `credit_currency_id`** on restaurant create. Currency is inherited from the institution entity (derived from the entity’s address → market). See [RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md](../b2b_client/RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md).
+- **Do not send `credit_currency_id`** on restaurant create. Currency is inherited from the institution entity (derived from the entity’s address → market). See [CREDIT_AND_CURRENCY_CLIENT.md](CREDIT_AND_CURRENCY_CLIENT.md).
 
 ## Update status (B2B)
 

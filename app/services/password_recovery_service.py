@@ -310,7 +310,9 @@ class PasswordRecoveryService:
                     UPDATE user_info
                     SET hashed_password = %s,
                         modified_date = CURRENT_TIMESTAMP,
-                        status = 'Active'
+                        status = 'Active',
+                        email_verified = TRUE,
+                        email_verified_at = CURRENT_TIMESTAMP
                     WHERE user_id = %s
                     """,
                     (password_hash, user_id)
@@ -333,9 +335,11 @@ class PasswordRecoveryService:
             log_password_recovery_debug(f"reset_password: password updated and code marked used for user_id={user_id}")
             log_info(f"Password successfully reset for user {user_id}")
 
+            refreshed = user_service.get_by_id(UUID(user_id), db, scope=None)
             return {
                 "success": True,
-                "message": "Password reset successful. You can now log in with your new password."
+                "message": "Password reset successful. You can now log in with your new password.",
+                "user": refreshed,
             }
         
         except Exception as e:

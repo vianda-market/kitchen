@@ -5,16 +5,17 @@ Routes for managing national holidays (employee-only access).
 Supports single and bulk operations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from uuid import UUID
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import psycopg2.extensions
 
 from app.schemas.consolidated_schemas import (
     NationalHolidayCreateSchema,
     NationalHolidayUpdateSchema,
     NationalHolidayResponseSchema,
-    NationalHolidayBulkCreateSchema
+    NationalHolidayBulkCreateSchema,
+    NationalHolidaySyncFromProviderSchema,
 )
 from app.services.crud_service import national_holiday_service
 from app.auth.dependencies import get_employee_user
@@ -22,11 +23,36 @@ from app.dependencies.database import get_db
 from app.services.error_handling import handle_business_operation
 from app.utils.log import log_info
 from app.utils.db import db_batch_insert, db_read
+from app.services.cron.holiday_refresh import run_holiday_refresh
 
 router = APIRouter(
     prefix="/national-holidays",
     tags=["National Holidays"]
 )
+
+
+@router.post("/sync-from-provider", response_model=Dict[str, Any])
+def sync_national_holidays_from_provider(
+    payload: Optional[NationalHolidaySyncFromProviderSchema] = Body(default=None),
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    Import public holidays from Nager.Date for all configured market countries.
+
+    Internal-only. Body optional: `years` for explicit UTC-bounded calendar years;
+    omit for default (current + next year, clamped). UPSERT refreshes nager_date rows; manual rows unchanged.
+    """
+    del db  # sync uses its own pooled connection
+    del current_user
+    years = None if payload is None else payload.years
+    result = run_holiday_refresh(years=years)
+    if result.get("status") == "error":
+        reason = result.get("reason", "Holiday sync failed")
+        if result.get("years") == []:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=reason)
+    return result
 
 
 @router.get("", response_model=List[NationalHolidayResponseSchema])
@@ -62,7 +88,8 @@ def list_national_holidays(
                 is_archived,
                 created_date,
                 modified_by,
-                modified_date
+                modified_date,
+                source
             FROM national_holidays 
             {where_clause}
             ORDER BY country_code, holiday_date
@@ -116,7 +143,8 @@ def create_national_holiday(
             "recurring_day": payload.recurring_day,
             "status": payload.status if payload.status else "Active",  # Use provided status or default to Active
             "is_archived": False,
-            "modified_by": current_user["user_id"]
+            "modified_by": current_user["user_id"],
+            "source": "manual",
         }
         
         # Create holiday
@@ -153,7 +181,8 @@ def create_national_holidays_bulk(
                 "recurring_day": holiday.recurring_day,
                 "status": holiday.status if holiday.status else "Active",  # Use provided status or default to Active
                 "is_archived": False,
-                "modified_by": current_user["user_id"]
+                "modified_by": current_user["user_id"],
+                "source": "manual",
             })
         
         # Batch insert all holidays atomically using db_batch_insert

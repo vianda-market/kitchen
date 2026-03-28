@@ -1,11 +1,18 @@
 import os
 import uuid
+from typing import Optional
+
 import jwt
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
+import psycopg2.extensions
+from fastapi import HTTPException, Request, status, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. are defined
+from app.dependencies.database import get_db
+from app.utils.db import db_read
+from app.utils.locale import resolve_locale_from_header, SUPPORTED_LOCALES
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+optional_bearer_scheme = HTTPBearer(auto_error=False)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 DUMMY_ADMIN_USER_ID = os.getenv("DUMMY_ADMIN_USER_ID", None)
@@ -31,7 +38,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             "role_type": "client",
             "role_name": "Unknown",
             "institution_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
-            "credit_worth": None,
+            "locale": "en",
+            "credit_cost_local_currency": None,
             "subscription_market_id": None,
         }
     
@@ -69,16 +77,19 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
                 detail="Token payload is missing required fields."
             )
         
-        # Return the full user payload including role_name and optional credit_worth/subscription_market_id (single subscription per user).
+        # Return the full user payload including role_name and optional credit_cost_local_currency/subscription_market_id (single subscription per user).
         out = {
             "user_id": user_id,
             "role_type": role_type,
             "role_name": role_name,
             "institution_id": institution_id,
         }
-        if "credit_worth" in payload and "subscription_market_id" in payload:
-            out["credit_worth"] = payload["credit_worth"]
+        if "credit_cost_local_currency" in payload and "subscription_market_id" in payload:
+            out["credit_cost_local_currency"] = payload["credit_cost_local_currency"]
             out["subscription_market_id"] = payload["subscription_market_id"]
+        loc = payload.get("locale")
+        if loc:
+            out["locale"] = loc
         return out
     
     except jwt.PyJWTError:
@@ -86,6 +97,82 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
+
+
+def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_bearer_scheme),
+) -> Optional[dict]:
+    """Optional Bearer JWT: returns None if missing or invalid (no 401)."""
+    if credentials is None or not credentials.credentials:
+        return None
+    token = credentials.credentials
+    try:
+        if token.startswith("Bearer "):
+            token = token.split("Bearer ", 1)[1]
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id = uuid.UUID(payload.get("sub"))
+        role_type = payload.get("role_type")
+        role_name = payload.get("role_name", "Unknown")
+        try:
+            institution_id = uuid.UUID(payload.get("institution_id"))
+        except (ValueError, TypeError):
+            return None
+        if not role_type:
+            return None
+        out = {
+            "user_id": user_id,
+            "role_type": role_type,
+            "role_name": role_name,
+            "institution_id": institution_id,
+        }
+        if "credit_cost_local_currency" in payload and "subscription_market_id" in payload:
+            out["credit_cost_local_currency"] = payload["credit_cost_local_currency"]
+            out["subscription_market_id"] = payload["subscription_market_id"]
+        loc = payload.get("locale")
+        if loc:
+            out["locale"] = loc
+        return out
+    except (jwt.PyJWTError, ValueError, TypeError):
+        return None
+
+
+def get_resolved_locale(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> str:
+    """DB user_info.locale wins; then Accept-Language; then default."""
+    accept = request.headers.get("Accept-Language")
+    uid = current_user.get("user_id")
+    if uid is not None:
+        row = db_read(
+            "SELECT locale FROM user_info WHERE user_id = %s",
+            (str(uid),),
+            connection=db,
+            fetch_one=True,
+        )
+        if row and row.get("locale") and row["locale"] in SUPPORTED_LOCALES:
+            return row["locale"]
+    return resolve_locale_from_header(accept)
+
+
+def get_resolved_locale_optional(
+    request: Request,
+    current_user: Optional[dict] = Depends(get_optional_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> str:
+    """Same as get_resolved_locale but for routes that allow anonymous access."""
+    accept = request.headers.get("Accept-Language")
+    if current_user and current_user.get("user_id") is not None:
+        row = db_read(
+            "SELECT locale FROM user_info WHERE user_id = %s",
+            (str(current_user["user_id"]),),
+            connection=db,
+            fetch_one=True,
+        )
+        if row and row.get("locale") and row["locale"] in SUPPORTED_LOCALES:
+            return row["locale"]
+    return resolve_locale_from_header(accept)
 
 
 def get_super_admin_user(current_user: dict = Depends(get_current_user)):

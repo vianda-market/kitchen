@@ -443,7 +443,7 @@ useEffect(() => {
 
 For questions or issues with this implementation:
 
-1. **Backend API Documentation**: `/docs/API_VERSIONING_CONSISTENCY_FIX.md`
+1. **Backend API Documentation**: `docs/zArchive/roadmap/API_VERSIONING_CONSISTENCY_FIX.md`
 2. **Schema Reference**: `app/schemas/consolidated_schemas.py` (line 1074+)
 3. **Validation Logic**: `app/services/discretionary_service.py` (line 276+)
 4. **Enum Definition**: `app/config/enums/discretionary_reasons.py`

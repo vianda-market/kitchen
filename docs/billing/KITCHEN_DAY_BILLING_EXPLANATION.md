@@ -189,8 +189,14 @@ python -c "from app.services.cron.billing_events import run_kitchen_day_closure_
 # Available commands
 python app/services/cron/billing_events.py daily
 python app/services/cron/billing_events.py kitchen_closure
+python app/services/cron/billing_events.py multi_market        # All locations
+python app/services/cron/billing_events.py multi_market AR     # Single location
+python app/services/cron/billing_events.py kitchen_start      # All locations
+python app/services/cron/billing_events.py kitchen_start US-Pacific
 python app/services/cron/billing_events.py dashboard
 ```
+
+**Location-based billing:** `multi_market_billing_entry(location_id)` processes restaurants by address timezone. Use `location_id` (AR, PE, US-Eastern, US-Pacific, etc.) for GCP Cloud Scheduler jobs.
 
 ---
 

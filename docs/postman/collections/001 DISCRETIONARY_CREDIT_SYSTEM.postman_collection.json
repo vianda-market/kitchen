@@ -83,7 +83,7 @@
 									"    market_id: '00000000-0000-0000-0000-000000000001',",
 									"    first_name: 'Admin',",
 									"    last_name: 'User',",
-									"    cellphone: '5550000000'",
+									"    mobile_number: '+15005550006'",
 									"};",
 									"pm.request.body.raw = JSON.stringify(body);",
 									"const token = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken') || pm.globals.get('superAdminAuthToken');",
@@ -123,7 +123,7 @@
 						"header": [{"key": "Content-Type", "value": "application/json", "type": "text"}],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"email\": \"admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"Internal\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\",\n    \"first_name\": \"Admin\",\n    \"last_name\": \"User\",\n    \"cellphone\": \"5550000000\"\n}"
+							"raw": "{\n    \"username\": \"admin\",\n    \"email\": \"admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"Internal\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\",\n    \"first_name\": \"Admin\",\n    \"last_name\": \"User\",\n    \"mobile_number\": \"+15005550006\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/users",

@@ -130,7 +130,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 
 ## 7. Related documentation
 
-- [USER_AND_MARKET_API_CLIENT.md](./USER_AND_MARKET_API_CLIENT.md) — User–market storage, GET /users/me, B2C/B2B usage.
+- [USER_MODEL_FOR_CLIENTS.md](./USER_MODEL_FOR_CLIENTS.md#7-user-and-market-market_id--market_ids) — User–market storage, GET /users/me, B2C/B2B usage.
 - [ENRICHED_ENDPOINT_PATTERN.md](./ENRICHED_ENDPOINT_PATTERN.md)
 - [API_PERMISSIONS_BY_ROLE.md](./API_PERMISSIONS_BY_ROLE.md)
 - [COUNTRY_CODE_API_CONTRACT.md](./COUNTRY_CODE_API_CONTRACT.md)

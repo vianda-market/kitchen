@@ -14,9 +14,9 @@ This document summarizes APIs that **Customers** can access. For full matrices, 
 | **Lead encouragement (zipcode metrics)** | **GET** `/api/v1/leads/zipcode-metrics` | Pre-signup: pass `zip` and optional `country_code`; returns restaurant count, has_coverage, matched_zipcode. **No auth**; rate-limited. Full spec: [../shared_client/ZIPCODE_METRICS_LEAD_API.md](../shared_client/ZIPCODE_METRICS_LEAD_API.md). |
 | **Restaurant explore (authorized)** | **GET** `/api/v1/restaurants/cities`, **GET** `/api/v1/restaurants/by-city`, **GET** `/api/v1/restaurants/explore/kitchen-days`, **GET** `/api/v1/restaurants/explore/pickup-windows`, **GET** `/api/v1/restaurants/{id}/coworker-pickup-windows` | City dropdown then list/map + plates. **Auth required.** When using a market, **`kitchen_day` is required** (Monday–Friday); omit → 400. **kitchen-days**: allowed kitchen days for dropdown (closest first). **pickup-windows**: 15-min windows for "Select pickup window" modal. **has_volunteer**, **has_coworker_offer**, **has_coworker_request**: per restaurant when kitchen_day set. **coworker-pickup-windows**: pickup time ranges from coworkers (offer/request); call only when has_coworker_offer or has_coworker_request. **is_already_reserved**, **existing_plate_selection_id**: per plate. **Plates**: lean payload (plate_id, product_name, image_url thumbnail, credit, savings, badges). **GET /plates/enriched/{plate_id}?kitchen_day=** adds coworker flags for Reservations-flow modal. Full spec: [RESTAURANT_EXPLORE_B2C.md](./RESTAURANT_EXPLORE_B2C.md), [POST_RESERVATION_PICKUP_B2C.md](./POST_RESERVATION_PICKUP_B2C.md). |
 | **Auth** | POST `/api/v1/auth/token` | Login |
-| **Username recovery** | POST `/api/v1/auth/forgot-username` | Forgot username; optional "also send password reset". **Full spec**: [../shared_client/USERNAME_RECOVERY.md](../shared_client/USERNAME_RECOVERY.md). |
+| **Username recovery** | POST `/api/v1/auth/forgot-username` | Forgot username; optional "also send password reset". **Full spec**: [USER_MODEL_FOR_CLIENTS.md §8](../shared_client/USER_MODEL_FOR_CLIENTS.md#8-forgot-username). |
 | **Customer signup (email verification)** | POST `/api/v1/customers/signup/request`, POST `/api/v1/customers/signup/verify` | Two-step: request sends verification email; verify with token creates user and returns JWT. **Full spec**: [CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](./CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md). Summary below. |
-| **Users (self)** | GET/PUT `/api/v1/users/me` | Profile, terminate, employer. **GET** returns `market_id` (primary) and `market_ids` (all, primary first) — use to restore market selector after login. See [USER_AND_MARKET_API_CLIENT.md](../shared_client/USER_AND_MARKET_API_CLIENT.md). |
+| **Users (self)** | GET/PUT `/api/v1/users/me` | Profile, terminate, employer. **GET** returns `market_id` (primary) and `market_ids` (all, primary first) — use to restore market selector after login. **`mobile_number` (E.164)** and read-only verification flags: [USER_MODEL_FOR_CLIENTS.md](../shared_client/USER_MODEL_FOR_CLIENTS.md). |
 | **Messaging preferences** | GET/PUT `/api/v1/users/me/messaging-preferences` | Configure coworker pickup, plate readiness, promotions push, and promotions email toggles. See [MESSAGING_PREFERENCES_B2C.md](./MESSAGING_PREFERENCES_B2C.md). |
 | **Plans** | GET `/api/v1/plans/`, `/enriched/` | Browse plans (read-only) |
 | **Subscriptions** | GET/POST/PUT `/api/v1/subscriptions/`, `/me` | Own subscriptions. **Payment**: Use **POST /with-payment** and **POST /{id}/confirm-payment** (mock) or poll GET when using Stripe. See [SUBSCRIPTION_PAYMENT_API.md](./SUBSCRIPTION_PAYMENT_API.md). Fintech Link deprecated; do not use. |
@@ -39,7 +39,7 @@ Customer registration uses a **two-step flow** so that a row in `user_info` is c
 
 | Step | Endpoint | Purpose |
 |------|----------|---------|
-| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, **country_code**, city_id or city_name, cellphone, first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). Use GET /leads/markets for `country_code` values. |
+| 1 | `POST /api/v1/customers/signup/request` | Send signup payload (username, password, email, **country_code**, city_id or city_name, mobile_number (optional E.164), first_name, last_name). Backend validates, stores a pending signup, and sends a verification email. Response is always a generic success message (no email enumeration). Use GET /leads/markets for `country_code` values. |
 | 2 | `POST /api/v1/customers/signup/verify` | Send `{"token": "..."}` (from the link in the email). Backend creates the user, marks the token used, and returns the user object plus `access_token` so the client can log the user in immediately. |
 
 **UI flow**
@@ -67,12 +67,12 @@ Customer registration uses a **two-step flow** so that a row in `user_info` is c
 
 ## Shared Pattern Docs (in shared_client/)
 
-- [USER_SELF_UPDATE_PATTERN](../shared_client/USER_SELF_UPDATE_PATTERN.md) – Use `/me` for self-updates
+- [USER_MODEL_FOR_CLIENTS](../shared_client/USER_MODEL_FOR_CLIENTS.md) – Use `/me` for self-updates; `mobile_number` (E.164); markets
 - [ENRICHED_ENDPOINT_PATTERN](../shared_client/ENRICHED_ENDPOINT_PATTERN.md) – Use `/enriched/` for plates, addresses
 - [ARCHIVED_RECORDS_PATTERN](../shared_client/ARCHIVED_RECORDS_PATTERN.md) – Default excludes archived
 - [SCOPING_BEHAVIOR_FOR_UI](../shared_client/SCOPING_BEHAVIOR_FOR_UI.md) – Customer = user-scoped
 - [ADDRESSES_API_CLIENT](../shared_client/ADDRESSES_API_CLIENT.md) – Suggest, create (place_id or structured); Address CRUD; **B2C:** omit `institution_id` and `user_id` on create; **address types by role** (B2C: only Customer Home, Billing, Employer in forms)
 - [MARKET_BASED_SUBSCRIPTIONS](../shared_client/MARKET_BASED_SUBSCRIPTIONS.md) – Multi-market
-- [USER_AND_MARKET_API_CLIENT](../shared_client/USER_AND_MARKET_API_CLIENT.md) – User–market storage and API (market_id, market_ids from GET /users/me; restore market selector)
+- [USER_MODEL_FOR_CLIENTS §7](../shared_client/USER_MODEL_FOR_CLIENTS.md#7-user-and-market-market_id--market_ids) – `market_id` / `market_ids` from GET /users/me; restore market selector
 - [PLATE_API_CLIENT](../shared_client/PLATE_API_CLIENT.md) – Plate selection, plate pickup pending, enriched endpoint (ingredients, pickup_instructions)
 - [POST_RESERVATION_PICKUP_B2C](./POST_RESERVATION_PICKUP_B2C.md) – Volunteer pickup, coworker list/notify, notifications, editability

@@ -6,7 +6,8 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning
 from app.dto.models import UserDTO
-from app.services.crud_service import user_service, subscription_service, plan_service
+from app.services.crud_service import user_service
+from app.auth.utils import build_token_data, merge_subscription_token_claims
 from app.services.entity_service import get_user_by_username
 from app.config import Status
 import psycopg2.extensions
@@ -75,29 +76,8 @@ async def login(
     # Log successful authentication
     log_info(f"User authenticated successfully with id: {user.user_id}")
 
-    # Resolve credit_worth for JWT (single subscription per user; used by explore/by-city for savings).
-    # A future traveler program will allow ordering in other markets using the in-market subscription.
-    credit_worth = None
-    subscription_market_id = None
-    try:
-        subscription = subscription_service.get_by_user(user.user_id, db)
-        if subscription:
-            plan = plan_service.get_by_id(subscription.plan_id, db)
-            if plan:
-                credit_worth = float(plan.credit_worth)
-                subscription_market_id = str(subscription.market_id)
-    except Exception:
-        pass  # Optional: token works without credit_worth; by-city returns savings=0
-
-    token_data = {
-        "sub": str(user.user_id),
-        "role_type": role_type or "Unknown",
-        "role_name": role_name or "Unknown",
-        "institution_id": str(user.institution_id),
-    }
-    if credit_worth is not None and subscription_market_id is not None:
-        token_data["credit_worth"] = credit_worth
-        token_data["subscription_market_id"] = subscription_market_id
+    token_data = build_token_data(user)
+    merge_subscription_token_claims(token_data, user.user_id, db)
 
     access_token = create_access_token(data=token_data)
     return {"access_token": access_token, "token_type": "bearer"}

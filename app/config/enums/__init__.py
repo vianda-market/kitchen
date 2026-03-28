@@ -21,6 +21,7 @@ from app.config.enums.subscription_status import SubscriptionStatus
 from app.config.enums.payment_method_types import PaymentMethodType
 from app.config.enums.street_types import StreetType
 from app.config.enums.bill_resolution import BillResolution
+from app.config.enums.bill_payout_status import BillPayoutStatus
 from app.config.enums.discretionary_status import DiscretionaryStatus
 from app.config.enums.favorite_entity_types import FavoriteEntityType
 from app.config.enums.portion_size_display import PortionSizeDisplay
@@ -39,6 +40,7 @@ __all__ = [
     "PaymentMethodType",
     "StreetType",
     "BillResolution",
+    "BillPayoutStatus",
     "DiscretionaryStatus",
     "FavoriteEntityType",
     "PortionSizeDisplay",

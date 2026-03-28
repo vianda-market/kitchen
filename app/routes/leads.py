@@ -48,7 +48,13 @@ def _get_available_markets_cached() -> List[MarketPublicMinimalSchema]:
         return [MarketPublicMinimalSchema(**m) for m in _available_markets_cache]
     raw = market_service.get_all(include_archived=False, status=Status.ACTIVE)
     slim = [
-        {"country_code": m["country_code"], "country_name": m["country_name"]}
+        {
+            "country_code": m["country_code"],
+            "country_name": m["country_name"],
+            "language": m.get("language") or "en",
+            "phone_dial_code": m.get("phone_dial_code"),
+            "phone_local_digits": m.get("phone_local_digits"),
+        }
         for m in raw
         if not is_global_market(m.get("market_id"))
     ]

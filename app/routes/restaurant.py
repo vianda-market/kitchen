@@ -28,7 +28,7 @@ from app.services.crud_service import (
     credit_currency_service,
     institution_entity_service,
     institution_service,
-    get_credit_worth_of_most_expensive_plan_for_market,
+    get_credit_cost_local_currency_of_most_expensive_plan_for_market,
 )
 from app.services.entity_service import (
     get_enriched_restaurants,
@@ -405,13 +405,13 @@ def get_restaurants_by_city_route(
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-    # Single subscription per user; savings use credit_worth only when exploring in the user's subscription market.
-    credit_worth = None
+    # Single subscription per user; savings use credit_cost_local_currency only when exploring in the user's subscription market.
+    credit_cost_local_currency = None
     if effective_market_id and str(effective_market_id) == current_user.get("subscription_market_id"):
-        credit_worth = current_user.get("credit_worth")
+        credit_cost_local_currency = current_user.get("credit_cost_local_currency")
     # When no subscription in this market, show best savings from the most expensive plan in the market (teaser).
-    if credit_worth is None and effective_market_id is not None:
-        credit_worth = get_credit_worth_of_most_expensive_plan_for_market(effective_market_id, db)
+    if credit_cost_local_currency is None and effective_market_id is not None:
+        credit_cost_local_currency = get_credit_cost_local_currency_of_most_expensive_plan_for_market(effective_market_id, db)
 
     user_id = current_user.get("user_id")
     if isinstance(user_id, str) and user_id:
@@ -443,7 +443,7 @@ def get_restaurants_by_city_route(
         db=db,
         timezone_str=timezone_str,
         kitchen_day=kitchen_day,
-        credit_worth=credit_worth,
+        credit_cost_local_currency=credit_cost_local_currency,
         user_id=user_id,
         employer_id=employer_id,
         employer_address_id=employer_address_id,

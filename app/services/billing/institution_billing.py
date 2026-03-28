@@ -291,18 +291,31 @@ class InstitutionBillingService:
         bill_date: date,
         system_user_id: UUID,
         country_code: Optional[str] = None,
+        location_id: Optional[str] = None,
+        timezone_filter: Optional[str] = None,
         connection=None
     ) -> Dict:
         """
         Phase 1: Create one settlement per restaurant with balance > 0 for the period.
         No global balance reset; each restaurant's balance is reset when its settlement is created.
-        Returns dict with settlements_created, total_amount, settlement_run_id, kitchen_day, etc.
+        When location_id is provided, timezone_filter and market are resolved from location config;
+        only restaurants in that timezone are processed. Returns dict with settlements_created, etc.
         """
         from uuid import uuid4
+        from app.config.location_config import get_location_config
         try:
+            market_override = None
+            if location_id:
+                loc_config = get_location_config(location_id)
+                if loc_config:
+                    timezone_filter = loc_config["timezone"]
+                    market_override = loc_config["market"]
             kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(bill_date)
             log_info(f"Phase 1 settlements: kitchen day {kitchen_day}, date {bill_date}")
-            restaurants = InstitutionBillingService._get_restaurants_with_balances(connection=connection)
+            restaurants = InstitutionBillingService._get_restaurants_with_balances(
+                connection=connection,
+                timezone_filter=timezone_filter,
+            )
             log_info(f"Phase 1: Found {len(restaurants) if restaurants else 0} restaurants with balance > 0")
             if not restaurants:
                 log_info("Phase 1: No restaurants with balance > 0")
@@ -311,7 +324,7 @@ class InstitutionBillingService:
                     "total_amount": 0.0,
                     "settlement_run_id": None,
                     "kitchen_day": kitchen_day,
-                    "country_code": country_code,
+                    "country_code": market_override or country_code,
                 }
             settlement_run_id = uuid4()
             entity_aggregates = InstitutionBillingService._aggregate_restaurants_by_entity(restaurants)
@@ -320,7 +333,7 @@ class InstitutionBillingService:
             period_start, period_end = None, None
             for entity_data in entity_aggregates:
                 try:
-                    entity_country = country_code
+                    entity_country = market_override or country_code
                     if not entity_country:
                         from app.services.market_detection import MarketDetectionService
                         entity_country = MarketDetectionService.get_country_from_entity(
@@ -367,12 +380,13 @@ class InstitutionBillingService:
                     log_error(f"Error creating settlements for entity {entity_data['institution_entity_id']}: {e}")
                     continue
             log_info(f"Phase 1 complete: {settlements_created} settlements, total {total_amount}")
+            resolved_country = market_override or country_code
             return {
                 "settlements_created": settlements_created,
                 "total_amount": float(total_amount),
                 "settlement_run_id": str(settlement_run_id),
                 "kitchen_day": kitchen_day,
-                "country_code": country_code,
+                "country_code": resolved_country,
                 "period_start": period_start.isoformat() if period_start else None,
                 "period_end": period_end.isoformat() if period_end else None,
             }
@@ -463,12 +477,13 @@ class InstitutionBillingService:
         bill_date: date,
         system_user_id: UUID,
         country_code: Optional[str] = None,
+        location_id: Optional[str] = None,
         connection=None
     ) -> Dict:
         """
         Full pipeline: Phase 1 (settlements per restaurant), Phase 2 (one bill per entity),
         then for each bill: issue tax doc stub, trigger payout (mock/live), set payout fields, mark_paid.
-        Uses one connection; commits after each mark_paid (or once at end if no bills).
+        When location_id is provided, only restaurants in that location's timezone are processed.
         """
         from app.services.billing.tax_doc_service import issue_tax_doc_for_bill
         from app.services.supplier_payout import trigger_payout
@@ -480,6 +495,7 @@ class InstitutionBillingService:
                 bill_date=bill_date,
                 system_user_id=system_user_id,
                 country_code=country_code,
+                location_id=location_id,
                 connection=connection,
             )
             if phase1.get("error"):
@@ -697,33 +713,56 @@ class InstitutionBillingService:
         """
         Check if it's time to generate bills (kitchen day has just closed) for a specific market.
         This can be used for real-time billing triggers.
-        
+
         Args:
             country_code: Country code for market-specific timing
-            
+
         Returns:
             True if bills should be generated now
         """
         current_time = datetime.now(timezone.utc)
         current_day = current_time.date()
         current_kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(current_day)
-        
-        # Get billing run time for today using market config
+
         billing_run_utc = MarketConfiguration.get_billing_run_utc(country_code, current_time, current_kitchen_day)
         if not billing_run_utc:
             return False
-        
-        # Check if we're within 5 minutes after billing run time (billing window)
+
         billing_window_start = billing_run_utc
         billing_window_end = billing_run_utc + timedelta(minutes=5)
-        
         return billing_window_start <= current_time <= billing_window_end
 
     @staticmethod
-    def _get_restaurants_with_balances(connection=None) -> List[Dict]:
-        """Get all restaurants that have balance data, grouped by institution_entity_id"""
+    def should_generate_bills_now_for_location(location_id: str) -> bool:
+        """
+        Check if it's time to generate bills for a location (uses location's timezone).
+        For US-Eastern vs US-Pacific, each has different UTC billing run time.
+        """
+        from app.config.location_config import get_location_config
+
+        loc = get_location_config(location_id)
+        if not loc:
+            return False
+        current_time = datetime.now(timezone.utc)
+        current_day = current_time.date()
+        current_kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(current_day)
+        billing_run_utc = MarketConfiguration.get_billing_run_utc_for_timezone(
+            loc["market"], loc["timezone"], current_time, current_kitchen_day
+        )
+        if not billing_run_utc:
+            return False
+        billing_window_start = billing_run_utc
+        billing_window_end = billing_run_utc + timedelta(minutes=5)
+        return billing_window_start <= current_time <= billing_window_end
+
+    @staticmethod
+    def _get_restaurants_with_balances(
+        connection=None,
+        timezone_filter: Optional[str] = None,
+    ) -> List[Dict]:
+        """Get restaurants that have balance data. When timezone_filter is set, only include restaurants whose address has that timezone."""
         try:
-            query = """
+            base_select = """
                 SELECT 
                     r.restaurant_id,
                     r.institution_id,
@@ -735,13 +774,23 @@ class InstitutionBillingService:
                 FROM restaurant_info r
                 INNER JOIN institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
                 INNER JOIN restaurant_balance_info rb ON r.restaurant_id = rb.restaurant_id
+            """
+            if timezone_filter:
+                base_select += """
+                INNER JOIN address_info a ON r.address_id = a.address_id
+                """
+            base_select += """
                 WHERE r.is_archived = %s 
                 AND rb.is_archived = %s
                 AND rb.balance > 0
-                ORDER BY r.institution_entity_id, r.restaurant_id
             """
-            
-            results = db_read(query, (False, False), connection=connection)
+            params: List = [False, False]
+            if timezone_filter:
+                base_select += " AND TRIM(COALESCE(a.timezone, '')) = %s"
+                params.append(timezone_filter)
+            base_select += " ORDER BY r.institution_entity_id, r.restaurant_id"
+
+            results = db_read(base_select, tuple(params), connection=connection)
             if results:
                 out = []
                 for row in results:

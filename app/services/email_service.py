@@ -284,6 +284,113 @@ The Vianda Team
             body_html=body_html
         )
 
+    def send_email_change_verification_email(
+        self,
+        to_email: str,
+        verification_code: str,
+        user_first_name: Optional[str],
+        expiry_hours: int = 24,
+    ) -> bool:
+        """
+        Send 6-digit code to the *new* email address to confirm an email change request.
+        """
+        first_name = user_first_name or "there"
+        subject = "Confirm your new email for Vianda"
+        body_text = f"""
+Hi {first_name},
+
+You requested to change the email address on your Vianda account.
+
+Your verification code is:
+
+{verification_code}
+
+Enter this code in the app to confirm your new email. It will expire in {expiry_hours} hours.
+
+If you didn't request this change, please ignore this email and your account email will stay the same.
+
+Thanks,
+The Vianda Team
+        """.strip()
+        body_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+        <h1 style="color: #2c3e50; margin-bottom: 20px;">Confirm your new email</h1>
+        <p>Hi {first_name},</p>
+        <p>You requested to change the email address on your Vianda account.</p>
+        <p>Your verification code is:</p>
+        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">{verification_code}</p>
+        <p style="font-size: 14px; color: #7f8c8d;">Enter this code in the app to confirm your new email. It will expire in {expiry_hours} hours.</p>
+        <p style="font-size: 14px; color: #7f8c8d;">If you didn't request this change, please ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
+        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
+    </div>
+</body>
+</html>
+        """.strip()
+        return self.send_email(
+            to_email=to_email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+        )
+
+    def send_email_change_confirmation_email(
+        self,
+        to_email: str,
+        user_first_name: Optional[str],
+        new_email: str,
+    ) -> bool:
+        """
+        Security notice to the *old* email after a successful email change.
+        """
+        first_name = user_first_name or "there"
+        subject = "Your Vianda account email was changed"
+        body_text = f"""
+Hi {first_name},
+
+The email address on your Vianda account was changed to: {new_email}
+
+If you made this change, you can ignore this message.
+
+If you did not make this change, contact support immediately and secure your account.
+
+Thanks,
+The Vianda Team
+        """.strip()
+        body_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+        <h1 style="color: #c0392b; margin-bottom: 20px;">Account email changed</h1>
+        <p>Hi {first_name},</p>
+        <p>The email address on your Vianda account was changed to: <strong>{new_email}</strong></p>
+        <p style="font-size: 14px; color: #7f8c8d;">If you made this change, you can ignore this message.</p>
+        <p style="font-size: 14px; color: #7f8c8d;">If you did not make this change, contact support immediately.</p>
+        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
+        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
+    </div>
+</body>
+</html>
+        """.strip()
+        return self.send_email(
+            to_email=to_email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+        )
+
     def send_username_recovery_email(
         self,
         to_email: str,

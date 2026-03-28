@@ -1,6 +1,13 @@
 # Image Storage Guidelines
 
-Images (product photos, QR codes, placeholders) live under the `static/` folder. The app mounts `static/` at `/static` for serving.
+Images (product photos, QR codes, placeholders) use local storage for development and GCS (Google Cloud Storage) for Cloud Run deployments.
+
+## Storage Modes
+
+| Mode  | When                         | Product Images                 | QR Codes                     | Placeholder                    |
+|-------|------------------------------|--------------------------------|------------------------------|--------------------------------|
+| Local | `GCS_SUPPLIER_BUCKET` empty  | `static/product_images/`       | `static/qr_codes/`           | `static/placeholders/product_default.png` |
+| GCS   | `GCS_*_BUCKET` set (Cloud Run)| `products/{institution_id}/{product_id}/` | `qrcodes/{restaurant_id}/{qr_code_id}.png` | `placeholder/product_default.png` (internal bucket) |
 
 ## Development (local)
 
@@ -12,19 +19,28 @@ Images (product photos, QR codes, placeholders) live under the `static/` folder.
 
 **Config (optional):**
 
-- `PRODUCT_IMAGE_STORAGE_MODE=local` (default)
 - `PRODUCT_IMAGE_LOCAL_PATH=static/product_images`
-- `QR_STORAGE_MODE=local`
+- `PRODUCT_IMAGE_BASE_URL=http://localhost:8000/static/product_images`
+- `QR_LOCAL_STORAGE_PATH=static/qr_codes`
 - `QR_BASE_URL=http://localhost:8000/static/qr_codes`
 
-**Teardown:** `app/db/build_kitchen_db_dev.sh` clears `static/product_images` and `static/qr_codes` before schema rebuild.
+**Teardown:** `app/db/build_kitchen_db.sh` clears `static/product_images` and `static/qr_codes` before schema rebuild.
 
-## Production (S3)
+## Production (GCS)
 
-For production, move images to S3:
+- **Product images:** `GCS_SUPPLIER_BUCKET` set → upload to `products/{institution_id}/{product_id}/image` and `.../thumbnail`.
+- **QR codes:** `GCS_INTERNAL_BUCKET` set → upload to `qrcodes/{restaurant_id}/{qr_code_id}.png`.
+- **Placeholder:** Uploaded to internal bucket at `placeholder/product_default.png` during Pulumi apply (infra).
+- **Serving:** Signed URLs generated at API response time; URLs expire (1h images, 24h QR codes).
 
-- **Product images:** Use `PRODUCT_IMAGE_STORAGE_MODE=s3` (or similar) when implemented. Path layout should stay `YYYY/MM/<product_id>.png` for easy migration.
-- **QR codes:** Use `QR_STORAGE_MODE=s3`; same layout under the bucket.
-- **Serving:** Serve via pre-signed URLs or CDN in front of the bucket.
+## Signed URL Expiry — Client Handling
 
-The `ProductImageService` and `QRCodeGenerationService` are designed so the storage backend can be swapped (local vs S3) without changing callers.
+**When displaying product images or QR codes from GCS signed URLs, handle 403 responses by re-fetching the image URL from the API and retrying. Do not cache signed URLs for longer than their expiration period.**
+
+- **Product images:** `GCS_SIGNED_URL_EXPIRATION_SECONDS` (default 3600 = 1 hour)
+- **QR codes:** `GCS_QR_SIGNED_URL_EXPIRATION_SECONDS` (default 86400 = 24 hours)
+
+**Implementation guidance:**
+
+- On `img` load error (403): call the API to get a fresh product/QR response (which includes a new signed URL) and update the image source.
+- Do not store signed URLs in long-lived caches (localStorage, long TTL) — they will expire.

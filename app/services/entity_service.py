@@ -28,11 +28,12 @@ from app.utils.address_formatting import format_address_display, format_street_d
 from app.utils.portion_size import bucket_portion_size
 from fastapi import HTTPException
 from app.security.institution_scope import InstitutionScope
-from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema
+from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, QRCodePrintContextSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema
 from app.schemas.payment_method import PaymentMethodEnrichedResponseSchema
 from app.schemas.restaurant_holidays import RestaurantHolidayEnrichedResponseSchema
 from app.services.enriched_service import EnrichedService
 from app.services.subscription_action_service import reconcile_hold_subscriptions
+from app.utils.phone import format_mobile_for_display
 from app.config import Status
 
 # =============================================================================
@@ -204,8 +205,8 @@ def get_user_by_username(
         HTTPException: For system errors or database failures
     """
     try:
-        # Use service layer instead of direct db_read
-        return user_service.get_by_field("username", username, db, scope=scope)
+        username_normalized = (username or "").strip().lower()
+        return user_service.get_by_field("username", username_normalized, db, scope=scope)
     except Exception as e:
         log_error(f"Error getting user by username {username}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get user by username")
@@ -230,8 +231,8 @@ def get_user_by_email(
         HTTPException: For system errors or database failures
     """
     try:
-        # Use service layer instead of direct db_read
-        return user_service.get_by_field("email", email, db, scope=scope)
+        email_normalized = (email or "").strip().lower()
+        return user_service.get_by_field("email", email_normalized, db, scope=scope)
     except Exception as e:
         log_error(f"Error getting user by email {email}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get user by email")
@@ -255,6 +256,11 @@ def create_user_with_validation(
     Raises:
         HTTPException: If validation fails
     """
+    # Normalize username and email to lowercase (safety net for any caller)
+    user_data["username"] = (user_data.get("username") or "").strip().lower()
+    if user_data.get("email"):
+        user_data["email"] = user_data["email"].strip().lower()
+    
     # Business validation
     if get_user_by_username(user_data["username"], db):
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -342,7 +348,11 @@ def get_enriched_users(
             "u.first_name",
             "u.last_name",
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as full_name",
-            "u.cellphone",
+            "u.mobile_number",
+            "u.mobile_number_verified",
+            "u.mobile_number_verified_at",
+            "u.email_verified",
+            "u.email_verified_at",
             "u.employer_id",
             "u.employer_address_id",
             "e.name as employer_name",
@@ -350,6 +360,7 @@ def get_enriched_users(
             "m.country_name as market_name",
             "u.city_id",
             "c.name as city_name",
+            "u.locale",
             "u.is_archived",
             "u.status",
             "u.created_date",
@@ -375,6 +386,7 @@ def get_enriched_users(
         d = u.dict()
         d.pop("market_ids", None)  # avoid duplicate keyword when building schema
         d["market_ids"] = bulk.get(u.user_id, [u.market_id])
+        d["mobile_number_display"] = format_mobile_for_display(d.get("mobile_number"))
         result.append(UserEnrichedResponseSchema(**d))
     return result
 
@@ -421,7 +433,11 @@ def get_enriched_user_by_id(
                 u.first_name,
                 u.last_name,
                 TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as full_name,
-                u.cellphone,
+                u.mobile_number,
+                u.mobile_number_verified,
+                u.mobile_number_verified_at,
+                u.email_verified,
+                u.email_verified_at,
                 u.employer_id,
                 u.employer_address_id,
                 e.name as employer_name,
@@ -429,6 +445,7 @@ def get_enriched_user_by_id(
                 m.country_name as market_name,
                 u.city_id,
                 c.name as city_name,
+                u.locale,
                 u.is_archived,
                 u.status,
                 u.created_date,
@@ -456,6 +473,7 @@ def get_enriched_user_by_id(
         result["market_ids"] = get_assigned_market_ids(
             user_id, db, fallback_primary=result.get("market_id")
         )
+        result["mobile_number_display"] = format_mobile_for_display(result.get("mobile_number"))
         enriched_user = UserEnrichedResponseSchema(**result)
         
         # Apply scope validation
@@ -625,6 +643,7 @@ def get_enriched_institution_entities(
             "a.city as address_city",
             "ie.tax_id",
             "ie.name",
+            "ie.stripe_connect_account_id",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -679,6 +698,7 @@ def get_enriched_institution_entity_by_id(
             "a.city as address_city",
             "ie.tax_id",
             "ie.name",
+            "ie.stripe_connect_account_id",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -693,6 +713,31 @@ def get_enriched_institution_entity_by_id(
         scope=scope,
         include_archived=include_archived
     )
+
+def get_institution_entity_by_connect_account_id(
+    stripe_connect_account_id: str,
+    db: psycopg2.extensions.connection,
+) -> Optional[dict]:
+    """Look up institution_entity by stripe_connect_account_id. Used by Connect webhook handlers."""
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT institution_entity_id, institution_id, name, stripe_connect_account_id
+                FROM ops.institution_entity_info
+                WHERE stripe_connect_account_id = %s AND is_archived = FALSE
+                """,
+                (stripe_connect_account_id,)
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            cols = [desc[0] for desc in cur.description]
+            return dict(zip(cols, row))
+    except Exception as e:
+        log_error(f"Error looking up entity by connect account id {stripe_connect_account_id}: {e}")
+        return None
+
 
 # =============================================================================
 # ADDRESS BUSINESS LOGIC
@@ -1028,6 +1073,7 @@ def get_enriched_restaurants(
             "a.city",
             "a.postal_code",
             "ie.credit_currency_id",
+            "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
             "r.cuisine",
             "r.is_archived",
@@ -1038,6 +1084,7 @@ def get_enriched_restaurants(
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
+            ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
@@ -1084,6 +1131,7 @@ def get_enriched_restaurant_by_id(
             "a.city",
             "a.postal_code",
             "ie.credit_currency_id",
+            "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
             "r.cuisine",
             "r.is_archived",
@@ -1094,6 +1142,7 @@ def get_enriched_restaurant_by_id(
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
+            ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
@@ -1275,6 +1324,15 @@ _qr_code_enriched_service = EnrichedService(
     institution_table_alias="r"  # institution_id is on the joined restaurant_info table
 )
 
+_qr_code_print_enriched_service = EnrichedService(
+    base_table="qr_code",
+    table_alias="q",
+    id_column="qr_code_id",
+    schema_class=QRCodePrintContextSchema,
+    institution_column="institution_id",
+    institution_table_alias="r",
+)
+
 def get_enriched_qr_codes(
     db: psycopg2.extensions.connection,
     *,
@@ -1295,8 +1353,11 @@ def get_enriched_qr_codes(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_qr_code_image_url
+
     return _qr_code_enriched_service.get_enriched(
         db,
+        row_transform=resolve_qr_code_image_url,
         select_fields=[
             "q.qr_code_id",
             "q.restaurant_id",
@@ -1351,9 +1412,12 @@ def get_enriched_qr_code_by_id(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_qr_code_image_url
+
     return _qr_code_enriched_service.get_enriched_by_id(
         qr_code_id,
         db,
+        row_transform=resolve_qr_code_image_url,
         select_fields=[
             "q.qr_code_id",
             "q.restaurant_id",
@@ -1384,6 +1448,43 @@ def get_enriched_qr_code_by_id(
         scope=scope,
         include_archived=include_archived
     )
+
+
+def get_qr_code_print_context_by_id(
+    qr_code_id: UUID,
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False,
+) -> Optional[QRCodePrintContextSchema]:
+    """QR row with raw address parts for market-aware print formatting. No signed URL transform."""
+    return _qr_code_print_enriched_service.get_enriched_by_id(
+        qr_code_id,
+        db,
+        select_fields=[
+            "q.qr_code_id",
+            "q.restaurant_id",
+            "r.name as restaurant_name",
+            "a.country_code",
+            "a.street_type",
+            "a.street_name",
+            "a.building_number",
+            "a.city",
+            "a.province",
+            "a.postal_code",
+            "COALESCE(m.country_name, '') as country_name",
+            "q.image_storage_path",
+        ],
+        joins=[
+            ("INNER", "restaurant_info", "r", "q.restaurant_id = r.restaurant_id"),
+            ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
+            ("INNER", "address_info", "a", "r.address_id = a.address_id"),
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+        ],
+        scope=scope,
+        include_archived=include_archived,
+    )
+
 
 # =============================================================================
 # PRODUCT ENRICHED BUSINESS LOGIC
@@ -1419,8 +1520,11 @@ def get_enriched_products(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_product_image_urls
+
     return _product_enriched_service.get_enriched(
         db,
+        row_transform=resolve_product_image_urls,
         select_fields=[
             "p.product_id",
             "p.institution_id",
@@ -1433,7 +1537,7 @@ def get_enriched_products(
             "p.image_thumbnail_url",
             "p.image_thumbnail_storage_path",
             "p.image_checksum",
-            "CASE WHEN p.image_storage_path != 'static/placeholders/product_default.png' THEN TRUE ELSE FALSE END as has_image",
+            "CASE WHEN p.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.is_archived",
             "p.status",
             "p.created_date",
@@ -1468,9 +1572,12 @@ def get_enriched_product_by_id(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_product_image_urls
+
     return _product_enriched_service.get_enriched_by_id(
         product_id,
         db,
+        row_transform=resolve_product_image_urls,
         select_fields=[
             "p.product_id",
             "p.institution_id",
@@ -1483,7 +1590,7 @@ def get_enriched_product_by_id(
             "p.image_thumbnail_url",
             "p.image_thumbnail_storage_path",
             "p.image_checksum",
-            "CASE WHEN p.image_storage_path != 'static/placeholders/product_default.png' THEN TRUE ELSE FALSE END as has_image",
+            "CASE WHEN p.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.is_archived",
             "p.status",
             "p.created_date",
@@ -1530,8 +1637,11 @@ def get_enriched_plates(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_product_image_urls
+
     plates = _plate_enriched_service.get_enriched(
         db,
+        row_transform=resolve_product_image_urls,
         select_fields=[
             "p.plate_id",
             "p.product_id",
@@ -1554,9 +1664,10 @@ def get_enriched_plates(
             "pr.ingredients",
             "pr.image_url as product_image_url",
             "pr.image_storage_path as product_image_storage_path",
-            "CASE WHEN pr.image_storage_path != 'static/placeholders/product_default.png' THEN TRUE ELSE FALSE END as has_image",
+            "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
+            "p.expected_payout_local_currency",
             "i.no_show_discount",
             "p.delivery_time_minutes",
             "p.is_archived",
@@ -1628,9 +1739,12 @@ def get_enriched_plate_by_id(
     Raises:
         HTTPException: For system errors or database failures
     """
+    from app.utils.gcs import resolve_product_image_urls
+
     plate = _plate_enriched_service.get_enriched_by_id(
         plate_id,
         db,
+        row_transform=resolve_product_image_urls,
         select_fields=[
             "p.plate_id",
             "p.product_id",
@@ -1653,9 +1767,10 @@ def get_enriched_plate_by_id(
             "pr.ingredients",
             "pr.image_url as product_image_url",
             "pr.image_storage_path as product_image_storage_path",
-            "CASE WHEN pr.image_storage_path != 'static/placeholders/product_default.png' THEN TRUE ELSE FALSE END as has_image",
+            "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
+            "p.expected_payout_local_currency",
             "i.no_show_discount",
             "p.delivery_time_minutes",
             "p.is_archived",
@@ -1738,6 +1853,8 @@ def get_enriched_markets(
             "m.credit_currency_id",
             "c.currency_name",
             "c.currency_code",
+            "c.credit_value_local_currency",
+            "c.currency_conversion_usd",
             "m.timezone",
             "m.kitchen_close_time",
             "m.is_archived",
@@ -1784,6 +1901,8 @@ def get_enriched_market_by_id(
             "m.credit_currency_id",
             "c.currency_name",
             "c.currency_code",
+            "c.credit_value_local_currency",
+            "c.currency_conversion_usd",
             "m.timezone",
             "m.kitchen_close_time",
             "m.is_archived",
@@ -1847,7 +1966,8 @@ def get_enriched_plans(
             "pl.name",
             "pl.credit",
             "pl.price",
-            "pl.credit_worth",
+            "pl.credit_cost_local_currency",
+            "pl.credit_cost_usd",
             "pl.rollover",
             "pl.rollover_cap",
             "pl.is_archived",
@@ -1899,7 +2019,8 @@ def get_enriched_plan_by_id(
             "pl.name",
             "pl.credit",
             "pl.price",
-            "pl.credit_worth",
+            "pl.credit_cost_local_currency",
+            "pl.credit_cost_usd",
             "pl.rollover",
             "pl.rollover_cap",
             "pl.is_archived",
@@ -1956,7 +2077,8 @@ def get_enriched_credit_currencies(
             "cc.credit_currency_id",
             "cc.currency_name",
             "cc.currency_code",
-            "cc.credit_value",
+            "cc.credit_value_local_currency",
+            "cc.currency_conversion_usd",
             "m.market_id",
             "m.country_name as market_name",
             "m.country_code",
@@ -2001,7 +2123,8 @@ def get_enriched_credit_currency_by_id(
             "cc.credit_currency_id",
             "cc.currency_name",
             "cc.currency_code",
-            "cc.credit_value",
+            "cc.credit_value_local_currency",
+            "cc.currency_conversion_usd",
             "m.market_id",
             "m.country_name as market_name",
             "m.country_code",
@@ -2695,7 +2818,7 @@ def get_enriched_subscriptions(
 ) -> List[SubscriptionEnrichedResponseSchema]:
     """
     Get all subscriptions with enriched data (user, plan, and market information).
-    Includes: user_full_name, user_username, user_email, user_status, user_cellphone,
+    Includes: user_full_name, user_username, user_email, user_status, user_mobile_number,
     plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status,
     market_id, market_name, country_code.
     Uses SQL JOINs to avoid N+1 queries.
@@ -2723,7 +2846,7 @@ def get_enriched_subscriptions(
             "u.username as user_username",
             "u.email as user_email",
             "u.status as user_status",
-            "u.cellphone as user_cellphone",
+            "u.mobile_number as user_mobile_number",
             "s.plan_id",
             "p.name as plan_name",
             "p.credit as plan_credit",
@@ -2764,7 +2887,7 @@ def get_enriched_subscription_by_id(
 ) -> Optional[SubscriptionEnrichedResponseSchema]:
     """
     Get a single subscription by ID with enriched data (user, plan, and market information).
-    Includes: user_full_name, user_username, user_email, user_status, user_cellphone,
+    Includes: user_full_name, user_username, user_email, user_status, user_mobile_number,
     plan_name, plan_credit, plan_price, plan_rollover, plan_rollover_cap, plan_status,
     market_id, market_name, country_code.
     Uses SQL JOINs to avoid N+1 queries.
@@ -2789,7 +2912,7 @@ def get_enriched_subscription_by_id(
             "u.username as user_username",
             "u.email as user_email",
             "u.status as user_status",
-            "u.cellphone as user_cellphone",
+            "u.mobile_number as user_mobile_number",
             "s.plan_id",
             "p.name as plan_name",
             "p.credit as plan_credit",
@@ -3527,11 +3650,13 @@ def get_enriched_restaurant_holidays(
                 rh.restaurant_id,
                 r.name as restaurant_name,
                 i.name as institution_name,
-                rh.country,
+                rh.country_code,
                 rh.holiday_date,
                 rh.holiday_name,
                 rh.is_recurring,
-                rh.recurring_month_day,
+                rh.recurring_month,
+                rh.recurring_day,
+                rh.source,
                 rh.status,
                 rh.is_archived,
                 rh.created_date,
@@ -3558,18 +3683,19 @@ def get_enriched_restaurant_holidays(
                 restaurant_id=UUID(row.get("restaurant_id")),
                 restaurant_name=row.get("restaurant_name"),
                 institution_name=row.get("institution_name"),
-                country=row.get("country"),
+                country_code=row.get("country_code"),
                 holiday_date=row.get("holiday_date"),
                 holiday_name=row.get("holiday_name"),
                 is_recurring=row.get("is_recurring", False),
-                recurring_month_day=row.get("recurring_month_day"),
-                status=row.get("status", Status.ACTIVE.value),  # Use actual status from database
+                recurring_month=row.get("recurring_month"),
+                recurring_day=row.get("recurring_day"),
+                source=row.get("source"),
+                status=row.get("status", Status.ACTIVE.value),
                 is_archived=row.get("is_archived", False),
                 created_date=row.get("created_date"),
                 modified_by=UUID(row.get("modified_by")) if row.get("modified_by") else None,
                 modified_date=row.get("modified_date"),
-                country_code=None,
-                is_editable=True  # Restaurant holidays are editable by suppliers
+                is_editable=True,
             ))
         
         # Step 2: Get national holidays for restaurants the user has access to
@@ -3629,6 +3755,9 @@ def get_enriched_restaurant_holidays(
                     nh.holiday_name,
                     nh.holiday_date,
                     nh.is_recurring,
+                    nh.recurring_month,
+                    nh.recurring_day,
+                    nh.source,
                     nh.status
                 FROM national_holidays nh
                 {national_where}
@@ -3649,18 +3778,19 @@ def get_enriched_restaurant_holidays(
                     holiday_name=row.get("holiday_name"),
                     holiday_date=row.get("holiday_date"),
                     is_recurring=row.get("is_recurring", False),
+                    recurring_month=row.get("recurring_month"),
+                    recurring_day=row.get("recurring_day"),
+                    source=row.get("source"),
                     holiday_id=None,
                     restaurant_id=None,
-                    restaurant_name=None,  # National holidays are not tied to a specific restaurant
-                    institution_name=None,  # National holidays are not tied to a specific institution
-                    country=None,
-                    recurring_month_day=None,
-                    status=row.get("status", Status.ACTIVE.value),  # Use actual status from database
-                    is_archived=False,  # National holidays shown are always non-archived (we filter archived ones)
+                    restaurant_name=None,
+                    institution_name=None,
+                    status=row.get("status", Status.ACTIVE.value),
+                    is_archived=False,
                     created_date=None,
                     modified_by=None,
                     modified_date=None,
-                    is_editable=False  # National holidays are NOT editable by suppliers
+                    is_editable=False,
                 ))
         
         # Sort all holidays by date (most recent first)
@@ -3725,7 +3855,7 @@ def get_enriched_payment_methods(
 ) -> List[PaymentMethodEnrichedResponseSchema]:
     """
     Get all payment methods with enriched data (user information).
-    Includes: user_full_name, user_username, user_email, user_cellphone.
+    Includes: user_full_name, user_username, user_email, user_mobile_number.
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -3749,7 +3879,7 @@ def get_enriched_payment_methods(
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as full_name",
             "u.username",
             "u.email",
-            "u.cellphone",
+            "u.mobile_number",
             "pm.method_type",
             "pm.method_type_id",
             "pm.address_id",
@@ -3781,7 +3911,7 @@ def get_enriched_payment_method_by_id(
 ) -> Optional[PaymentMethodEnrichedResponseSchema]:
     """
     Get a single payment method by ID with enriched data (user information).
-    Includes: user_full_name, user_username, user_email, user_cellphone.
+    Includes: user_full_name, user_username, user_email, user_mobile_number.
     Uses SQL JOINs to avoid N+1 queries.
     
     Args:
@@ -3802,7 +3932,7 @@ def get_enriched_payment_method_by_id(
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as full_name",
             "u.username",
             "u.email",
-            "u.cellphone",
+            "u.mobile_number",
             "pm.method_type",
             "pm.method_type_id",
             "pm.address_id",

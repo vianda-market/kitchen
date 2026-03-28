@@ -121,6 +121,31 @@ class TestSeedDataRecords:
             'market_id',
             global_market_id
         ), "Global Marketplace should be seeded"
+
+    def test_argentina_market_language_is_spanish(self, db_transaction):
+        """B2C signup derives locale from market_info.language; AR must stay es."""
+        argentina_market_id = '00000000-0000-0000-0000-000000000002'
+        with db_transaction.cursor() as cur:
+            cur.execute(
+                "SELECT language FROM market_info WHERE market_id = %s",
+                (argentina_market_id,),
+            )
+            row = cur.fetchone()
+        assert row is not None
+        assert row[0] == "es"
+
+    def test_pending_customer_signup_has_market_id_column(self, db_transaction):
+        """Signup verify flow requires market_id on pending row (no regression)."""
+        with db_transaction.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'customer'
+                  AND table_name = 'pending_customer_signup'
+                  AND column_name = 'market_id'
+                """
+            )
+            assert cur.fetchone() is not None
     
     def test_superadmin_user_properties(self, db_transaction):
         """Test that Super Admin user has correct properties."""
@@ -138,7 +163,7 @@ class TestSeedDataRecords:
             assert username == 'superadmin', f"Super Admin username should be 'superadmin', got '{username}'"
             assert role_type == 'Internal', f"Super Admin role_type should be 'Internal', got '{role_type}'"
             assert role_name == 'Super Admin', f"Super Admin role_name should be 'Super Admin', got '{role_name}'"
-            assert email == 'superadmin@example.com', f"Super Admin email should be 'superadmin@example.com', got '{email}'"
+            assert email == 'viandallc@gmail.com', f"Super Admin email should be 'viandallc@gmail.com', got '{email}'"
     
     def test_vianda_enterprises_name(self, db_transaction):
         """Test that Vianda Enterprises has correct name."""

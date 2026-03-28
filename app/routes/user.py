@@ -16,6 +16,7 @@ from app.services.entity_service import (
     set_user_market_assignments,
 )
 from app.services.user_signup_service import user_signup_service
+from app.services.email_change_service import email_change_service
 from app.services.error_handling import handle_business_operation, handle_get_by_id
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
@@ -28,6 +29,7 @@ from app.schemas.consolidated_schemas import (
     UserEnrichedResponseSchema,
     UserSearchResultSchema,
     UserSearchResponseSchema,
+    EmailChangeVerifySchema,
     ChangePasswordSchema,
     AdminResetPasswordSchema,
     AssignEmployerRequest,
@@ -112,10 +114,62 @@ def _validate_user_update_market_id(update_data: dict, current_user: dict) -> No
         )
 
 
-def _user_dto_to_response(user: UserDTO, db: psycopg2.extensions.connection) -> UserResponseSchema:
+def _apply_mobile_number_verification_reset(update_data: dict, existing_user: UserDTO) -> None:
+    """When mobile_number is in the payload and the value changed (including cleared to NULL), reset verification."""
+    if "mobile_number" not in update_data:
+        return
+    new_mobile = update_data.get("mobile_number")
+    existing_mobile = existing_user.mobile_number
+    if new_mobile != existing_mobile:
+        update_data["mobile_number_verified"] = False
+        update_data["mobile_number_verified_at"] = None
+
+
+def _apply_email_change_request(
+    target_user_id: UUID,
+    existing_user: UserDTO,
+    update_data: dict,
+    db: psycopg2.extensions.connection,
+) -> Optional[str]:
+    """
+    If payload requests a different email, start verification flow (do not write email to user_info yet).
+    Returns email_change_message for UserResponseSchema, or None.
+    """
+    if "email" not in update_data:
+        return None
+    new_email = update_data.get("email")
+    if new_email is None:
+        update_data.pop("email", None)
+        return None
+    new_norm = str(new_email).strip().lower()
+    existing_norm = (existing_user.email or "").strip().lower()
+    if new_norm == existing_norm:
+        update_data.pop("email", None)
+        return None
+    email_change_service.request_email_change(target_user_id, new_norm, db)
+    update_data.pop("email", None)
+    update_data["email_verified"] = False
+    update_data["email_verified_at"] = None
+    return (
+        f"A verification code has been sent to {new_norm}. "
+        "Your email will be updated after verification."
+    )
+
+
+def _user_dto_to_response(
+    user: UserDTO,
+    db: psycopg2.extensions.connection,
+    *,
+    email_change_message: Optional[str] = None,
+) -> UserResponseSchema:
     """Build UserResponseSchema from UserDTO with v2 market_ids."""
     market_ids = get_assigned_market_ids(user.user_id, db, fallback_primary=user.market_id)
-    return UserResponseSchema(**user.model_dump(), market_ids=market_ids)
+    payload = user.model_dump()
+    return UserResponseSchema(
+        **payload,
+        market_ids=market_ids,
+        email_change_message=email_change_message,
+    )
 
 
 def _user_dtos_to_responses(users: list, db: psycopg2.extensions.connection) -> List[UserResponseSchema]:
@@ -329,12 +383,15 @@ def update_current_user_profile(
     if "employer_id" in update_data and update_data["employer_id"] is None:
         update_data["employer_address_id"] = None
 
+    _apply_mobile_number_verification_reset(update_data, existing_user)
+    email_change_message = _apply_email_change_request(user_id, existing_user, update_data, db)
+
     def _update_user():
         update_data["modified_by"] = current_user["user_id"]
         updated = user_service.update(user_id, update_data, db, scope=scope)
         if not updated:
             raise user_not_found()
-        return _user_dto_to_response(updated, db)
+        return _user_dto_to_response(updated, db, email_change_message=email_change_message)
 
     return handle_business_operation(
         _update_user,
@@ -406,6 +463,26 @@ def change_my_password(
         scope=None,
     )
     return {"detail": "Password updated successfully"}
+
+
+# POST /users/me/verify-email-change - Confirm pending email change with code sent to new address
+@router.post("/me/verify-email-change", response_model=dict, status_code=status.HTTP_200_OK)
+def verify_my_email_change(
+    body: EmailChangeVerifySchema,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Complete email change using the verification code sent to the new email address."""
+
+    def _verify():
+        email_change_service.verify_email_change(current_user["user_id"], body.code, db)
+        return {"message": "Email updated successfully"}
+
+    return handle_business_operation(
+        _verify,
+        "verify email change",
+        "Email updated successfully",
+    )
 
 
 # PUT /users/me/terminate - Terminate current user's account
@@ -869,12 +946,15 @@ def update(
         effective_market_id = update_data.get("market_id") or existing_user.market_id
         _validate_user_update_city_id(update_data["city_id"], effective_market_id, db)
 
+    _apply_mobile_number_verification_reset(update_data, existing_user)
+    email_change_message = _apply_email_change_request(user_id, existing_user, update_data, db)
+
     def _update_user():
         update_data["modified_by"] = current_user["user_id"]
         updated = user_service.update(user_id, update_data, db, scope=scope)
         if not updated:
             raise user_not_found()
-        return _user_dto_to_response(updated, db)
+        return _user_dto_to_response(updated, db, email_change_message=email_change_message)
 
     return handle_business_operation(
         _update_user,

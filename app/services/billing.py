@@ -39,7 +39,7 @@ def process_client_bill_internal(
     if not credit_currency:
         raise Exception("Credit currency not found")
 
-    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value))
+    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value_local_currency))
     renewal_date = subscription.renewal_date
     if renewal_date.tzinfo is None:
         renewal_date = renewal_date.replace(tzinfo=timezone.utc)
@@ -79,7 +79,7 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     if not credit_currency:
         raise Exception("Credit currency not found")
 
-    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value))
+    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value_local_currency))
     new_balance = float(subscription.balance) + credits_to_add
 
     # Calculate new renewal_date: today (UTC) + 30 days, rounded up to next day at 00:00 UTC

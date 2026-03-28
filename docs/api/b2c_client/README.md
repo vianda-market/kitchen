@@ -5,7 +5,7 @@
 - **For agents**: [FRONTEND_AGENT_README.md](./FRONTEND_AGENT_README.md)
 - **For developers**: [B2C_ENDPOINTS_OVERVIEW.md](./B2C_ENDPOINTS_OVERVIEW.md)
 - **Customer registration (email verification)**: [CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](./CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md) — two-step signup flow for app implementation
-- **Username recovery (forgot username)**: [../shared_client/USERNAME_RECOVERY.md](../shared_client/USERNAME_RECOVERY.md)
+- **User model (profile, `/users/me`, markets, forgot-username, password recovery)**: [../shared_client/USER_MODEL_FOR_CLIENTS.md](../shared_client/USER_MODEL_FOR_CLIENTS.md)
 - **Lead encouragement (zipcode metrics)**: [../shared_client/ZIPCODE_METRICS_LEAD_API.md](../shared_client/ZIPCODE_METRICS_LEAD_API.md) — **GET** `/api/v1/leads/zipcode-metrics` (exact path; no auth)
 - **Payment, billing, fintech link changes**: [../shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md](../shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md) — Remove fintech link pages/modals; no manual create/process bill; use subscription with-payment only.
 - **Subscription payment (with-payment + confirm-payment)**: [SUBSCRIPTION_PAYMENT_API.md](./SUBSCRIPTION_PAYMENT_API.md) — Atomic flow, success/failure semantics (200 = success, full subscription returned), types, and Stripe polling.

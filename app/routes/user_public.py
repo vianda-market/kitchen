@@ -1,8 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status, Depends, Request
-from pydantic import BaseModel, EmailStr, Field, model_validator
-from app.dto.models import UserDTO
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from app.services.user_signup_service import user_signup_service
 from app.services.password_recovery_service import password_recovery_service
 from app.services.error_handling import handle_business_operation
@@ -12,6 +11,8 @@ from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_password_recovery_debug
 from app.utils.db import db_read
 from app.config.settings import settings
+from app.auth.security import create_access_token
+from app.auth.utils import build_token_data, merge_subscription_token_claims
 from app.utils.rate_limit import limiter
 import psycopg2.extensions
 
@@ -207,6 +208,14 @@ class ForgotUsernameRequest(BaseModel):
     email: EmailStr = Field(..., description="Email address of the account")
     send_password_reset: bool = Field(False, description="If true, also send a password reset link to this email")
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email_lowercase(cls, v):
+        """Normalize email to lowercase for case-insensitive lookup."""
+        if v is None or not isinstance(v, str):
+            return v
+        return v.strip().lower()
+
 
 # =============================================================================
 # PASSWORD RECOVERY ROUTES
@@ -215,6 +224,14 @@ class ForgotUsernameRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     """Request schema for forgot password"""
     email: EmailStr = Field(..., description="Email address of the account")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email_lowercase(cls, v):
+        """Normalize email to lowercase for case-insensitive lookup."""
+        if v is None or not isinstance(v, str):
+            return v
+        return v.strip().lower()
 
 
 class ResetPasswordRequest(BaseModel):
@@ -236,6 +253,8 @@ class PasswordRecoveryResponse(BaseModel):
     """Response schema for password recovery operations"""
     success: bool
     message: str
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
 
 
 @auth_router.post(
@@ -351,11 +370,18 @@ def reset_password(
         _reset_password,
         "password reset"
     )
-    
-    if not result['success']:
+
+    if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result['message']
+            detail=result["message"],
         )
-    
-    return result
+
+    user_dto = result.get("user")
+    out: dict = {"success": result["success"], "message": result["message"]}
+    if user_dto is not None:
+        token_data = build_token_data(user_dto)
+        merge_subscription_token_claims(token_data, user_dto.user_id, db)
+        out["access_token"] = create_access_token(data=token_data)
+        out["token_type"] = "bearer"
+    return out

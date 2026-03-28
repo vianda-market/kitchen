@@ -18,14 +18,12 @@ class TestZipcodeMetricsService(unittest.TestCase):
 
     @patch("app.services.zipcode_metrics_service.db_read")
     def test_exact_match_returns_count_and_center(self, mock_db_read):
-        """When requested zip matches a postal_code, return that zip's count and optional center."""
+        """When requested zip matches a postal_code, return that zip's count."""
         def db_read_side_effect(query, values, connection=None, fetch_one=False):
             if "DISTINCT a.postal_code" in query:
                 return [{"postal_code": "12345"}, {"postal_code": "67890"}]
             if "COUNT(DISTINCT" in query:
                 return {"cnt": 2} if fetch_one else None
-            if "AVG(g.latitude)" in query:
-                return {"lat": 40.5, "lng": -74.0} if fetch_one else None
             return [] if not fetch_one else None
         mock_db_read.side_effect = db_read_side_effect
         result = get_zipcode_metrics("12345", "US", self.mock_conn)
@@ -33,9 +31,6 @@ class TestZipcodeMetricsService(unittest.TestCase):
         self.assertEqual(result["matched_zipcode"], "12345")
         self.assertEqual(result["restaurant_count"], 2)
         self.assertTrue(result["has_coverage"])
-        self.assertIsNotNone(result["center"])
-        self.assertEqual(result["center"]["lat"], 40.5)
-        self.assertEqual(result["center"]["lng"], -74.0)
 
     @patch("app.services.zipcode_metrics_service.db_read")
     def test_no_match_uses_first_postal_code(self, mock_db_read):
@@ -57,7 +52,7 @@ class TestZipcodeMetricsService(unittest.TestCase):
 
     @patch("app.services.zipcode_metrics_service.db_read")
     def test_no_data_in_country_returns_zero_coverage(self, mock_db_read):
-        """When no postal_codes in country, return requested as matched, count 0, no center."""
+        """When no postal_codes in country, return requested as matched, count 0."""
         def db_read_side_effect(query, values, connection=None, fetch_one=False):
             if "DISTINCT a.postal_code" in query:
                 return []
@@ -70,7 +65,6 @@ class TestZipcodeMetricsService(unittest.TestCase):
         self.assertEqual(result["matched_zipcode"], "12345")
         self.assertEqual(result["restaurant_count"], 0)
         self.assertFalse(result["has_coverage"])
-        self.assertIsNone(result["center"])
 
     @patch("app.services.zipcode_metrics_service.db_read")
     def test_service_uses_country_code_as_given(self, mock_db_read):

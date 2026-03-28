@@ -55,7 +55,7 @@ RestaurantTransaction.update_balance_on_arrival(transaction_id, arrival_time, us
 **What happens:**
 1. Customer scans QR code at restaurant
 2. Transaction status updated to "Arrived"
-3. **Restaurant balance updated with FULL amount**: `credits × credit_value`
+3. **Restaurant balance updated with FULL amount**: `credits × credit_value_local_currency`
 4. Restaurant gets paid because customer actually showed up
 
 #### 3. Order Completion (via `plate_pickup.py`)
@@ -169,7 +169,7 @@ balance_record = RestaurantBalance.get_by_restaurant(restaurant_id)
 ### ✅ Automatic Financial Tracking
 - **Real-time balance updates** when orders are placed
 - **Transaction count tracking** for order volume analytics
-- **Monetary calculations** using credits × credit_value formula
+- **Monetary calculations** using credits × credit_value_local_currency formula
 
 ### ✅ Discount & Adjustment Handling
 - **Final amount adjustments** for no-show discounts
@@ -217,7 +217,7 @@ balance_record = RestaurantBalance.get_by_restaurant(restaurant_id)
 ## 🧪 Testing & Validation
 
 The system has been tested for:
-- ✅ **Balance calculation accuracy** (credits × credit_value)
+- ✅ **Balance calculation accuracy** (credits × credit_value_local_currency)
 - ✅ **Method existence and signatures**
 - ✅ **Transaction flow simulation**
 - ✅ **Archival system integration**

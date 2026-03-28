@@ -115,7 +115,7 @@ INSERT INTO plate_kitchen_days (plate_id, kitchen_day, ...) VALUES
 ### Step 4: Rebuild Database (local dev) or Run Migration (production)
 ```bash
 # Local development
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 
 # Production (requires migration script)
 # Run ALTER TYPE command above

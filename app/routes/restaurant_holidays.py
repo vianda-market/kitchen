@@ -26,6 +26,37 @@ from app.security.entity_scoping import EntityScopingService, ENTITY_RESTAURANT_
 from app.services.market_detection import MarketDetectionService
 from app.services.plate_selection_validation import _is_date_national_holiday
 
+
+def _derive_restaurant_country_code(
+    restaurant_id: UUID, db: psycopg2.extensions.connection
+) -> str:
+    """ISO alpha-2 from address.country_code (preferred) or country name mapping."""
+    restaurant = restaurant_service.get_by_id(restaurant_id, db)
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Restaurant not found: {restaurant_id}",
+        )
+    address = address_service.get_by_id(restaurant.address_id, db)
+    if not address:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restaurant has no address; cannot determine country_code",
+        )
+    cc = (address.country_code or "").strip()
+    if len(cc) != 2 and address.country:
+        mapped = MarketDetectionService._country_name_to_code(address.country)
+        cc = (mapped or "").strip()
+    if len(cc) != 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Could not determine ISO country code for the restaurant address; "
+                "ensure address.country_code is set."
+            ),
+        )
+    return cc
+
 router = APIRouter(
     prefix="/restaurant-holidays",
     tags=["Restaurant Holidays"]
@@ -35,34 +66,6 @@ router = APIRouter(
 def _get_scope_for_entity(current_user: dict):
     """Get institution scope for restaurant holidays entity"""
     return EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_HOLIDAY, current_user)
-
-
-def _get_restaurant_country_code(restaurant_id: UUID, db: psycopg2.extensions.connection) -> Optional[str]:
-    """
-    Get country code for a restaurant by looking up its address.
-    
-    Args:
-        restaurant_id: Restaurant ID
-        db: Database connection
-        
-    Returns:
-        Country code (2-letter ISO code) or None if not found
-    """
-    try:
-        restaurant = restaurant_service.get_by_id(restaurant_id, db)
-        if not restaurant:
-            return None
-        
-        address = address_service.get_by_id(restaurant.address_id, db)
-        if not address or not address.country:
-            return None
-        
-        # Convert country name to country code
-        country_code = MarketDetectionService._country_name_to_code(address.country)
-        return country_code
-    except Exception as e:
-        log_error(f"Error getting country code for restaurant {restaurant_id}: {e}")
-        return None
 
 
 def _validate_not_national_holiday(
@@ -89,12 +92,15 @@ def _validate_not_national_holiday(
     else:
         date_str = str(holiday_date)
     
-    # Get country code for the restaurant
-    country_code = _get_restaurant_country_code(restaurant_id, db)
-    if not country_code:
-        log_warning(f"Could not determine country code for restaurant {restaurant_id}, skipping national holiday validation")
-        return  # Can't validate without country code, allow it
-    
+    try:
+        country_code = _derive_restaurant_country_code(restaurant_id, db)
+    except HTTPException:
+        log_warning(
+            f"Could not determine country code for restaurant {restaurant_id}, "
+            "skipping national holiday validation"
+        )
+        return
+
     # Check if date is a national holiday
     if _is_date_national_holiday(date_str, country_code, db):
         raise HTTPException(
@@ -271,17 +277,20 @@ def create_restaurant_holiday(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Restaurant already has a holiday registered for {payload.holiday_date}"
             )
-        
-        # Prepare data for insert
+
+        country_code = _derive_restaurant_country_code(payload.restaurant_id, connection)
+
         holiday_data = {
             "restaurant_id": str(payload.restaurant_id),
-            "country": payload.country,
+            "country_code": country_code,
             "holiday_date": payload.holiday_date.isoformat(),
             "holiday_name": payload.holiday_name,
             "is_recurring": payload.is_recurring,
-            "recurring_month_day": payload.recurring_month_day,
+            "recurring_month": payload.recurring_month,
+            "recurring_day": payload.recurring_day,
             "is_archived": False,
-            "modified_by": current_user["user_id"]
+            "modified_by": current_user["user_id"],
+            "source": "manual",
         }
         
         # Create holiday
@@ -344,15 +353,18 @@ def create_restaurant_holidays_bulk(
         # Prepare data for batch insert
         data_list = []
         for holiday in payload.holidays:
+            cc = _derive_restaurant_country_code(holiday.restaurant_id, connection)
             data_list.append({
                 "restaurant_id": str(holiday.restaurant_id),
-                "country": holiday.country,
+                "country_code": cc,
                 "holiday_date": holiday.holiday_date.isoformat(),
                 "holiday_name": holiday.holiday_name,
                 "is_recurring": holiday.is_recurring,
-                "recurring_month_day": holiday.recurring_month_day,
+                "recurring_month": holiday.recurring_month,
+                "recurring_day": holiday.recurring_day,
                 "is_archived": False,
-                "modified_by": current_user["user_id"]
+                "modified_by": current_user["user_id"],
+                "source": "manual",
             })
         
         # Batch insert all holidays atomically using db_batch_insert
@@ -425,21 +437,26 @@ def update_restaurant_holiday(
                     detail=f"Restaurant already has a holiday registered for {payload.holiday_date}"
                 )
         
-        # Build update data
-        update_data = {}
+        update_data: dict = {}
         if payload.restaurant_id is not None:
             update_data["restaurant_id"] = str(payload.restaurant_id)
-        if payload.country is not None:
-            update_data["country"] = payload.country
+            update_data["country_code"] = _derive_restaurant_country_code(
+                payload.restaurant_id, connection
+            )
         if payload.holiday_date is not None:
             update_data["holiday_date"] = payload.holiday_date.isoformat()
         if payload.holiday_name is not None:
             update_data["holiday_name"] = payload.holiday_name
         if payload.is_recurring is not None:
             update_data["is_recurring"] = payload.is_recurring
-        if payload.recurring_month_day is not None:
-            update_data["recurring_month_day"] = payload.recurring_month_day
-        
+            if payload.is_recurring is False:
+                update_data["recurring_month"] = None
+                update_data["recurring_day"] = None
+        if payload.recurring_month is not None:
+            update_data["recurring_month"] = payload.recurring_month
+        if payload.recurring_day is not None:
+            update_data["recurring_day"] = payload.recurring_day
+
         update_data["modified_by"] = current_user["user_id"]
         
         # Update holiday

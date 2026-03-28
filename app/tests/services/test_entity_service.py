@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from app.services.entity_service import (
-    get_user_by_username, get_products_by_institution,
+    get_user_by_username, get_user_by_email, get_products_by_institution,
     get_plates_by_restaurant, get_bills_by_status,
     get_employers_by_name,
     get_enriched_discretionary_requests,
@@ -93,6 +93,61 @@ class TestEntityService:
             
             assert exc_info.value.status_code == 500
             assert "Failed to get user by username" in str(exc_info.value.detail)
+
+    def test_get_user_by_username_normalizes_to_lowercase(self, mock_db):
+        """Test that get_user_by_username normalizes username to lowercase before lookup."""
+        # Arrange: user stored with lowercase username
+        mock_user_data = {
+            "user_id": uuid4(),
+            "username": "testuser",
+            "email": "test@example.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "institution_id": uuid4(),
+            "role_type": RoleType.CUSTOMER,
+            "role_name": RoleName.COMENSAL,
+            "hashed_password": "hashed_password",
+            "market_id": uuid4(),
+            "is_archived": False,
+            "status": Status.ACTIVE,
+            "created_date": datetime.now(timezone.utc),
+            "modified_by": uuid4(),
+            "modified_date": datetime.now(timezone.utc)
+        }
+        with patch('app.services.entity_service.user_service') as mock_user_service:
+            mock_user_service.get_by_field.return_value = UserDTO(**mock_user_data)
+            # Act: pass mixed-case username
+            result = get_user_by_username("TestUser", mock_db)
+            # Assert: lookup used lowercase
+            assert result is not None
+            assert result.username == "testuser"
+            mock_user_service.get_by_field.assert_called_once_with("username", "testuser", mock_db, scope=None)
+
+    def test_get_user_by_email_normalizes_to_lowercase(self, mock_db):
+        """Test that get_user_by_email normalizes email to lowercase before lookup."""
+        mock_user_data = {
+            "user_id": uuid4(),
+            "username": "testuser",
+            "email": "user@example.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "institution_id": uuid4(),
+            "role_type": RoleType.CUSTOMER,
+            "role_name": RoleName.COMENSAL,
+            "hashed_password": "hashed_password",
+            "market_id": uuid4(),
+            "is_archived": False,
+            "status": Status.ACTIVE,
+            "created_date": datetime.now(timezone.utc),
+            "modified_by": uuid4(),
+            "modified_date": datetime.now(timezone.utc)
+        }
+        with patch('app.services.entity_service.user_service') as mock_user_service:
+            mock_user_service.get_by_field.return_value = UserDTO(**mock_user_data)
+            result = get_user_by_email("User@Example.com", mock_db)
+            assert result is not None
+            assert result.email == "user@example.com"
+            mock_user_service.get_by_field.assert_called_once_with("email", "user@example.com", mock_db, scope=None)
 
     def test_get_products_by_institution_filters_correctly(self, mock_db):
         """Test that get_products_by_institution filters products by institution."""
@@ -187,8 +242,9 @@ class TestEntityService:
                 plate_id=uuid4(),
                 restaurant_id=restaurant_id,
                 product_id=uuid4(),
-                price=10.0,
-                credit=5,
+                price=Decimal("10.0"),
+                credit=Decimal("5"),
+                expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=15,
                 status="Active",
                 modified_by=uuid4(),
@@ -200,8 +256,9 @@ class TestEntityService:
                 plate_id=uuid4(),
                 restaurant_id=other_restaurant_id,  # Different restaurant
                 product_id=uuid4(),
-                price=15.0,
-                credit=7,
+                price=Decimal("15.0"),
+                credit=Decimal("7"),
+                expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=20,
                 status="Active",
                 modified_by=uuid4(),
@@ -213,8 +270,9 @@ class TestEntityService:
                 plate_id=uuid4(),
                 restaurant_id=restaurant_id,
                 product_id=uuid4(),
-                price=8.0,
-                credit=4,
+                price=Decimal("8.0"),
+                credit=Decimal("4"),
+                expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=10,
                 status="Active",
                 modified_by=uuid4(),
@@ -568,6 +626,7 @@ class TestEnrichedPlatesPortionSize:
     """Tests for portion_size and minimum review threshold in enriched plates."""
 
     @patch("app.services.entity_service._plate_enriched_service")
+    @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
     def test_portion_size_insufficient_reviews_when_review_count_below_5(
         self, mock_plate_enriched, mock_db
     ):
@@ -603,6 +662,7 @@ class TestEnrichedPlatesPortionSize:
             has_image=False,
             price=Decimal("12.00"),
             credit=2,
+            expected_payout_local_currency=Decimal("0"),
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,
@@ -621,6 +681,7 @@ class TestEnrichedPlatesPortionSize:
         assert p.average_portion_size is None
 
     @patch("app.services.entity_service._plate_enriched_service")
+    @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
     def test_portion_size_bucketed_when_review_count_ge_5(
         self, mock_plate_enriched, mock_db
     ):
@@ -656,6 +717,7 @@ class TestEnrichedPlatesPortionSize:
             has_image=False,
             price=Decimal("12.00"),
             credit=2,
+            expected_payout_local_currency=Decimal("0"),
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,
@@ -674,6 +736,7 @@ class TestEnrichedPlatesPortionSize:
         assert p.average_portion_size == 2.1
 
     @patch("app.services.entity_service._plate_enriched_service")
+    @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
     def test_get_enriched_plate_by_id_portion_size(
         self, mock_plate_enriched, mock_db
     ):
@@ -710,6 +773,7 @@ class TestEnrichedPlatesPortionSize:
             has_image=False,
             price=Decimal("8.00"),
             credit=1,
+            expected_payout_local_currency=Decimal("0"),
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,

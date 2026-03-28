@@ -1764,16 +1764,16 @@ def get_institution_entity_by_institution(institution_id: UUID, connection=None)
     return result[0]['institution_entity_id'] if result else None
 
 
-def get_credit_worth_of_most_expensive_plan_for_market(market_id: UUID, connection=None) -> Optional[float]:
-    """Return credit_worth of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
+def get_credit_cost_local_currency_of_most_expensive_plan_for_market(market_id: UUID, connection=None) -> Optional[float]:
+    """Return credit_cost_local_currency of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
     query = """
-        SELECT credit_worth FROM plan_info
+        SELECT credit_cost_local_currency FROM plan_info
         WHERE market_id = %s AND is_archived = FALSE AND status = 'Active'
         ORDER BY price DESC
         LIMIT 1
     """
     row = db_read(query, (str(market_id),), connection=connection, fetch_one=True)
-    return float(row["credit_worth"]) if row and row.get("credit_worth") is not None else None
+    return float(row["credit_cost_local_currency"]) if row and row.get("credit_cost_local_currency") is not None else None
 
 
 def get_by_entity_and_period(entity_id: UUID, period_start: datetime, period_end: datetime, connection=None) -> Optional[InstitutionBillDTO]:

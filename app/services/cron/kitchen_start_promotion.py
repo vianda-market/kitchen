@@ -1,7 +1,7 @@
 """
 Kitchen Start Promotion Cron - Promote locked plate selections to live at kitchen start.
 
-Runs periodically (e.g. every 5-15 min). For each market where kitchen has started
+Runs periodically (e.g. every 5-15 min). For each location where kitchen has started
 (business_hours.open passed), promotes plate_selection_info rows to plate_pickup_live
 and restaurant_transaction. Idempotent.
 """
@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from uuid import UUID
 import pytz
 
+from app.config.location_config import get_all_locations, get_location_config
 from app.config.market_config import MarketConfiguration
 from app.services.kitchen_day_service import get_kitchen_day_for_date
 from app.services.plate_selection_promotion_service import promote_plate_selection_to_live
@@ -21,70 +22,82 @@ SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 
 def run_kitchen_start_promotion(
-    country_code: Optional[str] = None
+    location_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Promote locked plate selections to live for markets where kitchen has started.
+    Promote locked plate selections to live for locations where kitchen has started.
 
-    For each market (or single market if country_code provided):
-    - If now >= business_hours[kitchen_day].open in market timezone for today
+    For each location (or single location if location_id provided):
+    - If now >= business_hours[kitchen_day].open in location timezone for today
     - Find plate_selection_info: kitchen_day, pickup_date=today, is_archived=false,
-      NOT EXISTS in plate_pickup_live
+      NOT EXISTS in plate_pickup_live, address.timezone matches location
     - Promote each to live
 
     Args:
-        country_code: Optional. If provided, only process this market (AR, PE, US).
+        location_id: Optional. If provided, only process this location (AR, PE, US-Eastern, etc.).
 
     Returns:
-        Dict with promoted_count, markets_processed, errors, etc.
+        Dict with promoted_count, locations_processed, errors, etc.
     """
     result = {
         "cron_job": "kitchen_start_promotion",
         "execution_time": datetime.now(timezone.utc).isoformat(),
-        "country_code": country_code,
+        "location_id": location_id,
         "promoted_count": 0,
-        "markets_processed": 0,
+        "locations_processed": 0,
         "errors": [],
     }
 
-    markets = (
-        [(country_code.upper(), MarketConfiguration.get_market_config(country_code))]
-        if country_code
-        else list(MarketConfiguration.get_all_markets().items())
+    locations_to_process = (
+        [get_location_config(location_id)]
+        if location_id
+        else get_all_locations()
     )
+    locations_to_process = [loc for loc in locations_to_process if loc]
 
-    for cc, config in markets:
-        if not config:
-            continue
+    for loc in locations_to_process:
+        loc_id = loc["location"]
+        timezone_str = loc["timezone"]
+        market = loc["market"]
         try:
-            count = _promote_for_market(cc, config, SYSTEM_USER_ID)
+            count = _promote_for_location(loc_id, timezone_str, market, SYSTEM_USER_ID)
             result["promoted_count"] += count
-            result["markets_processed"] += 1
+            result["locations_processed"] += 1
         except Exception as e:
-            msg = f"Market {cc}: {e}"
+            msg = f"Location {loc_id}: {e}"
             log_error(msg)
             result["errors"].append(msg)
 
     log_info(f"Kitchen start promotion: promoted {result['promoted_count']} selections "
-             f"across {result['markets_processed']} markets")
+             f"across {result['locations_processed']} location(s)")
     return result
 
 
-def _promote_for_market(country_code: str, config, system_user_id: UUID) -> int:
-    """Process one market. Returns count promoted."""
-    tz = pytz.timezone(config.timezone)
+def _promote_for_location(
+    location_id: str,
+    timezone_str: str,
+    market: str,
+    system_user_id: UUID,
+) -> int:
+    """Process one location. Returns count promoted."""
+    tz = pytz.timezone(timezone_str)
     now_local = datetime.now(tz)
     today = now_local.date()
-    kitchen_day = get_kitchen_day_for_date(today, config.timezone, country_code)
+    config = MarketConfiguration.get_market_config(market)
+    if not config:
+        log_warning(f"Location {location_id}: no market config for {market}")
+        return 0
+
+    kitchen_day = get_kitchen_day_for_date(today, timezone_str, market)
 
     # kitchen_day enum: Mon-Fri only
     if kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
-        log_info(f"Market {country_code}: {kitchen_day} is not a kitchen day, skip")
+        log_info(f"Location {location_id}: {kitchen_day} is not a kitchen day, skip")
         return 0
 
     day_hours = config.business_hours.get(kitchen_day) if config.business_hours else None
     if not day_hours or "open" not in day_hours:
-        log_warning(f"Market {country_code}: no business_hours.open for {kitchen_day}")
+        log_warning(f"Location {location_id}: no business_hours.open for {kitchen_day}")
         return 0
 
     open_time = day_hours["open"]
@@ -92,10 +105,11 @@ def _promote_for_market(country_code: str, config, system_user_id: UUID) -> int:
         from datetime import time as dt_time
         open_time = datetime.strptime(open_time, "%H:%M").time()
     if now_local.time() < open_time:
-        log_info(f"Market {country_code}: kitchen not yet open (open={open_time})")
+        log_info(f"Location {location_id}: kitchen not yet open (open={open_time})")
         return 0
 
-    # Find selections to promote: pickup_date=today, kitchen_day, not archived, no pickup yet
+    # Find selections to promote: pickup_date=today, kitchen_day, not archived,
+    # address.timezone matches location, no pickup yet
     conn = get_db_connection()
     try:
         query = """
@@ -106,7 +120,7 @@ def _promote_for_market(country_code: str, config, system_user_id: UUID) -> int:
             WHERE ps.kitchen_day = %s
               AND ps.pickup_date = %s
               AND ps.is_archived = FALSE
-              AND UPPER(TRIM(COALESCE(a.country_code, ''))) = %s
+              AND TRIM(COALESCE(a.timezone, '')) = %s
               AND NOT EXISTS (
                   SELECT 1 FROM plate_pickup_live ppl
                   WHERE ppl.plate_selection_id = ps.plate_selection_id
@@ -115,12 +129,12 @@ def _promote_for_market(country_code: str, config, system_user_id: UUID) -> int:
         """
         rows = db_read(
             query,
-            (kitchen_day, today.isoformat(), country_code.upper()),
+            (kitchen_day, today.isoformat(), timezone_str),
             connection=conn,
         )
 
         if not rows:
-            log_info(f"Market {country_code}: no selections to promote")
+            log_info(f"Location {location_id}: no selections to promote")
             return 0
 
         promoted = 0

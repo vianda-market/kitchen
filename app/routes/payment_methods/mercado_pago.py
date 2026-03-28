@@ -10,7 +10,8 @@ MERCADOPAGO_REDIRECT_URI = os.getenv("MERCADOPAGO_REDIRECT_URI")  # Same you con
 router = APIRouter(
     prefix="/mercado-pago",
     tags=["Mercado Pago"],
-    dependencies=[Depends(oauth2_scheme)]
+    dependencies=[Depends(oauth2_scheme)],
+    include_in_schema=False,  # Stub — not production-ready; hidden until Mercado Pago integration is implemented
 )
 
 @router.get("/mercadopago/callback")

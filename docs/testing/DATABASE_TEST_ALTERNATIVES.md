@@ -42,7 +42,7 @@ def db_connection():
     """Real database connection for schema tests"""
     conn = psycopg2.connect(
         host="localhost",
-        database="kitchen_db_dev",
+        database="kitchen",
         user="cdeachaval"
     )
     yield conn
@@ -200,7 +200,7 @@ def test_db_connection() -> Generator[psycopg2.extensions.connection, None, None
     """Real database connection for integration tests"""
     conn = psycopg2.connect(
         host="localhost",
-        database="kitchen_db_dev",
+        database="kitchen",
         user="cdeachaval",
         autocommit=False
     )

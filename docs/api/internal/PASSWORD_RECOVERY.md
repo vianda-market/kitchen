@@ -193,8 +193,6 @@ SMTP_PASSWORD=your-gmail-app-password
 FROM_EMAIL=your-email@gmail.com
 FROM_NAME=Kitchen Backend
 
-# Frontend URL
-FRONTEND_URL=http://localhost:3000
 ```
 
 ### Gmail Setup

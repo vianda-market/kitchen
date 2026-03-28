@@ -26,6 +26,7 @@ from uuid import UUID
 import psycopg2.extensions
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_client_user, get_client_or_employee_user, oauth2_scheme
+from app.config.settings import settings
 from app.dependencies.database import get_db
 from app.services.error_handling import handle_get_by_id, handle_get_all, handle_create, handle_update, handle_delete
 from app.security.institution_scope import get_institution_scope
@@ -359,73 +360,7 @@ def create_product_routes() -> APIRouter:
     product_image_service = ProductImageService()
 
     def _product_custom_routes(router: APIRouter) -> None:
-        @router.post("", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
-        def create_product_with_image_validation(
-            create_data: ProductCreateSchema,
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
-        ):
-            """Create a new product with image validation"""
-            data = create_data.model_dump()
-            data["modified_by"] = current_user["user_id"]
-            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
-            image_storage_path = data.get("image_storage_path")
-            image_url = data.get("image_url")
-            image_checksum = data.get("image_checksum")
-            validated_path, validated_url, validated_checksum = product_image_service.validate_product_image_at_creation(
-                image_storage_path=image_storage_path,
-                image_url=image_url,
-                image_checksum=image_checksum
-            )
-            data["image_storage_path"] = validated_path
-            data["image_url"] = validated_url
-            data["image_thumbnail_storage_path"] = validated_path
-            data["image_thumbnail_url"] = validated_url
-            data["image_checksum"] = validated_checksum
-            def create_callable(payload: dict, connection: psycopg2.extensions.connection):
-                return product_service.create(payload, connection, scope=scope)
-            return handle_create(create_callable, data, db, "product")
-
-        @router.post("/{product_id}/image", response_model=ProductResponseSchema)
-        async def upload_product_image(
-            product_id: UUID,
-            file: UploadFile = File(...),
-            client_checksum: str = Form(...),
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db),
-        ):
-            """Upload or replace a product image."""
-            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
-            product = product_service.get_by_id(product_id, db, scope=scope)
-            if not product or product.is_archived:
-                raise entity_not_found("Product", product_id)
-            contents = await file.read()
-            storage_path, url_path, thumb_storage_path, thumb_url_path, checksum = product_image_service.save_image(
-                product_id,
-                image_bytes=contents,
-                content_type=file.content_type or "",
-                expected_checksum=client_checksum,
-            )
-            update_data = {
-                "image_url": url_path,
-                "image_storage_path": storage_path,
-                "image_thumbnail_url": thumb_url_path,
-                "image_thumbnail_storage_path": thumb_storage_path,
-                "image_checksum": checksum,
-                "modified_by": current_user["user_id"],
-            }
-            updated_product = product_service.update(product_id, update_data, db, scope=scope)
-            if not updated_product:
-                product_image_service.delete_image(storage_path, thumb_storage_path)
-                raise HTTPException(status_code=500, detail="Failed to update product image")
-            if (
-                product.image_storage_path != storage_path
-                and not product_image_service.is_placeholder(product.image_storage_path)
-            ):
-                old_thumb = getattr(product, "image_thumbnail_storage_path", None)
-                product_image_service.delete_image(product.image_storage_path, old_thumb)
-            return updated_product
-
+        # Static path segments must be registered before /{product_id} or "enriched" is parsed as a UUID.
         @router.get("/enriched", response_model=List[ProductEnrichedResponseSchema])
         def list_enriched_products(
             current_user: dict = Depends(get_current_user),
@@ -459,6 +394,136 @@ def create_product_routes() -> APIRouter:
             except Exception as e:
                 log_error(f"Error getting enriched product {product_id}: {e}")
                 raise HTTPException(status_code=500, detail="Failed to retrieve enriched product")
+
+        @router.get("/{product_id}", response_model=ProductResponseSchema)
+        def get_product_with_resolved_urls(
+            product_id: UUID,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ):
+            """Get a single product by ID with resolved image URLs (signed URLs when GCS)."""
+            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
+            product = product_service.get_by_id(product_id, db, scope=scope)
+            if not product or product.is_archived:
+                raise entity_not_found("Product", product_id)
+            data = product.model_dump(mode="json")
+            from app.utils.gcs import resolve_product_image_urls
+
+            data = resolve_product_image_urls(data)
+            return ProductResponseSchema(**data)
+
+        @router.post("", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
+        def create_product_with_image_validation(
+            create_data: ProductCreateSchema,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db)
+        ):
+            """Create a new product with image validation"""
+            data = create_data.model_dump()
+            data["modified_by"] = current_user["user_id"]
+            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
+            validated = product_image_service.validate_product_image_at_creation(
+                image_storage_path=data.get("image_storage_path"),
+                image_url=data.get("image_url"),
+                image_checksum=data.get("image_checksum"),
+            )
+            data["image_storage_path"] = validated["storage_path"]
+            data["image_url"] = validated["image_url"]
+            data["image_thumbnail_storage_path"] = validated["thumbnail_storage_path"]
+            data["image_thumbnail_url"] = validated["thumbnail_url"]
+            data["image_checksum"] = validated["checksum"]
+            def create_callable(payload: dict, connection: psycopg2.extensions.connection):
+                return product_service.create(payload, connection, scope=scope)
+            return handle_create(create_callable, data, db, "product")
+
+        @router.post("/{product_id}/image", response_model=ProductResponseSchema)
+        async def upload_product_image(
+            product_id: UUID,
+            file: UploadFile = File(...),
+            client_checksum: str = Form(...),
+            checksum_algorithm: str = Form(default="sha256"),
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ):
+            """Upload or replace a product image."""
+            from app.utils.checksum import verify_checksum
+
+            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
+            product = product_service.get_by_id(product_id, db, scope=scope)
+            if not product or product.is_archived:
+                raise entity_not_found("Product", product_id)
+            contents = await file.read()
+            if len(contents) > settings.MAX_PRODUCT_IMAGE_BYTES:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image too large. Maximum size is 5 MB.",
+                )
+            verify_checksum(contents, client_checksum, checksum_algorithm)
+            storage_path, url_path, thumb_storage_path, thumb_url_path, checksum = product_image_service.save_image(
+                product_id,
+                product.institution_id,
+                image_bytes=contents,
+                content_type=file.content_type or "",
+                expected_checksum=client_checksum,
+            )
+            update_data = {
+                "image_url": url_path,
+                "image_storage_path": storage_path,
+                "image_thumbnail_url": thumb_url_path,
+                "image_thumbnail_storage_path": thumb_storage_path,
+                "image_checksum": checksum,
+                "modified_by": current_user["user_id"],
+            }
+            updated_product = product_service.update(product_id, update_data, db, scope=scope)
+            if not updated_product:
+                product_image_service.delete_image(storage_path, thumb_storage_path)
+                raise HTTPException(status_code=500, detail="Failed to update product image")
+            if (
+                product.image_storage_path != storage_path
+                and not product_image_service.is_placeholder(product.image_storage_path)
+            ):
+                old_thumb = getattr(product, "image_thumbnail_storage_path", None)
+                product_image_service.delete_image(product.image_storage_path, old_thumb)
+            return updated_product
+
+        @router.delete("/{product_id}/image", response_model=ProductResponseSchema)
+        def delete_product_image(
+            product_id: UUID,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ):
+            """Delete product image and revert to placeholder. Idempotent: returns 200 if already placeholder."""
+            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
+            product = product_service.get_by_id(product_id, db, scope=scope)
+            if not product or product.is_archived:
+                raise entity_not_found("Product", product_id)
+            if product_image_service.is_placeholder(product.image_storage_path):
+                data = product.model_dump(mode="json")
+                from app.utils.gcs import resolve_product_image_urls
+
+                data = resolve_product_image_urls(data)
+                return ProductResponseSchema(**data)
+            product_image_service.delete_image(
+                product.image_storage_path,
+                getattr(product, "image_thumbnail_storage_path", None),
+            )
+            meta = product_image_service.placeholder_metadata()
+            update_data = {
+                "image_storage_path": meta["storage_path"],
+                "image_thumbnail_storage_path": meta["thumbnail_storage_path"],
+                "image_url": meta["image_url"],
+                "image_thumbnail_url": meta["thumbnail_url"],
+                "image_checksum": meta["checksum"],
+                "modified_by": current_user["user_id"],
+            }
+            updated_product = product_service.update(product_id, update_data, db, scope=scope)
+            if not updated_product:
+                raise HTTPException(status_code=500, detail="Failed to revert product to placeholder")
+            data = updated_product.model_dump(mode="json")
+            from app.utils.gcs import resolve_product_image_urls
+
+            data = resolve_product_image_urls(data)
+            return ProductResponseSchema(**data)
 
     router = create_crud_routes(
         config=config,
@@ -693,10 +758,12 @@ def create_credit_currency_routes() -> APIRouter:
         current_user: dict = Depends(get_employee_user),  # Internal-only
         db: psycopg2.extensions.connection = Depends(get_db)
     ):
-        """Create a new credit currency - Internal-only. Backend assigns currency_code from supported list."""
+        """Create a new credit currency - Internal-only. Backend assigns currency_code from supported list and fetches currency_conversion_usd from open.er-api.com."""
         from app.config.supported_currencies import get_currency_code_by_name
+        from app.services.cron.currency_refresh import fetch_usd_rate_for_currency
 
         data = create_data.model_dump()
+        data.pop("currency_conversion_usd", None)  # Backend fetches; do not accept client value
         # Resolve currency_code from currency_name; do not accept client-supplied currency_code
         currency_name = data.get("currency_name") or ""
         currency_code = get_currency_code_by_name(currency_name)
@@ -706,6 +773,13 @@ def create_credit_currency_routes() -> APIRouter:
                 detail="Currency name not supported. Use GET /api/v1/currencies/ for the list.",
             )
         data["currency_code"] = currency_code
+        rate, _ = fetch_usd_rate_for_currency(currency_code)
+        if rate is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Currency {currency_code} is not supported by the rate API for automatic exchange rate.",
+            )
+        data["currency_conversion_usd"] = rate
         data["modified_by"] = current_user["user_id"]
         scope = None  # Credit currencies are not institution-scoped
         def create_callable(payload: dict, connection: psycopg2.extensions.connection):

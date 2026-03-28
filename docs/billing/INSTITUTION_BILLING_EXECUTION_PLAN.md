@@ -78,14 +78,14 @@
 ### **Order Placement:**
 ```python
 # Conservative estimate (80% of full amount if 20% no-show discount)
-conservative_amount = credits × credit_value × (1 - no_show_discount_rate)
+conservative_amount = credits × credit_value_local_currency × (1 - no_show_discount_rate)
 RestaurantBalance.update_balance_for_transaction(..., no_show_discount=0.20)
 ```
 
 ### **Customer Arrival (QR Scan):**
 ```python
 # Add back the discount amount
-discount_amount = credits × credit_value × no_show_discount_rate
+discount_amount = credits × credit_value_local_currency × no_show_discount_rate
 RestaurantBalance.update_balance_for_transaction(discount_amount, no_show_discount=None)
 ```
 

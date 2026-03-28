@@ -88,7 +88,7 @@ Every institution **must** have a **`market_id`** (UUID). The database enforces 
 ## Supplier and Customer Employer: institution-bound market
 
 - **Supplier users** and **Customer Employer** users (B2B portal) must be assigned a `market_id` that matches their **institution’s** `market_id`. The backend rejects user create/update if the user’s market is not the same as the institution’s market (single-market v1). Supplier institutions cannot have personnel assigned to markets the institution is not registered for.
-- **Initial market non-editable**: For both Supplier and Customer Employer users, the assigned market cannot be changed via `PUT /users/me` or `PUT /users/{user_id}`; only the paid upgrade flow can add markets. See roadmap: [INSTITUTION_MARKET_AND_MULTI_MARKET_SCOPE.md](../../roadmap/INSTITUTION_MARKET_AND_MULTI_MARKET_SCOPE.md).
+- **Initial market non-editable**: For both Supplier and Customer Employer users, the assigned market cannot be changed via `PUT /users/me` or `PUT /users/{user_id}`; only the paid upgrade flow can add markets. See roadmap: [INSTITUTION_MARKET_AND_MULTI_MARKET_SCOPE.md](../../zArchive/roadmap/INSTITUTION_MARKET_AND_MULTI_MARKET_SCOPE.md).
 
 ---
 

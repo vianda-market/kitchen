@@ -10,7 +10,7 @@ Create a `.env` file in the project root with the following variables:
 # Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=kitchen_db_dev
+DB_NAME=kitchen
 DB_USER=kitchen_admin
 DB_PASSWORD=your_database_password_here
 
@@ -27,8 +27,7 @@ SMTP_PASSWORD=your-gmail-app-specific-password
 FROM_EMAIL=your-email@gmail.com
 FROM_NAME=Kitchen Backend
 
-# Frontend URLs (B2C on 8081, B2B on 5173 for local dev)
-FRONTEND_URL=http://localhost:8081
+# B2B Frontend URL (B2B on 5173 for local dev)
 B2B_FRONTEND_URL=http://localhost:5173
 
 # External API Keys (Google: per environment; local uses GOOGLE_API_KEY_DEV)
@@ -242,12 +241,14 @@ Use [Stripe test cards](https://stripe.com/docs/testing), e.g. `4242 4242 4242 4
 
 ## 🗄️ Database Configuration
 
+Use **`DB_NAME=kitchen`** locally and in every deployed environment. The name does not encode dev vs prod: environments are isolated by separate database **instances** (e.g. different Cloud SQL instances in different GCP projects), not by renaming the database.
+
 ### Local Development
 
 ```bash
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=kitchen_db_dev
+DB_NAME=kitchen
 DB_USER=kitchen_admin
 DB_PASSWORD=your_password_here
 ```
@@ -259,7 +260,7 @@ After deploying to AWS:
 ```bash
 DB_HOST=kitchen-db-prod.xxxxx.rds.amazonaws.com
 DB_PORT=5432
-DB_NAME=kitchen_db_prod
+DB_NAME=kitchen
 DB_USER=kitchen_admin
 DB_PASSWORD=your_strong_password_here
 ```
@@ -283,7 +284,6 @@ The application will automatically fetch credentials from Secrets Manager.
 ENVIRONMENT=dev
 DEBUG=true
 LOG_LEVEL=DEBUG
-FRONTEND_URL=http://localhost:8081
 B2B_FRONTEND_URL=http://localhost:5173
 ```
 
@@ -293,7 +293,6 @@ B2B_FRONTEND_URL=http://localhost:5173
 ENVIRONMENT=staging
 DEBUG=false
 LOG_LEVEL=INFO
-FRONTEND_URL=https://staging.kitchen.com
 B2B_FRONTEND_URL=https://b2b-staging.kitchen.com
 ```
 
@@ -303,7 +302,6 @@ B2B_FRONTEND_URL=https://b2b-staging.kitchen.com
 ENVIRONMENT=prod
 DEBUG=false
 LOG_LEVEL=WARNING
-FRONTEND_URL=https://app.kitchen.com
 B2B_FRONTEND_URL=https://b2b.kitchen.com
 USE_AWS_SECRETS=true
 ```
@@ -346,7 +344,7 @@ Check server logs for any configuration errors.
 
 - [Start Server Guide](START_SERVER.md)
 - [Infrastructure Documentation](../infrastructure/README.md)
-- [Technical Roadmap](roadmap/TECHNICAL_ROADMAP_2026.md)
+- [Technical Roadmap](../zArchive/roadmap/TECHNICAL_ROADMAP_2026.md) (archived)
 
 ---
 

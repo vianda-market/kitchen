@@ -82,7 +82,7 @@ Response: 200 OK
     "first_name": "John",
     "last_name": "Doe",
     "full_name": "John Doe",                 // ← Pre-concatenated!
-    "cellphone": "+1234567890",
+    "mobile_number": "+1234567890",
     "employer_id": "uuid" | null,
     "is_archived": false,
     "status": "Active",
@@ -120,7 +120,7 @@ Response: 200 OK
   "first_name": "John",
   "last_name": "Doe",
   "full_name": "John Doe",
-  "cellphone": "+1234567890",
+  "mobile_number": "+1234567890",
   "employer_id": "uuid" | null,
   "is_archived": false,
   "status": "Active",
@@ -158,7 +158,7 @@ Response: 200 OK
   "first_name": "John",
   "last_name": "Doe",
   "full_name": "John Doe",                   // ← Pre-concatenated!
-  "cellphone": "+1234567890",
+  "mobile_number": "+1234567890",
   "employer_id": "uuid" | null,
   "is_archived": false,
   "status": "Active",
@@ -244,7 +244,7 @@ interface UserEnrichedResponse {
   first_name: string | null;
   last_name: string | null;
   full_name: string;        // ← Pre-concatenated! Handles NULL values gracefully
-  cellphone: string;
+  mobile_number: string;
   employer_id: string | null;
   is_archived: boolean;
   status: string;
@@ -271,7 +271,7 @@ interface UserEnrichedResponse {
   email: string;
   first_name: string | null;
   last_name: string | null;
-  cellphone: string;
+  mobile_number: string;
   employer_id: string | null;
   is_archived: boolean;
   status: string;

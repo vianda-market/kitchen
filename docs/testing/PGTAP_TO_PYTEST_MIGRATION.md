@@ -103,7 +103,7 @@ app/tests/database/
 
 ### Phase 5: Build Script Update ✅
 
-6. **Update `app/db/build_kitchen_db_dev.sh`**
+6. **Update `app/db/build_kitchen_db.sh`**
    - Replace `prove` with `pytest`
    - Run database tests after schema rebuild
    - Keep schema rebuild and seed steps
@@ -171,7 +171,7 @@ def db_connection():
     """Real database connection for integration tests"""
     conn = psycopg2.connect(
         host=os.getenv('DB_HOST', 'localhost'),
-        database=os.getenv('DB_NAME', 'kitchen_db_dev'),
+        database=os.getenv('DB_NAME', 'kitchen'),
         user=os.getenv('DB_USER', 'cdeachaval')
     )
     yield conn
@@ -198,7 +198,7 @@ def db_transaction(db_connection):
 - [ ] Implement `test_schema.py`
 - [ ] Implement `test_seed.py`
 - [ ] Implement `test_integration.py`
-- [ ] Update `build_kitchen_db_dev.sh`
+- [ ] Update `build_kitchen_db.sh`
 - [ ] Test new pytest suite
 - [ ] Remove old pgTAP files
 - [ ] Update documentation
@@ -224,7 +224,7 @@ pytest app/tests/database/ --cov=app --cov-report=term-missing
 
 ### In Build Script
 ```bash
-# In build_kitchen_db_dev.sh
+# In build_kitchen_db.sh
 pytest app/tests/database/ -v
 ```
 

@@ -1,3 +1,6 @@
+-- search_path: belt-and-suspenders (ALTER DATABASE in build_kitchen_db.sh also sets it)
+SET search_path = core, ops, customer, billing, audit, public;
+
 -- Minimal seed so the app can start after tear-down and rebuild.
 --   • 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) and 7 markets — each market has its correct credit currency (e.g. Argentina -> ARS).
 --   • 2 institutions: Vianda Enterprises, Vianda Customers (both use Global market).
@@ -39,23 +42,23 @@ ALTER TABLE user_info
 TRUNCATE user_market_assignment, user_info, institution_info, market_info, credit_currency_info, city_info CASCADE;
 
 -- 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) for seeded markets. Insert first; market_info FK references these.
-INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('55555555-5555-5555-5555-555555555555', 'US Dollar', 'USD', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666601', 'Argentine Peso', 'ARS', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666602', 'Peruvian Sol', 'PEN', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666603', 'Chilean Peso', 'CLP', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666604', 'Mexican Peso', 'MXN', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666605', 'Brazilian Real', 'BRL', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('55555555-5555-5555-5555-555555555555', 'US Dollar', 'USD', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666601', 'Argentine Peso', 'ARS', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666602', 'Peruvian Sol', 'PEN', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666603', 'Chilean Peso', 'CLP', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666604', 'Mexican Peso', 'MXN', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666605', 'Brazilian Real', 'BRL', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Markets: each references its country's credit currency so JOINs return correct currency_code (e.g. Argentina -> ARS)
-INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, kitchen_close_time, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('00000000-0000-0000-0000-000000000001', 'Global Marketplace', 'GL', '55555555-5555-5555-5555-555555555555', 'UTC', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000002', 'Argentina', 'AR', '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000003', 'Peru', 'PE', '66666666-6666-6666-6666-666666666602', 'America/Lima', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000004', 'United States', 'US', '55555555-5555-5555-5555-555555555555', 'America/New_York', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000005', 'Chile', 'CL', '66666666-6666-6666-6666-666666666603', 'America/Santiago', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000006', 'Mexico', 'MX', '66666666-6666-6666-6666-666666666604', 'America/Mexico_City', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000007', 'Brazil', 'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, kitchen_close_time, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('00000000-0000-0000-0000-000000000001', 'Global Marketplace', 'GL', '55555555-5555-5555-5555-555555555555', 'UTC',                           '13:30'::TIME, 'en', NULL,   NULL, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000002', 'Argentina',          'AR', '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '13:30'::TIME, 'es', '+54',  10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000003', 'Peru',               'PE', '66666666-6666-6666-6666-666666666602', 'America/Lima',                  '13:30'::TIME, 'es', '+51',  9,    FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000004', 'United States',      'US', '55555555-5555-5555-5555-555555555555', 'America/New_York',              '13:30'::TIME, 'en', '+1',   10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000005', 'Chile',              'CL', '66666666-6666-6666-6666-666666666603', 'America/Santiago',              '13:30'::TIME, 'es', '+56',  9,    FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000006', 'Mexico',             'MX', '66666666-6666-6666-6666-666666666604', 'America/Mexico_City',           '13:30'::TIME, 'es', '+52',  10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000007', 'Brazil',             'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo',             '13:30'::TIME, 'pt', '+55',  11,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
 -- no_show_discount: NULL for Internal/Customer (not applicable); Supplier requires it at create time.
@@ -120,7 +123,7 @@ INSERT INTO city_info (name, country_code, province_code, is_archived, status, c
 -- Seeded users: Super Admin (human), system bot (automated operations only; do not use for login).
 -- Both get Global city (aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa).
 INSERT INTO user_info (
-  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, cellphone, market_id, city_id, is_archived, status, created_date, created_by, modified_by, modified_date
+  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, mobile_number, email_verified, email_verified_at, market_id, city_id, locale, is_archived, status, created_date, created_by, modified_by, modified_date
 ) VALUES (
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'superadmin',
@@ -130,10 +133,13 @@ INSERT INTO user_info (
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
   'Internal'::role_type_enum,
   'Super Admin'::role_name_enum,
-  'superadmin@example.com',
-  '5555555555',
+  'viandallc@gmail.com',
+  '+14155552671',
+  TRUE,
+  CURRENT_TIMESTAMP,
   '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  'en',
   FALSE,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -150,10 +156,13 @@ INSERT INTO user_info (
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
   'Internal'::role_type_enum,
   'Admin'::role_name_enum,
-  'system@internal',
-  '0000000000',
+  'admin@vianda.market',
+  NULL,
+  TRUE,
+  CURRENT_TIMESTAMP,
   '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  'en',
   FALSE,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,

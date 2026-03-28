@@ -417,7 +417,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = None
         mock_email_service.send_signup_verification_email.return_value = True
@@ -448,7 +448,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = MagicMock()  # user exists
         mock_get_by_email.return_value = None
 
@@ -470,7 +470,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = MagicMock()  # email already in user_info
 
@@ -552,8 +552,12 @@ class TestUserSignupService:
         """verify_and_complete_signup loads pending (incl. market_id, city_id), creates user, sets market assignment, marks used, returns user and JWT."""
         from datetime import datetime, timezone, timedelta
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_market_service.get_by_id.return_value = {
+            "is_archived": False,
+            "country_code": "AR",
+            "language": "es",
+        }
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="AR")
         mock_create_user.return_value = sample_user_dto
         mock_create_token.return_value = "fake.jwt.token"
 
@@ -566,7 +570,7 @@ class TestUserSignupService:
             "hashed_password": "hashed",
             "first_name": "John",
             "last_name": "Doe",
-            "cellphone": "9876543210",
+            "mobile_number": "+14155552671",
             "market_id": SAMPLE_MARKET_ID,
             "city_id": SAMPLE_CITY_ID,
             "used": False,
@@ -588,6 +592,10 @@ class TestUserSignupService:
         call_user_data = mock_create_user.call_args[0][0]
         assert call_user_data["market_id"] == SAMPLE_MARKET_ID
         assert call_user_data["city_id"] == SAMPLE_CITY_ID
+        assert call_user_data["locale"] == "es"
+        assert call_user_data["mobile_number"] == "+14155552671"
+        assert call_user_data["email_verified"] is True
+        assert "email_verified_at" in call_user_data
         mock_set_assignments.assert_called_once_with(sample_user_dto.user_id, [SAMPLE_MARKET_ID], mock_db)
         assert mock_cursor.execute.call_count >= 2  # SELECT then UPDATE
 

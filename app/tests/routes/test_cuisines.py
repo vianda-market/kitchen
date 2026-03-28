@@ -1,5 +1,5 @@
 """
-Tests for supported cuisines endpoint: GET /api/v1/cuisines/
+Tests for supported cuisines endpoint: GET /api/v1/cuisines
 """
 
 import pytest
@@ -39,11 +39,11 @@ def client_with_customer(mock_customer_user):
 
 
 class TestListCuisines:
-    """GET /api/v1/cuisines/ returns supported cuisines from config."""
+    """GET /api/v1/cuisines returns supported cuisines from config."""
 
     def test_returns_200_and_list_with_cuisine_name(self, client_with_customer):
         """Customer can list cuisines; each item has cuisine_name."""
-        resp = client_with_customer.get("/api/v1/cuisines/")
+        resp = client_with_customer.get("/api/v1/cuisines")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -54,7 +54,7 @@ class TestListCuisines:
 
     def test_sorted_alphabetically(self, client_with_customer):
         """List is sorted by cuisine_name (case-insensitive)."""
-        resp = client_with_customer.get("/api/v1/cuisines/")
+        resp = client_with_customer.get("/api/v1/cuisines")
         assert resp.status_code == 200
         data = resp.json()
         names = [x["cuisine_name"].lower() for x in data]
@@ -62,7 +62,7 @@ class TestListCuisines:
 
     def test_contains_italian_french_american(self, client_with_customer):
         """Response contains American, French, Italian per plan."""
-        resp = client_with_customer.get("/api/v1/cuisines/")
+        resp = client_with_customer.get("/api/v1/cuisines")
         assert resp.status_code == 200
         data = resp.json()
         names = [x["cuisine_name"] for x in data]

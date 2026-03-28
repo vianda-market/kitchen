@@ -13,8 +13,9 @@ app/db/
 ├── index.sql               ✅ Standard indexes
 ├── trigger.sql             ✅ History triggers
 ├── archival_indexes.sql    ✅ 15 archival performance indexes
-├── seed.sql                ✅ Reference data
-└── build_kitchen_db_dev.sh ✅ Build script (includes archival_indexes.sql)
+├── seed.sql                        ✅ Reference data
+├── build_kitchen_db.sh             ✅ Build script (includes archival_indexes.sql)
+└── post_rebuild_external_sync.py   ✅ Post-seed FX + holiday sync (optional; invoked by build script)
 ```
 
 ### **2. Application Code Files**
@@ -49,14 +50,32 @@ docs/
 ## **🔧 Build Process Integration**
 
 ### **Updated Build Script**
-The `app/db/build_kitchen_db_dev.sh` now includes:
+The `app/db/build_kitchen_db.sh` script (run from the **repository root**) loads, in order:
 ```bash
+DROP SCHEMA public CASCADE; CREATE SCHEMA public;
 \i app/db/schema.sql
 \i app/db/index.sql
 \i app/db/trigger.sql
-\i app/db/archival_indexes.sql  # ← NEW: Archival performance indexes
+\i app/db/archival_config_table.sql
+\i app/db/archival_indexes.sql
 \i app/db/seed.sql
 ```
+Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `PGPASSWORD` for non-local targets (e.g. Cloud SQL). For CI/GCP without a venv or static assets, use `SKIP_PYTEST=1` and `SKIP_IMAGE_CLEANUP=1` (see comments in the script). Air-gapped CI or no outbound HTTP: set `SKIP_POST_REBUILD_SYNC=1` to skip FX and holiday API calls after the final seed.
+
+### **Post-rebuild external sync (FX + national holidays)**
+
+After the **final** `seed.sql` pass, `build_kitchen_db.sh` runs `app/db/post_rebuild_external_sync.py` (when a venv exists and `SKIP_POST_REBUILD_SYNC` is unset). This step:
+
+- Updates `credit_currency_info.currency_conversion_usd` from **open.er-api.com** (non-USD rows; seed placeholders are `1.0` until then).
+- Inserts **national_holidays** from **date.nager.at** (Nager.Date) for market countries in app config.
+
+**Safety:** The script always exits successfully so a failed or blocked network does not abort the rebuild. It performs a short connectivity check per host before calling each API (avoids long timeouts when firewalled). Log lines are prefixed with `[post-rebuild-sync]` for grepping build logs.
+
+**Env:** If you use `PGPASSWORD` for `psql` but not `DB_PASSWORD`, the script copies `PGPASSWORD` to `DB_PASSWORD` so `psycopg2` matches the same database.
+
+**Manual run** (from repository root): `PYTHONPATH=. python app/db/post_rebuild_external_sync.py` — `PYTHONPATH=.` is required so `from app....` imports resolve.
+
+You can instead run the same SQL files with `psql -f` (also from repo root); add `-v ON_ERROR_STOP=1`. The script’s initial `DROP SCHEMA public CASCADE` gives a clean slate; the raw `-f` chain does not unless you run that separately.
 
 ### **What Happens on Rebuild**
 1. ✅ **Schema**: All tables created (enums stored on entities, no status_info/transaction_type_info)
@@ -64,6 +83,13 @@ The `app/db/build_kitchen_db_dev.sh` now includes:
 3. ✅ **Triggers**: History logging triggers
 4. ✅ **Data**: Reference data from seed.sql
 5. ✅ **Tests**: Pytest runs database integration tests
+6. ✅ **Post-rebuild sync**: Optional FX + holiday fetch (see subsection above; skipped if no venv or `SKIP_POST_REBUILD_SYNC=1`)
+
+### **IAM admin grants (`schema.sql` tail)**
+
+`app/db/schema.sql` ends with a conditional block that grants full access on `public` tables, sequences, and functions to the Cloud SQL IAM role `viandallc@gmail.com` when that role exists in the cluster (so local rebuilds without that role skip it with no error).
+
+**Note:** `ALTER DEFAULT PRIVILEGES` only applies to objects created later **by the role that executes** those `ALTER DEFAULT PRIVILEGES` statements (often your migration/schema superuser). That matches the usual “admin user gets defaults from the account that builds the schema” pattern; if you ever need defaults for objects created by a different role, that would need a separate `ALTER DEFAULT PRIVILEGES FOR ROLE ...`.
 
 ## **🚨 Critical Changes Made Persistent**
 
@@ -98,13 +124,13 @@ Status and transaction-type values are stored as PostgreSQL enums on entities (e
 ### **Quick Verification Commands**
 ```bash
 # 1. Verify archival indexes exist
-psql -d kitchen_db_dev -c "
+psql -d kitchen -c "
 SELECT count(*) FROM pg_indexes 
 WHERE indexname LIKE '%archival%' OR indexname LIKE '%stats%';"
 # Expected: 15
 
 # 2. Verify core tables exist
-psql -d kitchen_db_dev -c "
+psql -d kitchen -c "
 SELECT table_name FROM information_schema.tables 
 WHERE table_name IN ('user_info', 'plate_pickup_live', 'client_transaction', 'restaurant_info');"
 # Expected: 4 rows
@@ -131,13 +157,13 @@ assert config.retention_days > 0
 ### **❌ Direct Database Changes**
 ```bash
 # NEVER do this - changes will be lost on rebuild
-psql -d kitchen_db_dev -c "CREATE INDEX some_index ON some_table(column);"
+psql -d kitchen -c "CREATE INDEX some_index ON some_table(column);"
 ```
 
 ### **❌ Manual Data Updates**
 ```bash
 # NEVER do this - data will be lost on rebuild  
-psql -d kitchen_db_dev -c "INSERT INTO some_table VALUES (...);"
+psql -d kitchen -c "INSERT INTO some_table VALUES (...);"
 ```
 
 ### **✅ Always Do This Instead**
@@ -149,7 +175,7 @@ echo "CREATE INDEX some_index ON some_table(column);" >> app/db/archival_indexes
 echo "INSERT INTO some_table (...) VALUES (...);" >> app/db/seed.sql
 
 # Then rebuild
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 
 ## **🎯 Rebuild Test Checklist**
@@ -172,7 +198,7 @@ When adding new features that require database changes:
 4. **Reference data** → Add to `app/db/seed.sql`
 5. **New entity archival** → Add table to `TABLE_CATEGORY_MAPPING` in `app/config/archival_config.py`
 
-**Remember: Every change must survive `./app/db/build_kitchen_db_dev.sh`**
+**Remember: Every change must survive `./app/db/build_kitchen_db.sh`**
 
 ---
 

@@ -59,7 +59,7 @@ Content-Type: application/json
 {
   "first_name": "John",
   "last_name": "Doe",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 

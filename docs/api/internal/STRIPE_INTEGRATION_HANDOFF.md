@@ -14,6 +14,7 @@ Add to settings (e.g. `app/config/settings.py`) and env:
 - `STRIPE_SECRET_KEY` (required when `PAYMENT_PROVIDER=stripe`)
 - `STRIPE_WEBHOOK_SECRET` (required for webhook endpoint)
 - `PAYMENT_PROVIDER` — `mock` | `stripe` (default `mock`)
+- `STRIPE_CUSTOMER_SETUP_SUCCESS_URL` (optional default `success_url` for B2C `POST /api/v1/customer/payment-methods/setup-session` when the body omits it)
 
 ## 2. Replace mock with real implementation
 
@@ -33,6 +34,8 @@ Add to settings (e.g. `app/config/settings.py`) and env:
   - Read `subscription_id` from the payment metadata.
   - Call the same **activate subscription** logic used by the mock confirm step: `activate_subscription_after_payment(subscription_id, modified_by=...)` from `app/services/subscription_action_service.py`. For webhook, `modified_by` can be a system user or the subscription’s `user_id` (fetch from subscription).
 - **Idempotency:** If the subscription is already Active, or the `subscription_payment` row is already marked `succeeded`, skip or return 200 to avoid duplicate activation. Stripe may retry webhooks.
+- **HTTP 200 after verify:** For all accepted events, return **200** even when internal processing fails (log only), so Stripe does not retry for days. Invalid signature remains **400**.
+- **Saved cards:** Subscribe to **`payment_method.attached`** / **`payment_method.detached`** alongside `payment_intent.succeeded`. Implementation syncs rows in `app/services/stripe_customer_payment_method_sync.py`. **`customer.updated`** is intentionally omitted in v1.
 
 ## 4. Idempotency and failures
 
@@ -46,7 +49,7 @@ Add to settings (e.g. `app/config/settings.py`) and env:
 - For local e2e, expose the webhook URL via a tunnel (e.g. **Stripe CLI** `stripe listen --forward-to localhost:8000/api/v1/webhooks/stripe`) and use the CLI’s webhook signing secret in `.env`.
 - No change to the **subscription_payment** or **subscription_info** schema is required; only the adapter implementation and `PAYMENT_PROVIDER=stripe` switch.
 
-## Extension points (out of scope for initial handoff)
+## Extension points
 
-- **Stripe Customer / saved payment methods:** Can be added later; the handoff doc does not implement them.
+- **Stripe Customer / saved payment methods:** Implemented: live **`POST /api/v1/customer/payment-methods/setup-session`** (`Checkout` `mode=setup`), DB rows from **`payment_method.attached`** only. See `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` and `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` for follow-ups (`customer.updated`, max cards per user, Checkout API deprecations).
 - **Metered billing / proration:** Same flow supports one payment per subscription start; extensions can be noted where the adapter or webhook is extended.

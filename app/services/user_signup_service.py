@@ -24,6 +24,7 @@ from app.services.entity_service import (
 )
 from app.services.email_service import email_service
 from app.auth.security import create_access_token
+from app.auth.utils import build_token_data, merge_subscription_token_claims
 from app.utils.log import log_info, log_warning, log_error, log_email_tracking
 from app.security.institution_scope import InstitutionScope
 from app.config import RoleType, RoleName, Status
@@ -154,6 +155,14 @@ class UserSignupService:
 
         # Resolve and validate market_id (default Global for Admin/Super Admin/Supplier Admin; require for Manager/Operator; Managers cannot assign Global)
         self._resolve_market_id_for_admin_creation(user_data, current_user, db)
+        if not user_data.get("locale"):
+            mid = user_data.get("market_id")
+            if mid:
+                mid_uuid = mid if isinstance(mid, UUID) else UUID(str(mid))
+                mk = market_service.get_by_id(mid_uuid)
+                user_data["locale"] = (mk.get("language") if mk else None) or "en"
+            else:
+                user_data["locale"] = "en"
         # v2: if market_ids provided, use first as primary and persist assignments after create
         market_ids_list = user_data.pop("market_ids", None)
         if market_ids_list:
@@ -411,6 +420,9 @@ class UserSignupService:
         # Ensure email is lowercase
         if "email" in user_data:
             user_data["email"] = user_data["email"].strip().lower()
+        # Ensure username is lowercase (data from pending row or verify flow)
+        if "username" in user_data:
+            user_data["username"] = user_data.get("username", "").strip().lower()
 
         # Set default values for customer signup
         user_data.setdefault("is_archived", False)
@@ -431,6 +443,9 @@ class UserSignupService:
                     detail="Invalid or archived market_id from signup. Please request a new verification code.",
                 )
         user_data["market_id"] = market_id
+
+        mkt_lang = market_service.get_by_id(market_id)
+        user_data["locale"] = (mkt_lang.get("language") if mkt_lang else None) or "en"
 
         # city_id is required; must come from client (request) or pending row (verify)
         if user_data.get("city_id") is None:
@@ -470,6 +485,9 @@ class UserSignupService:
         # Ensure email is lowercase
         if "email" in user_data:
             user_data["email"] = user_data["email"].strip().lower()
+        # Ensure username is lowercase
+        if "username" in user_data:
+            user_data["username"] = user_data.get("username", "").strip().lower()
         
         # Set default values
         user_data.setdefault("is_archived", False)
@@ -778,7 +796,7 @@ class UserSignupService:
         self._validate_and_resolve_city_id(user_data, db)
         self._process_password_security(user_data)
         email = user_data.get("email", "").strip().lower()
-        username = user_data.get("username", "").strip()
+        username = user_data.get("username", "").strip().lower()
 
         if get_user_by_username(username, db):
             raise HTTPException(
@@ -807,7 +825,7 @@ class UserSignupService:
                 """
                 INSERT INTO pending_customer_signup (
                     email, verification_code, token_expiry,
-                    username, hashed_password, first_name, last_name, cellphone, market_id, city_id
+                    username, hashed_password, first_name, last_name, mobile_number, market_id, city_id
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
@@ -818,7 +836,7 @@ class UserSignupService:
                     user_data["hashed_password"],
                     user_data.get("first_name"),
                     user_data.get("last_name"),
-                    user_data.get("cellphone"),
+                    user_data.get("mobile_number"),
                     str(user_data["market_id"]),
                     str(user_data["city_id"]),
                 ),
@@ -867,7 +885,7 @@ class UserSignupService:
             cursor.execute(
                 """
                 SELECT pending_id, email, verification_code, token_expiry, used,
-                       username, hashed_password, first_name, last_name, cellphone, market_id, city_id
+                       username, hashed_password, first_name, last_name, mobile_number, market_id, city_id
                 FROM pending_customer_signup
                 WHERE verification_code = %s
                 """,
@@ -899,9 +917,11 @@ class UserSignupService:
             "hashed_password": row["hashed_password"],
             "first_name": row["first_name"],
             "last_name": row["last_name"],
-            "cellphone": row["cellphone"],
+            "mobile_number": row["mobile_number"],
             "market_id": row["market_id"],
             "city_id": row["city_id"],
+            "email_verified": True,
+            "email_verified_at": datetime.now(timezone.utc),
         }
         self._apply_customer_signup_rules(user_data, db)
         new_user = create_user_with_validation(user_data, db)
@@ -920,16 +940,9 @@ class UserSignupService:
             )
             db.commit()
 
-        role_type = getattr(new_user.role_type, "value", str(new_user.role_type))
-        role_name = getattr(new_user.role_name, "value", str(new_user.role_name))
-        access_token = create_access_token(
-            data={
-                "sub": str(new_user.user_id),
-                "role_type": role_type or "Unknown",
-                "role_name": role_name or "Unknown",
-                "institution_id": str(new_user.institution_id),
-            }
-        )
+        token_payload = build_token_data(new_user)
+        merge_subscription_token_claims(token_payload, new_user.user_id, db)
+        access_token = create_access_token(data=token_payload)
         log_info(f"Customer signup verified and user created: {new_user.user_id}")
         return new_user, access_token
 

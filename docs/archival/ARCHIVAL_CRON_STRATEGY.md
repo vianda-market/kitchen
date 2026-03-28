@@ -84,7 +84,7 @@ python -m uvicorn application:app --reload
 export USE_DATABASE_ARCHIVAL_CONFIG=true
 
 # Apply database schema
-psql -d kitchen_db_prod -f app/db/archival_config_table.sql
+psql -d kitchen -f app/db/archival_config_table.sql
 
 # Populate initial configuration via API
 curl -X POST /admin/archival-config/ -d '{...}'

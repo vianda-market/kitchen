@@ -1,5 +1,5 @@
 """
-Tests for supported provinces endpoint: GET /api/v1/provinces/
+Tests for supported provinces endpoint: GET /api/v1/provinces
 """
 
 import pytest
@@ -39,11 +39,11 @@ def client_with_customer(mock_customer_user):
 
 
 class TestListProvinces:
-    """GET /api/v1/provinces/ returns supported provinces from config."""
+    """GET /api/v1/provinces returns supported provinces from config."""
 
     def test_returns_200_and_list_with_province_fields(self, client_with_customer):
         """Customer can list provinces; each item has province_code, province_name, country_code."""
-        resp = client_with_customer.get("/api/v1/provinces/")
+        resp = client_with_customer.get("/api/v1/provinces")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -58,7 +58,7 @@ class TestListProvinces:
 
     def test_filter_by_country_code_returns_matching_provinces(self, client_with_customer):
         """Optional country_code filter returns only provinces for that country."""
-        resp = client_with_customer.get("/api/v1/provinces/?country_code=US")
+        resp = client_with_customer.get("/api/v1/provinces?country_code=US")
         assert resp.status_code == 200
         data = resp.json()
         for item in data:
@@ -70,7 +70,7 @@ class TestListProvinces:
 
     def test_us_includes_washington_and_florida(self, client_with_customer):
         """US provinces include Washington (Seattle) and Florida (Miami)."""
-        resp = client_with_customer.get("/api/v1/provinces/?country_code=US")
+        resp = client_with_customer.get("/api/v1/provinces?country_code=US")
         assert resp.status_code == 200
         data = resp.json()
         codes = [item["province_code"] for item in data]

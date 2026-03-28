@@ -1,5 +1,5 @@
 """
-Tests for supported cities endpoint: GET /api/v1/cities/
+Tests for supported cities endpoint: GET /api/v1/cities
 """
 
 import pytest
@@ -39,11 +39,11 @@ def client_with_customer(mock_customer_user):
 
 
 class TestListCities:
-    """GET /api/v1/cities/ returns supported cities from city_info."""
+    """GET /api/v1/cities returns supported cities from city_info."""
 
     def test_returns_200_and_list_with_city_fields(self, client_with_customer):
         """Customer can list cities; each item has city_id, name, country_code, province_code."""
-        resp = client_with_customer.get("/api/v1/cities/")
+        resp = client_with_customer.get("/api/v1/cities")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -59,7 +59,7 @@ class TestListCities:
 
     def test_filter_by_country_code_returns_matching_cities(self, client_with_customer):
         """Optional country_code filter returns only cities in that country."""
-        resp = client_with_customer.get("/api/v1/cities/?country_code=AR")
+        resp = client_with_customer.get("/api/v1/cities?country_code=AR")
         assert resp.status_code == 200
         data = resp.json()
         for item in data:
@@ -70,14 +70,14 @@ class TestListCities:
     def test_filter_by_province_code_returns_matching_cities(self, client_with_customer):
         """Optional province_code with country_code returns only cities in that province.
         Requires migration 002_add_province_to_city.sql and seed with province_code."""
-        resp = client_with_customer.get("/api/v1/cities/?country_code=US")
+        resp = client_with_customer.get("/api/v1/cities?country_code=US")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         all_us = resp.json()
         assert isinstance(all_us, list)
         has_province = any(item.get("province_code") for item in all_us)
         if not has_province:
             pytest.skip("province_code not populated; run migration 002_add_province_to_city.sql and re-seed")
-        resp = client_with_customer.get("/api/v1/cities/?country_code=US&province_code=WA")
+        resp = client_with_customer.get("/api/v1/cities?country_code=US&province_code=WA")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) >= 1
@@ -89,14 +89,14 @@ class TestListCities:
     def test_province_filter_excludes_wrong_province(self, client_with_customer):
         """Florida cities do not include Seattle (Seattle is in Washington).
         Requires migration 002_add_province_to_city.sql and seed with province_code."""
-        resp = client_with_customer.get("/api/v1/cities/?country_code=US")
+        resp = client_with_customer.get("/api/v1/cities?country_code=US")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         all_us = resp.json()
         assert isinstance(all_us, list)
         has_province = any(item.get("province_code") for item in all_us)
         if not has_province:
             pytest.skip("province_code not populated; run migration 002_add_province_to_city.sql and re-seed")
-        resp = client_with_customer.get("/api/v1/cities/?country_code=US&province_code=FL")
+        resp = client_with_customer.get("/api/v1/cities?country_code=US&province_code=FL")
         assert resp.status_code == 200
         data = resp.json()
         city_names = [item["name"] for item in data]

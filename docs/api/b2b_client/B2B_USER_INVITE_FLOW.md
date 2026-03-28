@@ -162,7 +162,6 @@ The backend replaces `{code}` with the 6-digit code.
 |-----------------------------|-----------------------------------------------------------------------------|
 | B2B_INVITE_SET_PASSWORD_URL | URL template for the set-password link. Use `{code}` placeholder. Optional. |
 | B2B_FRONTEND_URL            | B2B app base URL. When `B2B_INVITE_SET_PASSWORD_URL` is not set, the link is `{B2B_FRONTEND_URL}/set-password?code={code}`. Local dev: `http://localhost:5173`. In production, set `B2B_INVITE_SET_PASSWORD_URL` explicitly. |
-| FRONTEND_URL                | B2C app base URL (e.g. `http://localhost:8081`). Used for password reset, signup verification, etc. Separate from B2B. |
 
 ---
 
@@ -175,5 +174,4 @@ The backend replaces `{code}` with the 6-digit code.
 
 ## Related Documentation
 
-- [PASSWORD_RECOVERY_CLIENT.md](../../shared_client/PASSWORD_RECOVERY_CLIENT.md) — Uses the same `POST /auth/reset-password` endpoint
-- [USER_AND_MARKET_API_CLIENT.md](../../shared_client/USER_AND_MARKET_API_CLIENT.md) — User create/update API details
+- [USER_MODEL_FOR_CLIENTS.md](../shared_client/USER_MODEL_FOR_CLIENTS.md) — Password reset (`§9`), user create/update, `market_id` / `market_ids`. Long-form password UI samples: [PASSWORD_RECOVERY_CLIENT.md](../../zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md)

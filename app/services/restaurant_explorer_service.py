@@ -157,14 +157,14 @@ def get_coworker_pickup_windows(
     return result
 
 
-def _compute_savings_pct(plate_price: float, plate_credit: int, credit_worth: float) -> int:
+def _compute_savings_pct(plate_price: float, plate_credit: int, credit_cost_local_currency: float) -> int:
     """
-    Compute savings percentage: (plate_price - plate_credit * credit_worth) / plate_price * 100.
+    Compute savings percentage: (plate_price - plate_credit * credit_cost_local_currency) / plate_price * 100.
     Clamped to [0, 100]. Returns 0 if plate_price <= 0.
     """
     if plate_price <= 0:
         return 0
-    raw = (plate_price - plate_credit * credit_worth) / plate_price * 100
+    raw = (plate_price - plate_credit * credit_cost_local_currency) / plate_price * 100
     return int(round(max(0.0, min(100.0, raw))))
 
 
@@ -357,7 +357,7 @@ def get_plates_for_restaurants(
     """
     Return map restaurant_id -> list of plates (plate_id, product_name, price, credit, kitchen_day,
     image_url from product_info). Savings are NOT read from DB; caller should compute from
-    price, credit, and user's credit_worth (see get_restaurants_by_city).
+    price, credit, and user's credit_cost_local_currency (see get_restaurants_by_city).
     Only non-archived plates with a matching plate_kitchen_day.
     """
     if not restaurant_ids or kitchen_day not in VALID_KITCHEN_DAYS:
@@ -399,7 +399,7 @@ def get_plates_for_restaurants(
             "kitchen_day": row["kitchen_day"],
             "image_url": (row.get("image_url") or "").strip() or None,
             "ingredients": (row.get("ingredients") or "").strip() or None,
-            "savings": 0,  # Set by get_restaurants_by_city from credit_worth
+            "savings": 0,  # Set by get_restaurants_by_city from credit_cost_local_currency
             "average_stars": None,
             "average_portion_size": None,
             "portion_size": "insufficient_reviews",
@@ -434,7 +434,7 @@ def get_restaurants_by_city(
     *,
     timezone_str: Optional[str] = None,
     kitchen_day: Optional[str] = None,
-    credit_worth: Optional[float] = None,
+    credit_cost_local_currency: Optional[float] = None,
     user_id: Optional[UUID] = None,
     employer_id: Optional[UUID] = None,
     employer_address_id: Optional[UUID] = None,
@@ -447,7 +447,7 @@ def get_restaurants_by_city(
     and restaurants list with restaurant_id, name, cuisine, lat, lng, etc.
     When timezone_str is set and kitchen_day is omitted, resolve next available kitchen day.
     When kitchen_day is set (or resolved), attach plates for that day to each restaurant.
-    credit_worth: optional plan credit worth (local currency per credit); when set, savings
+    credit_cost_local_currency: optional plan credit cost (local currency per credit); when set, savings
     are computed per plate; otherwise savings=0.
     user_id: optional; when set, favorites are surfaced at top and is_favorite set on items.
     employer_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
@@ -558,7 +558,7 @@ def get_restaurants_by_city(
             "has_coworker_request": False,
         })
 
-        # 3) Plates for resolved/requested kitchen_day; compute savings from credit_worth
+        # 3) Plates for resolved/requested kitchen_day; compute savings from credit_cost_local_currency
     if resolved_kitchen_day and restaurants:
         rest_ids = [r["restaurant_id"] for r in restaurants]
         plates_by_restaurant = get_plates_for_restaurants(rest_ids, resolved_kitchen_day, db)
@@ -566,8 +566,8 @@ def get_restaurants_by_city(
             plates = plates_by_restaurant.get(r["restaurant_id"]) or []
             for plate in plates:
                 plate["savings"] = (
-                    _compute_savings_pct(plate["price"], plate["credit"], credit_worth)
-                    if credit_worth is not None else 0
+                    _compute_savings_pct(plate["price"], plate["credit"], credit_cost_local_currency)
+                    if credit_cost_local_currency is not None else 0
                 )
             r["plates"] = plates
 

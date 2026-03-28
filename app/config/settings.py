@@ -1,5 +1,6 @@
 # config/settings.py
 import os
+from typing import List
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,8 +25,6 @@ class Settings(BaseSettings):
     B2B_INVITE_SET_PASSWORD_URL: str = ""
     # B2B app base URL (e.g. http://localhost:5173). Used for invite set-password links when B2B_INVITE_SET_PASSWORD_URL not set.
     B2B_FRONTEND_URL: str = ""
-    # B2C app base URL (e.g. http://localhost:8081). Used for password reset, signup verification, etc.
-    FRONTEND_URL: str = ""
 
     # Payment provider: "mock" (Stripe mock for dev) or "stripe" (live Stripe). Default mock for dev.
     PAYMENT_PROVIDER: str = "mock"
@@ -36,12 +35,29 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""  # Optional; for client-side Stripe Elements
+    # B2C Checkout Session (mode=setup): default success_url when POST body omits success_url
+    STRIPE_CUSTOMER_SETUP_SUCCESS_URL: str = ""
+    # Stripe Connect (supplier outbound payouts). SUPPLIER_PAYOUT_PROVIDER=stripe to activate.
+    STRIPE_CONNECT_WEBHOOK_SECRET: str = ""  # whsec_… from sandbox/live Connect webhook endpoint
+    STRIPE_PLATFORM_ACCOUNT_ID: str = ""    # acct_… of the Vianda platform account (optional; for logging)
 
     # Google API Keys per environment (read from .env only - never commit)
     # local and dev use GOOGLE_API_KEY_DEV; staging uses _STAGING; prod uses _PROD
     GOOGLE_API_KEY_DEV: str = ""
     GOOGLE_API_KEY_STAGING: str = ""
     GOOGLE_API_KEY_PROD: str = ""
+
+    # GCS Configuration (empty = use local storage)
+    GCS_INTERNAL_BUCKET: str = ""
+    GCS_SUPPLIER_BUCKET: str = ""
+    GCS_CUSTOMER_BUCKET: str = ""
+    GCS_EMPLOYER_BUCKET: str = ""
+    GCS_SIGNED_URL_EXPIRATION_SECONDS: int = 3600
+    GCS_QR_SIGNED_URL_EXPIRATION_SECONDS: int = 86400
+    GCS_SIGNING_SA_EMAIL: str = ""  # Cloud Run: set to run_sa email; local: empty = default creds
+
+    # Product image upload: max file size in bytes (default 5 MB)
+    MAX_PRODUCT_IMAGE_BYTES: int = 5 * 1024 * 1024
 
     # Fixed institution IDs (must match seed.sql). Override via env if seed uses different UUIDs.
     VIANDA_CUSTOMERS_INSTITUTION_ID: str = "22222222-2222-2222-2222-222222222222"
@@ -71,6 +87,10 @@ class Settings(BaseSettings):
 
     # Enable/disable automatic archival
     AUTO_ARCHIVAL_ENABLED: bool = True
+
+    # i18n: supported API/UI locales (ISO 639-1 short codes)
+    DEFAULT_LOCALE: str = "en"
+    SUPPORTED_LOCALES: List[str] = ["en", "es", "pt"]
 
 settings = Settings()
 

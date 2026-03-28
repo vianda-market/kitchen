@@ -21,7 +21,7 @@ cp .env.example .env
 
 # Run database (PostgreSQL via Docker or local)
 # See docs/database/ for schema setup
-# app/db/build_kitchen_db_dev.sh for dev rebuild
+# app/db/build_kitchen_db.sh for dev rebuild
 
 # Start API
 uvicorn application:app --reload --host 0.0.0.0 --port 8000

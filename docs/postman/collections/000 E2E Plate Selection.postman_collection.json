@@ -362,7 +362,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value\": 1400\n}",
+              "raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_local_currency\": 1400\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1023,7 +1023,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"Supplier\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"cellphone\": \"1234567890\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
+              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"Supplier\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"mobile_number\": \"+15005550006\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2184,7 +2184,6 @@
                   "// Prepare payload for restaurant holiday creation",
                   "const payload = {",
                   "    restaurant_id: restaurantId,",
-                  "    country: \"Argentina\",",
                   "    holiday_date: holidayDate,",
                   "    holiday_name: \"Restaurant Maintenance Day\",",
                   "    is_recurring: false",
@@ -2215,7 +2214,8 @@
                   "    pm.expect(body).to.have.property(\"restaurant_id\");",
                   "    pm.expect(body).to.have.property(\"holiday_date\");",
                   "    pm.expect(body).to.have.property(\"holiday_name\");",
-                  "    pm.expect(body).to.have.property(\"country\");",
+                  "    pm.expect(body).to.have.property(\"country_code\");",
+                  "    pm.expect(body).to.have.property(\"source\");",
                   "    pm.expect(body).to.have.property(\"is_recurring\");",
                   "    ",
                   "    // Store holiday_id for potential future use",
@@ -2238,7 +2238,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurant_id\": \"\",\n  \"country_code\": \"AR\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
+              "raw": "{\n  \"restaurant_id\": \"\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2720,7 +2720,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"cellphone\": \"9876543210\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_id\": \"{{planCityId}}\"\n}",
+              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"mobile_number\": \"+14155552671\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_id\": \"{{planCityId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

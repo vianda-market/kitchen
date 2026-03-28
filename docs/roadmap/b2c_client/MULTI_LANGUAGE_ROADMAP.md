@@ -88,4 +88,4 @@ For unauthenticated screens (login, signup, forgot password): use device locale 
 ## References
 
 - [B2C_ENDPOINTS_OVERVIEW.md](../api/backend/b2c_client/B2C_ENDPOINTS_OVERVIEW.md)
-- [USER_SELF_UPDATE_PATTERN.md](../api/backend/shared_client/USER_SELF_UPDATE_PATTERN.md)
+- [USER_MODEL_FOR_CLIENTS.md](../../api/shared_client/USER_MODEL_FOR_CLIENTS.md)

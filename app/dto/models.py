@@ -19,7 +19,7 @@ from typing import Optional, List
 from datetime import datetime, date
 from uuid import UUID
 from decimal import Decimal
-from app.config import Status, RoleType, RoleName, DiscretionaryReason
+from app.config import Status, RoleType, RoleName, DiscretionaryReason, BillPayoutStatus
 
 # =============================================================================
 # CORE ENTITY DTOs
@@ -36,12 +36,16 @@ class UserDTO(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[str] = None
-    cellphone: Optional[str] = None
+    mobile_number: Optional[str] = None
+    mobile_number_verified: bool = False
+    mobile_number_verified_at: Optional[datetime] = None
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
     employer_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
     market_id: UUID
     city_id: Optional[UUID] = None
-    stripe_customer_id: Optional[str] = None
+    locale: str = "en"
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -91,12 +95,13 @@ class ProductDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PlateDTO(BaseModel):
-    """Pure DTO for plate data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_worth. no_show_discount comes from institution."""
+    """Pure DTO for plate data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_cost_local_currency. no_show_discount comes from institution. expected_payout_local_currency set by DB trigger."""
     plate_id: UUID
     product_id: UUID
     restaurant_id: UUID
     price: Decimal
     credit: Decimal
+    expected_payout_local_currency: Decimal
     delivery_time_minutes: int
     is_archived: bool = False
     status: Status
@@ -169,8 +174,6 @@ class InstitutionBillDTO(BaseModel):
     status: Status
     resolution: str
     tax_doc_external_id: Optional[str] = None
-    stripe_payout_id: Optional[str] = None
-    payout_completed_at: Optional[datetime] = None
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -229,7 +232,8 @@ class CreditCurrencyDTO(BaseModel):
     credit_currency_id: UUID
     currency_name: str
     currency_code: str
-    credit_value: Decimal
+    credit_value_local_currency: Decimal
+    currency_conversion_usd: Decimal
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -474,7 +478,8 @@ class PlanDTO(BaseModel):
     name: str
     credit: int
     price: Decimal
-    credit_worth: Decimal  # price / credit (local currency per credit), set by DB trigger
+    credit_cost_local_currency: Decimal  # price / credit (local currency per credit), set by DB trigger
+    credit_cost_usd: Decimal  # credit_cost_local_currency / currency_conversion_usd, set by DB trigger
     rollover: bool
     rollover_cap: Optional[Decimal]
     is_archived: bool = False
@@ -498,12 +503,30 @@ class InstitutionEntityDTO(BaseModel):
     credit_currency_id: UUID
     tax_id: str
     name: str
+    stripe_connect_account_id: Optional[str] = None
     is_archived: bool = False
     status: Status
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InstitutionBillPayoutDTO(BaseModel):
+    """Pure DTO for a single payout attempt on a bill. Append-only — retries insert new rows."""
+    bill_payout_id: UUID
+    institution_bill_id: UUID
+    provider: str
+    provider_transfer_id: Optional[str] = None
+    amount: Decimal
+    currency_code: str
+    status: BillPayoutStatus
+    idempotency_key: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    modified_by: Optional[UUID] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -524,6 +547,22 @@ class PaymentMethodDTO(BaseModel):
     is_archived: bool
     status: Status = Field(..., max_length=20)
     is_default: bool
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserPaymentProviderDTO(BaseModel):
+    """Pure DTO for a user's connected external payment provider account."""
+    user_payment_provider_id: UUID
+    user_id: UUID
+    provider: str
+    provider_customer_id: str
+    is_archived: bool = False
+    status: str
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -583,13 +622,15 @@ class RestaurantHolidaysDTO(BaseModel):
     """Pure DTO for restaurant holidays data"""
     holiday_id: UUID
     restaurant_id: UUID
-    country: str = Field(..., max_length=100)
+    country_code: str = Field(..., max_length=3)
     holiday_date: date
-    holiday_name: Optional[str] = Field(None, max_length=100)
+    holiday_name: str = Field(..., max_length=100)
     is_recurring: bool = False
-    recurring_month_day: Optional[str] = Field(None, max_length=10)
+    recurring_month: Optional[int] = Field(None, ge=1, le=12)
+    recurring_day: Optional[int] = Field(None, ge=1, le=31)
     status: Status
     is_archived: bool
+    source: str = Field(default="manual", max_length=20)
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -608,6 +649,7 @@ class NationalHolidayDTO(BaseModel):
     recurring_day: Optional[int] = Field(None, ge=1, le=31)
     status: Status = Field(default="Active", description="Status of the holiday (defaults to 'Active' if not set)")
     is_archived: bool = False
+    source: str = Field(default="manual", max_length=20)
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID

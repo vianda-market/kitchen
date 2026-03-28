@@ -33,11 +33,13 @@ Institution (supplier) payment follows a **settlement → bill → payout** flow
 
 ## Pipeline entry point
 
-- **Service:** `InstitutionBillingService.run_daily_settlement_bill_and_payout(bill_date, system_user_id, country_code, connection=None)`  
-  Runs Phase 1 → Phase 2 → for each bill: tax doc → payout → set payout fields → mark_paid. Uses one connection; commits after each mark_paid (or once at end if no bills).
+- **Service:** `InstitutionBillingService.run_daily_settlement_bill_and_payout(bill_date, system_user_id, country_code=None, location_id=None, connection=None)`  
+  Runs Phase 1 → Phase 2 → for each bill: tax doc → payout → set payout fields → mark_paid. When `location_id` is provided, only restaurants in that location's timezone are processed (e.g. US-Pacific for LA kitchens).
 
-- **Cron:** `app.services.cron.billing_events.run_daily_settlement_bill_and_payout(bill_date=None, country_code=None)`  
-  Intended to be scheduled (e.g. 3:30 PM local or configurable). Uses a system user and optional `bill_date` (default: yesterday) and `country_code`.
+- **Cron (location-based):** `app.services.cron.billing_events.multi_market_billing_entry(location_id=None)`  
+  When `location_id` is provided (e.g. `"AR"`, `"US-Pacific"`), processes only that location. When `None`, iterates all locations (AR, PE, US-Eastern, US-Central, US-Mountain, US-Pacific). Use for GCP Cloud Scheduler per-location jobs.
+
+- **Cron (legacy):** `run_daily_settlement_bill_and_payout`, `run_kitchen_day_closure_billing`, `run_daily_billing` — support `country_code` for market-level runs. For US multi-timezone, use `multi_market_billing_entry(location_id)` instead.
 
 - **API (manual/test):** `POST /api/v1/institution-bills/run-settlement-pipeline?bill_date=YYYY-MM-DD&country_code=XX`  
   Triggers the same pipeline; use for testing or one-off runs. Requires auth. Query params: `bill_date` (default: today), `country_code` (optional; auto-detected if omitted).
@@ -87,5 +89,10 @@ The E2E collection step **Generate daily restaurant settlement (pipeline)** runs
 - **Billing:** `app/services/billing/institution_billing.py` — Phase 1 (`run_phase1_settlements`), Phase 2 (`run_phase2_bills_and_payout`), pipeline (`run_daily_settlement_bill_and_payout`), report helpers.
 - **Tax doc:** `app/services/billing/tax_doc_service.py` — `issue_tax_doc_for_bill` (stub).
 - **Payout:** `app/services/supplier_payout/` — `trigger_payout` (mock in `mock.py`; live stub in `stripe_payout.py`).
-- **Cron:** `app/services/cron/billing_events.py` — `run_daily_settlement_bill_and_payout`.
+- **Cron:** `app/services/cron/billing_events.py` — `multi_market_billing_entry(location_id)`, `run_billing_for_location(location_id)`, `run_daily_settlement_bill_and_payout`.
 - **CRUD:** `app/services/crud_service.py` — `institution_settlement_service`, `get_settlements_by_run_id`, `get_settlements_by_entity_and_period`, `institution_bill_service` (create, update, mark_paid).
+
+## Related docs
+
+- [RESTAURANT_PAYMENT_FLOW_AND_APIS.md](RESTAURANT_PAYMENT_FLOW_AND_APIS.md) — Credit/currency model → balance → settlement → bill → Stripe payout; APIs; investigation of balance units vs `final_amount`.
+- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — Credit values, plan pricing, plate payouts.

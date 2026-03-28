@@ -137,7 +137,7 @@ func fetchCuisines() async throws -> [String] {
 
 ## Related Documentation
 
-- [RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY](../b2b_client/RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md) – Restaurant create/update, institution context
+- [CREDIT_AND_CURRENCY_CLIENT](CREDIT_AND_CURRENCY_CLIENT.md) – Restaurant create/update, institution context, currency from market
 - [PROVINCES_API_CLIENT](PROVINCES_API_CLIENT.md) – Similar pattern for address cascading dropdowns
 
 ---

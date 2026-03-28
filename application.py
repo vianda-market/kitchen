@@ -8,6 +8,7 @@ load_dotenv(dotenv_path=_env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from app.auth.middleware.permission_cache import PermissionCacheMiddleware
@@ -63,11 +64,32 @@ from app.routes.cuisines import router as cuisines_router
 # Leads (unauthenticated, rate-limited)
 from app.routes.leads import router as leads_router
 
-# Customer payment methods (B2C, mock for UI dev)
+# Phone pre-validation (unauthenticated, real-time form feedback)
+from app.routes.phone import router as phone_router
+
+# Customer payment methods and providers (B2C, mock for UI dev)
 from app.routes.customer.payment_methods import router as customer_payment_methods_router
+from app.routes.customer.payment_providers import router as customer_payment_providers_router
 
 # Configure logging - using the custom logger from app.utils.log
 from app.utils.log import logger
+
+
+class ContentLanguageMiddleware(BaseHTTPMiddleware):
+    """Header-only locale hint for clients (Accept-Language); not DB-backed."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        accept_language = request.headers.get("Accept-Language", "") or ""
+        locale = "en"
+        for lang in accept_language.replace(" ", "").split(","):
+            code = lang.split(";")[0].split("-")[0].lower()
+            if code in {"en", "es", "pt"}:
+                locale = code
+                break
+        response.headers["X-Content-Language"] = locale
+        return response
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -158,6 +180,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],  # Allow all methods
         allow_headers=["*"],  # Allow all headers
     )
+
+    # Order: last registered runs first on the request. Target: PermissionCache (outer) -> ContentLanguage -> CORS -> app.
+    app.add_middleware(ContentLanguageMiddleware)
 
     # Add permission cache middleware
     app.add_middleware(PermissionCacheMiddleware)
@@ -345,16 +370,22 @@ def create_app() -> FastAPI:
     v1_leads_router.include_router(leads_router)
     app.include_router(v1_leads_router)
 
+    # Phone pre-validation (versioned; no auth, real-time form feedback)
+    v1_phone_router = create_versioned_router("api", ["Phone"], APIVersion.V1)
+    v1_phone_router.include_router(phone_router)
+    app.include_router(v1_phone_router)
+
     # Webhooks (Stripe payment_intent.succeeded; no auth, verified via Stripe-Signature)
     from app.routes.webhooks import router as webhooks_router
     v1_webhooks_router = create_versioned_router("api", ["Webhooks"], APIVersion.V1)
     v1_webhooks_router.include_router(webhooks_router)
     app.include_router(v1_webhooks_router)
 
-    # Customer router (B2C payment method management; mock endpoints for UI dev)
+    # Customer router (B2C payment method and provider management; mock endpoints for UI dev)
     from fastapi import APIRouter
     customer_router = APIRouter(prefix="/customer", tags=["Customer"])
     customer_router.include_router(customer_payment_methods_router)
+    customer_router.include_router(customer_payment_providers_router)
     v1_customer_router = create_versioned_router("api", ["Customer"], APIVersion.V1)
     v1_customer_router.include_router(customer_router)
     app.include_router(v1_customer_router)
@@ -365,6 +396,12 @@ def create_app() -> FastAPI:
     v1_enums_router.include_router(enums_router)
     app.include_router(v1_enums_router)
     
+    # User payment summary (Internal only — employee portal for reviewing customer payment status)
+    from app.routes.admin.user_payment_summary import router as user_payment_summary_router
+    v1_user_payment_summary_router = create_versioned_router("api", ["User Payment Summary"], APIVersion.V1)
+    v1_user_payment_summary_router.include_router(user_payment_summary_router)
+    app.include_router(v1_user_payment_summary_router)
+
     # Admin Discretionary router (versioned)
     from app.routes.admin.discretionary import router as admin_discretionary_router
     v1_admin_discretionary_router = create_versioned_router("api", ["Admin Discretionary"], APIVersion.V1)

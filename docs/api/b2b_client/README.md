@@ -1,6 +1,6 @@
 # B2B Client Documentation (kitchen-web)
 
-**Last Updated**: 2026-02-10  
+**Last Updated**: 2026-03-19  
 **Audience**: kitchen-web (Restaurant + Employee)
 
 B2B-specific docs. **Copy with shared_client/** – see [../shared_client/README.md](../shared_client/README.md).
@@ -21,26 +21,24 @@ cp -r docs/api/b2b_client /path/to/kitchen-web/docs/api/
 | EMPLOYER_ASSIGNMENT_WORKFLOW.md | Backoffice employer management |
 | EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md | Employer address protection (Customers 403); Cities API; `city_id` filter |
 | ROLE_AND_FIELD_ACCESS_CLIENT.md | Role/field access for B2B |
-| PLAN_API_MARKET_CURRENCY.md | Plan create/update: no credit_currency_id; currency from market |
-| RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md | Restaurant and institution entity create: no credit_currency_id; derived from entity address → market |
+| (CREDIT_AND_CURRENCY_CLIENT in shared_client) | Credit currency create/edit, plan/restaurant/entity currency from market, plate payouts, B2C savings |
 | DISCRETIONARY_REQUEST_FORM_GUIDE.md | Discretionary credit requests |
 | CHANGE_PASSWORD_AND_ADMIN_RESET.md | Password change, admin reset |
 | (MARKET_SCOPE_FOR_CLIENTS in shared_client) | Markets API and market scope – shared |
-| PASSWORD_RECOVERY_CLIENT.md | Password recovery |
-| [USERNAME_RECOVERY.md](../shared_client/USERNAME_RECOVERY.md) | Username recovery (forgot username) |
+| **USER_MODEL_FOR_CLIENTS.md** (shared_client) | **User model:** roles, **`mobile_number` (E.164)**, `/users/me`, markets, forgot-username, password recovery. Long UI samples: [zArchive/.../PASSWORD_RECOVERY_CLIENT.md](../../zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md) |
 | (ENUM_SERVICE_API in shared_client) | Enum service – shared |
 | TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md | Timezone deduction UI |
 | TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md | Timezone deduction |
-| [SUPPORTED_CURRENCIES_API.md](./SUPPORTED_CURRENCIES_API.md) | Supported currencies list (dropdown); credit currency create with currency_name only (backend assigns currency_code). |
 | [PRODUCT_API_B2B.md](./PRODUCT_API_B2B.md) | Product CRUD, image upload (1 upload → 2 stored: thumbnail + full-size); enriched returns both image sizes for suppliers. |
 | feedback_from_client/ | B2B team feedback (addressed items moved to [zArchive/api/b2b_client](../../zArchive/api/b2b_client/)) |
 | [PAYMENT_METHOD_CHANGES_B2B](./PAYMENT_METHOD_CHANGES_B2B.md) | **B2B:** Institution bank account and fintech links removed; subscription payment flow; migration checklist. |
 | [QR_CODE_B2B.md](./QR_CODE_B2B.md) | **B2B:** QR code create flow (restaurant only), display (print vs screen), relationship to restaurant activation. |
 | [SUPPLIER_DASHBOARD_METRICS_B2B.md](./SUPPLIER_DASHBOARD_METRICS_B2B.md) | **B2B:** Supplier dashboard metrics: reservations by plate, live locked, people waiting, plates delivered, daily balance, average portion size, average plate rating. |
+| [NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md](./NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md) | **Internal only:** National holidays (country-wide), Nager.Date import, **`POST .../sync-from-provider`** for manual refresh button, CRUD/bulk for gaps. |
 | [PAYMENT_AND_BILLING_CLIENT_CHANGES](../shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md) | **Shared:** Payment atomic with billing; remove fintech link pages/modals and manual bill create/process flows. |
 
 ## Shared Docs (from shared_client/)
 
-API_PERMISSIONS_BY_ROLE, USER_SELF_UPDATE_PATTERN, ENRICHED_ENDPOINT_PATTERN, ARCHIVED_RECORDS_PATTERN, SCOPING_BEHAVIOR_FOR_UI, BULK_API_PATTERN, ENRICHED_ENDPOINT_UI_IMPLEMENTATION, **ADDRESSES_API_CLIENT** (includes **address types by role**: restrict create/edit address forms to allowed types per role to avoid 403 and poor UX), PLANS_FILTER_CLIENT_INTEGRATION, MARKET_BASED_SUBSCRIPTIONS, MARKET_MIGRATION_GUIDE, PLATE_API_CLIENT (plate pickup pending, plate selection, enriched endpoint).
+API_PERMISSIONS_BY_ROLE, **USER_MODEL_FOR_CLIENTS** (replaces USER_SELF_UPDATE_PATTERN and related user docs), ENRICHED_ENDPOINT_PATTERN, ARCHIVED_RECORDS_PATTERN, SCOPING_BEHAVIOR_FOR_UI, BULK_API_PATTERN, ENRICHED_ENDPOINT_UI_IMPLEMENTATION, **ADDRESSES_API_CLIENT** (includes **address types by role**: restrict create/edit address forms to allowed types per role to avoid 403 and poor UX), **CREDIT_AND_CURRENCY_CLIENT** (credit currency, plan/restaurant/entity currency from market, plate payouts, B2C savings), PLANS_FILTER_CLIENT_INTEGRATION, MARKET_BASED_SUBSCRIPTIONS, MARKET_MIGRATION_GUIDE, PLATE_API_CLIENT (plate pickup pending, plate selection, enriched endpoint).
 
 Links use `../shared_client/FILE.md` – works when shared_client and b2b_client folders exist in docs/api/.

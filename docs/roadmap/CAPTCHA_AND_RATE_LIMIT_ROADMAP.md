@@ -39,4 +39,4 @@ This roadmap covers human verification (e.g. CAPTCHA) and rate limiting across e
 
 ## Related
 
-- [LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md](./LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md) – Lead endpoints rate limit and human-check plan.
+- [LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md](../zArchive/roadmap/LEAD_RATE_LIMIT_AND_HUMAN_CHECK.md) – Lead endpoints rate limit and human-check plan (archived).
