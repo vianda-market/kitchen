@@ -16,53 +16,73 @@ def client():
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _clear_markets_cache():
+    """Reset the leads markets cache before each test."""
+    leads._markets_cache.clear()
+    yield
+    leads._markets_cache.clear()
+
+
 class TestLeadsMarketsEndpoint:
     """GET /api/v1/leads/markets."""
 
-    @patch("app.routes.leads.market_service")
-    def test_200_returns_country_code_and_country_name_only(self, mock_market_service, client):
-        """Response has country_code and country_name only; no market_id."""
-        mock_market_service.get_all.return_value = [
-            {"market_id": "11111111-1111-1111-1111-111111111111", "country_code": "AR", "country_name": "Argentina"},
-            {"market_id": "22222222-2222-2222-2222-222222222222", "country_code": "US", "country_name": "United States"},
+    @patch("app.routes.leads.get_markets_with_coverage")
+    def test_200_returns_public_market_fields_only(self, mock_coverage, client):
+        """Response has public market fields (country_code, country_name, language, phone, locale); no market_id."""
+        mock_coverage.return_value = [
+            {"country_code": "AR", "country_name": "Argentina", "language": "es", "phone_dial_code": "+54", "phone_local_digits": 10},
+            {"country_code": "US", "country_name": "United States", "language": "en", "phone_dial_code": "+1", "phone_local_digits": 10},
         ]
-        with patch("app.routes.leads.is_global_market", return_value=False):
-            resp = client.get("/api/v1/leads/markets")
+        resp = client.get("/api/v1/leads/markets")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 2
-        assert data[0] == {"country_code": "AR", "country_name": "Argentina"}
-        assert data[1] == {"country_code": "US", "country_name": "United States"}
+        assert data[0]["country_code"] == "AR"
+        assert data[0]["country_name"] == "Argentina"
+        assert data[0]["language"] == "es"
+        assert data[0]["locale"] == "es-AR"
+        assert data[1]["country_code"] == "US"
+        assert data[1]["locale"] == "en-US"
         assert "market_id" not in data[0]
         assert "market_id" not in data[1]
 
     @patch("app.routes.leads.market_service")
-    @patch("app.routes.leads._available_markets_cache", None)
-    @patch("app.routes.leads._available_markets_cache_expiry", 0)
-    def test_excludes_global_marketplace(self, mock_market_service, client):
-        """Global Marketplace is excluded from public list."""
+    def test_excludes_global_marketplace_supplier_audience(self, mock_market_service, client):
+        """Global Marketplace is excluded from supplier audience list."""
         mock_market_service.get_all.return_value = [
-            {"market_id": "00000000-0000-0000-0000-000000000001", "country_code": "GL", "country_name": "Global"},
-            {"market_id": "11111111-1111-1111-1111-111111111111", "country_code": "AR", "country_name": "Argentina"},
+            {"market_id": "00000000-0000-0000-0000-000000000001", "country_code": "GL", "country_name": "Global", "language": "en"},
+            {"market_id": "11111111-1111-1111-1111-111111111111", "country_code": "AR", "country_name": "Argentina", "language": "es"},
         ]
 
         def is_global(m_id):
             return str(m_id) == "00000000-0000-0000-0000-000000000001"
 
         with patch("app.routes.leads.is_global_market", side_effect=is_global):
-            resp = client.get("/api/v1/leads/markets")
+            resp = client.get("/api/v1/leads/markets", params={"audience": "supplier"})
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
-        assert data[0] == {"country_code": "AR", "country_name": "Argentina"}
+        assert data[0]["country_code"] == "AR"
+        assert data[0]["country_name"] == "Argentina"
+        assert data[0]["locale"] == "es-AR"
 
-    @patch("app.routes.leads.market_service")
-    def test_no_auth_required(self, mock_market_service, client):
+    @patch("app.routes.leads.get_markets_with_coverage")
+    def test_no_auth_required(self, mock_coverage, client):
         """Endpoint works without Authorization header."""
-        mock_market_service.get_all.return_value = []
-        with patch("app.routes.leads.is_global_market", return_value=False):
-            resp = client.get("/api/v1/leads/markets")
+        mock_coverage.return_value = []
+        resp = client.get("/api/v1/leads/markets")
         assert resp.status_code == 200
+
+    @patch("app.routes.leads.get_markets_with_coverage")
+    def test_unknown_audience_defaults_to_coverage_filtered(self, mock_coverage, client):
+        """Unknown audience value falls back to coverage-filtered (restrictive default)."""
+        mock_coverage.return_value = [
+            {"country_code": "AR", "country_name": "Argentina", "language": "es", "phone_dial_code": "+54", "phone_local_digits": 10},
+        ]
+        resp = client.get("/api/v1/leads/markets", params={"audience": "garbage"})
+        assert resp.status_code == 200
+        mock_coverage.assert_called_once()  # coverage path, not get_all
 
 
 class TestZipcodeMetricsEndpoint:

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">You're missing out on Vianda</h1>
+<p>Hi {{ user_first_name }},</p>
+<p>We noticed you haven't subscribed yet. Restaurants in your area are serving fresh plates every day — and you're missing out!</p>
+<p>Subscribing takes less than a minute. Open the Vianda app, pick a plan, and start ordering today.</p>
+{% if app_deep_link %}
+<p style="margin: 25px 0;">
+    <a href="{{ app_deep_link }}" style="background-color: #4a7c59; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Open in Vianda</a>
+</p>
+{% endif %}
+<p style="margin: 10px 0; font-size: 14px; color: #7f8c8d;">
+    <a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">Questions? Reply to this email — we're happy to help.</p>
+{% endblock %}

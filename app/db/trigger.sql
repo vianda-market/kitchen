@@ -19,7 +19,8 @@ BEGIN
         name,
         institution_type,
         market_id,
-        no_show_discount,
+        support_email_suppressed_until,
+        last_support_email_date,
         is_archived,
         status,
         created_date,
@@ -35,7 +36,8 @@ BEGIN
         NEW.name,
         NEW.institution_type,
         NEW.market_id,
-        NEW.no_show_discount,
+        NEW.support_email_suppressed_until,
+        NEW.last_support_email_date,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -86,6 +88,8 @@ BEGIN
         mobile_number_verified_at,
         email_verified,
         email_verified_at,
+        support_email_suppressed_until,
+        last_support_email_date,
         market_id,
         city_id,
         locale,
@@ -114,6 +118,8 @@ BEGIN
         NEW.mobile_number_verified_at,
         NEW.email_verified,
         NEW.email_verified_at,
+        NEW.support_email_suppressed_until,
+        NEW.last_support_email_date,
         NEW.market_id,
         NEW.city_id,
         NEW.locale,
@@ -177,7 +183,9 @@ BEGIN
         credit_currency_id,
         tax_id,
         name,
-        stripe_connect_account_id,
+        payout_provider_account_id,
+        payout_aggregator,
+        payout_onboarding_status,
         is_archived,
         status,
         created_date,
@@ -195,7 +203,9 @@ BEGIN
         NEW.credit_currency_id,
         NEW.tax_id,
         NEW.name,
-        NEW.stripe_connect_account_id,
+        NEW.payout_provider_account_id,
+        NEW.payout_aggregator,
+        NEW.payout_onboarding_status,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -351,6 +361,68 @@ AFTER INSERT OR UPDATE ON core.geolocation_info
 FOR EACH ROW
 EXECUTE FUNCTION geolocation_history_trigger_func();
 
+-- Trigger function for ops.cuisine history logging
+CREATE OR REPLACE FUNCTION cuisine_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.cuisine_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE cuisine_id = OLD.cuisine_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.cuisine_history (
+        event_id,
+        cuisine_id,
+        cuisine_name,
+        cuisine_name_i18n,
+        slug,
+        parent_cuisine_id,
+        description,
+        origin_source,
+        display_order,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.cuisine_id,
+        NEW.cuisine_name,
+        NEW.cuisine_name_i18n,
+        NEW.slug,
+        NEW.parent_cuisine_id,
+        NEW.description,
+        NEW.origin_source,
+        NEW.display_order,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS cuisine_history_trigger ON ops.cuisine;
+CREATE TRIGGER cuisine_history_trigger
+AFTER INSERT OR UPDATE ON ops.cuisine
+FOR EACH ROW
+EXECUTE FUNCTION cuisine_history_trigger_func();
+
 -- Trigger function for ops.restaurant_info history logging
 CREATE OR REPLACE FUNCTION restaurant_history_trigger_func()
 RETURNS TRIGGER AS $$
@@ -358,7 +430,6 @@ DECLARE
     new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
-        -- Mark the previous history record for this restaurant as not current
         UPDATE audit.restaurant_history
         SET is_current = FALSE,
             valid_until = CURRENT_TIMESTAMP
@@ -372,8 +443,20 @@ BEGIN
         institution_entity_id,
         address_id,
         name,
-        cuisine,
+        cuisine_id,
         pickup_instructions,
+        tagline,
+        tagline_i18n,
+        is_featured,
+        cover_image_url,
+        average_rating,
+        review_count,
+        verified_badge,
+        spotlight_label,
+        spotlight_label_i18n,
+        member_perks,
+        member_perks_i18n,
+        require_kiosk_code_verification,
         is_archived,
         status,
         created_date,
@@ -390,8 +473,20 @@ BEGIN
         NEW.institution_entity_id,
         NEW.address_id,
         NEW.name,
-        NEW.cuisine,
+        NEW.cuisine_id,
         NEW.pickup_instructions,
+        NEW.tagline,
+        NEW.tagline_i18n,
+        NEW.is_featured,
+        NEW.cover_image_url,
+        NEW.average_rating,
+        NEW.review_count,
+        NEW.verified_badge,
+        NEW.spotlight_label,
+        NEW.spotlight_label_i18n,
+        NEW.member_perks,
+        NEW.member_perks_i18n,
+        NEW.require_kiosk_code_verification,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -406,7 +501,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create the trigger on ops.restaurant_info
 DROP TRIGGER IF EXISTS restaurant_history_trigger ON ops.restaurant_info;
 CREATE TRIGGER restaurant_history_trigger
 AFTER INSERT OR UPDATE ON ops.restaurant_info
@@ -432,7 +526,11 @@ BEGIN
         product_id,
         institution_id,
         name,
+        name_i18n,
         ingredients,
+        ingredients_i18n,
+        description,
+        description_i18n,
         dietary,
         is_archived,
         status,
@@ -453,7 +551,11 @@ BEGIN
         NEW.product_id,
         NEW.institution_id,
         NEW.name,
+        NEW.name_i18n,
         NEW.ingredients,
+        NEW.ingredients_i18n,
+        NEW.description,
+        NEW.description_i18n,
         NEW.dietary,
         NEW.is_archived,
         NEW.status,
@@ -713,8 +815,16 @@ BEGIN
         plan_id,
         market_id,
         name,
+        name_i18n,
+        marketing_description,
+        marketing_description_i18n,
+        features,
+        features_i18n,
+        cta_label,
+        cta_label_i18n,
         credit,
         price,
+        highlighted,
         credit_cost_local_currency,
         credit_cost_usd,
         rollover,
@@ -733,8 +843,16 @@ BEGIN
         NEW.plan_id,
         NEW.market_id,
         NEW.name,
+        NEW.name_i18n,
+        NEW.marketing_description,
+        NEW.marketing_description_i18n,
+        NEW.features,
+        NEW.features_i18n,
+        NEW.cta_label,
+        NEW.cta_label_i18n,
         NEW.credit,
         NEW.price,
+        NEW.highlighted,
         NEW.credit_cost_local_currency,
         NEW.credit_cost_usd,
         NEW.rollover,
@@ -785,6 +903,7 @@ BEGIN
         subscription_status,
         hold_start_date,
         hold_end_date,
+        early_renewal_threshold,
         is_archived,
         status,
         created_date,
@@ -805,6 +924,7 @@ BEGIN
         NEW.subscription_status,
         NEW.hold_start_date,
         NEW.hold_end_date,
+        NEW.early_renewal_threshold,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -1118,6 +1238,82 @@ CREATE TRIGGER institution_settlement_history_trigger
 AFTER INSERT OR UPDATE ON billing.institution_settlement
 FOR EACH ROW
 EXECUTE FUNCTION institution_settlement_history_trigger_func();
+
+-- Trigger function for billing.supplier_invoice history logging
+CREATE OR REPLACE FUNCTION supplier_invoice_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.supplier_invoice_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE supplier_invoice_id = OLD.supplier_invoice_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.supplier_invoice_history (
+        event_id,
+        supplier_invoice_id,
+        institution_entity_id,
+        country_code,
+        invoice_type,
+        external_invoice_number,
+        issued_date,
+        amount,
+        currency_code,
+        tax_amount,
+        tax_rate,
+        document_storage_path,
+        document_format,
+        status,
+        rejection_reason,
+        reviewed_by,
+        reviewed_at,
+        is_archived,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.supplier_invoice_id,
+        NEW.institution_entity_id,
+        NEW.country_code,
+        NEW.invoice_type,
+        NEW.external_invoice_number,
+        NEW.issued_date,
+        NEW.amount,
+        NEW.currency_code,
+        NEW.tax_amount,
+        NEW.tax_rate,
+        NEW.document_storage_path,
+        NEW.document_format,
+        NEW.status,
+        NEW.rejection_reason,
+        NEW.reviewed_by,
+        NEW.reviewed_at,
+        NEW.is_archived,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS supplier_invoice_history_trigger ON billing.supplier_invoice;
+CREATE TRIGGER supplier_invoice_history_trigger
+AFTER INSERT OR UPDATE ON billing.supplier_invoice
+FOR EACH ROW
+EXECUTE FUNCTION supplier_invoice_history_trigger_func();
 
 -- Trigger function for core.credit_currency_info history logging
 CREATE OR REPLACE FUNCTION credit_currency_history_trigger_func()
@@ -1620,3 +1816,159 @@ CREATE TRIGGER user_payment_provider_history_trigger
 AFTER INSERT OR UPDATE ON customer.user_payment_provider
 FOR EACH ROW
 EXECUTE FUNCTION user_payment_provider_history_trigger_func();
+
+-- =============================================================================
+-- Employer Benefits Program history trigger
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION employer_benefits_program_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.employer_benefits_program_history
+        SET is_current = FALSE, valid_until = CURRENT_TIMESTAMP
+        WHERE program_id = OLD.program_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.employer_benefits_program_history (
+        event_id, program_id, institution_id,
+        benefit_rate, benefit_cap, benefit_cap_period,
+        price_discount, minimum_monthly_fee,
+        billing_cycle, billing_day, billing_day_of_week,
+        enrollment_mode, allow_early_renewal,
+        stripe_customer_id, stripe_payment_method_id, payment_method_type,
+        is_active, is_archived, status,
+        created_date, created_by, modified_by, modified_date,
+        is_current, valid_until
+    )
+    VALUES (
+        new_event_id, NEW.program_id, NEW.institution_id,
+        NEW.benefit_rate, NEW.benefit_cap, NEW.benefit_cap_period,
+        NEW.price_discount, NEW.minimum_monthly_fee,
+        NEW.billing_cycle, NEW.billing_day, NEW.billing_day_of_week,
+        NEW.enrollment_mode, NEW.allow_early_renewal,
+        NEW.stripe_customer_id, NEW.stripe_payment_method_id, NEW.payment_method_type,
+        NEW.is_active, NEW.is_archived, NEW.status,
+        NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date,
+        TRUE, 'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS employer_benefits_program_history_trigger ON core.employer_benefits_program;
+CREATE TRIGGER employer_benefits_program_history_trigger
+AFTER INSERT OR UPDATE ON core.employer_benefits_program
+FOR EACH ROW
+EXECUTE FUNCTION employer_benefits_program_history_trigger_func();
+
+-- =============================================================================
+-- Employer Bill history trigger
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION employer_bill_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.employer_bill_history
+        SET is_current = FALSE, valid_until = CURRENT_TIMESTAMP
+        WHERE employer_bill_id = OLD.employer_bill_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.employer_bill_history (
+        event_id, employer_bill_id, institution_id,
+        billing_period_start, billing_period_end, billing_cycle,
+        total_renewal_events, gross_employer_share,
+        price_discount, discounted_amount,
+        minimum_fee_applied, billed_amount,
+        currency_code, stripe_invoice_id,
+        payment_status, paid_date,
+        is_archived, status,
+        created_date, created_by, modified_by, modified_date,
+        is_current, valid_until
+    )
+    VALUES (
+        new_event_id, NEW.employer_bill_id, NEW.institution_id,
+        NEW.billing_period_start, NEW.billing_period_end, NEW.billing_cycle,
+        NEW.total_renewal_events, NEW.gross_employer_share,
+        NEW.price_discount, NEW.discounted_amount,
+        NEW.minimum_fee_applied, NEW.billed_amount,
+        NEW.currency_code, NEW.stripe_invoice_id,
+        NEW.payment_status, NEW.paid_date,
+        NEW.is_archived, NEW.status,
+        NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date,
+        TRUE, 'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS employer_bill_history_trigger ON billing.employer_bill;
+CREATE TRIGGER employer_bill_history_trigger
+AFTER INSERT OR UPDATE ON billing.employer_bill
+FOR EACH ROW
+EXECUTE FUNCTION employer_bill_history_trigger_func();
+
+-- Trigger function for billing.supplier_terms history logging
+CREATE OR REPLACE FUNCTION supplier_terms_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.supplier_terms_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE supplier_terms_id = OLD.supplier_terms_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.supplier_terms_history (
+        event_id,
+        supplier_terms_id,
+        institution_id,
+        no_show_discount,
+        payment_frequency,
+        require_invoice,
+        invoice_hold_days,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.supplier_terms_id,
+        NEW.institution_id,
+        NEW.no_show_discount,
+        NEW.payment_frequency,
+        NEW.require_invoice,
+        NEW.invoice_hold_days,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS supplier_terms_history_trigger ON billing.supplier_terms;
+CREATE TRIGGER supplier_terms_history_trigger
+AFTER INSERT OR UPDATE ON billing.supplier_terms
+FOR EACH ROW
+EXECUTE FUNCTION supplier_terms_history_trigger_func();

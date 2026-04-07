@@ -13,12 +13,13 @@ from app.schemas.billing.institution_bill import (
 )
 from app.schemas.consolidated_schemas import InstitutionBillEnrichedResponseSchema
 from app.security.entity_scoping import EntityScopingService, ENTITY_INSTITUTION_BILL
-from fastapi import Query
+from fastapi import Query, Response
 from app.services.billing.institution_billing import InstitutionBillingService
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_error
 from app.services.error_handling import handle_business_operation, handle_get_by_id, handle_get_all, handle_update, handle_delete
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 router = APIRouter(prefix="/institution-bills", tags=["Institution Bills"])
@@ -68,6 +69,8 @@ def get_institution_bills(
 
 @router.get("/enriched", response_model=List[InstitutionBillEnrichedResponseSchema])
 def get_enriched_institution_bills_endpoint(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -78,16 +81,20 @@ def get_enriched_institution_bills_endpoint(
     - Internal: See all institution bills
     - Suppliers: See bills for restaurants in their institution
     - Customers: See bills for restaurants in their institution (if applicable)"""
-    
+
     def _get_enriched_bills():
         scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_BILL, current_user)
         return get_enriched_institution_bills(
             db,
             scope=scope,
-            include_archived=False
+            include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
-    
-    return handle_business_operation(_get_enriched_bills, "enriched institution bills retrieval")
+
+    result = handle_business_operation(_get_enriched_bills, "enriched institution bills retrieval")
+    set_pagination_headers(response, result)
+    return result
 
 @router.get("/{bill_id}", response_model=InstitutionBillResponseSchema)
 def get_institution_bill(

@@ -44,3 +44,29 @@ def merge_subscription_token_claims(
                 token_data["subscription_market_id"] = str(subscription.market_id)
     except Exception:
         pass
+
+
+def merge_onboarding_token_claims(
+    token_data: Dict[str, Any],
+    db: psycopg2.extensions.connection,
+) -> None:
+    """
+    Add onboarding_status claim for Supplier/Employer/Customer users.
+    Values: not_started, in_progress, complete (never stalled — that's internal-only).
+    Mutates token_data in place.
+    """
+    role_type = token_data.get("role_type")
+    if role_type == "Internal":
+        return
+
+    try:
+        if role_type in ("Supplier", "Employer"):
+            from app.services.onboarding_service import get_onboarding_status_claim
+            institution_id = UUID(token_data["institution_id"])
+            token_data["onboarding_status"] = get_onboarding_status_claim(institution_id, db)
+        elif role_type == "Customer":
+            from app.services.onboarding_service import get_customer_onboarding_claim
+            user_id = UUID(token_data["sub"])
+            token_data["onboarding_status"] = get_customer_onboarding_claim(user_id, db)
+    except Exception:
+        pass

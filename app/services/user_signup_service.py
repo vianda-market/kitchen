@@ -24,7 +24,7 @@ from app.services.entity_service import (
 )
 from app.services.email_service import email_service
 from app.auth.security import create_access_token
-from app.auth.utils import build_token_data, merge_subscription_token_claims
+from app.auth.utils import build_token_data, merge_subscription_token_claims, merge_onboarding_token_claims
 from app.utils.log import log_info, log_warning, log_error, log_email_tracking
 from app.security.institution_scope import InstitutionScope
 from app.config import RoleType, RoleName, Status
@@ -70,6 +70,31 @@ class UserSignupService:
         rt = user_data.get("role_type")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
         return rt_str == "Internal"
+
+    @staticmethod
+    def _check_employer_domain(email: Optional[str], db: Optional[psycopg2.extensions.connection]) -> Optional[UUID]:
+        """Check if the email's domain matches an active employer domain. Returns institution_id or None."""
+        if not email or not db or "@" not in email:
+            return None
+        domain = email.split("@")[1].lower().strip()
+        if not domain:
+            return None
+        from app.utils.db import db_read
+        row = db_read(
+            """
+            SELECT ed.institution_id
+            FROM employer_domain ed
+            JOIN employer_benefits_program ebp ON ed.institution_id = ebp.institution_id
+            WHERE ed.domain = %s
+              AND ed.is_active = TRUE AND ed.is_archived = FALSE
+              AND ebp.is_active = TRUE AND ebp.is_archived = FALSE
+            LIMIT 1
+            """,
+            (domain,),
+            connection=db,
+            fetch_one=True,
+        )
+        return UUID(str(row["institution_id"])) if row else None
 
     def process_customer_signup(
         self, 
@@ -411,8 +436,13 @@ class UserSignupService:
             user_data: User data dictionary (modified in place)
             db: Optional DB connection for re-validation at verify
         """
-        # Override to seeded values for customer signup
-        user_data["institution_id"] = get_vianda_customers_institution_id()
+        # Check if email domain matches an active employer domain (domain-gated enrollment)
+        employer_inst_id = self._check_employer_domain(user_data.get("email"), db)
+        if employer_inst_id:
+            user_data["institution_id"] = str(employer_inst_id)
+            log_info(f"Domain-gated signup: assigned employer institution {employer_inst_id} for email {user_data.get('email')}")
+        else:
+            user_data["institution_id"] = get_vianda_customers_institution_id()
         user_data["role_type"] = self.CUSTOMER_ROLE_TYPE
         user_data["role_name"] = self.CUSTOMER_ROLE_NAME
         user_data["modified_by"] = self.BOT_USER_ID
@@ -540,11 +570,13 @@ class UserSignupService:
             )
             db.commit()
         log_email_tracking(f"B2B invite email: sending to {email} (user_id={user_id})")
+        from app.utils.locale import get_user_locale
         sent = email_service.send_b2b_invite_email(
             to_email=email,
             reset_code=reset_code,
             user_first_name=first_name,
             expiry_hours=invite_expiry_hours,
+            locale=get_user_locale(user_id, db),
         )
         if sent:
             log_email_tracking(f"B2B invite email sent to {email}")
@@ -942,6 +974,7 @@ class UserSignupService:
 
         token_payload = build_token_data(new_user)
         merge_subscription_token_claims(token_payload, new_user.user_id, db)
+        merge_onboarding_token_claims(token_payload, db)
         access_token = create_access_token(data=token_payload)
         log_info(f"Customer signup verified and user created: {new_user.user_id}")
         return new_user, access_token

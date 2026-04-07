@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Special offer for you</h1>
+<p>Hi {{ user_first_name }},</p>
+<p>We have a special offer just for you: <strong>{{ promo_details }}</strong></p>
+<p>Subscribe now in the Vianda app and start enjoying daily meals from restaurants near you — at a special price.</p>
+<p style="margin: 25px 0;">
+    <a href="{{ app_store_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">This offer is for a limited time. Questions? Reply to this email.</p>
+{% endblock %}

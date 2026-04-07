@@ -250,7 +250,7 @@ def sample_plate_selection():
 
 @pytest.fixture
 def sample_plate():
-    """Sample PlateDTO for testing. no_show_discount is at institution level."""
+    """Sample PlateDTO for testing."""
     from app.dto.models import PlateDTO
     from app.config import Status
     return PlateDTO(

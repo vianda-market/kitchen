@@ -1,18 +1,69 @@
 """
-Resolve ISO 3166-1 alpha-2 country code to official country name.
-Normalize country_code at API boundary (single place for uppercase / alpha-3→alpha-2 / default).
+Country code utilities — single source of truth for ISO 3166-1 conversions.
 
-Accepts ISO 3166-1 alpha-2 or alpha-3; converts alpha-3 to alpha-2 at entry and logs the conversion.
-Store and return only alpha-2. Uses pycountry (offline, no API key).
+- normalize_country_code: alpha-3→alpha-2 normalization at API boundary (uses pycountry)
+- resolve_country_name: alpha-2→official country name (uses pycountry)
+- country_alpha2_to_alpha3 / country_alpha3_to_alpha2 / country_name_to_alpha2:
+  fast lookups via static dicts (no pycountry dependency, used by address gateways)
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 import pycountry
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Static lookup dicts — used by address gateways for fast conversion
+# ---------------------------------------------------------------------------
+
+_COUNTRY_ALPHA2_TO_ALPHA3: Dict[str, str] = {
+    "AR": "ARG", "US": "USA", "BR": "BRA", "MX": "MEX", "CA": "CAN",
+    "CL": "CHL", "CO": "COL", "PE": "PER", "UY": "URY", "PY": "PRY",
+    "EC": "ECU", "BO": "BOL", "VE": "VEN", "GB": "GBR", "ES": "ESP",
+    "FR": "FRA", "DE": "DEU", "IT": "ITA", "JP": "JPN", "AU": "AUS",
+}
+
+_COUNTRY_NAME_TO_ALPHA2: Dict[str, str] = {
+    "argentina": "AR", "united states": "US", "usa": "US", "united states of america": "US",
+    "brazil": "BR", "brasil": "BR", "mexico": "MX", "méxico": "MX", "canada": "CA",
+    "chile": "CL", "colombia": "CO", "peru": "PE", "perú": "PE",
+    "uruguay": "UY", "paraguay": "PY", "ecuador": "EC", "bolivia": "BO",
+    "venezuela": "VE", "venezuela (bolivarian republic of)": "VE",
+    "united kingdom": "GB", "uk": "GB", "great britain": "GB", "england": "GB",
+    "spain": "ES", "españa": "ES", "france": "FR", "germany": "DE", "deutschland": "DE",
+    "italy": "IT", "italia": "IT", "japan": "JP", "australia": "AU",
+}
+
+
+def country_alpha2_to_alpha3(alpha2: str) -> str:
+    """Convert ISO 3166-1 alpha-2 to alpha-3. Returns upper input if not in map."""
+    if not alpha2 or len(alpha2) != 2:
+        return (alpha2 or "").upper()
+    return _COUNTRY_ALPHA2_TO_ALPHA3.get(alpha2.upper(), alpha2.upper())
+
+
+def country_alpha3_to_alpha2(alpha3: str) -> str:
+    """Convert alpha-3 to alpha-2. Returns first two chars uppercased if not in map."""
+    rev = {v: k for k, v in _COUNTRY_ALPHA2_TO_ALPHA3.items()}
+    if alpha3 and len(alpha3) == 3:
+        return rev.get(alpha3.upper(), alpha3.upper()[:2])
+    return (alpha3 or "")[:2].upper()
+
+
+def country_name_to_alpha2(name: str) -> Optional[str]:
+    """Resolve country name (e.g. 'Argentina') to ISO 3166-1 alpha-2. Returns None if not found."""
+    if not name or not name.strip():
+        return None
+    key = name.strip().lower()
+    return _COUNTRY_NAME_TO_ALPHA2.get(key)
+
+
+# ---------------------------------------------------------------------------
+# pycountry-based utilities — richer but slower, used at API boundaries
+# ---------------------------------------------------------------------------
 
 
 def normalize_country_code(value: Optional[str], default: Optional[str] = None) -> str:

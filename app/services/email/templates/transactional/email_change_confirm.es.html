@@ -1,0 +1,8 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #c0392b; margin-bottom: 20px;">Email de la cuenta modificado</h1>
+<p>Hola {{ first_name }},</p>
+<p>El email de tu cuenta de Vianda fue cambiado a: <strong>{{ new_email }}</strong></p>
+<p style="font-size: 14px; color: #7f8c8d;">Si realizaste este cambio, podes ignorar este mensaje.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Si no realizaste este cambio, contacta a soporte de inmediato.</p>
+{% endblock %}

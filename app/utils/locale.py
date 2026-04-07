@@ -23,6 +23,19 @@ def resolve_locale_from_header(accept_language: Optional[str]) -> str:
     return DEFAULT_LOCALE
 
 
+def get_user_locale(user_id, db) -> str:
+    """Fetch user's locale from DB; fallback to DEFAULT_LOCALE."""
+    from app.utils.db import db_read
+    row = db_read(
+        "SELECT locale FROM user_info WHERE user_id = %s",
+        (str(user_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    locale = (row.get("locale") if row else None) or DEFAULT_LOCALE
+    return locale if locale in SUPPORTED_LOCALES else DEFAULT_LOCALE
+
+
 def resolve_user_locale(
     current_user: Optional[dict],
     accept_language: Optional[str] = None,

@@ -38,26 +38,29 @@ SUPPLIER_ADDRESS_MUTATION_ROLES = {"Admin", "Manager"}
 # Supplier roles that can create/edit users (Admin and Manager)
 SUPPLIER_USER_MUTATION_ROLES = {"Admin", "Manager"}
 
+# Supplier roles that can access CRUD management routes (Admin and Manager). Operator is kiosk-only.
+SUPPLIER_MANAGEMENT_ROLES = {"Admin", "Manager"}
+
 # Institution bank accounts and institution entities: only Supplier Admin can access (GET, POST, PUT, DELETE)
 SUPPLIER_ADMIN_ONLY_ROLES = {"Admin"}
 
-# Institution no_show_discount: only Internal Manager, Global Manager, Admin, or Super Admin can edit
-INSTITUTION_NO_SHOW_DISCOUNT_EDIT_ROLES = {"Manager", "Global Manager", "Admin", "Super Admin"}
+# Supplier terms: only Internal Manager, Global Manager, Admin, or Super Admin can edit
+SUPPLIER_TERMS_EDIT_ROLES = {"Manager", "Global Manager", "Admin", "Super Admin"}
 
 
-def ensure_can_edit_institution_no_show_discount(current_user: dict) -> None:
-    """Raise 403 if user cannot edit no_show_discount on institution."""
+def ensure_can_edit_supplier_terms(current_user: dict) -> None:
+    """Raise 403 if user cannot edit supplier terms."""
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     if role_type != "Internal":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit no_show_discount.",
+            detail="Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit supplier terms.",
         )
-    if role_name not in INSTITUTION_NO_SHOW_DISCOUNT_EDIT_ROLES:
+    if role_name not in SUPPLIER_TERMS_EDIT_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Manager, Global Manager, Admin, or Super Admin can edit no_show_discount.",
+            detail="Only Manager, Global Manager, Admin, or Super Admin can edit supplier terms.",
         )
 
 
@@ -434,6 +437,28 @@ def ensure_supplier_can_create_edit_users(current_user: dict) -> None:
             detail=(
                 "Only Supplier Admin and Manager can create or edit users. "
                 "Supplier Operator has read-only access to users within their institution."
+            ),
+        )
+
+
+def ensure_supplier_admin_or_manager(current_user: dict) -> None:
+    """
+    Block Supplier Operators from management/CRUD endpoints. Internal passes through.
+
+    - Supplier Admin, Supplier Manager: Allowed (full CRUD management access).
+    - Supplier Operator: Blocked (kiosk-only: daily orders, verify code, hand out, mark complete, view feedback).
+    - Internal, Customer, Employer: No restriction from this check (handled by other guards).
+    """
+    role_type = (current_user.get("role_type") or "").strip()
+    if role_type != "Supplier":
+        return
+    role_name = (current_user.get("role_name") or "").strip()
+    if role_name not in SUPPLIER_MANAGEMENT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Supplier Operators can only access kiosk and field operations. "
+                "Use Admin or Manager role for this action."
             ),
         )
 

@@ -20,19 +20,19 @@ def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = 
 
 
 def create_account_link(
-    stripe_connect_account_id: str,
+    payout_provider_account_id: str,
     refresh_url: str,
     return_url: str,
 ) -> dict:
     """Return a fake onboarding link; no Stripe call made."""
-    log_info(f"[MOCK] Created onboarding link for {stripe_connect_account_id}")
+    log_info(f"[MOCK] Created onboarding link for {payout_provider_account_id}")
     return {
-        "url": f"https://connect.stripe.com/mock/onboarding/{stripe_connect_account_id}",
+        "url": f"https://connect.stripe.com/mock/onboarding/{payout_provider_account_id}",
         "expires_at": 9999999999,
     }
 
 
-def get_account_status(stripe_connect_account_id: str) -> dict:
+def get_account_status(payout_provider_account_id: str) -> dict:
     """Return fully-enabled mock status; no Stripe call made."""
     return {
         "charges_enabled": True,
@@ -41,8 +41,15 @@ def get_account_status(stripe_connect_account_id: str) -> dict:
     }
 
 
+def create_account_session(payout_provider_account_id: str) -> str:
+    """Return a fake client_secret; no Stripe call made."""
+    mock_secret = f"cs_mock_{uuid.uuid4().hex}"
+    log_info(f"[MOCK] Created AccountSession for {payout_provider_account_id}")
+    return mock_secret
+
+
 def create_transfer(
-    stripe_connect_account_id: str,
+    payout_provider_account_id: str,
     amount_minor: int,
     currency: str,
     institution_bill_id: UUID,
@@ -52,7 +59,7 @@ def create_transfer(
     """Return a fake tr_mock_… transfer ID; no Stripe call made."""
     mock_id = f"tr_mock_{uuid.uuid4().hex[:16]}"
     log_info(
-        f"[MOCK] Transfer {mock_id} → {stripe_connect_account_id} "
+        f"[MOCK] Transfer {mock_id} → {payout_provider_account_id} "
         f"amount={amount_minor} {currency} bill={institution_bill_id}"
     )
     return mock_id
@@ -99,18 +106,18 @@ def execute_supplier_payout(
     entity = institution_entity_service.get_by_id(str(entity_id), db)
     if not entity:
         raise HTTPException(status_code=404, detail="Institution entity not found")
-    connect_id = entity.get("stripe_connect_account_id")
+    connect_id = entity.get("payout_provider_account_id")
     if not connect_id:
         raise HTTPException(
             status_code=400,
-            detail="Entity has no Stripe Connect account. Complete onboarding first.",
+            detail="Entity has no payout provider account. Complete onboarding first.",
         )
 
     amount = bill.get("amount") or 0
     currency_code = bill.get("currency_code") or "usd"
     idempotency_key = f"bill_{institution_bill_id}_stripe"
     transfer_id = create_transfer(
-        stripe_connect_account_id=connect_id,
+        payout_provider_account_id=connect_id,
         amount_minor=int(amount),
         currency=currency_code,
         institution_bill_id=institution_bill_id,
@@ -132,6 +139,13 @@ def execute_supplier_payout(
         )
         payout_id = cur.fetchone()[0]
     db.commit()
+
+    log_info(
+        f"[MOCK] Payout initiated: institution_entity_id={entity_id} "
+        f"institution_bill_id={institution_bill_id} bill_payout_id={payout_id} "
+        f"amount={amount} currency={currency_code} provider=mock "
+        f"provider_transfer_id={transfer_id}"
+    )
 
     with db.cursor() as cur:
         cur.execute(

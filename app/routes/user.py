@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body, status
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, Response, status
 from typing import Optional, List
 from uuid import UUID
 from pydantic import EmailStr
@@ -58,6 +58,7 @@ from app.services.messaging_preferences_service import (
 )
 from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
 from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 
@@ -438,6 +439,51 @@ def update_my_messaging_preferences(
     )
 
 
+# POST /users/me/fcm-token - Register or update FCM device token
+@router.post("/me/fcm-token", status_code=status.HTTP_200_OK)
+def register_fcm_token(
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Register or update FCM device token for push notifications. Called on login and token refresh."""
+    from app.services.fcm_token_service import register_fcm_token as _register
+    from uuid import UUID as _UUID
+
+    token = (body.get("token") or "").strip()
+    platform = (body.get("platform") or "").strip().lower()
+
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+    if platform not in ("ios", "android", "web"):
+        raise HTTPException(status_code=400, detail="platform must be ios, android, or web")
+
+    user_id = current_user["user_id"]
+    if isinstance(user_id, str):
+        user_id = _UUID(user_id)
+
+    _register(user_id, token, platform, db)
+    return {"detail": "FCM token registered"}
+
+
+# DELETE /users/me/fcm-token - Remove all FCM tokens for current user (logout)
+@router.delete("/me/fcm-token", status_code=status.HTTP_200_OK)
+def delete_my_fcm_tokens(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Remove all FCM tokens for the current user. Called on logout."""
+    from app.services.fcm_token_service import delete_user_fcm_tokens
+    from uuid import UUID as _UUID
+
+    user_id = current_user["user_id"]
+    if isinstance(user_id, str):
+        user_id = _UUID(user_id)
+
+    count = delete_user_fcm_tokens(user_id, db)
+    return {"detail": f"Deleted {count} FCM token(s)"}
+
+
 # PUT /users/me/password - Change current user's password
 @router.put("/me/password", response_model=dict, status_code=status.HTTP_200_OK)
 def change_my_password(
@@ -649,6 +695,8 @@ def assign_my_employer(
 # GET /users/enriched - List all users with enriched data
 @router.get("/enriched", response_model=List[UserEnrichedResponseSchema])
 def list_enriched_users(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -656,12 +704,18 @@ def list_enriched_users(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
     def _get_enriched_users():
-        return get_enriched_users(db, scope=scope, include_archived=False)
+        return get_enriched_users(
+            db, scope=scope, include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
+        )
 
-    return handle_business_operation(
+    result = handle_business_operation(
         _get_enriched_users,
         "enriched user list retrieval"
     )
+    set_pagination_headers(response, result)
+    return result
 
 # GET /users/enriched/{user_id} - Get a single user with enriched data
 @router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema)

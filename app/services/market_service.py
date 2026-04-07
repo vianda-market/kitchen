@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from psycopg2.extras import RealDictCursor
 
+from app.utils.db import db_read
 from app.utils.db_pool import get_db_pool
 from app.utils.log import logger
 from app.config import Status
@@ -62,6 +63,37 @@ def _serialize_market(market: dict) -> dict:
     if kct is not None and hasattr(kct, "strftime"):
         m["kitchen_close_time"] = kct.strftime("%H:%M")
     return m
+
+
+def get_markets_with_coverage(db) -> List[dict]:
+    """
+    Return active non-global markets that have at least one
+    institution -> restaurant -> plate -> plate_kitchen_days chain, all active.
+    Used by GET /leads/markets (default, no audience param).
+    """
+    query = """
+        SELECT m.country_code, m.country_name, m.language,
+               m.phone_dial_code, m.phone_local_digits
+        FROM market_info m
+        WHERE m.status = 'Active'
+          AND m.is_archived = FALSE
+          AND m.market_id != %s
+          AND EXISTS (
+              SELECT 1
+              FROM institution_info i
+              JOIN restaurant_info r ON r.institution_id = i.institution_id
+              JOIN plate_info p ON p.restaurant_id = r.restaurant_id
+              JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+              WHERE i.market_id = m.market_id
+                AND i.status = 'Active' AND i.is_archived = FALSE
+                AND r.status = 'Active' AND r.is_archived = FALSE
+                AND p.is_archived = FALSE
+                AND pkd.status = 'Active' AND pkd.is_archived = FALSE
+          )
+        ORDER BY m.country_name
+    """
+    rows = db_read(query, (str(GLOBAL_MARKET_ID),), connection=db)
+    return [dict(r) for r in rows] if rows else []
 
 
 class MarketService:

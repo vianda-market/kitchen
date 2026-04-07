@@ -160,5 +160,5 @@ The backend uses **Stripe-hosted Checkout / Setup Sessions** — raw card data n
 | `docs/api/internal/STRIPE_INTEGRATION_HANDOFF.md` | Backend implementation details — webhook handler, PaymentIntent flow, idempotency |
 | `docs/api/b2c_client/PAYMENT_PROVIDERS_B2C.md` | B2C client integration for the provider connection/disconnect UI |
 | `docs/api/shared_client/CUSTOMER_PAYMENT_METHODS_API.md` | Full API contract for card management endpoints |
-| `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` | Phase plan — what is live, what is next (Phase 3 live Stripe, Phase 4 subscription integration) |
-| `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` | Production hardening items — race conditions, webhook sync, idempotency |
+| `docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` | Phase plan — what is live, what is next (Phase 3 live Stripe, Phase 4 subscription integration) |
+| `docs/plans/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` | Production hardening items — race conditions, webhook sync, idempotency |

@@ -101,7 +101,8 @@ class TestEnumService(unittest.TestCase):
             'address_type', 'role_type', 'institution_type', 'institution_type_assignable', 'role_name',
             'subscription_status', 'method_type',
             'transaction_type', 'street_type', 'kitchen_day',
-            'pickup_type', 'discretionary_reason', 'portion_size_display', 'bill_resolution', 'favorite_entity_type'
+            'pickup_type', 'discretionary_reason', 'portion_size_display', 'bill_resolution', 'favorite_entity_type',
+            'bill_payout_status'
         }
         
         actual_keys = set(enums.keys())

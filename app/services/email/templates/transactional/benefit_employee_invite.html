@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Your Vianda meal benefit is ready!</h1>
+<p>Hi {{ first_name }},</p>
+<p><strong>{{ employer_name }}</strong> has signed you up for a Vianda meal subscription benefit.</p>
+<h2 style="color: #2c3e50; font-size: 18px;">Get started:</h2>
+<p><strong>Step 1:</strong> Set your password</p>
+<p style="margin: 15px 0;"><a href="{{ set_password_url }}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Set your password</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Or copy this link: {{ set_password_url }}</p>
+<p><strong>Step 2:</strong> Download the Vianda app</p>
+<p style="margin: 10px 0;"><a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a> | <a href="{{ play_store_url }}">Google Play</a></p>
+<p><strong>Step 3:</strong> Log in and browse plans</p>
+<p style="font-size: 14px; color: #7f8c8d;">This link will expire in {{ expiry_hours }} hours.</p>
+{% endblock %}

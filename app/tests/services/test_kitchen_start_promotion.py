@@ -62,7 +62,9 @@ class TestPromotePlateSelectionToLive:
         mock_restaurant.institution_id = uuid4()
 
         mock_institution = Mock()
-        mock_institution.no_show_discount = 0
+
+        mock_supplier_terms = Mock()
+        mock_supplier_terms.no_show_discount = 0
 
         credit_currency_id = uuid4()
         with patch('app.services.plate_selection_promotion_service.plate_selection_service') as mock_sel_svc, \
@@ -70,6 +72,7 @@ class TestPromotePlateSelectionToLive:
              patch('app.services.plate_selection_promotion_service.plate_service') as mock_plate_svc, \
              patch('app.services.plate_selection_promotion_service.restaurant_service') as mock_rest_svc, \
              patch('app.services.plate_selection_promotion_service.institution_service') as mock_inst_svc, \
+             patch('app.services.plate_selection_promotion_service.supplier_terms_service') as mock_st_svc, \
              patch('app.services.plate_selection_promotion_service.qr_code_service') as mock_qr_svc, \
              patch('app.services.plate_selection_promotion_service.credit_currency_service') as mock_cc_svc, \
              patch('app.services.plate_selection_promotion_service.get_credit_currency_id_for_restaurant', return_value=credit_currency_id), \
@@ -79,6 +82,7 @@ class TestPromotePlateSelectionToLive:
             mock_plate_svc.get_by_id.return_value = mock_plate
             mock_rest_svc.get_by_id.return_value = mock_restaurant
             mock_inst_svc.get_by_id.return_value = mock_institution
+            mock_st_svc.get_by_field.return_value = mock_supplier_terms
             mock_qr_svc.get_by_restaurant.return_value = Mock(qr_code_id=uuid4(), qr_code_payload="test")
             mock_cc_svc.get_by_id.return_value = Mock(credit_currency_id=uuid4(), currency_code="USD")
 

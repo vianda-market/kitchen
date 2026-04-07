@@ -1,0 +1,9 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Seu nome de usuário Vianda</h1>
+<p>Oi {{ first_name }},</p>
+<p>Você solicitou o nome de usuário da sua conta Vianda.</p>
+<p style="font-weight: bold;">Seu nome de usuário é: {{ username }}</p>
+<p>Use este nome de usuário para entrar. Se precisar redefinir sua senha, use o link "Esqueceu a senha?" na página de login.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Se você não solicitou isso, por favor ignore este e-mail.</p>
+{% endblock %}

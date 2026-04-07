@@ -1,0 +1,17 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Não perca seu benefício de refeição</h1>
+<p>Oi {{ user_first_name }},</p>
+<p>Apenas um lembrete — <strong>{{ employer_name }}</strong> configurou um benefício de refeição Vianda para você, mas você ainda não assinou.</p>
+<p>Seus colegas já estão aproveitando refeições diárias. Não fique de fora — assine no app e comece a pedir hoje mesmo.</p>
+{% if app_deep_link %}
+<p style="margin: 25px 0;">
+    <a href="{{ app_deep_link }}" style="background-color: #4a7c59; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Abrir no Vianda</a>
+</p>
+{% endif %}
+<p style="margin: 10px 0; font-size: 14px; color: #7f8c8d;">
+    <a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">Precisa de ajuda? Responda este e-mail.</p>
+{% endblock %}

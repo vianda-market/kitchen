@@ -22,14 +22,13 @@ Benefits:
 - Reduced import complexity
 """
 
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, RootModel, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, RootModel, ValidationInfo, computed_field, field_validator, model_validator
 from typing import Optional, List, Literal, Dict, Any
 from datetime import datetime, date
 from uuid import UUID
 from decimal import Decimal
 from app.config import Status, RoleType, RoleName, TransactionType, KitchenDay, PickupType, AuditOperation, DiscretionaryReason
-from app.config.supported_cuisines import is_supported_cuisine
-from app.config.enums import FavoriteEntityType
+from app.config.enums import FavoriteEntityType, DietaryFlag, PaymentFrequency
 from app.utils.country import normalize_country_code
 from app.utils.phone import normalize_mobile_for_schema
 from app.config.settings import settings
@@ -389,35 +388,26 @@ class CustomerSignupSchema(BaseModel):
         return self
 
 class InstitutionCreateSchema(BaseModel):
-    """Schema for creating a new institution. market_id is required. no_show_discount required for Supplier."""
+    """Schema for creating a new institution. market_id is required."""
     name: str = Field(..., max_length=100)
     institution_type: Optional[RoleType] = None  # Defaults to Supplier in DB if omitted
     market_id: UUID = Field(..., description="Required: market UUID (e.g. Global Marketplace or a country market from GET /api/v1/markets/enriched/)")
-    no_show_discount: Optional[int] = Field(None, ge=0, le=100, description="Percentage 0-100; required when institution_type is Supplier")
-
-    @model_validator(mode="after")
-    def supplier_requires_no_show_discount(self):
-        inst_type = self.institution_type
-        no_show = self.no_show_discount
-        is_supplier = inst_type is None or (hasattr(inst_type, "value") and inst_type.value == "Supplier") or inst_type == "Supplier"
-        if is_supplier and no_show is None:
-            raise ValueError("no_show_discount is required when institution_type is Supplier")
-        return self
 
 class InstitutionUpdateSchema(BaseModel):
     """Schema for updating institution information"""
     name: Optional[str] = Field(None, max_length=100)
     institution_type: Optional[RoleType] = None
     market_id: Optional[UUID] = None  # When provided, must be a valid market UUID (single, global, or multi)
-    no_show_discount: Optional[int] = Field(None, ge=0, le=100, description="Percentage 0-100; cannot be None for Supplier institutions")
+    support_email_suppressed_until: Optional[datetime] = Field(None, description="Manual override: suppress onboarding emails until this date")
 
 class InstitutionResponseSchema(BaseModel):
-    """Schema for institution response data. market_id is always present (never null). no_show_discount is null for Internal/Customer."""
+    """Schema for institution response data. market_id is always present (never null)."""
     institution_id: UUID
     name: str
     institution_type: RoleType
     market_id: UUID = Field(..., description="Required: market UUID (Global = all markets, one UUID = local market)")
-    no_show_discount: Optional[int] = Field(None, description="Percentage 0-100; required for Supplier, null for Internal/Customer")
+    support_email_suppressed_until: Optional[datetime] = None
+    last_support_email_date: Optional[datetime] = None
     is_archived: bool
     status: Status
     created_date: datetime
@@ -434,26 +424,110 @@ class InstitutionResponseSchema(BaseModel):
 # 2. RESTAURANT & FOOD SCHEMAS
 # =============================================================================
 
+# =============================================================================
+# CUISINE SCHEMAS
+# =============================================================================
+
+class CuisineResponseSchema(BaseModel):
+    """Public cuisine response for dropdowns and autocomplete."""
+    cuisine_id: UUID
+    cuisine_name: str
+    slug: str
+    parent_cuisine_id: Optional[UUID] = None
+    description: Optional[str] = None
+    display_order: Optional[int] = None
+
+
+class CuisineDetailResponseSchema(BaseModel):
+    """Admin cuisine response with full detail including i18n."""
+    cuisine_id: UUID
+    cuisine_name: str
+    cuisine_name_i18n: Optional[dict] = None
+    slug: str
+    parent_cuisine_id: Optional[UUID] = None
+    description: Optional[str] = None
+    origin_source: str
+    display_order: Optional[int] = None
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+
+class CuisineCreateSchema(BaseModel):
+    """Schema for creating a new cuisine (admin)."""
+    cuisine_name: str = Field(..., max_length=80)
+    cuisine_name_i18n: Optional[dict] = None
+    slug: Optional[str] = Field(None, max_length=80, description="Auto-generated from cuisine_name if not provided")
+    parent_cuisine_id: Optional[UUID] = None
+    description: Optional[str] = Field(None, max_length=500)
+    display_order: Optional[int] = None
+
+
+class CuisineUpdateSchema(BaseModel):
+    """Schema for updating a cuisine (admin)."""
+    cuisine_name: Optional[str] = Field(None, max_length=80)
+    cuisine_name_i18n: Optional[dict] = None
+    slug: Optional[str] = Field(None, max_length=80)
+    parent_cuisine_id: Optional[UUID] = None
+    description: Optional[str] = Field(None, max_length=500)
+    display_order: Optional[int] = None
+
+
+class CuisineSuggestionCreateSchema(BaseModel):
+    """Schema for supplier to suggest a new cuisine."""
+    suggested_name: str = Field(..., max_length=120)
+    restaurant_id: Optional[UUID] = None
+
+
+class CuisineSuggestionResponseSchema(BaseModel):
+    """Response for cuisine suggestion."""
+    suggestion_id: UUID
+    suggested_name: str
+    suggested_by: UUID
+    restaurant_id: Optional[UUID] = None
+    suggestion_status: str
+    reviewed_by: Optional[UUID] = None
+    reviewed_date: Optional[datetime] = None
+    review_notes: Optional[str] = None
+    resolved_cuisine_id: Optional[UUID] = None
+    created_date: datetime
+
+
+class CuisineSuggestionApproveSchema(BaseModel):
+    """Schema for approving a cuisine suggestion."""
+    resolved_cuisine_id: Optional[UUID] = Field(None, description="Map to existing cuisine; if null, creates new from suggested_name")
+    review_notes: Optional[str] = Field(None, max_length=500)
+
+
+class CuisineSuggestionRejectSchema(BaseModel):
+    """Schema for rejecting a cuisine suggestion."""
+    review_notes: Optional[str] = Field(None, max_length=500)
+
+
+# =============================================================================
+# RESTAURANT SCHEMAS
+# =============================================================================
+
 class RestaurantCreateSchema(BaseModel):
     """Schema for creating a new restaurant. credit_currency inherited from institution_entity."""
     institution_id: UUID
     institution_entity_id: UUID
     address_id: UUID
     name: str = Field(..., max_length=100)
-    cuisine: Optional[str] = Field(None, max_length=50)
+    cuisine_id: Optional[UUID] = None
     pickup_instructions: Optional[str] = Field(None, max_length=500)
-
-    @field_validator("cuisine")
-    @classmethod
-    def cuisine_must_be_supported(cls, v):
-        """Validate cuisine is in supported list. Use GET /api/v1/cuisines/ for valid values."""
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return v
-        if not is_supported_cuisine(v):
-            raise ValueError(
-                f"Cuisine '{v}' is not supported. Use GET /api/v1/cuisines/ for valid values."
-            )
-        return v
+    tagline: Optional[str] = Field(None, max_length=500)
+    tagline_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    is_featured: Optional[bool] = None
+    cover_image_url: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: Optional[int] = None
+    verified_badge: Optional[bool] = None
+    spotlight_label: Optional[str] = Field(None, max_length=200)
+    spotlight_label_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    member_perks: Optional[List[str]] = None
+    member_perks_i18n: Optional[dict] = Field(None, description="Locale map: {en: [...], es: [...]}")
 
 class RestaurantUpdateSchema(BaseModel):
     """Schema for updating restaurant information"""
@@ -461,21 +535,21 @@ class RestaurantUpdateSchema(BaseModel):
     institution_entity_id: Optional[UUID] = None
     address_id: Optional[UUID] = None
     name: Optional[str] = Field(None, max_length=100)
-    cuisine: Optional[str] = Field(None, max_length=50)
+    cuisine_id: Optional[UUID] = None
     pickup_instructions: Optional[str] = Field(None, max_length=500)
+    tagline: Optional[str] = Field(None, max_length=500)
+    tagline_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    is_featured: Optional[bool] = None
+    cover_image_url: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: Optional[int] = None
+    verified_badge: Optional[bool] = None
+    spotlight_label: Optional[str] = Field(None, max_length=200)
+    spotlight_label_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    member_perks: Optional[List[str]] = None
+    member_perks_i18n: Optional[dict] = Field(None, description="Locale map: {en: [...], es: [...]}")
+    require_kiosk_code_verification: Optional[bool] = Field(None, description="Enable kiosk code verification for this restaurant (Supplier Admin only)")
     status: Optional[Status] = Field(None, description="Active only allowed when restaurant has active plate_kitchen_days; Inactive always allowed")
-
-    @field_validator("cuisine")
-    @classmethod
-    def cuisine_must_be_supported(cls, v):
-        """Validate cuisine is in supported list. Use GET /api/v1/cuisines/ for valid values."""
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return v
-        if not is_supported_cuisine(v):
-            raise ValueError(
-                f"Cuisine '{v}' is not supported. Use GET /api/v1/cuisines/ for valid values."
-            )
-        return v
 
 class RestaurantSearchResultSchema(BaseModel):
     """One restaurant in GET /restaurants/search/ response (minimal fields for discretionary recipient picker)."""
@@ -547,7 +621,8 @@ class RestaurantExplorerItemSchema(BaseModel):
     """One restaurant in GET /restaurants/by-city response (list and map)."""
     restaurant_id: UUID
     name: str
-    cuisine: Optional[str] = None
+    cuisine_name: Optional[str] = None
+    tagline: Optional[str] = None
     lat: Optional[float] = Field(None, description="Latitude from geolocation; null if missing")
     lng: Optional[float] = Field(None, description="Longitude from geolocation; null if missing")
     postal_code: Optional[str] = Field(None, description="Zipcode/postal code from address")
@@ -571,19 +646,32 @@ class RestaurantsByCityResponseSchema(BaseModel):
     city: str = Field(..., description="Matched city (case-insensitive)")
     center: Optional["ZipcodeCenterSchema"] = Field(None, description="Optional lat/lng center for the city")
     kitchen_day: Optional[str] = Field(None, description="Kitchen day used for plates (when market/kitchen_day resolved)")
-    restaurants: List[RestaurantExplorerItemSchema] = Field(..., description="Restaurants in the city with name, cuisine, geolocation; plates when kitchen_day present")
+    restaurants: List[RestaurantExplorerItemSchema] = Field(..., description="Restaurants in the city with name, cuisine_name, geolocation; plates when kitchen_day present")
 
 
 class RestaurantResponseSchema(BaseModel):
-    """Schema for restaurant response data"""
+    """Schema for restaurant response data. Includes full _i18n locale maps for B2B edit forms."""
     restaurant_id: UUID
     institution_id: UUID
     institution_entity_id: UUID
     address_id: UUID
     credit_currency_id: UUID
     name: str
-    cuisine: Optional[str]
+    cuisine_id: Optional[UUID] = None
+    cuisine_name: Optional[str] = None
     pickup_instructions: Optional[str] = None
+    tagline: Optional[str] = None
+    tagline_i18n: Optional[dict] = None
+    is_featured: bool = False
+    cover_image_url: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: int = 0
+    verified_badge: bool = False
+    spotlight_label: Optional[str] = None
+    spotlight_label_i18n: Optional[dict] = None
+    member_perks: Optional[List[str]] = None
+    member_perks_i18n: Optional[dict] = None
+    require_kiosk_code_verification: bool = False
     is_archived: bool
     status: Status
     created_date: datetime
@@ -600,8 +688,12 @@ class ProductCreateSchema(BaseModel):
     """Schema for creating a new product"""
     institution_id: UUID
     name: str = Field(..., max_length=100)
+    name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
     ingredients: Optional[str] = Field(None, max_length=255)
-    dietary: Optional[str] = Field(None, max_length=255)
+    ingredients_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    description: Optional[str] = Field(None, max_length=1000)
+    description_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    dietary: Optional[List[DietaryFlag]] = None
     image_url: str = Field(default=PLACEHOLDER_IMAGE_URL, max_length=500)
     image_storage_path: str = Field(default=PLACEHOLDER_IMAGE_PATH, max_length=500)
     image_checksum: str = Field(default=PLACEHOLDER_IMAGE_CHECKSUM, max_length=128)
@@ -610,19 +702,27 @@ class ProductUpdateSchema(BaseModel):
     """Schema for updating product information"""
     institution_id: Optional[UUID] = None
     name: Optional[str] = Field(None, max_length=100)
+    name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
     ingredients: Optional[str] = Field(None, max_length=255)
-    dietary: Optional[str] = Field(None, max_length=255)
+    ingredients_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    description: Optional[str] = Field(None, max_length=1000)
+    description_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    dietary: Optional[List[DietaryFlag]] = None
     image_url: Optional[str] = Field(None, max_length=500)
     image_storage_path: Optional[str] = Field(None, max_length=500)
     image_checksum: Optional[str] = Field(None, max_length=128)
 
 class ProductResponseSchema(BaseModel):
-    """Schema for product response data. Includes both image sizes after upload."""
+    """Schema for product response data. Includes full _i18n locale maps for B2B edit forms."""
     product_id: UUID
     institution_id: UUID
     name: str
+    name_i18n: Optional[dict] = None
     ingredients: Optional[str]
-    dietary: Optional[str]
+    ingredients_i18n: Optional[dict] = None
+    description: Optional[str] = None
+    description_i18n: Optional[dict] = None
+    dietary: Optional[List[DietaryFlag]]
     image_url: Optional[str]
     image_storage_path: str
     image_thumbnail_url: Optional[str] = None
@@ -641,14 +741,18 @@ class ProductEnrichedResponseSchema(BaseModel):
     institution_id: UUID
     institution_name: str
     name: str
+    name_i18n: Optional[dict] = Field(None, exclude=True)
     ingredients: Optional[str]
-    dietary: Optional[str]
-    image_url: Optional[str]  # Full-size URL (e.g. max 1024px)
+    ingredients_i18n: Optional[dict] = Field(None, exclude=True)
+    description: Optional[str] = None
+    description_i18n: Optional[dict] = Field(None, exclude=True)
+    dietary: Optional[List[DietaryFlag]]
+    image_url: Optional[str]
     image_storage_path: str
-    image_thumbnail_url: Optional[str]  # Thumbnail URL (e.g. 300×300)
+    image_thumbnail_url: Optional[str]
     image_thumbnail_storage_path: str
     image_checksum: str
-    has_image: bool  # Flag indicating if product has a custom uploaded image (TRUE) or default placeholder (FALSE)
+    has_image: bool
     is_archived: bool
     status: Status
     created_date: datetime
@@ -657,7 +761,7 @@ class ProductEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PlateCreateSchema(BaseModel):
-    """Schema for creating a new plate. Savings are computed on the fly from plan credit_cost_local_currency. no_show_discount is at institution level."""
+    """Schema for creating a new plate. Savings are computed on the fly from plan credit_cost_local_currency."""
     product_id: UUID
     restaurant_id: UUID
     price: Decimal = Field(..., ge=0)
@@ -695,7 +799,8 @@ class PlateEnrichedResponseSchema(BaseModel):
     restaurant_id: UUID
     institution_name: str
     restaurant_name: str
-    cuisine: Optional[str]
+    cuisine_name: Optional[str] = None
+    cuisine_name_i18n: Optional[dict] = Field(None, exclude=True)
     pickup_instructions: Optional[str] = None
     country_name: str
     country_code: str
@@ -715,15 +820,19 @@ class PlateEnrichedResponseSchema(BaseModel):
     )
     review_count: int = 0
     product_name: str
-    dietary: Optional[str]
-    ingredients: Optional[str] = None  # From product_info for plate modal
-    product_image_url: Optional[str]  # Product image URL for display
+    product_name_i18n: Optional[dict] = Field(None, exclude=True)
+    dietary: Optional[List[DietaryFlag]]
+    ingredients: Optional[str] = None
+    ingredients_i18n: Optional[dict] = Field(None, exclude=True)
+    description: Optional[str] = None
+    description_i18n: Optional[dict] = Field(None, exclude=True)
+    product_image_url: Optional[str]
     product_image_storage_path: str  # Product image storage path
     has_image: bool  # Flag indicating if product has a custom uploaded image (TRUE) or default placeholder (FALSE)
     price: Decimal
     credit: int
     expected_payout_local_currency: Decimal
-    no_show_discount: Optional[int] = Field(None, description="From institution; null for non-Supplier")
+    no_show_discount: Optional[int] = Field(None, description="From supplier_terms; null when no terms configured")
     delivery_time_minutes: int
     is_archived: bool
     status: Status
@@ -786,7 +895,7 @@ class PlateKitchenDayEnrichedResponseSchema(BaseModel):
     institution_name: str
     restaurant_name: str
     plate_name: str  # Actually from product_info.name
-    dietary: Optional[str]  # From product_info.dietary
+    dietary: Optional[List[DietaryFlag]]  # From product_info.dietary
     is_archived: bool
     created_date: datetime
     modified_by: UUID
@@ -799,6 +908,8 @@ class PlateReviewCreateSchema(BaseModel):
     plate_pickup_id: UUID = Field(..., description="The pickup being reviewed; must be completed (was_collected=true) and belong to the user")
     stars_rating: int = Field(..., ge=1, le=5, description="Star rating 1-5")
     portion_size_rating: int = Field(..., ge=1, le=3, description="Portion size rating 1-3")
+    would_order_again: Optional[bool] = Field(None, description="Would order this plate again")
+    comment: Optional[str] = Field(None, max_length=500, description="Optional text feedback for the restaurant (max 500 chars)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -810,9 +921,71 @@ class PlateReviewResponseSchema(BaseModel):
     plate_pickup_id: UUID
     stars_rating: int
     portion_size_rating: int
+    would_order_again: Optional[bool] = None
+    comment: Optional[str] = None
     is_archived: bool
     created_date: datetime
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class NotificationActionSchema(BaseModel):
+    """Nested schema for notification banner action display"""
+    action_type: str
+    action_label: str
+
+class NotificationBannerResponseSchema(BaseModel):
+    """Schema for a single notification banner in the active list"""
+    notification_id: UUID
+    notification_type: str
+    priority: str
+    created_at: datetime
+    expires_at: datetime
+    payload: dict
+    action: NotificationActionSchema
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ActiveNotificationsResponseSchema(BaseModel):
+    """Wrapper response for GET /notifications/active"""
+    notifications: List[NotificationBannerResponseSchema]
+
+class NotificationAcknowledgeSchema(BaseModel):
+    """Request body for POST /notifications/{id}/acknowledge"""
+    action_taken: str = Field(..., pattern=r"^(dismissed|opened|completed)$")
+
+
+class PlateReviewEnrichedResponseSchema(BaseModel):
+    """Supplier-facing enriched plate review — no customer PII."""
+    plate_review_id: UUID
+    plate_id: UUID
+    plate_name: str
+    restaurant_name: str
+    stars_rating: int
+    portion_size_rating: int
+    would_order_again: Optional[bool] = None
+    comment: Optional[str] = None
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PortionComplaintCreateSchema(BaseModel):
+    """Schema for filing a portion complaint after rating portion size as 1."""
+    plate_pickup_id: UUID = Field(..., description="The pickup being complained about")
+    complaint_text: Optional[str] = Field(None, max_length=1000, description="Details about the portion issue")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PortionComplaintResponseSchema(BaseModel):
+    """Schema for portion complaint response."""
+    complaint_id: UUID
+    plate_pickup_id: UUID
+    plate_review_id: Optional[UUID] = None
+    restaurant_id: UUID
+    photo_storage_path: Optional[str] = None
+    complaint_text: Optional[str] = None
+    resolution_status: str
+    created_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -918,6 +1091,13 @@ class PlanCreateSchema(BaseModel):
     """Schema for creating a new plan"""
     market_id: UUID = Field(..., description="Market (country) this plan belongs to")
     name: str = Field(..., max_length=100)
+    name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    marketing_description: Optional[str] = Field(None, max_length=1000)
+    marketing_description_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    features: Optional[List[str]] = None
+    features_i18n: Optional[dict] = Field(None, description="Locale map: {en: [...], es: [...]}")
+    cta_label: Optional[str] = Field(None, max_length=200)
+    cta_label_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
     credit: int = Field(..., gt=0)
     price: float = Field(..., ge=0)
     rollover: Optional[bool] = True
@@ -927,6 +1107,13 @@ class PlanUpdateSchema(BaseModel):
     """Schema for updating plan information"""
     market_id: Optional[UUID] = Field(None, description="Market (country) this plan belongs to")
     name: Optional[str] = Field(None, max_length=100)
+    name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    marketing_description: Optional[str] = Field(None, max_length=1000)
+    marketing_description_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
+    features: Optional[List[str]] = None
+    features_i18n: Optional[dict] = Field(None, description="Locale map: {en: [...], es: [...]}")
+    cta_label: Optional[str] = Field(None, max_length=200)
+    cta_label_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
     credit: Optional[int] = Field(None, gt=0)
     price: Optional[float] = Field(None, ge=0)
     rollover: Optional[bool] = None
@@ -934,19 +1121,25 @@ class PlanUpdateSchema(BaseModel):
     status: Optional[Status] = None
 
 class PlanResponseSchema(BaseModel):
-    """Schema for plan response data"""
+    """Schema for plan response data. Includes full _i18n locale maps for B2B edit forms."""
     plan_id: UUID
     market_id: UUID
     name: str
+    name_i18n: Optional[dict] = None
+    marketing_description: Optional[str] = None
+    marketing_description_i18n: Optional[dict] = None
+    features: Optional[List[str]] = None
+    features_i18n: Optional[dict] = None
+    cta_label: Optional[str] = None
+    cta_label_i18n: Optional[dict] = None
     credit: int
     price: float
-    credit_cost_local_currency: float  # price / credit (local currency per credit)
+    credit_cost_local_currency: float
     credit_cost_usd: float
     status: Status
     rollover: bool
     rollover_cap: Optional[Decimal]
     is_archived: bool
-    status: Status
     created_date: datetime
     modified_date: datetime
 
@@ -956,14 +1149,21 @@ class PlanEnrichedResponseSchema(BaseModel):
     """Schema for enriched plan response data with currency name and code"""
     plan_id: UUID
     market_id: UUID
-    market_name: str  # country_name from market_info
-    country_code: str  # from market_info
+    market_name: str
+    country_code: str
     currency_name: str
     currency_code: str
     name: str
+    name_i18n: Optional[dict] = Field(None, exclude=True)
+    marketing_description: Optional[str] = None
+    marketing_description_i18n: Optional[dict] = Field(None, exclude=True)
+    features: Optional[List[str]] = None
+    features_i18n: Optional[dict] = Field(None, exclude=True)
+    cta_label: Optional[str] = None
+    cta_label_i18n: Optional[dict] = Field(None, exclude=True)
     credit: int
     price: float
-    credit_cost_local_currency: float  # price / credit (local currency per credit)
+    credit_cost_local_currency: float
     credit_cost_usd: float
     rollover: bool
     rollover_cap: Optional[Decimal]
@@ -1000,6 +1200,7 @@ class SubscriptionEnrichedResponseSchema(BaseModel):
     subscription_status: Optional[str] = None
     hold_start_date: Optional[datetime] = None
     hold_end_date: Optional[datetime] = None
+    early_renewal_threshold: Optional[int] = 10
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
@@ -1039,7 +1240,8 @@ class AddressCreateSchema(BaseModel):
     """Schema for creating a new address. address_type is ignored by the backend and derived from linkages.
     institution_id and user_id are optional for B2C (Customer); backend sets from JWT. For B2B they are required and must be sent by the client.
     When place_id is provided (from suggest selection), all address fields are ignored and backend fetches Place Details."""
-    place_id: Optional[str] = Field(None, description="Google Place ID from suggest; when set, address fields are ignored and Place Details are fetched")
+    place_id: Optional[str] = Field(None, description="Place identifier from address search (Mapbox mapbox_id or Google place_id); when set, address fields are ignored and details are fetched")
+    session_token: Optional[str] = Field(None, description="Session token from suggest flow for billing optimization")
     institution_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     employer_id: Optional[UUID] = None  # Links address to employer (nullable)
@@ -1126,10 +1328,11 @@ class AddressCreateSchema(BaseModel):
 
 
 class AddressUpdateSchema(BaseModel):
-    """Schema for updating address. Only floor, apartment_unit, is_default (subpremise) are editable. Address core is immutable."""
+    """Schema for updating address. Only floor, apartment_unit, is_default, map_center_label (subpremise) are editable. Address core is immutable."""
     floor: Optional[str] = Field(None, max_length=50)
     apartment_unit: Optional[str] = Field(None, max_length=20)
     is_default: Optional[bool] = None
+    map_center_label: Optional[str] = Field(None, max_length=20, description="Map center-of-gravity label: 'home' or 'other'. NULL defaults to 'home'.")
 
 
 class CityResponseSchema(BaseModel):
@@ -1169,6 +1372,8 @@ class AddressResponseSchema(BaseModel):
     street_name: str
     building_number: str
     apartment_unit: Optional[str]
+    latitude: Optional[float] = Field(None, description="Latitude from geolocation (null if not geocoded)")
+    longitude: Optional[float] = Field(None, description="Longitude from geolocation (null if not geocoded)")
     timezone: str
     is_archived: bool
     status: Status
@@ -1201,6 +1406,8 @@ class AddressEnrichedResponseSchema(BaseModel):
     street_name: str
     building_number: str
     apartment_unit: Optional[str]
+    latitude: Optional[float] = Field(None, description="Latitude from geolocation (null if not geocoded)")
+    longitude: Optional[float] = Field(None, description="Longitude from geolocation (null if not geocoded)")
     timezone: str
     is_archived: bool
     status: Status
@@ -1218,7 +1425,7 @@ class AddressEnrichedResponseSchema(BaseModel):
 
 class AddressSuggestionSchema(BaseModel):
     """One address suggestion from GET /addresses/suggest. Autocomplete only – client selects and sends place_id on create."""
-    place_id: str = Field(..., description="Google Place ID for Place Details on create")
+    place_id: str = Field(..., description="Place identifier from address search (Mapbox mapbox_id or Google place_id)")
     display_text: str = Field(..., description="Human-readable text for dropdown (e.g. '123 Main St, City, Country')")
     country_code: Optional[str] = Field(None, description="ISO 3166-1 alpha-2 when country filter was applied (e.g. AR)")
 
@@ -1226,6 +1433,27 @@ class AddressSuggestionSchema(BaseModel):
 class AddressSuggestResponseSchema(BaseModel):
     """Response for GET /api/v1/addresses/suggest."""
     suggestions: List[AddressSuggestionSchema] = Field(default_factory=list)
+
+
+class CitySnapshotMarkerSchema(BaseModel):
+    """One restaurant marker on a static map snapshot."""
+    restaurant_id: UUID
+    name: str
+    lat: float
+    lng: float
+    pixel_x: int = Field(..., description="X position in CSS pixels from top-left of image")
+    pixel_y: int = Field(..., description="Y position in CSS pixels from top-left of image")
+
+
+class CitySnapshotResponseSchema(BaseModel):
+    """Response for GET /api/v1/maps/city-snapshot. Static map image with restaurant pin positions."""
+    image_url: Optional[str] = Field(None, description="Signed URL for the cached map image. None when no restaurants have coordinates.")
+    center: Optional[dict] = Field(None, description="Center point used for the image: { lat, lng }")
+    zoom: int = 14
+    width: int
+    height: int
+    retina: bool
+    markers: List[CitySnapshotMarkerSchema] = Field(default_factory=list, description="Restaurant pins visible in the image with pixel positions for tap target overlay")
 
 
 class RestaurantEnrichedResponseSchema(BaseModel):
@@ -1247,7 +1475,20 @@ class RestaurantEnrichedResponseSchema(BaseModel):
         description="Credit value in local currency for this market; use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_local_currency)",
     )
     name: str
-    cuisine: Optional[str]
+    cuisine_id: Optional[UUID] = None
+    cuisine_name: Optional[str] = None
+    cuisine_name_i18n: Optional[dict] = Field(None, exclude=True)
+    tagline: Optional[str] = None
+    tagline_i18n: Optional[dict] = Field(None, exclude=True)
+    is_featured: bool = False
+    cover_image_url: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: int = 0
+    verified_badge: bool = False
+    spotlight_label: Optional[str] = None
+    spotlight_label_i18n: Optional[dict] = Field(None, exclude=True)
+    member_perks: Optional[List[str]] = None
+    member_perks_i18n: Optional[dict] = Field(None, exclude=True)
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1744,7 +1985,9 @@ class InstitutionEntityResponseSchema(BaseModel):
     credit_currency_id: UUID
     tax_id: str
     name: str
-    stripe_connect_account_id: Optional[str] = None
+    payout_provider_account_id: Optional[str] = None
+    payout_aggregator: Optional[str] = None
+    payout_onboarding_status: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1769,7 +2012,42 @@ class InstitutionEntityEnrichedResponseSchema(BaseModel):
     address_city: str
     tax_id: str
     name: str
-    stripe_connect_account_id: Optional[str] = None
+    payout_provider_account_id: Optional[str] = None
+    payout_aggregator: Optional[str] = None
+    payout_onboarding_status: Optional[str] = None
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierTermsCreateSchema(BaseModel):
+    """Schema for creating supplier terms for an institution."""
+    no_show_discount: int = Field(0, ge=0, le=100, description="Percentage 0-100 deducted on no-show")
+    payment_frequency: PaymentFrequency = Field(PaymentFrequency.DAILY, description="daily, weekly, biweekly, or monthly")
+    require_invoice: Optional[bool] = Field(None, description="NULL = inherit from market; TRUE/FALSE = override")
+    invoice_hold_days: Optional[int] = Field(None, gt=0, description="NULL = inherit from market default")
+
+class SupplierTermsUpdateSchema(BaseModel):
+    """Schema for updating supplier terms."""
+    no_show_discount: Optional[int] = Field(None, ge=0, le=100)
+    payment_frequency: Optional[PaymentFrequency] = None
+    require_invoice: Optional[bool] = None
+    invoice_hold_days: Optional[int] = Field(None, gt=0)
+
+class SupplierTermsResponseSchema(BaseModel):
+    """Schema for supplier terms response with resolved effective values."""
+    supplier_terms_id: UUID
+    institution_id: UUID
+    no_show_discount: int
+    payment_frequency: PaymentFrequency
+    require_invoice: Optional[bool]
+    invoice_hold_days: Optional[int]
+    effective_require_invoice: bool
+    effective_invoice_hold_days: int
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1790,6 +2068,76 @@ class InstitutionBillPayoutResponseSchema(BaseModel):
     status: str
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BillPayoutEnrichedResponseSchema(BaseModel):
+    """Enriched payout with institution, entity, and billing period context. Entity-level view."""
+    bill_payout_id: UUID
+    institution_bill_id: UUID
+    institution_id: UUID
+    institution_name: str
+    institution_entity_id: UUID
+    institution_entity_name: str
+    provider: str
+    provider_transfer_id: Optional[str] = None
+    amount: Decimal
+    currency_code: str
+    billing_period_start: datetime
+    billing_period_end: datetime
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarketPayoutAggregatorResponseSchema(BaseModel):
+    """Schema for the payout aggregator configured for a market."""
+    market_id: UUID
+    aggregator: str
+    is_active: bool
+    require_invoice: bool
+    max_unmatched_bill_days: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierInvoiceEnrichedResponseSchema(BaseModel):
+    """Enriched supplier invoice with entity name, institution name, created-by user name, and country details."""
+    supplier_invoice_id: UUID
+    institution_entity_id: UUID
+    institution_entity_name: str
+    institution_name: str
+    country_code: str
+    invoice_type: str
+    external_invoice_number: Optional[str] = None
+    issued_date: date
+    amount: Decimal
+    currency_code: str
+    tax_amount: Optional[Decimal] = None
+    tax_rate: Optional[Decimal] = None
+    # Document
+    document_url: Optional[str] = None
+    document_format: Optional[str] = None
+    # Country-specific details (populated based on country_code)
+    ar_details: Optional[dict] = None
+    pe_details: Optional[dict] = None
+    us_details: Optional[dict] = None
+    # Review
+    status: str
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    # Created by
+    created_by_name: Optional[str] = None
+    # Audit
+    is_archived: bool
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1876,15 +2224,23 @@ class NationalHolidaySyncFromProviderSchema(BaseModel):
 # ============================================================================
 
 class DailyOrderItemSchema(BaseModel):
-    """Schema for a single order item in daily orders view"""
-    customer_name: str = Field(..., description="Privacy-safe customer name (First L.)")
+    """Schema for a single order item in daily orders / kiosk view"""
+    plate_pickup_id: Optional[UUID] = Field(None, description="Pickup ID for POST /plate-pickup/{id}/hand-out or /complete")
+    customer_name: str = Field(..., description="Privacy-safe customer initials (M.G.)")
     plate_name: str = Field(..., description="Name of the plate ordered")
-    confirmation_code: str = Field(..., description="Pickup confirmation code")
-    status: str = Field(..., description="Order status")
-    arrival_time: Optional[datetime] = Field(None, description="When customer arrived")
-    pickup_time_range: str = Field(..., description="Expected pickup time range")
+    confirmation_code: Optional[str] = Field(None, description="6-digit numeric confirmation code for kiosk verification")
+    status: str = Field(..., description="Order status: Pending, Arrived, Handed Out, Completed, Cancelled")
+    arrival_time: Optional[datetime] = Field(None, description="When customer scanned QR")
+    expected_completion_time: Optional[datetime] = Field(None, description="Authoritative pickup deadline (arrival_time + countdown_seconds)")
+    completion_time: Optional[datetime] = Field(None, description="When order was completed")
+    countdown_seconds: int = Field(300, description="Configured pickup countdown duration")
+    extensions_used: int = Field(0, description="Timer extensions used by customer")
+    was_collected: bool = Field(False, description="Whether plate was actually picked up")
+    pickup_time_range: str = Field(..., description="Expected pickup time range (HH:MM-HH:MM)")
     kitchen_day: str = Field(..., description="Kitchen day for the order")
-    
+    pickup_type: Optional[str] = Field(None, description="self / offer / request — from pickup preferences")
+    is_no_show: bool = Field(False, description="True when status is Pending and the order's pickup window has passed")
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -1893,8 +2249,10 @@ class OrderSummarySchema(BaseModel):
     total_orders: int = Field(..., description="Total number of orders")
     pending: int = Field(..., description="Number of pending orders (not yet arrived)")
     arrived: int = Field(..., description="Number of arrived orders (waiting for pickup)")
+    handed_out: int = Field(0, description="Number of orders handed out (waiting for customer confirmation)")
     completed: int = Field(..., description="Number of completed orders")
-    
+    no_show: int = Field(0, description="Number of no-show orders (Pending after pickup window closed)")
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -1902,17 +2260,53 @@ class RestaurantDailyOrdersSchema(BaseModel):
     """Schema for a restaurant's daily orders"""
     restaurant_id: UUID = Field(..., description="Restaurant UUID")
     restaurant_name: str = Field(..., description="Restaurant name")
+    require_kiosk_code_verification: bool = Field(False, description="Whether this restaurant requires code entry on kiosk")
+    pickup_window_start: Optional[str] = Field(None, description="Earliest pickup time (HH:MM)")
+    pickup_window_end: Optional[str] = Field(None, description="Latest pickup time (HH:MM)")
     orders: List[DailyOrderItemSchema] = Field(..., description="List of orders for this restaurant")
     summary: OrderSummarySchema = Field(..., description="Summary statistics for this restaurant")
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class DailyOrdersResponseSchema(BaseModel):
     """Schema for daily orders response"""
     order_date: date = Field(..., description="Date of the orders")
+    server_time: datetime = Field(..., description="Server timestamp for timer sync (avoids client clock drift)")
     restaurants: List[RestaurantDailyOrdersSchema] = Field(..., description="List of restaurants with their orders")
     
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VerifyAndHandoffRequest(BaseModel):
+    """Request schema for kiosk code verification + handoff"""
+    confirmation_code: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$', description="6-digit numeric confirmation code from customer's phone")
+    restaurant_id: UUID = Field(..., description="Restaurant where the handoff is happening")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class VerifyCodePlateSchema(BaseModel):
+    """Plate info in verify-and-handoff response"""
+    plate_name: str
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class VerifyAndHandoffResponse(BaseModel):
+    """Response from kiosk code verification + handoff"""
+    match: bool = Field(..., description="Whether a matching order was found")
+    customer_initials: Optional[str] = Field(None, description="Customer initials (M.G.)")
+    plate_pickup_ids: Optional[List[UUID]] = Field(None, description="Matched pickup IDs")
+    plates: Optional[List[VerifyCodePlateSchema]] = Field(None, description="Plates in this order")
+    status: Optional[str] = Field(None, description="New status after handoff (Handed Out)")
+    arrival_time: Optional[datetime] = Field(None, description="When customer scanned QR")
+    expected_completion_time: Optional[datetime] = Field(None, description="Pickup deadline")
+    handed_out_time: Optional[datetime] = Field(None, description="When handoff was recorded")
+    countdown_seconds: Optional[int] = Field(None, description="Timer duration reference")
+    extensions_used: Optional[int] = Field(None, description="Timer extensions used")
+    max_extensions: Optional[int] = Field(None, description="Max extensions allowed")
+    message: Optional[str] = Field(None, description="Error message when match=false")
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -1946,6 +2340,12 @@ class MarketResponseSchema(BaseModel):
     created_date: datetime = Field(..., description="When this market was created")
     modified_date: datetime = Field(..., description="When this market was last modified")
 
+    @computed_field
+    @property
+    def locale(self) -> str:
+        """BCP 47 locale derived from language + country_code (e.g. es-AR)."""
+        return f"{self.language}-{self.country_code}"
+
     @field_validator("kitchen_close_time", mode="before")
     @classmethod
     def parse_kitchen_close_time(cls, v):
@@ -1959,6 +2359,98 @@ class MarketResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadsFeaturedRestaurantSchema(BaseModel):
+    """Schema for GET /leads/featured-restaurant — single localized values, no _i18n maps."""
+    restaurant_id: UUID
+    name: str
+    cuisine_name: Optional[str] = None
+    tagline: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: int = 0
+    cover_image_url: Optional[str] = None
+    spotlight_label: Optional[str] = None
+    verified_badge: bool = False
+    member_perks: Optional[List[str]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadsRestaurantSchema(BaseModel):
+    """GET /leads/restaurants — limited public projection of restaurant_info."""
+    restaurant_id: UUID
+    name: str
+    cuisine_name: Optional[str] = None
+    tagline: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: int = 0
+    cover_image_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadsPlanSchema(BaseModel):
+    """GET /leads/plans — limited public projection of plan_info. All prices are monthly."""
+    plan_id: UUID
+    name: str
+    marketing_description: Optional[str] = None
+    features: List[str] = []
+    cta_label: Optional[str] = None
+    credit: int
+    price: float
+    highlighted: bool = False
+    currency: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadInterestCreateSchema(BaseModel):
+    """POST /leads/interest — notify-me request from marketing site or B2C app."""
+    email: str = Field(..., description="Contact email")
+    country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2")
+    city_name: Optional[str] = Field(None, max_length=100)
+    zipcode: Optional[str] = Field(None, max_length=20)
+    zipcode_only: bool = Field(False, description="Only alert for this zipcode")
+    interest_type: str = Field("customer", description="customer, employer, or supplier")
+    business_name: Optional[str] = Field(None, max_length=200)
+    message: Optional[str] = Field(None, max_length=1000)
+    cuisine_id: Optional[UUID] = Field(None, description="Cuisine preference (customer/supplier)")
+    employee_count_range: Optional[str] = Field(None, max_length=20, description="Company size range (employer)")
+
+
+class LeadInterestResponseSchema(BaseModel):
+    """Response for lead interest endpoints."""
+    lead_interest_id: UUID
+    email: str
+    country_code: str
+    city_name: Optional[str] = None
+    zipcode: Optional[str] = None
+    zipcode_only: bool = False
+    interest_type: str
+    business_name: Optional[str] = None
+    message: Optional[str] = None
+    cuisine_id: Optional[UUID] = None
+    employee_count_range: Optional[str] = None
+    status: str
+    source: str
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadsCuisineSchema(BaseModel):
+    """GET /leads/cuisines — public cuisine list for interest form dropdowns."""
+    cuisine_id: UUID
+    cuisine_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployeeCountRangeSchema(BaseModel):
+    """GET /leads/employee-count-ranges — predefined company size ranges."""
+    range_id: str
+    label: str
+
+
 class MarketPublicMinimalSchema(BaseModel):
     """Minimal schema for public GET /leads/markets (no auth). country_code, country_name, language, and phone prefix for B2C pre-auth locale and signup form."""
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
@@ -1966,6 +2458,12 @@ class MarketPublicMinimalSchema(BaseModel):
     language: str = Field(..., min_length=2, max_length=5, description="Default UI locale for this market: en, es, pt")
     phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix (e.g. '+54'). Use as default country in phone input fields.")
     phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
+
+    @computed_field
+    @property
+    def locale(self) -> str:
+        """BCP 47 locale derived from language + country_code (e.g. es-AR)."""
+        return f"{self.language}-{self.country_code}"
 
 
 class MarketPublicResponseSchema(BaseModel):
@@ -1980,6 +2478,12 @@ class MarketPublicResponseSchema(BaseModel):
     phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
     currency_code: Optional[str] = Field(None, description="Currency code")
     currency_name: Optional[str] = Field(None, description="Currency name")
+
+    @computed_field
+    @property
+    def locale(self) -> str:
+        """BCP 47 locale derived from language + country_code (e.g. es-AR)."""
+        return f"{self.language}-{self.country_code}"
 
     @field_validator("kitchen_close_time", mode="before")
     @classmethod
@@ -2162,3 +2666,41 @@ class EnumsResponseSchema(RootModel[Dict[str, EnumLabeledValuesSchema]]):
         }
     )
 
+
+# =============================================================================
+# INGREDIENT CATALOG SCHEMAS
+# =============================================================================
+
+class IngredientSearchResultSchema(BaseModel):
+    """Single result item from GET /ingredients/search or POST /ingredients/custom."""
+    ingredient_id: UUID
+    name_display: str
+    name_en: Optional[str] = None
+    off_taxonomy_id: Optional[str] = None
+    image_url: Optional[str] = None   # null while unenriched → show generic icon
+    source: str
+    is_verified: bool
+    image_enriched: bool   # True once Wikidata image cron has run for this entry
+
+
+class IngredientCustomCreateSchema(BaseModel):
+    """Request body for POST /ingredients/custom."""
+    name: str = Field(..., min_length=2, max_length=150)
+    lang: Optional[str] = Field(None, pattern="^(es|en|pt)$")
+
+
+class ProductIngredientResponseSchema(BaseModel):
+    """Single ingredient row from GET /products/{id}/ingredients."""
+    product_ingredient_id: UUID
+    ingredient_id: UUID
+    name_display: str
+    name_en: Optional[str] = None
+    image_url: Optional[str] = None
+    sort_order: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductIngredientsSetSchema(BaseModel):
+    """Request body for POST /products/{id}/ingredients (full replacement)."""
+    ingredient_ids: List[UUID] = Field(..., max_length=30)

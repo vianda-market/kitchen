@@ -21,7 +21,34 @@ router = APIRouter(
 
 # Request schemas
 class ScanQRRequest(BaseModel):
-    qr_code_payload: str  # Customer scans QR code and gets the payload string
+    qr_code_id: UUID = Field(..., description="QR code UUID from the signed URL")
+    sig: str = Field(..., min_length=16, max_length=16, pattern=r'^[0-9a-f]{16}$', description="HMAC-SHA256 signature (first 16 hex chars)")
+
+class CompleteOrderRequest(BaseModel):
+    completion_type: Optional[str] = Field(
+        "user_confirmed",
+        pattern=r'^(user_confirmed|user_disputed|timer_expired|confirmation_timeout|kitchen_day_close)$',
+        description="How the pickup was completed: user_confirmed, user_disputed, timer_expired, confirmation_timeout, kitchen_day_close"
+    )
+
+# Response schemas for scan-qr
+class PlateDetail(BaseModel):
+    plate_name: str
+    plate_id: Optional[str] = None
+    description: Optional[str] = None
+
+class ScanQRResponse(BaseModel):
+    plate_pickup_id: Optional[UUID] = None
+    plate_pickup_ids: Optional[List[UUID]] = None
+    restaurant_name: Optional[str] = None
+    restaurant_id: Optional[UUID] = None
+    plates: Optional[List[PlateDetail]] = None
+    countdown_seconds: int = 300
+    max_extensions: int = 3
+    pickup_confirmed: bool = False
+    confirmation_code: Optional[str] = None
+    arrival_time: Optional[datetime] = None
+    server_time: Optional[datetime] = None
 
 # Response schemas for pending orders
 class PlateOrderSummary(BaseModel):
@@ -145,41 +172,55 @@ def scan_qr_code(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Scan QR code to mark customer as arrived - no pickup_id needed"""
-    from app.utils.log import log_error
-    import traceback
-    
+    """Scan signed QR code to mark customer as arrived. Returns pickup confirmation details."""
     def _scan_qr_code():
-        try:
-            result = plate_pickup_service.scan_qr_code_simplified(
-                request.qr_code_payload, current_user, db
-            )
-            return ScanQRResponse(**result)
-        except Exception as e:
-            error_msg = f"Error in QR scan: {str(e)}\nTraceback: {traceback.format_exc()}"
-            log_error(error_msg)
-            # Also write to file for debugging
-            with open("/tmp/qr_scan_error.log", "w") as f:
-                f.write(error_msg)
-            raise
-    
+        result = plate_pickup_service.scan_qr_code_by_id(
+            request.qr_code_id, request.sig, current_user, db
+        )
+        return ScanQRResponse(**result)
+
     return handle_business_operation(_scan_qr_code, "QR code scan processing")
 
-@router.post("/{pickup_id}/complete")
-def complete_order(
-    pickup_id: UUID, 
+@router.post("/{pickup_id}/hand-out")
+def hand_out_order(
+    pickup_id: UUID,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Mark order as complete (DEPRECATED - Use POST /institution-bills/generate-daily-bills instead)
-    
-    This endpoint is deprecated and will be removed in a future version.
-    For testing, use the billing endpoint which automatically completes orders as part of bill generation.
-    In production, orders are automatically completed by the cron job when kitchen days close.
+    """Mark order as Handed Out (restaurant gave the plate to customer). One-tap kiosk action.
+
+    Transitions: Arrived → Handed Out. Auth: Supplier (any role) or Internal.
+    """
+    from app.services.restaurant_staff_service import hand_out_pickup
+
+    def _hand_out():
+        # Validate user is Supplier or Internal
+        if current_user["role_type"] not in ("Supplier", "Internal"):
+            raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
+        return hand_out_pickup(pickup_id, current_user["user_id"], db)
+
+    return handle_business_operation(_hand_out, "order hand-out")
+
+@router.post("/{pickup_id}/complete")
+def complete_order(
+    pickup_id: UUID,
+    request: Optional[CompleteOrderRequest] = None,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Mark order as complete. Accepts optional completion_type for analytics.
+
+    completion_type values:
+    - user_confirmed: User tapped "I received my plate" (default)
+    - user_disputed: User tapped "I didn't receive this" — flags for support review
+    - timer_expired: Countdown timer ran out after all extensions exhausted
+    - confirmation_timeout: 5-min timeout after Handed Out with no customer response
+    - kitchen_day_close: Auto-completed by billing cron at end of kitchen day
     """
     def _complete_order():
-        return plate_pickup_service.complete_order(pickup_id, current_user, db)
-    
+        completion_type = (request.completion_type if request else "user_confirmed") or "user_confirmed"
+        return plate_pickup_service.complete_order(pickup_id, current_user, db, completion_type=completion_type)
+
     return handle_business_operation(_complete_order, "order completion")
 
 # DELETE /plate-pickup/{pickup_id} – Delete (soft-delete) a plate pickup record

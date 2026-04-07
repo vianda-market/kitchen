@@ -53,6 +53,113 @@ def _get_payment_provider_name() -> str:
     return (getattr(settings, "PAYMENT_PROVIDER", None) or "mock").strip().lower()
 
 
+def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.connection):
+    """Check if user is a benefit employee and compute employer/employee split.
+    Returns dict with split info, or None if user is not a benefit employee."""
+    from app.services.crud_service import institution_service
+    from app.services.employer.program_service import get_program_by_institution
+    from app.services.employer.billing_service import compute_employee_benefit
+
+    user = db_read(
+        "SELECT institution_id FROM user_info WHERE user_id = %s::uuid AND is_archived = FALSE",
+        (str(user_id),), connection=db, fetch_one=True,
+    )
+    if not user:
+        return None
+    institution_id = user["institution_id"]
+
+    inst = institution_service.get_by_id(institution_id, db, scope=None)
+    if not inst:
+        return None
+    inst_type = getattr(inst, "institution_type", None)
+    inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
+    if inst_type_str != "Employer":
+        return None
+
+    program = get_program_by_institution(institution_id, db)
+    if not program or not program.is_active:
+        return None
+
+    plan_price = float(getattr(plan, "price", 0))
+    benefit_cap = float(program.benefit_cap) if program.benefit_cap is not None else None
+
+    # Compute monthly cap usage for this user
+    already_used = 0.0
+    if benefit_cap is not None and program.benefit_cap_period == "monthly":
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        usage_rows = db_read(
+            """
+            SELECT COALESCE(SUM(ebl.employee_benefit), 0) as total_used
+            FROM employer_bill_line ebl
+            JOIN employer_bill eb ON ebl.employer_bill_id = eb.employer_bill_id
+            WHERE ebl.user_id = %s::uuid
+              AND ebl.renewal_date >= %s
+            """,
+            (str(user_id), month_start),
+            connection=db, fetch_one=True,
+        )
+        already_used = float(usage_rows["total_used"]) if usage_rows else 0.0
+
+    employee_benefit, employee_share = compute_employee_benefit(
+        plan_price=plan_price,
+        benefit_rate=program.benefit_rate,
+        benefit_cap=benefit_cap,
+        benefit_cap_period=program.benefit_cap_period,
+        already_used_this_month=already_used,
+    )
+
+    return {
+        "employee_share": employee_share,
+        "employee_share_cents": int(round(employee_share * 100)),
+        "employee_benefit": employee_benefit,
+        "institution_id": institution_id,
+        "program": program,
+    }
+
+
+def _create_fully_subsidized_subscription(
+    user_id: UUID, plan, market_id, benefit_info: dict, db: psycopg2.extensions.connection
+):
+    """Create a subscription that activates immediately with no payment (100% employer subsidy)."""
+    from app.utils.log import log_info
+    plan_credit = int(getattr(plan, "credit", 0))
+    program = benefit_info["program"]
+    early_threshold = None if not program.allow_early_renewal else 10
+
+    # Check for existing subscription in this market
+    existing = get_subscription_by_user_and_market(user_id, market_id, db)
+    if existing:
+        if existing.subscription_status == SubscriptionStatus.ACTIVE.value:
+            raise HTTPException(status_code=409, detail={"code": "already_active", "subscription_id": str(existing.subscription_id), "message": "You already have an active subscription in this market."})
+
+    create_data = {
+        "plan_id": plan.plan_id,
+        "user_id": user_id,
+        "market_id": market_id,
+        "balance": plan_credit,
+        "status": Status.ACTIVE,
+        "subscription_status": SubscriptionStatus.ACTIVE.value,
+        "early_renewal_threshold": early_threshold,
+        "modified_by": user_id,
+    }
+    subscription = subscription_service.create(create_data, db, scope=None)
+    if not subscription:
+        raise HTTPException(status_code=500, detail="Failed to create subscription.")
+    log_info(f"Fully-subsidized subscription {subscription.subscription_id} created for benefit employee {user_id}")
+
+    # Return same shape as with-payment but with no-payment indicators
+    return {
+        "subscription_id": subscription.subscription_id,
+        "payment_id": subscription.subscription_id,  # No real payment — use subscription_id as placeholder
+        "external_payment_id": "fully_subsidized",
+        "client_secret": "fully_subsidized",
+        "amount_cents": 0,
+        "currency": "usd",
+    }
+
+
 @router.post("/with-payment", response_model=SubscriptionWithPaymentResponseSchema)
 def create_subscription_with_payment(
     body: SubscriptionWithPaymentRequestSchema,
@@ -79,6 +186,16 @@ def create_subscription_with_payment(
     market_id = plan.market_id
     currency = (market.get("currency_code") or "usd").lower()
     amount_cents = int(round(float(plan.price) * 100))
+
+    # Employer benefit detection: adjust amount if user is a benefit employee
+    employer_benefit_info = _compute_employer_benefit(user_id, plan, db)
+    if employer_benefit_info is not None:
+        if employer_benefit_info["employee_share_cents"] == 0:
+            # Fully subsidized — activate immediately, no payment
+            return _create_fully_subsidized_subscription(user_id, plan, market_id, employer_benefit_info, db)
+        else:
+            # Partial subsidy — charge employee their share only
+            amount_cents = employer_benefit_info["employee_share_cents"]
 
     existing = get_subscription_by_user_and_market(user_id, market_id, db)
     if existing:

@@ -5,7 +5,7 @@ This router provides atomic QR code operations with automatic image generation.
 Replaces the generic CRUD routes for QR codes with specialized business logic.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import HTMLResponse
 from uuid import UUID
 from typing import List, Optional
@@ -30,6 +30,7 @@ from app.services.error_handling import handle_business_operation, handle_get_by
 from app.utils.error_messages import entity_not_found
 from app.utils.log import log_error
 from app.security.entity_scoping import EntityScopingService, ENTITY_QR_CODE, ENTITY_RESTAURANT
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 router = APIRouter(prefix="/qr-codes", tags=["QR Codes"])
@@ -95,6 +96,8 @@ def get_all_qr_codes(
 # GET /qr-codes/enriched - List all QR codes with enriched data
 @router.get("/enriched", response_model=List[QRCodeEnrichedResponseSchema])
 def list_enriched_qr_codes(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -104,8 +107,11 @@ def list_enriched_qr_codes(
         enriched_qr_codes = get_enriched_qr_codes(
             db,
             scope=scope,
-            include_archived=False
+            include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
+        set_pagination_headers(response, enriched_qr_codes)
         return enriched_qr_codes
     except HTTPException:
         raise

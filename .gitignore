@@ -27,8 +27,12 @@ kenv/
 .vscode/
 .cursor/
 
+# Claude Code
+.claude/
+
 # Custom project files
 .qodo
+.mcp.json
 
 # Local-only documentation (credentials, notes)
 docs/local/

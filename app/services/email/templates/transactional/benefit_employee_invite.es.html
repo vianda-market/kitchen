@@ -1,0 +1,14 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Tu beneficio de comidas en Vianda esta listo!</h1>
+<p>Hola {{ first_name }},</p>
+<p><strong>{{ employer_name }}</strong> te inscribio en un beneficio de suscripcion de comidas con Vianda.</p>
+<h2 style="color: #2c3e50; font-size: 18px;">Para comenzar:</h2>
+<p><strong>Paso 1:</strong> Establece tu contrasena</p>
+<p style="margin: 15px 0;"><a href="{{ set_password_url }}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Establecer contrasena</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">O copia este enlace: {{ set_password_url }}</p>
+<p><strong>Paso 2:</strong> Descarga la app de Vianda</p>
+<p style="margin: 10px 0;"><a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a> | <a href="{{ play_store_url }}">Google Play</a></p>
+<p><strong>Paso 3:</strong> Inicia sesion y explora los planes</p>
+<p style="font-size: 14px; color: #7f8c8d;">Este enlace expira en {{ expiry_hours }} horas.</p>
+{% endblock %}

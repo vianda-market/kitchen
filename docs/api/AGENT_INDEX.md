@@ -7,7 +7,7 @@ Add this file's path to your repo's `CLAUDE.md` to give your agent full context.
 /Users/cdeachaval/Desktop/local/kitchen/docs/api/AGENT_INDEX.md
 ```
 
-**Roadmap index** (planned features, cross-repo coordination): `/Users/cdeachaval/Desktop/local/kitchen/docs/roadmap/AGENT_INDEX.md`
+**Plans index** (planned features, cross-repo coordination): `/Users/cdeachaval/Desktop/local/kitchen/docs/plans/AGENT_INDEX.md`
 **Live schema** (when backend is running): `http://localhost:8000/openapi.json`
 **TypeScript types**: `npx openapi-typescript http://localhost:8000/openapi.json -o src/api/types.ts`
 **Auth**: `POST /api/v1/auth/token` → `Authorization: Bearer {token}`
@@ -41,16 +41,25 @@ _Routes: `/auth/token`, `/users/`, `/users/me`, `/customers/signup/`_
 ---
 
 ## Discovery & Onboarding
-_Routes: `/leads/`, `/markets/`, `/enums/`_
+_Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-status`, `/users/me/onboarding-status`_
 
 | Audience | File | Description |
 |----------|------|-------------|
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/ONBOARDING_STATUS_B2B.md` | Supplier/employer onboarding status — 7-item checklist, JWT claim, gated navigation, dashboard progress |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/ONBOARDING_STATUS_DELIVERY_RESPONSE.md` | Delivery response: all 6 items complete, summary endpoint shape, stall detection, activity tracking, open questions answered |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/CUSTOMER_ONBOARDING_STATUS_B2C.md` | Customer onboarding — email verification + subscription checklist, JWT claim, subscribe prompts |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/ONBOARDING_CLARIFICATIONS_B2C.md` | Clarifications: JWT on all flows, sync status, deep links, email suppression, deferred endpoints |
 | B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/MARKET_SELECTION_AT_SIGNUP.md` | Country dropdown for signup — use `GET /leads/markets`, send `country_code` |
 | B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/LEADS_ENDPOINTS_MIGRATION.md` | Market dropdown migrated from `/markets` to `/leads` — migration guide |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/ENUM_SERVICE_SPECIFICATION.md` | Fetch enum values dynamically from `/enums/` instead of hardcoding |
+| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/LANGUAGE_AND_LOCALE_FOR_CLIENTS.md` | i18n scaffolding — locales endpoint, locale-aware market names, BCP 47 locale field, enum labels, JWT locale claim |
 | B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/MARKETS_API_CLIENT.md` | Markets API — multi-currency, multi-timezone, institution scoping |
 | B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/INSTITUTION_MARKET_ID.md` | Every institution must have `market_id` — not nullable, required on create |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/ZIPCODE_METRICS_LEAD_API.md` | Pre-signup coverage check with restaurant count by zipcode |
+| Marketing | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Coverage checker, interest forms, reCAPTCHA, restaurant/plan endpoints for marketing site |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/LEADS_SIMPLIFICATION.md` | Remove coverage check from app, simplify signup, add "not served" → marketing site link |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
+| Infra | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/LEADS_MIGRATION_INFRA.md` | reCAPTCHA and CORS env vars for Cloud Run |
 
 ---
 
@@ -70,13 +79,15 @@ _Routes: `/subscriptions/`, `/customer/payment-methods/`, `/customer/payment-pro
 ---
 
 ## Institution Billing (B2B)
-_Routes: `/institution-bills/`, `/admin/discretionary/`, `/super-admin/discretionary/`_
+_Routes: `/institution-bills/`, `/supplier-invoices/`, `/admin/discretionary/`, `/super-admin/discretionary/`_
 
 | Audience | File | Description |
 |----------|------|-------------|
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/SUPPLIER_INVOICE_REGISTRATION_B2B.md` | Supplier invoice registration — bill matching, AR/US validation, W-9 collection, review flow |
 | B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/DISCRETIONARY_REQUEST_FORM_GUIDE.md` | Discretionary credit request form — category/reason schema |
-| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/INSTITUTION_NO_SHOW_DISCOUNT.md` | Configure no-show discount rate at institution level |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/SUPPLIER_TERMS_B2B.md` | Supplier terms — no-show discount, payment frequency, invoice compliance overrides |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md` | Removed features: fintech links, manual bill creation, bank accounts |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/PAYOUT_HISTORY_ENRICHED_B2B.md` | Enriched payout history list — entity-level view with institution, billing period |
 
 ---
 
@@ -117,6 +128,10 @@ _Routes: `/plate-selections/`, `/plate-pickup/`, `/favorites/`_
 | B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md` | Recommendation badges and favorite hearts on plate cards |
 | B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/POST_RESERVATION_PICKUP_B2C.md` | Post-reservation pickup intent and coworker matching flow |
 | B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/PICKUP_AVAILABILITY_AT_KITCHEN_START.md` | Show when a reserved plate is ready for pickup |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/POST_PICKUP_FLOW_API.md` | Signed QR codes, enhanced scan-qr, completion tracking, extended reviews |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/PUSH_NOTIFICATIONS_API.md` | FCM token registration, push on Handed Out, timer sync fields, portion complaint field names |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/PLATE_REVIEW_FEEDBACK_B2B.md` | Customer review comments and feedback for restaurant dashboard |
+| B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/KIOSK_MODE_API.md` | Kiosk mode — daily orders, verify-and-handoff, hand-out, timer sync, Operator access matrix |
 
 ---
 
@@ -132,11 +147,12 @@ _Routes: `/employers/`, `/institution-entities/`_
 ---
 
 ## Geography
-_Routes: `/addresses/`, `/cities/`, `/provinces/`, `/countries/`_
+_Routes: `/addresses/`, `/maps/`, `/cities/`, `/provinces/`, `/countries/`_
 
 | Audience | File | Description |
 |----------|------|-------------|
-| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/ADDRESSES_API_CLIENT.md` | Address autocomplete and creation with geolocation |
+| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/ADDRESSES_API_CLIENT.md` | Address autocomplete and creation with geolocation (Mapbox provider, session_token) |
+| B2C | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` | Static map images for Explore tab — `GET /maps/city-snapshot` with pin pixel positions, center-of-gravity address selection, Mapbox SDK fallback plan |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/PROVINCES_API_CLIENT.md` | Provinces for cascading country → province → city dropdowns |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/COUNTRY_CODE_API_CONTRACT.md` | Accept alpha-2 or alpha-3; always store and return alpha-2 |
 | B2B | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/b2b_client/TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md` | Backend derives timezone from country/province — no client input needed |
@@ -165,6 +181,9 @@ _Applies across all routes_
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/STATUS_ON_CREATE.md` | Do not send `status` on create requests — backend sets the default |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/BULK_API_PATTERN.md` | Atomic bulk create/update/delete for batch operations |
 | Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/MARKET_AND_SCOPE_GUIDELINE.md` | Market behavior, institution scoping, and subscription rules |
+| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/RATE_LIMIT_HANDLING_CLIENT.md` | Per-user rate limiting — tiers, 429 handling, `X-RateLimit-*` headers, subscribe prompt for Free tier |
+| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/GENERIC_PAGINATION_CLIENT.md` | Server-side pagination — `page`/`page_size` query params, `X-Total-Count` header, opt-in endpoint list |
+| Both | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/shared_client/CAPTCHA_PROTECTION.md` | reCAPTCHA v3 on auth endpoints — conditional (login, verify, recovery) and always-on (signup/request for web) |
 
 ---
 
@@ -184,6 +203,11 @@ _Deployment, hosting, and backend environment requirements_
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/README.md` | Infrastructure is moving to a separate Pulumi repo (from legacy CloudFormation) |
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/feedback_for_infra.md` | Backend requirements for the infra team — FastAPI, PostgreSQL, env vars, and dependency specs |
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/STRIPE_PAYMENT_INFRASTRUCTURE.md` | Stripe payment infrastructure — GCP Secret Manager secrets, Cloud Run env vars, Stripe Dashboard webhook registration, per-environment activation checklist |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/SUPPLIER_INVOICE_STORAGE_INFRASTRUCTURE.md` | Supplier invoice GCS storage schema — bucket paths, per-country lifecycle policies for document retention |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/GCS_BUCKET_SCHEMA_STABILIZATION.md` | **GCS bucket schema stabilization** — canonical blob path inventory across all 4 private buckets, lifecycle policy gaps (QR code deletion risk), architectural questions, and deliverables for infra agent |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/MAPBOX_CONFIGURATION_INFRASTRUCTURE.md` | **Mapbox address/geocoding** — Secret Manager tokens, Cloud Run env vars, `ADDRESS_PROVIDER` toggle, per-environment activation checklist |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/SENDGRID_EMAIL_INFRASTRUCTURE.md` | **SendGrid email** — GCP Marketplace setup, Secret Manager API key, Cloud Run env vars, DNS domain auth (SPF/DKIM/DMARC on vianda.market), per-environment activation checklist |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/infrastructure/RATE_LIMIT_INFRASTRUCTURE.md` | **Rate limiting** — `RATE_LIMIT_ENABLED` env var, activation checklist, no Redis dependency |
 
 ---
 
@@ -218,6 +242,7 @@ _Architecture decisions, design patterns, and implementation guides for agents w
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/internal/SUPPLIER_INSTITUTION_PAYMENT.md` | Atomic settlement, bill, and payout flow — no zero-value transactions |
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/internal/UNIFIED_PAYMENT_METHODS_AND_ATTEMPT_DEPRECATION.md` | Unified payment methods backed by aggregators; payment attempts table removed |
 | `/Users/cdeachaval/Desktop/local/kitchen/docs/api/internal/FINTECH_LINK_DEPRECATION.md` | Fintech link endpoints deprecated — use atomic subscription-with-payment instead |
+| `/Users/cdeachaval/Desktop/local/kitchen/docs/api/internal/FINANCIAL_DATA_HIERARCHY.md` | **Start here for financial data** — Transaction → Balance → Settlement → Bill → Payout → Invoice hierarchy, table-to-level map, design decisions |
 
 ### Restaurant & Operations
 

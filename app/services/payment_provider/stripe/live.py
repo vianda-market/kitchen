@@ -79,7 +79,7 @@ def create_customer_checkout_setup_session(
     Commits after provider insert so the record survives Session.create failures (return 502 to client).
 
     TODO: Stripe may deprecate payment_method_types=['card'] in favor of automatic_payment_methods or
-    payment_method_configuration — see docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md
+    payment_method_configuration — see docs/plans/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md
     """
     _ensure_stripe_configured()
     cursor = db.cursor()

@@ -1,0 +1,22 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Activa tu suscripcion en Vianda</h1>
+<p>Hola {{ user_first_name }},</p>
+<p>Bienvenido a Vianda! Ya verificaste tu email — ahora es momento de elegir un plan y empezar a disfrutar comidas diarias de restaurantes locales.</p>
+<p>Con una suscripcion de Vianda podes:</p>
+<ul style="padding-left: 20px;">
+    <li>Explorar platos frescos del dia de restaurantes cerca tuyo</li>
+    <li>Reservar y retirar tus comidas cuando quieras</li>
+    <li>Ahorrar con precios de suscripcion</li>
+</ul>
+{% if app_deep_link %}
+<p style="margin: 25px 0;">
+    <a href="{{ app_deep_link }}" style="background-color: #4a7c59; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Abrir en Vianda</a>
+</p>
+{% endif %}
+<p style="margin: 10px 0; font-size: 14px; color: #7f8c8d;">
+    <a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">Preguntas? Responde a este correo — con gusto te ayudamos.</p>
+{% endblock %}

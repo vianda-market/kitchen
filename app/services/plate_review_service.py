@@ -22,12 +22,12 @@ def create_review(
     stars_rating: int,
     portion_size_rating: int,
     db: psycopg2.extensions.connection,
+    *,
+    would_order_again: Optional[bool] = None,
+    comment: Optional[str] = None,
 ) -> PlateReviewDTO:
     """
     Create a plate review. One review per pickup; immutable after creation.
-
-    Eligibility: The pickup must belong to the user, have was_collected=true,
-    and must not already have a review.
 
     Args:
         user_id: Current user (Customer)
@@ -35,6 +35,8 @@ def create_review(
         stars_rating: 1-5
         portion_size_rating: 1-3
         db: Database connection
+        would_order_again: Optional boolean — would user order this plate again
+        comment: Optional text feedback for the restaurant (max 500 chars)
 
     Returns:
         PlateReviewDTO of the created review
@@ -92,13 +94,18 @@ def create_review(
         "stars_rating": stars_rating,
         "portion_size_rating": portion_size_rating,
     }
+    if would_order_again is not None:
+        data["would_order_again"] = would_order_again
+    if comment is not None:
+        data["comment"] = comment.strip()[:500]
     review_id = db_insert("plate_review_info", data, connection=db)
 
     # 4. Fetch and return
     row = db_read(
         """
         SELECT plate_review_id, user_id, plate_id, plate_pickup_id,
-               stars_rating, portion_size_rating, is_archived, created_date, modified_date
+               stars_rating, portion_size_rating, would_order_again, comment,
+               is_archived, created_date, modified_date
         FROM plate_review_info
         WHERE plate_review_id = %s
         """,
@@ -121,7 +128,8 @@ def get_reviews_by_user(
     rows = db_read(
         f"""
         SELECT plate_review_id, user_id, plate_id, plate_pickup_id,
-               stars_rating, portion_size_rating, is_archived, created_date, modified_date
+               stars_rating, portion_size_rating, would_order_again, comment,
+               is_archived, created_date, modified_date
         FROM plate_review_info
         WHERE user_id = %s {archived_clause}
         ORDER BY plate_review_id DESC
@@ -142,7 +150,8 @@ def get_review_by_pickup(
     row = db_read(
         """
         SELECT plate_review_id, user_id, plate_id, plate_pickup_id,
-               stars_rating, portion_size_rating, is_archived, created_date, modified_date
+               stars_rating, portion_size_rating, would_order_again, comment,
+               is_archived, created_date, modified_date
         FROM plate_review_info
         WHERE plate_pickup_id = %s AND user_id = %s AND is_archived = FALSE
         """,
@@ -151,6 +160,64 @@ def get_review_by_pickup(
         fetch_one=True,
     )
     return PlateReviewDTO(**row) if row else None
+
+
+def get_enriched_reviews_by_institution(
+    institution_id: Optional[UUID],
+    db: psycopg2.extensions.connection,
+    *,
+    plate_id: Optional[UUID] = None,
+    restaurant_id: Optional[UUID] = None,
+) -> List[dict]:
+    """
+    Return enriched plate reviews scoped to an institution (supplier).
+    No customer PII (user_id, plate_pickup_id excluded).
+
+    Args:
+        institution_id: Supplier institution UUID. None = global (Internal users).
+        db: Database connection
+        plate_id: Optional filter by plate
+        restaurant_id: Optional filter by restaurant
+
+    Returns:
+        List of dicts matching PlateReviewEnrichedResponseSchema fields
+    """
+    conditions = ["pr.is_archived = FALSE"]
+    params: list = []
+
+    if institution_id is not None:
+        conditions.append("ie.institution_id = %s")
+        params.append(str(institution_id))
+
+    if plate_id is not None:
+        conditions.append("pr.plate_id = %s")
+        params.append(str(plate_id))
+
+    if restaurant_id is not None:
+        conditions.append("pl.restaurant_id = %s")
+        params.append(str(restaurant_id))
+
+    where_clause = " AND ".join(conditions)
+
+    rows = db_read(
+        f"""
+        SELECT pr.plate_review_id, pr.plate_id, prod.name AS plate_name,
+               r.name AS restaurant_name,
+               pr.stars_rating, pr.portion_size_rating,
+               pr.would_order_again, pr.comment, pr.created_date
+        FROM plate_review_info pr
+        JOIN plate_info pl ON pr.plate_id = pl.plate_id
+        JOIN product_info prod ON pl.product_id = prod.product_id
+        JOIN restaurant_info r ON pl.restaurant_id = r.restaurant_id
+        JOIN institution_entity_info ie ON r.restaurant_id = ie.entity_id
+        WHERE {where_clause}
+        ORDER BY pr.created_date DESC
+        """,
+        tuple(params),
+        connection=db,
+        fetch_one=False,
+    ) or []
+    return rows
 
 
 def get_plate_review_aggregates(
@@ -186,3 +253,92 @@ def get_plate_review_aggregates(
         }
         for r in rows
     }
+
+
+def file_portion_complaint(
+    plate_review_id: UUID,
+    user_id: UUID,
+    complaint_text: Optional[str],
+    photo_storage_path: Optional[str],
+    db: psycopg2.extensions.connection,
+) -> dict:
+    """
+    File a portion complaint for a review with portion_size_rating == 1.
+
+    Args:
+        plate_review_id: The review this complaint is for
+        user_id: Current customer user
+        complaint_text: Optional details about the portion issue
+        photo_storage_path: Optional GCS path to complaint photo
+        db: Database connection
+
+    Returns:
+        Dict with complaint details
+
+    Raises:
+        HTTPException: 404 if review not found, 403 if not owned, 400 if portion rating != 1
+    """
+    # Validate review exists, belongs to user, and has portion_size_rating == 1
+    review = db_read(
+        """
+        SELECT plate_review_id, user_id, plate_id, plate_pickup_id, portion_size_rating
+        FROM plate_review_info
+        WHERE plate_review_id = %s AND is_archived = FALSE
+        """,
+        (str(plate_review_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if str(review["user_id"]) != str(user_id):
+        raise HTTPException(status_code=403, detail="Review does not belong to you")
+    if review["portion_size_rating"] != 1:
+        raise HTTPException(status_code=400, detail="Portion complaints can only be filed for reviews with portion size rating of 1 (small)")
+
+    # Check no existing complaint for this review
+    existing = db_read(
+        "SELECT complaint_id FROM portion_complaint WHERE plate_review_id = %s",
+        (str(plate_review_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="A portion complaint has already been filed for this review")
+
+    # Get restaurant_id from the pickup
+    pickup = db_read(
+        "SELECT restaurant_id FROM plate_pickup_live WHERE plate_pickup_id = %s",
+        (str(review["plate_pickup_id"]),),
+        connection=db,
+        fetch_one=True,
+    )
+    restaurant_id = pickup["restaurant_id"] if pickup else None
+
+    # Insert complaint
+    data = {
+        "plate_pickup_id": str(review["plate_pickup_id"]),
+        "plate_review_id": str(plate_review_id),
+        "user_id": str(user_id),
+        "restaurant_id": str(restaurant_id) if restaurant_id else None,
+    }
+    if complaint_text:
+        data["complaint_text"] = complaint_text.strip()[:1000]
+    if photo_storage_path:
+        data["photo_storage_path"] = photo_storage_path
+
+    complaint_id = db_insert("portion_complaint", data, connection=db)
+
+    # Fetch and return
+    row = db_read(
+        """
+        SELECT complaint_id, plate_pickup_id, plate_review_id, restaurant_id,
+               photo_storage_path, complaint_text, resolution_status, created_date
+        FROM portion_complaint WHERE complaint_id = %s
+        """,
+        (str(complaint_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    log_info(f"Portion complaint filed: {complaint_id} for review {plate_review_id} by user {user_id}")
+    return row

@@ -1,0 +1,17 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Você está perdendo o melhor do Vianda</h1>
+<p>Oi {{ user_first_name }},</p>
+<p>Notamos que você ainda não assinou. Restaurantes na sua região estão servindo pratos frescos todos os dias — e você está perdendo!</p>
+<p>Assinar leva menos de um minuto. Abra o app Vianda, escolha um plano e comece a pedir hoje mesmo.</p>
+{% if app_deep_link %}
+<p style="margin: 25px 0;">
+    <a href="{{ app_deep_link }}" style="background-color: #4a7c59; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Abrir no Vianda</a>
+</p>
+{% endif %}
+<p style="margin: 10px 0; font-size: 14px; color: #7f8c8d;">
+    <a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">Dúvidas? Responda este e-mail — teremos prazer em ajudar.</p>
+{% endblock %}

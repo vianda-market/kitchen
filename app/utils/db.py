@@ -207,6 +207,10 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('institution_bill_history', 'resolution'): 'bill_resolution_enum',
         # Favorite entity type enum
         ('user_favorite_info', 'entity_type'): 'favorite_entity_type_enum',
+        # Notification banner enums
+        ('notification_banner', 'notification_type'): 'notification_banner_type_enum',
+        ('notification_banner', 'priority'): 'notification_banner_priority_enum',
+        ('notification_banner', 'action_status'): 'notification_banner_action_status_enum',
     }
     
     # Handle enum arrays for address_type (special case - must come before scalar enum handling)
@@ -295,6 +299,7 @@ PRIMARY_KEY_MAPPING = {
     "geolocation_info": "geolocation_id",
     "plate_kitchen_days": "plate_kitchen_day_id",
     "restaurant_holidays": "holiday_id",
+    "notification_banner": "notification_id",
     # role_info, status_info, transaction_type_info removed
 }
 

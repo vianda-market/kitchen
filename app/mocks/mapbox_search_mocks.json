@@ -1,0 +1,74 @@
+{
+  "suggest": {
+    "suggestions": [
+      {
+        "name": "Avenida Santa Fe 2567",
+        "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjg",
+        "full_address": "Avenida Santa Fe 2567, C1425 Buenos Aires, Argentina",
+        "place_formatted": "C1425 Buenos Aires, Argentina",
+        "context": {
+          "country": {"country_code": "AR", "name": "Argentina"},
+          "region": {"name": "Buenos Aires"},
+          "place": {"name": "Buenos Aires"},
+          "postcode": {"name": "C1425"},
+          "street": {"name": "Avenida Santa Fe"},
+          "address": {"address_number": "2567"}
+        }
+      },
+      {
+        "name": "Avenida Corrientes 1234",
+        "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjk",
+        "full_address": "Avenida Corrientes 1234, C1043 Buenos Aires, Argentina",
+        "place_formatted": "C1043 Buenos Aires, Argentina",
+        "context": {
+          "country": {"country_code": "AR", "name": "Argentina"},
+          "region": {"name": "Ciudad Autonoma de Buenos Aires"},
+          "place": {"name": "Buenos Aires"},
+          "postcode": {"name": "C1043"},
+          "street": {"name": "Avenida Corrientes"},
+          "address": {"address_number": "1234"}
+        }
+      }
+    ]
+  },
+  "retrieve": {
+    "dXJuOm1ieHBsYzo0NTk2Mjg": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.4023328, -34.5880634]
+      },
+      "properties": {
+        "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjg",
+        "full_address": "Avenida Santa Fe 2567, C1425 Buenos Aires, Argentina",
+        "context": {
+          "country": {"country_code": "AR", "name": "Argentina"},
+          "region": {"name": "Buenos Aires"},
+          "place": {"name": "Buenos Aires"},
+          "postcode": {"name": "C1425"},
+          "street": {"name": "Avenida Santa Fe"},
+          "address": {"address_number": "2567"}
+        }
+      }
+    },
+    "dXJuOm1ieHBsYzo0NTk2Mjk": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.3816591, -34.6037389]
+      },
+      "properties": {
+        "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjk",
+        "full_address": "Avenida Corrientes 1234, C1043 Buenos Aires, Argentina",
+        "context": {
+          "country": {"country_code": "AR", "name": "Argentina"},
+          "region": {"name": "Ciudad Autonoma de Buenos Aires"},
+          "place": {"name": "Buenos Aires"},
+          "postcode": {"name": "C1043"},
+          "street": {"name": "Avenida Corrientes"},
+          "address": {"address_number": "1234"}
+        }
+      }
+    }
+  }
+}

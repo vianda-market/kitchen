@@ -16,6 +16,7 @@ from app.tests.database.test_data.expected_seed_data import (
     get_expected_institution_count,
     get_expected_currency_count,
     get_expected_market_count,
+    get_expected_cuisine_count,
 )
 
 
@@ -52,6 +53,14 @@ class TestSeedDataCounts:
         expected = get_expected_market_count()
         assert count == expected, (
             f"Expected {expected} market(s) in seed, found {count}"
+        )
+
+    def test_cuisine_seed_count(self, db_transaction):
+        """Test that seed has the expected number of cuisines (22 non-archived)."""
+        count = count_non_archived_rows(db_transaction, 'cuisine')
+        expected = get_expected_cuisine_count()
+        assert count == expected, (
+            f"Expected {expected} cuisine(s) in seed, found {count}"
         )
 
 

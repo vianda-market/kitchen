@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Response
 from typing import Optional, List
 from uuid import UUID
 from app.dto.models import EmployerDTO
@@ -21,6 +21,7 @@ from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning
 from app.utils.query_params import limit_query
 from app.utils.error_messages import employer_not_found
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 router = APIRouter(
@@ -51,13 +52,21 @@ def search_employers(
 # Must be registered before /{employer_id} so /enriched is not parsed as employer_id.
 @router.get("/enriched", response_model=List[EmployerEnrichedResponseSchema])
 def get_all_employers_enriched(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Get all employers with enriched address data. Non-archived only."""
     def _get_enriched_employers():
-        return get_enriched_employers(db, include_archived=False)
-    
-    return handle_business_operation(_get_enriched_employers, "enriched employers retrieval")
+        return get_enriched_employers(
+            db, include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
+        )
+
+    result = handle_business_operation(_get_enriched_employers, "enriched employers retrieval")
+    set_pagination_headers(response, result)
+    return result
 
 # GET /employers/enriched/{employer_id} - Get single employer with enriched address data
 @router.get("/enriched/{employer_id}", response_model=EmployerEnrichedResponseSchema)

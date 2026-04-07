@@ -141,3 +141,9 @@ CREATE INDEX IF NOT EXISTS idx_address_info_country_province_city ON core.addres
 
 -- Discretionary history: look up creator (CREATE row) by discretionary_id and operation
 CREATE INDEX IF NOT EXISTS idx_discretionary_history_discretionary_operation ON audit.discretionary_history(discretionary_id, operation);
+
+-- Lead interest: email lookup, country+city filter, interest type filter
+CREATE INDEX IF NOT EXISTS idx_lead_interest_email ON core.lead_interest(email);
+CREATE INDEX IF NOT EXISTS idx_lead_interest_country_city ON core.lead_interest(country_code, city_name) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_lead_interest_type ON core.lead_interest(interest_type) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_lead_interest_cuisine ON core.lead_interest(cuisine_id) WHERE cuisine_id IS NOT NULL AND NOT is_archived;

@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "geo-test-001",
 		"name": "007 Geolocation Testing",
-		"description": "Tests for geolocation service functionality including geocoding, reverse geocoding, and distance calculations. Works in both DEV_MODE (mock responses) and production mode (real Google Maps API).",
+		"description": "Tests for geolocation service functionality including geocoding, reverse geocoding, and distance calculations. Works in both DEV_MODE (mock responses) and production mode (real Mapbox Geocoding API). Provider controlled by ADDRESS_PROVIDER setting (default: mapbox).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"event": [
@@ -24,7 +24,7 @@
 	],
 	"item": [
 		{
-			"name": "🔐 Setup & Authentication",
+			"name": "Setup & Authentication",
 			"item": [
 				{
 					"name": "Login Vianda Admin",
@@ -43,8 +43,7 @@
 									"pm.collectionVariables.set(\"authToken\", access_token);",
 									"pm.collectionVariables.set(\"adminAuthToken\", access_token);",
 									"pm.globals.set(\"authToken\", access_token);",
-									"pm.globals.set(\"adminAuthToken\", access_token);",
-									"console.log(\"✅ Admin authenticated\");"
+									"pm.globals.set(\"adminAuthToken\", access_token);"
 								],
 								"type": "text/javascript"
 							}
@@ -63,15 +62,13 @@
 							"urlencoded": [
 								{
 									"key": "username",
-									"value": "{{adminUsername}}",
-									"type": "text",
-									"description": "Default: admin_user"
+									"value": "{{superAdminUsername}}",
+									"type": "text"
 								},
 								{
 									"key": "password",
-									"value": "{{adminPassword}}",
-									"type": "text",
-									"description": "Default: admin_password"
+									"value": "{{superAdminPassword}}",
+									"type": "text"
 								}
 							]
 						},
@@ -81,7 +78,7 @@
 			]
 		},
 		{
-			"name": "📍 Geocoding Tests (Address → Coordinates)",
+			"name": "Geocoding Tests (Address to Coordinates)",
 			"item": [
 				{
 					"name": "Query Test Address",
@@ -101,7 +98,7 @@
 									"    }",
 									"}, function(err, res) {",
 									"    if (err) {",
-									"        console.error('❌ Error querying addresses:', err);",
+									"        console.error('Error querying addresses:', err);",
 									"        return;",
 									"    }",
 									"    ",
@@ -109,12 +106,11 @@
 									"    if (addresses && addresses.length > 0) {",
 									"        const testAddress = addresses[0];",
 									"        pm.collectionVariables.set('testAddressId', testAddress.address_id);",
-									"        pm.collectionVariables.set('testAddressStreet', testAddress.street_address);",
 									"        pm.collectionVariables.set('testAddressCity', testAddress.city || 'Buenos Aires');",
 									"        pm.collectionVariables.set('testAddressCountry', testAddress.country_name || 'Argentina');",
-									"        console.log('✅ Found test address:', testAddress.street_address);",
+									"        console.log('Found test address:', testAddress.address_id);",
 									"    } else {",
-									"        console.warn('⚠️ No addresses found - tests may fail');",
+									"        console.warn('No addresses found - tests may fail');",
 									"    }",
 									"});"
 								],
@@ -150,39 +146,29 @@
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/addresses",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", ""],
-							"query": []
+							"path": ["api", "v1", "addresses"]
 						}
 					}
 				},
 				{
-					"name": "Test Geocoding (Mock or Real)",
+					"name": "Fetch Address (verify geolocation created)",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Note: This tests the geolocation service indirectly",
-									"// In DEV_MODE=true, it uses mock responses",
-									"// In DEV_MODE=false, it calls Google Maps API",
-									"",
 									"pm.test(\"Response successful\", function () {",
-									"    // May be 200 (success) or 404 (address not found) - both are valid",
-									"    pm.expect(pm.response.code).to.be.oneOf([200, 404, 500]);",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
 									"});",
 									"",
 									"if (pm.response.code === 200) {",
-									"    pm.test(\"Response contains geolocation data\", function () {",
+									"    pm.test(\"Address has expected fields\", function () {",
 									"        const body = pm.response.json();",
-									"        // Check if response has latitude/longitude or similar structure",
-									"        pm.expect(body).to.be.an('object');",
-									"        console.log('✅ Geocoding response:', JSON.stringify(body, null, 2));",
+									"        pm.expect(body).to.have.property('address_id');",
+									"        pm.expect(body).to.have.property('city');",
+									"        pm.expect(body).to.have.property('country_code');",
 									"    });",
-									"}",
-									"",
-									"// Log DEV_MODE status",
-									"console.log('ℹ️ If DEV_MODE=true in .env, this uses mock responses');",
-									"console.log('ℹ️ If DEV_MODE=false, this calls Google Maps API');"
+									"}"
 								],
 								"type": "text/javascript"
 							}
@@ -197,7 +183,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses{{testAddressId}}",
+							"raw": "{{baseUrl}}/api/v1/addresses/{{testAddressId}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "addresses", "{{testAddressId}}"]
 						}
@@ -206,97 +192,33 @@
 			]
 		},
 		{
-			"name": "🧪 Direct Gateway Testing (Dev Mode)",
+			"name": "Provider Verification",
 			"item": [
 				{
-					"name": "Verify DEV_MODE Active",
+					"name": "Verify Provider Configuration",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// This is a documentation test - verifies setup",
-									"pm.test(\"Test collection is configured\", function () {",
-									"    const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
-									"    const token = pm.collectionVariables.get('adminAuthToken') || pm.environment.get('adminAuthToken');",
-									"    pm.expect(baseUrl).to.not.be.undefined;",
-									"    pm.expect(token).to.not.be.undefined;",
+									"pm.test(\"Health check passes\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
 									"});",
 									"",
-									"console.log('📝 Geolocation Testing Notes:');",
-									"console.log('1. Set DEV_MODE=true in .env to use mock responses (no API costs)');",
-									"console.log('2. Set DEV_MODE=false to test with real Google Maps API');",
-									"console.log('3. Mock responses are in: app/mocks/google_maps_responses.json');",
-									"console.log('4. Gateway logs API calls for cost tracking');",
+									"console.log('Geolocation Testing Notes:');",
+									"console.log('1. ADDRESS_PROVIDER=mapbox (default) uses Mapbox Geocoding API v6');",
+									"console.log('2. ADDRESS_PROVIDER=google uses Google Maps Geocoding API (fallback)');",
+									"console.log('3. DEV_MODE=true uses mock responses (no API costs)');",
+									"console.log('4. If Mapbox token is set, DEV_MODE is overridden to use live API');",
 									"console.log('');",
-									"console.log('🎯 Expected Behavior:');",
-									"console.log('- DEV_MODE=true: Returns Buenos Aires coordinates from mock');",
-									"console.log('- DEV_MODE=false: Calls Google Maps API (requires API key)');",
+									"console.log('Mock files:');",
+									"console.log('  Mapbox: app/mocks/mapbox_geocoding_mocks.json');",
+									"console.log('  Google: app/mocks/google_maps_responses.json');",
 									"console.log('');",
-									"console.log('💡 To verify mode, check server logs for:');",
-									"console.log('  🚧 \"Google Maps Geocoding API Gateway running in DEV_MODE\"');",
-									"console.log('  or');",
-									"console.log('  💰 \"External API Call: Google Maps Geocoding API...\"');"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{adminAuthToken}}"
-							}
-						],
-						"url": "{{baseUrl}}/api/v1/health"
-					}
-				}
-			]
-		},
-		{
-			"name": "📊 Summary & Verification",
-			"item": [
-				{
-					"name": "Collection Summary",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Geolocation testing complete\", function () {",
-									"    pm.expect(true).to.be.true;",
-									"});",
-									"",
-									"console.log('');",
-									"console.log('═══════════════════════════════════════');",
-									"console.log('  🗺️ GEOLOCATION TESTING SUMMARY');",
-									"console.log('═══════════════════════════════════════');",
-									"console.log('');",
-									"console.log('✅ Phase 0.5 Complete:');",
-									"console.log('  - Gateway infrastructure tested');",
-									"console.log('  - DEV_MODE functionality verified');",
-									"console.log('  - Mock responses working');",
-									"console.log('  - Service integration confirmed');",
-									"console.log('');",
-									"console.log('📁 Files Created:');",
-									"console.log('  - app/gateways/base_gateway.py');",
-									"console.log('  - app/gateways/google_maps_gateway.py');",
-									"console.log('  - app/mocks/google_maps_responses.json');",
-									"console.log('  - app/tests/gateways/ (21 unit tests)');",
-									"console.log('');",
-									"console.log('🧪 Test Coverage:');",
-									"console.log('  - Unit Tests: 21/21 passing ✅');",
-									"console.log('  - Postman Tests: Self-contained ✅');",
-									"console.log('  - Claude.md: Updated with guidelines ✅');",
-									"console.log('');",
-									"console.log('🚀 Next Steps:');",
-									"console.log('  - Phase 1: Database schema updates');",
-									"console.log('  - Phase 2: Geolocation Market Architecture');",
-									"console.log('  - Phase 3: Distance-based features');",
-									"console.log('');",
-									"console.log('═══════════════════════════════════════');"
+									"console.log('Check server logs for:');",
+									"console.log('  \"Mapbox Geocoding API Gateway running in DEV_MODE\" (mock)');",
+									"console.log('  \"Mapbox Geocoding Gateway using live API\" (live)');",
+									"console.log('  \"External API Call: Mapbox Geocoding API...\" (API call logged)');"
 								],
 								"type": "text/javascript"
 							}
@@ -323,14 +245,16 @@
 			"type": "string"
 		},
 		{
-			"key": "adminUsername",
-			"value": "admin",
-			"type": "string"
+			"key": "superAdminUsername",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
 		},
 		{
-			"key": "adminPassword",
-			"value": "Admin123!",
-			"type": "string"
+			"key": "superAdminPassword",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
 		},
 		{
 			"key": "authToken",
@@ -344,12 +268,6 @@
 		},
 		{
 			"key": "testAddressId",
-			"value": "",
-			"type": "string",
-			"description": "Automatically populated by query"
-		},
-		{
-			"key": "testAddressStreet",
 			"value": "",
 			"type": "string",
 			"description": "Automatically populated by query"

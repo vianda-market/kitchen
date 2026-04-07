@@ -90,6 +90,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         loc = payload.get("locale")
         if loc:
             out["locale"] = loc
+        if "onboarding_status" in payload:
+            out["onboarding_status"] = payload["onboarding_status"]
         return out
     
     except jwt.PyJWTError:
@@ -131,6 +133,8 @@ def get_optional_user(
         loc = payload.get("locale")
         if loc:
             out["locale"] = loc
+        if "onboarding_status" in payload:
+            out["onboarding_status"] = payload["onboarding_status"]
         return out
     except (jwt.PyJWTError, ValueError, TypeError):
         return None
@@ -141,7 +145,8 @@ def get_resolved_locale(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ) -> str:
-    """DB user_info.locale wins; then Accept-Language; then default."""
+    """DB user_info.locale wins; then Accept-Language; then default.
+    Also stores resolved locale on request.state for ContentLanguageMiddleware."""
     accept = request.headers.get("Accept-Language")
     uid = current_user.get("user_id")
     if uid is not None:
@@ -152,8 +157,12 @@ def get_resolved_locale(
             fetch_one=True,
         )
         if row and row.get("locale") and row["locale"] in SUPPORTED_LOCALES:
-            return row["locale"]
-    return resolve_locale_from_header(accept)
+            locale = row["locale"]
+            request.state.resolved_locale = locale
+            return locale
+    locale = resolve_locale_from_header(accept)
+    request.state.resolved_locale = locale
+    return locale
 
 
 def get_resolved_locale_optional(

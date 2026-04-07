@@ -1,0 +1,1797 @@
+{
+	"info": {
+		"_postman_id": "billing-payout-stripe-connect-2026-v1",
+		"name": "012 BILLING_PAYOUT_AND_STRIPE_CONNECT",
+		"description": "012 – Billing, Payout & Stripe Connect. Covers 5 high-priority gaps: Institution Billing, Client Billing, Supplier Invoices + W-9, Stripe Connect, and Payouts. Depends on collection 000 having been run first (for institution, entity, restaurant, and settlement data). In DEV_MODE, Stripe Connect returns mock IDs (acct_mock_..., tr_mock_...). Flow: (1) Auth, (2) Data Discovery, (3) Institution Bills, (4) Client Bills, (5) Supplier Invoices, (6) Supplier W-9, (7) Stripe Connect, (8) Payouts.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Auth",
+			"item": [
+				{
+					"name": "Login Super Admin",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Sync credentials from env/globals if available",
+									"const u = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername');",
+									"const p = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword');",
+									"if (u) pm.collectionVariables.set('superAdminUsername', u);",
+									"if (p) pm.collectionVariables.set('superAdminPassword', p);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login successful - Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains access_token', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('access_token');",
+									"    pm.expect(body.access_token).to.be.a('string');",
+									"});",
+									"",
+									"const { access_token } = pm.response.json();",
+									"pm.collectionVariables.set('authToken', access_token);",
+									"pm.environment.set('authToken', access_token);",
+									"pm.collectionVariables.set('superAdminAuthToken', access_token);",
+									"pm.environment.set('superAdminAuthToken', access_token);",
+									"pm.globals.set('superAdminAuthToken', access_token);",
+									"console.log('Super Admin token stored.');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{superAdminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{superAdminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "token"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login Vianda Admin",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Sync admin credentials from env/globals",
+									"const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+									"const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+									"if (u) pm.collectionVariables.set('adminUsername', u);",
+									"if (p) pm.collectionVariables.set('adminPassword', p);",
+									"",
+									"if (!pm.collectionVariables.get('adminUsername') || !pm.collectionVariables.get('adminPassword')) {",
+									"    throw new Error('adminUsername/adminPassword not set. Run collection 001 first or set env vars.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login successful - Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains access_token', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('access_token');",
+									"});",
+									"",
+									"const { access_token } = pm.response.json();",
+									"pm.collectionVariables.set('adminAuthToken', access_token);",
+									"pm.environment.set('adminAuthToken', access_token);",
+									"pm.globals.set('adminAuthToken', access_token);",
+									"console.log('Admin token stored.');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{adminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{adminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "token"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Data Discovery",
+			"item": [
+				{
+					"name": "Discover Institution Entity",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Sync from env if available",
+									"const eid = pm.environment.get('institutionEntityId');",
+									"if (eid) pm.collectionVariables.set('institutionEntityId', eid);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"if (body.length > 0) {",
+									"    const entity = body.find(e => !e.is_archived) || body[0];",
+									"    const entityId = entity.institution_entity_id;",
+									"    const institutionId = entity.institution_id;",
+									"    const entityName = entity.institution_entity_name || entity.entity_name || 'Unknown';",
+									"",
+									"    pm.collectionVariables.set('institutionEntityId', entityId);",
+									"    pm.environment.set('institutionEntityId', entityId);",
+									"    pm.globals.set('institutionEntityId', entityId);",
+									"",
+									"    pm.collectionVariables.set('institutionId', institutionId);",
+									"    pm.environment.set('institutionId', institutionId);",
+									"    pm.globals.set('institutionId', institutionId);",
+									"",
+									"    pm.collectionVariables.set('entityName', entityName);",
+									"    console.log('Discovered entity:', entityName, '| entityId:', entityId, '| institutionId:', institutionId);",
+									"} else {",
+									"    console.warn('No institution entities found. Run collection 000 first.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/enriched",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "enriched"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Discover Institution Bills",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"console.log('Institution bills found:', body.length);",
+									"if (body.length > 0) {",
+									"    const billId = body[0].institution_bill_id;",
+									"    pm.collectionVariables.set('entityBillId', billId);",
+									"    pm.environment.set('entityBillId', billId);",
+									"    console.log('Stored entityBillId:', billId);",
+									"} else {",
+									"    console.warn('No institution bills found. Settlement pipeline will create them.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Discover Client Bills",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"console.log('Client bills found:', body.length);",
+									"if (body.length > 0) {",
+									"    const billId = body[0].client_bill_id;",
+									"    pm.collectionVariables.set('clientBillId', billId);",
+									"    pm.environment.set('clientBillId', billId);",
+									"    console.log('Stored clientBillId:', billId);",
+									"} else {",
+									"    console.warn('No client bills found. Client bill tests will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/client-bills",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "client-bills"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Institution Bills",
+			"item": [
+				{
+					"name": "Get Institution Bill by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('entityBillId')) {",
+									"    throw new Error('entityBillId not set. Run collection 000 and settlement pipeline first.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has required bill fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('institution_bill_id');",
+									"    pm.expect(body).to.have.property('amount');",
+									"    pm.expect(body).to.have.property('resolution');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/{{entityBillId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "{{entityBillId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Enriched Institution Bills",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"if (body.length > 0) {",
+									"    pm.test('Enriched fields present', function () {",
+									"        pm.expect(body[0]).to.have.property('institution_name');",
+									"        pm.expect(body[0]).to.have.property('institution_entity_name');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/enriched",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "enriched"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Institution Bill",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"currency_code\": \"ARS\"}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/{{entityBillId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "{{entityBillId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Billing Summary",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Compute start_date as first of last month, end_date as today",
+									"const now = new Date();",
+									"const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);",
+									"const endDate = now;",
+									"",
+									"const fmt = d => d.toISOString().split('T')[0];",
+									"pm.collectionVariables.set('billingPeriodStart', fmt(startDate));",
+									"pm.collectionVariables.set('billingPeriodEnd', fmt(endDate));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200 or 404', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    console.log('Billing summary retrieved successfully.');",
+									"} else {",
+									"    console.log('No billing summary data for this period.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/summary/{{institutionId}}?start_date={{billingPeriodStart}}&end_date={{billingPeriodEnd}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "summary", "{{institutionId}}"],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "{{billingPeriodStart}}"
+								},
+								{
+									"key": "end_date",
+									"value": "{{billingPeriodEnd}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Institution Bill",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200 or 400 (already cancelled)', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    console.log('Institution bill cancelled successfully.');",
+									"} else {",
+									"    console.log('Bill already cancelled or cannot be cancelled.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/{{entityBillId}}/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "{{entityBillId}}", "cancel"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Daily Bills",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const billDate = new Date().toISOString().split('T')[0];",
+									"pm.collectionVariables.set('billDate', billDate);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has message and statistics', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('message');",
+									"    pm.expect(body).to.have.property('statistics');",
+									"});",
+									"",
+									"console.log('Daily bills generated:', JSON.stringify(pm.response.json()));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/generate-daily-bills?bill_date={{billDate}}&country_code=AR",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "generate-daily-bills"],
+							"query": [
+								{
+									"key": "bill_date",
+									"value": "{{billDate}}"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Run Settlement Pipeline",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has message', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('message');",
+									"});",
+									"",
+									"console.log('Settlement pipeline result:', JSON.stringify(pm.response.json()));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-bills/run-settlement-pipeline?bill_date={{billDate}}&country_code=AR",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-bills", "run-settlement-pipeline"],
+							"query": [
+								{
+									"key": "bill_date",
+									"value": "{{billDate}}"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Client Bills",
+			"item": [
+				{
+					"name": "Get Client Bill by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    console.warn('clientBillId not set - test will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    pm.test('SKIPPED: clientBillId not set', function () {",
+									"        console.warn('No clientBillId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"",
+									"    pm.test('Has client_bill_id', function () {",
+									"        const body = pm.response.json();",
+									"        pm.expect(body).to.have.property('client_bill_id');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/client-bills/{{clientBillId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "client-bills", "{{clientBillId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Client Bill",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    console.warn('clientBillId not set - test will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    pm.test('SKIPPED: clientBillId not set', function () {",
+									"        console.warn('No clientBillId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"currency_code\": \"ARS\"}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/client-bills/{{clientBillId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "client-bills", "{{clientBillId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Process Client Bill",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    console.warn('clientBillId not set - test will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    pm.test('SKIPPED: clientBillId not set', function () {",
+									"        console.warn('No clientBillId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200 or 400 (already processed)', function () {",
+									"        pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/client-bills/{{clientBillId}}/process",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "client-bills", "{{clientBillId}}", "process"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Client Bill",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    console.warn('clientBillId not set - test will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('clientBillId')) {",
+									"    pm.test('SKIPPED: clientBillId not set', function () {",
+									"        console.warn('No clientBillId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/client-bills/{{clientBillId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "client-bills", "{{clientBillId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Supplier Invoices",
+			"item": [
+				{
+					"name": "Create Supplier Invoice",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const baseUrl = pm.collectionVariables.get('baseUrl');",
+									"const token = pm.collectionVariables.get('authToken');",
+									"const entityId = pm.collectionVariables.get('institutionEntityId');",
+									"",
+									"if (!entityId) {",
+									"    console.warn('institutionEntityId not set - cannot create invoice.');",
+									"    return;",
+									"}",
+									"",
+									"const boundary = '----InvoiceBoundary' + Date.now();",
+									"const issuedDate = new Date().toISOString().split('T')[0];",
+									"",
+									"const countryDetails = JSON.stringify({",
+									"    cae_code: '12345678901234',",
+									"    cae_expiry_date: '2026-12-31',",
+									"    afip_point_of_sale: '0001',",
+									"    supplier_cuit: '20-12345678-9'",
+									"});",
+									"",
+									"const parts = [",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"institution_entity_id\"\\r\\n\\r\\n' + entityId,",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"country_code\"\\r\\n\\r\\nAR',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"invoice_type\"\\r\\n\\r\\nFactura Electronica',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"issued_date\"\\r\\n\\r\\n' + issuedDate,",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"amount\"\\r\\n\\r\\n1500.00',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"currency_code\"\\r\\n\\r\\nARS',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"external_invoice_number\"\\r\\n\\r\\nINV-PM-001',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"tax_amount\"\\r\\n\\r\\n315.00',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"tax_rate\"\\r\\n\\r\\n21.00',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"country_details_json\"\\r\\n\\r\\n' + countryDetails,",
+									"    '--' + boundary + '--'",
+									"].join('\\r\\n');",
+									"",
+									"pm.sendRequest({",
+									"    url: baseUrl + '/api/v1/supplier-invoices',",
+									"    method: 'POST',",
+									"    header: {",
+									"        'Authorization': 'Bearer ' + token,",
+									"        'Content-Type': 'multipart/form-data; boundary=' + boundary",
+									"    },",
+									"    body: { mode: 'raw', raw: parts }",
+									"}, (err, res) => {",
+									"    if (!err && (res.code === 201 || res.code === 200)) {",
+									"        const body = res.json();",
+									"        if (body.supplier_invoice_id) {",
+									"            pm.collectionVariables.set('supplierInvoiceId', body.supplier_invoice_id);",
+									"            pm.environment.set('supplierInvoiceId', body.supplier_invoice_id);",
+									"            console.log('Created supplier invoice:', body.supplier_invoice_id);",
+									"        }",
+									"    } else {",
+									"        console.log('Invoice creation:', err || res.code, res ? res.text() : '');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"// Verify supplierInvoiceId was set by pre-request, or find one in the list",
+									"const body = pm.response.json();",
+									"if (!pm.collectionVariables.get('supplierInvoiceId') && body.length > 0) {",
+									"    const invoiceId = body[0].supplier_invoice_id;",
+									"    pm.collectionVariables.set('supplierInvoiceId', invoiceId);",
+									"    pm.environment.set('supplierInvoiceId', invoiceId);",
+									"    console.log('Fallback: stored supplierInvoiceId from list:', invoiceId);",
+									"} else if (pm.collectionVariables.get('supplierInvoiceId')) {",
+									"    console.log('supplierInvoiceId confirmed:', pm.collectionVariables.get('supplierInvoiceId'));",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Supplier Invoices",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Enriched Supplier Invoices",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"if (body.length > 0) {",
+									"    pm.test('Enriched fields present', function () {",
+									"        pm.expect(body[0]).to.have.property('institution_entity_name');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices/enriched",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices", "enriched"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Supplier Invoice by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('supplierInvoiceId')) {",
+									"    console.warn('supplierInvoiceId not set - test will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('supplierInvoiceId')) {",
+									"    pm.test('SKIPPED: supplierInvoiceId not set', function () {",
+									"        console.warn('No supplierInvoiceId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"",
+									"    pm.test('Has required invoice fields', function () {",
+									"        const body = pm.response.json();",
+									"        pm.expect(body).to.have.property('supplier_invoice_id');",
+									"        pm.expect(body).to.have.property('amount');",
+									"        pm.expect(body).to.have.property('status');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices/{{supplierInvoiceId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices", "{{supplierInvoiceId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Review Supplier Invoice (Approve)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200 or 400 (already reviewed)', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    console.log('Supplier invoice approved.');",
+									"} else {",
+									"    console.log('Invoice already reviewed or cannot be reviewed.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"status\": \"Approved\"}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices/{{supplierInvoiceId}}/review",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices", "{{supplierInvoiceId}}", "review"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Match Invoice to Bill",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('entityBillId')) {",
+									"    console.warn('entityBillId not set - match will be skipped.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('entityBillId')) {",
+									"    pm.test('SKIPPED: entityBillId not set', function () {",
+									"        console.warn('No entityBillId available. Skipping.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200, 201, or 400', function () {",
+									"        pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[{\"institution_bill_id\": \"{{entityBillId}}\", \"matched_amount\": 1500.00}]"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-invoices/{{supplierInvoiceId}}/match",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-invoices", "{{supplierInvoiceId}}", "match"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Supplier W-9",
+			"item": [
+				{
+					"name": "Submit W-9",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const baseUrl = pm.collectionVariables.get('baseUrl');",
+									"const token = pm.collectionVariables.get('authToken');",
+									"const entityId = pm.collectionVariables.get('institutionEntityId');",
+									"",
+									"if (!entityId) {",
+									"    console.warn('institutionEntityId not set - cannot submit W-9.');",
+									"    return;",
+									"}",
+									"",
+									"const boundary = '----W9Boundary' + Date.now();",
+									"const parts = [",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"institution_entity_id\"\\r\\n\\r\\n' + entityId,",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"legal_name\"\\r\\n\\r\\nPostman Test Corp',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"tax_classification\"\\r\\n\\r\\nllc',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"ein_last_four\"\\r\\n\\r\\n1234',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"address_line\"\\r\\n\\r\\n123 Test Street, Buenos Aires',",
+									"    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"business_name\"\\r\\n\\r\\nPostman Test LLC',",
+									"    '--' + boundary + '--'",
+									"].join('\\r\\n');",
+									"",
+									"pm.sendRequest({",
+									"    url: baseUrl + '/api/v1/supplier-w9',",
+									"    method: 'POST',",
+									"    header: {",
+									"        'Authorization': 'Bearer ' + token,",
+									"        'Content-Type': 'multipart/form-data; boundary=' + boundary",
+									"    },",
+									"    body: { mode: 'raw', raw: parts }",
+									"}, (err, res) => {",
+									"    if (!err && (res.code === 201 || res.code === 200)) {",
+									"        const body = res.json();",
+									"        if (body.w9_id) {",
+									"            pm.collectionVariables.set('supplierW9Id', body.w9_id);",
+									"            console.log('Created/updated W-9:', body.w9_id);",
+									"        }",
+									"    } else {",
+									"        console.log('W-9 creation:', err || res.code);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has W-9 fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('w9_id');",
+									"    pm.expect(body).to.have.property('legal_name');",
+									"    pm.expect(body).to.have.property('ein_last_four');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-w9/{{institutionEntityId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-w9", "{{institutionEntityId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get W-9 by Entity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has W-9 fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('w9_id');",
+									"    pm.expect(body).to.have.property('legal_name');",
+									"});",
+									"",
+									"pm.test('Legal name matches', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body.legal_name).to.equal('Postman Test Corp');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/supplier-w9/{{institutionEntityId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "supplier-w9", "{{institutionEntityId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "7. Stripe Connect",
+			"item": [
+				{
+					"name": "Get Payout Aggregator",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has aggregator fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('aggregator');",
+									"    pm.expect(body).to.have.property('is_active');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/{{institutionEntityId}}/payout-aggregator",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "{{institutionEntityId}}", "payout-aggregator"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Account Session (Onboarding)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200 or 201', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"pm.test('Has session fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('client_secret');",
+									"    pm.expect(body).to.have.property('payout_provider_account_id');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"if (body.payout_provider_account_id) {",
+									"    pm.collectionVariables.set('payoutProviderAccountId', body.payout_provider_account_id);",
+									"    pm.environment.set('payoutProviderAccountId', body.payout_provider_account_id);",
+									"    console.log('Stored payout_provider_account_id:', body.payout_provider_account_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/{{institutionEntityId}}/stripe-connect/account-session",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "{{institutionEntityId}}", "stripe-connect", "account-session"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Onboarding Link",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has onboarding link fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('url');",
+									"    pm.expect(body).to.have.property('expires_at');",
+									"});",
+									"",
+									"console.log('Onboarding link:', pm.response.json().url);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/{{institutionEntityId}}/stripe-connect/onboarding-link?refresh_url=http://localhost:3000/refresh&return_url=http://localhost:3000/return",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "{{institutionEntityId}}", "stripe-connect", "onboarding-link"],
+							"query": [
+								{
+									"key": "refresh_url",
+									"value": "http://localhost:3000/refresh"
+								},
+								{
+									"key": "return_url",
+									"value": "http://localhost:3000/return"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Connect Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has connect status fields', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.have.property('charges_enabled');",
+									"    pm.expect(body).to.have.property('payouts_enabled');",
+									"    pm.expect(body).to.have.property('details_submitted');",
+									"});",
+									"",
+									"console.log('Connect status:', JSON.stringify(pm.response.json()));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/{{institutionEntityId}}/stripe-connect/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "{{institutionEntityId}}", "stripe-connect", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Execute Payout",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('entityBillId')) {",
+									"    console.warn('entityBillId not set - payout will be skipped.');",
+									"    return;",
+									"}",
+									"",
+									"// Re-run settlement pipeline to get a fresh (non-cancelled) bill if needed",
+									"const baseUrl = pm.collectionVariables.get('baseUrl');",
+									"const token = pm.collectionVariables.get('adminAuthToken') || pm.collectionVariables.get('authToken');",
+									"const billDate = new Date().toISOString().split('T')[0];",
+									"",
+									"pm.sendRequest({",
+									"    url: baseUrl + '/api/v1/institution-bills/run-settlement-pipeline?bill_date=' + billDate + '&country_code=AR',",
+									"    method: 'POST',",
+									"    header: {",
+									"        'Authorization': 'Bearer ' + token",
+									"    }",
+									"}, (err, res) => {",
+									"    if (!err && res.code === 200) {",
+									"        console.log('Settlement pipeline re-run for fresh bills.');",
+									"        // Try to get a fresh bill ID",
+									"        pm.sendRequest({",
+									"            url: baseUrl + '/api/v1/institution-bills',",
+									"            method: 'GET',",
+									"            header: {",
+									"                'Authorization': 'Bearer ' + token",
+									"            }",
+									"        }, (err2, res2) => {",
+									"            if (!err2 && res2.code === 200) {",
+									"                const bills = res2.json();",
+									"                const activeBill = bills.find(b => b.resolution !== 'Cancelled' && b.resolution !== 'Paid');",
+									"                if (activeBill) {",
+									"                    pm.collectionVariables.set('entityBillId', activeBill.institution_bill_id);",
+									"                    console.log('Using fresh bill for payout:', activeBill.institution_bill_id);",
+									"                }",
+									"            }",
+									"        });",
+									"    } else {",
+									"        console.log('Settlement pipeline:', err || res.code);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (!pm.collectionVariables.get('entityBillId')) {",
+									"    pm.test('SKIPPED: entityBillId not set', function () {",
+									"        console.warn('No entityBillId available. Skipping payout.');",
+									"    });",
+									"} else {",
+									"    pm.test('Status 200, 201, or 400', function () {",
+									"        pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+									"    });",
+									"",
+									"    if (pm.response.code === 200 || pm.response.code === 201) {",
+									"        pm.test('Has payout fields', function () {",
+									"            const body = pm.response.json();",
+									"            pm.expect(body).to.have.property('bill_payout_id');",
+									"            pm.expect(body).to.have.property('provider_transfer_id');",
+									"            pm.expect(body).to.have.property('status');",
+									"        });",
+									"",
+									"        const body = pm.response.json();",
+									"        if (body.bill_payout_id) {",
+									"            pm.collectionVariables.set('payoutId', body.bill_payout_id);",
+									"            pm.environment.set('payoutId', body.bill_payout_id);",
+									"            console.log('Payout executed:', body.bill_payout_id);",
+									"        }",
+									"    } else {",
+									"        console.log('Payout rejected (400):', pm.response.json().detail || pm.response.text());",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"institution_bill_id\": \"{{entityBillId}}\"}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/institution-entities/{{institutionEntityId}}/stripe-connect/payout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "institution-entities", "{{institutionEntityId}}", "stripe-connect", "payout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "8. Payouts",
+			"item": [
+				{
+					"name": "List Enriched Payouts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is array', function () {",
+									"    const body = pm.response.json();",
+									"    pm.expect(body).to.be.an('array');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"if (body.length > 0) {",
+									"    pm.test('Enriched payout fields present', function () {",
+									"        pm.expect(body[0]).to.have.property('bill_payout_id');",
+									"        pm.expect(body[0]).to.have.property('institution_name');",
+									"        pm.expect(body[0]).to.have.property('amount');",
+									"        pm.expect(body[0]).to.have.property('status');",
+									"    });",
+									"    console.log('Payouts found:', body.length);",
+									"} else {",
+									"    console.log('No payouts found yet.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payouts/enriched",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payouts", "enriched"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"const base = pm.environment.get('baseUrl') || pm.globals.get('baseUrl') || 'http://localhost:8000';",
+					"pm.collectionVariables.set('baseUrl', base);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "superAdminUsername",
+			"value": ""
+		},
+		{
+			"key": "superAdminPassword",
+			"value": ""
+		},
+		{
+			"key": "adminUsername",
+			"value": ""
+		},
+		{
+			"key": "adminPassword",
+			"value": ""
+		},
+		{
+			"key": "authToken",
+			"value": ""
+		},
+		{
+			"key": "adminAuthToken",
+			"value": ""
+		},
+		{
+			"key": "institutionId",
+			"value": ""
+		},
+		{
+			"key": "institutionEntityId",
+			"value": ""
+		},
+		{
+			"key": "restaurantId",
+			"value": ""
+		},
+		{
+			"key": "entityBillId",
+			"value": ""
+		},
+		{
+			"key": "clientBillId",
+			"value": ""
+		},
+		{
+			"key": "supplierInvoiceId",
+			"value": ""
+		},
+		{
+			"key": "supplierW9Id",
+			"value": ""
+		},
+		{
+			"key": "domainId",
+			"value": ""
+		},
+		{
+			"key": "payoutId",
+			"value": ""
+		},
+		{
+			"key": "billingPeriodStart",
+			"value": ""
+		},
+		{
+			"key": "billingPeriodEnd",
+			"value": ""
+		},
+		{
+			"key": "supplierUsername",
+			"value": ""
+		},
+		{
+			"key": "supplierPassword",
+			"value": ""
+		},
+		{
+			"key": "supplierAuthToken",
+			"value": ""
+		}
+	]
+}

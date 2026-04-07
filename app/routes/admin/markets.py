@@ -8,10 +8,10 @@ Markets define the countries where the platform operates.
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 import psycopg2.extensions
 
-from app.auth.dependencies import get_current_user, get_employee_user
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     MarketResponseSchema,
@@ -22,7 +22,10 @@ from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_glo
 from app.services.entity_service import get_enriched_markets, get_enriched_market_by_id
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
+from app.i18n.locale_names import localize_country_name, localize_currency_name
 from app.utils.country import resolve_country_name
+from app.utils.error_messages import entity_not_found
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/markets", tags=["Markets"])
 
@@ -60,7 +63,10 @@ async def list_markets(
 
 @router.get("/enriched", response_model=List[MarketResponseSchema])
 async def list_enriched_markets(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
@@ -70,6 +76,7 @@ async def list_enriched_markets(
 
     This enriched endpoint returns markets with currency information
     (currency_name and currency_code) from the credit_currency_info table.
+    Country and currency names are localized based on the user's resolved locale.
 
     **Returns**: List of markets with enriched currency data
 
@@ -78,8 +85,16 @@ async def list_enriched_markets(
     try:
         enriched_markets = get_enriched_markets(
             db,
-            include_archived=False
+            include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
+        if locale != "en":
+            for m in enriched_markets:
+                m.country_name = localize_country_name(m.country_code, locale)
+                if m.currency_code:
+                    m.currency_name = localize_currency_name(m.currency_code, locale)
+        set_pagination_headers(response, enriched_markets)
         return enriched_markets
     except HTTPException:
         raise
@@ -91,6 +106,7 @@ async def list_enriched_markets(
 async def get_enriched_market(
     market_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
@@ -101,7 +117,7 @@ async def get_enriched_market(
     **Path Parameters**:
     - `market_id`: UUID of the market
 
-    **Returns**: Market with enriched currency data
+    **Returns**: Market with enriched currency data (country and currency names localized)
 
     **Raises**:
     - 404: Market not found
@@ -114,10 +130,15 @@ async def get_enriched_market(
             db,
             include_archived=False
         )
-        
+
         if not enriched_market:
-            raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
-        
+            raise entity_not_found("Market", market_id, locale=locale)
+
+        if locale != "en":
+            enriched_market.country_name = localize_country_name(enriched_market.country_code, locale)
+            if enriched_market.currency_code:
+                enriched_market.currency_name = localize_currency_name(enriched_market.currency_code, locale)
+
         return enriched_market
     except HTTPException:
         raise

@@ -21,15 +21,16 @@ Institution (supplier) payment follows a **settlement → bill → payout** flow
 3. **Tax doc**  
    For each bill, a tax document is issued (stub returns a placeholder `tax_doc_external_id`; country-specific e-invoicing can be added later). The id is stored on the bill.
 
-4. **Payout**  
-   For each bill, the supplier payout service is called (mock returns success and a fake `stripe_payout_id`; live Stripe can be wired via `SUPPLIER_PAYOUT_PROVIDER=stripe`). On success, the bill is updated with `stripe_payout_id` and `payout_completed_at`, then marked paid via `institution_bill_service.mark_paid` (sets `status = 'Processed'`, `resolution = 'Paid'`).
+4. **Payout**
+   For each bill, the Connect gateway is called (`connect_gateway.execute_supplier_payout` or `connect_mock.execute_supplier_payout` depending on `SUPPLIER_PAYOUT_PROVIDER`). The gateway inserts a `billing.institution_bill_payout` row (Pending), creates a Stripe Transfer (or mock), and writes the `provider_transfer_id` back. On success, the bill is marked paid via `institution_bill_service.mark_paid` (sets `status = 'Processed'`, `resolution = 'Paid'`). If the entity has no payout provider account or payouts are not enabled, the bill is skipped (stays Pending for manual payout later).
 
-**Bill resolution (enum)**  
-`institution_bill_info.resolution` uses PostgreSQL enum `bill_resolution_enum`: **Pending**, **Paid**, **Rejected**. New bills start as Pending; after payout, `mark_paid` sets Paid. Cancelled or rejected bills use Rejected. Python: `app.config.enums.BillResolution`.
+**Bill resolution (enum)**
+`institution_bill_info.resolution` uses PostgreSQL enum `bill_resolution_enum`: **Pending**, **Paid**, **Failed**, **Rejected**. New bills start as Pending; after payout confirmation (via `payout.paid` webhook), the bill moves to Paid. Failed payouts (via `transfer.reversed` or `payout.failed` webhooks) set Failed. Admin rejection sets Rejected. Python: `app.config.enums.BillResolution`.
 
-**Where to see the payment record (mock or live)**  
-- **Pipeline response:** `POST .../run-settlement-pipeline` returns `bill_ids` (UUIDs) and `paid_bills` (array of `{ institution_bill_id, stripe_payout_id, payout_completed_at }`) for each paid bill. The mock sets `stripe_payout_id` to a placeholder like `po_mock_<short_uuid>`.
-- **Bill resource:** `GET /api/v1/institution-bills/{bill_id}` returns the bill with `stripe_payout_id` and `payout_completed_at` populated after payout. There is no separate payment table; the bill row is the payment record.
+**Where to see the payment record (mock or live)**
+- **Pipeline response:** `POST .../run-settlement-pipeline` returns `bill_ids` (UUIDs) and `paid_bills` (array of `{ institution_bill_id, bill_payout_id, provider_transfer_id }`) for each paid bill. The mock sets `provider_transfer_id` to a placeholder like `tr_mock_<hex>`.
+- **Payout table:** `billing.institution_bill_payout` holds one row per payout attempt per bill. The table is append-only — retries insert a new row. Fields: `bill_payout_id`, `institution_bill_id`, `provider`, `provider_transfer_id`, `amount`, `currency_code`, `status`, `idempotency_key`, `created_at`, `completed_at`.
+- **Admin endpoint:** `GET /api/v1/institution-entities/{entity_id}/stripe-connect/payouts` lists all payout attempts for an entity's bills (Internal role only).
 
 ## Pipeline entry point
 
@@ -46,7 +47,7 @@ Institution (supplier) payment follows a **settlement → bill → payout** flow
 
 ## Configuration
 
-- **SUPPLIER_PAYOUT_PROVIDER** (settings): `mock` (default) or `stripe`. Mock returns success and a placeholder payout id; Stripe implementation can be added under `app/services/supplier_payout/stripe_payout.py`.
+- **SUPPLIER_PAYOUT_PROVIDER** (settings): `mock` (default) or `stripe`. Mock returns success and a placeholder transfer id; live Stripe calls `stripe.Transfer.create` via `app/services/payment_provider/stripe/connect_gateway.py`.
 
 ## Why might there be no rows in institution_bill_info?
 
@@ -79,7 +80,7 @@ The E2E collection step **Generate daily restaurant settlement (pipeline)** runs
 ## Audit and reporting
 
 - **Per restaurant:** `institution_settlement` rows (one per restaurant per period when balance > 0), with `settlement_number`, `settlement_run_id`, `institution_bill_id`.
-- **Per entity:** One `institution_bill_info` per entity per run, with `tax_doc_external_id`, `stripe_payout_id`, `payout_completed_at`.
+- **Per entity:** One `institution_bill_info` per entity per run, with `tax_doc_external_id`. Payout details are in `billing.institution_bill_payout` (one row per attempt, linked via `institution_bill_id`).
 - **Settlement report (minimal):**  
   - `InstitutionBillingService.get_settlement_report_by_run_id(settlement_run_id, connection)` — JSON payload by run (settlements list, by_entity summary, totals).  
   - `InstitutionBillingService.get_settlement_report_by_bill_id(institution_bill_id, connection)` — JSON payload for one bill (its settlement lines).
@@ -88,7 +89,7 @@ The E2E collection step **Generate daily restaurant settlement (pipeline)** runs
 
 - **Billing:** `app/services/billing/institution_billing.py` — Phase 1 (`run_phase1_settlements`), Phase 2 (`run_phase2_bills_and_payout`), pipeline (`run_daily_settlement_bill_and_payout`), report helpers.
 - **Tax doc:** `app/services/billing/tax_doc_service.py` — `issue_tax_doc_for_bill` (stub).
-- **Payout:** `app/services/supplier_payout/` — `trigger_payout` (mock in `mock.py`; live stub in `stripe_payout.py`).
+- **Payout:** `app/services/payment_provider/stripe/connect_gateway.py` (live) and `connect_mock.py` (mock) — `execute_supplier_payout`. Provider selected by `SUPPLIER_PAYOUT_PROVIDER` setting.
 - **Cron:** `app/services/cron/billing_events.py` — `multi_market_billing_entry(location_id)`, `run_billing_for_location(location_id)`, `run_daily_settlement_bill_and_payout`.
 - **CRUD:** `app/services/crud_service.py` — `institution_settlement_service`, `get_settlements_by_run_id`, `get_settlements_by_entity_and_period`, `institution_bill_service` (create, update, mark_paid).
 

@@ -30,6 +30,7 @@ class Status(str, Enum):
     # Order / plate pickup statuses
     PENDING = "Pending"
     ARRIVED = "Arrived"
+    HANDED_OUT = "Handed Out"
     COMPLETED = "Completed"
     CANCELLED = "Cancelled"
     
@@ -75,7 +76,7 @@ def _ensure_contexts_filled() -> None:
     STATUS_CONTEXTS["general"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
     STATUS_CONTEXTS["user"] = [Status.ACTIVE, Status.INACTIVE]
     STATUS_CONTEXTS["restaurant"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
-    STATUS_CONTEXTS["plate_pickup"] = [Status.PENDING, Status.ARRIVED, Status.COMPLETED, Status.CANCELLED]
+    STATUS_CONTEXTS["plate_pickup"] = [Status.PENDING, Status.ARRIVED, Status.HANDED_OUT, Status.COMPLETED, Status.CANCELLED]
     STATUS_CONTEXTS["bill"] = [Status.PENDING, Status.PROCESSED, Status.CANCELLED]
 
 

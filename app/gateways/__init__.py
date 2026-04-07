@@ -11,8 +11,14 @@ All external service calls should go through these gateways to enable:
 
 from app.gateways.base_gateway import BaseGateway
 from app.gateways.google_maps_gateway import GoogleMapsGateway
+from app.gateways.mapbox_search_gateway import MapboxSearchGateway
+from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
+from app.gateways.mapbox_static_gateway import MapboxStaticGateway
 
 __all__ = [
     "BaseGateway",
     "GoogleMapsGateway",
+    "MapboxSearchGateway",
+    "MapboxGeocodingGateway",
+    "MapboxStaticGateway",
 ]

@@ -94,6 +94,13 @@ class TestPlanCreateRolloverDefaults:
         created.plan_id = uuid4()
         created.market_id = uuid4()
         created.name = "Test"
+        created.name_i18n = None
+        created.marketing_description = None
+        created.marketing_description_i18n = None
+        created.features = None
+        created.features_i18n = None
+        created.cta_label = None
+        created.cta_label_i18n = None
         created.credit = 10
         created.price = 9.99
         created.credit_cost_local_currency = 1.0

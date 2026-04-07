@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #c0392b; margin-bottom: 20px;">Account email changed</h1>
+<p>Hi {{ first_name }},</p>
+<p>The email address on your Vianda account was changed to: <strong>{{ new_email }}</strong></p>
+<p style="font-size: 14px; color: #7f8c8d;">If you made this change, you can ignore this message.</p>
+<p style="font-size: 14px; color: #7f8c8d;">If you did not make this change, contact support immediately.</p>
+{% endblock %}

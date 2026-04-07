@@ -3,7 +3,7 @@
 Custom restaurant routes with automatic balance creation.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from uuid import UUID
 from typing import List, Optional
 import psycopg2.extensions
@@ -52,7 +52,8 @@ from app.services.restaurant_visibility import (
 )
 from app.services.market_service import market_service, is_global_market
 from app.utils.country import normalize_country_code
-from app.auth.dependencies import get_current_user, get_client_or_employee_user
+from app.auth.dependencies import get_current_user, get_client_or_employee_user, get_resolved_locale
+from app.i18n.locale_names import resolve_cuisine_name, resolve_i18n_field, resolve_i18n_list_field
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning, log_error
 from app.utils.query_params import limit_query, institution_filter, market_filter
@@ -60,6 +61,7 @@ from app.services.error_handling import handle_business_operation
 from app.utils.error_messages import entity_not_found
 from app.security.entity_scoping import EntityScopingService, ENTITY_RESTAURANT
 from app.security.scoping import resolve_institution_filter
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 from app.config import Status
 
 router = APIRouter(
@@ -367,6 +369,7 @@ def get_restaurants_by_city_route(
     market_id: Optional[UUID] = Query(None, description="User's market; if omitted, primary market is used"),
     kitchen_day: Optional[str] = Query(None, description="Monday–Friday; required when using market to get plates; must be this week or next week (through next Friday)"),
     current_user: dict = Depends(get_client_or_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -447,6 +450,7 @@ def get_restaurants_by_city_route(
         user_id=user_id,
         employer_id=employer_id,
         employer_address_id=employer_address_id,
+        locale=locale,
     )
     data["restaurants"] = [RestaurantExplorerItemSchema(**r) for r in data["restaurants"]]
     return RestaurantsByCityResponseSchema(**data)
@@ -460,8 +464,11 @@ def get_restaurants_by_city_route(
 # GET /restaurants/enriched - List all restaurants with enriched data
 @router.get("/enriched", response_model=List[RestaurantEnrichedResponseSchema])
 def list_enriched_restaurants(
+    response: Response,
     institution_id: Optional[UUID] = institution_filter(),
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
@@ -478,8 +485,17 @@ def list_enriched_restaurants(
             scope=scope,
             include_archived=False,
             institution_id=effective_institution_id,
-            institution_market_id=institution_market_id
+            institution_market_id=institution_market_id,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
+        if locale != "en":
+            for r in enriched_restaurants:
+                resolve_cuisine_name(r, locale)
+                resolve_i18n_field(r, "tagline", locale)
+                resolve_i18n_field(r, "spotlight_label", locale)
+                resolve_i18n_list_field(r, "member_perks", locale)
+        set_pagination_headers(response, enriched_restaurants)
         return enriched_restaurants
     except HTTPException:
         raise
@@ -492,6 +508,7 @@ def list_enriched_restaurants(
 def get_enriched_restaurant_by_id_route(
     restaurant_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Get a single restaurant by ID with enriched data (institution_name, entity_name, address details). Non-archived only."""
@@ -504,7 +521,12 @@ def get_enriched_restaurant_by_id_route(
             include_archived=False
         )
         if not enriched_restaurant:
-            raise entity_not_found("Restaurant", restaurant_id)
+            raise entity_not_found("Restaurant", restaurant_id, locale=locale)
+        if locale != "en":
+            resolve_cuisine_name(enriched_restaurant, locale)
+            resolve_i18n_field(enriched_restaurant, "tagline", locale)
+            resolve_i18n_field(enriched_restaurant, "spotlight_label", locale)
+            resolve_i18n_list_field(enriched_restaurant, "member_perks", locale)
         return enriched_restaurant
     except HTTPException:
         raise
@@ -613,10 +635,15 @@ def update_restaurant(
         updated_restaurant = restaurant_service.update(restaurant_id, update_data, db, scope=scope)
         if not updated_restaurant:
             raise HTTPException(status_code=500, detail="Failed to update restaurant")
-        
+
+        # Check onboarding regression when status changes away from Active
+        if "status" in update_data and update_data["status"] != Status.ACTIVE:
+            from app.services.onboarding_service import check_onboarding_regression
+            check_onboarding_regression("restaurant_info", restaurant_id, db)
+
         log_info(f"Successfully updated restaurant: {restaurant_id}")
         return RestaurantResponseSchema(**_restaurant_to_response(updated_restaurant, db))
-        
+
     except HTTPException:
         raise
     except Exception as e:

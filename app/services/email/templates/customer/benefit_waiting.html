@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Your meal benefit is waiting</h1>
+<p>Hi {{ user_first_name }},</p>
+<p><strong>{{ employer_name }}</strong> is covering your meals through Vianda — but you haven't activated your subscription yet.</p>
+<p>Here's how to get started:</p>
+<ol style="padding-left: 20px;">
+    <li>Download the Vianda app</li>
+    <li>Log in with your email</li>
+    <li>Choose a plan — your employer covers the cost</li>
+</ol>
+{% if app_deep_link %}
+<p style="margin: 25px 0;">
+    <a href="{{ app_deep_link }}" style="background-color: #4a7c59; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Open in Vianda</a>
+</p>
+{% endif %}
+<p style="margin: 10px 0; font-size: 14px; color: #7f8c8d;">
+    <a href="{{ app_store_url }}" style="margin-right: 10px;">App Store</a>
+    <a href="{{ play_store_url }}">Google Play</a>
+</p>
+<p style="font-size: 14px; color: #7f8c8d;">Questions? Reply to this email.</p>
+{% endblock %}

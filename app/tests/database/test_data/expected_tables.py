@@ -30,6 +30,8 @@ BASE_TABLES = [
     'discretionary_resolution_info',
     'employer_info',
     'national_holidays',
+    'cuisine',
+    'cuisine_suggestion',
 ]
 
 # History Tables (audit trail tables)
@@ -55,6 +57,7 @@ HISTORY_TABLES = [
     'restaurant_holidays_history',
     'plate_kitchen_days_history',
     'plate_selection_history',
+    'cuisine_history',
 ]
 
 # Child Tables (dependent tables)

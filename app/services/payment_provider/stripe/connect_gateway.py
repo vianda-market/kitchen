@@ -1,6 +1,6 @@
 # app/services/payment_provider/stripe/connect_gateway.py
 """
-Stripe Connect outbound: account creation, onboarding links, transfers, and payout execution.
+Stripe Connect outbound: account creation, onboarding links, account sessions, transfers, and payout execution.
 
 Only active when SUPPLIER_PAYOUT_PROVIDER=stripe. Uses the same STRIPE_SECRET_KEY as inbound.
 All functions raise HTTPException on Stripe API errors so routes get clean 4xx/5xx responses.
@@ -12,9 +12,30 @@ from uuid import UUID
 import psycopg2.extensions
 import stripe
 
+from fastapi import HTTPException
+
 from app.config.settings import settings
 from app.config.enums import BillPayoutStatus
 from app.utils.log import log_info, log_error
+
+
+def _handle_stripe_error(e: Exception) -> HTTPException:
+    """Map Stripe exceptions to appropriate HTTP status codes. Never leak raw Stripe messages."""
+    if isinstance(e, stripe.error.AuthenticationError):
+        log_error(f"Stripe authentication error: {e}")
+        return HTTPException(status_code=500, detail="Payment provider authentication failed")
+    if isinstance(e, stripe.error.InvalidRequestError):
+        return HTTPException(status_code=400, detail=f"Invalid request: {getattr(e, 'user_message', None) or 'check parameters'}")
+    if isinstance(e, stripe.error.PermissionError):
+        return HTTPException(status_code=400, detail="Payment provider account not ready for this operation")
+    if isinstance(e, stripe.error.APIConnectionError):
+        return HTTPException(status_code=503, detail="Payment provider temporarily unavailable")
+    if isinstance(e, stripe.error.RateLimitError):
+        return HTTPException(status_code=429, detail="Payment provider rate limit exceeded")
+    if isinstance(e, stripe.error.StripeError):
+        log_error(f"Stripe error: {e}")
+        return HTTPException(status_code=502, detail="Payment provider error")
+    return HTTPException(status_code=502, detail="Payment provider error")
 
 
 def _ensure_connect_configured() -> None:
@@ -31,8 +52,8 @@ def _ensure_connect_configured() -> None:
 def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = None) -> str:
     """
     Create a Stripe Express connected account for a supplier entity.
-    Returns stripe_connect_account_id (acct_…). Idempotent by metadata lookup is not done here —
-    callers must check entity.stripe_connect_account_id before calling.
+    Returns payout_provider_account_id (acct_…). Callers must check
+    entity.payout_provider_account_id before calling (idempotency is the caller's responsibility).
     """
     _ensure_connect_configured()
     params = {
@@ -43,13 +64,16 @@ def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = 
         params["business_profile"] = {"name": name}
     if email:
         params["email"] = email
-    account = stripe.Account.create(**params)
+    try:
+        account = stripe.Account.create(**params)
+    except Exception as e:
+        raise _handle_stripe_error(e)
     log_info(f"Created Stripe Connect account {account.id} for entity {entity_id}")
     return account.id
 
 
 def create_account_link(
-    stripe_connect_account_id: str,
+    payout_provider_account_id: str,
     refresh_url: str,
     return_url: str,
 ) -> dict:
@@ -59,23 +83,29 @@ def create_account_link(
     Links expire in ~10 minutes; always regenerate on each onboarding attempt.
     """
     _ensure_connect_configured()
-    link = stripe.AccountLink.create(
-        account=stripe_connect_account_id,
-        refresh_url=refresh_url,
-        return_url=return_url,
-        type="account_onboarding",
-    )
-    log_info(f"Created onboarding link for {stripe_connect_account_id}")
+    try:
+        link = stripe.AccountLink.create(
+            account=payout_provider_account_id,
+            refresh_url=refresh_url,
+            return_url=return_url,
+            type="account_onboarding",
+        )
+    except Exception as e:
+        raise _handle_stripe_error(e)
+    log_info(f"Created onboarding link for {payout_provider_account_id}")
     return {"url": link.url, "expires_at": link.expires_at}
 
 
-def get_account_status(stripe_connect_account_id: str) -> dict:
+def get_account_status(payout_provider_account_id: str) -> dict:
     """
     Retrieve charges_enabled, payouts_enabled, and details_submitted from Stripe.
     Returns {"charges_enabled": bool, "payouts_enabled": bool, "details_submitted": bool}.
     """
     _ensure_connect_configured()
-    account = stripe.Account.retrieve(stripe_connect_account_id)
+    try:
+        account = stripe.Account.retrieve(payout_provider_account_id)
+    except Exception as e:
+        raise _handle_stripe_error(e)
     return {
         "charges_enabled": account.charges_enabled,
         "payouts_enabled": account.payouts_enabled,
@@ -83,8 +113,25 @@ def get_account_status(stripe_connect_account_id: str) -> dict:
     }
 
 
+def create_account_session(payout_provider_account_id: str) -> str:
+    """
+    Create a Stripe AccountSession for embedded onboarding (Connect.js).
+    Returns client_secret. Expires in minutes — always regenerate, never cache.
+    """
+    _ensure_connect_configured()
+    try:
+        session = stripe.AccountSession.create(
+            account=payout_provider_account_id,
+            components={"account_onboarding": {"enabled": True}},
+        )
+    except Exception as e:
+        raise _handle_stripe_error(e)
+    log_info(f"Created AccountSession for {payout_provider_account_id}")
+    return session.client_secret
+
+
 def create_transfer(
-    stripe_connect_account_id: str,
+    payout_provider_account_id: str,
     amount_minor: int,
     currency: str,
     institution_bill_id: UUID,
@@ -97,17 +144,20 @@ def create_transfer(
     Uses idempotency_key to prevent double-transfers on retries.
     """
     _ensure_connect_configured()
-    transfer = stripe.Transfer.create(
-        amount=amount_minor,
-        currency=(currency or "usd").lower(),
-        destination=stripe_connect_account_id,
-        metadata={
-            "institution_bill_id": str(institution_bill_id),
-            "institution_entity_id": str(institution_entity_id),
-        },
-        idempotency_key=idempotency_key,
-    )
-    log_info(f"Created Stripe Transfer {transfer.id} → {stripe_connect_account_id} for bill {institution_bill_id}")
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount_minor,
+            currency=(currency or "usd").lower(),
+            destination=payout_provider_account_id,
+            metadata={
+                "institution_bill_id": str(institution_bill_id),
+                "institution_entity_id": str(institution_entity_id),
+            },
+            idempotency_key=idempotency_key,
+        )
+    except Exception as e:
+        raise _handle_stripe_error(e)
+    log_info(f"Created Stripe Transfer {transfer.id} → {payout_provider_account_id} for bill {institution_bill_id}")
     return transfer.id
 
 
@@ -125,13 +175,12 @@ def execute_supplier_payout(
 
     Steps:
     1. Load and validate bill (Pending resolution, no active payout in progress)
-    2. Load entity; verify stripe_connect_account_id is set and payouts_enabled
+    2. Load entity; verify payout_provider_account_id is set and payouts_enabled
     3. INSERT payout row (Pending) with idempotency_key
     4. Call Stripe create_transfer
     5. UPDATE payout row with provider_transfer_id
     6. Return payout row dict
     """
-    from fastapi import HTTPException
     from app.services.crud_service import institution_bill_service, institution_entity_service
     from app.utils.db import db_read
 
@@ -166,11 +215,11 @@ def execute_supplier_payout(
     entity = institution_entity_service.get_by_id(str(entity_id), db)
     if not entity:
         raise HTTPException(status_code=404, detail="Institution entity not found")
-    connect_id = entity.get("stripe_connect_account_id")
+    connect_id = entity.get("payout_provider_account_id")
     if not connect_id:
         raise HTTPException(
             status_code=400,
-            detail="Entity has no Stripe Connect account. Complete onboarding first.",
+            detail="Entity has no payout provider account. Complete onboarding first.",
         )
 
     # Verify payouts_enabled via live Stripe check
@@ -205,7 +254,7 @@ def execute_supplier_payout(
 
         # 4. Call Stripe
         transfer_id = create_transfer(
-            stripe_connect_account_id=connect_id,
+            payout_provider_account_id=connect_id,
             amount_minor=amount_minor,
             currency=currency_code,
             institution_bill_id=institution_bill_id,
@@ -225,11 +274,18 @@ def execute_supplier_payout(
             )
         db.commit()
 
+        log_info(
+            f"Payout initiated: institution_entity_id={entity_id} "
+            f"institution_bill_id={institution_bill_id} bill_payout_id={payout_id} "
+            f"amount={amount} currency={currency_code} provider=stripe "
+            f"provider_transfer_id={transfer_id}"
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         log_error(f"Payout execution failed for bill {institution_bill_id}: {e}")
-        raise HTTPException(status_code=502, detail=f"Stripe payout failed: {str(e)}")
+        raise _handle_stripe_error(e)
 
     # 6. Return payout row
     with db.cursor() as cur:

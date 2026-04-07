@@ -1,0 +1,10 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Fuiste invitado a Vianda</h1>
+<p>Hola {{ first_name }},</p>
+<p>Fuiste invitado a unirte a Vianda. Hace clic en el enlace de abajo para establecer tu contrasena y acceder a tu cuenta:</p>
+<p style="margin: 25px 0;"><a href="{{ set_password_url }}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Establecer contrasena</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">O copia este enlace: {{ set_password_url }}</p>
+<p style="font-size: 14px; color: #7f8c8d;">Este enlace expira en {{ expiry_hours }} horas.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Si no esperabas esta invitacion, ignora este correo.</p>
+{% endblock %}

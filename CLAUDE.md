@@ -3,6 +3,7 @@
 ## Project
 Vianda marketplace backend — PostgreSQL + FastAPI. Multi-market B2B/B2C food subscription platform.
 Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flow.
+Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, routes, or subsystems.
 
 ## Never Do These
 - Never run or write migrations — tear down and rebuild: `bash app/db/build_kitchen_db.sh`
@@ -10,6 +11,7 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 - Never register routes directly to `app` — always use `create_versioned_router()`
 - Never write Python unit tests for services — use Postman collections (see Testing below)
 - Never store secrets in code
+- Never pass `page`/`page_size` pagination params in cron jobs or internal service calls — pagination is for HTTP routes only
 
 ## Essential Commands
 - **Rebuild DB:** `bash app/db/build_kitchen_db.sh`
@@ -50,6 +52,16 @@ Full reference: `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md`
 Details + examples: `docs/guidelines/CODE_CONVENTIONS.md`
 Enriched endpoint pattern + field naming: `docs/guidelines/ENRICHED_ENDPOINTS.md`
 
+## Pagination (Opt-In)
+Server-side pagination is **opt-in per route** — not all endpoints need it.
+
+- **CRUD routes:** Set `paginatable=True` on `RouteConfig` in `route_factory.py`
+- **Enriched routes:** Add `pagination: Optional[PaginationParams] = Depends(get_pagination_params)` and call `set_pagination_headers(response, result)`
+- **Primitives:** `app/utils/pagination.py` — `PaginationParams`, `PaginatedList`, `get_pagination_params`, `set_pagination_headers`
+- **Protocol:** Frontend sends `page` + `page_size` query params → backend returns `X-Total-Count` header. No params = all records (backward compatible).
+- **Cron jobs / internal service calls:** NEVER pass `page`/`page_size`. These always need all records. Pagination is exclusively for HTTP route consumption.
+- **Reference data** (countries, currencies, cuisines, enums): NOT paginated — small datasets, no opt-in needed.
+
 ## Testing
 | What | How |
 |---|---|
@@ -78,11 +90,27 @@ Enriched endpoint pattern + field naming: `docs/guidelines/ENRICHED_ENDPOINTS.md
 | `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md` | Adding auth to a new endpoint or checking permission logic |
 | `docs/guidelines/database/ENUM_MAINTENANCE.md` | Adding or modifying a PostgreSQL enum |
 | `docs/guidelines/database/DATABASE_REBUILD_PERSISTENCE.md` | Rebuilding the database or managing seed data |
-| `docs/roadmap/vianda_home_apis.md` | Implementing vianda-home marketing site APIs |
+| `docs/plans/vianda_home_apis.md` | Implementing vianda-home marketing site APIs |
 
-## Cross-Repo Agent Index Files
-- **This repo:** `docs/api/AGENT_INDEX.md`, `docs/roadmap/AGENT_INDEX.md`
-- **vianda-app (B2C):** `/Users/cdeachaval/Desktop/local/vianda-app/docs/frontend/AGENT_INDEX.md`
+## Cross-Repo Documentation Protocol
+
+This repo (kitchen) is the **backend source of truth**. It produces API docs and roadmaps that other repo agents consume. Other repos never write docs here — they read our docs and produce their own implementation + documentation.
+
+**When completing a feature that affects other repos**, always:
+1. Produce or update the relevant `docs/api/` doc describing the new endpoints, contracts, and behaviors
+2. In your summary of changes, list the docs produced and which agents need them:
+   - **vianda-platform agent**: for B2B UI changes (Employer Program pages, auth changes, error handling)
+   - **vianda-app agent**: for B2C UI changes (benefit plans display, subscription flow changes)
+   - **infra-kitchen-gcp agent**: for cron jobs, env vars, Stripe config, GCS buckets
+3. Point the user to the specific files to share with each agent
+
+**Doc locations produced by this repo:**
+- `docs/api/` — **Permanent** API integration docs (endpoints, contracts, auth). Indexed in `docs/api/AGENT_INDEX.md`. This is the source of truth for how the system works. Other repo agents read these to understand established functionality.
+- `docs/plans/` — **Ephemeral** feature plans and design decisions. Plans are consumed during implementation, then archived. Never reference old plans to understand how things work — that information belongs in `docs/api/` or `CLAUDE_ARCHITECTURE.md`. When completing a plan, summarize any long-term relevant info (endpoint contracts, behaviors, constraints) into the appropriate `docs/api/` doc before archiving the plan.
+- `CLAUDE_ARCHITECTURE.md` — System overview for cross-repo context
+
+**Agent index files in other repos (read-only, for context):**
 - **vianda-platform (B2B):** `/Users/cdeachaval/Desktop/local/vianda-platform/docs/frontend/AGENT_INDEX.md`
+- **vianda-app (B2C):** `/Users/cdeachaval/Desktop/local/vianda-app/docs/frontend/AGENT_INDEX.md`
 - **vianda-home (marketing):** `/Users/cdeachaval/Desktop/local/vianda-home/docs/frontend/AGENT_INDEX.md`
 - **infra-kitchen-gcp:** `/Users/cdeachaval/Desktop/local/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`

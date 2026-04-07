@@ -149,18 +149,33 @@ def _handle_account_updated(
     event: stripe.Event,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Log payouts_enabled state change for a connected account. Informational only."""
-    from app.services.entity_service import get_institution_entity_by_connect_account_id
+    """Sync payout_onboarding_status on entity when Stripe confirms onboarding is complete."""
+    from app.services.entity_service import get_institution_entity_by_payout_account_id
+    from app.services.crud_service import institution_entity_service
     account = event.data.object
     connect_id = account.id if hasattr(account, "id") else None
     if not connect_id:
         return
-    entity = get_institution_entity_by_connect_account_id(connect_id, db)
-    payouts_enabled = getattr(account, "payouts_enabled", None)
-    entity_id = entity.get("institution_entity_id") if entity else "(unknown)"
+    entity = get_institution_entity_by_payout_account_id(connect_id, db)
+    payouts_enabled = getattr(account, "payouts_enabled", False)
+    details_submitted = getattr(account, "details_submitted", False)
+    entity_id = entity.get("institution_entity_id") if entity else None
     log_info(
-        f"Connect account.updated: {connect_id} entity={entity_id} payouts_enabled={payouts_enabled}"
+        f"Connect account.updated: {connect_id} entity={entity_id} "
+        f"payouts_enabled={payouts_enabled} details_submitted={details_submitted}"
     )
+    if entity_id and details_submitted:
+        try:
+            institution_entity_service.update(
+                str(entity_id),
+                {"payout_onboarding_status": "complete"},
+                db,
+            )
+            db.commit()
+            log_info(f"Set payout_onboarding_status=complete for entity {entity_id}")
+        except Exception as e:
+            db.rollback()
+            log_error(f"Connect account.updated: failed to update onboarding status for entity {entity_id}: {e}")
 
 
 def _handle_transfer_created(
@@ -199,6 +214,14 @@ def _handle_transfer_reversed(
     transfer_id = transfer.id if hasattr(transfer, "id") else None
     if not transfer_id:
         return
+    reversals = getattr(transfer, "reversals", None)
+    reversal_reason = "unknown"
+    if reversals and hasattr(reversals, "data") and reversals.data:
+        first = reversals.data[0]
+        reversal_reason = getattr(first, "reason", None) or "unknown"
+    log_warning(
+        f"Connect transfer.reversed: transfer={transfer_id} reason={reversal_reason}"
+    )
     try:
         with db.cursor() as cur:
             cur.execute(

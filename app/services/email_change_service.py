@@ -18,6 +18,7 @@ from app.config import Status
 from app.services.email_service import email_service
 from app.services.entity_service import get_user_by_email
 from app.services.crud_service import user_service
+from app.utils.locale import get_user_locale
 from app.utils.log import log_info, log_error, log_warning
 
 
@@ -141,6 +142,7 @@ class EmailChangeService:
                 verification_code=verification_code,
                 user_first_name=user.first_name,
                 expiry_hours=self.token_expiry_hours,
+                locale=get_user_locale(user_id, db),
             )
             if not sent:
                 try:
@@ -298,6 +300,7 @@ class EmailChangeService:
                 to_email=old_email_str.strip(),
                 user_first_name=first_name,
                 new_email=new_email,
+                locale=get_user_locale(user_id, db),
             )
             if not sent:
                 log_warning(

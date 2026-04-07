@@ -22,8 +22,8 @@
   "variable": [
     {"key": "baseUrl", "value": "http://localhost:8000", "type": "string"},
     {"key": "customerAuthToken", "value": "", "type": "string"},
-    {"key": "customerUsername", "value": "customer", "type": "string"},
-    {"key": "customerPassword", "value": "Customer123!", "type": "string"},
+    {"key": "customerUsername", "value": "", "type": "string", "description": "Set by 000 Customer Signup or environment"},
+    {"key": "customerPassword", "value": "", "type": "string", "description": "Set by 000 Customer Signup or environment"},
     {"key": "paymentMethodId", "value": "", "type": "string"},
     {"key": "mockAddSkipped", "value": "false", "type": "string"}
   ],

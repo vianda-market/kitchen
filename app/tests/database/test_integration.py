@@ -26,10 +26,10 @@ class TestSupplierOnboarding:
         admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution (Supplier requires no_show_discount)
+            # Create institution
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Supplier Inc.', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Supplier Inc.', %s)
             """, (str(institution_id), admin_user_id))
             
             # Verify creation
@@ -70,10 +70,10 @@ class TestSupplierOnboarding:
         admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution first (required for user; Supplier requires no_show_discount)
+            # Create institution first (required for user)
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Institution', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Institution', %s)
             """, (str(institution_id), admin_user_id))
             
             # Create user (market_id required; use Global Marketplace from seed)
@@ -126,10 +126,10 @@ class TestSupplierOnboarding:
             cur.execute("SELECT COUNT(*) FROM institution_history")
             initial_count = cur.fetchone()[0]
             
-            # Create institution (Supplier requires no_show_discount)
+            # Create institution
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Institution', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Institution', %s)
             """, (str(institution_id), admin_user_id))
             
             # Verify history count increased

@@ -330,3 +330,77 @@ def resolve_qr_code_image_url(row: dict) -> dict:
     if "qr_code_image_url" in row:
         row["qr_code_image_url"] = url
     return row
+
+
+def upload_supplier_invoice_document(
+    supplier_invoice_id: str | UUID,
+    institution_entity_id: str | UUID,
+    country_code: str,
+    file_data: bytes,
+    content_type: str,
+) -> str:
+    """Upload supplier invoice document to supplier bucket. Returns blob path."""
+    from app.config.settings import settings
+
+    blob_name = f"invoices/{country_code}/{institution_entity_id}/{supplier_invoice_id}/document"
+    md5_hash = hashlib.md5(file_data).digest()
+    upload_file(
+        settings.GCS_SUPPLIER_BUCKET,
+        blob_name,
+        file_data,
+        content_type,
+        md5_hash=md5_hash,
+    )
+    return blob_name
+
+
+def get_supplier_invoice_document_signed_url(
+    supplier_invoice_id: str | UUID,
+    institution_entity_id: str | UUID,
+    country_code: str,
+) -> str:
+    """Generate signed URL for supplier invoice document (1h expiry)."""
+    from app.config.settings import settings
+
+    blob_name = f"invoices/{country_code}/{institution_entity_id}/{supplier_invoice_id}/document"
+    return generate_signed_url(
+        settings.GCS_SUPPLIER_BUCKET,
+        blob_name,
+        settings.GCS_SIGNED_URL_EXPIRATION_SECONDS,
+    )
+
+
+def upload_supplier_w9_document(
+    w9_id: str | UUID,
+    institution_entity_id: str | UUID,
+    file_data: bytes,
+    content_type: str,
+) -> str:
+    """Upload signed W-9 PDF to supplier bucket. Returns blob path."""
+    from app.config.settings import settings
+
+    blob_name = f"w9/{institution_entity_id}/{w9_id}/document"
+    md5_hash = hashlib.md5(file_data).digest()
+    upload_file(
+        settings.GCS_SUPPLIER_BUCKET,
+        blob_name,
+        file_data,
+        content_type,
+        md5_hash=md5_hash,
+    )
+    return blob_name
+
+
+def get_supplier_w9_document_signed_url(
+    w9_id: str | UUID,
+    institution_entity_id: str | UUID,
+) -> str:
+    """Generate signed URL for W-9 document (1h expiry)."""
+    from app.config.settings import settings
+
+    blob_name = f"w9/{institution_entity_id}/{w9_id}/document"
+    return generate_signed_url(
+        settings.GCS_SUPPLIER_BUCKET,
+        blob_name,
+        settings.GCS_SIGNED_URL_EXPIRATION_SECONDS,
+    )

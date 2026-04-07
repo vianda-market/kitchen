@@ -50,6 +50,7 @@ class SubscriptionResponseSchema(BaseModel):
     subscription_status: Optional[str] = None
     hold_start_date: Optional[datetime] = None
     hold_end_date: Optional[datetime] = None
+    early_renewal_threshold: Optional[int] = 10
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
@@ -73,3 +74,10 @@ class SubscriptionHoldRequestSchema(BaseModel):
             if delta.days > 90:
                 raise ValueError("Hold duration cannot exceed 3 months")
         return self
+
+
+class RenewalPreferencesSchema(BaseModel):
+    """Request body for PATCH /subscriptions/me/renewal-preferences.
+    Send an integer (>= 1) to set the early renewal credit threshold.
+    Send null to disable early renewal (period-end only)."""
+    early_renewal_threshold: Optional[int] = Field(None, ge=1, description="Min credits before early renewal triggers. Send null to disable early renewal (period-end only).")

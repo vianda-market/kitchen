@@ -1,0 +1,9 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Verifique seu e-mail</h1>
+<p>Oi {{ first_name }},</p>
+<p>Obrigado por se cadastrar. Seu código de verificação é:</p>
+<p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">{{ verification_code }}</p>
+<p style="font-size: 14px; color: #7f8c8d;">Insira este código para verificar seu e-mail. Ele expira em {{ expiry_hours }} horas.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Se você não criou uma conta, por favor ignore este e-mail.</p>
+{% endblock %}

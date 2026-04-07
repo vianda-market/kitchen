@@ -51,5 +51,5 @@ Add to settings (e.g. `app/config/settings.py`) and env:
 
 ## Extension points
 
-- **Stripe Customer / saved payment methods:** Implemented: live **`POST /api/v1/customer/payment-methods/setup-session`** (`Checkout` `mode=setup`), DB rows from **`payment_method.attached`** only. See `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` and `docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` for follow-ups (`customer.updated`, max cards per user, Checkout API deprecations).
+- **Stripe Customer / saved payment methods:** Implemented: live **`POST /api/v1/customer/payment-methods/setup-session`** (`Checkout` `mode=setup`), DB rows from **`payment_method.attached`** only. See `docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` and `docs/plans/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` for follow-ups (`customer.updated`, max cards per user, Checkout API deprecations).
 - **Metered billing / proration:** Same flow supports one payment per subscription start; extensions can be noted where the adapter or webhook is extended.

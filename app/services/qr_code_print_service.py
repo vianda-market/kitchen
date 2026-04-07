@@ -121,7 +121,6 @@ def build_qr_code_print_html(
     name_esc = html.escape(ctx.restaurant_name)
     street_esc = html.escape(street) if street else ""
     locality_esc = html.escape(locality) if locality else ""
-    qr_id_esc = html.escape(str(ctx.qr_code_id))
     data_uri = f"data:image/png;base64,{image_base64}"
 
     autoprint_script = ""
@@ -139,9 +138,7 @@ def build_qr_code_print_html(
             address_block += f"<p>{locality_esc}</p>"
         address_block += "</div>"
 
-    footer = (
-        f"<p class=\"footer\">Scan to confirm pickup · {qr_id_esc}</p>"
-    )
+    footer = "<p class=\"footer\">Scan to confirm pickup</p>"
 
     return f"""<!DOCTYPE html>
 <html lang="en">

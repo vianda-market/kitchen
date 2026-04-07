@@ -12,7 +12,9 @@ from app.utils.log import log_info, log_warning, log_password_recovery_debug
 from app.utils.db import db_read
 from app.config.settings import settings
 from app.auth.security import create_access_token
-from app.auth.utils import build_token_data, merge_subscription_token_claims
+from app.auth.utils import build_token_data, merge_subscription_token_claims, merge_onboarding_token_claims
+from app.auth.captcha_guard import always_require_captcha_for_web, require_captcha_after_threshold
+from app.auth.ip_attempt_tracker import ip_tracker
 from app.utils.rate_limit import limiter
 import psycopg2.extensions
 
@@ -60,6 +62,31 @@ auth_router = APIRouter(
 # Get signup constants from service
 SIGNUP_CONSTANTS = user_signup_service.get_signup_constants()
 
+# ── Conditional reCAPTCHA guards ──────────────────────────────────────────────
+_signup_captcha = always_require_captcha_for_web(action="signup")
+_signup_verify_captcha = require_captcha_after_threshold(
+    action="signup_verify",
+    threshold=settings.SIGNUP_VERIFY_CAPTCHA_THRESHOLD,
+    window_seconds=settings.SIGNUP_VERIFY_CAPTCHA_WINDOW_SECONDS,
+)
+_forgot_password_captcha = require_captcha_after_threshold(
+    action="forgot_password",
+    threshold=settings.FORGOT_PASSWORD_CAPTCHA_THRESHOLD,
+    window_seconds=settings.FORGOT_PASSWORD_CAPTCHA_WINDOW_SECONDS,
+    track_all_requests=True,
+)
+_forgot_username_captcha = require_captcha_after_threshold(
+    action="forgot_username",
+    threshold=settings.FORGOT_USERNAME_CAPTCHA_THRESHOLD,
+    window_seconds=settings.FORGOT_USERNAME_CAPTCHA_WINDOW_SECONDS,
+    track_all_requests=True,
+)
+_reset_password_captcha = require_captcha_after_threshold(
+    action="reset_password",
+    threshold=settings.RESET_PASSWORD_CAPTCHA_THRESHOLD,
+    window_seconds=settings.RESET_PASSWORD_CAPTCHA_WINDOW_SECONDS,
+)
+
 
 # =============================================================================
 # CUSTOMER SIGNUP (EMAIL VERIFICATION FLOW)
@@ -92,6 +119,7 @@ def signup_request(
     request: Request,
     user: CustomerSignupSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_signup_captcha),
 ):
     """
     Step 1 of customer signup: validate payload, store pending signup, send verification email.
@@ -129,6 +157,7 @@ def signup_verify(
     request: Request,
     body: VerifySignupRequest,
     db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_signup_verify_captcha),
 ):
     """
     Step 2 of customer signup: validate verification code (or legacy token) from email, create user, return user and JWT.
@@ -143,6 +172,7 @@ def signup_verify(
         "Signup verified",
     )
     if not result:
+        ip_tracker.increment(request.client.host, "signup_verify")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired verification code",
@@ -273,6 +303,7 @@ def forgot_username(
     request: Request,
     body: ForgotUsernameRequest,
     db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_forgot_username_captcha),
 ):
     """Request username recovery; optionally also trigger password reset email."""
     log_password_recovery_debug(f"POST /forgot-username received email={body.email!r} send_password_reset={body.send_password_reset}")
@@ -306,7 +337,8 @@ def forgot_username(
 def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_forgot_password_captcha),
 ):
     """
     Request password reset for an account.
@@ -351,7 +383,8 @@ def forgot_password(
 def reset_password(
     request: Request,
     body: ResetPasswordRequest,
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_reset_password_captcha),
 ):
     """
     Reset password using valid reset code (or legacy token) from email.
@@ -365,13 +398,14 @@ def reset_password(
             new_password=body.new_password,
             db=db
         )
-    
+
     result = handle_business_operation(
         _reset_password,
         "password reset"
     )
 
     if not result["success"]:
+        ip_tracker.increment(request.client.host, "reset_password")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result["message"],
@@ -382,6 +416,7 @@ def reset_password(
     if user_dto is not None:
         token_data = build_token_data(user_dto)
         merge_subscription_token_claims(token_data, user_dto.user_id, db)
+        merge_onboarding_token_claims(token_data, db)
         out["access_token"] = create_access_token(data=token_data)
         out["token_type"] = "bearer"
     return out

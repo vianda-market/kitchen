@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Your setup is almost there!</h1>
+<p>Hi {{ institution_name }} team,</p>
+<p>Your Vianda setup is <strong>{{ completion_percentage }}%</strong> complete — you're almost there!</p>
+<p>These steps are still missing:</p>
+<ul style="padding-left: 20px;">{{ steps_html }}</ul>
+<p>Finishing setup means your restaurant goes live and customers can start ordering.</p>
+<p style="margin: 25px 0;"><a href="{{ b2b_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete your setup</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Want us to walk you through it? Reply to this email to schedule a quick support call.</p>
+{% endblock %}

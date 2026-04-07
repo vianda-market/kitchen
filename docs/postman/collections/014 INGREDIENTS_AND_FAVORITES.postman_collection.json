@@ -1,0 +1,696 @@
+{
+  "info": {
+    "name": "014 INGREDIENTS_AND_FAVORITES",
+    "description": "Ingredient search (local + Open Food Facts fallback) and custom creation. Customer favorite management (plates + restaurants). Run collection 000 first (creates customer, plates, restaurants).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Login Super Admin",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const u = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername') || 'superadmin';",
+                  "const p = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword') || 'SuperAdmin1!';",
+                  "pm.collectionVariables.set('superAdminUsername', u);",
+                  "pm.collectionVariables.set('superAdminPassword', p);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains access_token', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "    pm.expect(body.access_token).to.be.a('string');",
+                  "});",
+                  "",
+                  "const { access_token } = pm.response.json();",
+                  "pm.collectionVariables.set('authToken', access_token);",
+                  "pm.environment.set('authToken', access_token);",
+                  "pm.globals.set('authToken', access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{superAdminUsername}}", "type": "text" },
+                { "key": "password", "value": "{{superAdminPassword}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const u = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
+                  "const p = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
+                  "",
+                  "if (!u || !p) {",
+                  "    throw new Error('customerUsername / customerPassword not set. Run collection 000 first.');",
+                  "}",
+                  "",
+                  "pm.collectionVariables.set('customerUsername', u);",
+                  "pm.collectionVariables.set('customerPassword', p);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customer login successful - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains access_token', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "const { access_token } = pm.response.json();",
+                  "pm.collectionVariables.set('customerAuthToken', access_token);",
+                  "pm.environment.set('customerAuthToken', access_token);",
+                  "pm.globals.set('customerAuthToken', access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{customerUsername}}", "type": "text" },
+                { "key": "password", "value": "{{customerPassword}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Ingredients",
+      "item": [
+        {
+          "name": "Search Ingredients (English)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Items have name_display and source', function () {",
+                  "    const body = pm.response.json();",
+                  "    if (body.length > 0) {",
+                  "        pm.expect(body[0]).to.have.property('name_display');",
+                  "        pm.expect(body[0]).to.have.property('source');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingredients/search?query=tomato&lang=en",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingredients", "search"],
+              "query": [
+                { "key": "query", "value": "tomato" },
+                { "key": "lang", "value": "en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search Ingredients (Spanish)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingredients/search?query=zanahoria&lang=es",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingredients", "search"],
+              "query": [
+                { "key": "query", "value": "zanahoria" },
+                { "key": "lang", "value": "es" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Custom Ingredient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect(status).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Has ingredient_id and name_display', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('ingredient_id');",
+                  "    pm.expect(body).to.have.property('name_display');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.ingredient_id) {",
+                  "    pm.collectionVariables.set('customIngredientId', body.ingredient_id);",
+                  "    pm.environment.set('customIngredientId', body.ingredient_id);",
+                  "    pm.globals.set('customIngredientId', body.ingredient_id);",
+                  "    console.log('Created custom ingredient: ' + body.ingredient_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Postman Test Ingredient\", \"lang\": \"en\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingredients/custom",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingredients", "custom"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Discover Test Data",
+      "item": [
+        {
+          "name": "Discover Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.length > 0 && body[0].restaurant_id) {",
+                  "    pm.collectionVariables.set('testRestaurantId', body[0].restaurant_id);",
+                  "    pm.environment.set('testRestaurantId', body[0].restaurant_id);",
+                  "    pm.globals.set('testRestaurantId', body[0].restaurant_id);",
+                  "    console.log('Found restaurant: ' + body[0].restaurant_id);",
+                  "} else {",
+                  "    console.warn('No restaurants found. Run collection 000 first.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Discover Plate and Get Current Favorites",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const token = pm.collectionVariables.get('authToken');",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/plates',",
+                  "    method: 'GET',",
+                  "    header: {",
+                  "        'Authorization': 'Bearer ' + token",
+                  "    }",
+                  "}, function (err, res) {",
+                  "    if (err) {",
+                  "        console.warn('Failed to fetch plates: ' + err);",
+                  "        return;",
+                  "    }",
+                  "    const plates = res.json();",
+                  "    if (Array.isArray(plates) && plates.length > 0 && plates[0].plate_id) {",
+                  "        pm.collectionVariables.set('testPlateId', plates[0].plate_id);",
+                  "        pm.environment.set('testPlateId', plates[0].plate_id);",
+                  "        pm.globals.set('testPlateId', plates[0].plate_id);",
+                  "        console.log('Found plate: ' + plates[0].plate_id);",
+                  "    } else {",
+                  "        console.warn('No plates found via /plates. testPlateId not set.');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has plate_ids and restaurant_ids arrays', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_ids');",
+                  "    pm.expect(body).to.have.property('restaurant_ids');",
+                  "    pm.expect(Array.isArray(body.plate_ids)).to.be.true;",
+                  "    pm.expect(Array.isArray(body.restaurant_ids)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites/me/ids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites", "me", "ids"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Favorites",
+      "item": [
+        {
+          "name": "Add Restaurant Favorite",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const rid = pm.collectionVariables.get('testRestaurantId');",
+                  "if (!rid) {",
+                  "    console.warn('testRestaurantId not set — skipping.');",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 201) {",
+                  "    pm.test('Restaurant favorite added', function () {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('favorite_id');",
+                  "        pm.expect(body.entity_type).to.equal('restaurant');",
+                  "    });",
+                  "    const body = pm.response.json();",
+                  "    if (body.favorite_id) {",
+                  "        pm.collectionVariables.set('favoriteRestaurantId', body.favorite_id);",
+                  "        pm.environment.set('favoriteRestaurantId', body.favorite_id);",
+                  "        pm.globals.set('favoriteRestaurantId', body.favorite_id);",
+                  "    }",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 — already favorited', function () {",
+                  "        console.log('Already favorited: ' + JSON.stringify(pm.response.json()));",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 201 or 400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"entity_type\": \"restaurant\", \"entity_id\": \"{{testRestaurantId}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Plate Favorite",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const pid = pm.collectionVariables.get('testPlateId');",
+                  "if (!pid) {",
+                  "    console.warn('testPlateId not set — skipping.');",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 201) {",
+                  "    pm.test('Plate favorite added', function () {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('favorite_id');",
+                  "    });",
+                  "    const body = pm.response.json();",
+                  "    if (body.favorite_id) {",
+                  "        pm.collectionVariables.set('favoritePlateId', body.favorite_id);",
+                  "        pm.environment.set('favoritePlateId', body.favorite_id);",
+                  "        pm.globals.set('favoritePlateId', body.favorite_id);",
+                  "    }",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 — already favorited', function () {",
+                  "        console.log('Already favorited: ' + JSON.stringify(pm.response.json()));",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 201 or 400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"entity_type\": \"plate\", \"entity_id\": \"{{testPlateId}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List My Favorites",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List My Favorites (Filter by Restaurant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('All items are restaurant type', function () {",
+                  "    const body = pm.response.json();",
+                  "    body.forEach(function (item) {",
+                  "        pm.expect(item.entity_type).to.equal('restaurant');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites/me?entity_type=restaurant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites", "me"],
+              "query": [
+                { "key": "entity_type", "value": "restaurant" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Favorite IDs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has plate_ids and restaurant_ids arrays', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_ids');",
+                  "    pm.expect(body).to.have.property('restaurant_ids');",
+                  "    pm.expect(Array.isArray(body.plate_ids)).to.be.true;",
+                  "    pm.expect(Array.isArray(body.restaurant_ids)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites/me/ids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites", "me", "ids"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Restaurant Favorite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/favorites/restaurant/{{testRestaurantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "favorites", "restaurant", "{{testRestaurantId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "const base = pm.environment.get('baseUrl') || pm.globals.get('baseUrl') || 'http://localhost:8000';",
+          "pm.collectionVariables.set('baseUrl', base);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "superAdminUsername", "value": "" },
+    { "key": "superAdminPassword", "value": "" },
+    { "key": "customerUsername", "value": "" },
+    { "key": "customerPassword", "value": "" },
+    { "key": "authToken", "value": "" },
+    { "key": "customerAuthToken", "value": "" },
+    { "key": "customIngredientId", "value": "" },
+    { "key": "favoritePlateId", "value": "" },
+    { "key": "favoriteRestaurantId", "value": "" },
+    { "key": "testPlateId", "value": "" },
+    { "key": "testRestaurantId", "value": "" }
+  ]
+}

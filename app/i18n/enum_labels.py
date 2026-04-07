@@ -16,6 +16,38 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "Completed": "Completed",
             "Failed": "Failed",
         },
+        "status": {
+            "Active": "Active",
+            "Inactive": "Inactive",
+            "Pending": "Pending",
+            "Arrived": "Arrived",
+            "Completed": "Completed",
+            "Cancelled": "Cancelled",
+        },
+        "kitchen_days": {
+            "Monday": "Monday",
+            "Tuesday": "Tuesday",
+            "Wednesday": "Wednesday",
+            "Thursday": "Thursday",
+            "Friday": "Friday",
+        },
+        "subscription_status": {
+            "Active": "Active",
+            "On Hold": "On Hold",
+            "Pending": "Pending",
+            "Cancelled": "Cancelled",
+        },
+        "discretionary_status": {
+            "Pending": "Pending",
+            "Cancelled": "Cancelled",
+            "Approved": "Approved",
+            "Rejected": "Rejected",
+        },
+        "pickup_type": {
+            "self": "Self pickup",
+            "offer": "Offers to pick up",
+            "request": "Requests pickup",
+        },
         "street_type": {
             "St": "Street",
             "Ave": "Avenue",
@@ -48,6 +80,38 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "Pending": "Pendiente",
             "Completed": "Completado",
             "Failed": "Fallido",
+        },
+        "status": {
+            "Active": "Activo",
+            "Inactive": "Inactivo",
+            "Pending": "Pendiente",
+            "Arrived": "Llegado",
+            "Completed": "Completado",
+            "Cancelled": "Cancelado",
+        },
+        "kitchen_days": {
+            "Monday": "Lunes",
+            "Tuesday": "Martes",
+            "Wednesday": "Miércoles",
+            "Thursday": "Jueves",
+            "Friday": "Viernes",
+        },
+        "subscription_status": {
+            "Active": "Activo",
+            "On Hold": "En pausa",
+            "Pending": "Pendiente",
+            "Cancelled": "Cancelado",
+        },
+        "discretionary_status": {
+            "Pending": "Pendiente",
+            "Cancelled": "Cancelado",
+            "Approved": "Aprobado",
+            "Rejected": "Rechazado",
+        },
+        "pickup_type": {
+            "self": "Retiro propio",
+            "offer": "Ofrece retirar",
+            "request": "Solicita retiro",
         },
         "street_type": {
             "St": "Calle",
@@ -82,6 +146,38 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "Completed": "Concluído",
             "Failed": "Falho",
         },
+        "status": {
+            "Active": "Ativo",
+            "Inactive": "Inativo",
+            "Pending": "Pendente",
+            "Arrived": "Chegou",
+            "Completed": "Concluído",
+            "Cancelled": "Cancelado",
+        },
+        "kitchen_days": {
+            "Monday": "Segunda-feira",
+            "Tuesday": "Terça-feira",
+            "Wednesday": "Quarta-feira",
+            "Thursday": "Quinta-feira",
+            "Friday": "Sexta-feira",
+        },
+        "subscription_status": {
+            "Active": "Ativo",
+            "On Hold": "Em pausa",
+            "Pending": "Pendente",
+            "Cancelled": "Cancelado",
+        },
+        "discretionary_status": {
+            "Pending": "Pendente",
+            "Cancelled": "Cancelado",
+            "Approved": "Aprovado",
+            "Rejected": "Rejeitado",
+        },
+        "pickup_type": {
+            "self": "Retirada própria",
+            "offer": "Oferece retirar",
+            "request": "Solicita retirada",
+        },
         "street_type": {
             "St": "Rua",
             "Ave": "Avenida",
@@ -105,7 +201,10 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
 }
 
-LABELED_ENUM_TYPES = frozenset({"street_type", "address_type", "bill_resolution", "bill_payout_status"})
+LABELED_ENUM_TYPES = frozenset({
+    "street_type", "address_type", "bill_resolution", "bill_payout_status",
+    "status", "kitchen_days", "subscription_status", "discretionary_status", "pickup_type",
+})
 
 
 def get_label(enum_type: str, code: str, locale: str = "en") -> str:

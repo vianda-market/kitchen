@@ -62,6 +62,7 @@ def cancel_subscription(
         subscription_status=SubscriptionStatus.CANCELLED.value,
         hold_start_date=subscription.hold_start_date,
         hold_end_date=subscription.hold_end_date,
+        early_renewal_threshold=subscription.early_renewal_threshold,
         is_archived=True,
         status=Status.CANCELLED,
         created_date=subscription.created_date,

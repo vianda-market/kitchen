@@ -2,7 +2,7 @@
 
 **Audience:** B2B (kitchen-web) and B2C (kitchen-mobile) client developers and AI agents integrating the Kitchen API.  
 **Purpose:** Single reference for how the backend exposes **language/locale**, what clients should send, and what is **not** localized yet.  
-**Last updated:** March 2026
+**Last updated:** April 2026
 
 ---
 
@@ -16,22 +16,29 @@
 6. [JWT access token: `locale` claim](#6-jwt-access-token-locale-claim)  
 7. [Password reset: new session token](#7-password-reset-new-session-token)  
 8. [Enums API: labeled dropdowns](#8-enums-api-labeled-dropdowns)  
-9. [Response header: `X-Content-Language`](#9-response-header-x-content-language)  
-10. [What is not localized yet (MVP)](#10-what-is-not-localized-yet-mvp)  
-11. [Implementation checklist for clients](#11-implementation-checklist-for-clients)  
-12. [Related documentation](#12-related-documentation)
+9. [Locales discovery endpoint](#9-locales-discovery-endpoint)  
+10. [Market locale enrichment](#10-market-locale-enrichment)  
+11. [Response header: `X-Content-Language`](#11-response-header-x-content-language)  
+12. [What is not localized yet (MVP)](#12-what-is-not-localized-yet-mvp)  
+13. [Implementation checklist for clients](#13-implementation-checklist-for-clients)  
+14. [Related documentation](#14-related-documentation)
 
 ---
 
 ## 1. Supported locales
 
-The API uses **ISO 639-1 short codes** only (no `en-US` / `es-AR` in v1):
+The API uses **ISO 639-1 short codes** only. There is no locale selector exposed to users — clients offer a **language picker** and the full locale is derived automatically by the backend.
 
-| Code | Notes |
-|------|--------|
-| `en` | Default |
-| `es` | Spanish |
-| `pt` | Portuguese (Brazil-oriented copy where translated) |
+| Code | Language | Market(s) | Derived locale |
+|------|----------|-----------|---------------|
+| `en` | English (default) | US | `en-US` |
+| `es` | Spanish | AR, PE | `es-AR` / `es-PE` (per user's market) |
+| `pt` | Portuguese | BR | `pt-BR` |
+
+**Design decision — no locale selector:**
+Users select a language (3 options: English, Español, Português). The full locale — which governs number/date/currency formatting and regional dialect display (e.g. "palta" vs "aguacate") — is derived server-side from `language + user's market_id`. There is no reason to expose a locale picker: vianda operates in a small, well-defined set of markets where language and market together fully determine locale. OS locale is used to pre-select the language on first launch; the user can override it.
+
+**Internal users** (who manage entities across markets) inherit locale from the entity or market currently being viewed for dialect-sensitive content.
 
 Invalid locale values on write (e.g. `PUT /users/me` with `locale: "fr"`) return **422** validation errors.
 
@@ -52,10 +59,14 @@ The server configuration mirrors this (`DEFAULT_LOCALE`, `SUPPORTED_LOCALES` in 
 | Signal | Source | Use on client |
 |--------|--------|----------------|
 | **`language`** on market objects | `market_info.language` (DB) | Default UI language for a **country/market** before signup |
+| **`locale`** (BCP 47) on market objects | Computed from `language` + `country_code` | Full locale for `Intl.NumberFormat` / `Intl.DateTimeFormat` (e.g. `es-AR`) — see [§10](#10-market-locale-enrichment) |
 | **`locale`** on user objects | `user_info.locale` (DB) | Persisted user preference |
 | **`locale`** in JWT payload | Issued at login, B2C verify, password reset | Quick read without `/users/me`; **can be stale** after profile `PUT` — see [§6](#6-jwt-access-token-locale-claim) |
 | **`?language=`** on `GET /api/v1/enums` | Query param | Which translation map to use for **labels** in that response |
-| **`X-Content-Language`** response header | Middleware (header-based) | Hint only; **not** the same as DB-resolved user locale for authenticated users — see [§9](#9-response-header-x-content-language) |
+| **`?language=`** on `GET /api/v1/leads/markets` | Query param (or `Accept-Language` fallback) | Localized `country_name` — see [§10](#10-market-locale-enrichment) |
+| **`?language=`** on `GET /api/v1/cuisines` | Query param (or `Accept-Language` fallback) | Localized `cuisine_name` from `cuisine_name_i18n` JSONB |
+| **`GET /api/v1/locales`** | Backend settings | Discover supported locales dynamically — see [§9](#9-locales-discovery-endpoint) |
+| **`X-Content-Language`** response header | Middleware (header-based) | Hint only; **not** the same as DB-resolved user locale for authenticated users — see [§11](#11-response-header-x-content-language) |
 
 **Authoritative order for “what language is this user using?”** when implementing server-driven copy later: resolved locale from backend dependencies is **`user_info.locale` (if authenticated)** → **`Accept-Language`** → **default `en`**. Clients should align UI with `user.locale` when available.
 
@@ -66,10 +77,12 @@ The server configuration mirrors this (`DEFAULT_LOCALE`, `SUPPORTED_LOCALES` in 
 **`GET /api/v1/leads/markets`** (no auth, rate-limited) returns a minimal list of markets available for signup country selection. Each item includes:
 
 - `country_code`
-- `country_name`
+- `country_name` — localized when `?language=` or `Accept-Language` is provided (see [§10](#10-market-locale-enrichment))
 - **`language`** — ISO 639-1 code for that market (`es` for AR/PE/CL/MX, `en` for US/Global policy, `pt` for BR, etc.)
+- **`locale`** — BCP 47 tag derived from `language + country_code` (e.g. `es-AR`). Use for `Intl.NumberFormat` / `Intl.DateTimeFormat`.
+- `phone_dial_code`, `phone_local_digits` — phone input defaults
 
-Use **`language`** from the row the user selects (or the app’s default market) to set **initial app UI language** before a `user_info` row exists.
+Use **`language`** from the row the user selects (or the app’s default market) to set **initial app UI language** before a `user_info` row exists. Use **`locale`** for number/date/currency formatting.
 
 Details and other lead endpoints: [LEADS_API_SCOPE.md](./LEADS_API_SCOPE.md).
 
@@ -139,37 +152,117 @@ Still returns a **JSON array of strings** (codes only). Use the **aggregate** `G
 
 ---
 
-## 9. Response header: `X-Content-Language`
+## 9. Locales discovery endpoint
 
-Many responses include **`X-Content-Language: en|es|pt`**, derived from **`Accept-Language`** in middleware (**no DB access**). That means for logged-in users it does **not** necessarily match **`user_info.locale`**.
+### `GET /api/v1/locales`
 
-Use it as a **rough hint** for formatting or fallback copy; prefer **`user.locale`** and **`GET /api/v1/enums?language=…`** for precise behavior.
+Public, cacheable endpoint that exposes which locales the platform supports. No authentication required.
+
+**Response:**
+
+```json
+{
+  "supported": ["en", "es"],
+  "default": "en"
+}
+```
+
+- **Cache:** `Cache-Control: public, max-age=86400` (24 hours). Locales change only on deploy.
+- **Use cases:**
+  - **vianda-home:** Render locale toggle dynamically (no hardcoded locale list in frontend)
+  - **vianda-platform (B2B):** `useLocales()` hook — determines how many locale inputs to render in multi-locale content authoring forms
+  - **vianda-app (B2C):** Language picker in profile screen
+- When a new language launches (e.g. Portuguese), all clients pick it up automatically — no frontend deployment needed.
 
 ---
 
-## 10. What is not localized yet (MVP)
+## 10. Market locale enrichment
 
-Phase 1 is **scaffolding** only:
+### BCP 47 `locale` field on all market responses
 
-- Most **`HTTPException` `detail`** strings and database error paths remain **English**.
-- **`app/i18n/messages.py`** exists with a small **`get_message`** helper; widespread wiring is **post-MVP** (see [LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md](../../roadmap/LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md) — Post-MVP Phases 2–3).
+All market response schemas now include a computed **`locale`** field — a BCP 47 tag derived from `language + country_code`:
 
-Do not assume error bodies or Pydantic validation messages follow the user’s locale yet.
+```json
+{
+  "country_code": "AR",
+  "language": "es",
+  "locale": "es-AR"
+}
+```
+
+Use this for `Intl.NumberFormat` and `Intl.DateTimeFormat` instead of device/browser locale. Without it, a user with an English-language phone in Argentina sees US-style number formatting for ARS amounts.
+
+**Present on:** `MarketResponseSchema`, `MarketPublicMinimalSchema`, `MarketPublicResponseSchema`.
+
+### Locale-aware `country_name` and `currency_name`
+
+Market display names are localized at response time based on the user's locale:
+
+| Endpoint | How locale is resolved | Fields localized |
+|----------|----------------------|-----------------|
+| `GET /api/v1/leads/markets` (no auth) | `?language=` query param → `Accept-Language` header → `en` | `country_name` |
+| `GET /api/v1/markets/enriched` (auth) | User's resolved locale (`user.locale` → `Accept-Language` → `en`) | `country_name`, `currency_name` |
+| `GET /api/v1/markets/enriched/{id}` (auth) | Same as above | `country_name`, `currency_name` |
+
+**Examples:**
+
+| country_code | `en` | `es` | `pt` |
+|---|---|---|---|
+| AR | Argentina | Argentina | Argentina |
+| US | United States | Estados Unidos | Estados Unidos |
+| BR | Brazil | Brasil | Brasil |
+
+| currency_code | `en` | `es` | `pt` |
+|---|---|---|---|
+| ARS | Argentine Peso | Peso argentino | Peso argentino |
+| USD | US Dollar | Dólar estadounidense | Dólar dos Estados Unidos |
+
+Non-enriched admin CRUD endpoints (`GET /markets`, `GET /markets/{id}`) return canonical English names.
 
 ---
 
-## 11. Implementation checklist for clients
+## 11. Response header: `X-Content-Language`
+
+All responses include **`X-Content-Language: en|es|pt`**. For routes that inject `get_resolved_locale` (enriched endpoints, market endpoints), the header reflects the **DB-resolved user locale** (`user_info.locale`). For other routes, it falls back to **`Accept-Language`** header parsing.
+
+This means for authenticated enriched endpoints, `X-Content-Language` matches the locale used to resolve localized content (cuisine names, taglines, etc.). For routes without locale injection, it remains a rough hint based on the request header.
+
+---
+
+## 12. What is localized and what is not
+
+**Localized (Phases 1–5):**
+- Enum labels: 9 enum types have es/pt labels via `GET /api/v1/enums?language=` (status, kitchen_days, subscription_status, discretionary_status, pickup_type, bill_resolution, bill_payout_status, street_type, address_type)
+- Entity CRUD error messages (`entity_not_found`, `creation_failed`, etc.) — localized via `get_message()` on routes with `get_resolved_locale`
+- Database constraint errors (`handle_database_exception`) — localized when `locale` param is passed
+- Email subject lines — all 8 email types resolve subject via `get_message()` with user’s locale
+- Market names (`country_name`, `currency_name`) — localized at response time via `pycountry`
+- Cuisine names — localized via `cuisine_name_i18n` JSONB
+- Admin-authored content (tagline, plan name, product name, etc.) — JSONB `_i18n` columns with locale resolution
+
+**Not yet localized:**
+- ~289 route-level `HTTPException(detail=...)` strings remain hardcoded English (incremental adoption in progress)
+- Email body text (8 templates) — subjects localized, bodies still English
+- Pydantic validation error messages — still English defaults
+- Push notification content — not yet implemented
+
+---
+
+## 13. Implementation checklist for clients
 
 1. Send **`Accept-Language`** on all API calls (match OS/browser/app language).
-2. On signup country picker, read **`language`** from **`GET /api/v1/leads/markets`** and set initial UI locale.
-3. After auth, sync UI from **`user.locale`**; after **`PUT /users/me`** with `locale`, refresh profile or token.
-4. Load enums via **`GET /api/v1/enums?language={uiLocale}`**; render **`labels`** in UI; submit **`values`** to the API.
-5. After password reset, if **`access_token`** is present, store it and decode **`locale`** (or fetch `/users/me`).
-6. Do not rely on **`X-Content-Language`** alone for authenticated UX language.
+2. On signup country picker, read **`language`** from **`GET /api/v1/leads/markets`** and set initial UI language. Do not build a locale picker — locale is derived from language + market on the backend.
+3. Use **`locale`** (BCP 47) from market responses for `Intl.NumberFormat` and `Intl.DateTimeFormat` instead of device/browser locale.
+4. After auth, sync UI from **`user.locale`**; after **`PUT /users/me`** with `locale`, refresh profile or token.
+5. Load enums via **`GET /api/v1/enums?language={uiLocale}`**; render **`labels`** in UI; submit **`values`** to the API.
+6. Fetch **`GET /api/v1/locales`** to discover supported locales dynamically — use for language pickers and multi-locale authoring forms.
+7. For localized country names on pre-auth screens, pass **`?language=`** to `GET /api/v1/leads/markets`.
+8. After password reset, if **`access_token`** is present, store it and decode **`locale`** (or fetch `/users/me`).
+9. Do not rely on **`X-Content-Language`** alone for authenticated UX language.
 
 ---
 
-## 12. Related documentation
+## 14. Related documentation
 
 | Topic | Document |
 |-------|----------|
@@ -177,5 +270,5 @@ Do not assume error bodies or Pydantic validation messages follow the user’s l
 | User profile, `PUT /users/me`, password reset body | [USER_MODEL_FOR_CLIENTS.md](./USER_MODEL_FOR_CLIENTS.md) |
 | Lead endpoints (markets, cities, email-registered) | [LEADS_API_SCOPE.md](./LEADS_API_SCOPE.md) |
 | Markets, subscriptions, scope | [MARKET_AND_SCOPE_GUIDELINE.md](./MARKET_AND_SCOPE_GUIDELINE.md) |
-| Backend roadmap (Phase 1 done; Phases 2–8 backlog) | [LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md](../../roadmap/LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md) |
+| Backend roadmap (Phase 1 done; Phases 2–10 backlog) | [LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md](../../roadmap/LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md) |
 | B2C copy-specific notes | [MULTI_LANGUAGE_ROADMAP.md](../../roadmap/b2c_client/MULTI_LANGUAGE_ROADMAP.md) |

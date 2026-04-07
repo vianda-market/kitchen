@@ -23,6 +23,10 @@ from app.services.crud_service import (
     is_holiday
 )
 from app.config.market_config import MarketConfiguration
+from app.services.billing.supplier_terms_resolution import (
+    resolve_effective_invoice_config,
+    get_supplier_payment_frequency,
+)
 from app.config import Status
 from app.config.enums import BillResolution
 from app.utils.log import log_info, log_warning, log_error
@@ -32,6 +36,62 @@ from app.services.crud_service import (
     restaurant_transaction_service,
     plate_pickup_live_service
 )
+
+def _is_supplier_payout_due(payment_frequency: str, today: date) -> bool:
+    """Check if a supplier payout is due today based on payment_frequency.
+
+    Follows the same pattern as employer_billing._is_billing_due().
+    """
+    if payment_frequency == "daily":
+        return True
+    if payment_frequency == "weekly":
+        return today.weekday() == 0  # Monday
+    if payment_frequency == "biweekly":
+        return today.weekday() == 0 and today.isocalendar()[1] % 2 == 1  # Every other Monday (odd ISO weeks)
+    if payment_frequency == "monthly":
+        return today.day == 1
+    return True
+
+
+def _check_invoice_compliance(
+    institution_id: UUID,
+    institution_entity_id: UUID,
+    db,
+) -> bool:
+    """Check if an entity passes the invoice compliance gate.
+
+    Returns True if payout is allowed, False if held due to uninvoiced bills.
+    """
+    config = resolve_effective_invoice_config(institution_id, db)
+    if not config["effective_require_invoice"]:
+        return True
+
+    hold_days = config["effective_invoice_hold_days"]
+    row = db_read(
+        """
+        SELECT MIN(b.period_end) as oldest_unmatched
+        FROM billing.institution_bill_info b
+        WHERE b.institution_entity_id = %s
+          AND b.is_archived = FALSE
+          AND b.resolution = 'Pending'
+          AND NOT EXISTS (
+            SELECT 1 FROM billing.bill_invoice_match m
+            WHERE m.institution_bill_id = b.institution_bill_id
+          )
+        """,
+        (str(institution_entity_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if not row or not row.get("oldest_unmatched"):
+        return True  # No unmatched bills — compliant
+
+    oldest = row["oldest_unmatched"]
+    if isinstance(oldest, datetime):
+        oldest = oldest.date()
+    days_unmatched = (date.today() - oldest).days
+    return days_unmatched <= hold_days
+
 
 class InstitutionBillingService:
     """Service for generating and managing institution bills based on restaurant balances"""
@@ -430,6 +490,12 @@ class InstitutionBillingService:
                 if not institution_id:
                     log_warning(f"Institution not found for entity {institution_entity_id}, skipping")
                     continue
+                # Payment frequency gate: skip bill creation if not due today
+                freq = get_supplier_payment_frequency(institution_id, connection)
+                today = date.today()
+                if not _is_supplier_payout_due(freq, today):
+                    log_info(f"Skipping bill for entity {institution_entity_id}: payment_frequency={freq}, not due on {today}")
+                    continue
                 amount = sum(s.amount for s in entity_settlements)
                 transaction_count = sum(s.transaction_count for s in entity_settlements)
                 first = entity_settlements[0]
@@ -486,7 +552,13 @@ class InstitutionBillingService:
         When location_id is provided, only restaurants in that location's timezone are processed.
         """
         from app.services.billing.tax_doc_service import issue_tax_doc_for_bill
-        from app.services.supplier_payout import trigger_payout
+        from app.config.settings import settings
+        def _get_connect_gw():
+            if (settings.SUPPLIER_PAYOUT_PROVIDER or "mock").lower() == "stripe":
+                from app.services.payment_provider.stripe import connect_gateway
+                return connect_gateway
+            from app.services.payment_provider.stripe import connect_mock
+            return connect_mock
         own_conn = connection is None
         if own_conn:
             connection = get_db_connection()
@@ -532,34 +604,40 @@ class InstitutionBillingService:
             cc = phase1.get("country_code") or country_code or "US"
             bills_paid = 0
             paid_bill_details: List[Dict] = []
+            gw = _get_connect_gw()
             for bill_id in bill_ids:
                 bill = institution_bill_service.get_by_id(bill_id, connection)
                 if not bill:
                     continue
                 issue_tax_doc_for_bill(bill_id, cc, connection)
-                payout_result = trigger_payout(
-                    bill_id,
-                    bill.amount or Decimal("0"),
-                    bill.currency_code or "USD",
-                )
-                if not payout_result.get("success"):
-                    log_warning(f"Payout failed for bill {bill_id}: {payout_result.get('error')}")
+                entity_id = getattr(bill, "institution_entity_id", None) or bill.get("institution_entity_id") if isinstance(bill, dict) else bill.institution_entity_id
+                if not entity_id:
+                    log_warning(f"Bill {bill_id} has no institution_entity_id; skipping payout")
                     continue
-                institution_bill_service.update(
-                    bill_id,
-                    {
-                        "stripe_payout_id": payout_result.get("stripe_payout_id"),
-                        "payout_completed_at": datetime.now(timezone.utc),
-                    },
-                    connection,
-                    commit=False,
-                )
+                # Invoice compliance gate
+                bill_institution_id = getattr(bill, "institution_id", None) or (bill.get("institution_id") if isinstance(bill, dict) else None)
+                if bill_institution_id and not _check_invoice_compliance(bill_institution_id, entity_id, connection):
+                    log_warning(f"Payout held for bill {bill_id}: entity {entity_id} has unmatched bills exceeding invoice hold threshold")
+                    continue
+                try:
+                    payout_result = gw.execute_supplier_payout(
+                        institution_bill_id=UUID(str(bill_id)),
+                        entity_id=UUID(str(entity_id)),
+                        current_user_id=system_user_id,
+                        db=connection,
+                    )
+                except HTTPException as e:
+                    log_warning(f"Payout skipped for bill {bill_id}: {e.detail}")
+                    continue
+                except Exception as e:
+                    log_warning(f"Payout failed for bill {bill_id}: {e}")
+                    continue
                 institution_bill_service.mark_paid(bill_id, system_user_id, connection)
                 bills_paid += 1
                 paid_bill_details.append({
                     "institution_bill_id": str(bill_id),
-                    "stripe_payout_id": payout_result.get("stripe_payout_id"),
-                    "payout_completed_at": datetime.now(timezone.utc).isoformat(),
+                    "bill_payout_id": str(payout_result.get("bill_payout_id", "")),
+                    "provider_transfer_id": payout_result.get("provider_transfer_id"),
                 })
             if own_conn:
                 connection.commit()

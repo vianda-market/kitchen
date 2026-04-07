@@ -19,6 +19,7 @@ import psycopg2.extras
 from app.services.crud_service import user_service
 from app.services.email_service import email_service
 from app.auth.security import hash_password
+from app.utils.locale import get_user_locale
 from app.utils.log import log_info, log_error, log_warning, log_password_recovery_debug
 from app.config import Status
 
@@ -114,7 +115,8 @@ class PasswordRecoveryService:
                 to_email=email_normalized,
                 reset_code=reset_code,
                 user_first_name=user.first_name,
-                expiry_hours=self.token_expiry_hours
+                expiry_hours=self.token_expiry_hours,
+                locale=get_user_locale(user.user_id, db),
             )
             
             if not email_sent:
@@ -178,7 +180,8 @@ class PasswordRecoveryService:
             username_sent = email_service.send_username_recovery_email(
                 to_email=email_normalized,
                 username=user.username,
-                user_first_name=user.first_name
+                user_first_name=user.first_name,
+                locale=get_user_locale(user.user_id, db),
             )
             if not username_sent:
                 log_password_recovery_debug("username recovery: send_username_recovery_email returned False")

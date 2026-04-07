@@ -28,7 +28,7 @@ from app.utils.address_formatting import format_address_display, format_street_d
 from app.utils.portion_size import bucket_portion_size
 from fastapi import HTTPException
 from app.security.institution_scope import InstitutionScope
-from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, QRCodePrintContextSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema
+from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, QRCodePrintContextSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema, SupplierInvoiceEnrichedResponseSchema
 from app.schemas.payment_method import PaymentMethodEnrichedResponseSchema
 from app.schemas.restaurant_holidays import RestaurantHolidayEnrichedResponseSchema
 from app.services.enriched_service import EnrichedService
@@ -321,7 +321,9 @@ def get_enriched_users(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[UserEnrichedResponseSchema]:
     """
     Get all users with enriched data (role_name, role_type, institution_name).
@@ -373,7 +375,9 @@ def get_enriched_users(
             ("LEFT", "city_info", "c", "u.city_id = c.city_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
     # v2: attach market_ids for each user (bulk fetch)
     if not users:
@@ -599,7 +603,9 @@ def get_enriched_institution_entities(
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
     institution_id: Optional[UUID] = None,
-    institution_market_id: Optional[UUID] = None
+    institution_market_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[InstitutionEntityEnrichedResponseSchema]:
     """
     Get all institution entities with enriched data (institution, address, and market information).
@@ -643,7 +649,9 @@ def get_enriched_institution_entities(
             "a.city as address_city",
             "ie.tax_id",
             "ie.name",
-            "ie.stripe_connect_account_id",
+            "ie.payout_provider_account_id",
+            "ie.payout_aggregator",
+            "ie.payout_onboarding_status",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -657,7 +665,9 @@ def get_enriched_institution_entities(
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_institution_entity_by_id(
@@ -698,7 +708,9 @@ def get_enriched_institution_entity_by_id(
             "a.city as address_city",
             "ie.tax_id",
             "ie.name",
-            "ie.stripe_connect_account_id",
+            "ie.payout_provider_account_id",
+            "ie.payout_aggregator",
+            "ie.payout_onboarding_status",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -714,20 +726,20 @@ def get_enriched_institution_entity_by_id(
         include_archived=include_archived
     )
 
-def get_institution_entity_by_connect_account_id(
-    stripe_connect_account_id: str,
+def get_institution_entity_by_payout_account_id(
+    payout_provider_account_id: str,
     db: psycopg2.extensions.connection,
 ) -> Optional[dict]:
-    """Look up institution_entity by stripe_connect_account_id. Used by Connect webhook handlers."""
+    """Look up institution_entity by payout_provider_account_id. Used by Connect webhook handlers."""
     try:
         with db.cursor() as cur:
             cur.execute(
                 """
-                SELECT institution_entity_id, institution_id, name, stripe_connect_account_id
+                SELECT institution_entity_id, institution_id, name, payout_provider_account_id
                 FROM ops.institution_entity_info
-                WHERE stripe_connect_account_id = %s AND is_archived = FALSE
+                WHERE payout_provider_account_id = %s AND is_archived = FALSE
                 """,
-                (stripe_connect_account_id,)
+                (payout_provider_account_id,)
             )
             row = cur.fetchone()
             if row is None:
@@ -735,7 +747,7 @@ def get_institution_entity_by_connect_account_id(
             cols = [desc[0] for desc in cur.description]
             return dict(zip(cols, row))
     except Exception as e:
-        log_error(f"Error looking up entity by connect account id {stripe_connect_account_id}: {e}")
+        log_error(f"Error looking up entity by payout account id {payout_provider_account_id}: {e}")
         return None
 
 
@@ -758,7 +770,9 @@ def get_enriched_addresses(
     *,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    institution_id: Optional[UUID] = None
+    institution_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[AddressEnrichedResponseSchema]:
     """
     Get all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name).
@@ -805,16 +819,21 @@ def get_enriched_addresses(
             "a.status",
             "a.created_date",
             "a.modified_date",
+            "g.latitude",
+            "g.longitude",
             "COALESCE(TRIM(CONCAT_WS(' · ', a.street_name, a.city, a.postal_code)), '') as formatted_address"
         ],
         joins=[
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
     for addr in addresses:
         addr.formatted_address = format_address_display(
@@ -877,12 +896,15 @@ def get_enriched_address_by_id(
             "a.status",
             "a.created_date",
             "a.modified_date",
+            "g.latitude",
+            "g.longitude",
             "COALESCE(TRIM(CONCAT_WS(' · ', a.street_name, a.city, a.postal_code)), '') as formatted_address"
         ],
         joins=[
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
         ],
         scope=scope,
         include_archived=include_archived
@@ -930,7 +952,9 @@ def get_enriched_addresses_search(
     q: Optional[str] = None,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    limit: int = 50
+    limit: int = 50,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[AddressEnrichedResponseSchema]:
     """
     Search addresses with enriched data, optionally restricted by institution and text query.
@@ -974,16 +998,21 @@ def get_enriched_addresses_search(
             "a.status",
             "a.created_date",
             "a.modified_date",
+            "g.latitude",
+            "g.longitude",
             "COALESCE(TRIM(CONCAT_WS(' · ', a.street_name, a.city, a.postal_code)), '') as formatted_address"
         ],
         joins=[
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
         ],
         scope=effective_scope,
         include_archived=include_archived,
         additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
     for addr in addresses:
         addr.formatted_address = format_address_display(
@@ -1030,7 +1059,9 @@ def get_enriched_restaurants(
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
     institution_id: Optional[UUID] = None,
-    institution_market_id: Optional[UUID] = None
+    institution_market_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[RestaurantEnrichedResponseSchema]:
     """
     Get all restaurants with enriched data (institution name, entity name, address details).
@@ -1075,7 +1106,20 @@ def get_enriched_restaurants(
             "ie.credit_currency_id",
             "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
-            "r.cuisine",
+            "r.cuisine_id",
+            "cu.cuisine_name",
+            "cu.cuisine_name_i18n",
+            "r.tagline",
+            "r.tagline_i18n",
+            "r.is_featured",
+            "r.cover_image_url",
+            "r.average_rating",
+            "r.review_count",
+            "r.verified_badge",
+            "r.spotlight_label",
+            "r.spotlight_label_i18n",
+            "r.member_perks",
+            "r.member_perks_i18n",
             "r.is_archived",
             "r.status",
             "r.created_date",
@@ -1086,11 +1130,14 @@ def get_enriched_restaurants(
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_restaurant_by_id(
@@ -1133,7 +1180,20 @@ def get_enriched_restaurant_by_id(
             "ie.credit_currency_id",
             "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
-            "r.cuisine",
+            "r.cuisine_id",
+            "cu.cuisine_name",
+            "cu.cuisine_name_i18n",
+            "r.tagline",
+            "r.tagline_i18n",
+            "r.is_featured",
+            "r.cover_image_url",
+            "r.average_rating",
+            "r.review_count",
+            "r.verified_badge",
+            "r.spotlight_label",
+            "r.spotlight_label_i18n",
+            "r.member_perks",
+            "r.member_perks_i18n",
             "r.is_archived",
             "r.status",
             "r.created_date",
@@ -1144,7 +1204,8 @@ def get_enriched_restaurant_by_id(
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
         ],
         scope=scope,
         include_archived=include_archived
@@ -1337,7 +1398,9 @@ def get_enriched_qr_codes(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[QRCodeEnrichedResponseSchema]:
     """
     Get all QR codes with enriched data (institution name, restaurant name, address details).
@@ -1387,7 +1450,9 @@ def get_enriched_qr_codes(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_qr_code_by_id(
@@ -1504,7 +1569,9 @@ def get_enriched_products(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[ProductEnrichedResponseSchema]:
     """
     Get all products with enriched data (institution name).
@@ -1530,7 +1597,11 @@ def get_enriched_products(
             "p.institution_id",
             "i.name as institution_name",
             "p.name",
+            "p.name_i18n",
             "p.ingredients",
+            "p.ingredients_i18n",
+            "p.description",
+            "p.description_i18n",
             "p.dietary",
             "p.image_url",
             "p.image_storage_path",
@@ -1547,7 +1618,9 @@ def get_enriched_products(
             ("INNER", "institution_info", "i", "p.institution_id = i.institution_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_product_by_id(
@@ -1583,7 +1656,11 @@ def get_enriched_product_by_id(
             "p.institution_id",
             "i.name as institution_name",
             "p.name",
+            "p.name_i18n",
             "p.ingredients",
+            "p.ingredients_i18n",
+            "p.description",
+            "p.description_i18n",
             "p.dietary",
             "p.image_url",
             "p.image_storage_path",
@@ -1621,7 +1698,9 @@ def get_enriched_plates(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[PlateEnrichedResponseSchema]:
     """
     Get all plates with enriched data (institution, restaurant, product, address details).
@@ -1648,7 +1727,8 @@ def get_enriched_plates(
             "p.restaurant_id",
             "i.name as institution_name",
             "r.name as restaurant_name",
-            "r.cuisine",
+            "cu.cuisine_name",
+            "cu.cuisine_name_i18n",
             "r.pickup_instructions",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",
@@ -1660,15 +1740,19 @@ def get_enriched_plates(
             "g.latitude",
             "g.longitude",
             "pr.name as product_name",
+            "pr.name_i18n as product_name_i18n",
             "pr.dietary",
             "pr.ingredients",
+            "pr.ingredients_i18n",
+            "pr.description",
+            "pr.description_i18n",
             "pr.image_url as product_image_url",
             "pr.image_storage_path as product_image_storage_path",
             "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
             "p.expected_payout_local_currency",
-            "i.no_show_discount",
+            "st.no_show_discount",
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
@@ -1682,12 +1766,16 @@ def get_enriched_plates(
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
             ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
+            ("LEFT", "supplier_terms", "st", "i.institution_id = st.institution_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "geolocation_info", "g", "a.address_id = g.address_id AND g.is_archived = FALSE"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
     for plate in plates:
         plate.address_display = format_street_display(
@@ -1751,7 +1839,8 @@ def get_enriched_plate_by_id(
             "p.restaurant_id",
             "i.name as institution_name",
             "r.name as restaurant_name",
-            "r.cuisine",
+            "cu.cuisine_name",
+            "cu.cuisine_name_i18n",
             "r.pickup_instructions",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",
@@ -1763,15 +1852,19 @@ def get_enriched_plate_by_id(
             "g.latitude",
             "g.longitude",
             "pr.name as product_name",
+            "pr.name_i18n as product_name_i18n",
             "pr.dietary",
             "pr.ingredients",
+            "pr.ingredients_i18n",
+            "pr.description",
+            "pr.description_i18n",
             "pr.image_url as product_image_url",
             "pr.image_storage_path as product_image_storage_path",
             "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
             "p.expected_payout_local_currency",
-            "i.no_show_discount",
+            "st.no_show_discount",
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
@@ -1785,9 +1878,11 @@ def get_enriched_plate_by_id(
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
             ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
+            ("LEFT", "supplier_terms", "st", "i.institution_id = st.institution_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "geolocation_info", "g", "a.address_id = g.address_id AND g.is_archived = FALSE"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
         ],
         scope=scope,
         include_archived=include_archived
@@ -1828,7 +1923,9 @@ def get_enriched_markets(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[MarketResponseSchema]:
     """
     Get all markets with enriched data (currency name and code).
@@ -1857,6 +1954,9 @@ def get_enriched_markets(
             "c.currency_conversion_usd",
             "m.timezone",
             "m.kitchen_close_time",
+            "m.language",
+            "m.phone_dial_code",
+            "m.phone_local_digits",
             "m.is_archived",
             "m.status",
             "m.created_date",
@@ -1866,7 +1966,9 @@ def get_enriched_markets(
             ("LEFT", "credit_currency_info", "c", "m.credit_currency_id = c.credit_currency_id")
         ],
         scope=None,  # Markets don't have institution scoping
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_market_by_id(
@@ -1905,6 +2007,9 @@ def get_enriched_market_by_id(
             "c.currency_conversion_usd",
             "m.timezone",
             "m.kitchen_close_time",
+            "m.language",
+            "m.phone_dial_code",
+            "m.phone_local_digits",
             "m.is_archived",
             "m.status",
             "m.created_date",
@@ -1937,7 +2042,9 @@ def get_enriched_plans(
     *,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    additional_conditions: Optional[List[tuple]] = None
+    additional_conditions: Optional[List[tuple]] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[PlanEnrichedResponseSchema]:
     """
     Get all plans with enriched data (currency name, code, and market info).
@@ -1964,6 +2071,13 @@ def get_enriched_plans(
             "cc.currency_name",
             "cc.currency_code",
             "pl.name",
+            "pl.name_i18n",
+            "pl.marketing_description",
+            "pl.marketing_description_i18n",
+            "pl.features",
+            "pl.features_i18n",
+            "pl.cta_label",
+            "pl.cta_label_i18n",
             "pl.credit",
             "pl.price",
             "pl.credit_cost_local_currency",
@@ -1981,7 +2095,9 @@ def get_enriched_plans(
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived,
-        additional_conditions=additional_conditions
+        additional_conditions=additional_conditions,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_plan_by_id(
@@ -2017,6 +2133,13 @@ def get_enriched_plan_by_id(
             "cc.currency_name",
             "cc.currency_code",
             "pl.name",
+            "pl.name_i18n",
+            "pl.marketing_description",
+            "pl.marketing_description_i18n",
+            "pl.features",
+            "pl.features_i18n",
+            "pl.cta_label",
+            "pl.cta_label_i18n",
             "pl.credit",
             "pl.price",
             "pl.credit_cost_local_currency",
@@ -2055,7 +2178,9 @@ def get_enriched_credit_currencies(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[CreditCurrencyEnrichedResponseSchema]:
     """
     Get all credit currencies with enriched data (market information).
@@ -2091,7 +2216,9 @@ def get_enriched_credit_currencies(
             ("INNER", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
         ],
         scope=None,  # Credit currencies don't have institution scoping
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_credit_currency_by_id(
@@ -2159,7 +2286,9 @@ def get_enriched_discretionary_requests(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[DiscretionaryEnrichedResponseSchema]:
     """
     Get all discretionary requests with enriched data (user, restaurant, institution, and market information).
@@ -2213,7 +2342,9 @@ def get_enriched_discretionary_requests(
             ("LEFT", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_discretionary_request_by_id(
@@ -2659,7 +2790,9 @@ def get_enriched_employers(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[EmployerEnrichedResponseSchema]:
     """
     Get all employers with enriched address data.
@@ -2697,7 +2830,9 @@ def get_enriched_employers(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=None,  # Employers don't have institution scope
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
     for emp in employers:
         emp.address_display = format_address_display(
@@ -2814,7 +2949,9 @@ def get_enriched_subscriptions(
     *,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    user_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[SubscriptionEnrichedResponseSchema]:
     """
     Get all subscriptions with enriched data (user, plan, and market information).
@@ -2864,6 +3001,7 @@ def get_enriched_subscriptions(
             "s.subscription_status",
             "s.hold_start_date",
             "s.hold_end_date",
+            "s.early_renewal_threshold",
             "s.created_date",
             "s.modified_by",
             "s.modified_date"
@@ -2875,7 +3013,9 @@ def get_enriched_subscriptions(
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_subscription_by_id(
@@ -2930,6 +3070,7 @@ def get_enriched_subscription_by_id(
             "s.subscription_status",
             "s.hold_start_date",
             "s.hold_end_date",
+            "s.early_renewal_threshold",
             "s.created_date",
             "s.modified_by",
             "s.modified_date"
@@ -2961,7 +3102,9 @@ def get_enriched_institution_bills(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[InstitutionBillEnrichedResponseSchema]:
     """
     Get all institution bills with enriched data (institution, entity, restaurant, and market information).
@@ -3012,7 +3155,142 @@ def get_enriched_institution_bills(
             ("INNER", "market_info", "m", "ibi.credit_currency_id = m.credit_currency_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
+    )
+
+# =============================================================================
+# BILL PAYOUT ENRICHED BUSINESS LOGIC
+# =============================================================================
+
+def get_enriched_bill_payouts(
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False,
+) -> List:
+    """
+    Get all bill payouts with enriched data (institution, entity, billing period).
+    Entity-level view — no restaurant breakdown (bills aggregate across restaurants).
+
+    Scoping:
+    - Internal: all payouts
+    - Supplier: payouts for bills belonging to their institution
+
+    Uses hand-written SQL because institution_bill_payout has no is_archived column;
+    the bill's is_archived is used for filtering instead.
+    """
+    conditions = ["ibi.is_archived = FALSE"] if not include_archived else []
+    params = []
+    if scope and not scope.is_global and scope.institution_id:
+        conditions.append("ibi.institution_id = %s::uuid")
+        params.append(str(scope.institution_id))
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    query = f"""
+        SELECT
+            bp.bill_payout_id,
+            bp.institution_bill_id,
+            ibi.institution_id,
+            COALESCE(i.name, '') AS institution_name,
+            ibi.institution_entity_id,
+            COALESCE(ie.name, '') AS institution_entity_name,
+            bp.provider,
+            bp.provider_transfer_id,
+            bp.amount,
+            bp.currency_code,
+            ibi.period_start AS billing_period_start,
+            ibi.period_end AS billing_period_end,
+            bp.status,
+            bp.created_at,
+            bp.completed_at
+        FROM billing.institution_bill_payout bp
+        INNER JOIN billing.institution_bill_info ibi
+            ON bp.institution_bill_id = ibi.institution_bill_id
+        LEFT JOIN core.institution_info i
+            ON ibi.institution_id = i.institution_id
+        LEFT JOIN ops.institution_entity_info ie
+            ON ibi.institution_entity_id = ie.institution_entity_id
+        {where}
+        ORDER BY bp.created_at DESC
+    """
+    rows = db_read(query, tuple(params) if params else None, connection=db)
+    return rows if rows else []
+
+
+# =============================================================================
+# SUPPLIER INVOICE ENRICHED BUSINESS LOGIC
+# =============================================================================
+
+_supplier_invoice_enriched_service = EnrichedService(
+    base_table="supplier_invoice",
+    table_alias="si",
+    id_column="supplier_invoice_id",
+    schema_class=SupplierInvoiceEnrichedResponseSchema,
+    institution_column="institution_id",
+    institution_table_alias="ie"
+)
+
+def get_enriched_supplier_invoices(
+    db: psycopg2.extensions.connection,
+    *,
+    scope: Optional[InstitutionScope] = None,
+    include_archived: bool = False,
+    institution_entity_id: Optional[UUID] = None,
+    status_filter: Optional[str] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
+) -> List[SupplierInvoiceEnrichedResponseSchema]:
+    """
+    Get supplier invoices with enriched data (entity name, institution name, created-by name).
+    Uses SQL JOINs to avoid N+1 queries.
+    """
+    additional_conditions: List[Tuple[str, Any]] = []
+    if institution_entity_id is not None:
+        additional_conditions.append(("si.institution_entity_id = %s", institution_entity_id))
+    if status_filter is not None:
+        additional_conditions.append(("si.status = %s::supplier_invoice_status_enum", status_filter))
+
+    return _supplier_invoice_enriched_service.get_enriched(
+        db,
+        select_fields=[
+            "si.supplier_invoice_id",
+            "si.institution_entity_id",
+            "COALESCE(ie.name, '') as institution_entity_name",
+            "COALESCE(i.name, '') as institution_name",
+            "si.country_code",
+            "si.invoice_type",
+            "si.external_invoice_number",
+            "si.issued_date",
+            "si.amount",
+            "si.currency_code",
+            "si.tax_amount",
+            "si.tax_rate",
+            "si.document_storage_path",
+            "si.document_format",
+            "si.status",
+            "si.rejection_reason",
+            "si.reviewed_by",
+            "si.reviewed_at",
+            "COALESCE(u.first_name || ' ' || u.last_name, '') as created_by_name",
+            "si.is_archived",
+            "si.created_date",
+            "si.created_by",
+            "si.modified_by",
+            "si.modified_date"
+        ],
+        joins=[
+            ("INNER", "institution_entity_info", "ie", "si.institution_entity_id = ie.institution_entity_id"),
+            ("LEFT", "institution_info", "i", "ie.institution_id = i.institution_id"),
+            ("LEFT", "user_info", "u", "si.created_by = u.user_id")
+        ],
+        scope=scope,
+        include_archived=include_archived,
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 # =============================================================================
@@ -3033,7 +3311,9 @@ def get_enriched_restaurant_balances(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[RestaurantBalanceEnrichedResponseSchema]:
     """
     Get all restaurant balances with enriched data (institution name, entity name, restaurant name, country).
@@ -3086,7 +3366,9 @@ def get_enriched_restaurant_balances(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_restaurant_balance_by_id(
@@ -3169,7 +3451,9 @@ def get_enriched_restaurant_transactions(
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
+    include_archived: bool = False,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[RestaurantTransactionEnrichedResponseSchema]:
     """
     Get all restaurant transactions with enriched data (institution name, entity name, restaurant name, plate name, currency code, country).
@@ -3237,7 +3521,9 @@ def get_enriched_restaurant_transactions(
             ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id")
         ],
         scope=scope,
-        include_archived=include_archived
+        include_archived=include_archived,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_restaurant_transaction_by_id(
@@ -3494,7 +3780,9 @@ def get_enriched_plate_kitchen_days(
     *,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    institution_id: Optional[UUID] = None
+    institution_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[PlateKitchenDayEnrichedResponseSchema]:
     """
     Get all plate kitchen days with enriched data (institution name, restaurant name, plate name, dietary).
@@ -3538,7 +3826,9 @@ def get_enriched_plate_kitchen_days(
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_plate_kitchen_day_by_id(
@@ -3851,7 +4141,9 @@ def get_enriched_payment_methods(
     *,
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
-    user_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None
 ) -> List[PaymentMethodEnrichedResponseSchema]:
     """
     Get all payment methods with enriched data (user information).
@@ -3899,7 +4191,9 @@ def get_enriched_payment_methods(
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None
+        additional_conditions=additional_conditions if additional_conditions else None,
+        page=page,
+        page_size=page_size,
     )
 
 def get_enriched_payment_method_by_id(

@@ -3,7 +3,7 @@ Customer payment method management (B2C).
 
 Mock endpoints for UI development. Phase 2: persists mock data to DB (user_payment_provider,
 payment_method, external_payment_method). DELETE and PUT default perform real DB updates.
-See docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md.
+See docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md.
 """
 import uuid as uuid_module
 from uuid import UUID

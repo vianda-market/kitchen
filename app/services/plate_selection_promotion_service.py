@@ -21,7 +21,7 @@ from app.services.crud_service import (
     plate_service, restaurant_service, institution_service, credit_currency_service,
     plate_selection_service, plate_pickup_live_service,
     restaurant_transaction_service, client_transaction_service,
-    subscription_service, qr_code_service,
+    subscription_service, qr_code_service, supplier_terms_service,
     create_with_conservative_balance_update,
     update_balance, mark_plate_selection_complete,
 )
@@ -96,10 +96,13 @@ def promote_plate_selection_to_live(
         log_error(f"Institution {restaurant.institution_id} not found for promotion of {plate_selection_id}")
         return None
 
+    supplier_terms = supplier_terms_service.get_by_field("institution_id", restaurant.institution_id, db)
+
     context: Dict[str, Any] = {
         "plate": plate,
         "restaurant": restaurant,
         "institution": institution,
+        "supplier_terms": supplier_terms,
         "qr_code": qr_code,
         "credit_currency": credit_currency,
     }
@@ -203,13 +206,13 @@ def _create_restaurant_transaction_for_promotion(
     modified_by: UUID,
     db: psycopg2.extensions.connection
 ) -> Optional[RestaurantTransactionDTO]:
-    """Create restaurant_transaction for a promoted selection. no_show_discount comes from institution."""
+    """Create restaurant_transaction for a promoted selection. no_show_discount comes from supplier_terms."""
     plate = context["plate"]
-    institution = context["institution"]
+    supplier_terms = context.get("supplier_terms")
     credit_currency = context["credit_currency"]
 
     credit_decimal = plate.credit if isinstance(plate.credit, Decimal) else Decimal(str(plate.credit))
-    no_show = institution.no_show_discount if institution.no_show_discount is not None else 0
+    no_show = supplier_terms.no_show_discount if supplier_terms else 0
     discount_decimal = Decimal(str(no_show))
     discount_multiplier = (Decimal("100") - discount_decimal) / Decimal("100")
     final_amount = credit_decimal * discount_multiplier

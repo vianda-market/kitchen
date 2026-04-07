@@ -438,6 +438,7 @@ def get_restaurants_by_city(
     user_id: Optional[UUID] = None,
     employer_id: Optional[UUID] = None,
     employer_address_id: Optional[UUID] = None,
+    locale: str = "en",
 ) -> dict[str, Any]:
     """
     Return restaurants in the given city (case-insensitive match) in the given country.
@@ -499,7 +500,8 @@ def get_restaurants_by_city(
         SELECT
             r.restaurant_id,
             r.name,
-            r.cuisine,
+            COALESCE(cu.cuisine_name_i18n->>%s, cu.cuisine_name) AS cuisine_name,
+            COALESCE(r.tagline_i18n->>%s, r.tagline) AS tagline,
             r.pickup_instructions,
             a.postal_code,
             TRIM(a.city) AS city,
@@ -510,6 +512,7 @@ def get_restaurants_by_city(
             g.longitude AS lng
         FROM restaurant_info r
         INNER JOIN address_info a ON r.address_id = a.address_id
+        LEFT JOIN cuisine cu ON r.cuisine_id = cu.cuisine_id
         LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
         WHERE a.country_code = %s
           AND TRIM(a.city) = %s
@@ -529,7 +532,7 @@ def get_restaurants_by_city(
     """
     rest_rows = db_read(
         query_restaurants,
-        (country, matched_city),
+        (locale, locale, country, matched_city),
         connection=db,
     ) or []
     restaurants: List[dict] = []
@@ -537,7 +540,8 @@ def get_restaurants_by_city(
         restaurants.append({
             "restaurant_id": row["restaurant_id"],
             "name": row["name"] or "",
-            "cuisine": row.get("cuisine"),
+            "cuisine_name": row.get("cuisine_name"),
+            "tagline": row.get("tagline"),
             "pickup_instructions": (row.get("pickup_instructions") or "").strip() or None,
             "lat": float(row["lat"]) if row.get("lat") is not None else None,
             "lng": float(row["lng"]) if row.get("lng") is not None else None,

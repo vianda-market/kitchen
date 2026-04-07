@@ -1481,14 +1481,15 @@
 		},
 		{
 			"key": "superAdminUsername",
-			"value": "superadmin",
+			"value": "",
 			"type": "string",
-			"description": "Seeded super admin (minimal seed)"
+			"description": "Set via Postman environment (e.g. superadmin)"
 		},
 		{
 			"key": "superAdminPassword",
-			"value": "SuperAdmin1!",
-			"type": "string"
+			"value": "",
+			"type": "string",
+			"description": "Set via Postman environment"
 		},
 		{
 			"key": "adminUsername",

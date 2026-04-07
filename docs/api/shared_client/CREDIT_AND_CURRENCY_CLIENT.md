@@ -146,7 +146,7 @@ When a customer arrives (QR scan), the restaurant balance is updated with:
 
 `credits × credit_value_local_currency`
 
-No-show orders use a discounted amount based on the institution’s `no_show_discount`. The plate API does not accept or return savings; savings appear only in B2C explore.
+No-show orders use a discounted amount based on the supplier’s `no_show_discount` (from `billing.supplier_terms`). The plate API does not accept or return savings; savings appear only in B2C explore.
 
 ---
 
