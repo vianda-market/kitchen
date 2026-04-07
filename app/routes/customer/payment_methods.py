@@ -1,15 +1,16 @@
 """
 Customer payment method management (B2C).
 
-Mock endpoints for UI development. Phase 2: persists mock data to DB (stripe_customer_id,
+Mock endpoints for UI development. Phase 2: persists mock data to DB (user_payment_provider,
 payment_method, external_payment_method). DELETE and PUT default perform real DB updates.
-See docs/roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md.
+See docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md.
 """
 import uuid as uuid_module
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
+import stripe
 from fastapi import APIRouter, Depends, HTTPException, Body
 import psycopg2.extensions
 
@@ -18,6 +19,11 @@ from app.dependencies.database import get_db
 from app.config.settings import settings
 from app.config import Status
 from app.utils.db import db_read, db_insert, db_update
+from app.utils.log import log_warning
+from app.services.payment_provider.stripe.live import (
+    create_customer_checkout_setup_session,
+    detach_customer_payment_method_external,
+)
 from app.schemas.customer_payment_method import (
     CustomerPaymentMethodListResponseSchema,
     CustomerPaymentMethodItemSchema,
@@ -38,27 +44,39 @@ def _ensure_stripe_customer_for_mock(
     user_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> str:
-    """Ensure user has stripe_customer_id; create mock value if missing. Returns the id."""
-    rows = db_read(
-        "SELECT stripe_customer_id FROM user_info WHERE user_id = %s::uuid",
+    """Ensure user has a stripe provider entry in user_payment_provider; create mock value if missing. Returns the provider_customer_id."""
+    # Verify user exists
+    user_rows = db_read(
+        "SELECT user_id FROM user_info WHERE user_id = %s::uuid AND is_archived = FALSE",
         (str(user_id),),
         connection=db,
     )
-    if not rows:
+    if not user_rows:
         raise HTTPException(status_code=404, detail="User not found.")
-    existing = rows[0].get("stripe_customer_id")
-    if existing:
-        return existing
+
+    provider_rows = db_read(
+        """
+        SELECT provider_customer_id FROM user_payment_provider
+        WHERE user_id = %s::uuid AND provider = 'stripe' AND is_archived = FALSE
+        LIMIT 1
+        """,
+        (str(user_id),),
+        connection=db,
+    )
+    if provider_rows:
+        return provider_rows[0]["provider_customer_id"]
+
     mock_cus_id = f"cus_mock_{str(user_id).replace('-', '')[:24]}"
     now = datetime.now(timezone.utc)
-    db_update(
-        "user_info",
+    db_insert(
+        "user_payment_provider",
         {
-            "stripe_customer_id": mock_cus_id,
+            "user_id": str(user_id),
+            "provider": "stripe",
+            "provider_customer_id": mock_cus_id,
             "modified_by": str(user_id),
             "modified_date": now,
         },
-        {"user_id": str(user_id)},
         connection=db,
     )
     return mock_cus_id
@@ -130,16 +148,49 @@ def create_setup_session(
     """
     Create Stripe Checkout setup session URL for adding/updating payment method.
     Mock: ensures stripe_customer_id on user, returns fixed URL. Live: creates Stripe Session.
-    Customer only.
+    Customer only. PM rows are created only via payment_method.attached webhook (not here).
     """
     user_id = UUID(str(current_user["user_id"]))
     if _get_payment_provider() == "mock":
         _ensure_stripe_customer_for_mock(user_id, db)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    return SetupSessionResponseSchema(
-        setup_url=MOCK_SETUP_URL,
-        expires_at=expires_at,
-    )
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        return SetupSessionResponseSchema(
+            setup_url=MOCK_SETUP_URL,
+            expires_at=expires_at,
+        )
+
+    # TODO(MAX_PM): cap saved Stripe cards per user before creating Session — STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+    if body:
+        success_url = body.success_url or body.return_url
+        cancel_url = body.cancel_url
+    if not success_url:
+        default_su = (getattr(settings, "STRIPE_CUSTOMER_SETUP_SUCCESS_URL", None) or "").strip()
+        success_url = default_su or None
+    if not success_url:
+        raise HTTPException(
+            status_code=400,
+            detail="success_url is required (request body or STRIPE_CUSTOMER_SETUP_SUCCESS_URL).",
+        )
+    if not cancel_url:
+        cancel_url = success_url
+    try:
+        setup_url, expires_at = create_customer_checkout_setup_session(
+            user_id, success_url, cancel_url, db
+        )
+        return SetupSessionResponseSchema(setup_url=setup_url, expires_at=expires_at)
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
+    except stripe.error.StripeError as e:
+        log_warning(f"Stripe setup-session failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Payment setup is temporarily unavailable. Please try again.",
+        ) from e
 
 
 @router.post("/mock-add", response_model=CustomerPaymentMethodItemSchema)
@@ -216,6 +267,27 @@ def delete_customer_payment_method(
         raise HTTPException(status_code=404, detail="Payment method not found.")
     if owner != user_id:
         raise HTTPException(status_code=403, detail="You cannot remove this payment method.")
+
+    ext_rows = db_read(
+        """
+        SELECT epm.external_id
+        FROM external_payment_method epm
+        WHERE epm.payment_method_id = %s::uuid AND epm.provider = 'stripe'
+        """,
+        (str(payment_method_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    external_id = ext_rows.get("external_id") if ext_rows else None
+
+    if _get_payment_provider() == "stripe" and external_id:
+        try:
+            detach_customer_payment_method_external(external_id)
+        except stripe.error.InvalidRequestError as e:
+            if getattr(e, "code", None) != "resource_missing":
+                log_warning(f"Stripe PaymentMethod.detach failed (still archiving): {e}")
+        except stripe.error.StripeError as e:
+            log_warning(f"Stripe PaymentMethod.detach failed (still archiving): {e}")
 
     db_update(
         "payment_method",

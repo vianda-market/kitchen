@@ -17,7 +17,7 @@ This codebase uses `uuidv7()` for time-ordered primary keys throughout the schem
 
 ```bash
 # Backup your current database
-pg_dump -U cdeachaval -h localhost kitchen_db_dev > backup_$(date +%Y%m%d).sql
+pg_dump -U cdeachaval -h localhost kitchen > backup_$(date +%Y%m%d).sql
 ```
 
 ### 2. Install PostgreSQL 18
@@ -72,11 +72,11 @@ Since this is a development database that gets rebuilt frequently, you can simpl
 
 ```bash
 # Drop and recreate the database
-dropdb -U cdeachaval -h localhost kitchen_db_dev
-createdb -U cdeachaval -h localhost kitchen_db_dev
+dropdb -U cdeachaval -h localhost kitchen
+createdb -U cdeachaval -h localhost kitchen
 
 # Rebuild schema (this will work with PostgreSQL 18+)
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 
 ### 6. Using Native UUIDv7 Function
@@ -112,7 +112,7 @@ After upgrade, verify PostgreSQL 18 is working:
 
 ```bash
 # Connect to database
-psql -U cdeachaval -h localhost -d kitchen_db_dev
+psql -U cdeachaval -h localhost -d kitchen
 
 # Test native uuidv7() function (PostgreSQL 18+ only)
 SELECT uuidv7();
@@ -133,5 +133,5 @@ brew services start postgresql@14
 ```
 
 The custom `uuid7_function.sql` file is archived at `docs/archived/db_migrations/uuid7_function.sql`. Run it before `schema.sql` when using PostgreSQL 14–17:
-`psql -U cdeachaval -h localhost -d kitchen_db_dev -f docs/archived/db_migrations/uuid7_function.sql`
+`psql -U cdeachaval -h localhost -d kitchen -f docs/archived/db_migrations/uuid7_function.sql`
 

@@ -38,7 +38,7 @@
 **Objective**: Fix duplicate function names in `crud_service.py`
 
 **Discovery**: 
-- The issues mentioned in `docs/roadmap/IMMEDIATE_FIXES_REQUIRED.md` have already been resolved
+- The issues mentioned in `docs/plans/IMMEDIATE_FIXES_REQUIRED.md` have already been resolved
 - Searched for all duplicate functions: **ZERO DUPLICATES FOUND** ✅
 - Verified 48 function definitions, all unique
 - No naming conflicts exist

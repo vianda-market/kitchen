@@ -26,10 +26,10 @@ class TestSupplierOnboarding:
         admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution (Supplier requires no_show_discount)
+            # Create institution
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Supplier Inc.', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Supplier Inc.', %s)
             """, (str(institution_id), admin_user_id))
             
             # Verify creation
@@ -70,19 +70,19 @@ class TestSupplierOnboarding:
         admin_user_id = str(SEED_SUPERADMIN_USER_ID)
         
         with db_transaction.cursor() as cur:
-            # Create institution first (required for user; Supplier requires no_show_discount)
+            # Create institution first (required for user)
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Institution', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Institution', %s)
             """, (str(institution_id), admin_user_id))
             
             # Create user (market_id required; use Global Marketplace from seed)
             cur.execute("""
                 INSERT INTO user_info (
                     user_id, institution_id, role_type, role_name, 
-                    username, email, hashed_password, cellphone, market_id, modified_by
+                    username, email, hashed_password, mobile_number, market_id, modified_by
                 ) VALUES (%s, %s, 'Supplier'::role_type_enum, 'Admin'::role_name_enum,
-                    'supplier_user', 'supplier_crud_test@example.com', 'hashedpwd', '555-1234',
+                    'supplier_user', 'supplier_crud_test@example.com', 'hashedpwd', '+15005550006',
                     '00000000-0000-0000-0000-000000000001'::uuid, %s)
             """, (str(user_id), str(institution_id), admin_user_id))
             
@@ -126,10 +126,10 @@ class TestSupplierOnboarding:
             cur.execute("SELECT COUNT(*) FROM institution_history")
             initial_count = cur.fetchone()[0]
             
-            # Create institution (Supplier requires no_show_discount)
+            # Create institution
             cur.execute("""
-                INSERT INTO institution_info (institution_id, name, modified_by, no_show_discount)
-                VALUES (%s, 'Test Institution', %s, 0)
+                INSERT INTO institution_info (institution_id, name, modified_by)
+                VALUES (%s, 'Test Institution', %s)
             """, (str(institution_id), admin_user_id))
             
             # Verify history count increased

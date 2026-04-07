@@ -176,7 +176,7 @@ def validate_restaurant(
 
 **See Also**: 
 - `docs/api/HOLIDAY_TABLES_ANALYSIS.md` - Details on holiday table structure and use cases
-- `docs/api/RESTAURANT_HOLIDAY_API_PLAN.md` - **Complete implementation plan for restaurant holidays API**
+- `docs/zArchive/roadmap/RESTAURANT_HOLIDAY_API_PLAN.md` - **Complete implementation plan for restaurant holidays API** (archived)
 
 ---
 

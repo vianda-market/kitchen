@@ -2,7 +2,6 @@ from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 import jwt
 from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. exist
-from app.utils.log import log_info
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -38,9 +37,7 @@ def verify_token(token: str):
     functions can access user_id, role_type, institution_id, etc.
     """
     try:
-        log_info(f"[verify_token] raw token in: {token}")
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        log_info(f"[verify_token] decoded payload: {payload}")
         # Ensure the required fields are present; raise an exception if not.
         user_id = payload.get("sub")
         role_type = payload.get("role_type")

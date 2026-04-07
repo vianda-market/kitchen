@@ -1,0 +1,11 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Sua configuração está quase pronta!</h1>
+<p>Oi equipe {{ institution_name }},</p>
+<p>Sua configuração do Vianda está <strong>{{ completion_percentage }}%</strong> concluída — falta pouco!</p>
+<p>Estes passos ainda estão pendentes:</p>
+<ul style="padding-left: 20px;">{{ steps_html }}</ul>
+<p>Finalizar a configuração significa que seu restaurante ficará ativo e os clientes poderão começar a fazer pedidos.</p>
+<p style="margin: 25px 0;"><a href="{{ b2b_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Completar sua configuração</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Quer que a gente te ajude? Responda este e-mail para agendar uma chamada rápida de suporte.</p>
+{% endblock %}

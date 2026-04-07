@@ -14,7 +14,7 @@ Benefits:
 - Easy to extend with new enriched endpoints
 """
 
-from typing import TypeVar, Generic, Optional, List, Any, Tuple, Dict, Callable
+from typing import TypeVar, Generic, Optional, List, Any, Tuple, Dict, Callable, Union
 from uuid import UUID
 from datetime import datetime
 import psycopg2.extensions
@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from app.utils.db import db_read
 from app.utils.log import log_info, log_error
 from app.security.institution_scope import InstitutionScope
+from app.utils.pagination import PaginatedList
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -176,11 +177,14 @@ class EnrichedService(Generic[T]):
         scope: Optional[InstitutionScope] = None,
         include_archived: bool = False,
         additional_conditions: Optional[List[Tuple[str, Any]]] = None,
-        order_by: Optional[str] = None
-    ) -> List[T]:
+        order_by: Optional[str] = None,
+        row_transform: Optional[Callable[[dict], dict]] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+    ) -> Union[List[T], "PaginatedList[T]"]:
         """
         Get all enriched records with JOINs and filtering.
-        
+
         Args:
             db: Database connection
             select_fields: List of SELECT fields (e.g., ["user_id", "i.name as institution_name"])
@@ -189,10 +193,18 @@ class EnrichedService(Generic[T]):
             include_archived: Whether to include archived records
             additional_conditions: List of (condition, param) tuples for custom WHERE conditions
             order_by: ORDER BY clause (defaults to self.default_order_by)
-            
+            page: Optional 1-based page number (activates pagination when both page and page_size are set)
+            page_size: Optional rows per page (clamped to 1-100)
+
         Returns:
-            List of enriched schema objects
+            List of enriched schema objects, or PaginatedList with .total_count when paginated
         """
+        paginate = page is not None and page_size is not None
+        if paginate:
+            page_size = max(1, min(page_size, 100))
+            page = max(1, page)
+            offset = (page - 1) * page_size
+
         try:
             # Build WHERE clause
             where_clause, params = self._build_where_clause(
@@ -200,40 +212,65 @@ class EnrichedService(Generic[T]):
                 scope=scope,
                 additional_conditions=additional_conditions
             )
-            
+
             # Build JOIN clauses
             join_clauses = []
             for join_type, table, alias, condition in joins:
                 join_clauses.append(f"{join_type} JOIN {table} {alias} ON {condition}")
-            
+
             # Build ORDER BY
             order_by_clause = order_by or self.default_order_by
-            
+
+            # Run COUNT query before pagination LIMIT/OFFSET
+            total_count = 0
+            if paginate:
+                count_query = f"""
+                    SELECT COUNT(*)
+                    FROM {self.base_table} {self.table_alias}
+                    {' '.join(join_clauses)}
+                    {where_clause}
+                """
+                count_result = self._execute_query(count_query, list(params), db, fetch_one=True)
+                total_count = count_result[0]["count"] if count_result else 0
+
             # Build complete query
+            pagination_clause = ""
+            query_params = list(params)
+            if paginate:
+                pagination_clause = "LIMIT %s OFFSET %s"
+                query_params.extend([page_size, offset])
+
             query = f"""
-                SELECT 
+                SELECT
                     {', '.join(select_fields)}
                 FROM {self.base_table} {self.table_alias}
                 {' '.join(join_clauses)}
                 {where_clause}
                 ORDER BY {order_by_clause}
+                {pagination_clause}
             """
-            
+
             # Execute query
-            results = self._execute_query(query, params, db, fetch_one=False)
-            
+            results = self._execute_query(query, query_params, db, fetch_one=False)
+
             if not results:
+                if paginate:
+                    return PaginatedList([], total_count=total_count)
                 return []
-            
+
             # Convert UUIDs and validate schemas
             enriched_items = []
             for row in results:
                 row_dict = dict(row)
                 row_dict = self._convert_uuids_to_strings(row_dict)
+                if row_transform:
+                    row_dict = row_transform(row_dict)
                 enriched_items.append(self.schema_class(**row_dict))
-            
+
+            if paginate:
+                return PaginatedList(enriched_items, total_count=total_count)
             return enriched_items
-            
+
         except HTTPException:
             raise
         except Exception as e:
@@ -254,7 +291,8 @@ class EnrichedService(Generic[T]):
         joins: List[Tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
         scope: Optional[InstitutionScope] = None,
         include_archived: bool = False,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None
+        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
+        row_transform: Optional[Callable[[dict], dict]] = None,
     ) -> Optional[T]:
         """
         Get a single enriched record by ID with JOINs and filtering.
@@ -308,6 +346,8 @@ class EnrichedService(Generic[T]):
             # Convert UUIDs and validate schema
             row_dict = dict(results[0])
             row_dict = self._convert_uuids_to_strings(row_dict)
+            if row_transform:
+                row_dict = row_transform(row_dict)
             return self.schema_class(**row_dict)
             
         except HTTPException:

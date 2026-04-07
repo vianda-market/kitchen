@@ -6,7 +6,7 @@ Plate kitchen days define which plates are available on which days of the week.
 This API allows Suppliers to manage kitchen days for plates in their institution,
 and Internal users to manage all kitchen days.
 """
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Response
 from typing import Optional, List
 from uuid import UUID
 from app.dto.models import PlateKitchenDaysDTO
@@ -31,6 +31,7 @@ from app.security.entity_scoping import EntityScopingService, ENTITY_PLATE_KITCH
 from app.security.scoping import resolve_institution_filter
 from app.utils.query_params import institution_filter
 from app.utils.db import db_read
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 router = APIRouter(
@@ -116,21 +117,26 @@ def list_plate_kitchen_days(
 # Enriched routes MUST be before /{kitchen_day_id} so /enriched is not parsed as kitchen_day_id
 @router.get("/enriched", response_model=List[PlateKitchenDayEnrichedResponseSchema])
 def list_enriched_plate_kitchen_days(
+    response: Response,
     institution_id: Optional[UUID] = institution_filter(),
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """List all plate kitchen day assignments with enriched data. Optional institution_id filters by institution (B2B Internal dropdown scoping)."""
     scope = _get_scope_for_entity(current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
-    
+
     try:
         enriched_days = get_enriched_plate_kitchen_days(
             db,
             scope=scope,
             include_archived=False,
-            institution_id=effective_institution_id
+            institution_id=effective_institution_id,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
+        set_pagination_headers(response, enriched_days)
         return enriched_days
     except HTTPException:
         raise

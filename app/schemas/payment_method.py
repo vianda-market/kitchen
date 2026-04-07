@@ -65,7 +65,7 @@ class PaymentMethodEnrichedResponseSchema(BaseModel):
     full_name: str
     username: str
     email: str
-    cellphone: Optional[str] = None
+    mobile_number: Optional[str] = None
     method_type: str
     method_type_id: Optional[UUID] = None
     address_id: Optional[UUID] = None
@@ -78,5 +78,36 @@ class PaymentMethodEnrichedResponseSchema(BaseModel):
     provider: Optional[str] = None
     last4: Optional[str] = None
     brand: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- User payment provider (e.g. Stripe account connection) ---
+class UserPaymentProviderResponseSchema(BaseModel):
+    """Connected payment provider for a user (e.g. Stripe account).
+    Intentionally omits provider_customer_id — internal system field, not for clients."""
+    user_payment_provider_id: UUID
+    provider: str
+    created_date: datetime
+    payment_method_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Employee-facing user payment summary (Internal role only) ---
+class UserPaymentSummarySchema(BaseModel):
+    """Read-only summary of a customer's payment method status.
+    Used by Internal employees to review which customers have Stripe cards registered.
+    Intentionally omits provider_customer_id (cus_xxx) — internal Stripe identifier."""
+    user_id: UUID
+    username: str
+    email: str
+    full_name: str
+    status: str
+    has_stripe_provider: bool
+    provider_connected_date: Optional[datetime] = None
+    payment_method_count: int
+    default_last4: Optional[str] = None
+    default_brand: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

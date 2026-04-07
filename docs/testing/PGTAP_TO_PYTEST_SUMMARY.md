@@ -21,7 +21,7 @@ The database tests have been successfully migrated from pgTAP SQL-based tests to
 - ✅ `app/tests/database/test_integration.py` - Integration workflow tests
 - ✅ `app/tests/database/test_data/expected_tables.py` - Data-driven table lists
 - ✅ `app/tests/database/test_data/expected_seed_data.py` - Data-driven seed expectations
-- ✅ Updated `app/db/build_kitchen_db_dev.sh` - Now uses pytest instead of prove
+- ✅ Updated `app/db/build_kitchen_db.sh` - Now uses pytest instead of prove
 
 ---
 
@@ -58,7 +58,7 @@ pytest app/tests/database/test_integration.py -v
 
 ### Run with Build Script
 ```bash
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 The build script now automatically runs pytest tests after rebuilding the schema.
 
@@ -107,7 +107,7 @@ pytest app/tests/database/ --cov=app --cov-report=term-missing
 pytest app/tests/database/ -v
 
 # Or run the full build script
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 
 ### 2. Remove Old pgTAP Files (Optional - after verification)

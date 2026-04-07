@@ -1,0 +1,10 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Você foi convidado para a Vianda</h1>
+<p>Oi {{ first_name }},</p>
+<p>Você foi convidado para se juntar à Vianda. Clique no link abaixo para definir sua senha e acessar sua conta:</p>
+<p style="margin: 25px 0;"><a href="{{ set_password_url }}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Definir sua senha</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Ou copie este link: {{ set_password_url }}</p>
+<p style="font-size: 14px; color: #7f8c8d;">Este link expira em {{ expiry_hours }} horas.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Se você não esperava este convite, por favor ignore este e-mail.</p>
+{% endblock %}

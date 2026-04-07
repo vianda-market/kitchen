@@ -1,6 +1,6 @@
 # Shared Client Documentation
 
-**Last Updated**: 2026-02-21  
+**Last Updated**: 2026-03-22  
 **Purpose**: Docs to copy to BOTH kitchen-web (B2B) and kitchen-mobile (B2C) repos. No duplication – this folder is the single source.
 
 ---
@@ -32,9 +32,7 @@ cp -r docs/api/b2c_client /path/to/kitchen-mobile/docs/api/
 | File | Use |
 |------|-----|
 | API_PERMISSIONS_BY_ROLE.md | Permission matrix by role |
-| USER_UPDATE_PATTERN.md | User updates: self (use /me) and by others (admin/backend portal); immutable fields (username, role_type, institution_id) |
-| USER_SELF_UPDATE_PATTERN.md | `/me` for self-updates; migration and deprecation |
-| USERNAME_IMMUTABLE_CLIENT.md | Username read-only; B2B and B2C must not send username on profile update; backend portal same rule |
+| **USER_MODEL_FOR_CLIENTS.md** | **Single user guide:** roles/institutions, **`mobile_number` (E.164)** + read-only verification flags, username/email lowercase, **`email_verified` / email change** (`PUT` + **`POST /users/me/verify-email-change`**), lead **`GET /leads/email-registered`**, immutable username, **`PUT /users/me`** vs admin **`PUT /users/{user_id}`**, **`market_id` / `market_ids`**, forgot-username, password recovery. Replaces USER_UPDATE_PATTERN, USER_SELF_UPDATE_PATTERN, USERNAME_*, USER_AND_MARKET_API_CLIENT, PASSWORD_RECOVERY_CLIENT, EMAIL_REGISTERED_CHECK_CLIENT (archived under `docs/zArchive/api/shared_client/`). |
 | ENRICHED_ENDPOINT_PATTERN.md | `/enriched/` for denormalized data |
 | ARCHIVED_RECORDS_PATTERN.md | `include_archived` behavior |
 | SCOPING_BEHAVIOR_FOR_UI.md | Institution/user scoping |
@@ -45,12 +43,12 @@ cp -r docs/api/b2c_client /path/to/kitchen-mobile/docs/api/
 | **PROVINCES_API_CLIENT.md** | **Supported provinces/state:** `GET /api/v1/provinces/`, cascading Country → Province → City, address validation |
 | PLANS_FILTER_CLIENT_INTEGRATION.md | Plans filtering |
 | **MARKET_AND_SCOPE_GUIDELINE.md** | **Single guideline:** initial phase (single market per institution, Comensal at signup), Markets API, scope, subscriptions, country-flag UI, migration. Replaces and merges MARKET_SCOPE_FOR_CLIENTS, MARKET_BASED_SUBSCRIPTIONS, MARKET_MIGRATION_GUIDE, MARKET_COUNTRY_FLAG_UI_PATTERN (archived in docs/zArchive/api/shared_client/). |
-| USER_AND_MARKET_API_CLIENT.md | User–market storage and API: `market_id` / `market_ids` from GET /users/me; B2C restore market selector; B2B assigned market |
 | ENUM_SERVICE_API.md | Enum service |
 | **PLATE_API_CLIENT.md** | **Combined plate guide:** enriched endpoint (ingredients, pickup_instructions, address_display), plate create/update (no savings), plate selection, plate pickup pending. Replaces PLATE_SELECTION_API, PLATE_PICKUP_PENDING_API, PLATE_API_NO_SAVINGS (archived in docs/zArchive/api/shared_client/). |
-| USERNAME_RECOVERY.md | Username recovery (forgot username), both B2B and B2C |
+| **CREDIT_AND_CURRENCY_CLIENT.md** | **Credit and currency guide:** credit_value_local_currency, currency_conversion_usd, credit_cost_local_currency, expected_payout_local_currency, market_credit_value_local_currency. Credit currency create/edit, plan/restaurant/entity currency from market, plate payouts, B2C savings. Replaces SUPPORTED_CURRENCIES_API, CREDIT_CURRENCY_EDIT_IMMUTABLE_CURRENCY, PLAN_API_MARKET_CURRENCY, RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY, EXPLORE_AND_SAVINGS (archived in docs/zArchive/api/). |
 | DEBUG_LOGGING_STRATEGY.md | Debug logging: single env var `DEBUG_PASSWORD_RECOVERY` (1/true/yes), same for backend and clients |
 | STATUS_ON_CREATE.md | Status on create: omit or send null; backend assigns default (e.g. Active). Clients can stop sending status on creation. |
+| **LANGUAGE_AND_LOCALE_FOR_CLIENTS.md** | **i18n scaffolding:** supported locales, `Accept-Language`, `user.locale` / JWT `locale`, `market.language` on lead markets, labeled **`GET /api/v1/enums?language=`**, `X-Content-Language`, password-reset `access_token`, MVP limits (errors still English). |
 | **LEADS_API_SCOPE.md** | **All unauthenticated endpoints** under `/api/v1/leads/`: markets, cities, city-metrics, zipcode-metrics, email-registered. No auth; rate-limited. |
 | ZIPCODE_METRICS_LEAD_API.md | Lead encouragement: **GET** `/api/v1/leads/zipcode-metrics` (zip, country_code). No auth; rate-limited. Use this path, not zipcode-check or by-zipcode. |
 | **PAYMENT_AND_BILLING_CLIENT_CHANGES.md** | **Payment atomic with billing + Fintech link deprecation:** Remove all fintech link pages/modals and any manual “create bill” / “process bill” flows. Use only subscription with-payment and confirm-payment for subscription payment. |

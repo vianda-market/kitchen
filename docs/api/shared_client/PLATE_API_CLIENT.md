@@ -78,7 +78,8 @@ The enriched plate response includes institution, restaurant, product, address, 
 | `has_image` | bool | True if custom image; false if default placeholder |
 | `price` | decimal | Plate price |
 | `credit` | int | Credit value |
-| `no_show_discount` | int \| null | No-show discount (denormalized from institution; null for non-Supplier) |
+| **`expected_payout_local_currency`** | decimal | Monetary amount supplier receives per plate in local currency (`credit × credit_value_local_currency`). Read-only, computed by backend. Do not send on create/update. |
+| `no_show_discount` | int \| null | No-show discount (from `supplier_terms`; null when no terms configured) |
 | `delivery_time_minutes` | int | Delivery time in minutes |
 | `is_archived` | bool | Archived flag |
 | `status` | string | Status (e.g. Active) |
@@ -114,9 +115,9 @@ The enriched plate response includes institution, restaurant, product, address, 
 
 **Audience:** B2B (supplier/employee portal) and any client that implements plate create/update.
 
-Savings are **not stored** on plates. They are computed on the fly for B2C explore using the user's plan `credit_worth`, plate price, and plate credit. The plate API does **not** accept or return `savings` for create/update or for the enriched plate list/detail.
+Savings are **not stored** on plates. They are computed on the fly for B2C explore using the user's plan `credit_cost_local_currency`, plate price, and plate credit. The plate API does **not** accept or return `savings` for create/update or for the enriched plate list/detail.
 
-**No-show discount** is configured at the **institution level** (not per plate). Configure it via the Institution API (`PUT /api/v1/institutions/{id}` with `no_show_discount`). See [ROLE_AND_FIELD_ACCESS_CLIENT.md](../b2b_client/ROLE_AND_FIELD_ACCESS_CLIENT.md#institution-api--no_show_discount).
+**No-show discount** is configured per supplier via `billing.supplier_terms` (not per plate or per institution). Configure it via the Supplier Terms API (`PUT /api/v1/supplier-terms/{institution_id}`). See [SUPPLIER_TERMS_B2B.md](../b2b_client/SUPPLIER_TERMS_B2B.md).
 
 ### Create
 
@@ -137,12 +138,16 @@ Same fields as create, all optional. **No `savings` or `no_show_discount` field.
 ### Responses
 
 - **GET /api/v1/plates/** does **not** include `savings` or `no_show_discount`.
-- **GET /api/v1/plates/enriched/** includes `no_show_discount` (from institution; can be null for non-Supplier).
+- **GET /api/v1/plates/enriched/** includes `no_show_discount` (from `supplier_terms`; null when no terms configured).
 - **Savings** appear only in **B2C** endpoint **GET /api/v1/restaurants/by-city**, in `restaurants[].plates[].savings` (integer 0–100), where they are computed per user/plan.
 
 ### UI instruction (B2B)
 
-For plate management (tables and create/edit modals): **do not** add a savings or no_show_discount column/input. Only use: product, restaurant, price, credit, delivery_time_minutes. Configure no-show discount at the institution level.
+For plate management (tables and create/edit modals): **do not** add a savings or no_show_discount column/input. Only use: product, restaurant, price, credit, delivery_time_minutes. Configure no-show discount via Supplier Terms (`PUT /api/v1/supplier-terms/{institution_id}`).
+
+### Live preview of expected payout when creating a plate (B2B)
+
+When the Supplier creates a plate in the UI, they need live feedback on `expected_payout_local_currency` before submit. Call **GET /api/v1/restaurants/enriched** or **GET /api/v1/restaurants/enriched/{restaurant_id}** to obtain `market_credit_value_local_currency` for the selected restaurant. The UI can then show a live preview: `expected_payout_local_currency ≈ credit × market_credit_value_local_currency` before submit. The stored value is set by the backend trigger on create/update.
 
 ---
 
@@ -370,7 +375,7 @@ interface PendingOrdersResponse {
 ## Related Documentation
 
 - [ADDRESSES_API_CLIENT.md](ADDRESSES_API_CLIENT.md) — Address display formatting per market (`address_display`, `formatted_address`)
-- [b2c_client/EXPLORE_AND_SAVINGS.md](../b2c_client/EXPLORE_AND_SAVINGS.md) — Where savings appear (B2C explore only)
+- [CREDIT_AND_CURRENCY_CLIENT.md](CREDIT_AND_CURRENCY_CLIENT.md) — Savings (B2C explore), expected payout, market credit value
 - [b2c_client/EXPLORE_KITCHEN_DAY_B2C.md](../b2c_client/EXPLORE_KITCHEN_DAY_B2C.md) — Kitchen day and explore flow
 - [b2c_client/POST_RESERVATION_PICKUP_B2C.md](../b2c_client/POST_RESERVATION_PICKUP_B2C.md) — Volunteer flow, coworker list/notify, `has_volunteer`, editability
 

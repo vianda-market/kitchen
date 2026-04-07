@@ -213,72 +213,136 @@ def run_kitchen_day_closure_billing(country_code: Optional[str] = None) -> Dict[
             "restaurants_processed": 0
         }
 
-def run_multi_market_billing() -> Dict[str, Any]:
+def run_billing_for_location(location_id: str) -> Dict[str, Any]:
     """
-    Run billing for all configured markets.
-    This is useful for a single cron job that handles multiple markets.
-    
-    Returns:
-        Dict with results for all markets
+    Run billing for a single location (timezone-region).
+    Filters restaurants by address.timezone; uses location's market for kitchen config.
     """
     try:
-        from app.config.market_config import MarketConfiguration
-        
-        all_markets = MarketConfiguration.get_all_markets()
+        from app.config.location_config import get_location_config
+
+        loc_config = get_location_config(location_id)
+        if not loc_config:
+            log_error(f"Unknown location_id: {location_id}")
+            return {
+                "cron_job": "billing_for_location",
+                "location_id": location_id,
+                "success": False,
+                "error": f"Unknown location_id: {location_id}",
+                "bills_created": 0,
+                "total_amount": 0.0,
+                "restaurants_processed": 0,
+            }
+        if not InstitutionBillingService.should_generate_bills_now_for_location(location_id):
+            return {
+                "cron_job": "billing_for_location",
+                "location_id": location_id,
+                "success": True,
+                "bills_created": 0,
+                "total_amount": 0.0,
+                "restaurants_processed": 0,
+                "reason": f"Not yet time to bill for location {location_id}",
+            }
+        current_day = datetime.now(timezone.utc).date()
+        result = InstitutionBillingService.run_daily_settlement_bill_and_payout(
+            bill_date=current_day,
+            system_user_id=SYSTEM_USER_ID,
+            location_id=location_id,
+            connection=None,
+        )
+        result.update({
+            "cron_job": "billing_for_location",
+            "location_id": location_id,
+            "success": "error" not in result,
+        })
+        result.setdefault("restaurants_processed", result.get("settlements_created", 0))
+        return result
+    except Exception as e:
+        log_error(f"Fatal error in billing for location {location_id}: {e}")
+        return {
+            "cron_job": "billing_for_location",
+            "location_id": location_id,
+            "success": False,
+            "error": str(e),
+            "bills_created": 0,
+            "total_amount": 0.0,
+            "restaurants_processed": 0,
+        }
+
+
+def run_multi_market_billing(location_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Run billing for configured locations.
+    When location_id is provided, process only that location.
+    When None, process all locations (AR, PE, US-Eastern, US-Central, US-Mountain, US-Pacific).
+
+    Args:
+        location_id: Optional. If provided, only process this location.
+
+    Returns:
+        Dict with results for all processed locations
+    """
+    try:
+        from app.config.location_config import get_all_locations, get_location_config
+
+        all_locations = get_all_locations()
+        locations_to_process = (
+            [get_location_config(location_id)]
+            if location_id
+            else all_locations
+        )
+        locations_to_process = [loc for loc in locations_to_process if loc]
         results = {}
-        
-        log_info(f"Starting multi-market billing for {len(all_markets)} markets")
-        
-        for country_code, market_config in all_markets.items():
+
+        log_info(f"Starting multi-market billing for {len(locations_to_process)} location(s)")
+
+        for loc in locations_to_process:
+            loc_id = loc["location"]
             try:
-                log_info(f"Processing market: {country_code} ({market_config.market_name})")
-                
-                # Run billing for this market
-                market_result = run_kitchen_day_closure_billing(country_code)
-                results[country_code] = market_result
-                
+                log_info(f"Processing location: {loc_id} ({loc['timezone']})")
+                market_result = run_billing_for_location(loc_id)
+                results[loc_id] = market_result
             except Exception as e:
-                log_error(f"Error processing market {country_code}: {e}")
-                results[country_code] = {
+                log_error(f"Error processing location {loc_id}: {e}")
+                results[loc_id] = {
                     "success": False,
                     "error": str(e),
                     "bills_created": 0,
                     "total_amount": 0.0,
-                    "restaurants_processed": 0
+                    "restaurants_processed": 0,
                 }
-        
-        # Calculate totals
+
         total_bills = sum(r.get("bills_created", 0) for r in results.values())
         total_amount = sum(r.get("total_amount", 0.0) for r in results.values())
         total_restaurants = sum(r.get("restaurants_processed", 0) for r in results.values())
-        
+
         multi_market_result = {
             "cron_job": "multi_market_billing",
             "execution_time": datetime.now(timezone.utc).isoformat(),
             "success": True,
-            "markets_processed": len(all_markets),
+            "locations_processed": len(locations_to_process),
             "total_bills_created": total_bills,
             "total_amount": total_amount,
             "total_restaurants_processed": total_restaurants,
-            "market_results": results
+            "location_results": results,
         }
-        
+
         log_info(f"Multi-market billing completed: {total_bills} bills, ${total_amount} total")
         return multi_market_result
-        
+
     except Exception as e:
         error_msg = f"Fatal error in multi-market billing: {e}"
         log_error(error_msg)
-        
+
         return {
             "cron_job": "multi_market_billing",
             "execution_time": datetime.now(timezone.utc).isoformat(),
             "success": False,
             "error": str(e),
-            "markets_processed": 0,
+            "locations_processed": 0,
             "total_bills_created": 0,
             "total_amount": 0.0,
-            "total_restaurants_processed": 0
+            "total_restaurants_processed": 0,
         }
 
 def run_monthly_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
@@ -435,9 +499,9 @@ def kitchen_day_closure_billing_entry():
     result = run_kitchen_day_closure_billing()
     return result
 
-def multi_market_billing_entry():
-    """Entry point for multi-market billing cron job"""
-    result = run_multi_market_billing()
+def multi_market_billing_entry(location_id: Optional[str] = None):
+    """Entry point for multi-market billing cron job. When location_id is provided, process only that location; when None, process all locations."""
+    result = run_multi_market_billing(location_id=location_id)
     return result
 
 def monthly_billing_entry():
@@ -451,10 +515,22 @@ def dashboard_entry():
     return result
 
 
-def kitchen_start_promotion_entry(country_code: Optional[str] = None):
+def kitchen_start_promotion_entry(location_id: Optional[str] = None):
     """Entry point for kitchen start promotion cron. Promotes locked plate selections to live."""
     from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
-    return run_kitchen_start_promotion(country_code=country_code)
+    return run_kitchen_start_promotion(location_id=location_id)
+
+
+def currency_refresh_entry():
+    """Entry point for currency rate refresh cron. Fetches USD rates from open.er-api.com and updates credit_currency_info."""
+    from app.services.cron.currency_refresh import run_currency_refresh
+    return run_currency_refresh()
+
+
+def holiday_refresh_entry():
+    """Entry point for national public holiday sync from Nager.Date (market countries)."""
+    from app.services.cron.holiday_refresh import run_holiday_refresh
+    return run_holiday_refresh()
 
 
 if __name__ == "__main__":
@@ -476,15 +552,27 @@ if __name__ == "__main__":
             result = run_kitchen_day_closure_billing()
             log_info(f"Kitchen day closure billing result: {result}")
         elif command == "multi_market":
-            result = run_multi_market_billing()
+            result = run_multi_market_billing(location_id=sys.argv[2] if len(sys.argv) > 2 else None)
             log_info(f"Multi-market billing result: {result}")
         elif command == "kitchen_start":
             from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
-            result = run_kitchen_start_promotion(country_code=sys.argv[2] if len(sys.argv) > 2 else None)
+            result = run_kitchen_start_promotion(location_id=sys.argv[2] if len(sys.argv) > 2 else None)
             log_info(f"Kitchen start promotion result: {result}")
+        elif command == "currency_refresh":
+            from app.services.cron.currency_refresh import run_currency_refresh
+            result = run_currency_refresh()
+            log_info(f"Currency refresh result: {result}")
+        elif command == "holiday_refresh":
+            from app.services.cron.holiday_refresh import run_holiday_refresh
+            optional_years = [int(x) for x in sys.argv[2:]] if len(sys.argv) > 2 else None
+            result = run_holiday_refresh(years=optional_years)
+            log_info(f"Holiday refresh result: {result}")
         else:
             log_warning(f"Unknown command: {command}")
-            log_info("Available commands: daily, monthly, dashboard, kitchen_closure, multi_market, kitchen_start")
+            log_info(
+                "Available commands: daily, monthly, dashboard, kitchen_closure, "
+                "multi_market, kitchen_start, currency_refresh, holiday_refresh"
+            )
     else:
         result = run_daily_billing()
         log_info(f"Daily billing result: {result}")

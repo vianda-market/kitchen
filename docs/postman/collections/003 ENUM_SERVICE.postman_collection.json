@@ -48,11 +48,11 @@
 							"urlencoded": [
 								{
 									"key": "username",
-									"value": "{{adminUsername}}"
+									"value": "{{superAdminUsername}}"
 								},
 								{
 									"key": "password",
-									"value": "{{adminPassword}}"
+									"value": "{{superAdminPassword}}"
 								}
 							]
 						},
@@ -137,7 +137,15 @@
 									"    pm.expect(response).to.be.an('object');",
 									"});",
 									"",
-									"// Test that all expected enum types are present",
+									"function assertLabeled(entry) {",
+									"    pm.expect(entry).to.have.property('values');",
+									"    pm.expect(entry).to.have.property('labels');",
+									"    pm.expect(entry.values).to.be.an('array');",
+									"    pm.expect(entry.labels).to.be.an('object');",
+									"    entry.values.forEach(v => pm.expect(entry.labels).to.have.property(v));",
+									"}",
+									"",
+									"// Test that all expected enum types are present (values + labels per key)",
 									"const expectedEnumTypes = [",
 									"    'status', 'address_type', 'role_type', 'role_name',",
 									"    'subscription_status', 'method_type',",
@@ -146,10 +154,10 @@
 									"];",
 									"",
 									"expectedEnumTypes.forEach(enumType => {",
-									"    pm.test(`Response has ${enumType} enum`, function () {",
+									"    pm.test(`Response has ${enumType} labeled enum`, function () {",
 									"        pm.expect(response).to.have.property(enumType);",
-									"        pm.expect(response[enumType]).to.be.an('array');",
-									"        pm.expect(response[enumType].length).to.be.greaterThan(0);",
+									"        assertLabeled(response[enumType]);",
+									"        pm.expect(response[enumType].values.length).to.be.greaterThan(0);",
 									"    });",
 									"});",
 									"",
@@ -337,10 +345,17 @@
 									"",
 									"const response = pm.response.json();",
 									"",
-									"pm.test('Response contains all enum types', function () {",
+									"function labeled(entry) {",
+									"    pm.expect(entry).to.have.property('values');",
+									"    pm.expect(entry).to.have.property('labels');",
+									"}",
+									"pm.test('Response contains labeled core enums', function () {",
 									"    pm.expect(response).to.have.property('status');",
+									"    labeled(response.status);",
 									"    pm.expect(response).to.have.property('subscription_status');",
+									"    labeled(response.subscription_status);",
 									"    pm.expect(response).to.have.property('address_type');",
+									"    labeled(response.address_type);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -425,6 +440,46 @@
 							"raw": "{{baseUrl}}/api/v1/enums",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "enums", ""]
+						}
+					}
+				},
+				{
+					"name": "Get All Enums - invalid language",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 422', function () {",
+									"    pm.response.to.have.status(422);",
+									"});",
+									"const body = pm.response.json();",
+									"pm.test('Detail mentions unsupported language', function () {",
+									"    pm.expect(String(body.detail)).to.include('Unsupported language');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enums?language=xx",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "enums", ""],
+							"query": [
+								{
+									"key": "language",
+									"value": "xx"
+								}
+							]
 						}
 					}
 				}
@@ -546,28 +601,28 @@
 			"type": "string"
 		},
 		{
-			"key": "adminUsername",
-			"value": "admin",
+			"key": "superAdminUsername",
+			"value": "",
 			"type": "string",
-			"description": "Shared admin; set by 002 in env or use this default"
+			"description": "Set by environment variable"
 		},
 		{
-			"key": "adminPassword",
-			"value": "Admin123!",
+			"key": "superAdminPassword",
+			"value": "",
 			"type": "string",
-			"description": "Shared admin password; set by 002 in env or use this default"
+			"description": "Set by environment variable"
 		},
 		{
 			"key": "customerUsername",
-			"value": "customer",
+			"value": "",
 			"type": "string",
-			"description": "Shared customer; set by 000 in env or use this default"
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
 		},
 		{
 			"key": "customerPassword",
-			"value": "Customer123!",
+			"value": "",
 			"type": "string",
-			"description": "Shared customer password; set by 000 in env or use this default"
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
 		},
 		{
 			"key": "adminAuthToken",

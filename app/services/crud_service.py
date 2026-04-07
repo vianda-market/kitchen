@@ -13,13 +13,14 @@ Benefits:
 - Easy to extend with new operations
 """
 
-from typing import TypeVar, Generic, Optional, List, Dict, Any, Tuple
+from typing import TypeVar, Generic, Optional, List, Dict, Any, Tuple, Union
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
 import psycopg2
 from fastapi import HTTPException
 from app.utils.db import db_read, db_insert, db_update, db_delete
+from app.utils.pagination import PaginatedList
 from app.utils.log import log_info, log_warning, log_error
 from app.security.institution_scope import InstitutionScope
 from app.config import Status
@@ -402,9 +403,10 @@ class CRUDService(Generic[T]):
                         conditions.append(f"a.{self.institution_column} = %s")
                         values.append(scope.institution_id)
                     query = f"""
-                        SELECT a.*, m.country_name
+                        SELECT a.*, m.country_name, g.latitude, g.longitude
                         FROM address_info a
                         LEFT JOIN market_info m ON a.country_code = m.country_code
+                        LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
                         WHERE {' AND '.join(conditions)}
                     """
                     result = db_read(query, tuple(values), connection=db, fetch_one=True)
@@ -433,32 +435,31 @@ class CRUDService(Generic[T]):
         limit: Optional[int] = None,
         *,
         scope: Optional[InstitutionScope] = None,
-        include_archived: bool = False
-    ) -> List[T]:
+        include_archived: bool = False,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None
+    ) -> Union[List[T], "PaginatedList[T]"]:
         """
         Get all records (optionally including archived).
-        
+
         Args:
             db: Database connection
             limit: Optional limit on number of records
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records (default: False)
-            
+            page: Optional 1-based page number (activates pagination when both page and page_size are set)
+            page_size: Optional rows per page (clamped to 1-100)
+
         Returns:
-            List of DTO instances
+            List of DTO instances, or PaginatedList with .total_count when paginated
         """
+        paginate = page is not None and page_size is not None
+        if paginate:
+            page_size = max(1, min(page_size, 100))
+            page = max(1, page)
+            offset = (page - 1) * page_size
+
         try:
-            # #region agent log
-            if self.table_name == "institution_info":
-                try:
-                    import json
-                    _s = None if scope is None else {"is_global": getattr(scope, "is_global", None), "institution_id": str(scope.institution_id) if scope and getattr(scope, "institution_id", None) else None}
-                    _add = bool(scope and not getattr(scope, "is_global", True) and self.institution_column and getattr(scope, "institution_id", None))
-                    with open("/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen/.cursor/debug.log", "a") as _f:
-                        _f.write(json.dumps({"location": "crud_service.get_all.institution_info", "message": "CRUD_GET_ALL", "data": {"scope": _s, "institution_column": self.institution_column, "will_add_filter": _add}, "hypothesisId": "H4", "runId": "pre-fix", "timestamp": __import__("time").time() * 1000}) + "\n")
-                except Exception:
-                    pass
-            # #endregion
             # Use JOIN-based query if institution_join_path is configured
             if self.institution_join_path:
                 query, params = self._build_join_query_with_scope(
@@ -466,7 +467,13 @@ class CRUDService(Generic[T]):
                     include_archived=include_archived,
                     select_fields=f"{self.table_name}.*"
                 )
-                if limit:
+                if paginate:
+                    count_query = query.replace(f"SELECT {self.table_name}.*", "SELECT COUNT(*)", 1)
+                    count_result = db_read(count_query, tuple(params) if params else None, connection=db, fetch_one=True)
+                    total_count = count_result["count"] if count_result else 0
+                    query += " LIMIT %s OFFSET %s"
+                    params.extend([page_size, offset])
+                elif limit:
                     query += " LIMIT %s"
                     params.append(limit)
                 results = db_read(
@@ -485,14 +492,30 @@ class CRUDService(Generic[T]):
                         clauses.append(f"a.{self.institution_column} = %s")
                         params.append(scope.institution_id)
                     where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+                    if paginate:
+                        count_query = f"""
+                            SELECT COUNT(*)
+                            FROM address_info a
+                            LEFT JOIN market_info m ON a.country_code = m.country_code
+                            LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
+                            {where_clause}
+                        """
+                        count_result = db_read(count_query, tuple(params) if params else None, connection=db, fetch_one=True)
+                        total_count = count_result["count"] if count_result else 0
+
                     query = f"""
-                        SELECT a.*, m.country_name
+                        SELECT a.*, m.country_name, g.latitude, g.longitude
                         FROM address_info a
                         LEFT JOIN market_info m ON a.country_code = m.country_code
+                        LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
                         {where_clause}
                         ORDER BY a.{self.id_column} DESC
                     """
-                    if limit:
+                    if paginate:
+                        query += " LIMIT %s OFFSET %s"
+                        params.extend([page_size, offset])
+                    elif limit:
                         query += " LIMIT %s"
                         params.append(limit)
                     results = db_read(
@@ -510,12 +533,24 @@ class CRUDService(Generic[T]):
                         clauses.append(f"{self.institution_column} = %s")
                         params.append(scope.institution_id)
                     where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+                    if paginate:
+                        count_query = f"""
+                            SELECT COUNT(*) FROM {self.table_name}
+                            {where_clause}
+                        """
+                        count_result = db_read(count_query, tuple(params) if params else None, connection=db, fetch_one=True)
+                        total_count = count_result["count"] if count_result else 0
+
                     query = f"""
                         SELECT * FROM {self.table_name}
                         {where_clause}
                         ORDER BY {self.id_column} DESC
                     """
-                    if limit:
+                    if paginate:
+                        query += " LIMIT %s OFFSET %s"
+                        params.extend([page_size, offset])
+                    elif limit:
                         query += " LIMIT %s"
                         params.append(limit)
                     results = db_read(
@@ -523,11 +558,13 @@ class CRUDService(Generic[T]):
                         tuple(params) if params else None,
                         connection=db
                     )
-            
+
             dtos = [self.dto_class(**result) for result in results] if results else []
             # Additional scope enforcement for direct column scoping (redundant but safe)
             if scope and not scope.is_global and self.institution_column:
                 dtos = [dto for dto in dtos if scope.matches(getattr(dto, self.institution_column, None))]
+            if paginate:
+                return PaginatedList(dtos, total_count=total_count)
             return dtos
         except Exception as e:
             log_error(f"Error getting all {self.table_name}: {e}")
@@ -558,20 +595,24 @@ class CRUDService(Generic[T]):
         db: psycopg2.extensions.connection,
         limit: Optional[int] = None,
         *,
-        scope: Optional[InstitutionScope] = None
-    ) -> List[T]:
+        scope: Optional[InstitutionScope] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None
+    ) -> Union[List[T], "PaginatedList[T]"]:
         """
         Get all non-archived records.
         This is an alias for get_all() for clarity.
-        
+
         Args:
             db: Database connection
             limit: Optional limit on number of records
-            
+            page: Optional 1-based page number (activates pagination when both page and page_size are set)
+            page_size: Optional rows per page (clamped to 1-100)
+
         Returns:
-            List of DTO instances
+            List of DTO instances, or PaginatedList with .total_count when paginated
         """
-        return self.get_all(db, limit, scope=scope)
+        return self.get_all(db, limit, scope=scope, page=page, page_size=page_size)
     
     def get_by_field(
         self,
@@ -902,7 +943,12 @@ class CRUDService(Generic[T]):
                 {self.id_column: str(record_id)},
                 connection=db
             )
-            
+
+            if row_count > 0:
+                # Check if this archive caused an onboarding regression for a Supplier
+                from app.services.onboarding_service import check_onboarding_regression
+                check_onboarding_regression(self.table_name, record_id, db)
+
             return row_count > 0
         except Exception as e:
             log_error(f"Error soft deleting {self.table_name}: {e}")
@@ -1531,7 +1577,8 @@ class CRUDService(Generic[T]):
 from app.dto.models import (
     UserDTO, InstitutionDTO, ProductDTO, PlateDTO, RestaurantDTO,
     InstitutionBillDTO, InstitutionSettlementDTO, ClientBillDTO, CreditCurrencyDTO,
-    AddressDTO, EmployerDTO, CityDTO, GeolocationDTO,
+    AddressDTO, EmployerDTO, EmployerBenefitsProgramDTO, EmployerBillDTO, EmployerBillLineDTO, EmployerDomainDTO,
+    CityDTO, GeolocationDTO,
     RestaurantTransactionDTO, ClientTransactionDTO,
     PlateSelectionDTO, PickupPreferencesDTO,
     SubscriptionDTO, PlanDTO,
@@ -1539,7 +1586,11 @@ from app.dto.models import (
     PaymentMethodDTO, QRCodeDTO,
     RestaurantBalanceDTO, RestaurantHolidaysDTO, NationalHolidayDTO,
     PlateKitchenDaysDTO, PlatePickupLiveDTO,
-    DiscretionaryDTO, DiscretionaryResolutionDTO
+    DiscretionaryDTO, DiscretionaryResolutionDTO,
+    IngredientCatalogDTO,
+    SupplierInvoiceDTO, SupplierInvoiceARDTO, SupplierInvoicePEDTO, SupplierInvoiceUSDTO,
+    BillInvoiceMatchDTO, SupplierW9DTO, SupplierTermsDTO,
+    CuisineDTO, CuisineSuggestionDTO,
 )
 
 # Core entity services
@@ -1555,12 +1606,41 @@ institution_bill_service = CRUDService("institution_bill_info", InstitutionBillD
 institution_settlement_service = CRUDService("institution_settlement", InstitutionSettlementDTO, "settlement_id")
 client_bill_service = CRUDService("client_bill_info", ClientBillDTO, "client_bill_id")
 credit_currency_service = CRUDService("credit_currency_info", CreditCurrencyDTO, "credit_currency_id")
+supplier_invoice_service = CRUDService(
+    "supplier_invoice", SupplierInvoiceDTO, "supplier_invoice_id",
+    institution_join_path=[
+        ("INNER", "institution_entity_info", "ie",
+         "supplier_invoice.institution_entity_id = ie.institution_entity_id")
+    ],
+    institution_table_alias="ie"
+)
+bill_invoice_match_service = CRUDService("bill_invoice_match", BillInvoiceMatchDTO, "match_id")
+supplier_terms_service = CRUDService("supplier_terms", SupplierTermsDTO, "supplier_terms_id", institution_column="institution_id")
+supplier_invoice_ar_service = CRUDService("supplier_invoice_ar", SupplierInvoiceARDTO, "supplier_invoice_id")
+supplier_invoice_pe_service = CRUDService("supplier_invoice_pe", SupplierInvoicePEDTO, "supplier_invoice_id")
+supplier_invoice_us_service = CRUDService("supplier_invoice_us", SupplierInvoiceUSDTO, "supplier_invoice_id")
+supplier_w9_service = CRUDService(
+    "supplier_w9", SupplierW9DTO, "w9_id",
+    institution_join_path=[
+        ("INNER", "institution_entity_info", "ie",
+         "supplier_w9.institution_entity_id = ie.institution_entity_id")
+    ],
+    institution_table_alias="ie"
+)
 
 # Address and location services
 address_service = CRUDService("address_info", AddressDTO, "address_id", institution_column="institution_id")
 employer_service = CRUDService("employer_info", EmployerDTO, "employer_id")
+employer_benefits_program_service = CRUDService("employer_benefits_program", EmployerBenefitsProgramDTO, "program_id")
+employer_bill_service = CRUDService("employer_bill", EmployerBillDTO, "employer_bill_id")
+employer_bill_line_service = CRUDService("employer_bill_line", EmployerBillLineDTO, "line_id")
+employer_domain_service = CRUDService("employer_domain", EmployerDomainDTO, "domain_id")
 city_service = CRUDService("city_info", CityDTO, "city_id")
 geolocation_service = CRUDService("geolocation_info", GeolocationDTO, "geolocation_id")
+
+# Cuisine services
+cuisine_crud_service = CRUDService("cuisine", CuisineDTO, "cuisine_id")
+cuisine_suggestion_crud_service = CRUDService("cuisine_suggestion", CuisineSuggestionDTO, "suggestion_id")
 
 # Transaction services
 restaurant_transaction_service = CRUDService(
@@ -1764,16 +1844,16 @@ def get_institution_entity_by_institution(institution_id: UUID, connection=None)
     return result[0]['institution_entity_id'] if result else None
 
 
-def get_credit_worth_of_most_expensive_plan_for_market(market_id: UUID, connection=None) -> Optional[float]:
-    """Return credit_worth of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
+def get_credit_cost_local_currency_of_most_expensive_plan_for_market(market_id: UUID, connection=None) -> Optional[float]:
+    """Return credit_cost_local_currency of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
     query = """
-        SELECT credit_worth FROM plan_info
+        SELECT credit_cost_local_currency FROM plan_info
         WHERE market_id = %s AND is_archived = FALSE AND status = 'Active'
         ORDER BY price DESC
         LIMIT 1
     """
     row = db_read(query, (str(market_id),), connection=connection, fetch_one=True)
-    return float(row["credit_worth"]) if row and row.get("credit_worth") is not None else None
+    return float(row["credit_cost_local_currency"]) if row and row.get("credit_cost_local_currency") is not None else None
 
 
 def get_by_entity_and_period(entity_id: UUID, period_start: datetime, period_end: datetime, connection=None) -> Optional[InstitutionBillDTO]:
@@ -2413,3 +2493,6 @@ def get_plates_by_credit_currency_id(credit_currency_id: UUID, db: psycopg2.exte
 # Discretionary credit services
 discretionary_service = CRUDService("discretionary_info", DiscretionaryDTO, "discretionary_id")
 discretionary_resolution_service = CRUDService("discretionary_resolution_info", DiscretionaryResolutionDTO, "approval_id")
+
+# Ingredient catalog — global, no institution scoping
+ingredient_catalog_service = CRUDService("ingredient_catalog", IngredientCatalogDTO, "ingredient_id")

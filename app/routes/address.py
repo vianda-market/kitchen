@@ -1,7 +1,4 @@
-import time
-from collections import defaultdict
-
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Response
 from typing import List, Optional
 from uuid import UUID
 from app.services.crud_service import address_service
@@ -29,6 +26,7 @@ from app.security.entity_scoping import EntityScopingService, ENTITY_ADDRESS
 from app.security.scoping import get_user_scope, UserScope, resolve_institution_filter, InstitutionScope
 from app.security.field_policies import ensure_supplier_can_create_edit_addresses, ensure_customer_cannot_edit_employer_address
 from app.services.crud_service import user_service, institution_service
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 import psycopg2.extensions
 
 router = APIRouter(
@@ -40,32 +38,8 @@ router = APIRouter(
 
 # =============================================================================
 # ADDRESS AUTOCOMPLETE (suggest / validate) – same API for web, iOS, Android, React Native
+# Rate limiting handled by UserRateLimitMiddleware (app/auth/middleware/rate_limit_middleware.py)
 # =============================================================================
-
-# Rate limit: 60 requests per user per 60 seconds
-_SUGGEST_RATE_LIMIT_REQUESTS = 60
-_SUGGEST_RATE_LIMIT_WINDOW_SECONDS = 60
-_suggest_rate_limit_timestamps: dict = defaultdict(list)
-
-
-def _rate_limit_address_suggest(request: Request, current_user: dict) -> None:
-    """Allow at most 60 requests per user per 60 seconds."""
-    key = str(current_user.get("user_id", "")) or (request.client.host if request.client else "unknown")
-    now = time.time()
-    # Prune old entries and evict stale keys to prevent unbounded growth
-    for k, v in list(_suggest_rate_limit_timestamps.items()):
-        pruned = [t for t in v if now - t < _SUGGEST_RATE_LIMIT_WINDOW_SECONDS]
-        if pruned:
-            _suggest_rate_limit_timestamps[k] = pruned
-        else:
-            del _suggest_rate_limit_timestamps[k]
-    if len(_suggest_rate_limit_timestamps.get(key, [])) >= _SUGGEST_RATE_LIMIT_REQUESTS:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many address search requests. Please try again in 60 seconds.",
-        )
-    _suggest_rate_limit_timestamps.setdefault(key, []).append(now)
-
 
 @router.get("/suggest", response_model=AddressSuggestResponseSchema)
 def address_suggest(
@@ -75,18 +49,21 @@ def address_suggest(
     province: Optional[str] = Query(None, description="Province/state (e.g. WA, Washington) to narrow results when used with country and city"),
     city: Optional[str] = Query(None, description="City name to narrow results when used with country and province"),
     limit: int = Query(5, ge=1, le=10, description="Max number of suggestions (default 5)"),
+    session_token: Optional[str] = Query(None, description="Session token (UUIDv4) for billing optimization. Auto-generated if omitted."),
     current_user: dict = Depends(get_current_user),
 ):
     """
     **Suggest (autocomplete)**. Returns structured address suggestions for form pre-fill.
     Suggestions return addresses anywhere in the country (no city bounds). Rate-limited.
     Frontend: search box calls with ?q=...&country=...&limit=5. Pass province and city to bias relevance.
+    Pass session_token to group suggest + create calls into a single billing session.
     """
-    _rate_limit_address_suggest(request, current_user)
     config = get_address_autocomplete_config()
     if len((q or "").strip()) < config.ADDRESS_AUTOCOMPLETE_MIN_CHARS:
         return AddressSuggestResponseSchema(suggestions=[])
-    suggestions = address_autocomplete_service.suggest(q=q, country=country, province=province, city=city, limit=limit)
+    suggestions = address_autocomplete_service.suggest(
+        q=q, country=country, province=province, city=city, limit=limit, session_token=session_token,
+    )
     return AddressSuggestResponseSchema(suggestions=suggestions)
 
 
@@ -98,7 +75,9 @@ def address_suggest(
 # GET /addresses/enriched - List all addresses with enriched data
 @router.get("/enriched", response_model=List[AddressEnrichedResponseSchema])
 def list_enriched_addresses(
+    response: Response,
     institution_id: Optional[UUID] = institution_filter(),
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -108,33 +87,43 @@ def list_enriched_addresses(
 
         def _get_enriched_addresses():
             return get_enriched_addresses_for_customer(
-                user_scope.user_id, db, include_archived=False
+                user_scope.user_id, db, include_archived=False,
+                page=pagination.page if pagination else None,
+                page_size=pagination.page_size if pagination else None,
             )
 
-        return handle_business_operation(
+        result = handle_business_operation(
             _get_enriched_addresses,
             "enriched address list retrieval"
         )
+        set_pagination_headers(response, result)
+        return result
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
 
     def _get_enriched_addresses():
         return get_enriched_addresses(
-            db, scope=scope, include_archived=False, institution_id=effective_institution_id
+            db, scope=scope, include_archived=False, institution_id=effective_institution_id,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
 
-    return handle_business_operation(
+    result = handle_business_operation(
         _get_enriched_addresses,
         "enriched address list retrieval"
     )
+    set_pagination_headers(response, result)
+    return result
 
 # GET /addresses/search - Search addresses by institution and optional text (for B2B restaurant address picker)
 @router.get("/search", response_model=List[AddressEnrichedResponseSchema])
 def search_enriched_addresses(
+    response: Response,
     institution_id: Optional[UUID] = Query(None, description="Restrict to addresses for this institution"),
     q: Optional[str] = Query(None, description="Text search (street_name, city, postal_code, province)"),
     limit: int = Query(50, ge=1, le=100, description="Max results (default 50)"),
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -149,9 +138,13 @@ def search_enriched_addresses(
             scope=scope,
             include_archived=False,
             limit=limit,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
 
-    return handle_business_operation(_search, "address search")
+    result = handle_business_operation(_search, "address search")
+    set_pagination_headers(response, result)
+    return result
 
 # GET /addresses/enriched/{address_id} - Get a single address with enriched data
 @router.get("/enriched/{address_id}", response_model=AddressEnrichedResponseSchema)
@@ -292,8 +285,12 @@ def create_address(
     # Use institution scope for Suppliers/Internal
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user) if not user_scope.is_customer else None
 
+    session_token = addr_data.pop("session_token", None)
+
     def _create_address_with_geocoding():
-        return address_business_service.create_address_with_geocoding(addr_data, current_user, db, scope=scope)
+        return address_business_service.create_address_with_geocoding(
+            addr_data, current_user, db, scope=scope, session_token=session_token,
+        )
     
     result = handle_business_operation(
         _create_address_with_geocoding,

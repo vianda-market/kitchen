@@ -186,20 +186,8 @@ def get_plan_response_schema(version: APIVersion = APIVersion.V1) -> Type[BaseMo
 # Example of how to add version-specific schemas in the future:
 """
 # Example: Adding a v2 schema with breaking changes
-class UserCreateSchemaV2(BaseModel):
-    # New required field in v2
-    email_verified: bool = False
-    # Changed field type
-    phone_number: str = Field(..., max_length=15)  # Changed from cellphone
-    # All other fields remain the same
-    institution_id: UUID
-    role_id: UUID
-    username: str = Field(..., min_length=3, max_length=100)
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    first_name: Optional[str] = Field(None, max_length=50)
-    last_name: Optional[str] = Field(None, max_length=50)
-
-# Register the v2 schema
-schema_registry.register_schema("UserCreate", APIVersion.V2, UserCreateSchemaV2)
+# class UserCreateSchemaV2(BaseModel):
+#     email_verified: bool = False
+#     # ... register with schema_registry.register_schema("UserCreate", APIVersion.V2, UserCreateSchemaV2)
+# v1 user payloads use mobile_number (E.164) from consolidated_schemas.UserCreateSchema.
 """

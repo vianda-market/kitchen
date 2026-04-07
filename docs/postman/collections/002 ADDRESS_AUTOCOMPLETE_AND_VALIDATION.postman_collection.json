@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "address-autocomplete-validation-2026",
 		"name": "002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION",
-		"description": "Tests for address suggest (autocomplete) and create. Validate endpoint removed (2026-03); create uses structured address or place_id. Uses admin from 002 (env/globals) when available, else superadmin/SuperAdmin1!.",
+		"description": "Tests for address suggest (autocomplete) and create via place_id (Mapbox mapbox_id). Uses Mapbox Search Box API for suggest and retrieve. Structured address creation is DEV_MODE only. Uses admin from 002 (env/globals) when available, else superadmin/SuperAdmin1!.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
 	},
 	"variable": [
@@ -11,12 +11,12 @@
 			"value": "http://localhost:8000"
 		},
 		{
-			"key": "adminUsername",
-			"value": "superadmin"
+			"key": "superAdminUsername",
+			"value": ""
 		},
 		{
-			"key": "adminPassword",
-			"value": "SuperAdmin1!"
+			"key": "superAdminPassword",
+			"value": ""
 		},
 		{
 			"key": "authToken",
@@ -36,6 +36,18 @@
 		},
 		{
 			"key": "supplierUserId",
+			"value": ""
+		},
+		{
+			"key": "sessionToken",
+			"value": ""
+		},
+		{
+			"key": "selectedPlaceId",
+			"value": ""
+		},
+		{
+			"key": "lastCreatedAddressId",
 			"value": ""
 		}
 	],
@@ -102,11 +114,11 @@
 							"urlencoded": [
 								{
 									"key": "username",
-									"value": "{{adminUsername}}"
+									"value": "{{superAdminUsername}}"
 								},
 								{
 									"key": "password",
-									"value": "{{adminPassword}}"
+									"value": "{{superAdminPassword}}"
 								}
 							]
 						},
@@ -159,17 +171,11 @@
 									"",
 									"if (response.suggestions.length > 0) {",
 									"    const s = response.suggestions[0];",
-									"    pm.test('Suggestion has required address fields', function () {",
-									"        pm.expect(s).to.have.property('street_name');",
-									"        pm.expect(s).to.have.property('street_type');",
-									"        pm.expect(s).to.have.property('building_number');",
-									"        pm.expect(s).to.have.property('city');",
-									"        pm.expect(s).to.have.property('province');",
-									"        pm.expect(s).to.have.property('postal_code');",
-									"        pm.expect(s).to.have.property('country_code');",
-									"    });",
-									"    pm.test('country_code is alpha-2', function () {",
-									"        pm.expect(s.country_code.length).to.equal(2);",
+									"    pm.test('Suggestion has place_id and display_text', function () {",
+									"        pm.expect(s).to.have.property('place_id');",
+									"        pm.expect(s).to.have.property('display_text');",
+									"        pm.expect(s.place_id).to.be.a('string').and.not.empty;",
+									"        pm.expect(s.display_text).to.be.a('string').and.not.empty;",
 									"    });",
 									"}"
 								],
@@ -243,6 +249,66 @@
 					}
 				},
 				{
+					"name": "Suggest - with session_token",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate a session token for this suggest session",
+									"const sessionToken = pm.variables.replaceIn('{{$guid}}');",
+									"pm.collectionVariables.set('sessionToken', sessionToken);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Suggestions returned with session_token', function () {",
+									"    pm.expect(response).to.have.property('suggestions');",
+									"    pm.expect(response.suggestions).to.be.an('array');",
+									"});",
+									"",
+									"// Store first suggestion's place_id for the E2E create flow",
+									"if (response.suggestions.length > 0) {",
+									"    pm.collectionVariables.set('selectedPlaceId', response.suggestions[0].place_id);",
+									"    console.log('Selected place_id for create:', response.suggestions[0].place_id);",
+									"    console.log('Display text:', response.suggestions[0].display_text);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567&country=AR&limit=3&session_token={{sessionToken}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "addresses", "suggest"],
+							"query": [
+								{"key": "q", "value": "Avenida Santa Fe 2567"},
+								{"key": "country", "value": "AR"},
+								{"key": "limit", "value": "3"},
+								{"key": "session_token", "value": "{{sessionToken}}"}
+							]
+						}
+					}
+				},
+				{
 					"name": "Suggest - empty query returns 200 with empty suggestions",
 					"event": [
 						{
@@ -254,8 +320,9 @@
 									"});",
 									"",
 									"const response = pm.response.json();",
-									"pm.test('Suggestions is array', function () {",
+									"pm.test('Suggestions is empty array', function () {",
 									"    pm.expect(response.suggestions).to.be.an('array');",
+									"    pm.expect(response.suggestions.length).to.equal(0);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -281,8 +348,8 @@
 			]
 		},
 		{
-			"name": "Create Address (Structured)",
-			"description": "Validate endpoint removed. Create with full address fields. Uses institutionId and supplierUserId from collection 000 (env/globals); run 000 first or uses seed defaults.",
+			"name": "Create Address (Structured - DEV_MODE only)",
+			"description": "Create with full address fields. Only works when DEV_MODE=true. In production, use the place_id flow (E2E section below). Uses institutionId and supplierUserId from collection 000 (env/globals); run 000 first or uses seed defaults.",
 			"item": [
 				{
 					"name": "Create - valid address (Buenos Aires)",
@@ -293,7 +360,10 @@
 								"exec": [
 									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
 									"const response = pm.response.json();",
-									"pm.test('Response has address_id', function () { pm.expect(response).to.have.property('address_id'); });"
+									"pm.test('Response has address_id', function () { pm.expect(response).to.have.property('address_id'); });",
+									"if (response.address_id) {",
+									"    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
+									"}"
 								],
 								"type": "text/javascript"
 							}
@@ -376,47 +446,87 @@
 			]
 		},
 		{
-			"name": "E2E: Suggest → Create Address",
-			"description": "Run in order: 1) Authentication (Login then Get current user), 2) Suggest, 3) Create Address. Uses institutionId and supplierUserId from collection 000 (env/globals) when available; else seed defaults.",
+			"name": "E2E: Suggest → Select → Create via place_id",
+			"description": "Production flow: 1) Suggest with session_token, 2) Select a suggestion (store place_id), 3) Create address using place_id + session_token. Requires live Mapbox API (MAPBOX_ACCESS_TOKEN set) or DEV_MODE=true for mock responses.",
 			"item": [
 				{
-					"name": "1. Suggest (for E2E)",
+					"name": "1. Suggest (generate session_token, get suggestions)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate a session token for this E2E flow",
+									"const sessionToken = pm.variables.replaceIn('{{$guid}}');",
+									"pm.collectionVariables.set('sessionToken', sessionToken);",
+									"console.log('Generated session_token:', sessionToken);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('At least one suggestion returned', function () {",
+									"    pm.expect(response.suggestions).to.be.an('array');",
+									"    pm.expect(response.suggestions.length).to.be.above(0);",
+									"});",
+									"",
+									"if (response.suggestions.length > 0) {",
+									"    const selected = response.suggestions[0];",
+									"    pm.collectionVariables.set('selectedPlaceId', selected.place_id);",
+									"    console.log('Selected:', selected.display_text);",
+									"    console.log('place_id:', selected.place_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [{"key": "Authorization", "value": "Bearer {{authToken}}"}],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Corrientes+1234+Buenos+Aires&country=AR&limit=5",
+							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567+Buenos+Aires&country=AR&limit=5&session_token={{sessionToken}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "v1", "addresses", "suggest"],
 							"query": [
-								{"key": "q", "value": "Av. Corrientes 1234 Buenos Aires"},
+								{"key": "q", "value": "Avenida Santa Fe 2567 Buenos Aires"},
 								{"key": "country", "value": "AR"},
-								{"key": "limit", "value": "5"}
+								{"key": "limit", "value": "5"},
+								{"key": "session_token", "value": "{{sessionToken}}"}
 							]
 						}
 					}
 				},
 				{
-					"name": "2. Create Address (structured)",
+					"name": "2. Create Address via place_id",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
 									"const inst = pm.collectionVariables.get('institutionId') || pm.environment.get('institutionId') || pm.globals.get('institutionId') || pm.collectionVariables.get('testInstitutionId');",
-									"const uid = pm.collectionVariables.get('supplierUserId') || pm.environment.get('supplierUserId') || pm.globals.get('supplierUserId') || pm.collectionVariables.get('testUserId');",
+									"const placeId = pm.collectionVariables.get('selectedPlaceId');",
+									"const sessionToken = pm.collectionVariables.get('sessionToken');",
+									"",
+									"if (!placeId) {",
+									"    console.warn('No place_id from suggest step — run step 1 first');",
+									"}",
+									"",
 									"const body = {",
 									"    institution_id: inst,",
-									"    user_id: uid,",
-									"    country_code: 'AR',",
-									"    province: 'CABA',",
-									"    city: 'Buenos Aires',",
-									"    postal_code: 'C1043',",
-									"    street_type: 'Ave',",
-									"    street_name: 'Corrientes',",
-									"    building_number: '1234'",
+									"    place_id: placeId,",
+									"    session_token: sessionToken",
 									"};",
-									"pm.request.body.raw = JSON.stringify(body, null, 2);"
+									"pm.request.body.raw = JSON.stringify(body, null, 2);",
+									"console.log('Creating address with place_id:', placeId);"
 								],
 								"type": "text/javascript"
 							}
@@ -426,9 +536,25 @@
 							"script": {
 								"exec": [
 									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+									"",
 									"const response = pm.response.json();",
+									"pm.test('Response has address_id', function () {",
+									"    pm.expect(response).to.have.property('address_id');",
+									"});",
+									"",
+									"pm.test('Address has resolved fields from Mapbox', function () {",
+									"    pm.expect(response).to.have.property('street_name');",
+									"    pm.expect(response).to.have.property('city');",
+									"    pm.expect(response).to.have.property('province');",
+									"    pm.expect(response).to.have.property('country_code');",
+									"    pm.expect(response.country_code).to.equal('AR');",
+									"});",
+									"",
 									"if (response.address_id) {",
 									"    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
+									"    console.log('Created address:', response.address_id);",
+									"    console.log('Street:', response.street_name);",
+									"    console.log('City:', response.city);",
 									"}"
 								],
 								"type": "text/javascript"

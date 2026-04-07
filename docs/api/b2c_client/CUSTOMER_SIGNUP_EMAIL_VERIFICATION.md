@@ -14,7 +14,7 @@ This document describes the **two-step customer registration flow** with email v
 ┌─────────────┐     POST /signup/request      ┌─────────┐     Store pending     ┌──────────┐
 │   B2C App   │ ─────────────────────────────► │   API   │ ────────────────────► │  Email   │
 │ (signup     │  (username, password, email,  │         │  Send 6-digit         │  (SMTP)  │
-│  form)      │   country_code, cellphone,    │         │  verification code    │          │
+│  form)      │   country_code, mobile_number,│         │  verification code    │          │
 │             │   first_name, last_name)      │         │                       │          │
 └─────────────┘                                └─────────┘                       └────┬─────┘
        │                                          │ 201 + generic message              │
@@ -81,7 +81,7 @@ Content-Type: application/json
 | `country_code` | string | **Yes** | ISO 3166-1 alpha-2 (e.g. US, AR) | Country the user selected. Must be from `GET /api/v1/leads/markets`. Backend resolves to market internally. |
 | `city_id` | UUID | One of city_id or city_name | Valid city UUID | City UUID. Use when you have it (e.g. from `GET /api/v1/cities/`). Optional if `city_name` is provided. |
 | `city_name` | string | One of city_id or city_name | City name from API | City name the user selected. Must be from `GET /api/v1/leads/cities?country_code={country_code}`. Backend resolves to city_id. **Preferred for B2C** (no auth needed for cities list). |
-| `cellphone` | string | No | max 20 chars | Optional; users can add later in profile. |
+| `mobile_number` | string | No | Valid **E.164** if provided (e.g. `+5491112345678`) | Optional. National formats are accepted when `country_code` allows parsing; backend stores E.164. Omit or `null` if unknown. |
 | `first_name` | string | No | max 50 chars | |
 | `last_name` | string | No | max 50 chars | |
 
@@ -94,7 +94,7 @@ Content-Type: application/json
   "email": "jane.doe@example.com",
   "country_code": "US",
   "city_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-  "cellphone": "+5491112345678",
+  "mobile_number": "+5491112345678",
   "first_name": "Jane",
   "last_name": "Doe"
 }
@@ -108,7 +108,7 @@ The app must call **`GET /api/v1/leads/markets`** (no auth) to get the list of c
 
 **City selection:** Call `GET /api/v1/leads/cities?country_code={country_code}` (no auth) to get city names for the signup picker. Send the selected `city_name` in the signup body; the backend resolves it to `city_id`. One of `city_id` or `city_name` is **required** at signup.
 
-When `cellphone` is optional (backend support), it can be omitted or sent as `null`.
+When `mobile_number` is not collected at signup, omit it or send `null`.
 
 ### Success response (verification email sent)
 
@@ -199,7 +199,7 @@ Content-Type: application/json
     "email": "jane.doe@example.com",
     "first_name": "Jane",
     "last_name": "Doe",
-    "cellphone": "+5491112345678",
+    "mobile_number": "+5491112345678",
     "employer_id": null,
     "is_archived": false,
     "status": "Active",
@@ -276,7 +276,7 @@ GET /api/v1/customers/signup/dev-pending-token?email=<email>
 
 | Item | Value |
 |------|--------|
-| Step 1 | `POST /api/v1/customers/signup/request` with `username`, `password`, `email`, `country_code`, `city_id` or `city_name`, `cellphone`, `first_name`, `last_name` |
+| Step 1 | `POST /api/v1/customers/signup/request` with `username`, `password`, `email`, `country_code`, `city_id` or `city_name`, `mobile_number` (optional, E.164), `first_name`, `last_name` |
 | Step 1 success | 201; show “Check your email”; same message even if email already registered |
 | Step 2 | User opens link → app gets `token` from URL → `POST /api/v1/customers/signup/verify` with `{"token": "..."}` |
 | Step 2 success | 201; body has `user` and `access_token`; store token and treat user as logged in |

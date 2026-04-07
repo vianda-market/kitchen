@@ -28,6 +28,9 @@ kenv/
 .cursor/
 .claude/
 
+# Claude Code
+.claude/
+
 # Custom project files
 .qodo
 .mcp.json

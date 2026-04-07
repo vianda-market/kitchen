@@ -74,8 +74,8 @@ class TestSubscriptionPaymentTable:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), admin_id),
             )
@@ -137,8 +137,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -178,8 +178,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -223,8 +223,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Entry Level', %s, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Entry Level', %s, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), plan_credits, str(admin_id)),
             )
@@ -278,8 +278,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan', 70, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Plan', 70, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -331,8 +331,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Zero Credit Plan', 0, 0, 0, false, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Zero Credit Plan', 0, 0, 0.0, 0.0, false, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -373,8 +373,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, rollover_cap, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan With Cap', 70, 100.0, 10.0, true, 20, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, rollover_cap, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Plan With Cap', 70, 100.0, 0.0, 0.0, true, 20, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -421,8 +421,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Cron Plan', 30, 50.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Cron Plan', 30, 50.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -457,8 +457,8 @@ class TestSubscriptionPaymentFlow:
             plan_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Cancel Test Plan', 10, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Cancel Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -503,8 +503,8 @@ class TestSubscriptionPaymentFlow:
             plan_id_1 = uuid4()
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan A', 10, 100.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Plan A', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id_1), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -529,8 +529,8 @@ class TestSubscriptionPaymentFlow:
         with db_transaction.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan B', 20, 200.0, 10.0, true, false, 'Active'::status_enum, %s)
+                INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
+                VALUES (%s, %s, 'Plan B', 20, 200.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
                 """,
                 (str(plan_id_2), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )

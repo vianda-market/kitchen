@@ -399,21 +399,24 @@ def _is_date_restaurant_holiday(
     if result and result.get('count', 0) > 0:
         return True
     
-    # Check recurring holidays (MM-DD format)
     from datetime import datetime
     try:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        month_day = f"{date_obj.month:02d}-{date_obj.day:02d}"
-        
+        month = date_obj.month
+        day = date_obj.day
+
         query = """
-        SELECT COUNT(*) FROM restaurant_holidays 
-        WHERE restaurant_id = %s 
-        AND recurring_month_day = %s 
+        SELECT COUNT(*) FROM restaurant_holidays
+        WHERE restaurant_id = %s
+        AND recurring_month = %s
+        AND recurring_day = %s
         AND is_recurring = TRUE
         AND is_archived = FALSE
         """
-        result = db_read(query, (str(restaurant_id), month_day), connection=db, fetch_one=True)
-        
+        result = db_read(
+            query, (str(restaurant_id), month, day), connection=db, fetch_one=True
+        )
+
         return result and result.get('count', 0) > 0
     except ValueError:
         return False

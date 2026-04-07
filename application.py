@@ -8,6 +8,7 @@ load_dotenv(dotenv_path=_env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from app.auth.middleware.permission_cache import PermissionCacheMiddleware
@@ -30,8 +31,10 @@ from app.routes.crud_routes_user import crud_router_user
 from app.routes.plate_selection import router as plate_selection_router
 from app.routes.plate_pickup import router as plate_pickup_router
 from app.routes.plate_review import router as plate_review_router
+from app.routes.notification_banner import router as notification_banner_router
 from app.routes.favorite import router as favorite_router
 from app.routes.employer import router as employer_router
+from app.routes.employer_program import router as employer_program_router
 from app.routes.address import router as address_router
 from app.routes.qr_code import router as qr_code_router
 from app.routes.institution_entity import router as institution_entity_router
@@ -49,6 +52,9 @@ from app.routes.payment_methods.mercado_pago import router as mercado_pago_route
 # Billing routes
 from app.routes.billing.client_bill import router as client_bill_router
 from app.routes.billing.institution_bill import router as institution_bill_router
+from app.routes.billing.supplier_invoice import router as supplier_invoice_router
+from app.routes.billing.supplier_w9 import router as supplier_w9_router
+from app.routes.supplier_terms import router as supplier_terms_router
 
 # Admin routes
 from app.routes.admin.archival import router as archival_admin_router
@@ -59,15 +65,45 @@ from app.routes.currencies import router as currencies_router
 from app.routes.cities import router as cities_router
 from app.routes.provinces import router as provinces_router
 from app.routes.cuisines import router as cuisines_router
+from app.routes.admin.cuisines import router as admin_cuisines_router
+
+# Onboarding status (supplier/employer onboarding checklist)
+from app.routes.onboarding import router as onboarding_router
+from app.routes.user_onboarding import router as user_onboarding_router
 
 # Leads (unauthenticated, rate-limited)
 from app.routes.leads import router as leads_router
 
-# Customer payment methods (B2C, mock for UI dev)
+# Phone pre-validation (unauthenticated, real-time form feedback)
+from app.routes.phone import router as phone_router
+
+# Customer payment methods and providers (B2C, mock for UI dev)
 from app.routes.customer.payment_methods import router as customer_payment_methods_router
+from app.routes.customer.payment_providers import router as customer_payment_providers_router
 
 # Configure logging - using the custom logger from app.utils.log
 from app.utils.log import logger
+
+
+class ContentLanguageMiddleware(BaseHTTPMiddleware):
+    """Locale hint for clients via X-Content-Language header.
+    Uses DB-resolved locale from get_resolved_locale (stored on request.state)
+    when available; falls back to Accept-Language header parsing."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        locale = getattr(request.state, "resolved_locale", None)
+        if not locale:
+            accept_language = request.headers.get("Accept-Language", "") or ""
+            locale = "en"
+            for lang in accept_language.replace(" ", "").split(","):
+                code = lang.split(";")[0].split("-")[0].lower()
+                if code in {"en", "es", "pt"}:
+                    locale = code
+                    break
+        response.headers["X-Content-Language"] = locale
+        return response
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -113,8 +149,11 @@ OPENAPI_TAGS = [
     {"name": "Plate Reviews", "description": "Plate review ratings"},
     {"name": "Favorites", "description": "User favorites"},
     {"name": "Employers", "description": "Employer entities"},
+    {"name": "Employer Program", "description": "Employer Benefits Program — config, enrollment, billing"},
     {"name": "Addresses", "description": "Address management"},
     {"name": "QR Codes", "description": "QR code generation and lookup"},
+    {"name": "Onboarding", "description": "Supplier/employer onboarding status tracking"},
+    {"name": "User Onboarding", "description": "Customer onboarding status (user-level)"},
     {"name": "Institution Entities", "description": "Institutions and entities"},
     {"name": "Plate Kitchen Days", "description": "Kitchen day scheduling"},
     {"name": "Restaurants", "description": "Restaurant management"},
@@ -132,6 +171,7 @@ OPENAPI_TAGS = [
     {"name": "Cities", "description": "City reference data"},
     {"name": "Provinces", "description": "Province/state reference data"},
     {"name": "Cuisines", "description": "Cuisine types"},
+    {"name": "Ingredients", "description": "Ingredient catalog search and product ingredient management"},
     {"name": "Leads", "description": "Lead capture (unauthenticated)"},
     {"name": "Webhooks", "description": "Webhook handlers (e.g. Stripe)"},
     {"name": "Customer", "description": "B2C customer payment methods"},
@@ -140,6 +180,7 @@ OPENAPI_TAGS = [
     {"name": "Super-Admin Discretionary", "description": "Super-admin discretionary credits"},
     {"name": "Admin Archival", "description": "Archival statistics and operations"},
     {"name": "Admin Archival Config", "description": "Archival configuration"},
+    {"name": "Admin Cuisines", "description": "Admin cuisine management and suggestion review"},
 ]
 
 
@@ -150,14 +191,29 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # Add CORS middleware
+    # CORS: explicit allowlist from env, or allow all for local dev
+    from app.config.settings import settings
+    _raw_origins = settings.CORS_ALLOWED_ORIGINS.strip()
+    _allowed_origins = (
+        [o.strip() for o in _raw_origins.split(",") if o.strip()]
+        if _raw_origins else ["*"]
+    )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins
+        allow_origins=_allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],  # Allow all methods
-        allow_headers=["*"],  # Allow all headers
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Total-Count"],
     )
+
+    # Order: last registered runs first on the request.
+    # Target: PermissionCache (outer) -> UserRateLimit -> ContentLanguage -> CORS -> app.
+    app.add_middleware(ContentLanguageMiddleware)
+
+    # Authenticated user rate limiting (per-user sliding window, tier-based)
+    from app.auth.middleware.rate_limit_middleware import UserRateLimitMiddleware
+    app.add_middleware(UserRateLimitMiddleware)
 
     # Add permission cache middleware
     app.add_middleware(PermissionCacheMiddleware)
@@ -210,7 +266,17 @@ def create_app() -> FastAPI:
     v1_institution_entity_router = create_versioned_router("api", ["Institution Entities"], APIVersion.V1)
     v1_institution_entity_router.include_router(institution_entity_router)
     app.include_router(v1_institution_entity_router)
-    
+
+    # Onboarding status: register BEFORE CRUD so /institutions/onboarding-summary matches before /{institution_id}
+    v1_onboarding_router = create_versioned_router("api", ["Onboarding"], APIVersion.V1)
+    v1_onboarding_router.include_router(onboarding_router)
+    app.include_router(v1_onboarding_router)
+
+    # Customer onboarding (user-level): GET /users/me/onboarding-status
+    v1_user_onboarding_router = create_versioned_router("api", ["User Onboarding"], APIVersion.V1)
+    v1_user_onboarding_router.include_router(user_onboarding_router)
+    app.include_router(v1_user_onboarding_router)
+
     # Create versioned CRUD router
     v1_crud_router = create_versioned_router("api", ["CRUD"], APIVersion.V1)
     v1_crud_router.include_router(crud_router)
@@ -249,6 +315,10 @@ def create_app() -> FastAPI:
     v1_plate_review_router.include_router(plate_review_router)
     app.include_router(v1_plate_review_router)
 
+    v1_notification_banner_router = create_versioned_router("api", ["Notification Banners"], APIVersion.V1)
+    v1_notification_banner_router.include_router(notification_banner_router)
+    app.include_router(v1_notification_banner_router)
+
     v1_favorite_router = create_versioned_router("api", ["Favorites"], APIVersion.V1)
     v1_favorite_router.include_router(favorite_router)
     app.include_router(v1_favorite_router)
@@ -256,7 +326,11 @@ def create_app() -> FastAPI:
     v1_employer_router = create_versioned_router("api", ["Employers"], APIVersion.V1)
     v1_employer_router.include_router(employer_router)
     app.include_router(v1_employer_router)
-    
+
+    v1_employer_program_router = create_versioned_router("api", ["Employer Program"], APIVersion.V1)
+    v1_employer_program_router.include_router(employer_program_router)
+    app.include_router(v1_employer_program_router)
+
     v1_address_router = create_versioned_router("api", ["Addresses"], APIVersion.V1)
     v1_address_router.include_router(address_router)
     app.include_router(v1_address_router)
@@ -309,7 +383,27 @@ def create_app() -> FastAPI:
     v1_institution_bill_router = create_versioned_router("api", ["Institution Bills"], APIVersion.V1)
     v1_institution_bill_router.include_router(institution_bill_router)
     app.include_router(v1_institution_bill_router)
-    
+
+    # Supplier invoice compliance routes (versioned)
+    v1_supplier_invoice_router = create_versioned_router("api", ["Supplier Invoices"], APIVersion.V1)
+    v1_supplier_invoice_router.include_router(supplier_invoice_router)
+    app.include_router(v1_supplier_invoice_router)
+
+    # Supplier W-9 routes (versioned — US tax compliance)
+    v1_supplier_w9_router = create_versioned_router("api", ["Supplier W-9"], APIVersion.V1)
+    v1_supplier_w9_router.include_router(supplier_w9_router)
+    app.include_router(v1_supplier_w9_router)
+
+    v1_supplier_terms_router = create_versioned_router("api", ["Supplier Terms"], APIVersion.V1)
+    v1_supplier_terms_router.include_router(supplier_terms_router)
+    app.include_router(v1_supplier_terms_router)
+
+    # Payout enriched routes (versioned)
+    from app.routes.billing.payout import router as payout_router
+    v1_payout_router = create_versioned_router("api", ["Payouts"], APIVersion.V1)
+    v1_payout_router.include_router(payout_router)
+    app.include_router(v1_payout_router)
+
     # Markets router (versioned)
     v1_markets_router = create_versioned_router("api", ["Markets"], APIVersion.V1)
     v1_markets_router.include_router(markets_admin_router)
@@ -340,10 +434,21 @@ def create_app() -> FastAPI:
     v1_cuisines_router.include_router(cuisines_router)
     app.include_router(v1_cuisines_router)
     
+    # Locales router (versioned; no auth, public locale discovery)
+    from app.routes.locales import router as locales_router
+    v1_locales_router = create_versioned_router("api", ["Locales"], APIVersion.V1)
+    v1_locales_router.include_router(locales_router)
+    app.include_router(v1_locales_router)
+
     # Leads router (versioned; no auth, rate-limited)
     v1_leads_router = create_versioned_router("api", ["Leads"], APIVersion.V1)
     v1_leads_router.include_router(leads_router)
     app.include_router(v1_leads_router)
+
+    # Phone pre-validation (versioned; no auth, real-time form feedback)
+    v1_phone_router = create_versioned_router("api", ["Phone"], APIVersion.V1)
+    v1_phone_router.include_router(phone_router)
+    app.include_router(v1_phone_router)
 
     # Webhooks (Stripe payment_intent.succeeded; no auth, verified via Stripe-Signature)
     from app.routes.webhooks import router as webhooks_router
@@ -351,10 +456,11 @@ def create_app() -> FastAPI:
     v1_webhooks_router.include_router(webhooks_router)
     app.include_router(v1_webhooks_router)
 
-    # Customer router (B2C payment method management; mock endpoints for UI dev)
+    # Customer router (B2C payment method and provider management; mock endpoints for UI dev)
     from fastapi import APIRouter
     customer_router = APIRouter(prefix="/customer", tags=["Customer"])
     customer_router.include_router(customer_payment_methods_router)
+    customer_router.include_router(customer_payment_providers_router)
     v1_customer_router = create_versioned_router("api", ["Customer"], APIVersion.V1)
     v1_customer_router.include_router(customer_router)
     app.include_router(v1_customer_router)
@@ -364,7 +470,19 @@ def create_app() -> FastAPI:
     v1_enums_router = create_versioned_router("api", ["Enums"], APIVersion.V1)
     v1_enums_router.include_router(enums_router)
     app.include_router(v1_enums_router)
+
+    # Ingredients router (versioned; OFF-backed search + custom creation)
+    from app.routes.ingredients import router as ingredients_router
+    v1_ingredients_router = create_versioned_router("api", ["Ingredients"], APIVersion.V1)
+    v1_ingredients_router.include_router(ingredients_router)
+    app.include_router(v1_ingredients_router)
     
+    # User payment summary (Internal only — employee portal for reviewing customer payment status)
+    from app.routes.admin.user_payment_summary import router as user_payment_summary_router
+    v1_user_payment_summary_router = create_versioned_router("api", ["User Payment Summary"], APIVersion.V1)
+    v1_user_payment_summary_router.include_router(user_payment_summary_router)
+    app.include_router(v1_user_payment_summary_router)
+
     # Admin Discretionary router (versioned)
     from app.routes.admin.discretionary import router as admin_discretionary_router
     v1_admin_discretionary_router = create_versioned_router("api", ["Admin Discretionary"], APIVersion.V1)
@@ -385,6 +503,29 @@ def create_app() -> FastAPI:
     v1_archival_config_admin_router = create_versioned_router("api", ["Admin Archival Config"], APIVersion.V1)
     v1_archival_config_admin_router.include_router(archival_config_admin_router)
     app.include_router(v1_archival_config_admin_router)
+
+    # Admin leads routes (versioned) — Internal-only lead interest dashboard
+    from app.routes.admin.leads import router as admin_leads_router
+    v1_admin_leads_router = create_versioned_router("api", ["Admin Leads"], APIVersion.V1)
+    v1_admin_leads_router.include_router(admin_leads_router)
+    app.include_router(v1_admin_leads_router)
+
+    # Admin cuisine routes (versioned)
+    v1_admin_cuisines_router = create_versioned_router("api", ["Admin Cuisines"], APIVersion.V1)
+    v1_admin_cuisines_router.include_router(admin_cuisines_router)
+    app.include_router(v1_admin_cuisines_router)
+
+    # Maps (static map snapshots for B2C Explore)
+    from app.routes.maps import router as maps_router
+    v1_maps_router = create_versioned_router("api", ["Maps"], APIVersion.V1)
+    v1_maps_router.include_router(maps_router)
+    app.include_router(v1_maps_router)
+
+    # Dev-only routes (guarded by DEV_MODE)
+    from app.routes.dev import router as dev_router
+    v1_dev_router = create_versioned_router("api", ["Dev"], APIVersion.V1)
+    v1_dev_router.include_router(dev_router)
+    app.include_router(v1_dev_router)
 
     # Static files (product images, placeholders, QR codes)
     static_dir = Path(__file__).resolve().parent / "static"

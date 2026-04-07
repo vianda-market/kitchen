@@ -87,7 +87,13 @@ def sample_user_dto():
         first_name="John",
         last_name="Doe",
         email="test@example.com",
+        mobile_number=None,
+        mobile_number_verified=False,
+        mobile_number_verified_at=None,
+        email_verified=False,
+        email_verified_at=None,
         market_id=uuid4(),
+        city_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),
@@ -244,7 +250,7 @@ def sample_plate_selection():
 
 @pytest.fixture
 def sample_plate():
-    """Sample PlateDTO for testing. no_show_discount is at institution level."""
+    """Sample PlateDTO for testing."""
     from app.dto.models import PlateDTO
     from app.config import Status
     return PlateDTO(
@@ -252,7 +258,8 @@ def sample_plate():
         product_id=uuid4(),
         restaurant_id=uuid4(),
         price=Decimal("10.0"),
-        credit=5,
+        credit=Decimal("5"),
+        expected_payout_local_currency=Decimal("0"),
         delivery_time_minutes=15,
         is_archived=False,
         status=Status.ACTIVE,
@@ -313,7 +320,8 @@ def sample_credit_currency_dto():
         credit_currency_id=uuid4(),
         currency_name="Test Credits",
         currency_code="USD",
-        credit_value=Decimal("1.0"),
+        credit_value_local_currency=Decimal("1.0"),
+        currency_conversion_usd=Decimal("1.0"),
         is_archived=False,
         status="Active",
         created_date=datetime.now(timezone.utc),

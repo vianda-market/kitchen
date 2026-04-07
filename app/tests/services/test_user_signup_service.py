@@ -65,22 +65,24 @@ class TestUserSignupService:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Password must be at least 8 characters long" in str(exc_info.value.detail)
 
+    @patch('app.utils.db.db_read')
     @patch('app.services.user_signup_service.city_service')
     @patch('app.services.user_signup_service.market_service')
     @patch('app.services.user_signup_service.create_user_with_validation')
-    def test_process_customer_signup_hashes_password(self, mock_create_user, mock_market_service, mock_city_service, sample_user_data, mock_db, sample_user_dto):
+    def test_process_customer_signup_hashes_password(self, mock_create_user, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db, sample_user_dto):
         """Test that password is hashed during customer signup process."""
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_db_read.return_value = None  # No employer domain match
         # Arrange
         original_password = sample_user_data["password"]
         mock_create_user.return_value = sample_user_dto
-        
+
         # Act
         result = user_signup_service.process_customer_signup(sample_user_data, mock_db)
-        
+
         # Assert
         # Verify password was hashed and plain password removed
         call_args = mock_create_user.call_args[0][0]  # First positional argument (user_data)
@@ -88,15 +90,17 @@ class TestUserSignupService:
         assert "password" not in call_args
         assert call_args["hashed_password"] != original_password
 
+    @patch('app.utils.db.db_read')
     @patch('app.services.user_signup_service.city_service')
     @patch('app.services.user_signup_service.market_service')
     @patch('app.services.user_signup_service.create_user_with_validation')
-    def test_process_customer_signup_applies_customer_rules(self, mock_create_user, mock_market_service, mock_city_service, sample_user_data, mock_db, sample_user_dto):
+    def test_process_customer_signup_applies_customer_rules(self, mock_create_user, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db, sample_user_dto):
         """Test that customer signup applies correct business rules; country_code is resolved to market_id."""
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_db_read.return_value = None  # No employer domain match
         mock_create_user.return_value = sample_user_dto
 
         result = user_signup_service.process_customer_signup(sample_user_data, mock_db)
@@ -310,13 +314,15 @@ class TestUserSignupService:
         assert constants["customer_role_name"] == UserSignupService.CUSTOMER_ROLE_NAME.value
         assert constants["bot_user_id"] == UserSignupService.BOT_USER_ID
 
+    @patch('app.utils.db.db_read')
     @patch('app.services.user_signup_service.city_service')
     @patch('app.services.user_signup_service.market_service')
-    def test_apply_customer_signup_rules_sets_defaults(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
+    def test_apply_customer_signup_rules_sets_defaults(self, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db):
         """Test that customer signup rules set correct default values; market_id and city_id are preserved from input."""
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
         mock_market_service.get_by_id.return_value = {"is_archived": False}
+        mock_db_read.return_value = None  # No employer domain match
         user_data = sample_user_data.copy()
         user_data["market_id"] = SAMPLE_MARKET_ID  # Simulates resolved value from country_code
 
@@ -417,7 +423,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = None
         mock_email_service.send_signup_verification_email.return_value = True
@@ -448,7 +454,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = MagicMock()  # user exists
         mock_get_by_email.return_value = None
 
@@ -470,7 +476,7 @@ class TestUserSignupService:
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
-        sample_user_data["cellphone"] = "9876543210"
+        sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = MagicMock()  # email already in user_info
 
@@ -552,8 +558,12 @@ class TestUserSignupService:
         """verify_and_complete_signup loads pending (incl. market_id, city_id), creates user, sets market assignment, marks used, returns user and JWT."""
         from datetime import datetime, timezone, timedelta
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_market_service.get_by_id.return_value = {
+            "is_archived": False,
+            "country_code": "AR",
+            "language": "es",
+        }
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="AR")
         mock_create_user.return_value = sample_user_dto
         mock_create_token.return_value = "fake.jwt.token"
 
@@ -566,7 +576,7 @@ class TestUserSignupService:
             "hashed_password": "hashed",
             "first_name": "John",
             "last_name": "Doe",
-            "cellphone": "9876543210",
+            "mobile_number": "+14155552671",
             "market_id": SAMPLE_MARKET_ID,
             "city_id": SAMPLE_CITY_ID,
             "used": False,
@@ -588,6 +598,10 @@ class TestUserSignupService:
         call_user_data = mock_create_user.call_args[0][0]
         assert call_user_data["market_id"] == SAMPLE_MARKET_ID
         assert call_user_data["city_id"] == SAMPLE_CITY_ID
+        assert call_user_data["locale"] == "es"
+        assert call_user_data["mobile_number"] == "+14155552671"
+        assert call_user_data["email_verified"] is True
+        assert "email_verified_at" in call_user_data
         mock_set_assignments.assert_called_once_with(sample_user_dto.user_id, [SAMPLE_MARKET_ID], mock_db)
         assert mock_cursor.execute.call_count >= 2  # SELECT then UPDATE
 

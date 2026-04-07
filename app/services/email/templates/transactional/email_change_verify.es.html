@@ -1,0 +1,10 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Confirma tu nuevo email</h1>
+<p>Hola {{ first_name }},</p>
+<p>Solicitaste cambiar la direccion de email de tu cuenta de Vianda.</p>
+<p>Tu codigo de verificacion es:</p>
+<p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">{{ verification_code }}</p>
+<p style="font-size: 14px; color: #7f8c8d;">Ingresa este codigo en la app para confirmar tu nuevo email. Expira en {{ expiry_hours }} horas.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Si no solicitaste este cambio, ignora este correo.</p>
+{% endblock %}

@@ -256,6 +256,24 @@ class MarketConfiguration:
         
         billing_run_local = day_config["billing_run"]
         return cls.convert_local_to_utc(country_code, billing_run_local, target_date)
+
+    @classmethod
+    def get_billing_run_utc_for_timezone(
+        cls, market: str, timezone_str: str, target_date: datetime, day_name: str
+    ) -> Optional[datetime]:
+        """Get billing run time in UTC using a specific timezone (for location-based billing, e.g. US-Pacific)."""
+        config = cls.get_market_config(market)
+        if not config:
+            return None
+        day_config = config.kitchen_day_config.get(day_name)
+        if not day_config or not day_config.get("enabled", True):
+            return None
+        billing_run_local = day_config["billing_run"]
+        d = target_date.date() if isinstance(target_date, datetime) else target_date
+        local_dt = datetime.combine(d, billing_run_local)
+        local_tz = ZoneInfo(timezone_str)
+        local_dt = local_dt.replace(tzinfo=local_tz)
+        return local_dt.astimezone(ZoneInfo("UTC"))
     
     @classmethod
     def get_reservation_opens_utc(cls, country_code: str, target_date: datetime, day_name: str) -> Optional[datetime]:

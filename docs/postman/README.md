@@ -124,7 +124,7 @@ All collections use **ISO 3166-1 alpha-2** for `country_code` (e.g. `AR`, `US`, 
 - `PUT /users/me/employer` — assign employer
 - `PUT /users/me/terminate` — terminate account
 
-**Use `/{user_id}` only for admin operations** (editing another user). See [USER_SELF_UPDATE_PATTERN.md](../api/shared_client/USER_SELF_UPDATE_PATTERN.md) and [API_DEPRECATION_PLAN.md](../roadmap/API_DEPRECATION_PLAN.md).
+**Use `/{user_id}` only for admin operations** (editing another user). See [USER_MODEL_FOR_CLIENTS.md](../api/shared_client/USER_MODEL_FOR_CLIENTS.md#6-self-service-usersme-and-410-on-self-use-of-user_id) and [API_DEPRECATION_PLAN.md](../zArchive/roadmap/API_DEPRECATION_PLAN.md).
 
 ## 📝 Notes
 

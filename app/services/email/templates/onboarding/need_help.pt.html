@@ -1,0 +1,10 @@
+{% extends "base.pt.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Precisa de ajuda para finalizar a configuração?</h1>
+<p>Oi equipe {{ institution_name }},</p>
+<p>Você está com <strong>{{ completion_percentage }}%</strong> da configuração do Vianda concluída — ótimo progresso!</p>
+<p>Aqui está o que falta:</p>
+<ul style="padding-left: 20px;">{{ steps_html }}</ul>
+<p style="margin: 25px 0;"><a href="{{ b2b_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Continuar configuração</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Precisa de uma mão? Responda este e-mail e ajudaremos você a finalizar.</p>
+{% endblock %}

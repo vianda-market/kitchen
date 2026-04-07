@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Your Vianda username</h1>
+<p>Hi {{ first_name }},</p>
+<p>You requested your username for your Vianda account.</p>
+<p style="font-weight: bold;">Your username is: {{ username }}</p>
+<p>Use this username to sign in. If you need to reset your password, use the "Forgot password?" link on the sign-in page.</p>
+<p style="font-size: 14px; color: #7f8c8d;">If you didn't request this, please ignore this email.</p>
+{% endblock %}

@@ -10,7 +10,7 @@
 | Phase | Status | What to expect |
 |-------|--------|----------------|
 | **Phase 1** | **Live** | Mock endpoints return fixture data or no-op. **Build UI now** — list, add, delete, set default. |
-| **Phase 2** | Planned | Database schema (`stripe_customer_id`). No client change. |
+| **Phase 2** | **Live** | Database-backed. `user_payment_provider` table stores Stripe account link per user. New endpoints: `GET /customer/payment-providers` and `DELETE /customer/payment-providers/{id}`. See [PAYMENT_PROVIDERS_B2C.md](./PAYMENT_PROVIDERS_B2C.md). |
 | **Phase 3** | Planned | Live Stripe: real Setup Session, webhooks. `setup_url` will redirect to Stripe Checkout. |
 | **Phase 4** | Planned | Subscription flow: if user has saved card, with-payment may skip card form. |
 
@@ -74,6 +74,7 @@ These endpoints are **Customer-only**. B2B (kitchen-web) is used by Employees an
 
 ## Related
 
+- [PAYMENT_PROVIDERS_B2C.md](./PAYMENT_PROVIDERS_B2C.md) — Connected payment providers (Phase 2 new endpoints)
 - [SUBSCRIPTION_PAYMENT_API.md](./SUBSCRIPTION_PAYMENT_API.md) — Subscribe + pay flow (with-payment, confirm-payment)
 - [STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md](../../roadmap/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md)
 - [PAYMENT_AND_BILLING_CLIENT_CHANGES.md](../shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md)

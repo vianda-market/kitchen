@@ -97,10 +97,11 @@ class PlatePickupService:
             raise HTTPException(status_code=500, detail="Failed to process QR code scan")
     
     def complete_order(
-        self, 
-        pickup_id: UUID, 
-        current_user: Dict[str, Any], 
-        db: psycopg2.extensions.connection
+        self,
+        pickup_id: UUID,
+        current_user: Dict[str, Any],
+        db: psycopg2.extensions.connection,
+        completion_type: str = "user_confirmed"
     ) -> Dict[str, Any]:
         """
         Mark order as complete.
@@ -122,23 +123,67 @@ class PlatePickupService:
             # Get the pickup record
             pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db)
             
-            if pickup_record.status not in ['Arrived', 'Pending']:
+            if pickup_record.status not in ['Arrived', 'Pending', 'Handed Out']:
                 raise HTTPException(status_code=400, detail=f"Cannot complete order with status {pickup_record.status}")
-            
+
+            # Handle disputes: log and auto-complete with was_collected=False (interim until support queue)
+            if completion_type == "user_disputed":
+                log_warning(f"Order {pickup_id} disputed by user {current_user['user_id']} — flagging for review")
+
             completion_time = datetime.now()
-            
+
             # Update plate_pickup_live (do NOT archive immediately - keep for customer service)
             # All operations use commit=False for atomic transaction
-            self._update_pickup_record_completion(pickup_id, completion_time, current_user, db)
-            
+            self._update_pickup_record_completion(
+                pickup_id, completion_time, current_user, db,
+                completion_type=completion_type,
+                was_collected=(completion_type != "user_disputed")
+            )
+
             # Update restaurant_transaction with balance adjustment if needed
             self._update_restaurant_transaction_completion(pickup_record, completion_time, current_user, db)
-            
+
             # Commit all operations atomically
             db.commit()
-            log_info(f"Order {pickup_id} completed for user {current_user['user_id']} (atomic transaction)")
-            
-            return {"status": "completed", "message": "Order completed successfully"}
+            log_info(f"Order {pickup_id} completed for user {current_user['user_id']} (completion_type={completion_type})")
+
+            # Best-effort: create survey notification banner after successful pickup
+            if completion_type != "user_disputed":
+                try:
+                    from app.services.notification_banner_service import create_notification
+                    from app.services.crud_service import product_service
+
+                    selection = plate_selection_service.get_by_id(
+                        str(pickup_record.plate_selection_id), db
+                    )
+                    product = product_service.get_by_id(
+                        str(pickup_record.product_id), db
+                    ) if selection else None
+
+                    plate_name = product.name if product else "Your plate"
+                    pickup_date_str = str(selection.pickup_date) if selection else str(completion_time.date())
+
+                    create_notification(
+                        user_id=current_user["user_id"],
+                        notification_type="survey_available",
+                        priority="normal",
+                        payload={
+                            "plate_name": plate_name,
+                            "pickup_date": pickup_date_str,
+                            "plate_selection_id": str(pickup_record.plate_selection_id),
+                            "plate_pickup_id": str(pickup_id),
+                        },
+                        action_type="open_survey",
+                        action_label="Rate this plate",
+                        client_types=["b2c-mobile", "b2c-web"],
+                        expires_at=completion_time + timedelta(hours=48),
+                        dedup_key=f"survey_available:{pickup_record.plate_selection_id}",
+                        db=db,
+                    )
+                except Exception as e:
+                    log_warning(f"Failed to create survey notification for pickup {pickup_id}: {e}")
+
+            return {"status": "completed", "message": "Order completed successfully", "completion_type": completion_type}
         except HTTPException:
             # HTTPException already handled rollback, just re-raise
             raise
@@ -345,18 +390,21 @@ class PlatePickupService:
         log_info(f"Restaurant balance updated for customer arrival - transaction {restaurant_transaction.transaction_id} (commit deferred)")
     
     def _update_pickup_record_completion(
-        self, 
-        pickup_id: UUID, 
-        completion_time: datetime, 
-        current_user: Dict[str, Any], 
-        db: psycopg2.extensions.connection
+        self,
+        pickup_id: UUID,
+        completion_time: datetime,
+        current_user: Dict[str, Any],
+        db: psycopg2.extensions.connection,
+        completion_type: str = "user_confirmed",
+        was_collected: bool = True
     ) -> None:
         """Update pickup record with completion information (commit=False for atomic transaction)"""
         update_data = {
             "status": Status.COMPLETED,
             "is_archived": False,  # Keep active per retention policy (archived after 30 days)
             "completion_time": completion_time,
-            "was_collected": True,
+            "was_collected": was_collected,
+            "completion_type": completion_type,
             "modified_by": current_user["user_id"]
         }
         
@@ -583,6 +631,105 @@ class PlatePickupService:
             'window_minutes': 15
         }
     
+    def scan_qr_code_by_id(
+        self,
+        qr_code_id: UUID,
+        sig: str,
+        current_user: Dict[str, Any],
+        db: psycopg2.extensions.connection
+    ) -> Dict[str, Any]:
+        """
+        Scan QR code using qr_code_id + HMAC signature. Returns rich pickup confirmation.
+
+        Args:
+            qr_code_id: QR code UUID from the signed URL
+            sig: 16-hex-char HMAC signature
+            current_user: Current user information
+            db: Database connection
+
+        Returns:
+            Dictionary with pickup confirmation details for B2C app
+
+        Raises:
+            HTTPException: 400 invalid_signature, 400 wrong_restaurant, 404 no_active_reservation
+        """
+        from app.utils.qr_hmac import verify_qr_signature
+        from app.utils.db import db_read
+        from app.config.settings import settings
+
+        # 1. Verify HMAC signature
+        if not verify_qr_signature(str(qr_code_id), sig):
+            raise HTTPException(status_code=400, detail="invalid_signature")
+
+        # 2. Look up QR code by ID
+        qr_row = db_read(
+            """SELECT restaurant_id FROM qr_code
+               WHERE qr_code_id = %s AND is_archived = FALSE AND status = 'Active'
+               LIMIT 1""",
+            (str(qr_code_id),), connection=db, fetch_one=True
+        )
+        if not qr_row:
+            raise HTTPException(status_code=400, detail="invalid_signature")
+
+        restaurant_id = UUID(qr_row["restaurant_id"])
+        user_id = current_user["user_id"]
+
+        # 3. Check user has active orders at this restaurant
+        order_count = self._get_simple_order_count(user_id, restaurant_id, db)
+
+        if order_count == 0:
+            # Distinguish: wrong restaurant vs no orders at all
+            any_orders = db_read(
+                """SELECT r.name AS restaurant_name
+                   FROM plate_pickup_live ppl
+                   JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
+                   WHERE ppl.status = 'Pending' AND ppl.is_archived = FALSE AND ppl.user_id = %s
+                   LIMIT 1""",
+                (str(user_id),), connection=db, fetch_one=True
+            )
+            if any_orders:
+                raise HTTPException(status_code=400, detail="wrong_restaurant")
+            raise HTTPException(status_code=404, detail="no_active_reservation")
+
+        # 4. Mark arrival and generate confirmation code
+        confirmation_code = self._generate_confirmation_code()
+        self._update_orders_arrival(user_id, restaurant_id, confirmation_code, db)
+
+        # 5. Get plate details and pickup IDs
+        plates_raw = self._get_plates_for_pickup_display(user_id, restaurant_id, db)
+        plate_pickup_ids = [UUID(p["plate_pickup_id"]) for p in plates_raw if p.get("plate_pickup_id")]
+
+        # 6. Get restaurant name
+        restaurant_name_row = db_read(
+            "SELECT name FROM restaurant_info WHERE restaurant_id = %s",
+            (str(restaurant_id),), connection=db, fetch_one=True
+        )
+        restaurant_name = restaurant_name_row["name"] if restaurant_name_row else "Unknown"
+
+        # 7. Build plates response matching B2C contract
+        plates = [
+            {
+                "plate_name": p["plate_name"],
+                "plate_id": p.get("plate_pickup_id"),  # pickup-level ID for display
+                "description": None,
+            }
+            for p in plates_raw
+        ]
+
+        return {
+            "plate_pickup_id": plate_pickup_ids[0] if plate_pickup_ids else None,
+            "plate_pickup_ids": plate_pickup_ids,
+            "restaurant_name": restaurant_name,
+            "restaurant_id": restaurant_id,
+            "plates": plates,
+            "countdown_seconds": settings.PICKUP_COUNTDOWN_SECONDS,
+            "max_extensions": settings.PICKUP_MAX_EXTENSIONS,
+            "pickup_confirmed": True,
+            "confirmation_code": confirmation_code,
+            "arrival_time": datetime.now(),
+            "server_time": datetime.now(),
+        }
+
     def scan_qr_code_simplified(
         self,
         qr_code_payload: str,
@@ -590,21 +737,11 @@ class PlatePickupService:
         db: psycopg2.extensions.connection
     ) -> Dict[str, Any]:
         """
+        DEPRECATED — use scan_qr_code_by_id for signed QR codes.
         Simplified QR code scanning with 4 error cases and no window enforcement.
-        
-        Args:
-            qr_code_payload: QR code payload from scanned QR code
-            current_user: Current user information
-            db: Database connection
-            
-        Returns:
-            Dictionary with scan result
-            
-        Raises:
-            HTTPException: For various error cases
         """
         user_id = current_user["user_id"]
-        
+
         # Case 4: Validate QR code exists
         if not self._validate_qr_code_exists(qr_code_payload, db):
             return {
@@ -612,7 +749,7 @@ class PlatePickupService:
                 "message": "This QR code is not recognized by our system",
                 "suggestion": "Please scan a valid restaurant QR code"
             }
-        
+
         # Extract restaurant_id from payload
         try:
             restaurant_id = self._extract_restaurant_id(qr_code_payload)
@@ -622,10 +759,10 @@ class PlatePickupService:
                 "message": "Invalid QR code format",
                 "suggestion": "Please scan a valid restaurant QR code"
             }
-        
+
         # Get simple order count for this restaurant
         order_count = self._get_simple_order_count(user_id, restaurant_id, db)
-        
+
         if order_count > 0:
             # Case 1: Success - customer has orders at this restaurant
             confirmation_code = self._generate_confirmation_code()
@@ -743,12 +880,9 @@ class PlatePickupService:
             }
     
     def _generate_confirmation_code(self) -> str:
-        """Generate a 6-character alphanumeric confirmation code"""
+        """Generate a 6-digit numeric confirmation code for kiosk verification"""
         import random
-        import string
-
-        characters = string.ascii_uppercase + string.digits
-        return ''.join(random.choice(characters) for _ in range(6))
+        return ''.join(str(random.randint(0, 9)) for _ in range(6))
 
     def _get_plates_for_pickup_display(
         self, user_id: UUID, restaurant_id: UUID, db: psycopg2.extensions.connection

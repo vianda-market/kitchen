@@ -18,6 +18,8 @@ from app.config.enums import (
     PickupType,
     AuditOperation,
     DiscretionaryReason,
+    BillPayoutStatus,
+    DietaryFlag,
 )
 
 __all__ = [
@@ -30,5 +32,7 @@ __all__ = [
     "PickupType",
     "AuditOperation",
     "DiscretionaryReason",
+    "BillPayoutStatus",
+    "DietaryFlag",
 ]
 

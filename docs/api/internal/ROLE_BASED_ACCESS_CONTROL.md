@@ -23,7 +23,9 @@ The API uses a two-tier role system: `role_type` and `role_name`. Together, thes
 - **Operator**: Self-only access (can only manage their own profile)
 
 #### Supplier Roles
-- **Admin**: Institution-scoped access (can manage resources within their institution)
+- **Admin**: Full institution-scoped access (CRUD + kiosk + billing + user management + code verification toggle)
+- **Manager**: Same as Admin minus institution entity config and code verification toggle
+- **Operator**: Kiosk-only — daily orders, verify code, hand out, mark complete, view customer feedback, self-profile. Blocked from all CRUD management routes (products, plans, plates, restaurants, users, addresses). See `docs/api/b2b_client/KIOSK_MODE_API.md` for access matrix.
 
 #### Customer Roles
 - **Comensal**: Self-only access (can only manage their own profile)
@@ -37,6 +39,8 @@ The API uses a two-tier role system: `role_type` and `role_name`. Together, thes
 | Employee | Management | Institution | ✅ Yes (institution users only) | `/me` endpoints |
 | Employee | Operator | None | ❌ No | `/me` endpoints only |
 | Supplier | Admin | Institution | ✅ Yes (institution users only) | `/me` endpoints |
+| Supplier | Manager | Institution | ✅ Yes (institution users only) | `/me` endpoints |
+| Supplier | Operator | Institution (read) | ❌ No (kiosk + read only) | `/me` endpoints + kiosk |
 | Customer | Comensal | None | ❌ No | `/me` endpoints only |
 
 ## Endpoint Access Patterns
@@ -59,7 +63,7 @@ Content-Type: application/json
 {
   "first_name": "John",
   "last_name": "Doe",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 

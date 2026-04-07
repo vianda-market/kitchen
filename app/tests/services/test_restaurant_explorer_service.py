@@ -20,7 +20,7 @@ from app.services.restaurant_explorer_service import (
 
 
 class TestGetPlatesForRestaurants:
-    """get_plates_for_restaurants returns plate_id, product_name, price, credit, kitchen_day, image_url; savings set to 0 (computed in get_restaurants_by_city from credit_worth)."""
+    """get_plates_for_restaurants returns plate_id, product_name, price, credit, kitchen_day, image_url; savings set to 0 (computed in get_restaurants_by_city from credit_cost_local_currency)."""
 
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_returns_image_url_and_savings_placeholder_from_product_and_plate(self, mock_db_read):
@@ -50,10 +50,10 @@ class TestGetPlatesForRestaurants:
         assert plates[0]["credit"] == 2
         assert plates[0]["kitchen_day"] == "Wednesday"
         assert plates[0]["image_url"] == "http://localhost:8000/static/products/abc.jpg"
-        assert plates[0]["savings"] == 0  # Computed in get_restaurants_by_city from credit_worth
+        assert plates[0]["savings"] == 0  # Computed in get_restaurants_by_city from credit_cost_local_currency
 
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_savings_zero_when_no_credit_worth(self, mock_db_read):
+    def test_savings_zero_when_no_credit_cost_local_currency(self, mock_db_read):
         rid = uuid4()
         mock_db_read.return_value = [
             {
@@ -825,25 +825,25 @@ class TestGetAllowedKitchenDaysSortedByDate:
 
 
 class TestComputeSavingsPct:
-    """Unit tests for savings formula: (price - credit * credit_worth) / price * 100, clamped to 0-100."""
+    """Unit tests for savings formula: (price - credit * credit_cost_local_currency) / price * 100, clamped to 0-100."""
 
     def test_normal_savings(self):
-        # price=10, credit=1, credit_worth=8 -> (10-8)/10*100 = 20%
+        # price=10, credit=1, credit_cost_local_currency=8 -> (10-8)/10*100 = 20%
         assert _compute_savings_pct(10.0, 1, 8.0) == 20
 
     def test_price_zero_returns_zero(self):
         assert _compute_savings_pct(0.0, 1, 5.0) == 0
 
     def test_credit_zero_full_price_no_savings(self):
-        # price=10, credit=0, credit_worth=5 -> 100%
+        # price=10, credit=0, credit_cost_local_currency=5 -> 100%
         assert _compute_savings_pct(10.0, 0, 5.0) == 100
 
-    def test_credit_worth_zero_full_savings(self):
-        # price=10, credit=2, credit_worth=0 -> 100%
+    def test_credit_cost_local_currency_zero_full_savings(self):
+        # price=10, credit=2, credit_cost_local_currency=0 -> 100%
         assert _compute_savings_pct(10.0, 2, 0.0) == 100
 
     def test_clamped_to_100(self):
-        # e.g. credit_worth negative or very high could give >100
+        # e.g. credit_cost_local_currency negative or very high could give >100
         assert _compute_savings_pct(10.0, 1, 0.0) == 100
         assert _compute_savings_pct(10.0, 0, 100.0) == 100
 

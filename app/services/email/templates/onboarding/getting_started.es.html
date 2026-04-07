@@ -1,0 +1,16 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Bienvenido a Vianda!</h1>
+<p>Hola equipo de {{ institution_name }},</p>
+<p>Notamos que todavia no empezaste a configurar tu restaurante. Comenzar es muy facil:</p>
+<ol style="padding-left: 20px;">
+    <li>Agrega la direccion de tu negocio</li>
+    <li>Configura tu entidad legal y datos de pago</li>
+    <li>Crea el perfil de tu restaurante</li>
+    <li>Agrega tus productos y platos</li>
+    <li>Configura tus dias de cocina</li>
+    <li>Genera tu codigo QR</li>
+</ol>
+<p style="margin: 25px 0;"><a href="{{ b2b_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Inicia sesion para comenzar</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Necesitas ayuda? Responde a este correo y nuestro equipo de soporte te guiara paso a paso.</p>
+{% endblock %}

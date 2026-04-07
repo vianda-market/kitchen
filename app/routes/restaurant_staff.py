@@ -13,8 +13,8 @@ import psycopg2.extensions
 
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db
-from app.services.restaurant_staff_service import get_daily_orders
-from app.schemas.consolidated_schemas import DailyOrdersResponseSchema
+from app.services.restaurant_staff_service import get_daily_orders, verify_and_handoff
+from app.schemas.consolidated_schemas import DailyOrdersResponseSchema, VerifyAndHandoffRequest, VerifyAndHandoffResponse
 from app.services.error_handling import handle_business_operation
 from app.services.crud_service import restaurant_service, institution_service
 from app.utils.log import log_info, log_warning
@@ -139,3 +139,46 @@ def get_restaurant_daily_orders(
         return result
     
     return handle_business_operation(_get_daily_orders, "daily orders retrieval")
+
+
+@router.post("/verify-and-handoff", response_model=VerifyAndHandoffResponse)
+def verify_and_handoff_endpoint(
+    request: VerifyAndHandoffRequest,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db)
+):
+    """Verify confirmation code and transition order to Handed Out (Layer 2 kiosk verification).
+
+    Auth: Supplier (any role, scoped to institution) or Internal.
+    """
+    def _verify():
+        # Validate restaurant belongs to user's institution (same pattern as daily-orders)
+        if current_user["role_type"] == "Supplier":
+            restaurant = restaurant_service.get_by_id(request.restaurant_id, db)
+            if not restaurant:
+                raise HTTPException(status_code=404, detail="Restaurant not found")
+
+            user_institution_query = """
+                SELECT ie.institution_entity_id
+                FROM institution_info i
+                INNER JOIN institution_entity_info ie ON i.institution_id = ie.institution_id
+                WHERE i.institution_id = %s AND i.is_archived = FALSE AND ie.is_archived = FALSE
+                LIMIT 1
+            """
+            result = db_read(user_institution_query, [str(current_user["institution_id"])], db)
+            if not result:
+                raise HTTPException(status_code=404, detail="Institution entity not found")
+            if restaurant.institution_entity_id != result[0]['institution_entity_id']:
+                raise HTTPException(status_code=403, detail="Access denied to this restaurant")
+
+        elif current_user["role_type"] != "Internal":
+            raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
+
+        return verify_and_handoff(
+            request.confirmation_code,
+            request.restaurant_id,
+            current_user["user_id"],
+            db
+        )
+
+    return handle_business_operation(_verify, "code verification and handoff")

@@ -846,7 +846,7 @@ interface CreateAddressRequest {
 
 - `API_PERMISSIONS_BY_ROLE.md` - Role-based access control
 - `SCOPING_BEHAVIOR_FOR_UI.md` - Scoping behavior (in shared_client)
-- `USER_SELF_UPDATE_PATTERN.md` - User self-update patterns (in shared_client)
+- `USER_MODEL_FOR_CLIENTS.md` - User self-update patterns, `/users/me`, markets (shared_client)
 
 ---
 

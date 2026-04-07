@@ -63,11 +63,11 @@
 							"urlencoded": [
 								{
 									"key": "username",
-									"value": "{{adminUsername}}"
+									"value": "{{superAdminUsername}}"
 								},
 								{
 									"key": "password",
-									"value": "{{adminPassword}}"
+									"value": "{{superAdminPassword}}"
 								}
 							]
 						},
@@ -240,12 +240,12 @@
 			"value": "http://localhost:8000"
 		},
 		{
-			"key": "adminUsername",
-			"value": "superadmin"
+			"key": "superAdminUsername",
+			"value": ""
 		},
 		{
-			"key": "adminPassword",
-			"value": "SuperAdmin1!"
+			"key": "superAdminPassword",
+			"value": ""
 		},
 		{
 			"key": "authToken",

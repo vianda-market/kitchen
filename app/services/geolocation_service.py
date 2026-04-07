@@ -1,51 +1,43 @@
 """
-Geolocation Service - Google Maps API Integration (via Gateway)
+Geolocation Service — Geocoding via configured provider (Mapbox or Google).
 
-This service provides geocoding (address → coordinates) and reverse geocoding 
-(coordinates → address) using Google Maps Geocoding API through the gateway pattern.
+Provides geocoding (address -> coordinates) and reverse geocoding
+(coordinates -> address) through the address provider abstraction.
 
-Setup:
-1. Get API key from Google Cloud Console (see docs/ENV_SETUP.md)
-2. Add to .env: GOOGLE_API_KEY_DEV=... (or _STAGING/_PROD per environment; local uses _DEV)
-3. Enable Geocoding API in Google Cloud Console
-4. For development: Set DEV_MODE=true to use mock responses
-
-Pricing:
-- Free tier: $200 credit/month (~28,500 requests)
-- After free tier: $5 per 1,000 requests
-
-API Documentation:
-https://developers.google.com/maps/documentation/geocoding/overview
+Provider is selected via ADDRESS_PROVIDER setting ("mapbox" or "google").
 """
 
 from typing import Optional, Dict, Any
 from math import radians, cos, sin, asin, sqrt
 
-from app.config.settings import get_google_api_key
-from app.gateways.google_maps_gateway import get_google_maps_gateway
+from app.gateways.address_provider import get_geocoding_gateway
 from app.gateways.base_gateway import ExternalServiceError
 from app.utils.log import log_info, log_warning, log_error
 
 
 class GeolocationService:
     """
-    Service for geocoding and distance calculations using Google Maps API.
-    
-    All external API calls are routed through GoogleMapsGateway for:
+    Service for geocoding and distance calculations.
+
+    All external API calls are routed through the configured geocoding gateway for:
     - Development mode support (mock responses)
     - Centralized cost tracking
     - Consistent error handling
     """
-    
+
     def __init__(self):
-        self.gateway = get_google_maps_gateway()
-    
+        self.gateway = get_geocoding_gateway()
+
     def is_configured(self) -> bool:
-        """Check if Google Maps API key is configured."""
-        # In dev mode, it's always "configured" (uses mocks)
+        """Check if the geocoding provider is configured (API key/token present or dev mode)."""
         if self.gateway.dev_mode:
             return True
-        return bool(get_google_api_key())
+        # Check provider-specific credentials
+        from app.config.settings import get_settings, get_mapbox_access_token, get_google_api_key
+        provider = get_settings().ADDRESS_PROVIDER.lower()
+        if provider == "google":
+            return bool(get_google_api_key())
+        return bool(get_mapbox_access_token())
     
     def geocode_address(
         self,

@@ -109,5 +109,5 @@ Valid values are available from `GET /api/v1/enums/` under the key `portion_size
 ## Related docs
 
 - [PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md](./PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md) — explore flow, `is_favorite`, `is_recommended`
-- [EXPLORE_AND_SAVINGS.md](./EXPLORE_AND_SAVINGS.md) — savings, price, credit
+- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — savings, price, credit (B2C explore)
 - [shared_client/PLATE_API_CLIENT.md](../shared_client/PLATE_API_CLIENT.md) — enriched plate endpoint (B2C and B2B)

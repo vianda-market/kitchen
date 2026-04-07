@@ -1,7 +1,7 @@
 """
 Database tests for customer payment methods (Stripe integration Phase 2).
 
-- Verifies user_info.stripe_customer_id and user_history.stripe_customer_id exist.
+- Verifies user_payment_provider and user_payment_provider_history tables.
 - Tests payment_method + external_payment_method flow (insert, list, archive, set default).
 """
 
@@ -16,53 +16,166 @@ from app.tests.database.test_data.expected_seed_data import (
 SEED_MARKET_ID = "00000000-0000-0000-0000-000000000001"
 
 
-class TestStripeCustomerIdColumn:
-    """Test stripe_customer_id column in user_info and user_history."""
+class TestUserPaymentProviderTable:
+    """Test user_payment_provider and user_payment_provider_history tables."""
 
-    def test_user_info_has_stripe_customer_id(self, db_transaction):
-        """user_info table has stripe_customer_id column."""
-        columns = get_table_columns(db_transaction, "user_info")
-        assert "stripe_customer_id" in columns
-
-    def test_user_history_has_stripe_customer_id(self, db_transaction):
-        """user_history table has stripe_customer_id column."""
-        columns = get_table_columns(db_transaction, "user_history")
-        assert "stripe_customer_id" in columns
-
-    def test_user_info_stripe_customer_id_can_be_updated(self, db_transaction):
-        """Can set stripe_customer_id on user_info and it propagates to history."""
-        admin_id = str(SEED_SUPERADMIN_USER_ID)
+    def _create_customer_user(self, cur, user_id, admin_id, username_suffix=""):
         cust_inst_id = str(SEED_INSTITUTION_CUSTOMERS_ID)
+        cur.execute(
+            """
+            INSERT INTO user_info (
+                user_id, institution_id, role_type, role_name,
+                username, email, hashed_password, market_id, modified_by
+            ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+                %s, %s, 'hash', %s::uuid, %s)
+            """,
+            (
+                str(user_id),
+                cust_inst_id,
+                f"upp_test_{user_id.hex[:8]}{username_suffix}",
+                f"upp_{user_id.hex[:8]}{username_suffix}@example.com",
+                SEED_MARKET_ID,
+                admin_id,
+            ),
+        )
+
+    def test_user_payment_provider_table_exists(self, db_transaction):
+        """user_payment_provider table has expected columns."""
+        columns = get_table_columns(db_transaction, "user_payment_provider")
+        for col in ("user_payment_provider_id", "user_id", "provider", "provider_customer_id", "is_archived"):
+            assert col in columns, f"Missing column: {col}"
+
+    def test_user_payment_provider_history_table_exists(self, db_transaction):
+        """user_payment_provider_history table has expected columns."""
+        columns = get_table_columns(db_transaction, "user_payment_provider_history")
+        for col in ("event_id", "user_payment_provider_id", "provider", "provider_customer_id", "is_current"):
+            assert col in columns, f"Missing column: {col}"
+
+    def test_user_info_does_not_have_stripe_customer_id(self, db_transaction):
+        """stripe_customer_id column should no longer exist on user_info."""
+        columns = get_table_columns(db_transaction, "user_info")
+        assert "stripe_customer_id" not in columns
+
+    def test_insert_provider_triggers_history(self, db_transaction):
+        """Inserting a user_payment_provider row fires the history trigger."""
+        admin_id = str(SEED_SUPERADMIN_USER_ID)
         user_id = uuid4()
         with db_transaction.cursor() as cur:
+            self._create_customer_user(cur, user_id, admin_id)
+            upp_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO user_info (
-                    user_id, institution_id, role_type, role_name,
-                    username, email, hashed_password, market_id, modified_by
-                ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
-                    'stripe_test_user', 'stripe_test@example.com', 'hash', %s::uuid, %s)
+                INSERT INTO user_payment_provider (
+                    user_payment_provider_id, user_id, provider, provider_customer_id, modified_by
+                ) VALUES (%s, %s, 'stripe', %s, %s)
                 """,
-                (str(user_id), cust_inst_id, SEED_MARKET_ID, admin_id),
+                (str(upp_id), str(user_id), f"cus_mock_{user_id.hex[:24]}", admin_id),
             )
             cur.execute(
-                "UPDATE user_info SET stripe_customer_id = %s WHERE user_id = %s",
-                ("cus_mock_abc123", str(user_id)),
-            )
-            cur.execute(
-                "SELECT stripe_customer_id FROM user_info WHERE user_id = %s",
-                (str(user_id),),
-            )
-            row = cur.fetchone()
-            assert row is not None
-            assert row[0] == "cus_mock_abc123"
-            cur.execute(
-                "SELECT stripe_customer_id FROM user_history WHERE user_id = %s AND is_current = TRUE",
-                (str(user_id),),
+                """
+                SELECT provider_customer_id FROM user_payment_provider_history
+                WHERE user_payment_provider_id = %s AND is_current = TRUE
+                """,
+                (str(upp_id),),
             )
             hist = cur.fetchone()
             assert hist is not None
-            assert hist[0] == "cus_mock_abc123"
+            assert hist[0] == f"cus_mock_{user_id.hex[:24]}"
+
+    def test_duplicate_active_provider_per_user_rejected(self, db_transaction):
+        """Partial unique index: one user cannot have two active stripe provider records."""
+        import psycopg2
+
+        admin_id = str(SEED_SUPERADMIN_USER_ID)
+        user_id = uuid4()
+        with db_transaction.cursor() as cur:
+            self._create_customer_user(cur, user_id, admin_id)
+            cur.execute(
+                """
+                INSERT INTO user_payment_provider (
+                    user_id, provider, provider_customer_id, modified_by
+                ) VALUES (%s, 'stripe', %s, %s)
+                """,
+                (str(user_id), f"cus_mock_{user_id.hex[:24]}", admin_id),
+            )
+            with pytest.raises(psycopg2.errors.UniqueViolation):
+                cur.execute(
+                    """
+                    INSERT INTO user_payment_provider (
+                        user_id, provider, provider_customer_id, modified_by
+                    ) VALUES (%s, 'stripe', %s, %s)
+                    """,
+                    (str(user_id), f"cus_mock_{user_id.hex[:20]}diff", admin_id),
+                )
+
+    def test_two_users_cannot_share_same_provider_customer(self, db_transaction):
+        """Partial unique index: two users cannot share the same provider+provider_customer_id."""
+        import psycopg2
+
+        admin_id = str(SEED_SUPERADMIN_USER_ID)
+        u1, u2 = uuid4(), uuid4()
+        shared_cus_id = f"cus_shared_{uuid4().hex[:16]}"
+        with db_transaction.cursor() as cur:
+            self._create_customer_user(cur, u1, admin_id, "_a")
+            self._create_customer_user(cur, u2, admin_id, "_b")
+            cur.execute(
+                """
+                INSERT INTO user_payment_provider (
+                    user_id, provider, provider_customer_id, modified_by
+                ) VALUES (%s, 'stripe', %s, %s)
+                """,
+                (str(u1), shared_cus_id, admin_id),
+            )
+            with pytest.raises(psycopg2.errors.UniqueViolation):
+                cur.execute(
+                    """
+                    INSERT INTO user_payment_provider (
+                        user_id, provider, provider_customer_id, modified_by
+                    ) VALUES (%s, 'stripe', %s, %s)
+                    """,
+                    (str(u2), shared_cus_id, admin_id),
+                )
+
+    def test_archive_provider_allows_new_active_record(self, db_transaction):
+        """Archiving a provider record allows a new active record for the same user+provider."""
+        admin_id = str(SEED_SUPERADMIN_USER_ID)
+        user_id = uuid4()
+        with db_transaction.cursor() as cur:
+            self._create_customer_user(cur, user_id, admin_id)
+            upp_id = uuid4()
+            cur.execute(
+                """
+                INSERT INTO user_payment_provider (
+                    user_payment_provider_id, user_id, provider, provider_customer_id, modified_by
+                ) VALUES (%s, %s, 'stripe', %s, %s)
+                """,
+                (str(upp_id), str(user_id), f"cus_old_{user_id.hex[:20]}", admin_id),
+            )
+            # Archive the first record
+            cur.execute(
+                """
+                UPDATE user_payment_provider SET is_archived = TRUE, modified_by = %s
+                WHERE user_payment_provider_id = %s
+                """,
+                (admin_id, str(upp_id)),
+            )
+            # Should be able to insert a new active record
+            cur.execute(
+                """
+                INSERT INTO user_payment_provider (
+                    user_id, provider, provider_customer_id, modified_by
+                ) VALUES (%s, 'stripe', %s, %s)
+                """,
+                (str(user_id), f"cus_new_{user_id.hex[:20]}", admin_id),
+            )
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM user_payment_provider
+                WHERE user_id = %s AND provider = 'stripe' AND is_archived = FALSE
+                """,
+                (str(user_id),),
+            )
+            assert cur.fetchone()[0] == 1
 
 
 class TestCustomerPaymentMethodFlow:

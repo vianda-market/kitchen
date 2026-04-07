@@ -5,12 +5,15 @@ API endpoints for retrieving system enum values.
 Provides centralized access to all valid enum values for frontend dropdowns.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import get_current_user, get_employee_or_supplier_user
 from app.config.enums import Status, DiscretionaryReason
+from app.config.settings import settings
+from app.i18n.enum_labels import LABELED_ENUM_TYPES, labels_for_values
 from app.schemas.consolidated_schemas import EnumsResponseSchema
 from app.services.enum_service import enum_service
 from app.utils.log import log_info, log_error
@@ -18,9 +21,28 @@ from app.utils.log import log_info, log_error
 router = APIRouter(prefix="/enums", tags=["Enums"])
 
 
-@router.get("")
+def _enums_with_labels(flat: Dict[str, List[str]], language: str) -> Dict[str, dict]:
+    """Map enum name -> {values, labels}; labeled enums use i18n maps, others use identity labels."""
+    out: Dict[str, dict] = {}
+    for k, v in flat.items():
+        if not isinstance(v, list):
+            continue
+        if k in LABELED_ENUM_TYPES:
+            labels = labels_for_values(k, v, language)
+        else:
+            labels = {x: x for x in v}
+        out[k] = {"values": v, "labels": labels}
+    return out
+
+
+@router.get("", response_model=EnumsResponseSchema)
 async def get_all_enums(
-    current_user: dict = Depends(get_current_user)
+    response: Response,
+    language: str = Query(
+        "en",
+        description="Locale for enum display labels (en, es, pt). Canonical `values` are unchanged.",
+    ),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Get all system enum values.
@@ -35,18 +57,21 @@ async def get_all_enums(
     **Caching**: This endpoint returns static configuration data.
     Frontend should cache for 1 hour to minimize API calls.
     
-    **Example Response**:
+    **Example Response** (each key is `{ "values": [...], "labels": { code: display } }`):
     ```json
     {
-        "status": ["Active", "Inactive", "Pending", ...],
-        "address_type": ["Restaurant", "Customer Home", ...],
-        "role_type": ["Internal", "Supplier", "Customer", "Employer"],
-        ...
+        "status": { "values": ["Active", "Inactive"], "labels": { "Active": "Active", ... } },
+        "street_type": { "values": ["St", "Ave"], "labels": { "St": "Street", "Ave": "Avenue" } }
     }
     ```
     """
-    log_info(f"User {current_user.get('user_id')} fetching system enums")
-    
+    if language not in settings.SUPPORTED_LOCALES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported language '{language}'. Supported: {', '.join(settings.SUPPORTED_LOCALES)}.",
+        )
+    log_info(f"User {current_user.get('user_id')} fetching system enums (language={language})")
+
     try:
         enums = enum_service.get_all_enums(current_user=current_user)
         # Ensure context-scoped status keys are always in the response (user form uses status_user)
@@ -56,16 +81,11 @@ async def get_all_enums(
         enums["status_bill"] = Status.get_by_context("bill")
         # Ensure discretionary_reason is always present (discretionary request form category dropdown)
         enums["discretionary_reason"] = enums.get("discretionary_reason") or DiscretionaryReason.values()
-        # Build response body so all keys are included (avoid any serialization stripping)
-        body = dict(enums)
+        body = _enums_with_labels(dict(enums), language)
         log_info(f"Enums served successfully (keys: {list(body.keys())})")
-        return JSONResponse(
-            content=body,
-            headers={
-                "Cache-Control": "public, max-age=3600",  # 1 hour cache
-                "X-Content-Type-Options": "nosniff"
-            }
-        )
+        response.headers["Cache-Control"] = "public, max-age=3600"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return body
     except Exception as e:
         log_error(f"Error fetching enums: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve enum values")

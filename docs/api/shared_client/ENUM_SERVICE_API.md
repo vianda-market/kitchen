@@ -6,6 +6,8 @@ The Enum Service API provides centralized access to all system enum values used 
 
 **Base Path**: `/api/v1/enums/`
 
+**Language (Phase 1 i18n):** `GET /api/v1/enums` accepts **`?language=en|es|pt`** (default `en`) and returns each enum key as **`{ "values": string[], "labels": Record<string,string> }`** instead of a bare string array. **`GET /api/v1/enums/{enum_name}`** is still a flat JSON array of codes. Invalid `language` → **422**. Full client guide: [LANGUAGE_AND_LOCALE_FOR_CLIENTS.md](./LANGUAGE_AND_LOCALE_FOR_CLIENTS.md).
+
 **Authentication**: Required (all authenticated users can access)
 
 **Supported Roles**: Employee, Supplier, Customer (varies by endpoint; see Role access rules below)

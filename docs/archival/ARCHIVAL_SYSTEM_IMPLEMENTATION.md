@@ -106,7 +106,7 @@ curl -X GET "http://localhost:8001/admin/archival/eligible/orders" \
 
 Run the archival indexes after any schema changes:
 ```bash
-psql kitchen_db_dev -f app/db/archival_indexes.sql
+psql kitchen -f app/db/archival_indexes.sql
 ```
 
 ## **🔧 Configuration**
@@ -204,7 +204,7 @@ curl http://localhost:8001/admin/archival/validate
 #### **2. Performance Issues**
 ```bash
 # Check if indexes are created
-psql kitchen_db_dev -c "\di idx_*archival*"
+psql kitchen -c "\di idx_*archival*"
 
 # Monitor query performance
 # Add EXPLAIN ANALYZE to archival queries

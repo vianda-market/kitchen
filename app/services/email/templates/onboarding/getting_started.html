@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Welcome to Vianda!</h1>
+<p>Hi {{ institution_name }} team,</p>
+<p>We noticed you haven't started setting up your restaurant yet. Getting started is easy:</p>
+<ol style="padding-left: 20px;">
+    <li>Add your business address</li>
+    <li>Set up your legal entity and payout details</li>
+    <li>Create your restaurant profile</li>
+    <li>Add your products and plates</li>
+    <li>Set your kitchen days</li>
+    <li>Generate your QR code</li>
+</ol>
+<p style="margin: 25px 0;"><a href="{{ b2b_url }}" style="background-color: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Log in to get started</a></p>
+<p style="font-size: 14px; color: #7f8c8d;">Need help? Reply to this email and our support team will walk you through it.</p>
+{% endblock %}

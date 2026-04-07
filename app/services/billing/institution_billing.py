@@ -23,6 +23,10 @@ from app.services.crud_service import (
     is_holiday
 )
 from app.config.market_config import MarketConfiguration
+from app.services.billing.supplier_terms_resolution import (
+    resolve_effective_invoice_config,
+    get_supplier_payment_frequency,
+)
 from app.config import Status
 from app.config.enums import BillResolution
 from app.utils.log import log_info, log_warning, log_error
@@ -32,6 +36,62 @@ from app.services.crud_service import (
     restaurant_transaction_service,
     plate_pickup_live_service
 )
+
+def _is_supplier_payout_due(payment_frequency: str, today: date) -> bool:
+    """Check if a supplier payout is due today based on payment_frequency.
+
+    Follows the same pattern as employer_billing._is_billing_due().
+    """
+    if payment_frequency == "daily":
+        return True
+    if payment_frequency == "weekly":
+        return today.weekday() == 0  # Monday
+    if payment_frequency == "biweekly":
+        return today.weekday() == 0 and today.isocalendar()[1] % 2 == 1  # Every other Monday (odd ISO weeks)
+    if payment_frequency == "monthly":
+        return today.day == 1
+    return True
+
+
+def _check_invoice_compliance(
+    institution_id: UUID,
+    institution_entity_id: UUID,
+    db,
+) -> bool:
+    """Check if an entity passes the invoice compliance gate.
+
+    Returns True if payout is allowed, False if held due to uninvoiced bills.
+    """
+    config = resolve_effective_invoice_config(institution_id, db)
+    if not config["effective_require_invoice"]:
+        return True
+
+    hold_days = config["effective_invoice_hold_days"]
+    row = db_read(
+        """
+        SELECT MIN(b.period_end) as oldest_unmatched
+        FROM billing.institution_bill_info b
+        WHERE b.institution_entity_id = %s
+          AND b.is_archived = FALSE
+          AND b.resolution = 'Pending'
+          AND NOT EXISTS (
+            SELECT 1 FROM billing.bill_invoice_match m
+            WHERE m.institution_bill_id = b.institution_bill_id
+          )
+        """,
+        (str(institution_entity_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if not row or not row.get("oldest_unmatched"):
+        return True  # No unmatched bills — compliant
+
+    oldest = row["oldest_unmatched"]
+    if isinstance(oldest, datetime):
+        oldest = oldest.date()
+    days_unmatched = (date.today() - oldest).days
+    return days_unmatched <= hold_days
+
 
 class InstitutionBillingService:
     """Service for generating and managing institution bills based on restaurant balances"""
@@ -291,18 +351,31 @@ class InstitutionBillingService:
         bill_date: date,
         system_user_id: UUID,
         country_code: Optional[str] = None,
+        location_id: Optional[str] = None,
+        timezone_filter: Optional[str] = None,
         connection=None
     ) -> Dict:
         """
         Phase 1: Create one settlement per restaurant with balance > 0 for the period.
         No global balance reset; each restaurant's balance is reset when its settlement is created.
-        Returns dict with settlements_created, total_amount, settlement_run_id, kitchen_day, etc.
+        When location_id is provided, timezone_filter and market are resolved from location config;
+        only restaurants in that timezone are processed. Returns dict with settlements_created, etc.
         """
         from uuid import uuid4
+        from app.config.location_config import get_location_config
         try:
+            market_override = None
+            if location_id:
+                loc_config = get_location_config(location_id)
+                if loc_config:
+                    timezone_filter = loc_config["timezone"]
+                    market_override = loc_config["market"]
             kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(bill_date)
             log_info(f"Phase 1 settlements: kitchen day {kitchen_day}, date {bill_date}")
-            restaurants = InstitutionBillingService._get_restaurants_with_balances(connection=connection)
+            restaurants = InstitutionBillingService._get_restaurants_with_balances(
+                connection=connection,
+                timezone_filter=timezone_filter,
+            )
             log_info(f"Phase 1: Found {len(restaurants) if restaurants else 0} restaurants with balance > 0")
             if not restaurants:
                 log_info("Phase 1: No restaurants with balance > 0")
@@ -311,7 +384,7 @@ class InstitutionBillingService:
                     "total_amount": 0.0,
                     "settlement_run_id": None,
                     "kitchen_day": kitchen_day,
-                    "country_code": country_code,
+                    "country_code": market_override or country_code,
                 }
             settlement_run_id = uuid4()
             entity_aggregates = InstitutionBillingService._aggregate_restaurants_by_entity(restaurants)
@@ -320,7 +393,7 @@ class InstitutionBillingService:
             period_start, period_end = None, None
             for entity_data in entity_aggregates:
                 try:
-                    entity_country = country_code
+                    entity_country = market_override or country_code
                     if not entity_country:
                         from app.services.market_detection import MarketDetectionService
                         entity_country = MarketDetectionService.get_country_from_entity(
@@ -367,12 +440,13 @@ class InstitutionBillingService:
                     log_error(f"Error creating settlements for entity {entity_data['institution_entity_id']}: {e}")
                     continue
             log_info(f"Phase 1 complete: {settlements_created} settlements, total {total_amount}")
+            resolved_country = market_override or country_code
             return {
                 "settlements_created": settlements_created,
                 "total_amount": float(total_amount),
                 "settlement_run_id": str(settlement_run_id),
                 "kitchen_day": kitchen_day,
-                "country_code": country_code,
+                "country_code": resolved_country,
                 "period_start": period_start.isoformat() if period_start else None,
                 "period_end": period_end.isoformat() if period_end else None,
             }
@@ -415,6 +489,12 @@ class InstitutionBillingService:
                 institution_id = get_institution_id_by_entity(institution_entity_id, connection)
                 if not institution_id:
                     log_warning(f"Institution not found for entity {institution_entity_id}, skipping")
+                    continue
+                # Payment frequency gate: skip bill creation if not due today
+                freq = get_supplier_payment_frequency(institution_id, connection)
+                today = date.today()
+                if not _is_supplier_payout_due(freq, today):
+                    log_info(f"Skipping bill for entity {institution_entity_id}: payment_frequency={freq}, not due on {today}")
                     continue
                 amount = sum(s.amount for s in entity_settlements)
                 transaction_count = sum(s.transaction_count for s in entity_settlements)
@@ -463,15 +543,22 @@ class InstitutionBillingService:
         bill_date: date,
         system_user_id: UUID,
         country_code: Optional[str] = None,
+        location_id: Optional[str] = None,
         connection=None
     ) -> Dict:
         """
         Full pipeline: Phase 1 (settlements per restaurant), Phase 2 (one bill per entity),
         then for each bill: issue tax doc stub, trigger payout (mock/live), set payout fields, mark_paid.
-        Uses one connection; commits after each mark_paid (or once at end if no bills).
+        When location_id is provided, only restaurants in that location's timezone are processed.
         """
         from app.services.billing.tax_doc_service import issue_tax_doc_for_bill
-        from app.services.supplier_payout import trigger_payout
+        from app.config.settings import settings
+        def _get_connect_gw():
+            if (settings.SUPPLIER_PAYOUT_PROVIDER or "mock").lower() == "stripe":
+                from app.services.payment_provider.stripe import connect_gateway
+                return connect_gateway
+            from app.services.payment_provider.stripe import connect_mock
+            return connect_mock
         own_conn = connection is None
         if own_conn:
             connection = get_db_connection()
@@ -480,6 +567,7 @@ class InstitutionBillingService:
                 bill_date=bill_date,
                 system_user_id=system_user_id,
                 country_code=country_code,
+                location_id=location_id,
                 connection=connection,
             )
             if phase1.get("error"):
@@ -516,34 +604,40 @@ class InstitutionBillingService:
             cc = phase1.get("country_code") or country_code or "US"
             bills_paid = 0
             paid_bill_details: List[Dict] = []
+            gw = _get_connect_gw()
             for bill_id in bill_ids:
                 bill = institution_bill_service.get_by_id(bill_id, connection)
                 if not bill:
                     continue
                 issue_tax_doc_for_bill(bill_id, cc, connection)
-                payout_result = trigger_payout(
-                    bill_id,
-                    bill.amount or Decimal("0"),
-                    bill.currency_code or "USD",
-                )
-                if not payout_result.get("success"):
-                    log_warning(f"Payout failed for bill {bill_id}: {payout_result.get('error')}")
+                entity_id = getattr(bill, "institution_entity_id", None) or bill.get("institution_entity_id") if isinstance(bill, dict) else bill.institution_entity_id
+                if not entity_id:
+                    log_warning(f"Bill {bill_id} has no institution_entity_id; skipping payout")
                     continue
-                institution_bill_service.update(
-                    bill_id,
-                    {
-                        "stripe_payout_id": payout_result.get("stripe_payout_id"),
-                        "payout_completed_at": datetime.now(timezone.utc),
-                    },
-                    connection,
-                    commit=False,
-                )
+                # Invoice compliance gate
+                bill_institution_id = getattr(bill, "institution_id", None) or (bill.get("institution_id") if isinstance(bill, dict) else None)
+                if bill_institution_id and not _check_invoice_compliance(bill_institution_id, entity_id, connection):
+                    log_warning(f"Payout held for bill {bill_id}: entity {entity_id} has unmatched bills exceeding invoice hold threshold")
+                    continue
+                try:
+                    payout_result = gw.execute_supplier_payout(
+                        institution_bill_id=UUID(str(bill_id)),
+                        entity_id=UUID(str(entity_id)),
+                        current_user_id=system_user_id,
+                        db=connection,
+                    )
+                except HTTPException as e:
+                    log_warning(f"Payout skipped for bill {bill_id}: {e.detail}")
+                    continue
+                except Exception as e:
+                    log_warning(f"Payout failed for bill {bill_id}: {e}")
+                    continue
                 institution_bill_service.mark_paid(bill_id, system_user_id, connection)
                 bills_paid += 1
                 paid_bill_details.append({
                     "institution_bill_id": str(bill_id),
-                    "stripe_payout_id": payout_result.get("stripe_payout_id"),
-                    "payout_completed_at": datetime.now(timezone.utc).isoformat(),
+                    "bill_payout_id": str(payout_result.get("bill_payout_id", "")),
+                    "provider_transfer_id": payout_result.get("provider_transfer_id"),
                 })
             if own_conn:
                 connection.commit()
@@ -697,33 +791,56 @@ class InstitutionBillingService:
         """
         Check if it's time to generate bills (kitchen day has just closed) for a specific market.
         This can be used for real-time billing triggers.
-        
+
         Args:
             country_code: Country code for market-specific timing
-            
+
         Returns:
             True if bills should be generated now
         """
         current_time = datetime.now(timezone.utc)
         current_day = current_time.date()
         current_kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(current_day)
-        
-        # Get billing run time for today using market config
+
         billing_run_utc = MarketConfiguration.get_billing_run_utc(country_code, current_time, current_kitchen_day)
         if not billing_run_utc:
             return False
-        
-        # Check if we're within 5 minutes after billing run time (billing window)
+
         billing_window_start = billing_run_utc
         billing_window_end = billing_run_utc + timedelta(minutes=5)
-        
         return billing_window_start <= current_time <= billing_window_end
 
     @staticmethod
-    def _get_restaurants_with_balances(connection=None) -> List[Dict]:
-        """Get all restaurants that have balance data, grouped by institution_entity_id"""
+    def should_generate_bills_now_for_location(location_id: str) -> bool:
+        """
+        Check if it's time to generate bills for a location (uses location's timezone).
+        For US-Eastern vs US-Pacific, each has different UTC billing run time.
+        """
+        from app.config.location_config import get_location_config
+
+        loc = get_location_config(location_id)
+        if not loc:
+            return False
+        current_time = datetime.now(timezone.utc)
+        current_day = current_time.date()
+        current_kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(current_day)
+        billing_run_utc = MarketConfiguration.get_billing_run_utc_for_timezone(
+            loc["market"], loc["timezone"], current_time, current_kitchen_day
+        )
+        if not billing_run_utc:
+            return False
+        billing_window_start = billing_run_utc
+        billing_window_end = billing_run_utc + timedelta(minutes=5)
+        return billing_window_start <= current_time <= billing_window_end
+
+    @staticmethod
+    def _get_restaurants_with_balances(
+        connection=None,
+        timezone_filter: Optional[str] = None,
+    ) -> List[Dict]:
+        """Get restaurants that have balance data. When timezone_filter is set, only include restaurants whose address has that timezone."""
         try:
-            query = """
+            base_select = """
                 SELECT 
                     r.restaurant_id,
                     r.institution_id,
@@ -735,13 +852,23 @@ class InstitutionBillingService:
                 FROM restaurant_info r
                 INNER JOIN institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
                 INNER JOIN restaurant_balance_info rb ON r.restaurant_id = rb.restaurant_id
+            """
+            if timezone_filter:
+                base_select += """
+                INNER JOIN address_info a ON r.address_id = a.address_id
+                """
+            base_select += """
                 WHERE r.is_archived = %s 
                 AND rb.is_archived = %s
                 AND rb.balance > 0
-                ORDER BY r.institution_entity_id, r.restaurant_id
             """
-            
-            results = db_read(query, (False, False), connection=connection)
+            params: List = [False, False]
+            if timezone_filter:
+                base_select += " AND TRIM(COALESCE(a.timezone, '')) = %s"
+                params.append(timezone_filter)
+            base_select += " ORDER BY r.institution_entity_id, r.restaurant_id"
+
+            results = db_read(base_select, tuple(params), connection=connection)
             if results:
                 out = []
                 for row in results:

@@ -34,14 +34,16 @@
 			"type": "string"
 		},
 		{
-			"key": "adminUsername",
-			"value": "admin",
-			"type": "string"
+			"key": "superAdminUsername",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
 		},
 		{
-			"key": "adminPassword",
-			"value": "Admin123!",
-			"type": "string"
+			"key": "superAdminPassword",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
 		},
 		{
 			"key": "sampleCountryCode",
@@ -94,11 +96,11 @@
 							"urlencoded": [
 								{
 									"key": "username",
-									"value": "{{adminUsername}}"
+									"value": "{{superAdminUsername}}"
 								},
 								{
 									"key": "password",
-									"value": "{{adminPassword}}"
+									"value": "{{superAdminPassword}}"
 								}
 							]
 						},

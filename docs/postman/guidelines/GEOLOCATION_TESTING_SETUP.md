@@ -40,7 +40,7 @@ The collection requires at least one address in the database:
 
 ```bash
 cd /Users/cdeachaval/Desktop/local/kitchen
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 
 ### 5. Start the Server
@@ -112,7 +112,7 @@ You can also run requests individually:
 
 **Solution:** Run database seed:
 ```bash
-./app/db/build_kitchen_db_dev.sh
+./app/db/build_kitchen_db.sh
 ```
 
 ### "GOOGLE_API_KEY not configured" Error

@@ -15,6 +15,7 @@ class AddressType(str, Enum):
     CUSTOMER_HOME = "Customer Home"
     CUSTOMER_BILLING = "Customer Billing"
     CUSTOMER_EMPLOYER = "Customer Employer"
+    CUSTOMER_OTHER = "Customer Other"
 
     @classmethod
     def values(cls) -> list[str]:

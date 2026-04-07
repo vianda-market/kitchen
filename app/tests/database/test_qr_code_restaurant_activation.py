@@ -4,7 +4,7 @@ Database tests for QR code restaurant activation: auto-deactivation trigger.
 When the last active QR code for a restaurant is archived, deleted, or set to Inactive,
 the restaurant_auto_deactivate_on_qr_code trigger sets the restaurant to Inactive.
 
-Requires trigger.sql to be applied (run build_kitchen_db_dev.sh to rebuild).
+Requires trigger.sql to be applied (run build_kitchen_db.sh to rebuild).
 """
 
 import pytest
@@ -96,7 +96,7 @@ class TestQRCodeAutoDeactivationTrigger:
         """When the only active QR code is set to Inactive, restaurant becomes Inactive."""
         cursor = db_transaction.cursor()
         if not _trigger_exists(cursor):
-            pytest.skip("Trigger restaurant_auto_deactivate_on_qr_code not installed; run build_kitchen_db_dev.sh")
+            pytest.skip("Trigger restaurant_auto_deactivate_on_qr_code not installed; run build_kitchen_db.sh")
         modified_by = str(SEED_SUPERADMIN_USER_ID)
         try:
             restaurant_id, qr_code_id = _create_restaurant_with_qr_code(cursor, modified_by)
@@ -129,7 +129,7 @@ class TestQRCodeAutoDeactivationTrigger:
         """When the only active QR code is archived, restaurant becomes Inactive."""
         cursor = db_transaction.cursor()
         if not _trigger_exists(cursor):
-            pytest.skip("Trigger restaurant_auto_deactivate_on_qr_code not installed; run build_kitchen_db_dev.sh")
+            pytest.skip("Trigger restaurant_auto_deactivate_on_qr_code not installed; run build_kitchen_db.sh")
         modified_by = str(SEED_SUPERADMIN_USER_ID)
         try:
             restaurant_id, qr_code_id = _create_restaurant_with_qr_code(cursor, modified_by)

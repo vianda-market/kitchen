@@ -1,5 +1,5 @@
 """
-Tests for supported currencies endpoint: GET /api/v1/currencies/
+Tests for supported currencies endpoint: GET /api/v1/currencies
 """
 
 import pytest
@@ -39,11 +39,11 @@ def client_with_employee(mock_employee_user):
 
 
 class TestListSupportedCurrencies:
-    """GET /api/v1/currencies/ returns supported currencies for dropdown."""
+    """GET /api/v1/currencies returns supported currencies for dropdown."""
 
     def test_returns_200_and_list_with_currency_name_and_code(self, client_with_employee):
         """Internal can list supported currencies; each item has currency_name and currency_code."""
-        resp = client_with_employee.get("/api/v1/currencies/")
+        resp = client_with_employee.get("/api/v1/currencies")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -56,7 +56,7 @@ class TestListSupportedCurrencies:
 
     def test_sorted_by_currency_name(self, client_with_employee):
         """List is sorted by currency_name (case-insensitive)."""
-        resp = client_with_employee.get("/api/v1/currencies/")
+        resp = client_with_employee.get("/api/v1/currencies")
         assert resp.status_code == 200
         data = resp.json()
         names = [x["currency_name"].lower() for x in data]
@@ -64,7 +64,7 @@ class TestListSupportedCurrencies:
 
     def test_contains_us_dollar_and_argentine_peso(self, client_with_employee):
         """Response contains expected entries."""
-        resp = client_with_employee.get("/api/v1/currencies/")
+        resp = client_with_employee.get("/api/v1/currencies")
         assert resp.status_code == 200
         data = resp.json()
         names = [x["currency_name"] for x in data]

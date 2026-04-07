@@ -1,8 +1,8 @@
 -- Archival Configuration Table
 -- This allows business users to modify archival policies without code changes
 
-\echo 'Creating table: archival_config'
-CREATE TABLE IF NOT EXISTS archival_config (
+\echo 'Creating table: core.archival_config'
+CREATE TABLE IF NOT EXISTS core.archival_config (
     config_id UUID PRIMARY KEY DEFAULT uuidv7(),
     table_name VARCHAR(100) NOT NULL UNIQUE,
     category VARCHAR(50) NOT NULL CHECK (category IN (
@@ -23,16 +23,16 @@ CREATE TABLE IF NOT EXISTS archival_config (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
 -- Index for performance
-CREATE INDEX IF NOT EXISTS idx_archival_config_active ON archival_config(is_active, table_name);
-CREATE INDEX IF NOT EXISTS idx_archival_config_category ON archival_config(category, is_active);
+CREATE INDEX IF NOT EXISTS idx_archival_config_active ON core.archival_config(is_active, table_name);
+CREATE INDEX IF NOT EXISTS idx_archival_config_category ON core.archival_config(category, is_active);
 
 -- Archival Configuration History Table
-\echo 'Creating table: archival_config_history'
-CREATE TABLE IF NOT EXISTS archival_config_history (
+\echo 'Creating table: audit.archival_config_history'
+CREATE TABLE IF NOT EXISTS audit.archival_config_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     config_id UUID NOT NULL,
     table_name VARCHAR(100) NOT NULL,
@@ -50,15 +50,15 @@ CREATE TABLE IF NOT EXISTS archival_config_history (
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     change_reason TEXT,
-    FOREIGN KEY (config_id) REFERENCES archival_config(config_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT
+    FOREIGN KEY (config_id) REFERENCES core.archival_config(config_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
 -- Index for history queries
-CREATE INDEX IF NOT EXISTS idx_archival_config_history_config_id ON archival_config_history(config_id);
-CREATE INDEX IF NOT EXISTS idx_archival_config_history_current ON archival_config_history(config_id, is_current);
+CREATE INDEX IF NOT EXISTS idx_archival_config_history_config_id ON audit.archival_config_history(config_id);
+CREATE INDEX IF NOT EXISTS idx_archival_config_history_current ON audit.archival_config_history(config_id, is_current);
 
--- Trigger for archival_config history logging
+-- Trigger for core.archival_config history logging
 CREATE OR REPLACE FUNCTION archival_config_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -66,14 +66,14 @@ DECLARE
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
         -- Mark previous version as no longer current
-        UPDATE archival_config_history
+        UPDATE audit.archival_config_history
         SET is_current = FALSE,
             valid_until = CURRENT_TIMESTAMP
         WHERE config_id = OLD.config_id AND is_current = TRUE;
     END IF;
 
     -- Insert new version
-    INSERT INTO archival_config_history (
+    INSERT INTO audit.archival_config_history (
         event_id, config_id, table_name, category, retention_days, grace_period_days,
         priority, description, is_active, effective_date, created_date, modified_by, 
         modified_date, is_current, valid_until, change_reason
@@ -94,8 +94,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS archival_config_history_trigger ON archival_config;
+DROP TRIGGER IF EXISTS archival_config_history_trigger ON core.archival_config;
 CREATE TRIGGER archival_config_history_trigger
-AFTER INSERT OR UPDATE ON archival_config
+AFTER INSERT OR UPDATE ON core.archival_config
 FOR EACH ROW
 EXECUTE FUNCTION archival_config_history_trigger_func(); 

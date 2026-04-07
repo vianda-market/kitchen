@@ -85,7 +85,7 @@ def derive_address_type_from_linkages(
     if pm:
         types.append(AddressType.CUSTOMER_BILLING.value)
 
-    # Customer Home: address belongs to Customer institution and is NOT linked to employer or payment method
+    # Customer Home or Customer Other: address belongs to Customer institution and is NOT linked to employer or payment method
     # Must exclude both employer primary (employer_info) and employer-linked (address_info.employer_id)
     if not is_employer_linked and not pm:
         inst = db_read(
@@ -102,7 +102,17 @@ def derive_address_type_from_linkages(
         if inst:
             it = inst.get("institution_type")
             if it in ("Customer", "customer") or (hasattr(it, "value") and getattr(it, "value", None) == "Customer"):
-                types.append(AddressType.CUSTOMER_HOME.value)
+                # Check if user tagged this address as "other" via map_center_label
+                sp_label = db_read(
+                    "SELECT map_center_label FROM core.address_subpremise WHERE address_id = %s AND map_center_label = 'other' LIMIT 1",
+                    (aid,),
+                    connection=db,
+                    fetch_one=True,
+                )
+                if sp_label:
+                    types.append(AddressType.CUSTOMER_OTHER.value)
+                else:
+                    types.append(AddressType.CUSTOMER_HOME.value)
 
     return sorted(set(types))
 
@@ -116,6 +126,7 @@ def _upsert_address_subpremise(
     floor: Optional[str] = None,
     apartment_unit: Optional[str] = None,
     is_default: bool = False,
+    map_center_label: Optional[str] = None,
     commit: bool = True,
 ) -> None:
     """
@@ -137,31 +148,37 @@ def _upsert_address_subpremise(
         fetch_one=True,
     )
     if existing:
+        update_data = {
+            "floor": floor,
+            "apartment_unit": apartment_unit,
+            "is_default": is_default,
+            "modified_by": mby,
+            "modified_date": datetime.now(timezone.utc),
+        }
+        if map_center_label is not None:
+            update_data["map_center_label"] = map_center_label
         db_update(
             "address_subpremise",
-            {
-                "floor": floor,
-                "apartment_unit": apartment_unit,
-                "is_default": is_default,
-                "modified_by": mby,
-                "modified_date": datetime.now(timezone.utc),
-            },
+            update_data,
             {"address_id": aid, "user_id": uid},
             connection=db,
             commit=commit,
         )
     else:
+        insert_data = {
+            "address_id": address_id,
+            "user_id": user_id,
+            "floor": floor,
+            "apartment_unit": apartment_unit,
+            "is_default": is_default,
+            "created_by": modified_by,
+            "modified_by": modified_by,
+        }
+        if map_center_label is not None:
+            insert_data["map_center_label"] = map_center_label
         db_insert(
             "address_subpremise",
-            {
-                "address_id": address_id,
-                "user_id": user_id,
-                "floor": floor,
-                "apartment_unit": apartment_unit,
-                "is_default": is_default,
-                "created_by": modified_by,
-                "modified_by": modified_by,
-            },
+            insert_data,
             connection=db,
             commit=commit,
         )
@@ -201,10 +218,12 @@ def get_addresses_for_customer(
     archived = "" if include_archived else " AND a.is_archived = FALSE"
     q = f"""
         SELECT a.*, COALESCE(m.country_name, '') AS country_name,
-               sp.floor, sp.apartment_unit, sp.is_default
+               sp.floor, sp.apartment_unit, sp.is_default,
+               g.latitude, g.longitude
         FROM address_info a
         LEFT JOIN market_info m ON a.country_code = m.country_code
         LEFT JOIN address_subpremise sp ON sp.address_id = a.address_id AND sp.user_id = %s
+        LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
         WHERE (a.user_id = %s OR sp.user_id IS NOT NULL{employer_clause}){archived}
     """
     rows = db_read(q, tuple(params), connection=db)
@@ -255,12 +274,13 @@ class AddressBusinessService:
         pass
     
     def create_address_with_geocoding(
-        self, 
-        address_data: Dict[str, Any], 
-        current_user: Dict[str, Any], 
+        self,
+        address_data: Dict[str, Any],
+        current_user: Dict[str, Any],
         db: psycopg2.extensions.connection,
         scope: Optional[InstitutionScope] = None,
-        commit: bool = True
+        commit: bool = True,
+        session_token: Optional[str] = None,
     ) -> AddressDTO:
         """
         Create a new address with automatic geocoding for restaurants, customer home, and customer employer addresses.
@@ -291,9 +311,10 @@ class AddressBusinessService:
 
         # place_id path: fetch Place Details, map to address, validate geography, create with geolocation
         place_id_raw = (address_data.get("place_id") or "").strip()
+        session_token_raw = session_token or (address_data.pop("session_token", None) or "").strip() or None
         if place_id_raw:
             address_data, geoloc_from_place = self._resolve_address_from_place_id(
-                place_id_raw, address_data, current_user
+                place_id_raw, address_data, current_user, session_token=session_token_raw
             )
         else:
             # Structured (manual) create is internal/testing only. Production must use place_id.
@@ -312,7 +333,7 @@ class AddressBusinessService:
 
         # Resolve country to alpha-2 only (DB and API standard); accept country_code (normalized by schema) or country (name)
         from app.services.market_service import market_service
-        from app.gateways.google_places_gateway import country_name_to_alpha2
+        from app.utils.country import country_name_to_alpha2
         from app.utils.country import normalize_country_code
         country_code = address_data.get("country_code")
         if not country_code and address_data.get("country"):
@@ -464,14 +485,15 @@ class AddressBusinessService:
         place_id: str,
         address_data: Dict[str, Any],
         current_user: Dict[str, Any],
+        session_token: Optional[str] = None,
     ) -> tuple:
         """
-        Fetch Place Details for place_id, map to address, validate geography.
+        Fetch address details for place_id/mapbox_id, map to address, validate geography.
         Returns (address_data_with_mapped_fields, geoloc_dict_or_None).
         geoloc_dict has place_id, viewport, formatted_address_google, latitude, longitude.
         Raises HTTPException 400 if address is outside service area.
         """
-        from app.gateways.google_places_gateway import get_google_places_gateway
+        from app.gateways.address_provider import get_search_gateway
         from app.services.address_autocomplete_mapping import (
             map_place_details_to_address,
             extract_place_details_geolocation,
@@ -480,11 +502,15 @@ class AddressBusinessService:
         from app.services.market_service import market_service
         from app.utils.country import normalize_country_code
 
-        gateway = get_google_places_gateway()
+        gateway = get_search_gateway()
         try:
-            details = gateway.place_details(place_id)
+            # Mapbox: retrieve by mapbox_id; Google: place_details by place_id
+            if hasattr(gateway, 'retrieve'):
+                details = gateway.retrieve(place_id, session_token=session_token)
+            else:
+                details = gateway.place_details(place_id)
         except Exception as e:
-            log_warning(f"Place Details failed for place_id={place_id}: {e}")
+            log_warning(f"Address details fetch failed for id={place_id}: {e}")
             raise HTTPException(
                 status_code=400,
                 detail="Could not fetch address details for the selected place. Please try again or enter the address manually.",
@@ -687,10 +713,12 @@ class AddressBusinessService:
         row = db_read(
             """
             SELECT a.*, COALESCE(m.country_name, '') AS country_name,
-                   sp.floor, sp.apartment_unit, sp.is_default
+                   sp.floor, sp.apartment_unit, sp.is_default,
+                   g.latitude, g.longitude
             FROM address_info a
             LEFT JOIN market_info m ON a.country_code = m.country_code
             LEFT JOIN address_subpremise sp ON sp.address_id = a.address_id AND sp.user_id = %s
+            LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
             WHERE a.address_id = %s AND a.is_archived = FALSE
             """,
             (str(user_id), str(address_id)),

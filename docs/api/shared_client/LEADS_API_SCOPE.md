@@ -7,7 +7,7 @@
 
 ## Overview
 
-Lead-capture endpoints serve pre-signup flows: country/city selection, coverage checks, and email lookup. They return **minimal data** (no internal IDs like `market_id`) to keep the public surface small and avoid exposing internal UUIDs.
+Lead-capture endpoints serve pre-signup flows: country/city selection, coverage checks, and email lookup. They return **minimal data** (no internal IDs like `market_id`) to keep the public surface small and avoid exposing internal UUIDs. **`GET /leads/markets`** includes a public **`language`** code per row for pre-auth UI (not a secret identifier).
 
 **For authenticated flows that need `market_id`, timezone, or currency**: use `GET /api/v1/markets/enriched/` instead.
 
@@ -17,7 +17,7 @@ Lead-capture endpoints serve pre-signup flows: country/city selection, coverage 
 
 | Endpoint | Auth | Rate limit | Response | Use case |
 |----------|------|------------|----------|----------|
-| `GET /api/v1/leads/markets` | None | 60/min | `country_code`, `country_name` only | B2C signup country dropdown, pre-auth country selector |
+| `GET /api/v1/leads/markets` | None | 60/min | `country_code`, `country_name`, **`language`** (ISO 639-1 for that market) | B2C signup country dropdown, pre-auth country selector + initial UI locale |
 | `GET /api/v1/leads/cities` | None | 20/min | city names | Lead flow, signup city picker |
 | `GET /api/v1/leads/city-metrics` | None | 20/min | restaurant count, has_coverage | Lead encouragement |
 | `GET /api/v1/leads/zipcode-metrics` | None | 20/min | restaurant count, has_coverage | Lead encouragement (legacy) |
@@ -29,16 +29,16 @@ Lead-capture endpoints serve pre-signup flows: country/city selection, coverage 
 
 **Auth**: None.
 
-**Response**: Array of `{ country_code, country_name }` only. No `market_id`, timezone, or currency.
+**Response**: Array of `{ country_code, country_name, language }`. **`language`** is the market’s default locale (`en`, `es`, or `pt`) for pre-auth UI (see [LANGUAGE_AND_LOCALE_FOR_CLIENTS.md](./LANGUAGE_AND_LOCALE_FOR_CLIENTS.md)). No `market_id`, timezone, or currency.
 
 ```json
 [
-  { "country_code": "AR", "country_name": "Argentina" },
-  { "country_code": "US", "country_name": "United States" }
+  { "country_code": "AR", "country_name": "Argentina", "language": "es" },
+  { "country_code": "US", "country_name": "United States", "language": "en" }
 ]
 ```
 
-**Use case**: Country dropdown for B2C signup; send `country_code` in signup request. Backend resolves `country_code` to `market_id` internally.
+**Use case**: Country dropdown for B2C signup; send `country_code` in signup request. Backend resolves `country_code` to `market_id` internally. Use **`language`** from the selected row (or app default) to align app language before the user exists in `user_info`.
 
 **Excludes**: Global Marketplace (assignment-only; not shown in public list).
 
@@ -81,6 +81,8 @@ Lead-capture endpoints serve pre-signup flows: country/city selection, coverage 
 **Response**: `{ "registered": true|false }`.
 
 **Use case**: After city/zipcode step, check if email exists to route user to login vs signup.
+
+**Client detail** (steps, 429 UX, enumeration): [USER_MODEL_FOR_CLIENTS.md](./USER_MODEL_FOR_CLIENTS.md) §3.4.
 
 ---
 

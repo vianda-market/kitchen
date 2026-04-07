@@ -73,6 +73,8 @@ curl -X POST "https://api.example.com/api/v1/products/{product_id}/image" \
 
 Standard CRUD responses. Include `image_url`, `image_storage_path`, `image_thumbnail_url`, `image_thumbnail_storage_path`, `image_checksum`.
 
+**GCS signed URLs:** When using GCS storage, `image_url` and `image_thumbnail_url` are time-limited signed URLs (1h default). Handle 403 on image load by re-fetching the product from the API to get a fresh signed URL. See [IMAGE_STORAGE_GUIDELINES.md](../../guidelines/storage/IMAGE_STORAGE_GUIDELINES.md).
+
 ---
 
 ## GET /api/v1/products/enriched/ and GET /api/v1/products/enriched/{product_id}

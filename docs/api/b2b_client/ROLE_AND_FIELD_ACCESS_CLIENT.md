@@ -86,29 +86,30 @@ When the user is a **Customer**:
 
 ---
 
-### Institution API — no_show_discount
+### Institution API
 
-When the user is an **Employee** with role_name **Manager**, **Global Manager**, **Admin**, or **Super Admin**:
-
-- Can edit `no_show_discount` on institutions via `PUT /api/v1/institutions/{id}` (payload: `{"no_show_discount": 0}` to `100`).
-- **Manager** and **Global Manager** can update **only** `no_show_discount`; other fields (name, institution_type, market_id) require Admin or Super Admin.
-- **Admin** and **Super Admin** can update all institution fields including `no_show_discount`.
-
-When the user is a **Supplier** (Admin or Manager):
-
-- **Cannot** edit `no_show_discount`. PUT with `no_show_discount` returns **403** with detail "Only Employees with Manager, Global Manager, Admin, or Super Admin role can edit no_show_discount."
-- Vianda negotiates no-show discount rates with institutions; Suppliers manage plates and other operational fields only.
-
-When creating a **Supplier** institution (`POST /api/v1/institutions/` with `institution_type: "Supplier"`):
-
-- **`no_show_discount` is required** (0–100). Omitting it returns **422**.
-- For Employee/Customer/Employer institutions, `no_show_discount` can be null (omitted).
+Institution updates (`PUT /api/v1/institutions/{id}`) require **Internal Admin or Super Admin**.
 
 **Institution type restrictions**:
-- **Employee** and **Customer** types: Only **Super Admin** can create or update institutions with `institution_type: "Employee"` or `"Customer"`. Admin attempting this gets **403** with detail "Only Super Admin can create Employee or Customer-type institutions." or "Only Super Admin can set institution_type to Employee or Customer."
-- **Employer** type: Included in assignable types for Admin and Super Admin (benefits-program institutions). If the B2B dropdown does not show Employer, ensure it uses `GET /api/v1/enums/institution-types/assignable` instead of hardcoded values.
+- **Internal** and **Customer** types: Only **Super Admin** can create or update these. Admin attempting this gets **403**.
+- **Employer** type: Included in assignable types for Admin and Super Admin.
 
-**Client recommendation**: For Employee Manager/Global Manager, show institution no-show discount edit in institution settings. For Suppliers, hide or disable the no_show_discount field. For institution create/edit, use `GET /api/v1/enums/institution-types/assignable` for the institution type dropdown.
+**Client recommendation**: For institution create/edit, use `GET /api/v1/enums/institution-types/assignable` for the institution type dropdown.
+
+### Supplier Terms API
+
+Supplier-specific deal terms (`no_show_discount`, `payment_frequency`, invoice compliance) are managed via dedicated endpoints:
+
+- `GET /api/v1/supplier-terms/{institution_id}` — Supplier Admin (own, read-only) / Internal
+- `PUT /api/v1/supplier-terms/{institution_id}` — Internal Manager, Global Manager, Admin, Super Admin only
+
+When the user is a **Supplier**:
+- **Cannot** edit supplier terms. PUT returns **403** with detail "Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit supplier terms."
+- Can read their own terms via GET.
+
+`no_show_discount` is **no longer on the institution payload**. It is now on `supplier_terms`. See [SUPPLIER_TERMS_B2B.md](./SUPPLIER_TERMS_B2B.md) for full API contract.
+
+**Client recommendation**: Show a "Supplier Terms" tab on institution detail (Supplier type only). For Suppliers, show terms as read-only. After creating a Supplier institution, call `PUT /supplier-terms/{id}` to configure terms.
 
 ---
 

@@ -45,53 +45,47 @@ class AtomicQRCodeService:
             HTTPException: If creation fails
         """
         try:
-            # Auto-generate QR code payload from restaurant_id
-            payload = f"restaurant_id:{restaurant_id}"
-            
+            from app.utils.qr_hmac import build_signed_qr_url
+
             # Start transaction
             with db.cursor() as cursor:
-                # 1. Create QR code record (with placeholder paths)
-                qr_data = {
-                    "restaurant_id": str(restaurant_id),
-                    "qr_code_payload": payload,
-                    "qr_code_image_url": "",  # Will be updated after image generation
-                    "image_storage_path": "",  # Will be updated after image generation
-                    "modified_by": str(current_user)
-                }
-                
-                # Insert QR code
+                # 1. Insert QR code with placeholder payload and paths
                 cursor.execute("""
-                    INSERT INTO qr_code 
+                    INSERT INTO qr_code
                     (restaurant_id, qr_code_payload, qr_code_image_url, image_storage_path, modified_by)
                     VALUES (%s, %s, %s, %s, %s)
                     RETURNING qr_code_id
                 """, (
-                    qr_data["restaurant_id"],
-                    qr_data["qr_code_payload"], 
-                    qr_data["qr_code_image_url"],
-                    qr_data["image_storage_path"],
-                    qr_data["modified_by"]
+                    str(restaurant_id),
+                    "",  # Placeholder — signed URL computed after we get qr_code_id
+                    "",
+                    "",
+                    str(current_user)
                 ))
-                
+
                 qr_code_id = cursor.fetchone()[0]
-                
-                # 2. Generate QR code image with checksum
+
+                # 2. Build signed QR URL payload from the generated qr_code_id
+                payload = build_signed_qr_url(str(qr_code_id))
+
+                # 3. Generate QR code image encoding the signed URL
                 storage_path, url_path, checksum = self.generation_service.generate_qr_code_image(
                     qr_code_id, restaurant_id, payload
                 )
-                
-                # 3. Update QR code with image paths
+
+                # 4. Update QR code with signed payload and image paths
                 cursor.execute("""
-                    UPDATE qr_code 
-                    SET qr_code_image_url = %s, image_storage_path = %s, qr_code_checksum = %s
+                    UPDATE qr_code
+                    SET qr_code_payload = %s, qr_code_image_url = %s,
+                        image_storage_path = %s, qr_code_checksum = %s
                     WHERE qr_code_id = %s
-                """, (url_path, storage_path, checksum, qr_code_id))
-                
+                """, (payload, url_path, storage_path, checksum, qr_code_id))
+
                 # Commit transaction
                 db.commit()
-                
+
                 log_info(f"QR code created atomically: {qr_code_id} for restaurant {restaurant_id}")
-                
+
                 # Return complete QR code
                 return qr_code_service.get_by_id(qr_code_id, db, scope=scope)
                 

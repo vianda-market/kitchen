@@ -10,12 +10,12 @@
 		{"key": "supplierToken", "value": ""},
 		{"key": "customerToken", "value": ""},
 		{"key": "adminToken", "value": ""},
-		{"key": "supplierUsername", "value": "supplier_admin"},
-		{"key": "supplierPassword", "value": "Supplier123!"},
-		{"key": "customerUsername", "value": "customer"},
-		{"key": "customerPassword", "value": "Customer123!"},
-		{"key": "adminUsername", "value": "admin"},
-		{"key": "adminPassword", "value": "Admin123!"},
+		{"key": "supplierUsername", "value": "", "description": "Set by 000 Supplier Setup or environment"},
+		{"key": "supplierPassword", "value": "", "description": "Set by 000 Supplier Setup or environment"},
+		{"key": "customerUsername", "value": "", "description": "Set by 000 Customer Signup or environment"},
+		{"key": "customerPassword", "value": "", "description": "Set by 000 Customer Signup or environment"},
+		{"key": "adminUsername", "value": "", "description": "Set by environment or admin user creation"},
+		{"key": "adminPassword", "value": "", "description": "Set by environment or admin user creation"},
 		{"key": "supplierInstitutionId", "value": "33333333-3333-3333-3333-333333333333"},
 		{"key": "supplierUserId", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"},
 		{"key": "customerInstitutionId", "value": "22222222-2222-2222-2222-222222222222"},
@@ -352,7 +352,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"role_type\": \"Supplier\",\n  \"role_name\": \"Admin\",\n  \"username\": \"newsupplier_{{$timestamp}}\",\n  \"email\": \"newsupplier_{{$timestamp}}@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"9999999999\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
+							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"role_type\": \"Supplier\",\n  \"role_name\": \"Admin\",\n  \"username\": \"newsupplier_{{$timestamp}}\",\n  \"email\": \"newsupplier_{{$timestamp}}@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+15005550006\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
 						},
 						"url": "{{baseUrl}}/api/v1/users"
 					}
@@ -379,7 +379,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"newcustomer\",\n  \"email\": \"newcustomer@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"8888888888\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Customer\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
+							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"newcustomer\",\n  \"email\": \"newcustomer@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+14155552671\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Customer\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
 						},
 						"url": "{{baseUrl}}/api/v1/users"
 					}
@@ -410,7 +410,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"another\",\n  \"email\": \"another@example.com\",\n  \"password\": \"TempPass123!\",\n  \"cellphone\": \"7777777777\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
+							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"another\",\n  \"email\": \"another@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+5491112345678\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
 						},
 						"url": "{{baseUrl}}/api/v1/users"
 					}

@@ -207,6 +207,10 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('institution_bill_history', 'resolution'): 'bill_resolution_enum',
         # Favorite entity type enum
         ('user_favorite_info', 'entity_type'): 'favorite_entity_type_enum',
+        # Notification banner enums
+        ('notification_banner', 'notification_type'): 'notification_banner_type_enum',
+        ('notification_banner', 'priority'): 'notification_banner_priority_enum',
+        ('notification_banner', 'action_status'): 'notification_banner_action_status_enum',
     }
     
     # Handle enum arrays for address_type (special case - must come before scalar enum handling)
@@ -237,7 +241,11 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         return str(value)
 
     # JSONB columns: psycopg2 cannot adapt Python dict; use Json() for JSONB
-    jsonb_columns = {("geolocation_info", "viewport"), ("geolocation_history", "viewport")}
+    jsonb_columns = {
+        ("geolocation_info", "viewport"),
+        ("geolocation_history", "viewport"),
+        ("currency_rate_raw", "raw_payload"),
+    }
     if (table, column) in jsonb_columns and isinstance(value, dict):
         return psycopg2.extras.Json(value)
 
@@ -258,6 +266,7 @@ PRIMARY_KEY_MAPPING = {
     "user_info": "user_id",
     "user_messaging_preferences": "user_id",
     "credential_recovery": "credential_recovery_id",
+    "email_change_request": "email_change_request_id",
     "address_info": "address_id",
     "address_subpremise": "subpremise_id",
     "employer_info": "employer_id",
@@ -282,6 +291,7 @@ PRIMARY_KEY_MAPPING = {
     "payment_method": "payment_method_id",
     "external_payment_method": "external_payment_method_id",
     "credit_currency_info": "credit_currency_id",
+    "currency_rate_raw": "currency_rate_raw_id",
     "restaurant_transaction": "transaction_id",
     "restaurant_balance_info": "restaurant_id",
     "institution_bill_info": "institution_bill_id",
@@ -289,6 +299,7 @@ PRIMARY_KEY_MAPPING = {
     "geolocation_info": "geolocation_id",
     "plate_kitchen_days": "plate_kitchen_day_id",
     "restaurant_holidays": "holiday_id",
+    "notification_banner": "notification_id",
     # role_info, status_info, transaction_type_info removed
 }
 

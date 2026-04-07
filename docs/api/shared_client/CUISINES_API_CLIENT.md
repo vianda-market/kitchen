@@ -1,7 +1,7 @@
 # Supported Cuisines API – Client Guide
 
-**Document Version**: 1.0  
-**Date**: March 2026  
+**Document Version**: 1.1  
+**Date**: April 2026  
 **For**: Frontend Team (Web, iOS, Android)
 
 ---
@@ -16,41 +16,49 @@ The backend exposes **GET /api/v1/cuisines/** to list supported cuisines for res
 
 ## Endpoint
 
-### GET /api/v1/cuisines/
+### GET /api/v1/cuisines
 
-**Description**: List supported cuisines for restaurant create/edit dropdown.
+**Description**: List supported cuisines for restaurant create/edit dropdown. Cuisine names are localized based on `?language=` or `Accept-Language` header.
 
 **Authorization**: Customer, Employee, or Supplier (JWT required).
 
-**Query parameters**: None.
+**Query parameters**:
 
-**Example**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `search` | string | — | Optional partial match on cuisine name or slug |
+| `language` | string | — | Locale for display names (`en`, `es`, `pt`). Falls back to `Accept-Language` header, then `en`. Invalid values return 422. |
+
+**Examples**
 
 ```http
-GET /api/v1/cuisines/
+GET /api/v1/cuisines
+GET /api/v1/cuisines?language=es
+GET /api/v1/cuisines?search=ita&language=es
 ```
 
-**Response**
+**Response** (with `?language=es`)
 
 ```json
 [
-  { "cuisine_name": "American" },
-  { "cuisine_name": "Chinese" },
-  { "cuisine_name": "French" },
-  { "cuisine_name": "Indian" },
-  { "cuisine_name": "Italian" },
-  { "cuisine_name": "Japanese" },
-  { "cuisine_name": "Mediterranean" },
-  { "cuisine_name": "Mexican" },
-  { "cuisine_name": "Thai" }
+  { "cuisine_id": "...", "cuisine_name": "Italiana", "slug": "italian", ... },
+  { "cuisine_id": "...", "cuisine_name": "Japonesa", "slug": "japanese", ... },
+  { "cuisine_id": "...", "cuisine_name": "Mexicana", "slug": "mexican", ... }
 ]
 ```
 
 **Response fields**
 
-| Field          | Type   | Description |
-|----------------|--------|-------------|
-| `cuisine_name` | string | Cuisine name for display and for `cuisine` on restaurant create/update. Use this value when submitting. |
+| Field | Type | Description |
+|-------|------|-------------|
+| `cuisine_id` | UUID | Unique identifier for the cuisine |
+| `cuisine_name` | string | Localized cuisine name for display. When `language` is not `en`, resolved from `cuisine_name_i18n` JSONB with fallback to English. |
+| `slug` | string | URL-safe identifier |
+| `parent_cuisine_id` | UUID? | Parent cuisine for hierarchical display |
+| `description` | string? | Optional description |
+| `display_order` | int? | Sort order hint |
+
+**Localization behavior**: Enriched restaurant and plate endpoints also resolve `cuisine_name` per the user's locale (via `Accept-Language` header). The localized name appears wherever cuisine is displayed — no client-side resolution needed.
 
 ---
 
@@ -137,7 +145,7 @@ func fetchCuisines() async throws -> [String] {
 
 ## Related Documentation
 
-- [RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY](../b2b_client/RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md) – Restaurant create/update, institution context
+- [CREDIT_AND_CURRENCY_CLIENT](CREDIT_AND_CURRENCY_CLIENT.md) – Restaurant create/update, institution context, currency from market
 - [PROVINCES_API_CLIENT](PROVINCES_API_CLIENT.md) – Similar pattern for address cascading dropdowns
 
 ---

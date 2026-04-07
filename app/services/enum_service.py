@@ -12,7 +12,7 @@ from app.config.enums import (
     TransactionType, KitchenDay, PickupType,
     DiscretionaryReason, DiscretionaryStatus, SubscriptionStatus,
     PaymentMethodType, StreetType,
-    BillResolution, FavoriteEntityType,
+    BillResolution, BillPayoutStatus, FavoriteEntityType,
     PortionSizeDisplay,
 )
 from app.security.field_policies import (
@@ -63,6 +63,7 @@ class EnumService:
             "pickup_type": PickupType.values(),
             "discretionary_reason": DiscretionaryReason.values(),
             "bill_resolution": BillResolution.values(),
+            "bill_payout_status": BillPayoutStatus.values(),
             "favorite_entity_type": FavoriteEntityType.values(),
             "portion_size_display": PortionSizeDisplay.values(),
         }

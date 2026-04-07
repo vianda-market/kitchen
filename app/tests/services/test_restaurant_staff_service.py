@@ -35,11 +35,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'John',
+                'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Grilled Chicken',
                 'restaurant_id': uuid4(),
-                'restaurant_name': 'Cambalache Palermo'
+                'restaurant_name': 'Cambalache Palermo',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         
@@ -73,11 +76,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'María',
+                'first_initial': 'M',
                 'last_initial': 'G',
                 'plate_name': 'Pasta',
                 'restaurant_id': uuid4(),
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         
@@ -92,8 +98,7 @@ class TestRestaurantStaffService:
             
             # Assert
             customer_name = result['restaurants'][0]['orders'][0]['customer_name']
-            assert customer_name == 'María G.'
-            assert 'García' not in customer_name  # Full last name not exposed
+            assert customer_name == 'M.G.'
 
     def test_filters_by_institution_entity_id(self, mock_db):
         """Test that orders are filtered by institution_entity_id."""
@@ -157,11 +162,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'John',
+                'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
                 'restaurant_id': restaurant_1_id,
-                'restaurant_name': 'Restaurant A'
+                'restaurant_name': 'Restaurant A',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'DEF456',
@@ -169,11 +177,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:30-13:00',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Jane',
+                'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
                 'restaurant_id': restaurant_2_id,
-                'restaurant_name': 'Restaurant B'
+                'restaurant_name': 'Restaurant B',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'GHI789',
@@ -181,11 +192,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '13:00-13:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Bob',
+                'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
                 'restaurant_id': restaurant_1_id,
-                'restaurant_name': 'Restaurant A'
+                'restaurant_name': 'Restaurant A',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         
@@ -224,13 +238,16 @@ class TestRestaurantStaffService:
                 'confirmation_code': 'ABC123',
                 'status': 'Active',
                 'arrival_time': None,  # Pending
-                'pickup_time_range': '12:00-12:30',
+                'pickup_time_range': '23:00-23:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'John',
+                'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'DEF456',
@@ -238,11 +255,14 @@ class TestRestaurantStaffService:
                 'arrival_time': datetime(2026, 2, 4, 12, 15),  # Arrived
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Jane',
+                'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'GHI789',
@@ -250,11 +270,14 @@ class TestRestaurantStaffService:
                 'arrival_time': datetime(2026, 2, 4, 12, 0),
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Bob',
+                'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         
@@ -288,11 +311,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '13:00-13:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Bob',
+                'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'ABC123',
@@ -300,11 +326,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'John',
+                'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'DEF456',
@@ -312,11 +341,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:30-13:00',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Jane',
+                'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
                 'restaurant_id': restaurant_id,
-                'restaurant_name': 'Test Restaurant'
+                'restaurant_name': 'Test Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         
@@ -435,11 +467,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'John',
+                'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
                 'restaurant_id': restaurant_1_id,
-                'restaurant_name': 'Zebra Restaurant'
+                'restaurant_name': 'Zebra Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'DEF456',
@@ -447,11 +482,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Jane',
+                'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
                 'restaurant_id': restaurant_2_id,
-                'restaurant_name': 'Alpha Restaurant'
+                'restaurant_name': 'Alpha Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             },
             {
                 'confirmation_code': 'GHI789',
@@ -459,11 +497,14 @@ class TestRestaurantStaffService:
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
                 'kitchen_day': 'Tuesday',
-                'first_name': 'Bob',
+                'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
                 'restaurant_id': restaurant_3_id,
-                'restaurant_name': 'Beta Restaurant'
+                'restaurant_name': 'Beta Restaurant',
+                'plate_pickup_id': uuid4(),
+                'expected_completion_time': None,
+                'completion_time': None
             }
         ]
         

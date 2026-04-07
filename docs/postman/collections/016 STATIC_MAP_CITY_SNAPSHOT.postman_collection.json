@@ -1,0 +1,273 @@
+{
+	"info": {
+		"_postman_id": "static-map-snapshot-2026",
+		"name": "016 STATIC_MAP_CITY_SNAPSHOT",
+		"description": "Tests for GET /api/v1/maps/city-snapshot — static map images centered on user's address with restaurant pin positions. Requires auth. Works in DEV_MODE (placeholder image) or with MAPBOX_ACCESS_TOKEN set (real Mapbox Static Images API).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8000" },
+		{ "key": "superAdminUsername", "value": "" },
+		{ "key": "superAdminPassword", "value": "" },
+		{ "key": "authToken", "value": "" }
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+					"if (t) pm.collectionVariables.set('authToken', t);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login OK', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.collectionVariables.set('authToken', r.access_token);",
+									"pm.environment.set('authToken', r.access_token);",
+									"pm.globals.set('authToken', r.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "username", "value": "{{superAdminUsername}}" },
+								{ "key": "password", "value": "{{superAdminPassword}}" }
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				}
+			]
+		},
+		{
+			"name": "City Snapshot",
+			"item": [
+				{
+					"name": "Snapshot - Buenos Aires light (center on seed address)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"pm.test('Response has expected fields', function () {",
+									"    pm.expect(r).to.have.property('zoom');",
+									"    pm.expect(r).to.have.property('width');",
+									"    pm.expect(r).to.have.property('height');",
+									"    pm.expect(r).to.have.property('retina');",
+									"    pm.expect(r).to.have.property('markers');",
+									"    pm.expect(r.markers).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Zoom is 14', function () {",
+									"    pm.expect(r.zoom).to.equal(14);",
+									"});",
+									"",
+									"if (r.markers.length > 0) {",
+									"    const m = r.markers[0];",
+									"    pm.test('Marker has pixel positions', function () {",
+									"        pm.expect(m).to.have.property('restaurant_id');",
+									"        pm.expect(m).to.have.property('name');",
+									"        pm.expect(m).to.have.property('lat');",
+									"        pm.expect(m).to.have.property('lng');",
+									"        pm.expect(m).to.have.property('pixel_x');",
+									"        pm.expect(m).to.have.property('pixel_y');",
+									"    });",
+									"    pm.test('Pixel positions are within image bounds', function () {",
+									"        pm.expect(m.pixel_x).to.be.at.least(0);",
+									"        pm.expect(m.pixel_x).to.be.at.most(r.width);",
+									"        pm.expect(m.pixel_y).to.be.at.least(0);",
+									"        pm.expect(m.pixel_y).to.be.at.most(r.height);",
+									"    });",
+									"}",
+									"",
+									"console.log('image_url:', r.image_url ? 'present' : 'null (no geocoded restaurants)');",
+									"console.log('markers:', r.markers.length);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-snapshot?city=Buenos+Aires&country_code=AR&center_lat=-34.5880&center_lng=-58.4023&width=600&height=400&retina=true&style=light",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-snapshot"],
+							"query": [
+								{ "key": "city", "value": "Buenos Aires" },
+								{ "key": "country_code", "value": "AR" },
+								{ "key": "center_lat", "value": "-34.5880" },
+								{ "key": "center_lng", "value": "-58.4023" },
+								{ "key": "width", "value": "600" },
+								{ "key": "height", "value": "400" },
+								{ "key": "retina", "value": "true" },
+								{ "key": "style", "value": "light" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Snapshot - dark mode",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.test('Dark mode response OK', function () {",
+									"    pm.expect(r).to.have.property('markers');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-snapshot?city=Buenos+Aires&country_code=AR&center_lat=-34.5880&center_lng=-58.4023&style=dark",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-snapshot"],
+							"query": [
+								{ "key": "city", "value": "Buenos Aires" },
+								{ "key": "country_code", "value": "AR" },
+								{ "key": "center_lat", "value": "-34.5880" },
+								{ "key": "center_lng", "value": "-58.4023" },
+								{ "key": "style", "value": "dark" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Snapshot - no restaurants returns empty markers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.test('No image and empty markers for unknown city', function () {",
+									"    pm.expect(r.image_url).to.be.null;",
+									"    pm.expect(r.markers).to.be.an('array').that.is.empty;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-snapshot?city=Nonexistent+City&country_code=XX&center_lat=0&center_lng=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-snapshot"],
+							"query": [
+								{ "key": "city", "value": "Nonexistent City" },
+								{ "key": "country_code", "value": "XX" },
+								{ "key": "center_lat", "value": "0" },
+								{ "key": "center_lng", "value": "0" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Snapshot - without auth returns 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-snapshot?city=Buenos+Aires&country_code=AR&center_lat=-34.59&center_lng=-58.40",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-snapshot"],
+							"query": [
+								{ "key": "city", "value": "Buenos Aires" },
+								{ "key": "country_code", "value": "AR" },
+								{ "key": "center_lat", "value": "-34.59" },
+								{ "key": "center_lng", "value": "-58.40" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Address Coordinates (dependency check)",
+			"item": [
+				{
+					"name": "Verify addresses return lat/lng",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"const addresses = pm.response.json();",
+									"pm.test('Response is array', function () {",
+									"    pm.expect(addresses).to.be.an('array');",
+									"});",
+									"if (addresses.length > 0) {",
+									"    const a = addresses[0];",
+									"    pm.test('Address response includes latitude and longitude fields', function () {",
+									"        pm.expect(a).to.have.property('latitude');",
+									"        pm.expect(a).to.have.property('longitude');",
+									"    });",
+									"    if (a.latitude !== null) {",
+									"        console.log('First address has coordinates:', a.latitude, a.longitude);",
+									"    } else {",
+									"        console.log('First address has no geolocation (latitude is null)');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				}
+			]
+		}
+	]
+}

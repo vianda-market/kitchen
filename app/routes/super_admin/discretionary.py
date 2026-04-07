@@ -4,9 +4,9 @@ Super-Admin Discretionary Credit Routes
 Routes for super-administrators to approve/reject discretionary credit requests.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 import psycopg2.extensions
 
 from app.dto.models import DiscretionaryDTO, DiscretionaryResolutionDTO
@@ -23,6 +23,7 @@ from app.auth.dependencies import get_super_admin_user, get_admin_user
 from app.dependencies.database import get_db
 from app.services.error_handling import handle_business_operation
 from app.utils.log import log_info
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 from app.config import Status
 
 router = APIRouter(
@@ -148,6 +149,8 @@ def get_pending_discretionary_requests(
 
 @router.get("/requests", response_model=List[DiscretionarySummarySchema])
 def get_all_discretionary_requests(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
@@ -158,7 +161,11 @@ def get_all_discretionary_requests(
     Available to Admin and Super Admin employees.
     """
     log_info(f"Admin {current_user['user_id']} retrieving all discretionary requests")
-    all_enriched = get_enriched_discretionary_requests(db, include_archived=False)
+    all_enriched = get_enriched_discretionary_requests(
+        db, include_archived=False,
+        page=pagination.page if pagination else None,
+        page_size=pagination.page_size if pagination else None,
+    )
     from app.services.crud_service import discretionary_resolution_service
     summary_requests = []
     for r in all_enriched:
@@ -190,4 +197,5 @@ def get_all_discretionary_requests(
             restaurant_name=r.restaurant_name,
         ))
     summary_requests.sort(key=lambda x: x.created_date, reverse=True)
+    set_pagination_headers(response, all_enriched)
     return summary_requests

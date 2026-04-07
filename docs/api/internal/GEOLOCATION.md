@@ -1,14 +1,16 @@
-# Geolocation Service - Google Maps API Integration
+# Geolocation Service — Address Provider Integration
 
 **Status**: ✅ Implemented  
-**Version**: 1.0  
-**Last Updated**: 2026-02-04
+**Version**: 2.0  
+**Last Updated**: 2026-04-03
 
 ---
 
+> **Provider change (April 2026):** The geolocation service now uses a **provider abstraction** (`app/gateways/address_provider.py`). The default provider is **Mapbox Geocoding API v6** (`ADDRESS_PROVIDER=mapbox`). Google Maps Geocoding is retained as a fallback (`ADDRESS_PROVIDER=google`). The setup instructions below cover Google only (legacy); for Mapbox setup see `docs/api/infrastructure/MAPBOX_CONFIGURATION_INFRASTRUCTURE.md`. The service API methods (`geocode_address`, `reverse_geocode`, `calculate_distance`, etc.) are unchanged regardless of provider.
+
 ## Overview
 
-The Geolocation Service provides address-to-coordinates conversion (geocoding) and coordinates-to-address conversion (reverse geocoding) using Google Maps Geocoding API.
+The Geolocation Service provides address-to-coordinates conversion (geocoding) and coordinates-to-address conversion (reverse geocoding) using the configured address provider (Mapbox by default, Google as fallback).
 
 **Key Features**:
 - ✅ Address geocoding (address → lat/lng)

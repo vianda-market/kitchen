@@ -1,3 +1,6 @@
+-- search_path: belt-and-suspenders (ALTER DATABASE in build_kitchen_db.sh also sets it)
+SET search_path = core, ops, customer, billing, audit, public;
+
 -- Minimal seed so the app can start after tear-down and rebuild.
 --   • 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) and 7 markets — each market has its correct credit currency (e.g. Argentina -> ARS).
 --   • 2 institutions: Vianda Enterprises, Vianda Customers (both use Global market).
@@ -39,34 +42,32 @@ ALTER TABLE user_info
 TRUNCATE user_market_assignment, user_info, institution_info, market_info, credit_currency_info, city_info CASCADE;
 
 -- 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) for seeded markets. Insert first; market_info FK references these.
-INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('55555555-5555-5555-5555-555555555555', 'US Dollar', 'USD', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666601', 'Argentine Peso', 'ARS', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666602', 'Peruvian Sol', 'PEN', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666603', 'Chilean Peso', 'CLP', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666604', 'Mexican Peso', 'MXN', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666605', 'Brazilian Real', 'BRL', 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('55555555-5555-5555-5555-555555555555', 'US Dollar', 'USD', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666601', 'Argentine Peso', 'ARS', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666602', 'Peruvian Sol', 'PEN', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666603', 'Chilean Peso', 'CLP', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666604', 'Mexican Peso', 'MXN', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666605', 'Brazilian Real', 'BRL', 1.0, 1.0, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Markets: each references its country's credit currency so JOINs return correct currency_code (e.g. Argentina -> ARS)
-INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, kitchen_close_time, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('00000000-0000-0000-0000-000000000001', 'Global Marketplace', 'GL', '55555555-5555-5555-5555-555555555555', 'UTC', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000002', 'Argentina', 'AR', '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000003', 'Peru', 'PE', '66666666-6666-6666-6666-666666666602', 'America/Lima', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000004', 'United States', 'US', '55555555-5555-5555-5555-555555555555', 'America/New_York', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000005', 'Chile', 'CL', '66666666-6666-6666-6666-666666666603', 'America/Santiago', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000006', 'Mexico', 'MX', '66666666-6666-6666-6666-666666666604', 'America/Mexico_City', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000007', 'Brazil', 'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo', '13:30'::TIME, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, kitchen_close_time, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('00000000-0000-0000-0000-000000000001', 'Global Marketplace', 'GL', '55555555-5555-5555-5555-555555555555', 'UTC',                           '13:30'::TIME, 'en', NULL,   NULL, FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000002', 'Argentina',          'AR', '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '13:30'::TIME, 'es', '+54',  10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000003', 'Peru',               'PE', '66666666-6666-6666-6666-666666666602', 'America/Lima',                  '13:30'::TIME, 'es', '+51',  9,    FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000004', 'United States',      'US', '55555555-5555-5555-5555-555555555555', 'America/New_York',              '13:30'::TIME, 'en', '+1',   10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000005', 'Chile',              'CL', '66666666-6666-6666-6666-666666666603', 'America/Santiago',              '13:30'::TIME, 'es', '+56',  9,    FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000006', 'Mexico',             'MX', '66666666-6666-6666-6666-666666666604', 'America/Mexico_City',           '13:30'::TIME, 'es', '+52',  10,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000007', 'Brazil',             'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo',             '13:30'::TIME, 'pt', '+55',  11,   FALSE, 'Active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
--- no_show_discount: NULL for Internal/Customer (not applicable); Supplier requires it at create time.
 -- created_by: dddddddd (superadmin) — FK dropped before insert, re-added after users exist.
-INSERT INTO institution_info (institution_id, name, institution_type, market_id, no_show_discount, is_archived, status, created_date, created_by, modified_by, modified_date)
+INSERT INTO institution_info (institution_id, name, institution_type, market_id, is_archived, status, created_date, created_by, modified_by, modified_date)
 VALUES (
   '11111111-1111-1111-1111-111111111111',           -- Vianda Enterprises (employees)
   'Vianda Enterprises',
   'Internal'::institution_type_enum,
   '00000000-0000-0000-0000-000000000001',           -- Global Marketplace
-  NULL,                                              -- no_show_discount not applicable for Internal
   False,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -79,7 +80,6 @@ VALUES (
   'Vianda Customers',
   'Customer'::institution_type_enum,
   '00000000-0000-0000-0000-000000000001',           -- Global Marketplace
-  NULL,                                              -- no_show_discount not applicable for Customer
   False,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -120,7 +120,7 @@ INSERT INTO city_info (name, country_code, province_code, is_archived, status, c
 -- Seeded users: Super Admin (human), system bot (automated operations only; do not use for login).
 -- Both get Global city (aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa).
 INSERT INTO user_info (
-  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, cellphone, market_id, city_id, is_archived, status, created_date, created_by, modified_by, modified_date
+  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, mobile_number, email_verified, email_verified_at, market_id, city_id, locale, is_archived, status, created_date, created_by, modified_by, modified_date
 ) VALUES (
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'superadmin',
@@ -130,10 +130,13 @@ INSERT INTO user_info (
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
   'Internal'::role_type_enum,
   'Super Admin'::role_name_enum,
-  'superadmin@example.com',
-  '5555555555',
+  'viandallc@gmail.com',
+  '+14155552671',
+  TRUE,
+  CURRENT_TIMESTAMP,
   '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  'en',
   FALSE,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -150,10 +153,13 @@ INSERT INTO user_info (
   '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
   'Internal'::role_type_enum,
   'Admin'::role_name_enum,
-  'system@internal',
-  '0000000000',
+  'admin@vianda.market',
+  NULL,
+  TRUE,
+  CURRENT_TIMESTAMP,
   '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  'en',
   FALSE,
   'Active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -166,6 +172,15 @@ INSERT INTO user_info (
 INSERT INTO user_market_assignment (user_id, market_id, is_primary)
 SELECT user_id, market_id, true FROM user_info WHERE user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 
+-- Market payout aggregators (require_invoice and max_unmatched_bill_days default to FALSE/30)
+INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, notes)
+SELECT market_id, 'stripe', TRUE, FALSE, 30, 'Stripe Connect supported'
+FROM core.market_info WHERE country_code IN ('AR', 'BR', 'CL', 'MX', 'US');
+
+INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, notes)
+SELECT market_id, 'none', FALSE, FALSE, 30, 'Stripe Connect not supported — alternative TBD (dLocal, Culqi, Niubiz)'
+FROM core.market_info WHERE country_code = 'PE';
+
 -- No address_info, plan_info, subscription_info, national_holidays in seed; create via API.
 
 ALTER TABLE institution_info
@@ -174,7 +189,7 @@ ALTER TABLE institution_info
 
 ALTER TABLE institution_history
   ADD CONSTRAINT fk_institution_history_modified_by FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
-  ADD CONSTRAINT fk_institution_history_created_by FOREIGN KEY (created_by) REFERENCES user_info(user_id) ON DELETE SET NULL;
+  ADD CONSTRAINT fk_institution_history_created_by FOREIGN KEY (created_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
 
 ALTER TABLE user_info
   ADD CONSTRAINT fk_user_info_modified_by FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
@@ -198,3 +213,41 @@ ALTER TABLE user_info
 
 -- role_info, role_history, status_info, status_history, transaction_type_info, transaction_type_history
 -- tables removed - no foreign key constraints needed
+
+-- ============================================================================
+-- CUISINE SEED DATA
+-- 15 parent cuisines + 7 child cuisines = 22 records
+-- All authored by bot_chef (bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb)
+-- ============================================================================
+
+\echo 'Seeding cuisine data (15 parents + 7 children)'
+
+-- Parent cuisines (hardcoded UUIDs so children can reference them)
+INSERT INTO cuisine (cuisine_id, cuisine_name, cuisine_name_i18n, slug, parent_cuisine_id, description, origin_source, display_order, is_archived, status, created_by, modified_by, modified_date) VALUES
+-- Market cuisines
+('c0000001-0000-0000-0000-000000000001', 'Argentinean',  '{"en": "Argentinean", "es": "Argentina", "pt": "Argentina"}',      'argentinean',  NULL, NULL, 'seed', 1,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000002', 'Peruvian',     '{"en": "Peruvian", "es": "Peruana", "pt": "Peruana"}',              'peruvian',     NULL, NULL, 'seed', 2,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000003', 'American',     '{"en": "American", "es": "Americana", "pt": "Americana"}',          'american',     NULL, NULL, 'seed', 3,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+-- Global classics
+('c0000001-0000-0000-0000-000000000004', 'Chinese',      '{"en": "Chinese", "es": "China", "pt": "Chinesa"}',                 'chinese',      NULL, NULL, 'seed', 4,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000005', 'Japanese',     '{"en": "Japanese", "es": "Japonesa", "pt": "Japonesa"}',             'japanese',     NULL, NULL, 'seed', 5,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000006', 'Indian',       '{"en": "Indian", "es": "India", "pt": "Indiana"}',                  'indian',       NULL, NULL, 'seed', 6,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000007', 'African',      '{"en": "African", "es": "Africana", "pt": "Africana"}',              'african',      NULL, NULL, 'seed', 7,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000008', 'Italian',      '{"en": "Italian", "es": "Italiana", "pt": "Italiana"}',              'italian',      NULL, NULL, 'seed', 8,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000009', 'Spaniard',     '{"en": "Spaniard", "es": "Española", "pt": "Espanhola"}',            'spaniard',     NULL, NULL, 'seed', 9,  FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000010', 'English',      '{"en": "English", "es": "Inglesa", "pt": "Inglesa"}',                'english',      NULL, NULL, 'seed', 10, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000011', 'French',       '{"en": "French", "es": "Francesa", "pt": "Francesa"}',               'french',       NULL, NULL, 'seed', 11, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000012', 'Portuguese',   '{"en": "Portuguese", "es": "Portuguesa", "pt": "Portuguesa"}',       'portuguese',   NULL, NULL, 'seed', 12, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000013', 'German',       '{"en": "German", "es": "Alemana", "pt": "Alemã"}',                   'german',       NULL, NULL, 'seed', 13, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000014', 'Polish',       '{"en": "Polish", "es": "Polaca", "pt": "Polonesa"}',                 'polish',       NULL, NULL, 'seed', 14, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('c0000001-0000-0000-0000-000000000015', 'Russian',      '{"en": "Russian", "es": "Rusa", "pt": "Russa"}',                     'russian',      NULL, NULL, 'seed', 15, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP);
+
+-- Child cuisines (reference parent UUIDs above)
+INSERT INTO cuisine (cuisine_name, cuisine_name_i18n, slug, parent_cuisine_id, description, origin_source, display_order, is_archived, status, created_by, modified_by, modified_date) VALUES
+('Poke',     '{"en": "Poke", "es": "Poke", "pt": "Poke"}',                   'poke',     'c0000001-0000-0000-0000-000000000005', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Tapas',    '{"en": "Tapas", "es": "Tapas", "pt": "Tapas"}',                 'tapas',    'c0000001-0000-0000-0000-000000000009', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Pizza',    '{"en": "Pizza", "es": "Pizza", "pt": "Pizza"}',                 'pizza',    'c0000001-0000-0000-0000-000000000008', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Burger',   '{"en": "Burger", "es": "Hamburguesa", "pt": "Hambúrguer"}',     'burger',   'c0000001-0000-0000-0000-000000000003', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Minutas',  '{"en": "Minutas", "es": "Minutas", "pt": "Minutas"}',           'minutas',  'c0000001-0000-0000-0000-000000000001', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Chifa',    '{"en": "Chifa", "es": "Chifa", "pt": "Chifa"}',                 'chifa',    'c0000001-0000-0000-0000-000000000002', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP),
+('Seafood',  '{"en": "Seafood", "es": "Mariscos", "pt": "Frutos do Mar"}',    'seafood',  'c0000001-0000-0000-0000-000000000002', NULL, 'seed', NULL, FALSE, 'Active'::status_enum, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', CURRENT_TIMESTAMP);

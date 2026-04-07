@@ -1,62 +1,33 @@
 """
-Email Service - Gmail SMTP for MVP
+Email Service — orchestrates email sending via pluggable provider (SMTP or SendGrid).
 
-This service handles email sending using Gmail SMTP.
-Post-UAT: Migrate to AWS SES for production.
-
-Setup Instructions:
-1. Create Gmail account (e.g., kitchen-backend@gmail.com)
-2. Enable 2FA on Gmail account
-3. Generate App-Specific Password:
-   - Go to Google Account > Security > 2-Step Verification > App passwords
-   - Generate password for "Mail" on "Other (Custom name)"
-4. Add credentials to .env:
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USERNAME=your-email@gmail.com
-   SMTP_PASSWORD=your-app-specific-password
-   FROM_EMAIL=your-email@gmail.com
-   FROM_NAME=Kitchen Backend
-
-Rate Limits:
-- Gmail Free: 500 emails/day
-- For production: Migrate to AWS SES (50,000 emails/day free tier)
-
-Debugging (optional, off by default):
-- Set LOG_EMAIL_TRACKING=1 (or true/yes) in .env to enable SMTP/email logs.
-- When enabled: config status at startup, each send attempt, success/failure, and errors.
-- Leave unset or set to 0/false in production to avoid noisy logs.
+Templates live in app/services/email/templates/ as Jinja2 files.
+Subjects are localized via app/i18n/messages.py.
 """
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import List, Optional
 import os
-from datetime import datetime, timezone
+from typing import List, Optional
 
+from app.i18n.messages import get_message
+from app.services.email.provider_factory import get_email_provider
+from app.services.email.template_renderer import render_email
 from app.utils.log import log_email_tracking
 from app.config.settings import get_settings
 
 
 class EmailService:
     def __init__(self):
-        self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        self.smtp_username = os.getenv('SMTP_USERNAME', '')
-        self.smtp_password = os.getenv('SMTP_PASSWORD', '')
-        self.from_email = os.getenv('FROM_EMAIL', self.smtp_username)
-        self.from_name = os.getenv('FROM_NAME', 'Vianda')
-        
-        # Validate configuration (only log when LOG_EMAIL_TRACKING=1 in .env)
-        if not self.smtp_username or not self.smtp_password:
-            log_email_tracking("Email service not configured. Set SMTP_USERNAME and SMTP_PASSWORD in .env", level="warning")
+        self._provider = get_email_provider()
+        settings = get_settings()
+        self.from_email = settings.EMAIL_FROM_ADDRESS or os.getenv('FROM_EMAIL', os.getenv('SMTP_USERNAME', ''))
+        self.from_name = settings.EMAIL_FROM_NAME or os.getenv('FROM_NAME', 'Vianda')
+        self.reply_to = settings.EMAIL_REPLY_TO or None
+
+        if not self._provider.is_configured():
+            log_email_tracking("Email service not configured. Check EMAIL_PROVIDER settings in .env", level="warning")
         else:
-            log_email_tracking(
-                f"Email service configured: SMTP_HOST={self.smtp_host}, SMTP_PORT={self.smtp_port}, "
-                f"FROM_EMAIL={self.from_email}, FROM_NAME={self.from_name}"
-            )
-    
+            log_email_tracking(f"Email service configured: provider={settings.EMAIL_PROVIDER}, from={self.from_email}")
+
     def send_email(
         self,
         to_email: str,
@@ -64,436 +35,247 @@ class EmailService:
         body_text: str,
         body_html: Optional[str] = None,
         cc: Optional[List[str]] = None,
-        bcc: Optional[List[str]] = None
+        bcc: Optional[List[str]] = None,
+        category: Optional[str] = None,
     ) -> bool:
-        """
-        Send email via Gmail SMTP.
-        
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            body_text: Plain text body (required)
-            body_html: HTML body (optional, falls back to text)
-            cc: List of CC email addresses
-            bcc: List of BCC email addresses
-        
-        Returns:
-            bool: True if sent successfully, False otherwise
-        """
-        if not self.smtp_username or not self.smtp_password:
-            log_email_tracking("Cannot send email: SMTP credentials not configured", level="error")
-            return False
-
-        log_email_tracking(f"Attempting to send email to {to_email}, subject: {subject!r}")
-        
-        try:
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = f"{self.from_name} <{self.from_email}>"
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg['Date'] = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S +0000')
-            
-            if cc:
-                msg['Cc'] = ', '.join(cc)
-            if bcc:
-                msg['Bcc'] = ', '.join(bcc)
-            
-            # Attach plain text part
-            part_text = MIMEText(body_text, 'plain')
-            msg.attach(part_text)
-            
-            # Attach HTML part if provided
-            if body_html:
-                part_html = MIMEText(body_html, 'html')
-                msg.attach(part_html)
-            
-            # Prepare recipient list
-            recipients = [to_email]
-            if cc:
-                recipients.extend(cc)
-            if bcc:
-                recipients.extend(bcc)
-            
-            # Connect to SMTP server
-            log_email_tracking(f"Connecting to {self.smtp_host}:{self.smtp_port}")
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()  # Upgrade to secure connection
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg, from_addr=self.from_email, to_addrs=recipients)
-            
-            log_email_tracking(f"Email sent successfully to {to_email} - Subject: {subject}")
-            return True
-        
-        except smtplib.SMTPAuthenticationError as e:
-            log_email_tracking(f"SMTP authentication failed: {str(e)}. Check SMTP_USERNAME and SMTP_PASSWORD.", level="error")
-            return False
-        except smtplib.SMTPException as e:
-            log_email_tracking(f"SMTP error sending email to {to_email}: {str(e)}", level="error")
-            return False
-        except Exception as e:
-            log_email_tracking(f"Unexpected error sending email to {to_email}: {str(e)}", level="error")
-            return False
-    
-    def send_password_reset_email(
-        self,
-        to_email: str,
-        reset_code: str,
-        user_first_name: str,
-        expiry_hours: int = 24
-    ) -> bool:
-        """
-        Send password reset email with 6-digit code only (no link).
-
-        Args:
-            to_email: User's email address
-            reset_code: 6-digit password reset code
-            user_first_name: User's first name for personalization
-            expiry_hours: Code expiry time in hours
-
-        Returns:
-            bool: True if sent successfully
-        """
-        subject = "Reset Your Vianda Password"
-
-        # Plain text version
-        body_text = f"""
-Hi {user_first_name},
-
-You requested to reset your password for your Vianda account.
-
-Your reset code is:
-
-{reset_code}
-
-Enter this code with your new password to reset. It will expire in {expiry_hours} hours.
-
-If you didn't request this password reset, please ignore this email.
-
-Thanks,
-The Vianda Team
-        """.strip()
-
-        # HTML version
-        body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h1 style="color: #2c3e50; margin-bottom: 20px;">Reset Your Password</h1>
-        <p>Hi {user_first_name},</p>
-        <p>You requested to reset your password for your Vianda account.</p>
-        <p>Your reset code is:</p>
-        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">{reset_code}</p>
-        <p style="font-size: 14px; color: #7f8c8d;">Enter this code with your new password to reset. It will expire in {expiry_hours} hours.</p>
-        <p style="font-size: 14px; color: #7f8c8d;">If you didn't request this password reset, please ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
-    </div>
-</body>
-</html>
-        """.strip()
-        
-        return self.send_email(
+        """Send email via the configured provider."""
+        return self._provider.send(
             to_email=to_email,
             subject=subject,
             body_text=body_text,
-            body_html=body_html
+            body_html=body_html,
+            cc=cc,
+            bcc=bcc,
+            reply_to=self.reply_to,
+            category=category,
         )
 
-    def send_b2b_invite_email(
-        self,
-        to_email: str,
-        reset_code: str,
-        user_first_name: Optional[str],
-        expiry_hours: int = 24,
-        *,
-        set_password_url_template: Optional[str] = None,
+    # =========================================================================
+    # Transactional emails
+    # =========================================================================
+
+    def send_password_reset_email(
+        self, to_email: str, reset_code: str, user_first_name: str,
+        expiry_hours: int = 24, locale: str = "en",
     ) -> bool:
-        """
-        Send B2B invite email with link to set password.
-        Used when an admin creates a user without a password; user clicks link to set their own.
+        subject = get_message("email.subject_password_reset", locale)
+        body_text, body_html = render_email(
+            "transactional/password_reset",
+            user_first_name=user_first_name, reset_code=reset_code, expiry_hours=expiry_hours,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
 
-        Args:
-            to_email: User's email address
-            reset_code: 6-digit code (included in link)
-            user_first_name: User's first name for personalization (optional)
-            expiry_hours: Code expiry time in hours
-            set_password_url_template: Optional. Default uses B2B_INVITE_SET_PASSWORD_URL env.
-                Template: {url} with {code} placeholder. E.g. "https://app.example.com/set-password?code={code}"
-
-        Returns:
-            bool: True if sent successfully
-        """
-        template = set_password_url_template or get_settings().B2B_INVITE_SET_PASSWORD_URL or os.getenv("B2B_INVITE_SET_PASSWORD_URL", "")
+    def send_b2b_invite_email(
+        self, to_email: str, reset_code: str, user_first_name: Optional[str],
+        expiry_hours: int = 24, *, set_password_url_template: Optional[str] = None, locale: str = "en",
+    ) -> bool:
+        template = set_password_url_template or get_settings().B2B_INVITE_SET_PASSWORD_URL or ""
         if template:
             set_password_url = template.replace("{code}", reset_code)
         else:
-            # Fallback: B2B_FRONTEND_URL (e.g. http://localhost:5173) for invite links; prod should set B2B_INVITE_SET_PASSWORD_URL
-            b2b_url = (get_settings().B2B_FRONTEND_URL or os.getenv("B2B_FRONTEND_URL", "")).rstrip("/")
-            if b2b_url:
-                set_password_url = f"{b2b_url}/set-password?code={reset_code}"
-            else:
-                set_password_url = f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
+            b2b_url = (get_settings().B2B_FRONTEND_URL or "").rstrip("/")
+            set_password_url = f"{b2b_url}/set-password?code={reset_code}" if b2b_url else f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
         first_name = user_first_name or "there"
-        subject = "You've been invited to Vianda – Set your password"
-        body_text = f"""
-Hi {first_name},
-
-You've been invited to join Vianda. Click the link below to set your password and access your account:
-
-{set_password_url}
-
-This link will expire in {expiry_hours} hours.
-
-If you didn't expect this invitation, please ignore this email.
-
-Thanks,
-The Vianda Team
-        """.strip()
-        body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h1 style="color: #2c3e50; margin-bottom: 20px;">You've been invited to Vianda</h1>
-        <p>Hi {first_name},</p>
-        <p>You've been invited to join Vianda. Click the link below to set your password and access your account:</p>
-        <p style="margin: 25px 0;"><a href="{set_password_url}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Set your password</a></p>
-        <p style="font-size: 14px; color: #7f8c8d;">Or copy this link: {set_password_url}</p>
-        <p style="font-size: 14px; color: #7f8c8d;">This link will expire in {expiry_hours} hours.</p>
-        <p style="font-size: 14px; color: #7f8c8d;">If you didn't expect this invitation, please ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
-    </div>
-</body>
-</html>
-        """.strip()
-        return self.send_email(
-            to_email=to_email,
-            subject=subject,
-            body_text=body_text,
-            body_html=body_html
+        subject = get_message("email.subject_b2b_invite", locale)
+        body_text, body_html = render_email(
+            "transactional/b2b_invite",
+            first_name=first_name, set_password_url=set_password_url, expiry_hours=expiry_hours,
         )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
+
+    def send_benefit_employee_invite_email(
+        self, to_email: str, reset_code: str, user_first_name: Optional[str],
+        employer_name: str = "your employer", expiry_hours: int = 24, locale: str = "en",
+    ) -> bool:
+        settings = get_settings()
+        template = settings.BENEFIT_INVITE_SET_PASSWORD_URL or settings.B2B_INVITE_SET_PASSWORD_URL or ""
+        if template:
+            set_password_url = template.replace("{code}", reset_code)
+        else:
+            b2b_url = (settings.B2B_FRONTEND_URL or "").rstrip("/")
+            set_password_url = f"{b2b_url}/set-password?code={reset_code}" if b2b_url else f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
+        first_name = user_first_name or "there"
+        subject = get_message("email.subject_benefit_invite", locale, employer_name=employer_name)
+        body_text, body_html = render_email(
+            "transactional/benefit_employee_invite",
+            first_name=first_name, employer_name=employer_name, set_password_url=set_password_url,
+            app_store_url=settings.APP_STORE_URL, play_store_url=settings.PLAY_STORE_URL,
+            expiry_hours=expiry_hours,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
+
+    def send_email_change_verification_email(
+        self, to_email: str, verification_code: str, user_first_name: Optional[str],
+        expiry_hours: int = 24, locale: str = "en",
+    ) -> bool:
+        first_name = user_first_name or "there"
+        subject = get_message("email.subject_email_change_verify", locale)
+        body_text, body_html = render_email(
+            "transactional/email_change_verify",
+            first_name=first_name, verification_code=verification_code, expiry_hours=expiry_hours,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
+
+    def send_email_change_confirmation_email(
+        self, to_email: str, user_first_name: Optional[str], new_email: str, locale: str = "en",
+    ) -> bool:
+        first_name = user_first_name or "there"
+        subject = get_message("email.subject_email_change_confirm", locale)
+        body_text, body_html = render_email(
+            "transactional/email_change_confirm",
+            first_name=first_name, new_email=new_email,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
 
     def send_username_recovery_email(
-        self,
-        to_email: str,
-        username: str,
-        user_first_name: Optional[str] = None
+        self, to_email: str, username: str, user_first_name: Optional[str] = None, locale: str = "en",
     ) -> bool:
-        """
-        Send username recovery email (forgot username flow).
-        Contains the username only; no password or reset link.
-
-        Args:
-            to_email: User's email address
-            username: The account username to include in the email
-            user_first_name: User's first name for personalization (optional)
-
-        Returns:
-            bool: True if sent successfully
-        """
         first_name = user_first_name or "there"
-        subject = "Your Vianda username"
-        body_text = f"""
-Hi {first_name},
-
-You requested your username for your Vianda account.
-
-Your username is: {username}
-
-Use this username to sign in. If you need to reset your password, use the "Forgot password?" link on the sign-in page.
-
-If you didn't request this, please ignore this email.
-
-Thanks,
-The Vianda Team
-        """.strip()
-        body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h1 style="color: #2c3e50; margin-bottom: 20px;">Your Vianda username</h1>
-        <p>Hi {first_name},</p>
-        <p>You requested your username for your Vianda account.</p>
-        <p style="font-weight: bold;">Your username is: {username}</p>
-        <p>Use this username to sign in. If you need to reset your password, use the "Forgot password?" link on the sign-in page.</p>
-        <p style="font-size: 14px; color: #7f8c8d;">If you didn't request this, please ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
-    </div>
-</body>
-</html>
-        """.strip()
-        return self.send_email(
-            to_email=to_email,
-            subject=subject,
-            body_text=body_text,
-            body_html=body_html
+        subject = get_message("email.subject_username_recovery", locale)
+        body_text, body_html = render_email(
+            "transactional/username_recovery",
+            first_name=first_name, username=username,
         )
-    
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
+
     def send_signup_verification_email(
-        self,
-        to_email: str,
-        verification_code: str,
-        user_first_name: Optional[str] = None,
-        expiry_hours: int = 24
+        self, to_email: str, verification_code: str, user_first_name: Optional[str] = None,
+        expiry_hours: int = 24, locale: str = "en",
     ) -> bool:
-        """
-        Send signup verification email with 6-digit code only (no link).
-        Used for customer self-registration: user enters code to verify email before account is created.
-
-        Args:
-            to_email: User's email address
-            verification_code: 6-digit verification code
-            user_first_name: User's first name for personalization (optional)
-            expiry_hours: Code expiry time in hours
-
-        Returns:
-            bool: True if sent successfully
-        """
         first_name = user_first_name or "there"
-        log_email_tracking(
-            f"Signup verification: to={to_email}, expiry_hours={expiry_hours}"
+        log_email_tracking(f"Signup verification: to={to_email}, expiry_hours={expiry_hours}")
+        subject = get_message("email.subject_signup_verify", locale)
+        body_text, body_html = render_email(
+            "transactional/signup_verify",
+            first_name=first_name, verification_code=verification_code, expiry_hours=expiry_hours,
         )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
 
-        subject = "Verify your email to complete signup"
+    def send_welcome_email(self, to_email: str, user_first_name: str, locale: str = "en") -> bool:
+        subject = get_message("email.subject_welcome", locale)
+        body_text, body_html = render_email("transactional/welcome", user_first_name=user_first_name)
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="transactional")
 
-        body_text = f"""
-Hi {first_name},
+    # =========================================================================
+    # Supplier/employer onboarding outreach
+    # =========================================================================
 
-Thanks for signing up. Your verification code is:
-
-{verification_code}
-
-Enter this code to verify your email. It will expire in {expiry_hours} hours.
-
-If you didn't create an account, please ignore this email.
-
-Thanks,
-The Vianda Team
-        """.strip()
-
-        body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h1 style="color: #2c3e50; margin-bottom: 20px;">Verify your email</h1>
-        <p>Hi {first_name},</p>
-        <p>Thanks for signing up. Your verification code is:</p>
-        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 20px 0;">{verification_code}</p>
-        <p style="font-size: 14px; color: #7f8c8d;">Enter this code to verify your email. It will expire in {expiry_hours} hours.</p>
-        <p style="font-size: 14px; color: #7f8c8d;">If you didn't create an account, please ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        <p style="font-size: 12px; color: #95a5a6;">Thanks,<br>The Vianda Team</p>
-    </div>
-</body>
-</html>
-        """.strip()
-
-        return self.send_email(
-            to_email=to_email,
-            subject=subject,
-            body_text=body_text,
-            body_html=body_html
-        )
-
-    def send_welcome_email(
-        self,
-        to_email: str,
-        user_first_name: str
+    def send_onboarding_getting_started_email(
+        self, to_email: str, institution_name: str, locale: str = "en",
     ) -> bool:
-        """
-        Send welcome email to new users.
-        
-        Args:
-            to_email: User's email address
-            user_first_name: User's first name
-        
-        Returns:
-            bool: True if sent successfully
-        """
-        subject = "Welcome to Vianda!"
-        
-        body_text = f"""
-Hi {user_first_name},
-
-Welcome to Vianda! We're excited to have you on board.
-
-You can now:
-- Browse daily plates from local restaurants
-- Select and pick up your meals
-- Manage your subscriptions
-
-If you have any questions, feel free to reach out to us.
-
-Thanks,
-The Vianda Team
-        """.strip()
-        
-        body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h1 style="color: #2c3e50;">Welcome to Vianda! 🍽️</h1>
-        
-        <p>Hi {user_first_name},</p>
-        
-        <p>We're excited to have you on board!</p>
-        
-        <p>You can now:</p>
-        <ul>
-            <li>Browse daily plates from local restaurants</li>
-            <li>Select and pick up your meals</li>
-            <li>Manage your subscriptions</li>
-        </ul>
-        
-        <p>If you have any questions, feel free to reach out to us.</p>
-        
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        
-        <p style="font-size: 12px; color: #95a5a6;">
-            Thanks,<br>
-            The Vianda Team
-        </p>
-    </div>
-</body>
-</html>
-        """.strip()
-        
-        return self.send_email(
-            to_email=to_email,
-            subject=subject,
-            body_text=body_text,
-            body_html=body_html
+        subject = get_message("email.subject_onboarding_getting_started", locale)
+        b2b_url = get_settings().B2B_FRONTEND_URL or "https://b2b.vianda.market"
+        body_text, body_html = render_email(
+            "onboarding/getting_started", institution_name=institution_name, b2b_url=b2b_url,
         )
-    
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="onboarding")
+
+    def send_onboarding_need_help_email(
+        self, to_email: str, institution_name: str, completion_percentage: int,
+        missing_steps: List[str], locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_onboarding_need_help", locale)
+        b2b_url = get_settings().B2B_FRONTEND_URL or "https://b2b.vianda.market"
+        steps_html = "".join(f"<li>{s.replace('_', ' ').title()}</li>" for s in missing_steps)
+        body_text, body_html = render_email(
+            "onboarding/need_help",
+            institution_name=institution_name, completion_percentage=completion_percentage,
+            steps_html=steps_html, b2b_url=b2b_url,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="onboarding")
+
+    def send_onboarding_incomplete_email(
+        self, to_email: str, institution_name: str, completion_percentage: int,
+        missing_steps: List[str], locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_onboarding_incomplete", locale)
+        b2b_url = get_settings().B2B_FRONTEND_URL or "https://b2b.vianda.market"
+        steps_html = "".join(f"<li>{s.replace('_', ' ').title()}</li>" for s in missing_steps)
+        body_text, body_html = render_email(
+            "onboarding/incomplete",
+            institution_name=institution_name, completion_percentage=completion_percentage,
+            steps_html=steps_html, b2b_url=b2b_url,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="onboarding")
+
+    def send_onboarding_complete_email(
+        self, to_email: str, institution_name: str, locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_onboarding_complete", locale)
+        body_text, body_html = render_email("onboarding/complete", institution_name=institution_name)
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="onboarding")
+
+    # =========================================================================
+    # Customer engagement emails
+    # =========================================================================
+
+    def _customer_email_context(self) -> dict:
+        """Common context for customer engagement email templates."""
+        settings = get_settings()
+        return {
+            "app_store_url": settings.APP_STORE_URL,
+            "play_store_url": settings.PLAY_STORE_URL,
+            "app_deep_link": f"{settings.APP_DEEP_LINK_BASE}plans" if settings.APP_DEEP_LINK_BASE else "",
+        }
+
+    def send_customer_subscribe_email(
+        self, to_email: str, user_first_name: str, locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_customer_subscribe", locale)
+        body_text, body_html = render_email(
+            "customer/subscribe_prompt", locale=locale,
+            user_first_name=user_first_name, **self._customer_email_context(),
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="customer-engagement")
+
+    def send_customer_missing_out_email(
+        self, to_email: str, user_first_name: str, locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_customer_missing_out", locale)
+        body_text, body_html = render_email(
+            "customer/missing_out", locale=locale,
+            user_first_name=user_first_name, **self._customer_email_context(),
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="customer-engagement")
+
+    def send_benefit_waiting_email(
+        self, to_email: str, user_first_name: str, employer_name: str, locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_benefit_waiting", locale, employer_name=employer_name)
+        body_text, body_html = render_email(
+            "customer/benefit_waiting", locale=locale,
+            user_first_name=user_first_name, employer_name=employer_name, **self._customer_email_context(),
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="customer-engagement")
+
+    def send_benefit_reminder_email(
+        self, to_email: str, user_first_name: str, employer_name: str, locale: str = "en",
+    ) -> bool:
+        subject = get_message("email.subject_benefit_reminder", locale, employer_name=employer_name)
+        body_text, body_html = render_email(
+            "customer/benefit_reminder", locale=locale,
+            user_first_name=user_first_name, employer_name=employer_name, **self._customer_email_context(),
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="customer-engagement")
+
+    # =========================================================================
+    # Promotional emails
+    # =========================================================================
+
+    def send_subscription_promo_email(
+        self, to_email: str, user_first_name: str, promo_details: str, locale: str = "en",
+    ) -> bool:
+        settings = get_settings()
+        subject = get_message("email.subject_subscription_promo", locale, promo_details=promo_details)
+        body_text, body_html = render_email(
+            "promotional/subscription_promo",
+            user_first_name=user_first_name, promo_details=promo_details,
+            app_store_url=settings.APP_STORE_URL, play_store_url=settings.PLAY_STORE_URL,
+        )
+        return self.send_email(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html, category="promotional")
+
     def is_configured(self) -> bool:
-        """Check if email service is properly configured."""
-        return bool(self.smtp_username and self.smtp_password)
+        return self._provider.is_configured()
 
 
 # Singleton instance

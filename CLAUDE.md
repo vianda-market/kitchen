@@ -1,216 +1,116 @@
-# Claude.md - PostgreSQL + FastAPI Development Rules
-
-## Mission
-Maximize developer velocity while guaranteeing data integrity in PostgreSQL-backed FastAPI applications.
-
-## Architecture Reference
-
-**Before starting any feature**, read [CLAUDE_ARCHITECTURE.md](./CLAUDE_ARCHITECTURE.md) for directory structure, route registration, data flow, and key entry points. Discover patterns from existing code rather than relying on examples here.
-
-## Quick Reference
-
-- **Paths**: Use `~/Desktop/local/kitchen`. Never use long iCloud paths.
-- **Database changes**: No migrations. DB is torn down and rebuilt. Primary keys use **UUID7** (`uuidv7()` in PostgreSQL 18+). Sync layers in order: `schema.sql` -> `trigger.sql` -> `seed.sql` -> DTOs -> Pydantic schemas.
-- **User quoting agent output**: When user writes "[Copied output from you kitchen Agent]", treat it as a self-citation.
-
----
-
-## Permission Model and Role-Based Access Control
-
-### Two-Tier Hierarchy
-
-1. **Role Type** (`role_type`): Institutional affiliation
-   - **Internal**: Vianda Enterprises, global access to all institutions
-   - **Supplier**: Restaurant/institution, scoped to their `institution_id`
-   - **Customer**: iOS/Android app users only (no backoffice)
-   - **Employer**: Benefit-program institution, institution-scoped (like Supplier)
-
-2. **Role Name** (`name` in `role_info`): Specific permissions within a role type
-   - Super Admin (Internal) | Admin (Internal/Supplier/Employer) | Comensal (Customer/Employer)
-
-### Key Rules
-
-- **Super Admin = Internal**: `role_type='Internal' AND role_name='Super Admin'` (NOT `role_type='Super Admin'`). Always check BOTH fields.
-- **Institution Scoping**: Internal = global (`InstitutionScope.is_global = True`), Supplier/Employer = scoped to `institution_id`, Customer = no backoffice.
-- **employer_id**: Only Customer (Comensal) can have employer_id; Internal, Supplier, Employer cannot.
-
-### Permission Dependency Chain
-
-```
-get_current_user() (base auth)
-    |-> get_employee_user() (Internal role_type)
-    |   |-> get_admin_user() (Internal + Admin/Super Admin)
-    |   |   '-> get_super_admin_user() (Internal + Super Admin)
-    |   '-> Used for: Plans, Credit Currency, Discretionary, Fintech Link (POST/PUT/DELETE)
-    |-> get_client_user() (Customer) -> Fintech Link (GET)
-    '-> get_client_or_employee_user() (Customer OR Internal) -> Plans (GET)
-```
-
-### Protected APIs Summary
-
-| API | Access |
-|-----|--------|
-| Plans GET | Internal + Customers |
-| Plans POST/PUT/DELETE | Internal only |
-| Credit Currency | Internal only |
-| Discretionary | Internal only (approve/reject: Super Admin only) |
-| Fintech Link GET | Customers only |
-| Fintech Link POST/PUT/DELETE | Internal only |
-| Supplier resources | Institution-scoped |
-
-### Key Files
-- `app/auth/dependencies.py`: Permission dependency functions
-- `app/security/scoping.py`: `InstitutionScope` for institution-based access control
-- `app/auth/routes.py`: JWT token creation (includes `role_type` + `role_name`)
-
----
-
-## Critical Project-Specific Rules
-
-### UUID Handling for psycopg2
-
-**Always convert UUID to string** when passing to psycopg2 queries:
-```python
-db_read(query, (str(uuid_value),), connection=db)  # GOOD
-db_read(query, (uuid_value,), connection=db)        # BAD - "can't adapt type 'UUID'"
-```
-
-### PostgreSQL Enums
-
-**Always check `app/db/schema.sql`** for exact enum format before using values. Enums are case-sensitive.
-
-| Database Enum | Format | Python Enum | Examples |
-|---|---|---|---|
-| `kitchen_day_enum` | Title Case | `KitchenDay` | `'Monday'`, `'Tuesday'` |
-| `address_type_enum` | Title Case | `AddressType` | `'Restaurant'`, `'Customer Home'` |
-| `status_enum` | Title Case | `Status` | `'Active'`, `'Inactive'` |
-| `role_type_enum` | Title Case | `RoleType` | `'Internal'`, `'Supplier'`, `'Customer'`, `'Employer'` |
-| `pickup_type_enum` | lowercase | `PickupType` | `'self'`, `'for_others'` |
-
-Use Python enums from `app/config/enums/` for type safety. When modifying enums, update: `schema.sql` -> Python enum -> validators -> services -> tests.
-
-### Database Schema Change Sync Order
-
-When adding/modifying/removing columns, update ALL layers in order:
-
-```
-1. schema.sql (table definition)
-2. trigger.sql (history table trigger - missing field = NULL constraint violation)
-3. seed.sql (if seeding the table)
-4. DTOs (app/dto/models.py) <-- MOST COMMONLY FORGOTTEN
-5. Pydantic schemas (if exposed via API)
-6. Postman collection (if testing the endpoint)
-```
-
-**Why DTOs matter**: DTOs define which fields CRUDService writes to the database. Missing field in DTO = field silently ignored during INSERT/UPDATE, even if present in the API request:
-```
-Request -> Schema OK -> Route OK -> DTO MISSING FIELD -> Database FAILS
-```
-
-**Not all fields need API schemas**: `modified_by`, `modified_date`, `created_date` are set automatically.
-
-### Pydantic Schema Field Naming
-
-**Never use Python type names as field names** (`date`, `time`, `datetime`, `list`, `dict`, `type`, etc.). This causes `RuntimeError: error checking inheritance`. Use descriptive names: `order_date`, `pickup_time`, `entity_type`.
-
-### In-Memory Caches and Rate Limits
-
-All in-memory caches/rate-limit dicts **must have eviction** (TTL, size limit, or key cleanup). No unbounded growth.
-
----
-
-## API Routing Rules
-
-### Versioned Route Registration
-
-All business routes MUST use `create_versioned_router()` to register under `/api/v1/`:
-
-```python
-# Route file: define prefix WITHOUT /api/v1/
-router = APIRouter(prefix="/markets", tags=["Markets"])
-
-# application.py: wrap with versioned router
-v1_router = create_versioned_router("api", ["Markets"], APIVersion.V1)
-v1_router.include_router(markets_admin_router)
-app.include_router(v1_router)
-```
-
-**Common mistakes**: Direct `app.include_router()` (missing `/api/v1/`), or adding `/api/v1/` to route prefix (double prefix).
-
-**Exceptions** (no versioned wrapper): `/health`, `/admin/archival/*`, `/admin/archival-config/*`
-
-### Trailing Slash Convention
-
-**No trailing slashes** on collection endpoints. App uses `redirect_slashes=False`. Register with `""` for roots, `"/enriched"` for subpaths.
-
-### Route Registration Order
-
-FastAPI uses the FIRST matching route. Register manual routes BEFORE auto-generated ones, or don't register auto-generated if manual exists.
-
----
-
-## Testing Rules
-
-### Unit Tests (pytest) - Non-Service Code Only
-
-Test: Gateways, Utils, Security, Auth Dependencies, DTOs, Schemas.
-Do NOT unit test: Services, Routes, Database layer.
-
-### Service Testing - Postman Collections ONLY
-
-Services are tested **exclusively** via Postman E2E collections. Each collection must be **self-contained**:
-- No hardcoded UUIDs from specific environments
-- Either create test data via API or query existing data
-- Include proper authentication setup
-- Can run standalone on a fresh database with seed data
-
-See `docs/postman/collections/` for existing patterns.
-
----
-
-## Design Patterns
-
-### Function Naming
-
-Pattern: `verb_entity_by_context()` - Be specific, describe return, include filtering context.
-
-### Service vs Utils
-
-- **Services** (`app/services/`): Business logic, domain rules. Require comprehensive testing (via Postman).
-- **Utils** (`app/utils/`): Low-level infrastructure, framework helpers. No testing needed.
-
-### Service Classes vs Standalone Functions
-
-- **CRUDService classes**: For standard CRUD on a specific table/entity
-- **Standalone functions**: For cross-entity lookups, pure validation, complex multi-entity business logic
-
-### Error Handling
-
-- **HTTPException**: For API operations, CRUD, validation failures, not-found, business rule violations
-- **Return None**: For optional operations, background processing, expected not-found lookups, internal helpers
-
-### Enriched Endpoints
-
-Use `/enriched/` endpoints with SQL JOINs when UI needs related entity names. Eliminates N+1 queries.
-- Base: `/users`, `/users/{id}`
-- Enriched: `/users/enriched`, `/users/enriched/{id}`
-- Schemas: `UserResponseSchema` vs `UserEnrichedResponseSchema`
-
-**Field naming in enriched queries**: Only rename fields when there is an actual column name collision between joined tables. Keep original names when no collision exists.
-
-### Root Cause Resolution
-
-Always fix issues at the root cause, not with downstream transformations. Example: register enum types with psycopg2 at connection time rather than SQL-casting in every query. Fallbacks are acceptable only with warning logs and clear documentation.
-
----
-
-## Documentation References
-
-- [CLAUDE_ARCHITECTURE.md](./CLAUDE_ARCHITECTURE.md) - Directory structure, route flow, entry points
-- [docs/api/API_VERSIONING_GUIDE.md](docs/api/API_VERSIONING_GUIDE.md) - API versioning strategy
-- [docs/api/USER_DEPENDENT_ROUTES_PATTERN.md](docs/api/USER_DEPENDENT_ROUTES_PATTERN.md) - Admin vs user routes
-- [docs/database/DATABASE_CONNECTION_PATTERNS.md](docs/database/DATABASE_CONNECTION_PATTERNS.md) - `connection=db` vs positional
-- [docs/database/DATABASE_TABLE_NAMING_PATTERNS.md](docs/database/DATABASE_TABLE_NAMING_PATTERNS.md) - `_info` suffix conventions
-- [docs/database/DATABASE_REBUILD_PERSISTENCE.md](docs/database/DATABASE_REBUILD_PERSISTENCE.md) - DB rebuild process
-- [docs/database/ENUM_MAINTENANCE.md](docs/database/ENUM_MAINTENANCE.md) - Enum management guide
-- [docs/postman/guidelines/PERMISSIONS_TESTING_GUIDE.md](docs/postman/guidelines/PERMISSIONS_TESTING_GUIDE.md) - Permission testing
+# CLAUDE.md
+
+## Project
+Vianda marketplace backend — PostgreSQL + FastAPI. Multi-market B2B/B2C food subscription platform.
+Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flow.
+Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, routes, or subsystems.
+
+## Never Do These
+- Never run or write migrations — tear down and rebuild: `bash app/db/build_kitchen_db.sh`
+- Never pass UUID directly to psycopg2 — always `str(uuid_value)`
+- Never register routes directly to `app` — always use `create_versioned_router()`
+- Never write Python unit tests for services — use Postman collections (see Testing below)
+- Never store secrets in code
+- Never pass `page`/`page_size` pagination params in cron jobs or internal service calls — pagination is for HTTP routes only
+
+## Essential Commands
+- **Rebuild DB:** `bash app/db/build_kitchen_db.sh`
+- **Import check:** `python3 -c "from application import app; print('OK')"`
+- **Run tests:** `pytest app/tests/`
+- **Paths:** Always use `~/Desktop/local/kitchen` — never long iCloud paths
+- **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
+
+## DB Schema Change — Sync All Layers (in order)
+When adding/modifying any column: `schema.sql` → `trigger.sql` → `seed.sql` → `app/dto/models.py` → `app/schemas/consolidated_schemas.py`
+
+- History tables (`audit.*`) must mirror their main table — triggers must INSERT the new column
+- DTOs define which fields CRUDService writes to DB — **missing field in DTO = silently dropped on insert**
+- `modified_by`, `created_date`, `modified_date` are set automatically — omit from API schemas
+- **Adding a column?** Search all service functions that query that table and add the field to every SELECT. `get_all()` functions especially — by name they must return all fields.
+
+Full guide with failure scenarios and examples: `docs/guidelines/SCHEMA_CHANGE_GUIDE.md`
+
+## Permissions (Two-Tier)
+- **role_type**: Internal | Supplier | Customer | Employer — controls institution scoping
+- **role_name**: Super Admin | Admin | Comensal — controls operation-level access within the type
+- Internal = global access. Supplier/Employer = institution-scoped via `InstitutionScope` (`app/security/scoping.py`)
+- Auth deps in `app/auth/dependencies.py`: `get_current_user`, `get_employee_user`, `get_super_admin_user`
+
+Full reference: `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md`
+
+## Code Conventions
+- **Functions:** `verb_entity_by_context()`, <50 lines, pure, explicit `db`/`logger` params
+- **DTOs:** Pure data structures only — `app/dto/models.py`. No logic, no methods.
+- **Enums:** Check `schema.sql` for exact case before use. Most are Title Case; `pickup_type_enum` is lowercase.
+- **Route versioning:** `create_versioned_router("api", [...], APIVersion.V1)` in `application.py`
+- **No trailing slash** on collection endpoints — prefix is `/entity-name`, not `/entity-name/`
+- **In-memory caches** must have TTL/size eviction — never unbounded growth
+- **Enriched endpoints** use SQL JOINs; only rename fields when there is an actual column collision.
+- **Error handling:** Route/CRUD operations → raise `HTTPException`. Internal lookups where "not found" is normal → return `None`.
+- **Schema field names:** Never use Python built-in type names as field names (`date`, `time`, `type`, `list`) — use `order_date`, `pickup_time`, etc.
+
+Details + examples: `docs/guidelines/CODE_CONVENTIONS.md`
+Enriched endpoint pattern + field naming: `docs/guidelines/ENRICHED_ENDPOINTS.md`
+
+## Pagination (Opt-In)
+Server-side pagination is **opt-in per route** — not all endpoints need it.
+
+- **CRUD routes:** Set `paginatable=True` on `RouteConfig` in `route_factory.py`
+- **Enriched routes:** Add `pagination: Optional[PaginationParams] = Depends(get_pagination_params)` and call `set_pagination_headers(response, result)`
+- **Primitives:** `app/utils/pagination.py` — `PaginationParams`, `PaginatedList`, `get_pagination_params`, `set_pagination_headers`
+- **Protocol:** Frontend sends `page` + `page_size` query params → backend returns `X-Total-Count` header. No params = all records (backward compatible).
+- **Cron jobs / internal service calls:** NEVER pass `page`/`page_size`. These always need all records. Pagination is exclusively for HTTP route consumption.
+- **Reference data** (countries, currencies, cuisines, enums): NOT paginated — small datasets, no opt-in needed.
+
+## Testing
+| What | How |
+|---|---|
+| `app/utils/`, `app/gateways/`, `app/auth/`, `app/security/` | pytest unit tests |
+| `app/services/`, `app/routes/` | Postman collections only (full HTTP stack) |
+
+- Postman collections must be self-contained — no hardcoded UUIDs, create or query test data inline
+- Collections live in `docs/postman/collections/`
+- One concept per test, Arrange-Act-Assert, mock external deps
+
+## Key Entry Points
+- **Route registration:** `application.py`
+- **All Pydantic schemas:** `app/schemas/consolidated_schemas.py`
+- **All DTOs:** `app/dto/models.py`
+- **Leads (public/no-auth):** `app/routes/leads.py`
+- **DB files:** `app/db/schema.sql`, `trigger.sql`, `seed.sql`, `index.sql`
+
+## Reference Map — Read When
+| Document | Read when |
+|---|---|
+| `CLAUDE_ARCHITECTURE.md` | Planning new features, modifying data flow, locating modules |
+| `docs/guidelines/SCHEMA_CHANGE_GUIDE.md` | Adding or modifying any DB column |
+| `docs/guidelines/ENRICHED_ENDPOINTS.md` | Building enriched endpoints or joining tables for UI display |
+| `docs/guidelines/CODE_CONVENTIONS.md` | Unsure about function design, error handling, or service patterns |
+| `docs/guidelines/ROOT_CAUSE_PRINCIPLE.md` | Fixing a type mismatch or considering a downstream workaround |
+| `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md` | Adding auth to a new endpoint or checking permission logic |
+| `docs/guidelines/database/ENUM_MAINTENANCE.md` | Adding or modifying a PostgreSQL enum |
+| `docs/guidelines/database/DATABASE_REBUILD_PERSISTENCE.md` | Rebuilding the database or managing seed data |
+| `docs/plans/vianda_home_apis.md` | Implementing vianda-home marketing site APIs |
+
+## Cross-Repo Documentation Protocol
+
+This repo (kitchen) is the **backend source of truth**. It produces API docs and roadmaps that other repo agents consume. Other repos never write docs here — they read our docs and produce their own implementation + documentation.
+
+**When completing a feature that affects other repos**, always:
+1. Produce or update the relevant `docs/api/` doc describing the new endpoints, contracts, and behaviors
+2. In your summary of changes, list the docs produced and which agents need them:
+   - **vianda-platform agent**: for B2B UI changes (Employer Program pages, auth changes, error handling)
+   - **vianda-app agent**: for B2C UI changes (benefit plans display, subscription flow changes)
+   - **infra-kitchen-gcp agent**: for cron jobs, env vars, Stripe config, GCS buckets
+3. Point the user to the specific files to share with each agent
+
+**Doc locations produced by this repo:**
+- `docs/api/` — **Permanent** API integration docs (endpoints, contracts, auth). Indexed in `docs/api/AGENT_INDEX.md`. This is the source of truth for how the system works. Other repo agents read these to understand established functionality.
+- `docs/plans/` — **Ephemeral** feature plans and design decisions. Plans are consumed during implementation, then archived. Never reference old plans to understand how things work — that information belongs in `docs/api/` or `CLAUDE_ARCHITECTURE.md`. When completing a plan, summarize any long-term relevant info (endpoint contracts, behaviors, constraints) into the appropriate `docs/api/` doc before archiving the plan.
+- `CLAUDE_ARCHITECTURE.md` — System overview for cross-repo context
+
+**Agent index files in other repos (read-only, for context):**
+- **vianda-platform (B2B):** `/Users/cdeachaval/Desktop/local/vianda-platform/docs/frontend/AGENT_INDEX.md`
+- **vianda-app (B2C):** `/Users/cdeachaval/Desktop/local/vianda-app/docs/frontend/AGENT_INDEX.md`
+- **vianda-home (marketing):** `/Users/cdeachaval/Desktop/local/vianda-home/docs/frontend/AGENT_INDEX.md`
+- **infra-kitchen-gcp:** `/Users/cdeachaval/Desktop/local/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`

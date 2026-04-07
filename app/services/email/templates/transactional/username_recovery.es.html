@@ -1,0 +1,9 @@
+{% extends "base.es.html" %}
+{% block content %}
+<h1 style="color: #2c3e50; margin-bottom: 20px;">Tu usuario de Vianda</h1>
+<p>Hola {{ first_name }},</p>
+<p>Solicitaste tu nombre de usuario de tu cuenta de Vianda.</p>
+<p style="font-weight: bold;">Tu usuario es: {{ username }}</p>
+<p>Usa este usuario para iniciar sesion. Si necesitas restablecer tu contrasena, usa el enlace "Olvide mi contrasena" en la pantalla de inicio de sesion.</p>
+<p style="font-size: 14px; color: #7f8c8d;">Si no solicitaste esto, ignora este correo.</p>
+{% endblock %}

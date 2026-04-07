@@ -1,0 +1,651 @@
+{
+  "info": {
+    "name": "013 SUBSCRIPTION_ACTIONS",
+    "description": "Subscription lifecycle: payment details, confirm, hold, resume, cancel, renewal preferences, enriched views. Run collection 000 first (creates customer + subscription). Uses clientUserAuthToken from environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Login Super Admin",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const u = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername') || 'superadmin';",
+                  "const p = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword') || 'SuperAdmin1!';",
+                  "pm.collectionVariables.set('superAdminUsername', u);",
+                  "pm.collectionVariables.set('superAdminPassword', p);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains access_token', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "    pm.expect(body.access_token).to.be.a('string');",
+                  "});",
+                  "",
+                  "const { access_token } = pm.response.json();",
+                  "pm.collectionVariables.set('authToken', access_token);",
+                  "pm.environment.set('authToken', access_token);",
+                  "pm.globals.set('authToken', access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{superAdminUsername}}", "type": "text" },
+                { "key": "password", "value": "{{superAdminPassword}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const u = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
+                  "const p = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
+                  "",
+                  "if (!u || !p) {",
+                  "    throw new Error('customerUsername / customerPassword not set. Run collection 000 first.');",
+                  "}",
+                  "",
+                  "pm.collectionVariables.set('customerUsername', u);",
+                  "pm.collectionVariables.set('customerPassword', p);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customer login successful - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains access_token', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "const { access_token } = pm.response.json();",
+                  "pm.collectionVariables.set('customerAuthToken', access_token);",
+                  "pm.environment.set('customerAuthToken', access_token);",
+                  "pm.globals.set('customerAuthToken', access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{customerUsername}}", "type": "text" },
+                { "key": "password", "value": "{{customerPassword}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Discover Data",
+      "item": [
+        {
+          "name": "Discover Active Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "const active = body.find(s => s.subscription_status !== 'Archived');",
+                  "if (active) {",
+                  "    pm.collectionVariables.set('subscriptionId', active.subscription_id);",
+                  "    pm.environment.set('subscriptionId', active.subscription_id);",
+                  "    pm.globals.set('subscriptionId', active.subscription_id);",
+                  "    console.log('Found subscription: ' + active.subscription_id);",
+                  "} else {",
+                  "    console.warn('No non-archived subscriptions found. Run collection 000 first.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "enriched"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription by ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const sid = pm.collectionVariables.get('subscriptionId');",
+                  "if (!sid) {",
+                  "    console.warn('subscriptionId not set — skipping.');",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has subscription fields', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('subscription_id');",
+                  "    pm.expect(body).to.have.property('subscription_status');",
+                  "    pm.expect(body).to.have.property('plan_id');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.plan_id) {",
+                  "    pm.collectionVariables.set('planId', body.plan_id);",
+                  "    pm.environment.set('planId', body.plan_id);",
+                  "    pm.globals.set('planId', body.plan_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Payment Details",
+      "item": [
+        {
+          "name": "Get Payment Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 200) {",
+                  "    pm.test('Payment details returned', function () {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('payment_id');",
+                  "        pm.expect(body).to.have.property('client_secret');",
+                  "    });",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 expected — subscription not Pending', function () {",
+                  "        console.log('Subscription already confirmed from 000 run.');",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 200 or 400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/payment-details",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "payment-details"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Payment (Mock Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 200 || status === 201) {",
+                  "    pm.test('Payment confirmed', function () {",
+                  "        console.log('Confirm payment succeeded (status ' + status + ').');",
+                  "        pm.expect(status).to.be.oneOf([200, 201]);",
+                  "    });",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 expected — not Pending or not mock env', function () {",
+                  "        const body = pm.response.json();",
+                  "        console.log('Confirm payment 400: ' + JSON.stringify(body));",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 200/201/400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/confirm-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "confirm-payment"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Hold and Resume",
+      "item": [
+        {
+          "name": "Put Subscription on Hold",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const now = new Date();",
+                  "const start = now.toISOString();",
+                  "const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();",
+                  "pm.collectionVariables.set('holdStartDate', start);",
+                  "pm.collectionVariables.set('holdEndDate', end);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 200) {",
+                  "    pm.test('Subscription put on hold', function () {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body.subscription_status).to.equal('On Hold');",
+                  "    });",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 — already on hold or cancelled', function () {",
+                  "        console.log('Hold rejected: ' + JSON.stringify(pm.response.json()));",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 200 or 400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"hold_start_date\": \"{{holdStartDate}}\", \"hold_end_date\": \"{{holdEndDate}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/hold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "hold"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription After Hold",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Subscription status is On Hold or Active', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.subscription_status).to.be.oneOf(['On Hold', 'Active']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/enriched/{{subscriptionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "enriched", "{{subscriptionId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resume Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const status = pm.response.code;",
+                  "",
+                  "if (status === 200) {",
+                  "    pm.test('Subscription resumed', function () {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body.subscription_status).to.equal('Active');",
+                  "    });",
+                  "} else if (status === 400) {",
+                  "    pm.test('400 — not on hold', function () {",
+                  "        console.log('Resume rejected: ' + JSON.stringify(pm.response.json()));",
+                  "        pm.expect(status).to.equal(400);",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + status, function () {",
+                  "        pm.expect.fail('Expected 200 or 400, got ' + status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/resume",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "resume"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Renewal Preferences",
+      "item": [
+        {
+          "name": "Update Renewal Preferences",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('early_renewal_threshold is 5', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.early_renewal_threshold).to.equal(5);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"early_renewal_threshold\": 5}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/me/renewal-preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "me", "renewal-preferences"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Cancel",
+      "item": [
+        {
+          "name": "Cancel Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Detail contains cancelled', function () {",
+                  "    const body = pm.response.json();",
+                  "    const detail = (body.detail || body.message || JSON.stringify(body)).toLowerCase();",
+                  "    pm.expect(detail).to.include('cancelled');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "cancel"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Enriched Views",
+      "item": [
+        {
+          "name": "List Enriched Subscriptions (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions", "enriched"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Standard Subscriptions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscriptions"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "const base = pm.environment.get('baseUrl') || pm.globals.get('baseUrl') || 'http://localhost:8000';",
+          "pm.collectionVariables.set('baseUrl', base);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "superAdminUsername", "value": "" },
+    { "key": "superAdminPassword", "value": "" },
+    { "key": "customerUsername", "value": "" },
+    { "key": "customerPassword", "value": "" },
+    { "key": "authToken", "value": "" },
+    { "key": "customerAuthToken", "value": "" },
+    { "key": "subscriptionId", "value": "" },
+    { "key": "planId", "value": "" }
+  ]
+}

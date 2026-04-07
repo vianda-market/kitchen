@@ -19,7 +19,8 @@ from typing import Optional, List
 from datetime import datetime, date
 from uuid import UUID
 from decimal import Decimal
-from app.config import Status, RoleType, RoleName, DiscretionaryReason
+from app.config import Status, RoleType, RoleName, DiscretionaryReason, BillPayoutStatus, DietaryFlag
+from app.config.enums import SupplierInvoiceStatus, SupplierInvoiceType, PaymentFrequency
 
 # =============================================================================
 # CORE ENTITY DTOs
@@ -36,12 +37,18 @@ class UserDTO(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[str] = None
-    cellphone: Optional[str] = None
+    mobile_number: Optional[str] = None
+    mobile_number_verified: bool = False
+    mobile_number_verified_at: Optional[datetime] = None
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
     employer_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
+    support_email_suppressed_until: Optional[datetime] = None
+    last_support_email_date: Optional[datetime] = None
     market_id: UUID
     city_id: Optional[UUID] = None
-    stripe_customer_id: Optional[str] = None
+    locale: str = "en"
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -57,7 +64,8 @@ class InstitutionDTO(BaseModel):
     name: str
     institution_type: RoleType  # Internal, Customer, Supplier, or Employer
     market_id: Optional[UUID] = None  # v1: NULL or Global = all markets; one UUID = local market
-    no_show_discount: Optional[int] = None  # Percentage 0-100; required for Supplier, NULL for Internal/Customer
+    support_email_suppressed_until: Optional[datetime] = None
+    last_support_email_date: Optional[datetime] = None
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -74,8 +82,12 @@ class ProductDTO(BaseModel):
     product_id: UUID
     institution_id: UUID
     name: str
+    name_i18n: Optional[dict] = None
     ingredients: Optional[str] = None
-    dietary: Optional[str] = None
+    ingredients_i18n: Optional[dict] = None
+    description: Optional[str] = None
+    description_i18n: Optional[dict] = None
+    dietary: Optional[List[str]] = None
     is_archived: bool = False
     status: Status
     image_url: str
@@ -91,12 +103,13 @@ class ProductDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PlateDTO(BaseModel):
-    """Pure DTO for plate data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_worth. no_show_discount comes from institution."""
+    """Pure DTO for plate data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_cost_local_currency. expected_payout_local_currency set by DB trigger."""
     plate_id: UUID
     product_id: UUID
     restaurant_id: UUID
     price: Decimal
     credit: Decimal
+    expected_payout_local_currency: Decimal
     delivery_time_minutes: int
     is_archived: bool = False
     status: Status
@@ -114,7 +127,45 @@ class PlateReviewDTO(BaseModel):
     plate_pickup_id: UUID
     stars_rating: int
     portion_size_rating: int
+    would_order_again: Optional[bool] = None
+    comment: Optional[str] = None
     is_archived: bool = False
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationBannerDTO(BaseModel):
+    """Pure DTO for in-app notification banner data."""
+    notification_id: UUID
+    user_id: UUID
+    notification_type: str
+    priority: str
+    payload: dict
+    action_type: str
+    action_label: str
+    client_types: List[str]
+    action_status: str
+    expires_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    dedup_key: str
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PortionComplaintDTO(BaseModel):
+    """Pure DTO for portion complaint data. Filed when customer rates portion size as 1 and chooses to complain."""
+    complaint_id: UUID
+    plate_pickup_id: UUID
+    plate_review_id: Optional[UUID] = None
+    user_id: UUID
+    restaurant_id: UUID
+    photo_storage_path: Optional[str] = None
+    complaint_text: Optional[str] = None
+    resolution_status: str = "open"
     created_date: datetime
     modified_date: datetime
 
@@ -132,6 +183,47 @@ class UserFavoriteDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CuisineDTO(BaseModel):
+    """Pure DTO for cuisine lookup table data."""
+    cuisine_id: UUID
+    cuisine_name: str
+    cuisine_name_i18n: Optional[dict] = None
+    slug: str
+    parent_cuisine_id: Optional[UUID] = None
+    description: Optional[str] = None
+    origin_source: str = "seed"
+    display_order: Optional[int] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CuisineSuggestionDTO(BaseModel):
+    """Pure DTO for cuisine suggestion workflow data."""
+    suggestion_id: UUID
+    suggested_name: str
+    suggested_by: UUID
+    restaurant_id: Optional[UUID] = None
+    suggestion_status: str = "Pending"
+    reviewed_by: Optional[UUID] = None
+    reviewed_date: Optional[datetime] = None
+    review_notes: Optional[str] = None
+    resolved_cuisine_id: Optional[UUID] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RestaurantDTO(BaseModel):
     """Pure DTO for restaurant data. credit_currency comes from institution_entity."""
     restaurant_id: UUID
@@ -139,8 +231,20 @@ class RestaurantDTO(BaseModel):
     institution_entity_id: UUID
     address_id: UUID
     name: str
-    cuisine: Optional[str] = None
+    cuisine_id: Optional[UUID] = None
     pickup_instructions: Optional[str] = None
+    tagline: Optional[str] = None
+    tagline_i18n: Optional[dict] = None
+    is_featured: bool = False
+    cover_image_url: Optional[str] = None
+    average_rating: Optional[Decimal] = None
+    review_count: int = 0
+    verified_badge: bool = False
+    spotlight_label: Optional[str] = None
+    spotlight_label_i18n: Optional[dict] = None
+    member_perks: Optional[List[str]] = None
+    member_perks_i18n: Optional[dict] = None
+    require_kiosk_code_verification: bool = False
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -169,8 +273,6 @@ class InstitutionBillDTO(BaseModel):
     status: Status
     resolution: str
     tax_doc_external_id: Optional[str] = None
-    stripe_payout_id: Optional[str] = None
-    payout_completed_at: Optional[datetime] = None
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -229,7 +331,8 @@ class CreditCurrencyDTO(BaseModel):
     credit_currency_id: UUID
     currency_name: str
     currency_code: str
-    credit_value: Decimal
+    credit_value_local_currency: Decimal
+    currency_conversion_usd: Decimal
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -260,6 +363,8 @@ class AddressDTO(BaseModel):
     street_name: str
     building_number: str
     apartment_unit: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     timezone: str
     is_archived: bool = False
     status: Status
@@ -272,13 +377,14 @@ class AddressDTO(BaseModel):
 
 
 class AddressSubpremiseDTO(BaseModel):
-    """Pure DTO for address_subpremise (floor, unit, is_default per user at an address)."""
+    """Pure DTO for address_subpremise (floor, unit, is_default, map_center_label per user at an address)."""
     subpremise_id: UUID
     address_id: UUID
     user_id: UUID
     floor: Optional[str] = None
     apartment_unit: Optional[str] = None
     is_default: bool = False
+    map_center_label: Optional[str] = None
     created_date: datetime
     modified_date: datetime
 
@@ -294,6 +400,118 @@ class EmployerDTO(BaseModel):
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployerBenefitsProgramDTO(BaseModel):
+    """Pure DTO for employer benefits program configuration"""
+    program_id: UUID
+    institution_id: UUID
+    benefit_rate: int
+    benefit_cap: Optional[Decimal] = None
+    benefit_cap_period: str
+    price_discount: int = 0
+    minimum_monthly_fee: Optional[Decimal] = None
+    billing_cycle: str
+    billing_day: Optional[int] = 1
+    billing_day_of_week: Optional[int] = None
+    enrollment_mode: str
+    allow_early_renewal: bool = False
+    stripe_customer_id: Optional[str] = None
+    stripe_payment_method_id: Optional[str] = None
+    payment_method_type: Optional[str] = None
+    is_active: bool = True
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployerBillDTO(BaseModel):
+    """Pure DTO for employer bill data"""
+    employer_bill_id: UUID
+    institution_id: UUID
+    billing_period_start: datetime
+    billing_period_end: datetime
+    billing_cycle: str
+    total_renewal_events: int = 0
+    gross_employer_share: Decimal = Decimal("0")
+    price_discount: int = 0
+    discounted_amount: Decimal = Decimal("0")
+    minimum_fee_applied: bool = False
+    billed_amount: Decimal = Decimal("0")
+    currency_code: str
+    stripe_invoice_id: Optional[str] = None
+    payment_status: str = "Pending"
+    paid_date: Optional[datetime] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployerBillLineDTO(BaseModel):
+    """Pure DTO for employer bill line item data"""
+    line_id: UUID
+    employer_bill_id: UUID
+    subscription_id: UUID
+    user_id: UUID
+    plan_id: UUID
+    plan_price: Decimal
+    benefit_rate: int
+    benefit_cap: Optional[Decimal] = None
+    benefit_cap_period: Optional[str] = None
+    employee_benefit: Decimal
+    renewal_date: datetime
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployerDomainDTO(BaseModel):
+    """Pure DTO for employer domain data"""
+    domain_id: UUID
+    institution_id: UUID
+    domain: str
+    is_active: bool = True
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadInterestDTO(BaseModel):
+    """Pure DTO for lead interest data (notify-me requests from marketing site / B2C app)."""
+    lead_interest_id: UUID
+    email: str
+    country_code: str
+    city_name: Optional[str] = None
+    zipcode: Optional[str] = None
+    zipcode_only: bool = False
+    interest_type: str
+    business_name: Optional[str] = None
+    message: Optional[str] = None
+    cuisine_id: Optional[UUID] = None
+    employee_count_range: Optional[str] = None
+    status: str
+    source: str
+    notified_date: Optional[datetime] = None
+    is_archived: bool = False
+    created_date: datetime
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -443,6 +661,18 @@ class MessagingPreferencesDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserFcmTokenDTO(BaseModel):
+    """Pure DTO for FCM device token. Ephemeral — tokens rotate and are deleted on logout."""
+    fcm_token_id: UUID
+    user_id: UUID
+    token: str
+    platform: str
+    created_date: datetime
+    updated_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # =============================================================================
 # SUBSCRIPTION & PLAN DTOs
 # =============================================================================
@@ -460,6 +690,7 @@ class SubscriptionDTO(BaseModel):
     subscription_status: Optional[str] = None  # Specific subscription status (Active/On Hold/Pending/Cancelled)
     hold_start_date: Optional[datetime] = None  # When subscription was put on hold
     hold_end_date: Optional[datetime] = None  # When subscription is expected to resume
+    early_renewal_threshold: Optional[int] = 10  # None = no early renewal; period-end only
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -472,9 +703,18 @@ class PlanDTO(BaseModel):
     plan_id: UUID
     market_id: UUID  # Market (country) this plan belongs to
     name: str
+    name_i18n: Optional[dict] = None
+    marketing_description: Optional[str] = None
+    marketing_description_i18n: Optional[dict] = None
+    features: Optional[List[str]] = None
+    features_i18n: Optional[dict] = None
+    cta_label: Optional[str] = None
+    cta_label_i18n: Optional[dict] = None
     credit: int
     price: Decimal
-    credit_worth: Decimal  # price / credit (local currency per credit), set by DB trigger
+    highlighted: bool = False
+    credit_cost_local_currency: Decimal  # price / credit (local currency per credit), set by DB trigger
+    credit_cost_usd: Decimal  # credit_cost_local_currency / currency_conversion_usd, set by DB trigger
     rollover: bool
     rollover_cap: Optional[Decimal]
     is_archived: bool = False
@@ -498,12 +738,145 @@ class InstitutionEntityDTO(BaseModel):
     credit_currency_id: UUID
     tax_id: str
     name: str
+    payout_provider_account_id: Optional[str] = None
+    payout_aggregator: Optional[str] = None
+    payout_onboarding_status: Optional[str] = None
     is_archived: bool = False
     status: Status
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierTermsDTO(BaseModel):
+    """Pure DTO for supplier terms — negotiated per-supplier institution."""
+    supplier_terms_id: UUID
+    institution_id: UUID
+    no_show_discount: int = 0
+    payment_frequency: PaymentFrequency = PaymentFrequency.DAILY
+    require_invoice: Optional[bool] = None
+    invoice_hold_days: Optional[int] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InstitutionBillPayoutDTO(BaseModel):
+    """Pure DTO for a single payout attempt on a bill. Append-only — retries insert new rows."""
+    bill_payout_id: UUID
+    institution_bill_id: UUID
+    provider: str
+    provider_transfer_id: Optional[str] = None
+    amount: Decimal
+    currency_code: str
+    status: BillPayoutStatus
+    idempotency_key: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    modified_by: Optional[UUID] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierInvoiceDTO(BaseModel):
+    """Pure DTO for core supplier invoice records. Country-specific fields in extension DTOs."""
+    supplier_invoice_id: UUID
+    institution_entity_id: UUID
+    country_code: str
+    invoice_type: SupplierInvoiceType
+    external_invoice_number: Optional[str] = None
+    issued_date: date
+    amount: Decimal
+    currency_code: str
+    tax_amount: Optional[Decimal] = None
+    tax_rate: Optional[Decimal] = None
+    # Document
+    document_storage_path: Optional[str] = None
+    document_format: Optional[str] = None
+    # Review
+    status: SupplierInvoiceStatus
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    # Audit
+    is_archived: bool = False
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierInvoiceARDTO(BaseModel):
+    """AR extension: AFIP Factura Electronica fields."""
+    supplier_invoice_id: UUID
+    cae_code: str
+    cae_expiry_date: date
+    afip_point_of_sale: str
+    supplier_cuit: str
+    recipient_cuit: Optional[str] = None
+    afip_document_type: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierInvoicePEDTO(BaseModel):
+    """PE extension: SUNAT CPE fields."""
+    supplier_invoice_id: UUID
+    sunat_serie: str
+    sunat_correlativo: str
+    cdr_status: Optional[str] = None
+    cdr_received_at: Optional[datetime] = None
+    supplier_ruc: str
+    recipient_ruc: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierInvoiceUSDTO(BaseModel):
+    """US extension: IRS 1099-NEC fields."""
+    supplier_invoice_id: UUID
+    tax_year: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BillInvoiceMatchDTO(BaseModel):
+    """Pure DTO for bill-to-invoice match records. Append-only junction table."""
+    match_id: UUID
+    institution_bill_id: UUID
+    supplier_invoice_id: UUID
+    matched_amount: Decimal
+    matched_by: UUID
+    matched_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierW9DTO(BaseModel):
+    """Pure DTO for US supplier W-9 tax records. One per entity (UNIQUE constraint)."""
+    w9_id: UUID
+    institution_entity_id: UUID
+    legal_name: str
+    business_name: Optional[str] = None
+    tax_classification: str
+    ein_last_four: str
+    address_line: str
+    document_storage_path: Optional[str] = None
+    is_archived: bool = False
+    collected_at: datetime
+    created_by: Optional[UUID] = None
+    modified_date: datetime
+    modified_by: UUID
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -524,6 +897,22 @@ class PaymentMethodDTO(BaseModel):
     is_archived: bool
     status: Status = Field(..., max_length=20)
     is_default: bool
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserPaymentProviderDTO(BaseModel):
+    """Pure DTO for a user's connected external payment provider account."""
+    user_payment_provider_id: UUID
+    user_id: UUID
+    provider: str
+    provider_customer_id: str
+    is_archived: bool = False
+    status: str
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -583,13 +972,15 @@ class RestaurantHolidaysDTO(BaseModel):
     """Pure DTO for restaurant holidays data"""
     holiday_id: UUID
     restaurant_id: UUID
-    country: str = Field(..., max_length=100)
+    country_code: str = Field(..., max_length=3)
     holiday_date: date
-    holiday_name: Optional[str] = Field(None, max_length=100)
+    holiday_name: str = Field(..., max_length=100)
     is_recurring: bool = False
-    recurring_month_day: Optional[str] = Field(None, max_length=10)
+    recurring_month: Optional[int] = Field(None, ge=1, le=12)
+    recurring_day: Optional[int] = Field(None, ge=1, le=31)
     status: Status
     is_archived: bool
+    source: str = Field(default="manual", max_length=20)
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -608,6 +999,7 @@ class NationalHolidayDTO(BaseModel):
     recurring_day: Optional[int] = Field(None, ge=1, le=31)
     status: Status = Field(default="Active", description="Status of the holiday (defaults to 'Active' if not set)")
     is_archived: bool = False
+    source: str = Field(default="manual", max_length=20)
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -646,6 +1038,11 @@ class PlatePickupLiveDTO(BaseModel):
     completion_time: Optional[datetime] = None
     expected_completion_time: Optional[datetime] = None
     confirmation_code: Optional[str] = None
+    completion_type: Optional[str] = None
+    extensions_used: int = 0
+    code_verified: bool = False
+    code_verified_time: Optional[datetime] = None
+    handed_out_time: Optional[datetime] = None
     created_date: datetime
     created_by: Optional[UUID] = None
     modified_by: UUID
@@ -687,6 +1084,74 @@ class DiscretionaryResolutionDTO(BaseModel):
     resolved_date: datetime
     created_date: datetime
     resolution_comment: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IngredientCatalogDTO(BaseModel):
+    """Pure DTO for ingredient catalog entries (global, not institution-scoped)."""
+    ingredient_id: UUID
+    name: str
+    name_display: str
+    name_es: Optional[str] = None
+    name_en: Optional[str] = None
+    name_pt: Optional[str] = None
+    off_taxonomy_id: Optional[str] = None
+    off_wikidata_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_source: Optional[str] = None
+    usda_fdc_id: Optional[int] = None
+    food_group: Optional[str] = None
+    image_enriched: bool = False
+    image_skipped: bool = False
+    usda_enriched: bool = False
+    usda_skipped: bool = False
+    source: str
+    is_verified: bool
+    created_date: datetime
+    modified_date: datetime
+    modified_by: UUID
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IngredientNutritionDTO(BaseModel):
+    """Pure DTO for per-ingredient nutritional data (Phase 7 — USDA enrichment)."""
+    nutrition_id: UUID
+    ingredient_id: UUID
+    source: str
+    per_amount_g: int
+    energy_kcal: Optional[Decimal] = None
+    protein_g: Optional[Decimal] = None
+    fat_g: Optional[Decimal] = None
+    carbohydrates_g: Optional[Decimal] = None
+    fiber_g: Optional[Decimal] = None
+    sugar_g: Optional[Decimal] = None
+    sodium_mg: Optional[Decimal] = None
+    fetched_date: date
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductIngredientDTO(BaseModel):
+    """Pure DTO for product ↔ ingredient junction rows."""
+    product_ingredient_id: UUID
+    product_id: UUID
+    ingredient_id: UUID
+    sort_order: int
+    created_date: datetime
+    modified_by: UUID
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IngredientAliasDTO(BaseModel):
+    """Pure DTO for regional ingredient name aliases."""
+    alias_id: UUID
+    ingredient_id: UUID
+    alias: str
+    region_code: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

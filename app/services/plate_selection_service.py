@@ -33,7 +33,6 @@ from app.services.credit_validation_service import (
 )
 from app.services.billing import (
     apply_subscription_renewal,
-    LOW_BALANCE_RENEWAL_THRESHOLD,
 )
 from app.services.restaurant_explorer_service import resolve_weekday_to_next_occurrence
 from .plate_selection_validation import (
@@ -151,31 +150,33 @@ def create_plate_selection_with_transactions(
                     },
                 )
 
-        # Step 2.75: Low-balance early renewal (only when renewal_date is in the future)
+        # Step 2.75: Low-balance early renewal (only when renewal_date is in the future and threshold is set)
         subscription = subscription_service.get_by_user(current_user["user_id"], db)
         if subscription:
-            balance = float(subscription.balance or 0)
-            renewal_date = subscription.renewal_date
-            if renewal_date is not None:
-                if renewal_date.tzinfo is None:
-                    renewal_date = renewal_date.replace(tzinfo=timezone.utc)
-                else:
-                    renewal_date = renewal_date.astimezone(timezone.utc)
-                now_utc = datetime.now(timezone.utc)
-                if balance < LOW_BALANCE_RENEWAL_THRESHOLD and renewal_date > now_utc:
-                    user_id = current_user.get("user_id")
-                    if isinstance(user_id, str):
-                        user_id = UUID(user_id)
-                    try:
-                        apply_subscription_renewal(
-                            subscription.subscription_id,
-                            db,
-                            modified_by=user_id,
-                            commit=True,
-                        )
-                        log_info(f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {LOW_BALANCE_RENEWAL_THRESHOLD}, renewal_date in future)")
-                    except (HTTPException, ValueError) as e:
-                        log_warning(f"Could not apply early renewal: {e}")
+            threshold = subscription.early_renewal_threshold
+            if threshold is not None:
+                balance = float(subscription.balance or 0)
+                renewal_date = subscription.renewal_date
+                if renewal_date is not None:
+                    if renewal_date.tzinfo is None:
+                        renewal_date = renewal_date.replace(tzinfo=timezone.utc)
+                    else:
+                        renewal_date = renewal_date.astimezone(timezone.utc)
+                    now_utc = datetime.now(timezone.utc)
+                    if balance < threshold and renewal_date > now_utc:
+                        user_id = current_user.get("user_id")
+                        if isinstance(user_id, str):
+                            user_id = UUID(user_id)
+                        try:
+                            apply_subscription_renewal(
+                                subscription.subscription_id,
+                                db,
+                                modified_by=user_id,
+                                commit=True,
+                            )
+                            log_info(f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {threshold}, renewal_date in future)")
+                        except (HTTPException, ValueError) as e:
+                            log_warning(f"Could not apply early renewal: {e}")
         
         # Step 3: NEW - Validate sufficient credits BEFORE creating any records
         credit_validation = validate_sufficient_credits(

@@ -3,12 +3,16 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.auth.security import create_access_token, verify_token, verify_password
 from app.utils.rate_limit import limiter
 from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.auth.captcha_guard import require_captcha_after_threshold
+from app.auth.ip_attempt_tracker import ip_tracker
 from app.dependencies.database import get_db
 from app.utils.log import log_info, log_warning
 from app.dto.models import UserDTO
-from app.services.crud_service import user_service, subscription_service, plan_service
+from app.services.crud_service import user_service
+from app.auth.utils import build_token_data, merge_subscription_token_claims, merge_onboarding_token_claims
 from app.services.entity_service import get_user_by_username
 from app.config import Status
+from app.config.settings import settings
 import psycopg2.extensions
 
 router = APIRouter(
@@ -16,24 +20,34 @@ router = APIRouter(
     tags=["Auth"]
 )
 
+_login_captcha = require_captcha_after_threshold(
+    action="login",
+    threshold=settings.LOGIN_CAPTCHA_THRESHOLD,
+    window_seconds=settings.LOGIN_CAPTCHA_WINDOW_SECONDS,
+)
+
 @router.post("/token")
 @limiter.limit("20/minute")
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
+    _captcha=Depends(_login_captcha),
 ):
+    ip = request.client.host
+
     # Retrieve an active user record by username using simple auth method
     try:
         user = get_user_by_username(form_data.username, db)
         if not user:
             log_warning(f"Authentication failed: username '{form_data.username}' not found")
+            ip_tracker.increment(ip, "login")
             raise HTTPException(status_code=400, detail="Username does not exist")
     except HTTPException:
-        # Re-raise HTTPException (already properly formatted)
         raise
     except Exception as e:
         log_warning(f"Authentication failed for username: {form_data.username} - {str(e)}")
+        ip_tracker.increment(ip, "login")
         raise HTTPException(status_code=400, detail="Username does not exist")
     
     # Debug logging for password verification
@@ -63,6 +77,7 @@ async def login(
     
     if not password_verified:
         log_warning(f"Invalid password for username: {form_data.username}")
+        ip_tracker.increment(ip, "login")
         raise HTTPException(status_code=400, detail="Incorrect password")
 
     # Block Inactive users (invite-flow users before password set, or admin-deactivated)
@@ -72,32 +87,52 @@ async def login(
             detail="Account not activated. Please set your password using the link from your invite email."
         )
     
-    # Log successful authentication
+    # Block Customer Comensal login on B2B platform (x-client-type: b2b)
+    client_type = request.headers.get("x-client-type", "").strip().lower()
+    if client_type == "b2b" and role_type == "Customer" and role_name == "Comensal":
+        from app.config.settings import get_settings
+        settings = get_settings()
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "customer_app_only",
+                "message": "Customer accounts must use the Vianda mobile app.",
+                "app_store_url": settings.APP_STORE_URL,
+                "play_store_url": settings.PLAY_STORE_URL,
+            }
+        )
+
+    # Successful auth — reset CAPTCHA counter for this IP
+    ip_tracker.reset(ip, "login")
     log_info(f"User authenticated successfully with id: {user.user_id}")
 
-    # Resolve credit_worth for JWT (single subscription per user; used by explore/by-city for savings).
-    # A future traveler program will allow ordering in other markets using the in-market subscription.
-    credit_worth = None
-    subscription_market_id = None
-    try:
-        subscription = subscription_service.get_by_user(user.user_id, db)
-        if subscription:
-            plan = plan_service.get_by_id(subscription.plan_id, db)
-            if plan:
-                credit_worth = float(plan.credit_worth)
-                subscription_market_id = str(subscription.market_id)
-    except Exception:
-        pass  # Optional: token works without credit_worth; by-city returns savings=0
+    token_data = build_token_data(user)
+    merge_subscription_token_claims(token_data, user.user_id, db)
+    merge_onboarding_token_claims(token_data, db)
 
-    token_data = {
-        "sub": str(user.user_id),
-        "role_type": role_type or "Unknown",
-        "role_name": role_name or "Unknown",
-        "institution_id": str(user.institution_id),
-    }
-    if credit_worth is not None and subscription_market_id is not None:
-        token_data["credit_worth"] = credit_worth
-        token_data["subscription_market_id"] = subscription_market_id
+    access_token = create_access_token(data=token_data)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/refresh")
+@limiter.limit("10/minute")
+async def refresh_token(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    user = user_service.get_by_id(current_user["user_id"], db)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if user.status == Status.INACTIVE:
+        raise HTTPException(
+            status_code=403,
+            detail="Account is inactive. Please contact support.",
+        )
+
+    token_data = build_token_data(user)
+    merge_subscription_token_claims(token_data, user.user_id, db)
+    merge_onboarding_token_claims(token_data, db)
 
     access_token = create_access_token(data=token_data)
     return {"access_token": access_token, "token_type": "bearer"}

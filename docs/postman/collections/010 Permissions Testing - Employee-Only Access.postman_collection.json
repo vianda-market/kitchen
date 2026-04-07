@@ -1029,7 +1029,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"currency_code\": \"ARS\",\n  \"credit_value\": 1.2,\n  \"status\": \"Active\"\n}"
+							"raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_local_currency\": 1.2\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/credit-currencies/",
@@ -3125,11 +3125,13 @@
 		},
 		{
 			"key": "adminUsername",
-			"value": "admin"
+			"value": "",
+			"description": "Set by environment or created via admin user registration"
 		},
 		{
 			"key": "adminPassword",
-			"value": "Admin123!"
+			"value": "",
+			"description": "Set by environment or created via admin user registration"
 		},
 		{
 			"key": "supplierUsername",
@@ -3143,19 +3145,23 @@
 		},
 		{
 			"key": "customerUsername",
-			"value": "customer"
+			"value": "",
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
 		},
 		{
 			"key": "customerPassword",
-			"value": "Customer123!"
+			"value": "",
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
 		},
 		{
 			"key": "superAdminUsername",
-			"value": "superadmin"
+			"value": "",
+			"description": "Set by environment variable"
 		},
 		{
 			"key": "superAdminPassword",
-			"value": "SuperAdmin1!"
+			"value": "",
+			"description": "Set by environment variable"
 		},
 		{
 			"key": "institutionAId",

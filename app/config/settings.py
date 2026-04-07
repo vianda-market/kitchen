@@ -1,5 +1,6 @@
 # config/settings.py
 import os
+from typing import List
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,24 +25,73 @@ class Settings(BaseSettings):
     B2B_INVITE_SET_PASSWORD_URL: str = ""
     # B2B app base URL (e.g. http://localhost:5173). Used for invite set-password links when B2B_INVITE_SET_PASSWORD_URL not set.
     B2B_FRONTEND_URL: str = ""
-    # B2C app base URL (e.g. http://localhost:8081). Used for password reset, signup verification, etc.
-    FRONTEND_URL: str = ""
 
     # Payment provider: "mock" (Stripe mock for dev) or "stripe" (live Stripe). Default mock for dev.
     PAYMENT_PROVIDER: str = "mock"
     # Supplier (institution) payout: "mock" or "stripe". Used after settlement → bill for restaurant payouts.
     SUPPLIER_PAYOUT_PROVIDER: str = "mock"
 
+    # Email provider: "smtp" (Gmail SMTP, default for dev) or "sendgrid" (production).
+    EMAIL_PROVIDER: str = "smtp"
+    SENDGRID_API_KEY: str = ""
+    EMAIL_FROM_ADDRESS: str = ""    # e.g. hello@vianda.market (falls back to FROM_EMAIL env var)
+    EMAIL_FROM_NAME: str = ""       # e.g. Vianda (falls back to FROM_NAME env var)
+    EMAIL_REPLY_TO: str = ""        # e.g. support@vianda.market
+
     # Stripe (required when PAYMENT_PROVIDER=stripe; use test keys sk_test_/pk_test_ for sandbox)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""  # Optional; for client-side Stripe Elements
+    # B2C Checkout Session (mode=setup): default success_url when POST body omits success_url
+    STRIPE_CUSTOMER_SETUP_SUCCESS_URL: str = ""
+    # Stripe Connect (supplier outbound payouts). SUPPLIER_PAYOUT_PROVIDER=stripe to activate.
+    STRIPE_CONNECT_WEBHOOK_SECRET: str = ""  # whsec_… from sandbox/live Connect webhook endpoint
+    STRIPE_PLATFORM_ACCOUNT_ID: str = ""    # acct_… of the Vianda platform account (optional; for logging)
+
+    # App store URLs for benefit employee invite emails (placeholder until apps are published)
+    APP_STORE_URL: str = "https://apps.apple.com/app/vianda/id_placeholder"
+    PLAY_STORE_URL: str = "https://play.google.com/store/apps/details?id=com.vianda.placeholder"
+    # B2C app password-set URL template for benefit employees (use {code} placeholder). Falls back to B2B URL if empty.
+    BENEFIT_INVITE_SET_PASSWORD_URL: str = ""
+    # B2C app deep link scheme for engagement emails (e.g. "vianda://plans"). Empty = use App Store/Play Store links only.
+    APP_DEEP_LINK_BASE: str = ""
 
     # Google API Keys per environment (read from .env only - never commit)
     # local and dev use GOOGLE_API_KEY_DEV; staging uses _STAGING; prod uses _PROD
     GOOGLE_API_KEY_DEV: str = ""
     GOOGLE_API_KEY_STAGING: str = ""
     GOOGLE_API_KEY_PROD: str = ""
+
+    # Mapbox Access Tokens per environment (read from .env only - never commit)
+    MAPBOX_ACCESS_TOKEN_DEV: str = ""
+    MAPBOX_ACCESS_TOKEN_STAGING: str = ""
+    MAPBOX_ACCESS_TOKEN_PROD: str = ""
+
+    # Address/geocoding provider: "mapbox" (default) or "google" (fallback)
+    ADDRESS_PROVIDER: str = "mapbox"
+
+    # Mapbox Static Images — style IDs and pin appearance
+    MAPBOX_STYLE_LIGHT: str = "mapbox/light-v11"
+    MAPBOX_STYLE_DARK: str = "mapbox/dark-v11"
+    MAPBOX_PIN_COLOR: str = "4a7c59"
+    MAPBOX_SNAPSHOT_MAX_PINS: int = 30
+    MAPBOX_SNAPSHOT_CACHE_SECONDS: int = 86400
+    MAPBOX_SNAPSHOT_ZOOM: int = 14
+
+    # GCS Configuration (empty = use local storage)
+    GCS_INTERNAL_BUCKET: str = ""
+    GCS_SUPPLIER_BUCKET: str = ""
+    GCS_CUSTOMER_BUCKET: str = ""
+    GCS_EMPLOYER_BUCKET: str = ""
+    GCS_SIGNED_URL_EXPIRATION_SECONDS: int = 3600
+    GCS_QR_SIGNED_URL_EXPIRATION_SECONDS: int = 86400
+    GCS_SIGNING_SA_EMAIL: str = ""  # Cloud Run: set to run_sa email; local: empty = default creds
+
+    # Product image upload: max file size in bytes (default 5 MB)
+    MAX_PRODUCT_IMAGE_BYTES: int = 5 * 1024 * 1024
+
+    # Supplier invoice document upload: max file size in bytes (default 10 MB)
+    MAX_INVOICE_DOCUMENT_BYTES: int = 10 * 1024 * 1024
 
     # Fixed institution IDs (must match seed.sql). Override via env if seed uses different UUIDs.
     VIANDA_CUSTOMERS_INSTITUTION_ID: str = "22222222-2222-2222-2222-222222222222"
@@ -72,7 +122,83 @@ class Settings(BaseSettings):
     # Enable/disable automatic archival
     AUTO_ARCHIVAL_ENABLED: bool = True
 
+    # i18n: supported API/UI locales (ISO 639-1 short codes)
+    DEFAULT_LOCALE: str = "en"
+    SUPPORTED_LOCALES: List[str] = ["en", "es", "pt"]
+
+    # Open Food Facts (OFF) — real-time ingredient autocomplete
+    OFF_ENABLED: bool = True                        # kill switch for OFF real-time calls
+    OFF_LOCAL_MIN_VERIFIED_RESULTS: int = 5         # min verified local results before calling OFF
+
+    # Ingredient enrichment cron — image phase (Wikidata, CC licensed, permanent storage)
+    WIKIDATA_ENRICHMENT_ENABLED: bool = False       # kill switch for Wikidata image cron
+    ENRICHMENT_BATCH_SIZE: int = 50                 # rows per cron run (shared by all enrichment phases)
+
+    # Ingredient enrichment cron — nutrition phase (USDA FoodData Central, Phase 7)
+    USDA_ENRICHMENT_ENABLED: bool = False           # kill switch for USDA nutrition cron
+
+    # QR code HMAC signing (HMAC-SHA256 secret for signed QR code URLs)
+    QR_HMAC_SECRET: str = ""
+
+    # Pickup timer configuration (B2C app reads these from scan-qr response)
+    PICKUP_COUNTDOWN_SECONDS: int = 300  # Timer duration in seconds (default 5 min)
+    PICKUP_MAX_EXTENSIONS: int = 3       # Max timer extensions allowed
+
+    # Handoff confirmation timeout (seconds after clerk marks Delivered before auto-completing)
+    HANDOFF_CONFIRMATION_TIMEOUT_SECONDS: int = 300
+
+    # Dispute auto-escalation (flags restaurants for Layer 2 code verification)
+    DISPUTE_AUTO_ESCALATION_RATE: float = 0.03    # 3% dispute rate threshold
+    DISPUTE_ESCALATION_MIN_ORDERS: int = 20        # Minimum orders before escalation applies
+    DISPUTE_ESCALATION_LOOKBACK_DAYS: int = 30     # Rolling window for rate calculation
+
+    # Portion complaint flag rate (size-1 + complaint, not size-1 alone)
+    PORTION_COMPLAINT_FLAG_RATE: float = 0.05      # 5% triggers restaurant SLA review
+
+    # Authenticated user rate limiting (middleware). Off by default for safe rollout.
+    RATE_LIMIT_ENABLED: bool = False
+    RATE_LIMIT_MAX_TRACKED_USERS: int = 10_000     # eviction threshold for in-memory buckets
+    RATE_LIMIT_EVICTION_AGE_SECONDS: int = 120     # stale bucket age before eviction
+
+    # Firebase Cloud Messaging (push notifications)
+    FIREBASE_CREDENTIALS_PATH: str = ""  # Path to Firebase service account JSON. Empty = push disabled.
+
+    # Spoonacular — future partnership only; data served transiently, never stored
+    # SPOONACULAR_API_KEY injected by GCP Secret Manager at runtime
+    SPOONACULAR_ENABLED: bool = False
+    SPOONACULAR_API_KEY: str = ""
+
+    # CORS: comma-separated allowed origins. Empty = allow all (local dev convenience).
+    CORS_ALLOWED_ORIGINS: str = ""
+
+    # reCAPTCHA v3: bot protection for public /leads/* endpoints. Empty = disabled (local dev).
+    RECAPTCHA_SECRET_KEY: str = ""
+    RECAPTCHA_SCORE_THRESHOLD: float = 0.3  # Minimum score (0.0 = bot, 1.0 = human)
+
+    # Conditional reCAPTCHA: per-endpoint thresholds and windows (0 = disabled for that endpoint)
+    LOGIN_CAPTCHA_THRESHOLD: int = 5
+    LOGIN_CAPTCHA_WINDOW_SECONDS: int = 900
+    SIGNUP_VERIFY_CAPTCHA_THRESHOLD: int = 3
+    SIGNUP_VERIFY_CAPTCHA_WINDOW_SECONDS: int = 900
+    FORGOT_PASSWORD_CAPTCHA_THRESHOLD: int = 3
+    FORGOT_PASSWORD_CAPTCHA_WINDOW_SECONDS: int = 900
+    FORGOT_USERNAME_CAPTCHA_THRESHOLD: int = 3
+    FORGOT_USERNAME_CAPTCHA_WINDOW_SECONDS: int = 900
+    RESET_PASSWORD_CAPTCHA_THRESHOLD: int = 3
+    RESET_PASSWORD_CAPTCHA_WINDOW_SECONDS: int = 900
+    CAPTCHA_MAX_TRACKED_IPS: int = 10_000
+    CAPTCHA_EVICTION_AGE_SECONDS: int = 1800
+
 settings = Settings()
+
+# Common email providers that cannot be registered as employer domains
+EMPLOYER_DOMAIN_BLACKLIST = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "yahoo.com",
+    "yahoo.co.uk", "yahoo.co.jp", "live.com", "msn.com", "aol.com",
+    "icloud.com", "me.com", "mac.com", "protonmail.com", "proton.me",
+    "mail.com", "zoho.com", "yandex.com", "yandex.ru", "tutanota.com",
+    "gmx.com", "gmx.net", "fastmail.com", "hey.com",
+}
 
 
 def get_vianda_customers_institution_id() -> UUID:
@@ -96,6 +222,20 @@ def get_google_api_key() -> str:
         key = settings.GOOGLE_API_KEY_PROD
     else:
         key = settings.GOOGLE_API_KEY_DEV  # fallback for unknown
+    return (key or "").strip()
+
+
+def get_mapbox_access_token() -> str:
+    """Return env-specific Mapbox access token. local/dev -> DEV; staging -> STAGING; prod -> PROD."""
+    env = (os.getenv("ENVIRONMENT") or "local").lower()
+    if env in ("local", "dev"):
+        key = settings.MAPBOX_ACCESS_TOKEN_DEV
+    elif env == "staging":
+        key = settings.MAPBOX_ACCESS_TOKEN_STAGING
+    elif env == "prod":
+        key = settings.MAPBOX_ACCESS_TOKEN_PROD
+    else:
+        key = settings.MAPBOX_ACCESS_TOKEN_DEV
     return (key or "").strip()
 
 

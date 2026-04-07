@@ -23,9 +23,17 @@ class CustomerPaymentMethodListResponseSchema(BaseModel):
 
 class SetupSessionRequestSchema(BaseModel):
     """Optional request body for POST /customer/payment-methods/setup-session"""
+    success_url: Optional[str] = Field(
+        None,
+        description="Stripe Checkout success_url after setup completes",
+    )
+    cancel_url: Optional[str] = Field(
+        None,
+        description="Stripe Checkout cancel_url; defaults to success_url when omitted",
+    )
     return_url: Optional[str] = Field(
         None,
-        description="URL to redirect after Stripe Checkout (mode=setup) completes",
+        description="Deprecated alias for success_url",
     )
 
 

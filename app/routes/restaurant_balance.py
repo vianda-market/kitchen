@@ -14,7 +14,7 @@ automatically by the system when:
 - Transactions are processed
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Response
 from typing import Optional, List
 from uuid import UUID
 import psycopg2.extensions
@@ -34,6 +34,7 @@ from app.utils.log import log_info
 from app.services.error_handling import handle_business_operation
 from app.security.institution_scope import InstitutionScope
 from app.security.entity_scoping import EntityScopingService, ENTITY_RESTAURANT_BALANCE
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(
     prefix="/restaurant-balances",
@@ -53,16 +54,18 @@ def _restaurant_balance_not_found() -> HTTPException:
 # Must be registered before /{restaurant_id} so /enriched is not parsed as restaurant_id.
 @router.get("/enriched", response_model=List[RestaurantBalanceEnrichedResponseSchema])
 def get_all_enriched_restaurant_balances(
+    response: Response,
+    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
     Get all restaurant balances with enriched data (institution name, entity name, restaurant name, country) (read-only).
-    
+
     **Note: This is a read-only endpoint. Restaurant balances are automatically
     managed by the backend through transactions and billing operations. They
     cannot be created or modified via API.**
-    
+
     Restaurant balances are updated automatically when:
     - Customers place orders (via plate selection)
     - Customers arrive at restaurants (via QR code scan)
@@ -75,15 +78,19 @@ def get_all_enriched_restaurant_balances(
         balances = get_enriched_restaurant_balances(
             db,
             scope=scope,
-            include_archived=False
+            include_archived=False,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
         log_info(f"Retrieved {len(balances)} enriched restaurant balances")
         return balances
-    
-    return handle_business_operation(
+
+    result = handle_business_operation(
         _get_enriched_restaurant_balances,
         "enriched restaurant balances retrieval"
     )
+    set_pagination_headers(response, result)
+    return result
 
 # GET /restaurant-balances/enriched/{restaurant_id} – Get single enriched restaurant balance (read-only)
 @router.get("/enriched/{restaurant_id}", response_model=RestaurantBalanceEnrichedResponseSchema)

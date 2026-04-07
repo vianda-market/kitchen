@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from psycopg2.extras import RealDictCursor
 
+from app.utils.db import db_read
 from app.utils.db_pool import get_db_pool
 from app.utils.log import logger
 from app.config import Status
@@ -23,6 +24,21 @@ GLOBAL_MARKET_ID = UUID("00000000-0000-0000-0000-000000000001")
 def is_global_market(market_id: Optional[UUID]) -> bool:
     """Return True if market_id is the Global Marketplace sentinel."""
     return market_id is not None and market_id == GLOBAL_MARKET_ID
+
+
+def default_language_for_country_code(country_code: str) -> str:
+    """
+    Default UI language for a market from ISO 3166-1 alpha-2 country code.
+    AR/PE/CL/MX -> es; US/CA -> en; BR -> pt; else en.
+    """
+    cc = (country_code or "").strip().upper()
+    if cc in ("AR", "PE", "CL", "MX"):
+        return "es"
+    if cc in ("US", "CA"):
+        return "en"
+    if cc == "BR":
+        return "pt"
+    return "en"
 
 
 def reject_global_market_for_entity(market_id: Optional[UUID], entity_name: str) -> None:
@@ -49,6 +65,37 @@ def _serialize_market(market: dict) -> dict:
     return m
 
 
+def get_markets_with_coverage(db) -> List[dict]:
+    """
+    Return active non-global markets that have at least one
+    institution -> restaurant -> plate -> plate_kitchen_days chain, all active.
+    Used by GET /leads/markets (default, no audience param).
+    """
+    query = """
+        SELECT m.country_code, m.country_name, m.language,
+               m.phone_dial_code, m.phone_local_digits
+        FROM market_info m
+        WHERE m.status = 'Active'
+          AND m.is_archived = FALSE
+          AND m.market_id != %s
+          AND EXISTS (
+              SELECT 1
+              FROM institution_info i
+              JOIN restaurant_info r ON r.institution_id = i.institution_id
+              JOIN plate_info p ON p.restaurant_id = r.restaurant_id
+              JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+              WHERE i.market_id = m.market_id
+                AND i.status = 'Active' AND i.is_archived = FALSE
+                AND r.status = 'Active' AND r.is_archived = FALSE
+                AND p.is_archived = FALSE
+                AND pkd.status = 'Active' AND pkd.is_archived = FALSE
+          )
+        ORDER BY m.country_name
+    """
+    rows = db_read(query, (str(GLOBAL_MARKET_ID),), connection=db)
+    return [dict(r) for r in rows] if rows else []
+
+
 class MarketService:
     """Service for managing markets (country-based subscription regions)"""
 
@@ -73,7 +120,7 @@ class MarketService:
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = """
-                    SELECT 
+                    SELECT
                         m.market_id,
                         m.country_name,
                         m.country_code,
@@ -82,6 +129,9 @@ class MarketService:
                         c.currency_name,
                         m.timezone,
                         m.kitchen_close_time,
+                        m.language,
+                        m.phone_dial_code,
+                        m.phone_local_digits,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -129,7 +179,7 @@ class MarketService:
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         m.market_id,
                         m.country_name,
                         m.country_code,
@@ -138,6 +188,9 @@ class MarketService:
                         c.currency_name,
                         m.timezone,
                         m.kitchen_close_time,
+                        m.language,
+                        m.phone_dial_code,
+                        m.phone_local_digits,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -178,7 +231,7 @@ class MarketService:
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         m.market_id,
                         m.country_name,
                         m.country_code,
@@ -187,6 +240,9 @@ class MarketService:
                         c.currency_name,
                         m.timezone,
                         m.kitchen_close_time,
+                        m.language,
+                        m.phone_dial_code,
+                        m.phone_local_digits,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -219,7 +275,8 @@ class MarketService:
         timezone: str,
         modified_by: UUID,
         status: Status = Status.ACTIVE,
-        kitchen_close_time: Optional[time] = None
+        kitchen_close_time: Optional[time] = None,
+        language: Optional[str] = None,
     ) -> dict:
         """
         Create a new market.
@@ -241,6 +298,7 @@ class MarketService:
         
         try:
             kct = kitchen_close_time if kitchen_close_time is not None else time(13, 30)
+            lang = language if language is not None else default_language_for_country_code(country_code)
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     INSERT INTO market_info (
@@ -249,10 +307,11 @@ class MarketService:
                         credit_currency_id,
                         timezone,
                         kitchen_close_time,
+                        language,
                         status,
                         modified_by
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING 
                         market_id,
                         country_name,
@@ -260,6 +319,7 @@ class MarketService:
                         credit_currency_id,
                         timezone,
                         kitchen_close_time,
+                        language,
                         is_archived,
                         status,
                         created_date,
@@ -270,6 +330,7 @@ class MarketService:
                     str(credit_currency_id),
                     timezone,
                     kct,
+                    lang,
                     status.value,
                     str(modified_by)
                 ))
@@ -279,7 +340,7 @@ class MarketService:
                 
                 # Fetch enriched market with currency info
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         m.market_id,
                         m.country_name,
                         m.country_code,
@@ -288,6 +349,9 @@ class MarketService:
                         c.currency_name,
                         m.timezone,
                         m.kitchen_close_time,
+                        m.language,
+                        m.phone_dial_code,
+                        m.phone_local_digits,
                         m.is_archived,
                         m.status,
                         m.created_date,
@@ -322,7 +386,8 @@ class MarketService:
         timezone: Optional[str] = None,
         kitchen_close_time: Optional[time] = None,
         status: Optional[Status] = None,
-        is_archived: Optional[bool] = None
+        is_archived: Optional[bool] = None,
+        language: Optional[str] = None,
     ) -> Optional[dict]:
         """
         Update an existing market.
@@ -376,6 +441,10 @@ class MarketService:
             if is_archived is not None:
                 updates.append("is_archived = %s")
                 params.append(is_archived)
+
+            if language is not None:
+                updates.append("language = %s")
+                params.append(language)
             
             if not updates:
                 # No updates provided

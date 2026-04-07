@@ -81,7 +81,7 @@ POST /users/
   "password": "SecurePassword123!",
   "first_name": "John",
   "last_name": "Doe",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -93,7 +93,7 @@ POST /users/
 - `username` (string): Unique username (min 3, max 100 characters)
 - `email` (EmailStr): Valid email address
 - `password` (string): Password (min 8 characters)
-- `cellphone` (string): Phone number (max 20 characters)
+- `mobile_number` (string): Optional; **E.164** if provided (e.g. `+14155552671`).
 
 ### Optional Fields
 
@@ -117,7 +117,7 @@ Content-Type: application/json
   "password": "SecurePassword123!",
   "first_name": "Admin",
   "last_name": "User",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -137,7 +137,7 @@ Content-Type: application/json
   "password": "SecurePassword123!",
   "first_name": "Manager",
   "last_name": "User",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -157,7 +157,7 @@ Content-Type: application/json
   "password": "SecurePassword123!",
   "first_name": "Operator",
   "last_name": "User",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -177,7 +177,7 @@ Content-Type: application/json
   "password": "SecurePassword123!",
   "first_name": "Supplier",
   "last_name": "Admin",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -197,7 +197,7 @@ Content-Type: application/json
   "password": "SecurePassword123!",
   "first_name": "Customer",
   "last_name": "User",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 
@@ -283,7 +283,7 @@ Content-Type: application/json
   "username": "test.user",
   "email": "test@example.com",
   "password": "SecurePassword123!",
-  "cellphone": "1234567890"
+  "mobile_number": "+14155552671"
 }
 ```
 

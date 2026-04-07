@@ -52,8 +52,8 @@ def _ensure_plan_for_market(cursor, market_id, modified_by, plan_id=None):
         return row[0]
     pid = plan_id or str(uuid4())
     cursor.execute("""
-        INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_worth, rollover, is_archived, status, modified_by, modified_date)
-        VALUES (%s, %s, 'Test Plan', 10, 100.0, 10.0, TRUE, FALSE, 'Active'::status_enum, %s, CURRENT_TIMESTAMP)
+        INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by, modified_date)
+        VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, TRUE, FALSE, 'Active'::status_enum, %s, CURRENT_TIMESTAMP)
     """, (pid, market_id, modified_by))
     return pid
 

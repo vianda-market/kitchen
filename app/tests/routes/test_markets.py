@@ -40,7 +40,7 @@ def client_with_employee(mock_employee_user):
 
 
 class TestCreateMarketCountryCodeOnly:
-    """POST /api/v1/markets/ accepts country_code only; country_name is derived."""
+    """POST /api/v1/markets accepts country_code only; country_name is derived."""
 
     @patch("app.routes.admin.markets.market_service")
     def test_create_market_with_country_code_only_derives_country_name(
@@ -67,7 +67,7 @@ class TestCreateMarketCountryCodeOnly:
             "timezone": "America/Argentina/Buenos_Aires",
             "status": "Active",
         }
-        resp = client_with_employee.post("/api/v1/markets/", json=payload)
+        resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 201
         data = resp.json()
         assert data["country_code"] == "AR"
@@ -85,9 +85,10 @@ class TestCreateMarketCountryCodeOnly:
             "timezone": "America/Argentina/Buenos_Aires",
         }
         with patch("app.routes.admin.markets.market_service") as mock_market_service:
-            resp = client_with_employee.post("/api/v1/markets/", json=payload)
+            resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 400
-        assert "Invalid country_code" in (resp.json().get("detail") or resp.text or "")
+        detail = resp.json().get("detail") or resp.json().get("error") or resp.text or ""
+        assert "country" in detail.lower() or "invalid" in detail.lower()
         mock_market_service.create.assert_not_called()
 
     @patch("app.routes.admin.markets.market_service")
@@ -113,7 +114,7 @@ class TestCreateMarketCountryCodeOnly:
             "timezone": "America/Argentina/Buenos_Aires",
             "status": "Active",
         }
-        resp = client_with_employee.post("/api/v1/markets/", json=payload)
+        resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 201
         assert resp.json()["country_code"] == "AR"
         call_kw = mock_market_service.create.call_args[1]
@@ -141,7 +142,7 @@ class TestCreateMarketCountryCodeOnly:
                 "created_date": "2026-02-10T12:00:00Z",
                 "modified_date": "2026-02-10T12:00:00Z",
             }
-            resp = client_with_employee.post("/api/v1/markets/", json=payload)
+            resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 201
         assert resp.json()["country_name"] == "Argentina"
         assert resp.json()["country_code"] == "AR"

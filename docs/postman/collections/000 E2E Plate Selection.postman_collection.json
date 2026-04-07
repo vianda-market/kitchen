@@ -107,12 +107,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "superadmin",
+                  "value": "{{superAdminUsername}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "SuperAdmin1!",
+                  "value": "{{superAdminPassword}}",
                   "type": "text"
                 }
               ]
@@ -362,7 +362,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value\": 1400\n}",
+              "raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_local_currency\": 1400\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -395,13 +395,15 @@
                   "if (pm.response.code === 201) {",
                   "    const body = pm.response.json();",
                   "    pm.collectionVariables.set(\"planMarketId\", body.market_id);",
+                  "    pm.environment.set(\"planMarketId\", body.market_id);",
+                  "    pm.globals.set(\"planMarketId\", body.market_id);",
                   "    console.log(\"✅ Created Argentina market:\", body.market_id);",
                   "} else if (pm.response.code === 409) {",
                   "    const planCreditCurrencyId = pm.collectionVariables.get(\"planCreditCurrencyId\");",
                   "    pm.sendRequest((pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\")) + \"/api/v1/markets\", function (err, res) {",
                   "        if (!err && res.code === 200) {",
                   "            const ar = res.json().find(m => m.country_code === 'AR');",
-                  "            if (ar) pm.collectionVariables.set(\"planMarketId\", ar.market_id);",
+                  "            if (ar) { pm.collectionVariables.set(\"planMarketId\", ar.market_id); pm.environment.set(\"planMarketId\", ar.market_id); pm.globals.set(\"planMarketId\", ar.market_id); }",
                   "        }",
                   "    });",
                   "}"
@@ -464,6 +466,8 @@
                   "        // Store the first market (Argentina) for plan creation",
                   "        const defaultMarket = markets.find(m => m.country_code === 'AR') || markets[0];",
                   "        pm.collectionVariables.set(\"planMarketId\", defaultMarket.market_id);",
+                  "        pm.environment.set(\"planMarketId\", defaultMarket.market_id);",
+                  "        pm.globals.set(\"planMarketId\", defaultMarket.market_id);",
                   "        pm.collectionVariables.set(\"planMarketCountry\", defaultMarket.country_name);",
                   "        pm.collectionVariables.set(\"planMarketCountryCode\", defaultMarket.country_code || \"AR\");",
                   "        pm.collectionVariables.set(\"planMarketCurrency\", defaultMarket.currency_code);",
@@ -523,6 +527,8 @@
                   "",
                   "    if (body.plan_id) {",
                   "        pm.collectionVariables.set(\"planId\", body.plan_id);",
+                  "        pm.environment.set(\"planId\", body.plan_id);",
+                  "        pm.globals.set(\"planId\", body.plan_id);",
                   "        console.log(\"Set planId:\", body.plan_id);",
                   "    } else {",
                   "        console.log(\"plan_id not found in response!\");",
@@ -782,12 +788,12 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "superadmin",
+                  "value": "{{superAdminUsername}}",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "SuperAdmin1!",
+                  "value": "{{superAdminPassword}}",
                   "type": "text"
                 }
               ]
@@ -1023,7 +1029,124 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"Supplier\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"cellphone\": \"1234567890\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
+              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"Supplier\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"mobile_number\": \"+15005550006\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Admin User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Normalized shared admin for downstream collections (001, 008, 010)",
+                  "const username = 'vianda_admin';",
+                  "const email = 'vianda_admin@example.com';",
+                  "const password = 'Admin123!';",
+                  "",
+                  "let raw = pm.request.body.raw;",
+                  "let payload = JSON.parse(raw);",
+                  "payload.username = username;",
+                  "payload.email = email;",
+                  "payload.password = password;",
+                  "",
+                  "// Internal Admin belongs to Vianda Enterprises",
+                  "payload.institution_id = '11111111-1111-1111-1111-111111111111';",
+                  "payload.role_type = 'Internal';",
+                  "payload.role_name = 'Admin';",
+                  "",
+                  "// Global market for Internal users",
+                  "payload.market_id = '00000000-0000-0000-0000-000000000001';",
+                  "",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "",
+                  "pm.collectionVariables.set('adminUsername', username);",
+                  "pm.collectionVariables.set('adminEmail', email);",
+                  "pm.collectionVariables.set('adminPassword', password);",
+                  "console.log('Using shared admin:', username, 'email:', email);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 201 && body.user_id) {",
+                  "    const id = body.user_id;",
+                  "    pm.collectionVariables.set('adminUserId', id);",
+                  "    pm.environment.set('adminUsername', 'vianda_admin');",
+                  "    pm.environment.set('adminPassword', 'Admin123!');",
+                  "    pm.environment.set('adminUserId', id);",
+                  "    pm.globals.set('adminUsername', 'vianda_admin');",
+                  "    pm.globals.set('adminPassword', 'Admin123!');",
+                  "    pm.globals.set('adminUserId', id);",
+                  "    pm.test('Store admin user ID', () => { pm.expect(id).to.be.ok; });",
+                  "    console.log('adminUserId set; env updated for downstream collections.');",
+                  "} else if (pm.response.code === 400 && body.detail && (body.detail + '').toLowerCase().includes('exist')) {",
+                  "    const token = pm.collectionVariables.get('authToken') || pm.environment.get('authToken');",
+                  "    const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl') || 'http://localhost:8000';",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/v1/users/lookup?username=vianda_admin',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, (err, res) => {",
+                  "        pm.test('Store admin user ID', function () {",
+                  "            if (err || res.code !== 200) {",
+                  "                pm.expect.fail('Admin exists but could not fetch: ' + (err ? err.message : (res && res.json() ? res.json().detail : 'unknown')));",
+                  "            } else {",
+                  "                const u = res.json();",
+                  "                pm.expect(u && u.user_id).to.be.ok;",
+                  "                if (u && u.user_id) {",
+                  "                    const id = u.user_id;",
+                  "                    pm.collectionVariables.set('adminUserId', id);",
+                  "                    pm.environment.set('adminUserId', id);",
+                  "                    pm.globals.set('adminUserId', id);",
+                  "                    pm.environment.set('adminUsername', 'vianda_admin');",
+                  "                    pm.environment.set('adminPassword', 'Admin123!');",
+                  "                    pm.globals.set('adminUsername', 'vianda_admin');",
+                  "                    pm.globals.set('adminPassword', 'Admin123!');",
+                  "                    console.log('Admin already existed; fetched user_id:', id);",
+                  "                }",
+                  "            }",
+                  "        });",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Store admin user ID', () => pm.expect.fail('Unexpected response: ' + pm.response.code + ' - ' + (body.detail || JSON.stringify(body))));",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"vianda_admin\",\n    \"email\": \"vianda_admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"Internal\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"mobile_number\": \"+15005550007\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2184,7 +2307,6 @@
                   "// Prepare payload for restaurant holiday creation",
                   "const payload = {",
                   "    restaurant_id: restaurantId,",
-                  "    country: \"Argentina\",",
                   "    holiday_date: holidayDate,",
                   "    holiday_name: \"Restaurant Maintenance Day\",",
                   "    is_recurring: false",
@@ -2215,7 +2337,8 @@
                   "    pm.expect(body).to.have.property(\"restaurant_id\");",
                   "    pm.expect(body).to.have.property(\"holiday_date\");",
                   "    pm.expect(body).to.have.property(\"holiday_name\");",
-                  "    pm.expect(body).to.have.property(\"country\");",
+                  "    pm.expect(body).to.have.property(\"country_code\");",
+                  "    pm.expect(body).to.have.property(\"source\");",
                   "    pm.expect(body).to.have.property(\"is_recurring\");",
                   "    ",
                   "    // Store holiday_id for potential future use",
@@ -2238,7 +2361,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurant_id\": \"\",\n  \"country_code\": \"AR\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
+              "raw": "{\n  \"restaurant_id\": \"\",\n  \"holiday_date\": \"\",\n  \"holiday_name\": \"Restaurant Maintenance Day\",\n  \"is_recurring\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2586,6 +2709,8 @@
                   "    pm.expect(cities).to.be.an(\"array\");",
                   "    if (cities.length > 0) {",
                   "        pm.collectionVariables.set(\"planCityId\", cities[0].city_id);",
+                  "        pm.environment.set(\"planCityId\", cities[0].city_id);",
+                  "        pm.globals.set(\"planCityId\", cities[0].city_id);",
                   "        console.log(\"✅ Set planCityId:\", cities[0].city_id, \"(\", cities[0].name, \")\");",
                   "    }",
                   "});"
@@ -2720,7 +2845,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"cellphone\": \"9876543210\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_id\": \"{{planCityId}}\"\n}",
+              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"mobile_number\": \"+14155552671\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_id\": \"{{planCityId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5092,12 +5217,12 @@
           "urlencoded": [
             {
               "key": "username",
-              "value": "superadmin",
+              "value": "{{superAdminUsername}}",
               "type": "text"
             },
             {
               "key": "password",
-              "value": "SuperAdmin1!",
+              "value": "{{superAdminPassword}}",
               "type": "text"
             }
           ]
@@ -5400,9 +5525,16 @@
         "packages": {},
         "requests": {},
         "exec": [
-          "// E2E uses minimal seed: superadmin / SuperAdmin1! only. Force these so Login works regardless of env/globals.",
-          "pm.collectionVariables.set(\"adminUsername\", \"superadmin\");",
-          "pm.collectionVariables.set(\"adminPassword\", \"SuperAdmin1!\");"
+          "// Pull superadmin credentials from environment (set in Postman environment: superAdminUsername, superAdminPassword).",
+          "const su = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername');",
+          "if (su) pm.collectionVariables.set('superAdminUsername', su);",
+          "const sp = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword');",
+          "if (sp) pm.collectionVariables.set('superAdminPassword', sp);",
+          "// Pull admin credentials if set by a previous collection run.",
+          "const au = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+          "if (au) pm.collectionVariables.set('adminUsername', au);",
+          "const ap = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+          "if (ap) pm.collectionVariables.set('adminPassword', ap);"
         ]
       }
     },
@@ -5425,12 +5557,24 @@
       "type": "string"
     },
     {
+      "key": "superAdminUsername",
+      "value": "",
+      "description": "Set via Postman environment (e.g. superadmin)"
+    },
+    {
+      "key": "superAdminPassword",
+      "value": "",
+      "description": "Set via Postman environment (e.g. SuperAdmin1!)"
+    },
+    {
       "key": "adminUsername",
-      "value": "superadmin"
+      "value": "",
+      "description": "Set by Create Admin User request"
     },
     {
       "key": "adminPassword",
-      "value": "SuperAdmin1!"
+      "value": "",
+      "description": "Set by Create Admin User request"
     },
     {
       "key": "institutionId",

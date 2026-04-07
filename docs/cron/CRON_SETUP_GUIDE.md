@@ -219,7 +219,7 @@ export USE_DATABASE_ARCHIVAL_CONFIG=false
 
 # Database connection for archival jobs
 export DB_HOST=localhost
-export DB_NAME=kitchen_db_prod
+export DB_NAME=kitchen
 export DB_USER=kitchen_user
 export DB_PASSWORD=your_password
 ```
@@ -237,7 +237,7 @@ INSERT INTO user_info (
     hashed_password, 
     first_name, 
     last_name, 
-    cellphone,
+    mobile_number,
     modified_by
 ) VALUES (
     '00000000-0000-0000-0000-000000000001',  -- Update SYSTEM_USER_ID in archival_job.py
