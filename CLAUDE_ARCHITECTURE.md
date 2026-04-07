@@ -119,6 +119,6 @@ Request
 
 ## Scoping
 
-- **Employee:** Global (all institutions).
+- **Internal:** Global (all institutions).
 - **Supplier:** Scoped to `institution_id` from JWT.
 - **EntityScopingService** (`app/security/entity_scoping.py`) maps entity types to scope logic for both base and enriched endpoints.
