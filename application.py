@@ -527,6 +527,18 @@ def create_app() -> FastAPI:
     v1_admin_cuisines_router.include_router(admin_cuisines_router)
     app.include_router(v1_admin_cuisines_router)
 
+    # Ad click tracking (user-facing, captures gclid/fbclid from frontend)
+    from app.routes.ad_tracking import router as ad_tracking_router
+    v1_ad_tracking_router = create_versioned_router("api", ["Ad Tracking"], APIVersion.V1)
+    v1_ad_tracking_router.include_router(ad_tracking_router)
+    app.include_router(v1_ad_tracking_router)
+
+    # Admin ad zones (geographic flywheel management)
+    from app.routes.admin.ad_zones import router as admin_ad_zones_router
+    v1_admin_ad_zones_router = create_versioned_router("api", ["Admin Ad Zones"], APIVersion.V1)
+    v1_admin_ad_zones_router.include_router(admin_ad_zones_router)
+    app.include_router(v1_admin_ad_zones_router)
+
     # Maps (static map snapshots for B2C Explore)
     from app.routes.maps import router as maps_router
     v1_maps_router = create_versioned_router("api", ["Maps"], APIVersion.V1)
