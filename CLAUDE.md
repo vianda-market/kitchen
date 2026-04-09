@@ -6,22 +6,27 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, routes, or subsystems.
 
 ## Never Do These
-- Never run or write migrations — tear down and rebuild: `bash app/db/build_kitchen_db.sh`
 - Never pass UUID directly to psycopg2 — always `str(uuid_value)`
 - Never register routes directly to `app` — always use `create_versioned_router()`
 - Never write Python unit tests for services — use Postman collections (see Testing below)
 - Never store secrets in code
 - Never pass `page`/`page_size` pagination params in cron jobs or internal service calls — pagination is for HTTP routes only
+- Never edit an already-applied migration file — write a new one instead
 
 ## Essential Commands
-- **Rebuild DB:** `bash app/db/build_kitchen_db.sh`
+- **Apply migrations:** `bash app/db/migrate.sh` (incremental — preserves data)
+- **Rebuild DB (fresh):** `bash app/db/build_kitchen_db.sh` (full tear-down — use for new environments or clean reset only)
 - **Import check:** `python3 -c "from application import app; print('OK')"`
 - **Run tests:** `pytest app/tests/`
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 
 ## DB Schema Change — Sync All Layers (in order)
-When adding/modifying any column: `schema.sql` → `trigger.sql` → `seed.sql` → `app/dto/models.py` → `app/schemas/consolidated_schemas.py`
+**Schema changes use migration files.** Write a migration in `app/db/migrations/NNNN_description.sql`, then update `schema.sql` to match.
+
+Migration file → `schema.sql` → `trigger.sql` → `seed/reference_data.sql` (if needed) → `app/dto/models.py` → `app/schemas/consolidated_schemas.py`
+
+Apply with `bash app/db/migrate.sh`. Full rebuild (`build_kitchen_db.sh`) is for fresh environments only — never use it to apply incremental changes on a database with test data you want to keep.
 
 - History tables (`audit.*`) must mirror their main table — triggers must INSERT the new column
 - DTOs define which fields CRUDService writes to DB — **missing field in DTO = silently dropped on insert**
@@ -81,7 +86,10 @@ Server-side pagination is **opt-in per route** — not all endpoints need it.
 - **All Pydantic schemas:** `app/schemas/consolidated_schemas.py`
 - **All DTOs:** `app/dto/models.py`
 - **Leads (public/no-auth):** `app/routes/leads.py`
-- **DB files:** `app/db/schema.sql`, `trigger.sql`, `seed.sql`, `index.sql`
+- **DB files:** `app/db/schema.sql`, `trigger.sql`, `index.sql`
+- **Migrations:** `app/db/migrations/` (incremental schema changes)
+- **Seed data:** `app/db/seed/reference_data.sql` (all envs), `app/db/seed/dev_fixtures.sql` (dev only)
+- **DB scripts:** `app/db/migrate.sh` (incremental), `app/db/build_kitchen_db.sh` (full rebuild)
 
 ## Reference Map — Read When
 | Document | Read when |

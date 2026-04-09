@@ -519,6 +519,40 @@ class LeadInterestDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RestaurantLeadDTO(BaseModel):
+    """Pure DTO for restaurant lead data (vetting pipeline applications)."""
+    restaurant_lead_id: UUID
+    business_name: str
+    contact_name: str
+    contact_email: str
+    contact_phone: str
+    country_code: str
+    city_name: str
+    years_in_operation: int
+    employee_count_range: str
+    kitchen_capacity_daily: int
+    website_url: Optional[str] = None
+    referral_source: str
+    message: Optional[str] = None
+    vetting_answers: dict = {}
+    lead_status: str
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    institution_id: Optional[UUID] = None
+    gclid: Optional[str] = None
+    fbclid: Optional[str] = None
+    fbc: Optional[str] = None
+    fbp: Optional[str] = None
+    event_id: Optional[str] = None
+    source_platform: Optional[str] = None
+    is_archived: bool = False
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CityDTO(BaseModel):
     """Pure DTO for city data (supported cities for user onboarding and address scoping)."""
     city_id: UUID

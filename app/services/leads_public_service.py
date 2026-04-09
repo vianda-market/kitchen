@@ -9,6 +9,7 @@ No external API calls. These are read-only projections for the marketing site.
 from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2.extensions
+import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 
 from app.config.enums import InterestType
@@ -276,3 +277,86 @@ def get_lead_interests(
         connection=db,
     )
     return ([dict(r) for r in rows] if rows else [], total)
+
+
+# ---------------------------------------------------------------------------
+# Restaurant Lead (vetting pipeline)
+# ---------------------------------------------------------------------------
+
+VALID_REFERRAL_SOURCES = {"ad", "referral", "search", "other"}
+
+
+def create_restaurant_lead(
+    data: dict,
+    db: psycopg2.extensions.connection,
+) -> Optional[dict]:
+    """
+    Insert a new restaurant lead application and link cuisine selections.
+    Returns the created row or None on validation failure.
+    """
+    referral_source = (data.get("referral_source") or "").strip().lower()
+    if referral_source not in VALID_REFERRAL_SOURCES:
+        return None
+
+    cuisine_ids = data.get("cuisine_ids") or []
+    if not cuisine_ids:
+        return None
+
+    email = (data.get("contact_email") or "").strip().lower()
+    country_code = (data.get("country_code") or "").strip().upper()
+
+    with db.cursor(cursor_factory=RealDictCursor) as cursor:
+        cursor.execute(
+            """
+            INSERT INTO core.restaurant_lead (
+                business_name, contact_name, contact_email, contact_phone,
+                country_code, city_name,
+                years_in_operation, employee_count_range, kitchen_capacity_daily,
+                website_url, referral_source, message, vetting_answers,
+                gclid, fbclid, fbc, fbp, event_id, source_platform
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s::restaurant_lead_referral_source_enum, %s,
+                    %s::jsonb,
+                    %s, %s, %s, %s, %s, %s)
+            RETURNING restaurant_lead_id, business_name, contact_email,
+                      country_code, lead_status, created_date
+            """,
+            (
+                (data.get("business_name") or "").strip(),
+                (data.get("contact_name") or "").strip(),
+                email,
+                (data.get("contact_phone") or "").strip(),
+                country_code,
+                (data.get("city_name") or "").strip(),
+                data.get("years_in_operation", 0),
+                (data.get("employee_count_range") or "").strip(),
+                data.get("kitchen_capacity_daily", 1),
+                (data.get("website_url") or "").strip() or None,
+                referral_source,
+                (data.get("message") or "").strip() or None,
+                psycopg2.extras.Json(data.get("vetting_answers") or {}),
+                data.get("gclid"),
+                data.get("fbclid"),
+                data.get("fbc"),
+                data.get("fbp"),
+                data.get("event_id"),
+                data.get("source_platform"),
+            ),
+        )
+        row = cursor.fetchone()
+        if not row:
+            db.rollback()
+            return None
+
+        lead_id = str(row["restaurant_lead_id"])
+
+        # Insert cuisine junction rows
+        for cid in cuisine_ids:
+            cursor.execute(
+                "INSERT INTO core.restaurant_lead_cuisine (restaurant_lead_id, cuisine_id) VALUES (%s, %s)",
+                (lead_id, str(cid)),
+            )
+
+        db.commit()
+    return dict(row) if row else None

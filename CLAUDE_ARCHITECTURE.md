@@ -330,8 +330,9 @@ Cross-platform in-app notification banner system. Frontends poll for active bann
 - **Data model:** `customer.notification_banner` — JSONB payload, dedup via `UNIQUE(user_id, dedup_key)`, `action_status` lifecycle (`active` → `dismissed`/`opened`/`completed`/`expired`), `client_types` array for backend-owned filtering.
 - **Enums:** `notification_banner_type_enum` (`survey_available`, `peer_pickup_volunteer`, `reservation_reminder`), `notification_banner_priority_enum` (`normal`, `high`), `notification_banner_action_status_enum` (`active`, `dismissed`, `opened`, `completed`, `expired`).
 - **Service:** `app/services/notification_banner_service.py` — `create_notification()` (raw SQL with ON CONFLICT dedup), `get_active_notifications()` (max 5, high priority first, 2h grace for surveys), `acknowledge_notification()` (idempotent), `expire_stale_notifications()` (bulk cleanup).
-- **Routes:** `app/routes/notification_banner.py` — `GET /notifications/active` (Customer, polled every 60s), `POST /notifications/{id}/acknowledge` (Customer), `POST /notifications/expire` (Internal, cron trigger).
+- **Routes:** `app/routes/notification_banner.py` — `GET /notifications/active` (Customer, polled every 60s), `POST /notifications/{id}/acknowledge` (Customer), `POST /notifications/expire` (Internal, cron trigger), `POST /notifications/generate-reminders` (Internal, cron trigger).
 - **Survey trigger:** Wired into `PlatePickupService.complete_order()` in `plate_pickup_service.py` — creates `survey_available` banner after successful pickup completion (best-effort, fail-silent).
+- **Reservation reminder cron:** `app/services/cron/notification_banner_cron.py` — `run_notification_banner_cron()` generates `reservation_reminder` notifications for pickups starting within 1h (market-local time) and expires stale notifications. Intended to run every 15 minutes.
 - **Relationship to push:** Complementary — push (FCM) delivers when app is backgrounded, banners deliver when foregrounded. Same event may trigger both; frontend deduplicates by `notification_id`.
 - **Plan doc:** `docs/plans/NOTIFICATION_BANNERS_PLAN.md`
 

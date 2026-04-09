@@ -92,6 +92,8 @@ DROP TABLE IF EXISTS audit.employer_bill_history CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill_line CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill CASCADE;
 DROP TABLE IF EXISTS audit.employer_benefits_program_history CASCADE;
+DROP TABLE IF EXISTS core.restaurant_lead_cuisine CASCADE;
+DROP TABLE IF EXISTS core.restaurant_lead CASCADE;
 DROP TABLE IF EXISTS core.lead_interest CASCADE;
 DROP TABLE IF EXISTS core.employer_domain CASCADE;
 DROP TABLE IF EXISTS core.employer_benefits_program CASCADE;
@@ -142,11 +144,14 @@ DROP TABLE IF EXISTS customer.pending_customer_signup CASCADE;
 DROP TABLE IF EXISTS customer.email_change_request CASCADE;
 DROP TABLE IF EXISTS customer.credential_recovery CASCADE;
 DROP TABLE IF EXISTS role_info CASCADE;
+DROP TABLE IF EXISTS core.schema_migration CASCADE;
 
 -- =============================================================================
 -- DROP ENUM TYPES (after dropping tables that use them)
 -- =============================================================================
 
+DROP TYPE IF EXISTS restaurant_lead_referral_source_enum CASCADE;
+DROP TYPE IF EXISTS restaurant_lead_status_enum CASCADE;
 DROP TYPE IF EXISTS flywheel_state_enum CASCADE;
 DROP TYPE IF EXISTS referral_status_enum CASCADE;
 DROP TYPE IF EXISTS notification_banner_type_enum CASCADE;
@@ -407,9 +412,34 @@ CREATE TYPE flywheel_state_enum AS ENUM (
     'paused'
 );
 
+\echo 'Creating enum type: restaurant_lead_status_enum'
+CREATE TYPE restaurant_lead_status_enum AS ENUM (
+    'submitted',
+    'under_review',
+    'verification_pending',
+    'approved',
+    'rejected'
+);
+
+\echo 'Creating enum type: restaurant_lead_referral_source_enum'
+CREATE TYPE restaurant_lead_referral_source_enum AS ENUM (
+    'ad',
+    'referral',
+    'search',
+    'other'
+);
+
 -- =============================================================================
 -- CREATE TABLES (enum types now exist)
 -- =============================================================================
+
+-- Migration tracking (used by migrate.sh; populated with baseline on full rebuild)
+CREATE TABLE IF NOT EXISTS core.schema_migration (
+    version     INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    applied_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    checksum    TEXT NOT NULL
+);
 
 -- National holidays table to prevent kitchen operations on these days
 CREATE TABLE IF NOT EXISTS core.national_holidays (
@@ -682,6 +712,52 @@ CREATE TABLE IF NOT EXISTS core.lead_interest (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+\echo 'Creating table: core.restaurant_lead'
+CREATE TABLE IF NOT EXISTS core.restaurant_lead (
+    restaurant_lead_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- Contact
+    business_name VARCHAR(200) NOT NULL,
+    contact_name VARCHAR(200) NOT NULL,
+    contact_email citext NOT NULL,
+    contact_phone VARCHAR(30) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
+    city_name VARCHAR(100) NOT NULL,
+    -- Business profile
+    years_in_operation INTEGER NOT NULL CHECK (years_in_operation >= 0),
+    employee_count_range VARCHAR(20) NOT NULL,
+    kitchen_capacity_daily INTEGER NOT NULL CHECK (kitchen_capacity_daily >= 1),
+    website_url VARCHAR(500),
+    referral_source restaurant_lead_referral_source_enum NOT NULL,
+    message TEXT,
+    -- Vetting (JSONB for flexibility until questions are finalized per country)
+    vetting_answers JSONB NOT NULL DEFAULT '{}',
+    -- Status / workflow
+    lead_status restaurant_lead_status_enum NOT NULL DEFAULT 'submitted'::restaurant_lead_status_enum,
+    rejection_reason TEXT,
+    reviewed_by UUID,  -- FK added after user_info exists
+    reviewed_at TIMESTAMPTZ,
+    -- Link to institution created on approval
+    institution_id UUID,  -- FK added after institution_info exists (already created above)
+    -- Ad click tracking
+    gclid VARCHAR(255),
+    fbclid VARCHAR(255),
+    fbc VARCHAR(500),
+    fbp VARCHAR(255),
+    event_id VARCHAR(255),
+    source_platform VARCHAR(20),
+    -- Standard fields
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON core.restaurant_lead(lead_status);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON core.restaurant_lead(country_code);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON core.restaurant_lead(contact_email);
+
+-- restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
+-- Deferred: see after cuisine table is created
+
 \echo 'Creating table: core.user_info'
 CREATE TABLE IF NOT EXISTS core.user_info (
     user_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -753,6 +829,11 @@ ALTER TABLE core.employer_benefits_program
 ALTER TABLE core.employer_domain
     ADD CONSTRAINT fk_employer_domain_modified_by
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT;
+
+-- core.restaurant_lead
+ALTER TABLE core.restaurant_lead
+    ADD CONSTRAINT fk_restaurant_lead_reviewed_by
+    FOREIGN KEY (reviewed_by) REFERENCES core.user_info(user_id) ON DELETE SET NULL;
 
 \echo 'Creating table: core.address_subpremise'
 CREATE TABLE IF NOT EXISTS core.address_subpremise (
@@ -1274,6 +1355,13 @@ CREATE TABLE IF NOT EXISTS ops.cuisine_suggestion (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_cuisine_suggestion_pending ON ops.cuisine_suggestion(suggestion_status) WHERE suggestion_status = 'pending';
+
+\echo 'Creating table: core.restaurant_lead_cuisine'
+CREATE TABLE IF NOT EXISTS core.restaurant_lead_cuisine (
+    restaurant_lead_id UUID NOT NULL REFERENCES core.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
+    cuisine_id UUID NOT NULL REFERENCES ops.cuisine(cuisine_id) ON DELETE CASCADE,
+    PRIMARY KEY (restaurant_lead_id, cuisine_id)
+);
 
 \echo 'Creating table: ops.qr_code'
 CREATE TABLE IF NOT EXISTS ops.qr_code (

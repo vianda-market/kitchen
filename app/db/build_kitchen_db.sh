@@ -40,6 +40,7 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-kitchen}"
 DB_USER="${DB_USER:-cdeachaval}"
+ENV="${ENV:-dev}"
 
 # psql uses libpq; Cloud SQL public IP requires TLS.
 if [ -n "${DB_SSLMODE:-}" ]; then
@@ -80,7 +81,7 @@ else
   echo "→ Skipping image directory cleanup (SKIP_IMAGE_CLEANUP=1)"
 fi
 
-echo "→ Rebuilding schema in ${DB_NAME} on ${DB_HOST}:${DB_PORT}…"
+echo "→ Rebuilding schema in ${DB_NAME} on ${DB_HOST}:${DB_PORT} (ENV=${ENV})…"
 psql \
   -h "${DB_HOST}" \
   -p "${DB_PORT}" \
@@ -101,8 +102,45 @@ CREATE SCHEMA public;
 \i app/db/trigger.sql
 \i app/db/archival_config_table.sql
 \i app/db/archival_indexes.sql
-\i app/db/seed.sql
+\i app/db/seed/reference_data.sql
 SQL
+
+# Dev fixtures (dev only — never loaded in staging/production)
+if [ "${ENV}" = "dev" ]; then
+  echo "→ Loading dev fixtures…"
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d "${DB_NAME}" \
+    -q -X -v ON_ERROR_STOP=1 \
+    -f app/db/seed/dev_fixtures.sql
+else
+  echo "→ Skipping dev fixtures (ENV=${ENV})"
+fi
+
+# Populate schema_migration baseline so migrate.sh knows this DB is current.
+# Every migration file that exists at rebuild time is marked as already applied.
+echo "→ Populating schema_migration baseline…"
+MIGRATIONS_DIR="app/db/migrations"
+MIGRATION_COUNT=0
+for filepath in "${MIGRATIONS_DIR}"/[0-9][0-9][0-9][0-9]_*.sql; do
+  [ -e "${filepath}" ] || continue
+  filename=$(basename "${filepath}")
+  version_str="${filename%%_*}"
+  version=$((10#${version_str}))
+  name="${filename%.sql}"
+  checksum=$(shasum -a 256 "${filepath}" | awk '{print $1}')
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d "${DB_NAME}" \
+    -q -X -v ON_ERROR_STOP=1 \
+    -c "INSERT INTO core.schema_migration (version, name, applied_at, checksum) VALUES (${version}, '${name}', now(), '${checksum}') ON CONFLICT (version) DO NOTHING;"
+  MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+done
+echo "→ Registered ${MIGRATION_COUNT} migration(s) as baseline"
 
 # Set default search_path at the database level so all future connections inherit it.
 # This allows bare table names (FROM user_info, etc.) to resolve without code changes.
@@ -143,9 +181,17 @@ if [ "${SKIP_RESEED:-0}" != "1" ]; then
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
     -d "${DB_NAME}" \
-    -q -X -v ON_ERROR_STOP=1 <<'SQL'
-\i app/db/seed.sql
-SQL
+    -q -X -v ON_ERROR_STOP=1 \
+    -f app/db/seed/reference_data.sql
+  if [ "${ENV}" = "dev" ]; then
+    psql \
+      -h "${DB_HOST}" \
+      -p "${DB_PORT}" \
+      -U "${DB_USER}" \
+      -d "${DB_NAME}" \
+      -q -X -v ON_ERROR_STOP=1 \
+      -f app/db/seed/dev_fixtures.sql
+  fi
 else
   echo "→ Skipping final re-seed (SKIP_RESEED=1)"
 fi

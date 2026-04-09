@@ -1,6 +1,6 @@
 # Restaurant Vetting System
 
-**Status:** Design (forms TBD, API integrations TBD)
+**Status:** Phase 1 complete (2026-04-09). Forms TBD, API integrations TBD.
 **Goal:** Structured vetting pipeline for restaurant suppliers joining the Vianda marketplace. Covers initial interest capture, business qualification forms, external verification services (credit, tax, licensing), and approval workflow.
 **Scope:** Backend + marketing site form requirements. Tied to B2B restaurant acquisition ad campaigns (see `docs/plans/GOOGLE_META_ADS_INTEGRATION_V2.md` section 11.7).
 
@@ -328,7 +328,7 @@ CREATE TABLE public.restaurant_lead_cuisine (
 
 ### 8.2 DB Schema Change Protocol
 
-When implementing, follow: `schema.sql` -> `trigger.sql` -> `seed.sql` -> `dto/models.py` -> `consolidated_schemas.py`
+When implementing, follow the migration workflow: migration file -> `schema.sql` -> `trigger.sql` -> `seed/reference_data.sql` (if needed) -> `dto/models.py` -> `consolidated_schemas.py`. Apply with `bash app/db/migrate.sh`.
 
 ---
 
@@ -371,7 +371,7 @@ Initial launch will use lead-gen to validate demand and simplify vetting. The fo
 
 | Phase | Scope | Depends On |
 |-------|-------|------------|
-| **Phase 1** | `restaurant_lead` table, DTO, schema. New `POST /leads/restaurant-interest` endpoint. | Nothing |
+| **Phase 1** | `restaurant_lead` table, DTO, schema. New `POST /leads/restaurant-interest` endpoint. **DONE** (migration 0001). | Nothing |
 | **Phase 2** | Wire CAPI `Lead` event on form submission (uses Ads Platform infra) | Ads Platform Phase 6 (Meta CAPI gateway) |
 | **Phase 3** | Admin review dashboard: list, view, approve/reject restaurant leads | Phase 1 |
 | **Phase 4** | On-approval automation: create institution, send invite, fire `ApprovedPartner` CAPI event | Phases 1, 2, 3 |

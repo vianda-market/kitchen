@@ -99,3 +99,12 @@ def expire_notifications(
     except Exception as e:
         log_error(f"Error expiring notifications: {e}")
         raise HTTPException(status_code=500, detail="Failed to expire notifications")
+
+
+@router.post("/generate-reminders", status_code=200)
+def generate_reminders(
+    current_user: dict = Depends(get_employee_user),
+):
+    """Run notification banner cron: generate reservation reminders + expire stale. Internal only."""
+    from app.services.cron.notification_banner_cron import run_notification_banner_cron
+    return run_notification_banner_cron()

@@ -2440,6 +2440,43 @@ class LeadInterestResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RestaurantLeadCreateSchema(BaseModel):
+    """POST /leads/restaurant-interest — restaurant supplier application."""
+    business_name: str = Field(..., max_length=200)
+    contact_name: str = Field(..., max_length=200)
+    contact_email: str = Field(..., description="Contact email")
+    contact_phone: str = Field(..., max_length=30)
+    country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2")
+    city_name: str = Field(..., max_length=100)
+    cuisine_ids: List[UUID] = Field(..., min_length=1, description="At least one cuisine")
+    years_in_operation: int = Field(..., ge=0)
+    employee_count_range: str = Field(..., max_length=20, description="e.g. 1-5, 6-15, 16-50, 50+")
+    kitchen_capacity_daily: int = Field(..., ge=1, description="Estimated daily meal output")
+    website_url: Optional[str] = Field(None, max_length=500)
+    referral_source: str = Field(..., description="ad, referral, search, or other")
+    message: Optional[str] = Field(None, max_length=2000)
+    vetting_answers: Optional[dict] = Field(default_factory=dict, description="Country-specific vetting question answers (JSONB)")
+    # Ad click tracking (captured from URL params by frontend)
+    gclid: Optional[str] = Field(None, max_length=255)
+    fbclid: Optional[str] = Field(None, max_length=255)
+    fbc: Optional[str] = Field(None, max_length=500)
+    fbp: Optional[str] = Field(None, max_length=255)
+    event_id: Optional[str] = Field(None, max_length=255)
+    source_platform: Optional[str] = Field(None, max_length=20, description="google, meta, organic, referral")
+
+
+class RestaurantLeadResponseSchema(BaseModel):
+    """Response for POST /leads/restaurant-interest."""
+    restaurant_lead_id: UUID
+    business_name: str
+    contact_email: str
+    country_code: str
+    lead_status: str
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LeadsCuisineSchema(BaseModel):
     """GET /leads/cuisines — public cuisine list for interest form dropdowns."""
     cuisine_id: UUID

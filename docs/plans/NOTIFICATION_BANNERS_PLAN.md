@@ -1,7 +1,7 @@
 # In-App Notification Banners — Backend Plan
 
-**Last Updated:** 2026-04-05
-**Status:** Planning
+**Last Updated:** 2026-04-09
+**Status:** Phase 1 complete, Phase 2 complete, Phase 3 pending
 **Origin:** `vianda-app` feedback doc: `docs/frontend/feedback_for_backend/in-app-notification-banners-requirements.md`
 
 ---
@@ -266,16 +266,16 @@ Per CLAUDE.md "DB Schema Change — Sync All Layers":
 
 **Deliverable:** Frontend can poll `/notifications/active` and get survey banners. Acknowledge works.
 
-### Phase 2: reservation_reminder + cron
+### Phase 2: reservation_reminder + cron -- DONE (2026-04-09)
 
 **Scope:** Reservation reminder creation via cron job.
 
-1. New cron: `app/services/cron/notification_banner_cron.py`
-   - Runs every 15 minutes
-   - Queries `plate_pickup_live` for pickups with window starting within 1h
-   - Creates `reservation_reminder` notifications (dedup prevents duplicates on re-run)
-2. Wire expiry cleanup into same cron
-3. Cron endpoint: `POST /api/v1/notifications/generate-reminders` (Internal only)
+1. New cron: `app/services/cron/notification_banner_cron.py` -- DONE
+   - `run_notification_banner_cron()` generates reminders + expires stale notifications
+   - Queries `plate_selection_info` (joined with product, restaurant, user, market) for selections with pickup window starting within 1h in market-local time
+   - Creates `reservation_reminder` notifications (dedup by `reservation_reminder:{plate_selection_id}:{pickup_date}`)
+2. Expiry cleanup wired into same cron -- DONE
+3. Cron endpoint: `POST /api/v1/notifications/generate-reminders` (employee auth) -- DONE
 
 ### Phase 3: peer_pickup_volunteer
 

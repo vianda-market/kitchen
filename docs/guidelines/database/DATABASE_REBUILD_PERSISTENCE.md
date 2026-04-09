@@ -1,21 +1,35 @@
-# Database Rebuild Persistence Guide
+# Database Persistence & Migration Guide
 
-## **🎯 Key Principle: All Changes Must Be in Repository Files**
+## **Two Paths: Migrate vs Rebuild**
 
-Since the database is frequently torn down and rebuilt, **ALL** changes must be made to repository files, never to the live database directly.
+| Path | Command | When to use |
+|------|---------|-------------|
+| **Migrate** | `bash app/db/migrate.sh` | Incremental schema changes — preserves existing data |
+| **Rebuild** | `bash app/db/build_kitchen_db.sh` | New dev machine, CI, or intentional clean reset |
 
-## **✅ Files Modified for Archival System Persistence**
+**Default to migrate.** Only rebuild when you need a fresh start.
 
-### **1. Database Structure Files**
+## **Key Principle: All Changes Must Be in Repository Files**
+
+Schema changes are made via **migration files** (`app/db/migrations/NNNN_description.sql`), then also applied to `schema.sql` so both paths stay in sync.
+
+## **Database Structure Files**
 ```
 app/db/
-├── schema.sql              ✅ Schema (enums on entities, no status_info/transaction_type_info)
-├── index.sql               ✅ Standard indexes
-├── trigger.sql             ✅ History triggers
-├── archival_indexes.sql    ✅ 15 archival performance indexes
-├── seed.sql                        ✅ Reference data
-├── build_kitchen_db.sh             ✅ Build script (includes archival_indexes.sql)
-└── post_rebuild_external_sync.py   ✅ Post-seed FX + holiday sync (optional; invoked by build script)
+├── schema.sql                      Canonical DDL (updated after each migration)
+├── index.sql                       Standard indexes
+├── trigger.sql                     History triggers
+├── archival_config_table.sql       Archival config table
+├── archival_indexes.sql            15 archival performance indexes
+├── migrate.sh                      Apply pending migrations (incremental)
+├── build_kitchen_db.sh             Full tear-down and rebuild
+├── post_rebuild_external_sync.py   Post-seed FX + holiday sync
+├── seed.sql                        Shim that loads both seed files below
+├── seed/
+│   ├── reference_data.sql          Markets, currencies, system users, cuisines (all envs)
+│   └── dev_fixtures.sql            Test data (dev only — never loaded in staging/production)
+└── migrations/
+    └── NNNN_description.sql        Versioned migration files (applied by migrate.sh)
 ```
 
 ### **2. Application Code Files**
@@ -47,19 +61,36 @@ docs/
     └── DATABASE_REBUILD_PERSISTENCE.md   This file
 ```
 
-## **🔧 Build Process Integration**
+## **Build Process Integration**
 
-### **Updated Build Script**
-The `app/db/build_kitchen_db.sh` script (run from the **repository root**) loads, in order:
+### **Incremental Migrations (preferred)**
+
 ```bash
-DROP SCHEMA public CASCADE; CREATE SCHEMA public;
-\i app/db/schema.sql
-\i app/db/index.sql
-\i app/db/trigger.sql
-\i app/db/archival_config_table.sql
-\i app/db/archival_indexes.sql
-\i app/db/seed.sql
+bash app/db/migrate.sh
 ```
+
+Applies only pending migrations from `app/db/migrations/`. Each migration runs in a transaction. Applied versions are tracked in `core.schema_migration`.
+
+Environment modes (`ENV` variable):
+- `dev` (default) — applies all migrations
+- `staging` — applies all migrations; rejects none (staging gets same schema as dev)
+- `production` — blocks destructive statements (DROP TABLE, TRUNCATE, ALTER TYPE)
+
+### **Full Rebuild (clean slate)**
+
+```bash
+bash app/db/build_kitchen_db.sh
+```
+
+Loads, in order:
+```
+DROP all schemas CASCADE → schema.sql → index.sql → trigger.sql →
+archival_config_table.sql → archival_indexes.sql → seed/reference_data.sql
+→ seed/dev_fixtures.sql (dev only) → baseline schema_migration rows
+```
+
+The rebuild script accepts `ENV=staging` to skip dev fixtures.
+
 Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `PGPASSWORD` for non-local targets (e.g. Cloud SQL). For CI/GCP without a venv or static assets, use `SKIP_PYTEST=1` and `SKIP_IMAGE_CLEANUP=1` (see comments in the script). Air-gapped CI or no outbound HTTP: set `SKIP_POST_REBUILD_SYNC=1` to skip FX and holiday API calls after the final seed.
 
 ### **Post-rebuild external sync (FX + national holidays)**
@@ -152,31 +183,12 @@ config = get_table_archival_config("plate_pickup_live")
 assert config.retention_days > 0
 ```
 
-## **⚠️ Things to Never Do**
+## **Things to Never Do**
 
-### **❌ Direct Database Changes**
-```bash
-# NEVER do this - changes will be lost on rebuild
-psql -d kitchen -c "CREATE INDEX some_index ON some_table(column);"
-```
-
-### **❌ Manual Data Updates**
-```bash
-# NEVER do this - data will be lost on rebuild  
-psql -d kitchen -c "INSERT INTO some_table VALUES (...);"
-```
-
-### **✅ Always Do This Instead**
-```bash
-# Add to app/db/archival_indexes.sql
-echo "CREATE INDEX some_index ON some_table(column);" >> app/db/archival_indexes.sql
-
-# Add to app/db/seed.sql
-echo "INSERT INTO some_table (...) VALUES (...);" >> app/db/seed.sql
-
-# Then rebuild
-./app/db/build_kitchen_db.sh
-```
+- **Never apply DDL directly** — changes will be lost on rebuild. Always use a migration file.
+- **Never edit an already-applied migration** — write a new one instead.
+- **Never use `build_kitchen_db.sh` to apply incremental changes** — use `migrate.sh` to preserve test data.
+- **Never insert reference data only in `dev_fixtures.sql`** — reference data belongs in `reference_data.sql` (and a migration for existing DBs).
 
 ## **🎯 Rebuild Test Checklist**
 
@@ -188,27 +200,29 @@ After any database rebuild, verify:
 - [ ] **Archival config** loads: `get_archival_priority_order()` returns tables
 - [ ] **Admin endpoints** accessible at `/admin/archival/*` and `/admin/archival-config/*`
 
-## **🚀 Future Additions**
+## **Adding Schema Changes**
 
 When adding new features that require database changes:
 
-1. **Schema changes** → Add to `app/db/schema.sql`
-2. **New indexes** → Add to `app/db/index.sql` or `app/db/archival_indexes.sql`
-3. **New triggers** → Add to `app/db/trigger.sql`
-4. **Reference data** → Add to `app/db/seed.sql`
-5. **New entity archival** → Add table to `TABLE_CATEGORY_MAPPING` in `app/config/archival_config.py`
+1. **Write a migration** → `app/db/migrations/NNNN_description.sql` (next sequence number)
+2. **Update schema.sql** → Apply the same DDL change so a fresh rebuild produces the same result
+3. **New indexes** → Include in the migration; also add to `app/db/index.sql` or `app/db/archival_indexes.sql`
+4. **New triggers** → Include in the migration; also add to `app/db/trigger.sql`
+5. **Reference data** → Include INSERT in the migration (with `ON CONFLICT DO NOTHING`); also add to `app/db/seed/reference_data.sql`
+6. **New entity archival** → Add table to `TABLE_CATEGORY_MAPPING` in `app/config/archival_config.py`
 
-**Remember: Every change must survive `./app/db/build_kitchen_db.sh`**
+**Dual-write rule:** Migration files and `schema.sql` must never contradict each other. The migration is the source of truth for "how we got here"; `schema.sql` is the source of truth for "what the DB looks like now."
+
+**Never edit an already-applied migration.** If you need to fix something, write a new migration.
 
 ---
 
-## **✅ Current Status: FULLY PERSISTENT**
+## **Current Status**
 
-All archival system changes are in repository files and persist across database rebuilds:
+All archival system changes persist across rebuilds. Migration system is in place for incremental schema changes.
 
-- **15 archival indexes** in `app/db/archival_indexes.sql` for query performance
-- **Category-based retention** via `app/config/archival_config.py` (TABLE_CATEGORY_MAPPING)
-- **Admin endpoints** for archival and config at `/admin/archival/*` and `/admin/archival-config/*`
-- **Documentation** in `docs/archival/` and `docs/api/internal/`
-
-**Next rebuild will automatically include all enhancements!** 🎉
+- **15 archival indexes** in `app/db/archival_indexes.sql`
+- **Category-based retention** via `app/config/archival_config.py`
+- **Admin endpoints** at `/admin/archival/*` and `/admin/archival-config/*`
+- **Migration tracking** via `core.schema_migration` table
+- **Seed data split** into `reference_data.sql` (all envs) + `dev_fixtures.sql` (dev only)

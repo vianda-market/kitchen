@@ -26,6 +26,8 @@ from app.schemas.consolidated_schemas import (
     LeadsPlanSchema,
     LeadsRestaurantSchema,
     MarketPublicMinimalSchema,
+    RestaurantLeadCreateSchema,
+    RestaurantLeadResponseSchema,
     ZipcodeMetricsResponseSchema,
 )
 from app.services.city_metrics_service import (
@@ -37,6 +39,7 @@ from app.services.leads_public_service import (
     get_public_restaurants,
     get_public_plans,
     create_lead_interest,
+    create_restaurant_lead,
     get_leads_cuisines,
     get_employee_count_ranges,
 )
@@ -376,3 +379,26 @@ async def submit_lead_interest(
             detail=f"Invalid interest_type '{data.interest_type}'. Must be: customer, employer, or supplier.",
         )
     return LeadInterestResponseSchema(**row)
+
+
+@router.post("/restaurant-interest", response_model=RestaurantLeadResponseSchema, status_code=201)
+@limiter.limit("5/minute")
+async def submit_restaurant_interest(
+    request: Request,
+    data: RestaurantLeadCreateSchema,
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    Public (no auth) restaurant supplier application.
+
+    Enhanced interest form for the B2B restaurant acquisition pipeline.
+    Captures contact info, business profile, cuisine selections, and ad tracking params.
+    Rate-limited to 5 requests per minute per IP.
+    """
+    row = create_restaurant_lead(data.model_dump(), db)
+    if not row:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid restaurant lead data. Check referral_source and cuisine_ids.",
+        )
+    return RestaurantLeadResponseSchema(**row)
