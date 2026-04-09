@@ -188,6 +188,19 @@ _Routes: `/plans/`_
 
 ---
 
+## Ads Platform (Conversion Tracking, Geographic Flywheel, Zone Management)
+_Routes: `/ad-tracking`, `/admin/ad-zones/`_
+
+| Audience | File | Description |
+|----------|------|-------------|
+| B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/ADS_TRACKING_INTEGRATION.md` | Click ID capture API, Meta Pixel JS (web), Meta SDK (native), event_id dedup, platform detection |
+| Marketing | `/Users/cdeachaval/learn/kitchen/docs/api/marketing_site/ADS_LANDING_PAGES.md` | Pixel JS installation, `/for-restaurants` + `/for-employers` landing pages, click ID capture in forms |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/AD_ZONE_MANAGEMENT.md` | Zone CRUD, flywheel state transitions, metrics refresh, overlap detection, audience export, Pixel on B2B portal |
+| Both | `docs/plans/GOOGLE_META_ADS_INTEGRATION_V2.md` | Full ads platform design (34 sections) -- conversion pipeline, geographic flywheel, campaign management, Gemini advisor |
+| Both | `docs/plans/RESTAURANT_VETTING_SYSTEM.md` | Restaurant supplier application form, vetting pipeline, approval workflow |
+
+---
+
 ## API Patterns & Conventions
 _Applies across all routes_
 

@@ -78,7 +78,7 @@ def categorize_meta_error(error_code: int, error_message: str = "") -> AdsErrorC
 
     logger.warning(
         "meta_ads_unknown_error",
-        extra={"error_code": error_code, "message": error_message},
+        extra={"error_code": error_code, "error_detail": error_message},
     )
     return AdsErrorCategory.PERMANENT
 

@@ -24,8 +24,9 @@ app/
 │   ├── location_config.py   # Location/city configuration
 │   ├── market_config.py     # Market-specific configuration
 │   └── supported_*.py       # supported_cities, supported_countries, supported_currencies, etc.
-├── core/                    # Versioning infrastructure
-│   └── versioning.py        # create_versioned_router, APIVersion
+├── core/                    # Versioning infrastructure + shared GCP utilities
+│   ├── versioning.py        # create_versioned_router, APIVersion
+│   └── gcp_secrets.py       # GCP Secret Manager client (TTL cache, ADC auth)
 ├── db/                      # Schema, triggers, seed
 │   ├── schema.sql           # Table definitions, enums
 │   ├── trigger.sql          # History triggers
@@ -43,7 +44,20 @@ app/
 │   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse) — default provider
 │   ├── mapbox_static_gateway.py  # Mapbox Static Images API — generates static map PNGs with pin overlays
 │   ├── google_maps_gateway.py    # Google Maps Geocoding (fallback provider)
-│   └── google_places_gateway.py  # Google Places API (fallback provider)
+│   ├── google_places_gateway.py  # Google Places API (fallback provider)
+│   └── ads/                      # Ad platform gateways (Google Ads, Meta Ads, Gemini)
+│       ├── base.py               # AdsConversionGateway + AdsCampaignGateway ABCs
+│       ├── factory.py            # get_conversion_gateway(platform) — mock/live routing
+│       ├── mock_gateway.py       # Logs payloads, returns success (DEV_MODE / provider=mock)
+│       ├── google/               # Google Ads API (Enhanced Conversions, Performance Max)
+│       │   ├── auth.py           # GoogleAdsClient singleton (OAuth2, Secret Manager)
+│       │   ├── conversion_gateway.py  # ClickConversion upload (gclid/wbraid/gbraid, hashed PII)
+│       │   └── campaign_gateway.py    # Stub (Phase 9)
+│       ├── meta/                 # Meta Marketing API + Conversions API (CAPI)
+│       │   ├── auth.py           # FacebookAdsApi singleton (system user token)
+│       │   ├── conversion_gateway.py  # CAPI EventRequest (fbc/fbp, event_id dedup)
+│       │   └── campaign_gateway.py    # Stub (Phase 10)
+│       └── gemini/               # Gemini advisor (Phase 22)
 ├── i18n/                    # Internationalization (locale-aware labels, names, messages)
 │   ├── enum_labels.py       # Enum display labels per locale (get_label, labels_for_values)
 │   ├── locale_names.py      # Country/currency name localization via pycountry gettext
@@ -85,7 +99,20 @@ app/
 │   ├── email/               # Email provider abstraction
 │   │   ├── provider_factory.py   # get_email_provider() — returns SMTP or SendGrid based on EMAIL_PROVIDER
 │   │   └── providers/            # base.py (ABC), smtp_provider.py, sendgrid_provider.py
-│   └── payment_provider/    # Stripe inbound (live, mock) + Connect outbound (connect_gateway, connect_mock)
+│   ├── payment_provider/    # Stripe inbound (live, mock) + Connect outbound (connect_gateway, connect_mock)
+│   └── ads/                 # Ads platform services (conversion tracking, zones, click attribution)
+│       ├── models.py            # ConversionEvent, AdsPlatform, CampaignStrategy enums
+│       ├── pii_hasher.py        # SHA256 hashing (shared by Google + Meta)
+│       ├── conversion_service.py # enqueue_conversion_for_all_platforms() fan-out
+│       ├── error_handler.py     # AdsErrorCategory enum, platform error mapping
+│       ├── subscription_ads_hook.py # Best-effort hook: webhook/renewal -> conversion events
+│       ├── zone_service.py      # Ad zone CRUD, flywheel state transitions, overlap validation
+│       ├── zone_metrics_service.py  # Refresh zone metrics (restaurants, subscribers, leads)
+│       ├── click_tracking_service.py # Store/query frontend click identifiers
+│       └── notify_me_sync.py    # Aggregate notify-me leads per zone, audience export
+├── workers/                 # ARQ background tasks (ads conversion uploads)
+│   ├── arq_settings.py      # ARQ WorkerSettings (Redis config, job timeout, retry)
+│   └── conversion_worker.py # upload_conversion task (platform-agnostic, routes via factory)
 └── utils/                   # Helpers
     ├── db.py                # db_read, db_write, get_db_connection
     ├── db_pool.py           # Connection pool, get_db_connection_context
@@ -322,3 +349,83 @@ Pluggable email transport: SMTP (Gmail, dev default) or SendGrid (production).
 - **Categories:** `transactional`, `onboarding`, `customer-engagement`, `promotional` — passed to SendGrid for analytics.
 - **Config:** `EMAIL_PROVIDER` (smtp/sendgrid), `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `EMAIL_REPLY_TO` in `app/config/settings.py`
 - **Domain:** `hello@vianda.market` (from, Google Workspace alias via `admin@vianda.market`), `support@vianda.market` (reply-to). SendGrid activation is a config-flip when volume justifies it.
+
+---
+
+## Ads Platform (Google Ads + Meta Ads)
+
+Multi-platform ad management: server-side conversion uploads, geographic flywheel, click attribution, and campaign management (future). Full design: `docs/plans/GOOGLE_META_ADS_INTEGRATION_V2.md`.
+
+### Architecture
+
+- **Gateway pattern:** `AdsConversionGateway` ABC with Google, Meta, and mock implementations. Factory (`app/gateways/ads/factory.py`) routes by platform + settings (mock/live). Same pattern as `address_provider.py` and `payment_provider/`.
+- **ARQ worker:** Background job queue via Redis for deferred conversion uploads. Google: 24h delay. Meta: 5min delay. Worker: `app/workers/conversion_worker.py`.
+- **Payment-provider-agnostic:** Ads hook is at the subscription confirmation layer, not the Stripe webhook. `subscription_ads_hook.py` is called best-effort after db.commit. Adding MercadoPago only requires a new webhook handler calling the same hook.
+- **PII security:** `pii_hasher.py` SHA256-hashes email/phone before enqueuing to Redis. Raw PII never enters the job queue or logs.
+
+### Geographic Flywheel
+
+- **Data model:** `core.ad_zone` table with lat/lon center + radius, flywheel state, metrics, budget allocation.
+- **Flywheel states:** `monitoring` -> `supply_acquisition` -> `demand_activation` -> `growth` -> `mature` -> `paused`. Operator can force any transition (cold start support).
+- **Zone creation:** Two paths: operator-created (cold start, no data needed) or advisor-proposed (DBSCAN clustering on notify-me leads, future Phase 22).
+- **Zone metrics:** `zone_metrics_service.py` refreshes restaurant/subscriber counts within zone radius using SQL haversine. Notify-me leads matched by city name (no lat/lon on leads yet).
+- **Audience export:** Hashed notify-me email lists per zone for Custom Audience upload.
+- **Campaign structure:** One campaign per strategy (B2C/B2B employer/B2B restaurant), one ad set per zone, CBO with per-zone min budgets.
+
+### Conversion Pipeline
+
+```
+Payment webhook -> subscription confirmed -> subscription_ads_hook.py [best-effort]
+    -> conversion_service.enqueue_conversion_for_all_platforms()
+        -> ARQ job per platform (deferred)
+            -> factory.get_conversion_gateway(platform)
+                -> MockConversionGateway (DEV_MODE)
+                OR GoogleAdsConversionGateway (Enhanced Conversions)
+                OR MetaConversionGateway (CAPI)
+```
+
+### Three Campaign Strategies
+
+| Strategy | Code | Events | Target |
+|----------|------|--------|--------|
+| B2C Individual | `b2c_subscriber` | Subscribe, Purchase, StartTrial | Consumers |
+| B2B Employer | `b2b_employer` | Lead, CompleteRegistration, Subscribe | HR directors |
+| B2B Restaurant | `b2b_restaurant` | Lead, CompleteRegistration, ApprovedPartner | Restaurant owners |
+
+### Key Entry Points
+
+| Concern | Location |
+|---------|----------|
+| Gateway factory | `app/gateways/ads/factory.py` |
+| Canonical models | `app/services/ads/models.py` |
+| Conversion dispatch | `app/services/ads/conversion_service.py` |
+| Subscription hook | `app/services/ads/subscription_ads_hook.py` |
+| Zone management | `app/services/ads/zone_service.py` |
+| Zone metrics refresh | `app/services/ads/zone_metrics_service.py` |
+| Click tracking | `app/services/ads/click_tracking_service.py` |
+| ARQ worker config | `app/workers/arq_settings.py` |
+| Settings | `app/config/settings.py` (ADS_*, GOOGLE_ADS_*, META_ADS_*, ZONE_*, GEMINI_*) |
+| DB tables | `core.ad_click_tracking`, `core.ad_zone`, `flywheel_state_enum` |
+
+### Routes
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | `/api/v1/ad-tracking` | JWT (any) | Frontend submits click IDs |
+| POST | `/api/v1/admin/ad-zones` | Internal | Create zone |
+| GET | `/api/v1/admin/ad-zones` | Internal | List zones |
+| GET | `/api/v1/admin/ad-zones/{id}` | Internal | Get zone |
+| PATCH | `/api/v1/admin/ad-zones/{id}` | Internal | Update zone |
+| POST | `/api/v1/admin/ad-zones/{id}/transition` | Internal | Force state transition |
+| GET | `/api/v1/admin/ad-zones/{id}/overlaps` | Internal | Check overlaps |
+| DELETE | `/api/v1/admin/ad-zones/{id}` | Internal | Delete zone |
+| POST | `/api/v1/admin/ad-zones/sync-metrics` | Internal | Refresh all zone metrics (cron) |
+| POST | `/api/v1/admin/ad-zones/{id}/sync-metrics` | Internal | Refresh single zone |
+| GET | `/api/v1/admin/ad-zones/{id}/audience` | Internal | Export hashed audience |
+
+### Tests
+
+| What | How |
+|------|-----|
+| `app/gateways/ads/`, `app/services/ads/pii_hasher.py`, `app/services/ads/models.py`, `app/services/ads/error_handler.py` | pytest (73 tests in `app/tests/gateways/ads/`) |
+| `app/services/ads/`, `app/routes/admin/ad_zones.py`, `app/routes/ad_tracking.py` | Postman collections (future) |
