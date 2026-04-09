@@ -122,23 +122,23 @@ class EntityScopingService:
         role_name = current_user.get("role_name")
         
         # Block Customers
-        if role_type == "Customer":
+        if role_type == "customer":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Customers cannot access plate kitchen days"
             )
-        
+
         # Employer: institution-scoped (like Supplier)
-        if role_type == "Employer":
+        if role_type == "employer":
             return get_institution_scope(current_user)
-        
+
         # Internal: check role_name for access level
-        if role_type == "Internal":
-            if role_name in ["Admin", "Super Admin"]:
+        if role_type == "internal":
+            if role_name in ["admin", "super_admin"]:
                 return None  # Global access
-            elif role_name == "Manager":
+            elif role_name == "manager":
                 return get_institution_scope(current_user)  # Institution scope
-            elif role_name == "Operator":
+            elif role_name == "operator":
                 # Internal Operators should be blocked in route layer
                 # If they reach here, return None and let route handle 403
                 return None
@@ -147,9 +147,9 @@ class EntityScopingService:
                 return None
         
         # Suppliers: institution-scoped
-        if role_type == "Supplier":
+        if role_type == "supplier":
             return get_institution_scope(current_user)
-        
+
         # Default: no access
         return None
     
@@ -264,7 +264,7 @@ class EntityScopingService:
         role_type = current_user.get("role_type")
         
         # Customers: no scoping (can view all plates)
-        if role_type == "Customer":
+        if role_type == "customer":
             return None
         
         # Internal, Suppliers, Employer: standard institution scoping
@@ -346,16 +346,16 @@ class EntityScopingService:
         """
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
-        
-        if role_type == "Employer":
+
+        if role_type == "employer":
             return get_institution_scope(current_user)  # Institution-scoped like Supplier
-        
-        if role_type == "Internal":
-            if role_name in ["Admin", "Super Admin"]:
+
+        if role_type == "internal":
+            if role_name in ["admin", "super_admin"]:
                 return None  # Global access
-            elif role_name == "Manager":
+            elif role_name == "manager":
                 return get_institution_scope(current_user)  # Institution scope
-            elif role_name == "Operator":
+            elif role_name == "operator":
                 # Internal Operators cannot manage other users
                 # They should use /me endpoints for self-updates
                 # For admin operations (managing others), return None and let route handle 403
@@ -410,22 +410,22 @@ class EntityScopingService:
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
         
-        if role_type == "Employer":
+        if role_type == "employer":
             return get_institution_scope(current_user)  # Institution-scoped like Supplier
-        
-        if role_type == "Internal":
-            if role_name in ["Admin", "Super Admin"]:
+
+        if role_type == "internal":
+            if role_name in ["admin", "super_admin"]:
                 return None  # Global access
-            elif role_name == "Manager":
+            elif role_name == "manager":
                 return get_institution_scope(current_user)  # Institution scope
-            elif role_name == "Operator":
+            elif role_name == "operator":
                 # Internal Operators should be blocked in route layer
                 # If they reach here, return None and let route handle 403
                 return None
             else:
                 # Unknown role_name - default to institution scope
                 return get_institution_scope(current_user)
-        elif role_type == "Supplier":
+        elif role_type == "supplier":
             # Suppliers should be blocked, but if they reach here, return None
             # (actual blocking happens in route layer)
             return None
@@ -451,7 +451,7 @@ class EntityScopingService:
         role_type = current_user.get("role_type")
         
         # Block Customers
-        if role_type == "Customer":
+        if role_type == "customer":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Customers cannot access restaurant holidays"

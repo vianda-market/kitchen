@@ -73,7 +73,7 @@ def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.conne
         return None
     inst_type = getattr(inst, "institution_type", None)
     inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
-    if inst_type_str != "Employer":
+    if inst_type_str != "employer":
         return None
 
     program = get_program_by_institution(institution_id, db)
@@ -469,6 +469,14 @@ def confirm_subscription_payment(
         subscription_id, UUID(str(_sp_id)), user_id, db
     )
     db.commit()
+
+    # Best-effort referral reward processing (non-blocking)
+    try:
+        from app.services.referral_service import process_referral_reward
+        process_referral_reward(user_id, db)
+    except Exception as e:
+        from app.utils.log import log_warning
+        log_warning(f"Referral reward processing failed for user {user_id}: {e}")
 
     updated = subscription_service.get_by_id(subscription_id, db, scope=None)
     return _subscription_to_response(updated)

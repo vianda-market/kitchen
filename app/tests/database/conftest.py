@@ -53,37 +53,37 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
     with conn.cursor() as cur:
         # 1. Archive client_bill_info for non-seed users
         cur.execute("""
-            UPDATE client_bill_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE client_bill_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
         """, (seed_user_ids,))
         # 2. Archive subscription_info for non-seed users
         cur.execute("""
-            UPDATE subscription_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE subscription_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
         """, (seed_user_ids,))
         # 3. Archive plan_info by test plan names
         cur.execute("""
-            UPDATE plan_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE plan_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE name IN ('Test Plan', 'Cron Plan', 'Plan With Cap', 'Entry Level', 'Plan', 'Zero Credit Plan')
         """)
         # 4. Archive address_info for non-seed users (future-proofing)
         cur.execute("""
-            UPDATE address_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE address_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id IS NOT NULL AND user_id NOT IN %s
         """, (seed_user_ids,))
         # 5. Archive payment_method for non-seed users
         cur.execute("""
-            UPDATE payment_method SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE payment_method SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
         """, (seed_user_ids,))
         # 6. Archive all users except seed (superadmin, system bot)
         cur.execute("""
-            UPDATE user_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE user_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
         """, (seed_user_ids,))
         # 7. Archive test institutions (per plan: name LIKE 'Test %')
         cur.execute("""
-            UPDATE institution_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE institution_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE name LIKE 'Test %%'
         """)
         # 8. Archive non-seed credit currencies (seed has USD, ARS, PEN, CLP, MXN, BRL)
@@ -96,7 +96,7 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
             '66666666-6666-6666-6666-666666666605',  # BRL
         )
         cur.execute("""
-            UPDATE credit_currency_info SET is_archived = TRUE, status = 'Inactive'::status_enum
+            UPDATE credit_currency_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE credit_currency_id NOT IN %s
         """, (seed_credit_currency_ids,))
     conn.commit()

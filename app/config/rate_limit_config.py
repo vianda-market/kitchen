@@ -47,9 +47,9 @@ class RateLimitRule:
 
 def classify_tier(role_type: str, onboarding_status: Optional[str]) -> str:
     """Derive rate-limit tier from JWT claims."""
-    if role_type == "Internal":
+    if role_type == "internal":
         return TIER_INTERNAL
-    if role_type in ("Supplier", "Employer"):
+    if role_type in ("supplier", "employer"):
         return TIER_B2B
     if onboarding_status == "complete":
         return TIER_ONBOARDED

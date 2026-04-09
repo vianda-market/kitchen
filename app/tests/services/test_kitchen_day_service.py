@@ -76,7 +76,7 @@ class TestKitchenDayService:
 
     def test_valid_kitchen_days_tuple(self):
         """VALID_KITCHEN_DAYS is a tuple of weekdays."""
-        assert VALID_KITCHEN_DAYS == ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+        assert VALID_KITCHEN_DAYS == ("monday", "tuesday", "wednesday", "thursday", "friday")
 
     def test_weekday_num_to_name(self):
         """WEEKDAY_NUM_TO_NAME maps indices to day names."""

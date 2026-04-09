@@ -82,7 +82,7 @@ def list_enriched_addresses(
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Internal dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
 
         def _get_enriched_addresses():
@@ -183,7 +183,7 @@ def get_address(
         raise address_not_found(address_id)
     
     # Apply user scoping for Customers: allow if created by user OR if it's their assigned employer_address_id
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
         user = user_service.get_by_id(user_scope.user_id, db, scope=None)
         employer_address_id = getattr(user, "employer_address_id", None) if user else None
@@ -211,7 +211,7 @@ def get_all_addresses(
 ):
     """Get all addresses. Optional institution_id filters by institution (B2B Internal dropdown scoping). Non-archived only."""
     # Apply user scoping for Customers
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
         # Customers: home/billing = created by user; employer = only assigned employer_address_id
         def fetch(connection: psycopg2.extensions.connection):
@@ -224,7 +224,7 @@ def get_all_addresses(
         effective_institution_id = resolve_institution_filter(institution_id, scope)
         if effective_institution_id is not None:
             effective_scope = InstitutionScope(
-                institution_id=str(effective_institution_id), role_type="Internal", role_name="Manager"
+                institution_id=str(effective_institution_id), role_type="internal", role_name="manager"
             )
         else:
             effective_scope = scope
@@ -264,7 +264,7 @@ def create_address(
             )
         addr_data["institution_id"] = current_user["institution_id"]
         # Only Comensal creating home/other (not employer address) gets user_id set
-        if current_user.get("role_name") == "Comensal" and not addr_data.get("employer_id"):
+        if current_user.get("role_name") == "comensal" and not addr_data.get("employer_id"):
             addr_data["user_id"] = current_user["user_id"]
     else:
         # For Suppliers/Internal: user_id optional; if provided, validate target user belongs to their institution
@@ -326,7 +326,7 @@ def update_address(
 
     # Exception: Customer may update subpremise (floor, unit, is_default) on their assigned employer address
     customer_editing_own_employer_subpremise = False
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
         user = user_service.get_by_id(user_scope.user_id, db, scope=None)
         employer_address_id = getattr(user, "employer_address_id", None) if user else None
@@ -386,7 +386,7 @@ def delete_address(
     role_name = current_user.get("role_name")
     
     # Apply user scoping for Customers and Internal Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(existing_address.user_id)
         scope = None  # No institution filtering needed for Customers and Internal Operators

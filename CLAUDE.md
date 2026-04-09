@@ -17,7 +17,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Rebuild DB:** `bash app/db/build_kitchen_db.sh`
 - **Import check:** `python3 -c "from application import app; print('OK')"`
 - **Run tests:** `pytest app/tests/`
-- **Paths:** Always use `~/Desktop/local/kitchen` — never long iCloud paths
+- **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 
 ## DB Schema Change — Sync All Layers (in order)
@@ -41,7 +41,11 @@ Full reference: `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md`
 ## Code Conventions
 - **Functions:** `verb_entity_by_context()`, <50 lines, pure, explicit `db`/`logger` params
 - **DTOs:** Pure data structures only — `app/dto/models.py`. No logic, no methods.
-- **Enums:** Check `schema.sql` for exact case before use. Most are Title Case; `pickup_type_enum` is lowercase.
+- **Enums:** All enums follow a consistent pattern:
+  - **Member name** (Title): UPPER_SNAKE_CASE — e.g. `SUPER_ADMIN`, `HANDED_OUT`
+  - **Value**: lowercase slug — e.g. `"super_admin"`, `"handed_out"` — stored in DB and sent over API
+  - **Display label**: Provided by `app/i18n/enum_labels.py` per locale — never use `.value` for display
+  - When using `strftime("%A")` for day names, always `.lower()` the result to match enum values
 - **Route versioning:** `create_versioned_router("api", [...], APIVersion.V1)` in `application.py`
 - **No trailing slash** on collection endpoints — prefix is `/entity-name`, not `/entity-name/`
 - **In-memory caches** must have TTL/size eviction — never unbounded growth
@@ -110,7 +114,7 @@ This repo (kitchen) is the **backend source of truth**. It produces API docs and
 - `CLAUDE_ARCHITECTURE.md` — System overview for cross-repo context
 
 **Agent index files in other repos (read-only, for context):**
-- **vianda-platform (B2B):** `/Users/cdeachaval/Desktop/local/vianda-platform/docs/frontend/AGENT_INDEX.md`
-- **vianda-app (B2C):** `/Users/cdeachaval/Desktop/local/vianda-app/docs/frontend/AGENT_INDEX.md`
-- **vianda-home (marketing):** `/Users/cdeachaval/Desktop/local/vianda-home/docs/frontend/AGENT_INDEX.md`
-- **infra-kitchen-gcp:** `/Users/cdeachaval/Desktop/local/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`
+- **vianda-platform (B2B):** `/Users/cdeachaval/learn/vianda-platform/docs/frontend/AGENT_INDEX.md`
+- **vianda-app (B2C):** `/Users/cdeachaval/learn/vianda-app/docs/frontend/AGENT_INDEX.md`
+- **vianda-home (marketing):** `/Users/cdeachaval/learn/vianda-home/docs/frontend/AGENT_INDEX.md`
+- **infra-kitchen-gcp:** `/Users/cdeachaval/learn/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`

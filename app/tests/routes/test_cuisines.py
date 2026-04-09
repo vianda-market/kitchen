@@ -19,8 +19,8 @@ from app.auth.dependencies import (
 def mock_customer_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": str(uuid4()),
     }
 
@@ -29,8 +29,8 @@ def mock_customer_user():
 def mock_supplier_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Supplier",
-        "role_name": "Admin",
+        "role_type": "supplier",
+        "role_name": "admin",
         "institution_id": str(uuid4()),
     }
 
@@ -200,7 +200,7 @@ class TestCreateSuggestion:
             "suggested_name": "Peruvian Fusion",
             "suggested_by": user_id,
             "restaurant_id": None,
-            "suggestion_status": "Pending",
+            "suggestion_status": "pending",
             "reviewed_by": None,
             "reviewed_date": None,
             "review_notes": None,
@@ -212,7 +212,7 @@ class TestCreateSuggestion:
         assert resp.status_code == 201
         data = resp.json()
         assert data["suggestion_id"] == suggestion_id
-        assert data["suggestion_status"] == "Pending"
+        assert data["suggestion_status"] == "pending"
 
     def test_missing_suggested_name_returns_422(self, client_with_supplier):
         """POST with empty body returns 422 (suggested_name is required)."""

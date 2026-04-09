@@ -104,7 +104,7 @@ def _upsert_nager_holiday(
             FALSE,
             NULL,
             NULL,
-            'Active'::status_enum,
+            'active'::status_enum,
             FALSE,
             %s::uuid,
             'nager_date'

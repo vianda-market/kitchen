@@ -65,7 +65,7 @@ def _archive_provider(
             """
             UPDATE user_payment_provider
             SET is_archived = TRUE,
-                status = 'Inactive'::status_enum,
+                status = 'inactive'::status_enum,
                 modified_by = %s::uuid,
                 modified_date = CURRENT_TIMESTAMP
             WHERE user_payment_provider_id = %s::uuid

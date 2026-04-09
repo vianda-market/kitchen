@@ -9,10 +9,10 @@ from enum import Enum
 
 class SubscriptionStatus(str, Enum):
     """Valid subscription status values"""
-    ACTIVE = "Active"
-    ON_HOLD = "On Hold"
-    PENDING = "Pending"
-    CANCELLED = "Cancelled"
+    ACTIVE = "active"
+    ON_HOLD = "on_hold"
+    PENDING = "pending"
+    CANCELLED = "cancelled"
 
     @classmethod
     def values(cls) -> list[str]:

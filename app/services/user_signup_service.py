@@ -62,14 +62,14 @@ class UserSignupService:
         rn = user_data.get("role_name")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
         rn_str = (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
-        return rt_str == "Customer" and rn_str == "Comensal"
+        return rt_str == "customer" and rn_str == "comensal"
 
     @staticmethod
     def _is_internal(user_data: Dict[str, Any]) -> bool:
         """True if role_type is Internal (enum or string)."""
         rt = user_data.get("role_type")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
-        return rt_str == "Internal"
+        return rt_str == "internal"
 
     @staticmethod
     def _check_employer_domain(email: Optional[str], db: Optional[psycopg2.extensions.connection]) -> Optional[UUID]:
@@ -197,7 +197,7 @@ class UserSignupService:
         # Internal or Supplier: default city_id to Global when not provided
         rt_str = (user_data.get("role_type").value if hasattr(user_data.get("role_type"), "value") else str(user_data.get("role_type") or "")) if user_data.get("role_type") else ""
         rn_str = (user_data.get("role_name").value if hasattr(user_data.get("role_name"), "value") else str(user_data.get("role_name") or "")) if user_data.get("role_name") else ""
-        if (rt_str == "Internal" or rt_str == "Supplier") and not user_data.get("city_id"):
+        if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_id"):
             user_data["city_id"] = GLOBAL_CITY_ID
             log_info(f"Defaulted city_id to Global for {rt_str}/{rn_str}")
         # Customer+Comensal created via B2B: require city_id, reject Global
@@ -613,14 +613,14 @@ class UserSignupService:
         rt_str = (role_type.value if hasattr(role_type, "value") else str(role_type)) if role_type else ""
         rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
         creator_rn = (current_user.get("role_name") or "").value if hasattr(current_user.get("role_name"), "value") else str(current_user.get("role_name") or "")
-        creator_is_super_admin = creator_rn == "Super Admin"
+        creator_is_super_admin = creator_rn == "super_admin"
 
         # Admin, Super Admin (Internal) -> default to Global if not provided. Supplier Admin and Employer -> default to institution's market
-        if rt_str == "Internal" and rn_str in ("Admin", "Super Admin"):
+        if rt_str == "internal" and rn_str in ("admin", "super_admin"):
             if not user_data.get("market_id"):
                 user_data["market_id"] = GLOBAL_MARKET_ID
                 log_info(f"Defaulted market_id to Global for {rt_str}/{rn_str}")
-        elif (rt_str == "Supplier" and rn_str == "Admin") or rt_str == "Employer":
+        elif (rt_str == "supplier" and rn_str == "admin") or rt_str == "employer":
             if not user_data.get("market_id"):
                 inst_id = user_data.get("institution_id")
                 if inst_id:
@@ -651,7 +651,7 @@ class UserSignupService:
         market_id = market_id_raw
 
         # Manager / Operator (Internal): market_id required; cannot be Global unless creator is Super Admin
-        if rt_str == "Internal" and rn_str in ("Manager", "Operator"):
+        if rt_str == "internal" and rn_str in ("manager", "operator"):
             if not market_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -660,11 +660,11 @@ class UserSignupService:
             if is_global_market(market_id) and not creator_is_super_admin:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Only Super Admin can assign Global market to Manager or Operator",
+                    detail="Only super_admin can assign Global market to manager or operator",
                 )
 
         # Customer: default already set in _apply_customer_signup_rules; admin-created Customer gets default US if not provided
-        if rt_str == "Customer" and not market_id:
+        if rt_str == "customer" and not market_id:
             user_data["market_id"] = self.DEFAULT_CUSTOMER_MARKET_ID
             log_info(f"Defaulted market_id to US for Customer")
 
@@ -705,8 +705,8 @@ class UserSignupService:
         rn = user_data.get("role_name")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
         rn_str = (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
-        is_supplier = rt_str == "Supplier"
-        is_employer = rt_str == "Employer"
+        is_supplier = rt_str == "supplier"
+        is_employer = rt_str == "employer"
         if not is_supplier and not is_employer:
             return
         institution_id = user_data.get("institution_id")
@@ -842,6 +842,35 @@ class UserSignupService:
                 "already_registered": True,
             }
 
+        # Resolve referral code: explicit in body, or fallback via device_id assignment
+        signup_referral_code = user_data.get("referral_code")
+        device_id = user_data.pop("_device_id", None)
+        if not signup_referral_code and device_id:
+            # Check for pre-auth referral code assignment from deep link
+            from app.utils.db import db_read as _db_read
+            assignment_rows = _db_read(
+                """
+                SELECT referral_code FROM referral_code_assignment
+                WHERE device_id = %s AND used = FALSE
+                  AND created_at > (CURRENT_TIMESTAMP - INTERVAL '48 hours')
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (device_id,),
+                connection=db,
+            )
+            if assignment_rows:
+                signup_referral_code = assignment_rows[0]["referral_code"]
+                user_data["referral_code"] = signup_referral_code
+
+        if signup_referral_code:
+            from app.services.referral_service import validate_referral_code
+            referrer = validate_referral_code(signup_referral_code, db)
+            if not referrer:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid referral code",
+                )
+
         verification_code = str(secrets.randbelow(1_000_000)).zfill(6)
         expiry = datetime.now(timezone.utc) + timedelta(hours=self.SIGNUP_VERIFICATION_CODE_EXPIRY_HOURS)
 
@@ -857,8 +886,9 @@ class UserSignupService:
                 """
                 INSERT INTO pending_customer_signup (
                     email, verification_code, token_expiry,
-                    username, hashed_password, first_name, last_name, mobile_number, market_id, city_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    username, hashed_password, first_name, last_name, mobile_number, market_id, city_id,
+                    referral_code
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     email,
@@ -871,6 +901,7 @@ class UserSignupService:
                     user_data.get("mobile_number"),
                     str(user_data["market_id"]),
                     str(user_data["city_id"]),
+                    signup_referral_code,
                 ),
             )
             db.commit()
@@ -917,7 +948,8 @@ class UserSignupService:
             cursor.execute(
                 """
                 SELECT pending_id, email, verification_code, token_expiry, used,
-                       username, hashed_password, first_name, last_name, mobile_number, market_id, city_id
+                       username, hashed_password, first_name, last_name, mobile_number, market_id, city_id,
+                       referral_code
                 FROM pending_customer_signup
                 WHERE verification_code = %s
                 """,
@@ -943,6 +975,7 @@ class UserSignupService:
                 detail="Verification code has expired",
             )
 
+        signup_referral_code = row.get("referral_code")  # referral code used at signup
         user_data = {
             "email": row["email"],
             "username": row["username"],
@@ -954,12 +987,50 @@ class UserSignupService:
             "city_id": row["city_id"],
             "email_verified": True,
             "email_verified_at": datetime.now(timezone.utc),
+            "referred_by_code": signup_referral_code,
         }
         self._apply_customer_signup_rules(user_data, db)
         new_user = create_user_with_validation(user_data, db)
         # Populate user_market_assignment so GET /restaurants/by-city and other market-scoped APIs see the customer's market
         market_id_uuid = user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
         set_user_market_assignments(new_user.user_id, [market_id_uuid], db)
+
+        # Generate and assign referral code for the new user
+        from app.utils.referral_code import generate_referral_code as gen_code
+        max_retries = 5
+        for attempt in range(max_retries):
+            code = gen_code(new_user.first_name)
+            try:
+                with db.cursor() as cur:
+                    cur.execute(
+                        "UPDATE user_info SET referral_code = %s WHERE user_id = %s::uuid",
+                        (code, str(new_user.user_id)),
+                    )
+                break
+            except psycopg2.errors.UniqueViolation:
+                db.rollback()
+                if attempt == max_retries - 1:
+                    log_warning(f"Failed to generate unique referral code for user {new_user.user_id} after {max_retries} attempts")
+
+        # Create referral record if user was referred
+        if signup_referral_code:
+            from app.services.referral_service import validate_referral_code, create_referral_on_signup
+            referrer = validate_referral_code(signup_referral_code, db)
+            if referrer:
+                create_referral_on_signup(
+                    referrer_user_id=UUID(str(referrer["user_id"])),
+                    referee_user_id=new_user.user_id,
+                    referral_code_used=signup_referral_code,
+                    market_id=market_id_uuid,
+                    modified_by=new_user.user_id,
+                    db=db,
+                )
+                # Mark any device-based assignment as used
+                with db.cursor() as cur:
+                    cur.execute(
+                        "UPDATE referral_code_assignment SET used = TRUE WHERE referral_code = %s AND used = FALSE",
+                        (signup_referral_code,),
+                    )
 
         with db.cursor() as cursor:
             cursor.execute(

@@ -60,26 +60,26 @@ class InstitutionScope:
         Internal Operator has no management capabilities.
         Supplier and Employer are institution-scoped.
         """
-        if self.role_type != "Internal":
+        if self.role_type != "internal":
             return False
-        
+
         # Check role_name for Internal users
-        if self.role_name in ["Admin", "Super Admin"]:
+        if self.role_name in ["admin", "super_admin"]:
             return True
-        
+
         return False
 
     @property
     def is_employee(self) -> bool:
         """
         Returns True if the user is Internal (Vianda Enterprises staff).
-        
+
         Internal users can have different access levels:
         - Admin/Super Admin: Global access
         - Manager: Institution-scoped access
         - Operator: Self-updates only
         """
-        return self.role_type == "Internal"
+        return self.role_type == "internal"
 
     def matches(self, resource_institution_id: Optional[Any]) -> bool:
         """Returns True if the resource's institution_id matches this scope."""
@@ -166,25 +166,25 @@ class UserScope:
         Internal Operator has no management capabilities.
         Supplier and Employer are institution-scoped.
         """
-        if self.role_type != "Internal":
+        if self.role_type != "internal":
             return False
-        
+
         # Check role_name for Internal users
         role_name = getattr(self, 'role_name', None)
-        if role_name in ["Admin", "Super Admin"]:
+        if role_name in ["admin", "super_admin"]:
             return True
-        
+
         return False
 
     @property
     def is_customer(self) -> bool:
         """Returns True if the user is a Customer."""
-        return self.role_type == "Customer"
+        return self.role_type == "customer"
 
     @property
     def is_supplier(self) -> bool:
         """Returns True if the user is a Supplier."""
-        return self.role_type == "Supplier"
+        return self.role_type == "supplier"
 
     def matches_user(self, resource_user_id: Optional[Any]) -> bool:
         """
@@ -201,23 +201,23 @@ class UserScope:
             return True
         
         # Internal Operator: self-scope only
-        if self.role_type == "Internal" and self.role_name == "Operator":
+        if self.role_type == "internal" and self.role_name == "operator":
             return _normalize(resource_user_id) == self.user_id
-        
+
         if self.is_customer:
             # Customers can only access their own user_id
             return _normalize(resource_user_id) == self.user_id
-        
+
         if self.is_supplier:
             # Suppliers can access users within their institution
             # Note: This requires a database check to verify the user belongs to the institution
             # For now, we return True and let the route/service layer handle institution validation
             return True
-        
+
         # Internal Management: institution-scoped (handled in route/service layer)
-        if self.role_type == "Internal" and self.role_name == "Manager":
+        if self.role_type == "internal" and self.role_name == "manager":
             return True  # Institution validation happens in route/service layer
-        
+
         return False
 
     def enforce_user(self, resource_user_id: Optional[Any]) -> None:
@@ -231,7 +231,7 @@ class UserScope:
         For Internal Admin/Super Admin: Global access (no enforcement needed)
         """
         # Internal Operator: self-scope only
-        if self.role_type == "Internal" and self.role_name == "Operator":
+        if self.role_type == "internal" and self.role_name == "operator":
             if _normalize(resource_user_id) != self.user_id:
                 raise HTTPException(
                     status_code=403,
@@ -263,19 +263,19 @@ class UserScope:
             return True
         
         # Internal Operator: self-scope only
-        if self.role_type == "Internal" and self.role_name == "Operator":
+        if self.role_type == "internal" and self.role_name == "operator":
             return _normalize(target_user_id) == self.user_id
-        
+
         if self.is_customer:
             # Customers can only assign their own user_id
             return _normalize(target_user_id) == self.user_id
-        
+
         if self.is_supplier:
             # Suppliers can assign to users within their institution
             return _normalize(target_user_institution_id) == self.institution_id
-        
+
         # Internal Management: institution-scoped
-        if self.role_type == "Internal" and self.role_name == "Manager":
+        if self.role_type == "internal" and self.role_name == "manager":
             return _normalize(target_user_institution_id) == self.institution_id
         
         return False
@@ -290,7 +290,7 @@ class UserScope:
                     status_code=403,
                     detail="Forbidden: customers can only assign addresses to themselves"
                 )
-            elif self.role_type == "Internal" and self.role_name == "Operator":
+            elif self.role_type == "internal" and self.role_name == "operator":
                 raise HTTPException(
                     status_code=403,
                     detail="Forbidden: Internal Operators can only assign addresses to themselves"
@@ -386,14 +386,14 @@ class EmployeeCustomerAccessControl:
         role_type = current_user.get("role_type")
         
         # Block Suppliers
-        if role_type == "Supplier":
+        if role_type == "supplier":
             return None, {
                 "status_code": 403,
                 "detail": "Forbidden: Suppliers cannot access this resource"
             }
-        
+
         # Customers: self-scope (filter by their own user_id)
-        if role_type == "Customer":
+        if role_type == "customer":
             user_id = current_user.get("user_id")
             if not user_id:
                 return None, {
@@ -412,14 +412,14 @@ class EmployeeCustomerAccessControl:
             return user_id, None
         
         # Internal: check role_name for access level
-        if role_type == "Internal":
+        if role_type == "internal":
             role_name = current_user.get("role_name")
-            if role_name in ["Admin", "Super Admin"]:
+            if role_name in ["admin", "super_admin"]:
                 return None, None  # Global access
-            elif role_name == "Manager":
+            elif role_name == "manager":
                 # Internal Management: institution-scoped (handled via scope in route)
                 return None, None  # Scope applied in route layer
-            elif role_name == "Operator":
+            elif role_name == "operator":
                 # Internal Operator: self-scope only (same as Customer)
                 user_id = current_user.get("user_id")
                 if not user_id:
@@ -482,14 +482,14 @@ class EmployeeCustomerAccessControl:
         role_type = current_user.get("role_type")
         
         # Internal: check role_name for access level
-        if role_type == "Internal":
+        if role_type == "internal":
             role_name = current_user.get("role_name")
-            if role_name in ["Admin", "Super Admin"]:
+            if role_name in ["admin", "super_admin"]:
                 return None  # Global access
-            elif role_name == "Manager":
+            elif role_name == "manager":
                 # Internal Management: institution-scoped (validation happens in route)
                 return None  # Institution validation in route layer
-            elif role_name == "Operator":
+            elif role_name == "operator":
                 # Internal Operator: self-scope only (same as Customer)
                 user_id = current_user.get("user_id")
                 if not user_id:
@@ -519,7 +519,7 @@ class EmployeeCustomerAccessControl:
             return None
         
         # Customers can only access their own records
-        if role_type == "Customer":
+        if role_type == "customer":
             user_id = current_user.get("user_id")
             if not user_id:
                 return {

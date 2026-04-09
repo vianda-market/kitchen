@@ -464,6 +464,12 @@ def create_app() -> FastAPI:
     v1_customer_router = create_versioned_router("api", ["Customer"], APIVersion.V1)
     v1_customer_router.include_router(customer_router)
     app.include_router(v1_customer_router)
+
+    # Customer Referral router (versioned)
+    from app.routes.customer.referral import router as customer_referral_router
+    v1_customer_referral_router = create_versioned_router("api", ["Referrals"], APIVersion.V1)
+    v1_customer_referral_router.include_router(customer_referral_router)
+    app.include_router(v1_customer_referral_router)
     
     # Enum Service router (versioned)
     from app.routes.enums import router as enums_router
@@ -488,6 +494,12 @@ def create_app() -> FastAPI:
     v1_admin_discretionary_router = create_versioned_router("api", ["Admin Discretionary"], APIVersion.V1)
     v1_admin_discretionary_router.include_router(admin_discretionary_router)
     app.include_router(v1_admin_discretionary_router)
+
+    # Admin Referral Config router (versioned)
+    from app.routes.admin.referral_config import router as admin_referral_config_router
+    v1_admin_referral_config_router = create_versioned_router("api", ["Admin Referral Config"], APIVersion.V1)
+    v1_admin_referral_config_router.include_router(admin_referral_config_router)
+    app.include_router(v1_admin_referral_config_router)
     
     # Super-Admin Discretionary router (versioned)
     from app.routes.super_admin.discretionary import router as super_admin_discretionary_router

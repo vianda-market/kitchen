@@ -107,7 +107,7 @@ def create_restaurant(
             raise HTTPException(status_code=404, detail=f"Credit currency not found for institution entity")
 
         restaurant_dict["modified_by"] = current_user["user_id"]
-        restaurant_dict["status"] = "Pending"
+        restaurant_dict["status"] = "pending"
 
         # Create the restaurant record with commit=False for atomic transaction
         restaurant = restaurant_service.create(restaurant_dict, db, scope=scope, commit=False)
@@ -214,7 +214,7 @@ def search_restaurants_route(
 
     # Effective institution: Internal users may pass any; non-Internal users only their own (resolve_institution_filter).
     if institution_id is not None:
-        if current_user.get("role_type") == "Internal":
+        if current_user.get("role_type") == "internal":
             effective_institution_id = institution_id
         else:
             effective_institution_id = resolve_institution_filter(institution_id, scope)
@@ -222,10 +222,10 @@ def search_restaurants_route(
         effective_institution_id = None
 
     # market_id: market-scoped Internal users (Manager, Operator) may only pass one of their assigned markets.
-    if market_id is not None and current_user.get("role_type") == "Internal":
+    if market_id is not None and current_user.get("role_type") == "internal":
         role_name = current_user.get("role_name")
         rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-        if rn_str in ("Manager", "Operator"):
+        if rn_str in ("manager", "operator"):
             assigned = get_assigned_market_ids(
                 current_user["user_id"], db, fallback_primary=current_user.get("market_id")
             )
@@ -321,7 +321,7 @@ def get_explore_pickup_windows(
     Use for the "Select pickup window" modal when reserving a plate.
     Requires a market (send market_id or have a primary market).
     """
-    if kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
+    if kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
         raise HTTPException(
             status_code=400,
             detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
@@ -368,6 +368,8 @@ def get_restaurants_by_city_route(
     country_code: Optional[str] = Query("US", description="ISO 3166-1 alpha-2 (e.g. US, AR)"),
     market_id: Optional[UUID] = Query(None, description="User's market; if omitted, primary market is used"),
     kitchen_day: Optional[str] = Query(None, description="Monday–Friday; required when using market to get plates; must be this week or next week (through next Friday)"),
+    cursor: Optional[str] = Query(None, description="Opaque cursor from previous response's next_cursor (infinite scroll)"),
+    limit: Optional[int] = Query(None, ge=1, description="Max plates per page (clamped to 10–50); enables cursor pagination"),
     current_user: dict = Depends(get_client_or_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -378,7 +380,7 @@ def get_restaurants_by_city_route(
     kitchen_day must fall within this week and next week (next week ends Friday); otherwise 400.
     City is matched case-insensitively. Customer or Internal only; 403 for Supplier. No institution scope.
     """
-    if kitchen_day is not None and kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
+    if kitchen_day is not None and kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
         raise HTTPException(status_code=400, detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday")
 
     user_id = current_user.get("user_id")
@@ -440,18 +442,23 @@ def get_restaurants_by_city_route(
             employer_id = user_row["employer_id"]
             employer_address_id = user_row.get("employer_address_id")
 
-    data = get_restaurants_by_city(
-        city=city,
-        country_code=country,
-        db=db,
-        timezone_str=timezone_str,
-        kitchen_day=kitchen_day,
-        credit_cost_local_currency=credit_cost_local_currency,
-        user_id=user_id,
-        employer_id=employer_id,
-        employer_address_id=employer_address_id,
-        locale=locale,
-    )
+    try:
+        data = get_restaurants_by_city(
+            city=city,
+            country_code=country,
+            db=db,
+            timezone_str=timezone_str,
+            kitchen_day=kitchen_day,
+            credit_cost_local_currency=credit_cost_local_currency,
+            user_id=user_id,
+            employer_id=employer_id,
+            employer_address_id=employer_address_id,
+            locale=locale,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     data["restaurants"] = [RestaurantExplorerItemSchema(**r) for r in data["restaurants"]]
     return RestaurantsByCityResponseSchema(**data)
 
@@ -547,7 +554,7 @@ def get_coworker_pickup_windows_route(
     Modal fetches only when has_coworker_offer or has_coworker_request from by-city/enriched.
     Returns empty when user has no employer.
     """
-    if kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
+    if kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
         raise HTTPException(
             status_code=400,
             detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",

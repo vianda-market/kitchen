@@ -15,8 +15,8 @@ from app.auth.dependencies import get_admin_user, oauth2_scheme
 def mock_admin_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Internal",
-        "role_name": "Super Admin",
+        "role_type": "internal",
+        "role_name": "super_admin",
         "institution_id": str(uuid4()),
     }
 
@@ -54,7 +54,7 @@ def _cuisine_dict(**overrides):
         "origin_source": "seed",
         "display_order": 1,
         "is_archived": False,
-        "status": "Active",
+        "status": "active",
         "created_date": now,
         "modified_date": now,
     }
@@ -70,7 +70,7 @@ def _suggestion_dict(**overrides):
         "suggested_name": "Peruvian Fusion",
         "suggested_by": str(uuid4()),
         "restaurant_id": None,
-        "suggestion_status": "Pending",
+        "suggestion_status": "pending",
         "reviewed_by": None,
         "reviewed_date": None,
         "review_notes": None,
@@ -152,13 +152,13 @@ class TestAdminCuisineCRUD:
         """DELETE /admin/cuisines/{id} soft-deletes (is_archived=true, status=Inactive)."""
         cuisine_id = str(uuid4())
         mock_crud.update.return_value = _cuisine_dict(
-            cuisine_id=cuisine_id, is_archived=True, status="Inactive"
+            cuisine_id=cuisine_id, is_archived=True, status="inactive"
         )
         resp = client_with_admin.delete(f"/api/v1/admin/cuisines/{cuisine_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["is_archived"] is True
-        assert data["status"] == "Inactive"
+        assert data["status"] == "inactive"
 
 
 # ---- Suggestion Review Tests ----
@@ -189,7 +189,7 @@ class TestAdminSuggestionReview:
         now = datetime.now(timezone.utc).isoformat()
         mock_service.approve_suggestion.return_value = _suggestion_dict(
             suggestion_id=suggestion_id,
-            suggestion_status="Approved",
+            suggestion_status="approved",
             resolved_cuisine_id=resolved_cuisine_id,
             reviewed_by=str(uuid4()),
             reviewed_date=now,
@@ -203,7 +203,7 @@ class TestAdminSuggestionReview:
             json=payload,
         )
         assert resp.status_code == 200
-        assert resp.json()["suggestion_status"] == "Approved"
+        assert resp.json()["suggestion_status"] == "approved"
 
     @patch("app.routes.admin.cuisines.cuisine_service")
     def test_approve_not_found_returns_404(self, mock_service, client_with_admin):
@@ -223,7 +223,7 @@ class TestAdminSuggestionReview:
         now = datetime.now(timezone.utc).isoformat()
         mock_service.reject_suggestion.return_value = _suggestion_dict(
             suggestion_id=suggestion_id,
-            suggestion_status="Rejected",
+            suggestion_status="rejected",
             reviewed_by=str(uuid4()),
             reviewed_date=now,
             review_notes="Not a distinct cuisine",
@@ -234,4 +234,4 @@ class TestAdminSuggestionReview:
             json=payload,
         )
         assert resp.status_code == 200
-        assert resp.json()["suggestion_status"] == "Rejected"
+        assert resp.json()["suggestion_status"] == "rejected"

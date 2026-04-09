@@ -4,7 +4,7 @@ import app.i18n.enum_labels as enum_labels
 
 
 def test_get_label_uses_spanish_when_present():
-    assert enum_labels.get_label("street_type", "St", "es") == "Calle"
+    assert enum_labels.get_label("street_type", "st", "es") == "Calle"
 
 
 def test_get_label_falls_back_to_english_when_locale_map_missing_code():

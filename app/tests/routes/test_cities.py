@@ -14,8 +14,8 @@ from app.auth.dependencies import get_client_employee_or_supplier_user, oauth2_s
 def mock_customer_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": str(uuid4()),
     }
 

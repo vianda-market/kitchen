@@ -60,7 +60,7 @@ async def get_all_enums(
     **Example Response** (each key is `{ "values": [...], "labels": { code: display } }`):
     ```json
     {
-        "status": { "values": ["Active", "Inactive"], "labels": { "Active": "Active", ... } },
+        "status": { "values": ["active", "inactive"], "labels": { "active": "Active", ... } },
         "street_type": { "values": ["St", "Ave"], "labels": { "St": "Street", "Ave": "Avenue" } }
     }
     ```
@@ -135,7 +135,7 @@ async def get_assignable_roles(
     role_names. Internal users see the full set.
     
     **Response** (Supplier):
-    {"role_type": ["Supplier"], "role_name_by_role_type": {"Supplier": ["Admin", "Manager", "Operator"]}}
+    {"role_type": ["supplier"], "role_name_by_role_type": {"supplier": ["admin", "manager", "operator"]}}
     
     **Response** (Internal): Full set per valid role combinations.
     """
@@ -179,11 +179,11 @@ async def get_enum_by_name(
     
     **Example**: GET /api/v1/enums/status
     ```json
-    ["Active", "Pending", "Inactive"]
+    ["active", "pending", "inactive"]
     ```
     **Example**: GET /api/v1/enums/status?context=user
     ```json
-    ["Active", "Inactive"]
+    ["active", "inactive"]
     ```
     
     **Error Responses**:

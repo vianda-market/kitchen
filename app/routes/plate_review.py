@@ -49,12 +49,12 @@ def get_institution_reviews_enriched(
     Auth: Supplier (Admin/Manager/Operator) or Internal. Customers are rejected.
     """
     role_type = current_user.get("role_type")
-    if role_type == "Customer":
+    if role_type == "customer":
         raise HTTPException(status_code=403, detail="Customers cannot access institution reviews")
 
     # Suppliers are scoped to their institution; Internal sees all
     institution_id = None
-    if role_type == "Supplier":
+    if role_type == "supplier":
         inst = current_user.get("institution_id")
         if not inst:
             raise HTTPException(status_code=403, detail="No institution assigned")

@@ -9,11 +9,11 @@ from enum import Enum
 
 class KitchenDay(str, Enum):
     """Valid kitchen days - fixed at compile time"""
-    MONDAY = "Monday"
-    TUESDAY = "Tuesday"
-    WEDNESDAY = "Wednesday"
-    THURSDAY = "Thursday"
-    FRIDAY = "Friday"
+    MONDAY = "monday"
+    TUESDAY = "tuesday"
+    WEDNESDAY = "wednesday"
+    THURSDAY = "thursday"
+    FRIDAY = "friday"
 
     @classmethod
     def values(cls) -> list[str]:

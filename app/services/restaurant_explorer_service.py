@@ -16,6 +16,7 @@ import pytz
 from app.utils.db import db_read
 from app.utils.address_formatting import format_street_display
 from app.utils.portion_size import bucket_portion_size
+from app.utils.cursor_pagination import slice_restaurants_by_cursor
 from app.services.plate_review_service import get_plate_review_aggregates
 from app.services.kitchen_day_service import (
     get_effective_current_day,
@@ -25,7 +26,7 @@ from app.services.kitchen_day_service import (
 )
 from app.services.plate_selection_validation import _find_next_available_kitchen_day_in_week
 
-WEEKDAY_NAME_TO_NUM = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4}
+WEEKDAY_NAME_TO_NUM = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4}
 
 
 def _parse_window_to_minutes(window: str) -> Optional[int]:
@@ -312,7 +313,7 @@ def resolve_kitchen_day_for_explore(
         next_day = _find_next_available_kitchen_day_in_week(
             current_day, list(VALID_KITCHEN_DAYS), country_code, db
         )
-        return next_day or "Monday"
+        return next_day or "monday"
 
     if config and config.kitchen_day_config:
         day_config = config.kitchen_day_config.get(current_day)
@@ -329,7 +330,7 @@ def resolve_kitchen_day_for_explore(
     next_day = _find_next_available_kitchen_day_in_week(
         current_day, list(VALID_KITCHEN_DAYS), country_code, db
     )
-    return next_day or "Monday"
+    return next_day or "monday"
 
 
 def _build_lean_plate_dict(plate: dict) -> dict:
@@ -375,7 +376,7 @@ def get_plates_for_restaurants(
             pr.ingredients
         FROM plate_info p
         INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.kitchen_day = %s
-          AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+          AND pkd.is_archived = FALSE AND pkd.status = 'active'
         INNER JOIN product_info pr ON pr.product_id = p.product_id AND pr.is_archived = FALSE
         WHERE p.restaurant_id IN (""" + ids_placeholder + """)
           AND p.is_archived = FALSE
@@ -439,6 +440,8 @@ def get_restaurants_by_city(
     employer_id: Optional[UUID] = None,
     employer_address_id: Optional[UUID] = None,
     locale: str = "en",
+    cursor: Optional[str] = None,
+    limit: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     Return restaurants in the given city (case-insensitive match) in the given country.
@@ -473,15 +476,15 @@ def get_restaurants_by_city(
         WHERE a.country_code = %s
           AND a.is_archived = FALSE
           AND r.is_archived = FALSE
-          AND r.status = 'Active'
+          AND r.status = 'active'
           AND EXISTS (
             SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
             SELECT 1 FROM qr_code qc
-            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
+            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
           )
           AND TRIM(a.city) != ''
     """
@@ -518,15 +521,15 @@ def get_restaurants_by_city(
           AND TRIM(a.city) = %s
           AND a.is_archived = FALSE
           AND r.is_archived = FALSE
-          AND r.status = 'Active'
+          AND r.status = 'active'
           AND EXISTS (
             SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
             SELECT 1 FROM qr_code qc
-            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
+            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
           )
         ORDER BY r.name
     """
@@ -727,9 +730,17 @@ def get_restaurants_by_city(
         for r in restaurants:
             r["plates"] = [_build_lean_plate_dict(p) for p in (r.get("plates") or [])]
 
+    # 5) Cursor pagination: slice the sorted list before building the response.
+    page_restaurants, next_cursor, has_more = slice_restaurants_by_cursor(
+        restaurants, cursor, limit,
+    )
+    restaurants = page_restaurants
+
     # 4) Center: avg lat/lng for the city (Active + plate_kitchen_days)
+    # Skip center query on page 2+ — the frontend caches it from page 1.
+    is_first_page = cursor is None
     center: Optional[dict] = None
-    if matched_city and restaurants:
+    if is_first_page and matched_city and restaurants:
         query_center = """
             SELECT AVG(g.latitude) AS lat, AVG(g.longitude) AS lng
             FROM geolocation_info g
@@ -739,15 +750,15 @@ def get_restaurants_by_city(
               AND TRIM(a.city) = %s
               AND a.is_archived = FALSE
               AND r.is_archived = FALSE
-              AND r.status = 'Active'
+              AND r.status = 'active'
               AND EXISTS (
                 SELECT 1 FROM plate_info p
-                INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+                INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
                 WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
               )
               AND EXISTS (
                 SELECT 1 FROM qr_code qc
-                WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
+                WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
               )
               AND g.is_archived = FALSE
         """
@@ -761,7 +772,7 @@ def get_restaurants_by_city(
             center = {"lat": float(center_row["lat"]), "lng": float(center_row["lng"])}
 
     # Fallback: when no center from restaurants, use city default (for users without default address)
-    if center is None and matched_city and country:
+    if is_first_page and center is None and matched_city and country:
         from app.config.supported_cities_default_location import get_city_default_location_by_name
         city_default = get_city_default_location_by_name(country, matched_city)
         if city_default:
@@ -775,4 +786,6 @@ def get_restaurants_by_city(
     }
     if resolved_kitchen_day:
         out["kitchen_day"] = resolved_kitchen_day
+    out["next_cursor"] = next_cursor
+    out["has_more"] = has_more
     return out

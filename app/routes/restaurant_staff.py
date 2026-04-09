@@ -60,7 +60,7 @@ def get_restaurant_daily_orders(
         # 1. Determine institution_entity_id based on role
         institution_entity_id = None
         
-        if current_user["role_type"] == "Supplier":
+        if current_user["role_type"] == "supplier":
             # Get user's institution, then institution_entity_id
             user_institution_query = """
                 SELECT i.institution_id, ie.institution_entity_id
@@ -98,7 +98,7 @@ def get_restaurant_daily_orders(
                         detail="Access denied to this restaurant"
                     )
         
-        elif current_user["role_type"] == "Internal":
+        elif current_user["role_type"] == "internal":
             # Internal users can access any restaurant
             # If restaurant_id provided, get its institution_entity_id
             if restaurant_id:
@@ -153,7 +153,7 @@ def verify_and_handoff_endpoint(
     """
     def _verify():
         # Validate restaurant belongs to user's institution (same pattern as daily-orders)
-        if current_user["role_type"] == "Supplier":
+        if current_user["role_type"] == "supplier":
             restaurant = restaurant_service.get_by_id(request.restaurant_id, db)
             if not restaurant:
                 raise HTTPException(status_code=404, detail="Restaurant not found")
@@ -171,7 +171,7 @@ def verify_and_handoff_endpoint(
             if restaurant.institution_entity_id != result[0]['institution_entity_id']:
                 raise HTTPException(status_code=403, detail="Access denied to this restaurant")
 
-        elif current_user["role_type"] != "Internal":
+        elif current_user["role_type"] != "internal":
             raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
 
         return verify_and_handoff(

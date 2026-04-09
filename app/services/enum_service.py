@@ -67,7 +67,7 @@ class EnumService:
             "favorite_entity_type": FavoriteEntityType.values(),
             "portion_size_display": PortionSizeDisplay.values(),
         }
-        if current_user and (current_user.get("role_type") or "").strip() == "Customer":
+        if current_user and (current_user.get("role_type") or "").strip().lower() == "customer":
             enums.pop("role_type", None)
             enums.pop("institution_type", None)
             enums.pop("role_name", None)
@@ -102,7 +102,7 @@ class EnumService:
         Raises:
             ValueError: If enum_name is not recognized or Customer requests role_type/role_name
         """
-        if current_user and (current_user.get("role_type") or "").strip() == "Customer":
+        if current_user and (current_user.get("role_type") or "").strip().lower() == "customer":
             if enum_name in ("role_type", "role_name", "institution_type"):
                 raise ValueError("Customers cannot read role or institution type enums")
         all_enums = EnumService.get_all_enums(current_user)
@@ -136,18 +136,18 @@ class EnumService:
         # Normalize to canonical role: JWT may have different casing; compare case-insensitively
         raw_lower = raw.lower()
         if raw_lower == "internal":
-            actor_role = "Internal"
+            actor_role = "internal"
         elif raw_lower == "supplier":
-            actor_role = "Supplier"
+            actor_role = "supplier"
         elif raw_lower == "customer":
-            actor_role = "Customer"
+            actor_role = "customer"
         elif raw_lower == "employer":
-            actor_role = "Employer"
+            actor_role = "employer"
         else:
-            actor_role = raw if raw in ("Internal", "Supplier", "Customer", "Employer") else (raw.capitalize() if raw else "")
+            actor_role = raw_lower if raw_lower in ("internal", "supplier", "customer", "employer") else (raw.lower() if raw else "")
 
-        if actor_role == "Internal":
-            # User role_type: Internal, Supplier, Customer, Employer (all four)
+        if actor_role == "internal":
+            # User role_type: internal, supplier, customer, employer (all four)
             role_types = [rt.value for rt in RoleType]
             role_name_by_role_type = {
                 rt.value: RoleName.get_valid_for_role_type(rt)
@@ -157,7 +157,7 @@ class EnumService:
                 "role_type": role_types,
                 "role_name_by_role_type": role_name_by_role_type,
             }
-        if actor_role == "Supplier":
+        if actor_role == "supplier":
             role_types = list(SUPPLIER_ALLOWED_USER_ROLE_TYPES)
             role_name_by_role_type = {}
             for rt_str in role_types:
@@ -187,13 +187,13 @@ class EnumService:
         role_type = str(current_user.get("role_type") or "").strip()
         role_name = str(current_user.get("role_name") or "").strip()
 
-        if role_type != "Internal":
+        if role_type.lower() != "internal":
             return []
 
-        if role_name == "Super Admin":
+        if role_name.lower() == "super_admin":
             return RoleType.values()
 
-        if role_name == "Admin":
+        if role_name.lower() == "admin":
             return [rt.value for rt in RoleType if rt not in (RoleType.INTERNAL, RoleType.CUSTOMER)]
 
         return []

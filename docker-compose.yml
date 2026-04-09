@@ -1,0 +1,41 @@
+version: "3.8"
+
+# Local development services for the ads platform.
+# Redis provides the ARQ job queue for deferred conversion uploads.
+# The arq-worker processes jobs from the queue.
+#
+# Usage:
+#   docker-compose up -d redis        # Redis only (run worker locally)
+#   docker-compose up -d              # Redis + worker
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  arq-worker:
+    build: .
+    command: arq app.workers.arq_settings.WorkerSettings
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - ADS_ENABLED_PLATFORMS=google,meta
+      - GOOGLE_ADS_PROVIDER=mock
+      - META_ADS_PROVIDER=mock
+      - DEV_MODE=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+volumes:
+  redis-data:

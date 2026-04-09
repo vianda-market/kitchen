@@ -114,53 +114,53 @@ def sample_employee_user():
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Internal",
-        "role_name": "Admin",
+        "role_type": "internal",
+        "role_name": "admin",
         "institution_id": uuid4()
     }
 
 
 @pytest.fixture
 def sample_super_admin_user():
-    """Super Admin user (role_type='Internal', role_name='Super Admin') for testing.
-    
+    """Super Admin user (role_type='internal', role_name='super_admin') for testing.
+
     Super Admins have global access (via Internal role_type) plus special
-    approval permissions (via role_name='Super Admin').
+    approval permissions (via role_name='super_admin').
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Internal",
-        "role_name": "Super Admin",
+        "role_type": "internal",
+        "role_name": "super_admin",
         "institution_id": uuid4()
     }
 
 
 @pytest.fixture
 def sample_supplier_user():
-    """Supplier user (role_type='Supplier', role_name='Admin') for testing.
-    
+    """Supplier user (role_type='supplier', role_name='admin') for testing.
+
     Suppliers are scoped to their institution_id and cannot access
     system configuration APIs.
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Supplier",
-        "role_name": "Admin",
+        "role_type": "supplier",
+        "role_name": "admin",
         "institution_id": uuid4()
     }
 
 
 @pytest.fixture
 def sample_customer_user():
-    """Customer user (role_type='Customer', role_name='Comensal') for testing.
-    
+    """Customer user (role_type='customer', role_name='comensal') for testing.
+
     Customers access iOS/Android apps only and have limited backoffice access
     (e.g., viewing plans).
     """
     return {
         "user_id": uuid4(),
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": uuid4()
     }
 
@@ -182,7 +182,7 @@ def sample_pickup_record():
         qr_code_id=uuid4(),
         qr_code_payload="QR123456",
         is_archived=False,
-        status="Pending",
+        status="pending",
         created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
         modified_date=datetime.now(timezone.utc)
@@ -201,7 +201,7 @@ def sample_qr_code():
         image_storage_path="static/qr_codes/sample.png",
         qr_code_checksum="19f3c0f4f064b2fb601b53f1f4a6a3a053217a81d8427a7201da7dda4dd5c6d2",
         is_archived=False,
-        status="Active",
+        status="active",
         created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
         modified_date=datetime.now(timezone.utc)
@@ -217,7 +217,7 @@ def sample_restaurant():
         name="Test Restaurant",
         institution_id=uuid4(),
         is_archived=False,
-        status="Active",
+        status="active",
         created_date=datetime.now(timezone.utc),
         modified_date=datetime.now(timezone.utc)
     )
@@ -236,7 +236,7 @@ def sample_plate_selection():
         product_id=uuid4(),
         qr_code_id=uuid4(),
         credit=1,
-        kitchen_day="Monday",
+        kitchen_day="monday",
         pickup_date=date.today(),
         pickup_time_range="12:00-12:15",
         pickup_intent="self",
@@ -285,13 +285,13 @@ def sample_restaurant_transaction():
         arrival_time=None,
         completion_time=None,
         expected_completion_time=None,
-        transaction_type="Order",
+        transaction_type="order",
         credit=Decimal("5.0"),
         no_show_discount=Decimal("10.0"),
         currency_code="USD",
         final_amount=Decimal("5.0"),
         is_archived=False,
-        status="Pending",
+        status="pending",
         created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
         modified_date=datetime.now(timezone.utc)
@@ -308,7 +308,7 @@ def sample_bill_data():
     return {
         "credit_currency_id": str(uuid4()),
         "amount": 25.50,
-        "status": "Pending"
+        "status": "pending"
     }
 
 
@@ -323,7 +323,7 @@ def sample_credit_currency_dto():
         credit_value_local_currency=Decimal("1.0"),
         currency_conversion_usd=Decimal("1.0"),
         is_archived=False,
-        status="Active",
+        status="active",
         created_date=datetime.now(timezone.utc),
         modified_by=uuid4(),
         modified_date=datetime.now(timezone.utc)

@@ -86,7 +86,7 @@ def get_coworkers_with_eligibility(
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
             WHERE u.employer_id = %s AND u.user_id != %s
               AND u.employer_address_id = %s
-              AND u.is_archived = FALSE AND u.status = 'Active'
+              AND u.is_archived = FALSE AND u.status = 'active'
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
@@ -102,7 +102,7 @@ def get_coworkers_with_eligibility(
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
             WHERE u.employer_id = %s AND u.user_id != %s
               AND u.employer_address_id IS NULL
-              AND u.is_archived = FALSE AND u.status = 'Active'
+              AND u.is_archived = FALSE AND u.status = 'active'
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,

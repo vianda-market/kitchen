@@ -326,14 +326,14 @@ def _resolve_employer_institution(current_user: dict, institution_id_override: O
     - Employer users: use their own institution_id from JWT.
     - Internal users: must provide institution_id via query param (they are global-scoped, not tied to an Employer institution)."""
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type == "Internal":
+    if role_type == "internal":
         if institution_id_override:
             return institution_id_override
         raise HTTPException(
             status_code=400,
             detail="Internal users must provide institution_id query parameter to specify which Employer institution to operate on.",
         )
-    if role_type == "Employer":
+    if role_type == "employer":
         inst_id = current_user.get("institution_id")
         if not inst_id:
             raise HTTPException(status_code=403, detail="No institution found for your account")
@@ -345,9 +345,9 @@ def _require_employer_admin(current_user: dict):
     """Raise 403 if user is not Employer Admin."""
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
-    if role_type == "Internal":
+    if role_type == "internal":
         return
-    if role_type != "Employer" or role_name != "Admin":
+    if role_type != "employer" or role_name != "admin":
         raise HTTPException(status_code=403, detail="Only Employer Admin can perform this action")
 
 

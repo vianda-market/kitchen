@@ -10,9 +10,9 @@ from enum import Enum
 
 class BillPayoutStatus(str, Enum):
     """Status of a single payout attempt on a bill."""
-    PENDING = "Pending"
-    COMPLETED = "Completed"
-    FAILED = "Failed"
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
     @classmethod
     def values(cls) -> list[str]:

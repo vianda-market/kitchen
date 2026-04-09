@@ -109,7 +109,7 @@ def soft_delete_cuisine(
     """Soft-delete a cuisine (set is_archived=true, status=Inactive)."""
     update_data = {
         "is_archived": True,
-        "status": "Inactive",
+        "status": "inactive",
         "modified_by": current_user["user_id"],
     }
     result = cuisine_crud_service.update(cuisine_id, update_data, db)

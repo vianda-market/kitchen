@@ -79,7 +79,7 @@ def stripe_pm_attached_insert_if_new(
                 user_id, method_type, is_archived, status, is_default,
                 modified_by, modified_date
             ) VALUES (
-                %s::uuid, 'Stripe', FALSE, 'Active'::status_enum, %s,
+                %s::uuid, 'Stripe', FALSE, 'active'::status_enum, %s,
                 %s::uuid, CURRENT_TIMESTAMP
             )
             RETURNING payment_method_id

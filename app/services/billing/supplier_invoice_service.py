@@ -114,7 +114,7 @@ def create_supplier_invoice(
     country_code = data.get("country_code", "")
 
     # Set status based on caller role
-    if role_type == "Internal":
+    if role_type == "internal":
         data["status"] = SupplierInvoiceStatus.APPROVED.value
         data["reviewed_by"] = user_id
         data["reviewed_at"] = datetime.utcnow().isoformat()
@@ -217,7 +217,7 @@ def review_supplier_invoice(
     reviewer_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> SupplierInvoiceDTO:
-    """Approve or reject a supplier invoice. Only valid from 'Pending Review' status."""
+    """Approve or reject a supplier invoice. Only valid from 'pending_review' status."""
     invoice = supplier_invoice_service.get_by_id(str(invoice_id), db)
     if not invoice:
         raise HTTPException(status_code=404, detail="Supplier invoice not found")
@@ -225,7 +225,7 @@ def review_supplier_invoice(
     if invoice.status != SupplierInvoiceStatus.PENDING_REVIEW:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot review invoice with status '{invoice.status.value}'. Must be 'Pending Review'.",
+            detail=f"Cannot review invoice with status '{invoice.status.value}'. Must be 'pending_review'.",
         )
 
     update_data = {

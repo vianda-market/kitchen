@@ -15,8 +15,8 @@ from app.auth.dependencies import get_employee_user, oauth2_scheme
 def mock_employee_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Internal",
-        "role_name": "Admin",
+        "role_type": "internal",
+        "role_name": "admin",
         "institution_id": str(uuid4()),
     }
 
@@ -57,7 +57,7 @@ class TestCreateMarketCountryCodeOnly:
             "timezone": "America/Argentina/Buenos_Aires",
             "kitchen_close_time": "13:30",
             "is_archived": False,
-            "status": "Active",
+            "status": "active",
             "created_date": "2026-02-10T12:00:00Z",
             "modified_date": "2026-02-10T12:00:00Z",
         }
@@ -65,7 +65,7 @@ class TestCreateMarketCountryCodeOnly:
             "country_code": "AR",
             "credit_currency_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
-            "status": "Active",
+            "status": "active",
         }
         resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 201
@@ -104,7 +104,7 @@ class TestCreateMarketCountryCodeOnly:
             "timezone": "America/Argentina/Buenos_Aires",
             "kitchen_close_time": "13:30",
             "is_archived": False,
-            "status": "Active",
+            "status": "active",
             "created_date": "2026-02-10T12:00:00Z",
             "modified_date": "2026-02-10T12:00:00Z",
         }
@@ -112,7 +112,7 @@ class TestCreateMarketCountryCodeOnly:
             "country_code": "ar",
             "credit_currency_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
-            "status": "Active",
+            "status": "active",
         }
         resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 201
@@ -138,7 +138,7 @@ class TestCreateMarketCountryCodeOnly:
                 "timezone": payload["timezone"],
                 "kitchen_close_time": "13:30",
                 "is_archived": False,
-                "status": "Active",
+                "status": "active",
                 "created_date": "2026-02-10T12:00:00Z",
                 "modified_date": "2026-02-10T12:00:00Z",
             }

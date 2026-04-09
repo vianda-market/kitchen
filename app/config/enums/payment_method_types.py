@@ -9,9 +9,9 @@ from enum import Enum
 
 class PaymentMethodProvider(str, Enum):
     """Valid payment method providers (aggregators only)"""
-    STRIPE = "Stripe"
-    MERCADO_PAGO = "Mercado Pago"
-    PAYU = "PayU"
+    STRIPE = "stripe"
+    MERCADO_PAGO = "mercado_pago"
+    PAYU = "payu"
 
     @classmethod
     def values(cls) -> list[str]:

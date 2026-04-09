@@ -8,7 +8,7 @@ WHERE completion_time IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_plate_pickup_archival_eligible 
 ON customer.plate_pickup_live(is_archived, status, completion_time) 
-WHERE is_archived = FALSE AND status = 'Completed';
+WHERE is_archived = FALSE AND status = 'completed';
 
 -- Transactions (billing.restaurant_transaction) archival indexes  
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_archival
@@ -17,7 +17,7 @@ WHERE completion_time IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_archival_eligible
 ON billing.restaurant_transaction(is_archived, status, completion_time)
-WHERE is_archived = FALSE AND status = 'Completed';
+WHERE is_archived = FALSE AND status = 'completed';
 
 -- Client transactions archival indexes
 CREATE INDEX IF NOT EXISTS idx_client_transaction_archival

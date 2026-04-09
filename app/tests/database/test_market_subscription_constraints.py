@@ -29,7 +29,7 @@ def _make_subscription_user(cursor, admin_id: str) -> str:
         INSERT INTO user_info (
             user_id, institution_id, role_type, role_name, username, email,
             hashed_password, market_id, modified_by
-        ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+        ) VALUES (%s, %s, 'customer'::role_type_enum, 'comensal'::role_name_enum,
             %s, %s, 'hash', %s::uuid, %s)
         """,
         (
@@ -53,7 +53,7 @@ def _ensure_plan_for_market(cursor, market_id, modified_by, plan_id=None):
     pid = plan_id or str(uuid4())
     cursor.execute("""
         INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by, modified_date)
-        VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, TRUE, FALSE, 'Active'::status_enum, %s, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, TRUE, FALSE, 'active'::status_enum, %s, CURRENT_TIMESTAMP)
     """, (pid, market_id, modified_by))
     return pid
 
@@ -84,9 +84,9 @@ class TestMarketSubscriptionConstraints:
                     subscription_status, is_archived, status,
                     modified_by
                 )
-                VALUES (%s, %s, %s, %s, 'Active', FALSE, 'Active', %s)
+                VALUES (%s, %s, %s, %s, 'active', FALSE, 'active', %s)
             """, (subscription_id_1, user_id, market_id, plan_id, modified_by))
-            
+
             # Try to create second subscription for same user/market (should fail)
             subscription_id_2 = str(uuid4())
             with pytest.raises(psycopg2.errors.UniqueViolation) as exc_info:
@@ -96,7 +96,7 @@ class TestMarketSubscriptionConstraints:
                         subscription_status, is_archived, status,
                         modified_by
                     )
-                    VALUES (%s, %s, %s, %s, 'Active', FALSE, 'Active', %s)
+                    VALUES (%s, %s, %s, %s, 'active', FALSE, 'active', %s)
                 """, (subscription_id_2, user_id, market_id, plan_id, modified_by))
             
             # Verify the error is about the unique constraint
@@ -132,7 +132,7 @@ class TestMarketSubscriptionConstraints:
                     subscription_status, is_archived, status,
                     modified_by
                 )
-                VALUES (%s, %s, %s, %s, 'Active', FALSE, 'Active', %s)
+                VALUES (%s, %s, %s, %s, 'active', FALSE, 'active', %s)
             """, (subscription_id_1, user_id, market_id_1, plan_id_1, modified_by))
             
             # Create subscription in Market 2 (should also succeed)
@@ -143,7 +143,7 @@ class TestMarketSubscriptionConstraints:
                     subscription_status, is_archived, status,
                     modified_by
                 )
-                VALUES (%s, %s, %s, %s, 'Active', FALSE, 'Active', %s)
+                VALUES (%s, %s, %s, %s, 'active', FALSE, 'active', %s)
             """, (subscription_id_2, user_id, market_id_2, plan_id_2, modified_by))
             
             # Verify both subscriptions exist
@@ -184,7 +184,7 @@ class TestMarketSubscriptionConstraints:
                     subscription_status, is_archived, status,
                     modified_by
                 )
-                VALUES (%s, %s, %s, %s, 'Cancelled', TRUE, 'Inactive', %s)
+                VALUES (%s, %s, %s, %s, 'cancelled', TRUE, 'inactive', %s)
             """, (subscription_id_1, user_id, market_id, plan_id, modified_by))
             
             # Create new active subscription (should succeed because first is archived)
@@ -195,7 +195,7 @@ class TestMarketSubscriptionConstraints:
                     subscription_status, is_archived, status,
                     modified_by
                 )
-                VALUES (%s, %s, %s, %s, 'Active', FALSE, 'Active', %s)
+                VALUES (%s, %s, %s, %s, 'active', FALSE, 'active', %s)
             """, (subscription_id_2, user_id, market_id, plan_id, modified_by))
             
             # Verify both exist (one archived, one active)

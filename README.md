@@ -6,7 +6,7 @@ FastAPI + PostgreSQL backend for the Kitchen platform. Manages restaurants, plat
 
 ```bash
 # Clone and enter project
-cd ~/Desktop/local/kitchen
+cd ~/learn/kitchen
 
 # Create virtual environment
 python -m venv venv

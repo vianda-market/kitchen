@@ -14,8 +14,8 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 def mock_current_user():
     return {
         "user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-        "role_type": "Internal",
-        "role_name": "Super Admin",
+        "role_type": "internal",
+        "role_name": "super_admin",
         "institution_id": "11111111-1111-1111-1111-111111111111",
     }
 
@@ -79,7 +79,7 @@ class TestAddressSuggestRoute:
 
         free_claims = {
             "sub": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "role_type": "Customer",
+            "role_type": "customer",
             "onboarding_status": "in_progress",
             "institution_id": "11111111-1111-1111-1111-111111111111",
         }

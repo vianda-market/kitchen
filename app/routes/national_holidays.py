@@ -84,7 +84,7 @@ def list_national_holidays(
                 is_recurring,
                 recurring_month,
                 recurring_day,
-                COALESCE(status, 'Active') as status,
+                COALESCE(status, 'active') as status,
                 is_archived,
                 created_date,
                 modified_by,
@@ -141,12 +141,12 @@ def create_national_holiday(
             "is_recurring": payload.is_recurring,
             "recurring_month": payload.recurring_month,
             "recurring_day": payload.recurring_day,
-            "status": payload.status if payload.status else "Active",  # Use provided status or default to Active
+            "status": payload.status if payload.status else "active",  # Use provided status or default to active
             "is_archived": False,
             "modified_by": current_user["user_id"],
             "source": "manual",
         }
-        
+
         # Create holiday
         created_holiday = national_holiday_service.create(holiday_data, connection, modified_by=current_user["user_id"])
         
@@ -179,7 +179,7 @@ def create_national_holidays_bulk(
                 "is_recurring": holiday.is_recurring,
                 "recurring_month": holiday.recurring_month,
                 "recurring_day": holiday.recurring_day,
-                "status": holiday.status if holiday.status else "Active",  # Use provided status or default to Active
+                "status": holiday.status if holiday.status else "active",  # Use provided status or default to active
                 "is_archived": False,
                 "modified_by": current_user["user_id"],
                 "source": "manual",

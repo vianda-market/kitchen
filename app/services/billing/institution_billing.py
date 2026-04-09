@@ -73,7 +73,7 @@ def _check_invoice_compliance(
         FROM billing.institution_bill_info b
         WHERE b.institution_entity_id = %s
           AND b.is_archived = FALSE
-          AND b.resolution = 'Pending'
+          AND b.resolution = 'pending'
           AND NOT EXISTS (
             SELECT 1 FROM billing.bill_invoice_match m
             WHERE m.institution_bill_id = b.institution_bill_id

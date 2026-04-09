@@ -23,7 +23,7 @@ class TestDateService:
         """Test that dev override is used when DEV_OVERRIDE_DAY is set."""
         mock_settings.DEV_OVERRIDE_DAY = "Monday"
         result = get_effective_current_day()
-        assert result == "Monday"
+        assert result == "monday"
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_ignores_invalid_dev_override(self, mock_settings):
@@ -38,7 +38,7 @@ class TestDateService:
             mock_datetime.now.return_value = mock_now
             
             result = get_effective_current_day()
-            assert result == "Tuesday"
+            assert result == "tuesday"
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_handles_empty_dev_override(self, mock_settings):
@@ -53,7 +53,7 @@ class TestDateService:
             mock_datetime.now.return_value = mock_now
             
             result = get_effective_current_day()
-            assert result == "Wednesday"
+            assert result == "wednesday"
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_uses_previous_day_before_1pm(self, mock_settings):
@@ -72,7 +72,7 @@ class TestDateService:
             mock_datetime.now.return_value = mock_now
             
             result = get_effective_current_day()
-            assert result == "Wednesday"
+            assert result == "wednesday"
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_uses_current_day_after_1pm(self, mock_settings):
@@ -87,7 +87,7 @@ class TestDateService:
             mock_datetime.now.return_value = mock_now
             
             result = get_effective_current_day()
-            assert result == "Friday"
+            assert result == "friday"
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_handles_invalid_timezone(self, mock_settings):
@@ -108,7 +108,7 @@ class TestDateService:
             mock_datetime.now.return_value = mock_now
             
             result = get_effective_current_day("Invalid/Timezone")
-            assert result == "Saturday"
+            assert result == "saturday"
             assert mock_timezone.call_count >= 2
 
     @patch('app.services.date_service.settings')

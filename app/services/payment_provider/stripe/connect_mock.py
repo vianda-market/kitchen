@@ -81,17 +81,17 @@ def execute_supplier_payout(
     bill = institution_bill_service.get_by_id(str(institution_bill_id), db)
     if not bill:
         raise HTTPException(status_code=404, detail="Institution bill not found")
-    if bill.get("resolution") != "Pending":
+    if bill.get("resolution") != "pending":
         raise HTTPException(
             status_code=400,
-            detail=f"Bill resolution is '{bill.get('resolution')}'; only Pending bills can be paid out",
+            detail=f"Bill resolution is '{bill.get('resolution')}'; only pending bills can be paid out",
         )
 
     with db.cursor() as cur:
         cur.execute(
             """
             SELECT bill_payout_id, status FROM billing.institution_bill_payout
-            WHERE institution_bill_id = %s AND status != 'Failed'
+            WHERE institution_bill_id = %s AND status != 'failed'
             ORDER BY created_at DESC LIMIT 1
             """,
             (str(institution_bill_id),),
@@ -132,7 +132,7 @@ def execute_supplier_payout(
             INSERT INTO billing.institution_bill_payout
                 (institution_bill_id, provider, provider_transfer_id, amount, currency_code,
                  status, idempotency_key, modified_by)
-            VALUES (%s, 'stripe', %s, %s, %s, 'Pending', %s, %s)
+            VALUES (%s, 'stripe', %s, %s, %s, 'pending', %s, %s)
             RETURNING bill_payout_id
             """,
             (str(institution_bill_id), transfer_id, amount, currency_code, idempotency_key, str(current_user_id)),

@@ -37,7 +37,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -73,7 +73,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -109,7 +109,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -145,7 +145,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -251,7 +251,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -309,7 +309,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"
@@ -341,7 +341,7 @@ class TestCreditValidationService:
             balance=Decimal(str(current_balance)),
             renewal_date="2023-12-31T23:59:59",
             is_archived=False,
-            status="Active",
+            status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
             modified_date="2023-01-01T00:00:00"

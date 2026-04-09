@@ -313,7 +313,7 @@ class PasswordRecoveryService:
                     UPDATE user_info
                     SET hashed_password = %s,
                         modified_date = CURRENT_TIMESTAMP,
-                        status = 'Active',
+                        status = 'active',
                         email_verified = TRUE,
                         email_verified_at = CURRENT_TIMESTAMP
                     WHERE user_id = %s

@@ -308,7 +308,7 @@ class TestCreditLoadingService:
             assert call_args["plate_selection_id"] is None
             assert call_args["credit"] == sample_amount
             assert call_args["final_amount"] == sample_amount
-            assert call_args["status"] == "Pending"
+            assert call_args["status"] == "pending"
             assert call_args["modified_by"] == sample_modified_by
     
     def test_create_restaurant_credit_transaction_zero_amount(

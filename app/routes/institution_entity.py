@@ -308,7 +308,7 @@ def execute_stripe_connect_payout(
 ):
     """
     Initiate a Stripe payout for an institution bill to the supplier entity's connected account.
-    Bill must have resolution='Pending' and no active payout already in progress.
+    Bill must have resolution='pending' and no active payout already in progress.
     Auth: Internal only (admins approve payouts; suppliers do not self-trigger).
     """
     scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)

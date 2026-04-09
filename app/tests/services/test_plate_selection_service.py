@@ -28,7 +28,7 @@ class TestPlateSelectionService:
         invalid_payload = {
             "plate_id": "invalid-uuid",
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         # Act & Assert
@@ -44,7 +44,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service:
@@ -63,7 +63,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -89,7 +89,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -132,7 +132,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -181,7 +181,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -223,7 +223,7 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
             mock_selection_service.create.return_value = None  # Creation failed
             # Mock kitchen days service (now accepts scope and include_archived)
             mock_kitchen_days_service.get_all.return_value = []
@@ -255,7 +255,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service:
@@ -276,7 +276,7 @@ class TestPlateSelectionService:
         payload = {
             # Missing plate_id
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         # Act & Assert
@@ -292,7 +292,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -340,8 +340,8 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
-            mock_get_current_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
+            mock_get_current_day.return_value = "monday"
             mock_validate_restaurant_status.return_value = None  # No exception means validation passed
             mock_country_to_code.return_value = None  # No country code, will just validate status
             mock_db_read.return_value = None  # No existing plate selection for this kitchen day
@@ -380,7 +380,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
         
         mock_plate = Mock()
@@ -431,8 +431,8 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
-            mock_get_current_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
+            mock_get_current_day.return_value = "monday"
             mock_validate_restaurant_status.return_value = None  # No exception means validation passed
             mock_country_to_code.return_value = None  # No country code, will just validate status
             mock_db_read.return_value = None  # No existing plate selection for this kitchen day
@@ -474,7 +474,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday"
+            "target_kitchen_day": "monday"
         }
 
         mock_plate = Mock()
@@ -520,8 +520,8 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
-            mock_get_current_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
+            mock_get_current_day.return_value = "monday"
             mock_validate_restaurant_status.return_value = None
             mock_country_to_code.return_value = None
             mock_kitchen_days_service.get_all.return_value = []
@@ -538,7 +538,7 @@ class TestPlateSelectionService:
             detail = exc_info.value.detail
             assert isinstance(detail, dict)
             assert detail.get("code") == "DUPLICATE_KITCHEN_DAY"
-            assert detail.get("kitchen_day") == "Monday"
+            assert detail.get("kitchen_day") == "monday"
             assert detail.get("existing_plate_selection_id") == existing_id
             assert "Continue to cancel your meal and reserve this plate" in detail.get("message", "")
 
@@ -550,7 +550,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday",
+            "target_kitchen_day": "monday",
             "replace_existing": True,
             "existing_plate_selection_id": existing_id,
         }
@@ -606,8 +606,8 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
-            mock_get_current_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
+            mock_get_current_day.return_value = "monday"
             mock_validate_restaurant_status.return_value = None
             mock_country_to_code.return_value = None
             mock_selection_service.create.return_value = mock_selection
@@ -651,7 +651,7 @@ class TestPlateSelectionService:
         payload = {
             "plate_id": str(uuid4()),
             "restaurant_id": str(uuid4()),
-            "target_kitchen_day": "Monday",
+            "target_kitchen_day": "monday",
             "replace_existing": True,
             "existing_plate_selection_id": wrong_id,
         }
@@ -699,8 +699,8 @@ class TestPlateSelectionService:
             mock_address_service.get_by_id.return_value = mock_address
             mock_qr_service.get_by_restaurant.return_value = mock_qr_code
             mock_currency_service.get_by_id.return_value = mock_currency
-            mock_determine_day.return_value = "Monday"
-            mock_get_current_day.return_value = "Monday"
+            mock_determine_day.return_value = "monday"
+            mock_get_current_day.return_value = "monday"
             mock_validate_restaurant_status.return_value = None
             mock_country_to_code.return_value = None
             mock_kitchen_days_service.get_all.return_value = []
@@ -731,7 +731,7 @@ class TestUpdatePlateSelection:
 
     def test_update_rejects_kitchen_day_with_400(self, sample_current_user, mock_db):
         """PATCH with kitchen_day returns 400."""
-        payload = {"kitchen_day": "Tuesday", "pickup_intent": "self"}
+        payload = {"kitchen_day": "tuesday", "pickup_intent": "self"}
         with pytest.raises(HTTPException) as exc_info:
             update_plate_selection(uuid4(), payload, sample_current_user, mock_db)
         assert exc_info.value.status_code == 400
@@ -739,7 +739,7 @@ class TestUpdatePlateSelection:
 
     def test_update_rejects_target_kitchen_day_with_400(self, sample_current_user, mock_db):
         """PATCH with target_kitchen_day returns 400."""
-        payload = {"target_kitchen_day": "Tuesday", "pickup_intent": "self"}
+        payload = {"target_kitchen_day": "tuesday", "pickup_intent": "self"}
         with pytest.raises(HTTPException) as exc_info:
             update_plate_selection(uuid4(), payload, sample_current_user, mock_db)
         assert exc_info.value.status_code == 400

@@ -14,7 +14,7 @@ from app.services.coworker_service import get_coworkers_with_eligibility
 class TestCoworkerServiceIneligibilityReason:
     """Tests for ineligibility_reason in get_coworkers_with_eligibility."""
 
-    def _make_ps_row(self, kitchen_day="Monday", restaurant_id=None, pickup_time_range="12:00-12:15", employer_id=None, employer_address_id=None):
+    def _make_ps_row(self, kitchen_day="monday", restaurant_id=None, pickup_time_range="12:00-12:15", employer_id=None, employer_address_id=None):
         return {
             "kitchen_day": kitchen_day,
             "restaurant_id": str(restaurant_id or uuid4()),

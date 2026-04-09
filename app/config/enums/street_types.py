@@ -9,16 +9,16 @@ from enum import Enum
 
 class StreetType(str, Enum):
     """Valid street type abbreviations"""
-    STREET = "St"
-    AVENUE = "Ave"
-    BOULEVARD = "Blvd"
-    ROAD = "Rd"
-    DRIVE = "Dr"
-    LANE = "Ln"
-    WAY = "Way"
-    COURT = "Ct"
-    PLACE = "Pl"
-    CIRCLE = "Cir"
+    STREET = "st"
+    AVENUE = "ave"
+    BOULEVARD = "blvd"
+    ROAD = "rd"
+    DRIVE = "dr"
+    LANE = "ln"
+    WAY = "way"
+    COURT = "ct"
+    PLACE = "pl"
+    CIRCLE = "cir"
 
     @classmethod
     def values(cls) -> list[str]:

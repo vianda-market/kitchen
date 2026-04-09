@@ -161,7 +161,7 @@ class TestEntityService:
                 product_id=uuid4(),
                 institution_id=institution_id,
                 name="Product 1",
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 image_url="http://localhost:8000/static/placeholders/product_default.png",
@@ -176,7 +176,7 @@ class TestEntityService:
                 product_id=uuid4(),
                 institution_id=other_institution_id,  # Different institution
                 name="Product 2",
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 image_url="http://localhost:8000/static/placeholders/product_default.png",
@@ -191,7 +191,7 @@ class TestEntityService:
                 product_id=uuid4(),
                 institution_id=institution_id,
                 name="Product 3",
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 image_url="http://localhost:8000/static/placeholders/product_default.png",
@@ -246,7 +246,7 @@ class TestEntityService:
                 credit=Decimal("5"),
                 expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=15,
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 created_date=datetime.now(timezone.utc),
@@ -260,7 +260,7 @@ class TestEntityService:
                 credit=Decimal("7"),
                 expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=20,
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 created_date=datetime.now(timezone.utc),
@@ -274,7 +274,7 @@ class TestEntityService:
                 credit=Decimal("4"),
                 expected_payout_local_currency=Decimal("0"),
                 delivery_time_minutes=10,
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 created_date=datetime.now(timezone.utc),
@@ -312,7 +312,7 @@ class TestEntityService:
         """Test that get_bills_by_status filters bills by status."""
         # Arrange
         institution_id = uuid4()
-        status = "Pending"
+        status = "pending"
         
         # Create mock InstitutionBillDTOs
         mock_bills = [
@@ -375,7 +375,7 @@ class TestEntityService:
         """Test that get_bills_by_status handles no bills found."""
         # Arrange
         institution_id = uuid4()
-        status = "Pending"
+        status = "pending"
         
         with patch('app.services.entity_service.institution_bill_service') as mock_bill_service:
             mock_bill_service.get_all.return_value = []
@@ -395,7 +395,7 @@ class TestEntityService:
                 employer_id=uuid4(),
                 name=employer_name,
                 address_id=uuid4(),
-                status="Active",
+                status="active",
                 modified_by=uuid4(),
                 is_archived=False,
                 created_date=datetime.now(timezone.utc),
@@ -476,7 +476,7 @@ class TestEntityService:
         """Test that get_bills_by_status handles service errors gracefully."""
         # Arrange
         institution_id = uuid4()
-        status = "Pending"
+        status = "pending"
         
         with patch('app.services.entity_service.institution_bill_service') as mock_bill_service:
             mock_bill_service.get_all.side_effect = Exception("Service error")
@@ -566,12 +566,12 @@ class TestEnrichedDiscretionary:
                 "market_name": "Argentina",
                 "country_code": "AR",
                 "approval_id": None,
-                "category": "Marketing Campaign",
+                "category": "marketing_campaign",
                 "reason": "Test",
                 "amount": Decimal("10.00"),
                 "comment": None,
                 "is_archived": False,
-                "status": "Pending",
+                "status": "pending",
                 "created_date": now,
                 "modified_date": now,
                 "created_by": str(creator_id),
@@ -605,12 +605,12 @@ class TestEnrichedDiscretionary:
             "market_name": "Argentina",
             "country_code": "AR",
             "approval_id": None,
-            "category": "Marketing Campaign",
+            "category": "marketing_campaign",
             "reason": "Test",
             "amount": Decimal("10.00"),
             "comment": None,
             "is_archived": False,
-            "status": "Pending",
+            "status": "pending",
             "created_date": now,
             "modified_date": now,
             "created_by": str(creator_id),
@@ -666,7 +666,7 @@ class TestEnrichedPlatesPortionSize:
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,
-            status="Active",
+            status="active",
             created_date=datetime.now(timezone.utc),
             modified_date=datetime.now(timezone.utc),
         )
@@ -721,7 +721,7 @@ class TestEnrichedPlatesPortionSize:
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,
-            status="Active",
+            status="active",
             created_date=datetime.now(timezone.utc),
             modified_date=datetime.now(timezone.utc),
         )
@@ -777,7 +777,7 @@ class TestEnrichedPlatesPortionSize:
             no_show_discount=0,
             delivery_time_minutes=15,
             is_archived=False,
-            status="Active",
+            status="active",
             created_date=datetime.now(timezone.utc),
             modified_date=datetime.now(timezone.utc),
         )

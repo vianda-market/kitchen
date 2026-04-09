@@ -33,13 +33,13 @@ class TestGetPlatesForRestaurants:
                 "product_name": "Grilled Chicken",
                 "price": 12.5,
                 "credit": 2,
-                "kitchen_day": "Wednesday",
+                "kitchen_day": "wednesday",
                 "image_url": "http://localhost:8000/static/products/abc.jpg",
             }
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Wednesday", mock_db)
+        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
 
         assert rid in result
         plates = result[rid]
@@ -48,7 +48,7 @@ class TestGetPlatesForRestaurants:
         assert plates[0]["product_name"] == "Grilled Chicken"
         assert plates[0]["price"] == 12.5
         assert plates[0]["credit"] == 2
-        assert plates[0]["kitchen_day"] == "Wednesday"
+        assert plates[0]["kitchen_day"] == "wednesday"
         assert plates[0]["image_url"] == "http://localhost:8000/static/products/abc.jpg"
         assert plates[0]["savings"] == 0  # Computed in get_restaurants_by_city from credit_cost_local_currency
 
@@ -62,13 +62,13 @@ class TestGetPlatesForRestaurants:
                 "product_name": "Pasta",
                 "price": 10.0,
                 "credit": 1,
-                "kitchen_day": "Monday",
+                "kitchen_day": "monday",
                 "image_url": None,
             }
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Monday", mock_db)
+        result = get_plates_for_restaurants([rid], "monday", mock_db)
 
         assert result[rid][0]["savings"] == 0
         assert result[rid][0]["image_url"] is None
@@ -83,25 +83,25 @@ class TestGetPlatesForRestaurants:
                 "product_name": "Salad",
                 "price": 8.0,
                 "credit": 1,
-                "kitchen_day": "Friday",
+                "kitchen_day": "friday",
                 "image_url": "",
             }
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Friday", mock_db)
+        result = get_plates_for_restaurants([rid], "friday", mock_db)
 
         assert result[rid][0]["image_url"] is None
         assert result[rid][0]["savings"] == 0
 
     def test_returns_empty_dict_for_invalid_kitchen_day(self):
         mock_db = MagicMock()
-        assert get_plates_for_restaurants([uuid4()], "Sunday", mock_db) == {}
+        assert get_plates_for_restaurants([uuid4()], "sunday", mock_db) == {}
         assert get_plates_for_restaurants([uuid4()], "Invalid", mock_db) == {}
 
     def test_returns_empty_dict_for_empty_restaurant_ids(self):
         mock_db = MagicMock()
-        assert get_plates_for_restaurants([], "Monday", mock_db) == {}
+        assert get_plates_for_restaurants([], "monday", mock_db) == {}
 
     @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
@@ -118,7 +118,7 @@ class TestGetPlatesForRestaurants:
                 "product_name": "New Plate",
                 "price": 10.0,
                 "credit": 1,
-                "kitchen_day": "Wednesday",
+                "kitchen_day": "wednesday",
                 "image_url": None,
             }
         ]
@@ -131,7 +131,7 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Wednesday", mock_db)
+        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "insufficient_reviews"
@@ -154,7 +154,7 @@ class TestGetPlatesForRestaurants:
                 "product_name": "Grilled Chicken",
                 "price": 12.0,
                 "credit": 2,
-                "kitchen_day": "Wednesday",
+                "kitchen_day": "wednesday",
                 "image_url": None,
             }
         ]
@@ -167,7 +167,7 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Wednesday", mock_db)
+        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "standard"  # 2.1 -> standard
@@ -185,8 +185,8 @@ class TestGetPlatesForRestaurants:
         pid_light = uuid4()
         pid_large = uuid4()
         mock_db_read.return_value = [
-            {"restaurant_id": rid, "plate_id": pid_light, "product_name": "Small", "price": 8.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
-            {"restaurant_id": rid, "plate_id": pid_large, "product_name": "Big", "price": 15.0, "credit": 2, "kitchen_day": "Monday", "image_url": None},
+            {"restaurant_id": rid, "plate_id": pid_light, "product_name": "Small", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+            {"restaurant_id": rid, "plate_id": pid_large, "product_name": "Big", "price": 15.0, "credit": 2, "kitchen_day": "monday", "image_url": None},
         ]
         mock_get_aggregates.return_value = {
             str(pid_light): {"average_stars": 4.0, "average_portion_size": 1.2, "review_count": 10},
@@ -194,7 +194,7 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Monday", mock_db)
+        result = get_plates_for_restaurants([rid], "monday", mock_db)
 
         plates_by_pid = {str(p["plate_id"]): p for p in result[rid]}
         assert plates_by_pid[str(pid_light)]["portion_size"] == "light"
@@ -209,12 +209,12 @@ class TestGetPlatesForRestaurants:
         rid = uuid4()
         pid = uuid4()
         mock_db_read.return_value = [
-            {"restaurant_id": rid, "plate_id": pid, "product_name": "New", "price": 10.0, "credit": 1, "kitchen_day": "Tuesday", "image_url": None},
+            {"restaurant_id": rid, "plate_id": pid, "product_name": "New", "price": 10.0, "credit": 1, "kitchen_day": "tuesday", "image_url": None},
         ]
         mock_get_aggregates.return_value = {}
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "Tuesday", mock_db)
+        result = get_plates_for_restaurants([rid], "tuesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "insufficient_reviews"
@@ -342,9 +342,9 @@ class TestGetRestaurantsByCity:
                 },
             ],
             [
-                {"restaurant_id": rid_a, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Wednesday", "image_url": None},
-                {"restaurant_id": rid_a, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "Wednesday", "image_url": None},
-                {"restaurant_id": rid_b, "plate_id": pid3, "product_name": "Soup", "price": 6.0, "credit": 1, "kitchen_day": "Wednesday", "image_url": None},
+                {"restaurant_id": rid_a, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
+                {"restaurant_id": rid_a, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
+                {"restaurant_id": rid_b, "plate_id": pid3, "product_name": "Soup", "price": 6.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
             ],
             [],  # vol_query (has_volunteer)
             [],  # reserved_query (user has no reserved plates)
@@ -354,7 +354,7 @@ class TestGetRestaurantsByCity:
 
         result = get_restaurants_by_city(
             "Buenos Aires", "AR", mock_db,
-            kitchen_day="Wednesday",
+            kitchen_day="wednesday",
             user_id=user_id,
         )
 
@@ -444,8 +444,8 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
-                {"restaurant_id": rid, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [],
             {"lat": -34.6, "lng": -58.4},
@@ -454,7 +454,7 @@ class TestGetRestaurantsByCity:
 
         result = get_restaurants_by_city(
             "Buenos Aires", "AR", mock_db,
-            kitchen_day="Monday",
+            kitchen_day="monday",
         )
 
         plates = result["restaurants"][0]["plates"]
@@ -491,8 +491,8 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": pid_reserved, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
-                {"restaurant_id": rid, "plate_id": pid_other, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": pid_reserved, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": pid_other, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [],
             [{"plate_id": pid_reserved, "plate_selection_id": plate_selection_id}],
@@ -503,7 +503,7 @@ class TestGetRestaurantsByCity:
         with patch("app.services.recommendation_service.apply_recommendation"):
             result = get_restaurants_by_city(
                 "Buenos Aires", "AR", mock_db,
-                kitchen_day="Monday",
+                kitchen_day="monday",
                 user_id=user_id,
             )
 
@@ -536,14 +536,14 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [],  # vol_query returns empty - no volunteers with both prefs True
             {"lat": -34.6, "lng": -58.4},
         ]
         mock_db = MagicMock()
 
-        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, kitchen_day="Monday")
+        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, kitchen_day="monday")
 
         assert result["restaurants"][0]["has_volunteer"] is False
 
@@ -568,14 +568,14 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [{"restaurant_id": rid}],  # vol_query returns this restaurant - has volunteer with prefs True
             {"lat": -34.6, "lng": -58.4},
         ]
         mock_db = MagicMock()
 
-        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, kitchen_day="Monday")
+        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, kitchen_day="monday")
 
         assert result["restaurants"][0]["has_volunteer"] is True
 
@@ -608,7 +608,7 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [],  # vol_query
             [],  # coworker_offer_query - no other coworker offers
@@ -620,7 +620,7 @@ class TestGetRestaurantsByCity:
 
         result = get_restaurants_by_city(
             "Buenos Aires", "AR", mock_db,
-            kitchen_day="Monday",
+            kitchen_day="monday",
             user_id=user_id,
             employer_id=employer_id,
             employer_address_id=employer_address_id,
@@ -658,7 +658,7 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "Monday", "image_url": None},
+                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
             ],
             [],  # vol_query
             [],  # coworker_offer_query
@@ -670,7 +670,7 @@ class TestGetRestaurantsByCity:
 
         result = get_restaurants_by_city(
             "Buenos Aires", "AR", mock_db,
-            kitchen_day="Monday",
+            kitchen_day="monday",
             user_id=user_id,
             employer_id=employer_id,
             employer_address_id=employer_address_id,
@@ -688,7 +688,7 @@ class TestGetCoworkerPickupWindows:
         """When user has no employer, returns empty list."""
         mock_db_read.side_effect = [{"employer_id": None, "employer_address_id": None}]
         mock_db = MagicMock()
-        result = get_coworker_pickup_windows(uuid4(), "Monday", uuid4(), mock_db)
+        result = get_coworker_pickup_windows(uuid4(), "monday", uuid4(), mock_db)
         assert result == []
 
     @patch("app.services.restaurant_explorer_service.get_pickup_windows_for_kitchen_day")
@@ -704,7 +704,7 @@ class TestGetCoworkerPickupWindows:
             [{"pickup_time_range": "12:00-12:15", "pickup_intent": "offer", "flexible_on_time": False}],
         ]
         mock_db = MagicMock()
-        result = get_coworker_pickup_windows(rid, "Monday", uid, mock_db)
+        result = get_coworker_pickup_windows(rid, "monday", uid, mock_db)
         assert len(result) == 1
         assert result[0]["pickup_time_range"] == "12:00-12:15"
         assert result[0]["intent"] == "offer"
@@ -725,7 +725,7 @@ class TestGetCoworkerPickupWindows:
             [{"pickup_time_range": "12:00-12:15", "pickup_intent": "request", "flexible_on_time": True}],
         ]
         mock_db = MagicMock()
-        result = get_coworker_pickup_windows(rid, "Monday", uid, mock_db)
+        result = get_coworker_pickup_windows(rid, "monday", uid, mock_db)
         assert len(result) >= 1
         windows = [r["pickup_time_range"] for r in result]
         assert "12:00-12:15" in windows
@@ -738,7 +738,7 @@ class TestGetCoworkerPickupWindows:
     def test_invalid_kitchen_day_returns_empty(self, mock_db_read, mock_get_windows):
         """When kitchen_day is invalid (e.g. Sunday), returns empty."""
         mock_db = MagicMock()
-        result = get_coworker_pickup_windows(uuid4(), "Sunday", uuid4(), mock_db)
+        result = get_coworker_pickup_windows(uuid4(), "sunday", uuid4(), mock_db)
         assert result == []
         mock_db_read.assert_not_called()
 
@@ -749,7 +749,7 @@ class TestGetPickupWindowsForKitchenDay:
     def test_ar_monday_returns_windows_11_30_to_13_30(self):
         """AR market: Monday 11:30–13:30 yields 8 windows."""
         target = date(2026, 3, 9)  # Monday
-        windows = get_pickup_windows_for_kitchen_day("AR", "Monday", target)
+        windows = get_pickup_windows_for_kitchen_day("AR", "monday", target)
         assert len(windows) == 8
         assert windows[0] == "11:30-11:45"
         assert windows[-1] == "13:15-13:30"
@@ -757,7 +757,7 @@ class TestGetPickupWindowsForKitchenDay:
     def test_us_friday_same_hours(self):
         """US market: same business hours as AR."""
         target = date(2026, 3, 13)  # Friday
-        windows = get_pickup_windows_for_kitchen_day("US", "Friday", target)
+        windows = get_pickup_windows_for_kitchen_day("US", "friday", target)
         assert "11:30-11:45" in windows
         assert "12:00-12:15" in windows
         assert "13:15-13:30" in windows
@@ -765,12 +765,12 @@ class TestGetPickupWindowsForKitchenDay:
     def test_unknown_country_returns_empty(self):
         """Unknown country code returns empty list."""
         target = date(2026, 3, 9)
-        assert get_pickup_windows_for_kitchen_day("XX", "Monday", target) == []
+        assert get_pickup_windows_for_kitchen_day("XX", "monday", target) == []
 
     def test_invalid_kitchen_day_returns_empty(self):
         """Invalid kitchen_day (e.g. Sunday) returns empty."""
         target = date(2026, 3, 9)
-        assert get_pickup_windows_for_kitchen_day("AR", "Sunday", target) == []
+        assert get_pickup_windows_for_kitchen_day("AR", "sunday", target) == []
 
 
 class TestGetAllowedKitchenDaysSortedByDate:
@@ -782,9 +782,9 @@ class TestGetAllowedKitchenDaysSortedByDate:
         tz = "America/Argentina/Buenos_Aires"
         items = get_allowed_kitchen_days_sorted_by_date(tz, country_code="AR")
         assert len(items) >= 1
-        assert items[0]["kitchen_day"] == "Monday"
+        assert items[0]["kitchen_day"] == "monday"
         assert items[0]["date"] == "2026-03-09"
-        fridays = [i for i in items if i["kitchen_day"] == "Friday"]
+        fridays = [i for i in items if i["kitchen_day"] == "friday"]
         assert not any(i["date"] == "2026-03-06" for i in fridays)
 
     @freeze_time("2026-03-06 16:00:00")  # 4 PM UTC = 1 PM Buenos Aires (before 1:30 PM close)
@@ -793,7 +793,7 @@ class TestGetAllowedKitchenDaysSortedByDate:
         tz = "America/Argentina/Buenos_Aires"
         items = get_allowed_kitchen_days_sorted_by_date(tz, country_code="AR")
         assert len(items) >= 1
-        assert items[0]["kitchen_day"] == "Friday"
+        assert items[0]["kitchen_day"] == "friday"
         assert items[0]["date"] == "2026-03-06"
 
     @freeze_time("2026-03-06 17:51:00")  # Friday 2:51 PM Buenos Aires
@@ -802,7 +802,7 @@ class TestGetAllowedKitchenDaysSortedByDate:
         tz = "America/Argentina/Buenos_Aires"
         items = get_allowed_kitchen_days_sorted_by_date(tz, country_code="XX")
         assert len(items) >= 1
-        assert items[0]["kitchen_day"] == "Friday"
+        assert items[0]["kitchen_day"] == "friday"
         assert items[0]["date"] == "2026-03-06"
 
     @freeze_time("2026-03-06 17:51:00")
@@ -811,7 +811,7 @@ class TestGetAllowedKitchenDaysSortedByDate:
         tz = "America/Argentina/Buenos_Aires"
         items = get_allowed_kitchen_days_sorted_by_date(tz)
         assert len(items) >= 1
-        assert items[0]["kitchen_day"] == "Friday"
+        assert items[0]["kitchen_day"] == "friday"
         assert items[0]["date"] == "2026-03-06"
 
     @freeze_time("2026-03-07 17:51:00")  # Saturday 2:51 PM Buenos Aires
@@ -820,7 +820,7 @@ class TestGetAllowedKitchenDaysSortedByDate:
         tz = "America/Argentina/Buenos_Aires"
         items = get_allowed_kitchen_days_sorted_by_date(tz, country_code="AR")
         assert len(items) >= 1
-        assert items[0]["kitchen_day"] == "Monday"
+        assert items[0]["kitchen_day"] == "monday"
         assert items[0]["date"] == "2026-03-09"
 
 
@@ -858,7 +858,7 @@ class TestGetPickupWindowsForKitchenDay:
     def test_ar_monday_returns_windows_1130_to_1330(self):
         """AR market: Monday 11:30-13:30 yields 8 windows."""
         target = date(2026, 3, 9)  # Monday
-        windows = get_pickup_windows_for_kitchen_day("AR", "Monday", target)
+        windows = get_pickup_windows_for_kitchen_day("AR", "monday", target)
         assert len(windows) == 8
         assert windows[0] == "11:30-11:45"
         assert windows[1] == "11:45-12:00"
@@ -867,17 +867,17 @@ class TestGetPickupWindowsForKitchenDay:
     def test_us_friday_same_windows(self):
         """US market: same business hours (11:30-13:30)."""
         target = date(2026, 3, 13)  # Friday
-        windows = get_pickup_windows_for_kitchen_day("US", "Friday", target)
+        windows = get_pickup_windows_for_kitchen_day("US", "friday", target)
         assert "11:30-11:45" in windows
         assert "12:00-12:15" in windows
         assert "13:15-13:30" in windows
 
     def test_unknown_country_returns_empty(self):
         """Unknown country code returns empty list."""
-        windows = get_pickup_windows_for_kitchen_day("XX", "Monday", date(2026, 3, 9))
+        windows = get_pickup_windows_for_kitchen_day("XX", "monday", date(2026, 3, 9))
         assert windows == []
 
     def test_invalid_kitchen_day_returns_empty(self):
         """Invalid kitchen_day (e.g. Saturday) returns empty (not in business_hours)."""
-        windows = get_pickup_windows_for_kitchen_day("AR", "Saturday", date(2026, 3, 14))
+        windows = get_pickup_windows_for_kitchen_day("AR", "saturday", date(2026, 3, 14))
         assert windows == []

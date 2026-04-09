@@ -12,47 +12,47 @@ from fastapi import HTTPException, status
 
 
 # Supplier may only use these address types (no customer-facing types on main address API)
-SUPPLIER_ALLOWED_ADDRESS_TYPES = {"Restaurant", "Entity Billing", "Entity Address"}
+SUPPLIER_ALLOWED_ADDRESS_TYPES = {"restaurant", "entity_billing", "entity_address"}
 
 # Customer may only use these address types (if we enforce; currently optional)
-CUSTOMER_ALLOWED_ADDRESS_TYPES = {"Customer Home", "Customer Billing", "Customer Employer"}
+CUSTOMER_ALLOWED_ADDRESS_TYPES = {"customer_home", "customer_billing", "customer_employer"}
 
 # Customer address types are allowed for institutions with institution_type = Customer or Employer
-CUSTOMER_INSTITUTION_ADDRESS_TYPES = {"Customer Home", "Customer Billing", "Customer Employer"}
+CUSTOMER_INSTITUTION_ADDRESS_TYPES = {"customer_home", "customer_billing", "customer_employer"}
 # Entity/restaurant address types are for Supplier or Internal institutions only (not Customer/Employer)
-ENTITY_INSTITUTION_ADDRESS_TYPES = {"Restaurant", "Entity Billing", "Entity Address"}
+ENTITY_INSTITUTION_ADDRESS_TYPES = {"restaurant", "entity_billing", "entity_address"}
 
 # Supplier may create/update users with these role_types only (Supplier only, not Internal or Customer)
-SUPPLIER_ALLOWED_USER_ROLE_TYPES = {"Supplier"}
+SUPPLIER_ALLOWED_USER_ROLE_TYPES = {"supplier"}
 
 # B2B POST /users: Customers cannot be created here; they must self-register via POST /customers/signup/request and /verify.
 # Internal creates Internal, Supplier, Employer; Supplier creates Supplier only.
-B2B_CREATABLE_ROLE_TYPES = {"Internal", "Supplier", "Employer"}
+B2B_CREATABLE_ROLE_TYPES = {"internal", "supplier", "employer"}
 
 # Supplier may assign these role_names only (excludes Super Admin, Comensal)
-SUPPLIER_ALLOWED_ROLE_NAMES = {"Admin", "Manager", "Operator"}
+SUPPLIER_ALLOWED_ROLE_NAMES = {"admin", "manager", "operator"}
 
 # Supplier roles that can create/edit/delete addresses (Admin and Manager)
-SUPPLIER_ADDRESS_MUTATION_ROLES = {"Admin", "Manager"}
+SUPPLIER_ADDRESS_MUTATION_ROLES = {"admin", "manager"}
 
 # Supplier roles that can create/edit users (Admin and Manager)
-SUPPLIER_USER_MUTATION_ROLES = {"Admin", "Manager"}
+SUPPLIER_USER_MUTATION_ROLES = {"admin", "manager"}
 
 # Supplier roles that can access CRUD management routes (Admin and Manager). Operator is kiosk-only.
-SUPPLIER_MANAGEMENT_ROLES = {"Admin", "Manager"}
+SUPPLIER_MANAGEMENT_ROLES = {"admin", "manager"}
 
 # Institution bank accounts and institution entities: only Supplier Admin can access (GET, POST, PUT, DELETE)
-SUPPLIER_ADMIN_ONLY_ROLES = {"Admin"}
+SUPPLIER_ADMIN_ONLY_ROLES = {"admin"}
 
 # Supplier terms: only Internal Manager, Global Manager, Admin, or Super Admin can edit
-SUPPLIER_TERMS_EDIT_ROLES = {"Manager", "Global Manager", "Admin", "Super Admin"}
+SUPPLIER_TERMS_EDIT_ROLES = {"manager", "global_manager", "admin", "super_admin"}
 
 
 def ensure_can_edit_supplier_terms(current_user: dict) -> None:
     """Raise 403 if user cannot edit supplier terms."""
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
-    if role_type != "Internal":
+    if role_type != "internal":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit supplier terms.",
@@ -81,12 +81,12 @@ def ensure_address_type_allowed(
     if not address_type_list:
         return
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type == "Internal":
+    if role_type == "internal":
         return
-    if role_type == "Supplier":
+    if role_type == "supplier":
         allowed = set(SUPPLIER_ALLOWED_ADDRESS_TYPES)
         if employer_context:
-            allowed = allowed | {"Customer Employer"}
+            allowed = allowed | {"customer_employer"}
         types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
         disallowed = types_set - allowed
         if disallowed:
@@ -98,7 +98,7 @@ def ensure_address_type_allowed(
                 ),
             )
         return
-    if role_type == "Customer":
+    if role_type == "customer":
         allowed = set(CUSTOMER_ALLOWED_ADDRESS_TYPES)
         types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
         disallowed = types_set - allowed
@@ -131,7 +131,7 @@ def ensure_address_type_matches_institution_type(
     types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
     has_customer_types = bool(types_set & CUSTOMER_INSTITUTION_ADDRESS_TYPES)
     has_entity_types = bool(types_set & ENTITY_INSTITUTION_ADDRESS_TYPES)
-    if has_customer_types and inst_type not in ("Customer", "Employer"):
+    if has_customer_types and inst_type not in ("customer", "employer"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -139,7 +139,7 @@ def ensure_address_type_matches_institution_type(
                 "for Customer or Employer institutions. This institution is not a Customer/Employer institution."
             ),
         )
-    if has_entity_types and inst_type in ("Customer", "Employer"):
+    if has_entity_types and inst_type in ("customer", "employer"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -165,9 +165,9 @@ def ensure_user_role_type_allowed(
         return
     role_type_str = role_type if isinstance(role_type, str) else getattr(role_type, "value", str(role_type))
     actor_role = (current_user.get("role_type") or "").strip()
-    if actor_role == "Internal":
+    if actor_role == "internal":
         return
-    if actor_role == "Supplier":
+    if actor_role == "supplier":
         allowed = set(SUPPLIER_ALLOWED_USER_ROLE_TYPES)
         if role_type_str not in allowed:
             raise HTTPException(
@@ -196,9 +196,9 @@ def ensure_user_role_name_allowed(
         return
     role_name_str = role_name if isinstance(role_name, str) else getattr(role_name, "value", str(role_name))
     actor_role = (current_user.get("role_type") or "").strip()
-    if actor_role == "Internal":
+    if actor_role == "internal":
         return
-    if actor_role == "Supplier":
+    if actor_role == "supplier":
         if role_name_str not in SUPPLIER_ALLOWED_ROLE_NAMES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -219,7 +219,7 @@ def ensure_operator_cannot_create_users(current_user: dict) -> None:
     """
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
-    if role_name == "Operator":
+    if role_name == "operator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -260,19 +260,19 @@ def ensure_can_assign_role_name(
     target_rt = _str(target_role_type)
 
     # Customer (Comensal only) and Employer (Admin, Manager, Comensal): only Internal creates these; no further restriction here
-    if target_rt == "Customer" or target_rt == "Employer" or target_str == "Comensal":
+    if target_rt == "customer" or target_rt == "employer" or target_str == "comensal":
         return
 
-    if target_str == "Super Admin":
-        if not (actor_rt == "Internal" and actor_rn == "Super Admin"):
+    if target_str == "super_admin":
+        if not (actor_rt == "internal" and actor_rn == "super_admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Super Admin can assign another user as Super Admin.",
             )
         return
 
-    if target_str == "Admin":
-        if actor_rn not in ("Admin", "Super Admin"):
+    if target_str == "admin":
+        if actor_rn not in ("admin", "super_admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin (or Super Admin) can assign another user as Admin.",
@@ -280,22 +280,22 @@ def ensure_can_assign_role_name(
         return
 
     # v2: Global Manager — only Super Admin, Admin, or Global Manager can assign; Global Manager can assign Global Manager only
-    if target_str == "Global Manager":
-        if actor_rn not in ("Admin", "Super Admin", "Global Manager"):
+    if target_str == "global_manager":
+        if actor_rn not in ("admin", "super_admin", "global_manager"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin, Super Admin, or Global Manager can assign Global Manager. Managers and Operators cannot.",
             )
         return
-    if actor_rn == "Global Manager":
+    if actor_rn == "global_manager":
         # Global Manager can only assign Global Manager (cannot create/assign Admin, Manager, Operator)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Global Manager can only create or assign Global Manager users.",
         )
 
-    if target_str in ("Manager", "Operator"):
-        if actor_rn not in ("Admin", "Super Admin", "Manager"):
+    if target_str in ("manager", "operator"):
+        if actor_rn not in ("admin", "super_admin", "manager"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin, Super Admin, or Manager can assign Manager or Operator role.",
@@ -330,12 +330,12 @@ def ensure_can_edit_user(
     target_rn = _str(target_role_name)
 
     # Only apply to Internal, Supplier, and Employer targets (hierarchy applies to these role types)
-    if target_rt not in ("Internal", "Supplier", "Employer"):
+    if target_rt not in ("internal", "supplier", "employer"):
         return
 
     # Target Super Admin: only Super Admin can edit (Internal only)
-    if target_rn == "Super Admin":
-        if not (actor_rt == "Internal" and actor_rn == "Super Admin"):
+    if target_rn == "super_admin":
+        if not (actor_rt == "internal" and actor_rn == "super_admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Super Admin can edit a Super Admin user.",
@@ -343,8 +343,8 @@ def ensure_can_edit_user(
         return
 
     # Target Admin: only Admin or Super Admin can edit (Manager cannot)
-    if target_rn == "Admin":
-        if actor_rn not in ("Admin", "Super Admin"):
+    if target_rn == "admin":
+        if actor_rn not in ("admin", "super_admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin or Super Admin can edit an Admin user.",
@@ -352,23 +352,23 @@ def ensure_can_edit_user(
         return
 
     # v2: Target Global Manager — only Super Admin, Admin, or Global Manager can edit
-    if target_rn == "Global Manager":
-        if actor_rn not in ("Admin", "Super Admin", "Global Manager"):
+    if target_rn == "global_manager":
+        if actor_rn not in ("admin", "super_admin", "global_manager"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin, Super Admin, or Global Manager can edit a Global Manager user.",
             )
         return
     # Actor is Global Manager: can only edit Global Manager (cannot edit Admin, Manager, Operator)
-    if actor_rn == "Global Manager":
+    if actor_rn == "global_manager":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Global Manager can only edit Global Manager users.",
         )
 
     # Target Manager, Operator: Admin, Super Admin, or Manager can edit
-    if target_rn in ("Manager", "Operator"):
-        if actor_rn not in ("Admin", "Super Admin", "Manager"):
+    if target_rn in ("manager", "operator"):
+        if actor_rn not in ("admin", "super_admin", "manager"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only Admin, Super Admin, or Manager can edit Manager or Operator users.",
@@ -387,7 +387,7 @@ def ensure_customer_cannot_edit_employer_address(
     employer_id is the source of truth (no need to inspect address_type).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Customer":
+    if role_type != "customer":
         return
     if existing_address and getattr(existing_address, "employer_id", None) is not None:
         raise HTTPException(
@@ -405,7 +405,7 @@ def ensure_supplier_can_create_edit_addresses(current_user: dict) -> None:
     - Internal and Customers: No restriction (handled by other logic).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Supplier":
+    if role_type != "supplier":
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_ADDRESS_MUTATION_ROLES:
@@ -428,7 +428,7 @@ def ensure_supplier_can_create_edit_users(current_user: dict) -> None:
     - Employees and Customers: No restriction (Customers cannot create users, enforced at route level).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Supplier":
+    if role_type != "supplier":
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_USER_MUTATION_ROLES:
@@ -450,7 +450,7 @@ def ensure_supplier_admin_or_manager(current_user: dict) -> None:
     - Internal, Customer, Employer: No restriction from this check (handled by other guards).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Supplier":
+    if role_type != "supplier":
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_MANAGEMENT_ROLES:
@@ -470,7 +470,7 @@ def ensure_supplier_admin_only(current_user: dict) -> None:
     """
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
-    if role_type != "Supplier" or role_name not in SUPPLIER_ADMIN_ONLY_ROLES:
+    if role_type != "supplier" or role_name not in SUPPLIER_ADMIN_ONLY_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -488,7 +488,7 @@ def ensure_supplier_can_reset_user_password(current_user: dict) -> None:
     - Internal and Customers: No restriction (Customers/Operators only for self, enforced in route).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Supplier":
+    if role_type != "supplier":
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_USER_MUTATION_ROLES:
@@ -534,9 +534,9 @@ def ensure_institution_type_matches_role_type(
     role_str = role_type.value if hasattr(role_type, "value") else str(role_type)
     inst_str = institution_type.value if hasattr(institution_type, "value") else str(institution_type)
     # Customer users may be in Customer or Employer institutions; others must match exactly
-    if role_str == "Customer" and inst_str in ("Customer", "Employer"):
+    if role_str == "customer" and inst_str in ("customer", "employer"):
         return
-    if role_str == "Employer" and inst_str == "Employer":
+    if role_str == "employer" and inst_str == "employer":
         return
     if role_str != inst_str:
         raise HTTPException(
@@ -564,7 +564,7 @@ def ensure_supplier_user_institution_only(
     - Customer: Cannot create users (enforced at route level).
     """
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Supplier":
+    if role_type != "supplier":
         return
     if not institution_id:
         raise HTTPException(
@@ -600,7 +600,7 @@ def ensure_employer_not_for_supplier_employee(
     if employer_id is None:
         return
     role_str = role_type.value if hasattr(role_type, "value") else str(role_type)
-    if role_str in ("Supplier", "Internal", "Employer"):
+    if role_str in ("supplier", "internal", "employer"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer (Comensal) users can have an employer.",

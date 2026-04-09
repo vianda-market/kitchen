@@ -9,7 +9,7 @@
 
 ```bash
 # 1. Initialize Git
-cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen"
+cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/learn/kitchen"
 git init
 
 # 2. Add all files

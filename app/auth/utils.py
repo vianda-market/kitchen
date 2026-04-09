@@ -56,15 +56,15 @@ def merge_onboarding_token_claims(
     Mutates token_data in place.
     """
     role_type = token_data.get("role_type")
-    if role_type == "Internal":
+    if role_type == "internal":
         return
 
     try:
-        if role_type in ("Supplier", "Employer"):
+        if role_type in ("supplier", "employer"):
             from app.services.onboarding_service import get_onboarding_status_claim
             institution_id = UUID(token_data["institution_id"])
             token_data["onboarding_status"] = get_onboarding_status_claim(institution_id, db)
-        elif role_type == "Customer":
+        elif role_type == "customer":
             from app.services.onboarding_service import get_customer_onboarding_claim
             user_id = UUID(token_data["sub"])
             token_data["onboarding_status"] = get_customer_onboarding_claim(user_id, db)

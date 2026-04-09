@@ -100,7 +100,7 @@ class TestZipcodeMetricsService(unittest.TestCase):
         def db_read_side_effect(query, values, connection=None, fetch_one=False):
             # All queries used for zipcode metrics should include qr_code filter
             self.assertIn("qr_code", query, "Visibility queries must filter by active QR code")
-            self.assertIn("Active", query, "QR code filter must require status Active")
+            self.assertIn("active", query.lower(), "QR code filter must require status active")
             if "DISTINCT a.postal_code" in query:
                 return []
             if "COUNT(DISTINCT" in query:

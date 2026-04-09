@@ -102,8 +102,8 @@ def global_scope():
     """InstitutionScope with global access (Internal Admin)"""
     return InstitutionScope(
         institution_id=uuid4(),
-        role_type="Internal",
-        role_name="Admin"  # Internal Admin has global access
+        role_type="internal",
+        role_name="admin"  # Internal Admin has global access
     )
 
 
@@ -113,7 +113,7 @@ def supplier_scope():
     institution_id = uuid4()
     return InstitutionScope(
         institution_id=institution_id,
-        role_type="Supplier"
+        role_type="supplier"
     )
 
 
@@ -203,7 +203,7 @@ class TestBuildJoinQueryWithScope:
             scope=supplier_scope,
             include_archived=False,
             additional_conditions=[
-                ("plate_kitchen_days.kitchen_day = %s", "Monday"),
+                ("plate_kitchen_days.kitchen_day = %s", "monday"),
                 ("p.plate_id = %s::uuid", str(uuid4()))
             ]
         )

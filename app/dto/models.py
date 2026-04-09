@@ -49,6 +49,8 @@ class UserDTO(BaseModel):
     market_id: UUID
     city_id: Optional[UUID] = None
     locale: str = "en"
+    referral_code: Optional[str] = None
+    referred_by_code: Optional[str] = None
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -209,7 +211,7 @@ class CuisineSuggestionDTO(BaseModel):
     suggested_name: str
     suggested_by: UUID
     restaurant_id: Optional[UUID] = None
-    suggestion_status: str = "Pending"
+    suggestion_status: str = "pending"
     reviewed_by: Optional[UUID] = None
     reviewed_date: Optional[datetime] = None
     review_notes: Optional[str] = None
@@ -448,7 +450,7 @@ class EmployerBillDTO(BaseModel):
     billed_amount: Decimal = Decimal("0")
     currency_code: str
     stripe_invoice_id: Optional[str] = None
-    payment_status: str = "Pending"
+    payment_status: str = "pending"
     paid_date: Optional[datetime] = None
     is_archived: bool = False
     status: Status
@@ -589,6 +591,7 @@ class ClientTransactionDTO(BaseModel):
     source: str
     plate_selection_id: Optional[UUID] = None
     discretionary_id: Optional[UUID] = None
+    referral_id: Optional[UUID] = None
     credit: int
     is_archived: bool = False
     status: Status
@@ -997,7 +1000,7 @@ class NationalHolidayDTO(BaseModel):
     is_recurring: bool = False
     recurring_month: Optional[int] = Field(None, ge=1, le=12)
     recurring_day: Optional[int] = Field(None, ge=1, le=31)
-    status: Status = Field(default="Active", description="Status of the holiday (defaults to 'Active' if not set)")
+    status: Status = Field(default="active", description="Status of the holiday (defaults to 'active' if not set)")
     is_archived: bool = False
     source: str = Field(default="manual", max_length=20)
     created_date: datetime
@@ -1152,6 +1155,114 @@ class IngredientAliasDTO(BaseModel):
     ingredient_id: UUID
     alias: str
     region_code: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =============================================================================
+# Referral DTOs
+# =============================================================================
+
+class ReferralConfigDTO(BaseModel):
+    """Pure DTO for referral configuration per market"""
+    referral_config_id: UUID
+    market_id: UUID
+    is_enabled: bool = True
+    referrer_bonus_rate: int = 15
+    referrer_bonus_cap: Optional[Decimal] = None
+    referrer_monthly_cap: Optional[int] = 5
+    min_plan_price_to_qualify: Decimal = Decimal("0")
+    cooldown_days: int = 0
+    held_reward_expiry_hours: int = 48
+    pending_expiry_days: int = 90
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralInfoDTO(BaseModel):
+    """Pure DTO for individual referral tracking"""
+    referral_id: UUID
+    referrer_user_id: UUID
+    referee_user_id: UUID
+    referral_code_used: str
+    market_id: UUID
+    referral_status: str
+    bonus_credits_awarded: Optional[Decimal] = None
+    bonus_plan_price: Optional[Decimal] = None
+    bonus_rate_applied: Optional[int] = None
+    qualified_date: Optional[datetime] = None
+    rewarded_date: Optional[datetime] = None
+    reward_held_until: Optional[datetime] = None
+    expired_date: Optional[datetime] = None
+    cancelled_date: Optional[datetime] = None
+    transaction_id: Optional[UUID] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AdClickTrackingDTO(BaseModel):
+    """DTO for ad click tracking records (conversion attribution)."""
+    id: UUID
+    user_id: UUID
+    subscription_id: Optional[UUID] = None
+    gclid: Optional[str] = None
+    wbraid: Optional[str] = None
+    gbraid: Optional[str] = None
+    fbclid: Optional[str] = None
+    fbc: Optional[str] = None
+    fbp: Optional[str] = None
+    event_id: Optional[str] = None
+    landing_url: Optional[str] = None
+    source_platform: Optional[str] = None
+    captured_at: datetime
+    google_upload_status: str = "pending"
+    google_uploaded_at: Optional[datetime] = None
+    meta_upload_status: str = "pending"
+    meta_uploaded_at: Optional[datetime] = None
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AdZoneDTO(BaseModel):
+    """DTO for geographic ad zones (flywheel engine)."""
+    id: UUID
+    name: str
+    country_code: str
+    city_name: str
+    neighborhood: Optional[str] = None
+    latitude: float
+    longitude: float
+    radius_km: float
+    flywheel_state: str
+    state_changed_at: datetime
+    state_changed_by: Optional[UUID] = None
+    notify_me_lead_count: int = 0
+    active_restaurant_count: int = 0
+    active_subscriber_count: int = 0
+    estimated_mau: Optional[int] = None
+    mau_estimated_at: Optional[datetime] = None
+    budget_allocation: Optional[dict] = None
+    daily_budget_cents: Optional[int] = None
+    meta_ad_set_ids: Optional[dict] = None
+    google_campaign_ids: Optional[dict] = None
+    created_by: str = "operator"
+    approved_by: Optional[UUID] = None
+    created_date: datetime
+    modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -194,8 +194,22 @@ Prefer refetching after favorite changes so the user sees the updated sort order
 
 ---
 
+## Pagination
+
+The explore endpoint (`GET /api/v1/restaurants/by-city`) supports **cursor-based infinite scroll pagination**. When `cursor` and/or `limit` query params are provided, the response includes `next_cursor` and `has_more` fields for paging through results.
+
+- Favorites and recommendation sorting are applied **before** pagination — recommended items always appear first, even across pages.
+- Sort order is stable within a browsing session. If the user adds/removes a favorite mid-scroll, the change takes effect on the next full explore reload (pull-to-refresh).
+- The `center` (city lat/lng) is only returned on the first page. Cache it client-side.
+
+For full pagination details, query params, and examples, see:
+[EXPLORE_SORTING_AND_PAGINATION.md](../shared_client/EXPLORE_SORTING_AND_PAGINATION.md)
+
+---
+
 ## Related docs
 
+- [EXPLORE_SORTING_AND_PAGINATION.md](../shared_client/EXPLORE_SORTING_AND_PAGINATION.md) — sorting logic, cursor pagination, FAQ
 - [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — savings, price, credit (B2C explore)
 - [EXPLORE_KITCHEN_DAY_B2C.md](./EXPLORE_KITCHEN_DAY_B2C.md) — kitchen day requirement
 - [feedback_from_client/RESTAURANT_EXPLORE_B2C.md](./feedback_from_client/RESTAURANT_EXPLORE_B2C.md) — full explore spec

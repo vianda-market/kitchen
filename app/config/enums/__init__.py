@@ -39,6 +39,7 @@ from app.config.enums.cuisine_suggestion_status import CuisineSuggestionStatus
 from app.config.enums.interest_type import InterestType
 from app.config.enums.lead_interest_status import LeadInterestStatus
 from app.config.enums.lead_interest_source import LeadInterestSource
+from app.config.enums.referral_status import ReferralStatus
 
 __all__ = [
     "AddressType",
@@ -72,5 +73,6 @@ __all__ = [
     "InterestType",
     "LeadInterestStatus",
     "LeadInterestSource",
+    "ReferralStatus",
 ]
 

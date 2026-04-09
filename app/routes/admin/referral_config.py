@@ -1,0 +1,116 @@
+# app/routes/admin/referral_config.py
+"""
+Admin Referral Configuration Routes
+
+Routes for internal administrators to manage referral program configuration per market
+and trigger the referral cron job.
+"""
+from uuid import UUID
+from typing import List
+
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.auth.dependencies import get_employee_user
+from app.dependencies.database import get_db
+from app.schemas.consolidated_schemas import (
+    ReferralConfigUpdateSchema,
+    ReferralConfigResponseSchema,
+    ReferralConfigEnrichedResponseSchema,
+)
+from app.services.crud_service import referral_config_service
+from app.utils.db import db_read
+from app.utils.log import log_info
+
+router = APIRouter(
+    prefix="/admin/referral-config",
+    tags=["Admin Referral Config"],
+)
+
+
+@router.get("", response_model=List[ReferralConfigResponseSchema])
+def list_referral_configs(
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """List all referral configurations (one per market)."""
+    configs = referral_config_service.get_all(db, include_archived=False)
+    return configs
+
+
+@router.get("/enriched", response_model=List[ReferralConfigEnrichedResponseSchema])
+def list_referral_configs_enriched(
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """List all referral configurations with market name and country code."""
+    rows = db_read(
+        """
+        SELECT rc.referral_config_id, rc.market_id,
+               m.country_name AS market_name, m.country_code,
+               rc.is_enabled, rc.referrer_bonus_rate, rc.referrer_bonus_cap,
+               rc.referrer_monthly_cap, rc.min_plan_price_to_qualify,
+               rc.cooldown_days, rc.held_reward_expiry_hours, rc.pending_expiry_days,
+               rc.is_archived, rc.status, rc.created_date, rc.modified_date
+        FROM referral_config rc
+        JOIN market_info m ON rc.market_id = m.market_id
+        WHERE rc.is_archived = FALSE
+        ORDER BY m.country_name
+        """,
+        connection=db,
+    )
+    return rows or []
+
+
+@router.get("/{market_id}", response_model=ReferralConfigResponseSchema)
+def get_referral_config_by_market(
+    market_id: UUID,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Get referral configuration for a specific market."""
+    rows = db_read(
+        "SELECT * FROM referral_config WHERE market_id = %s AND is_archived = FALSE",
+        (str(market_id),),
+        connection=db,
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Referral config not found for this market")
+    return rows[0]
+
+
+@router.put("/{market_id}", response_model=ReferralConfigResponseSchema)
+def update_referral_config(
+    market_id: UUID,
+    update: ReferralConfigUpdateSchema,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Update referral configuration for a market."""
+    rows = db_read(
+        "SELECT referral_config_id FROM referral_config WHERE market_id = %s AND is_archived = FALSE",
+        (str(market_id),),
+        connection=db,
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Referral config not found for this market")
+
+    config_id = UUID(str(rows[0]["referral_config_id"]))
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    update_data["modified_by"] = current_user["user_id"]
+
+    log_info(f"Admin {current_user['user_id']} updating referral config for market {market_id}")
+    updated = referral_config_service.update(config_id, update_data, db)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update referral config")
+    return updated
+
+
+@router.post("/run-cron", status_code=200)
+def run_referral_cron_endpoint(
+    current_user: dict = Depends(get_employee_user),
+):
+    """Run the referral cron job. Internal only."""
+    from app.services.cron.referral_cron import run_referral_cron
+    result = run_referral_cron()
+    return result

@@ -10,10 +10,10 @@ from enum import Enum
 
 class DiscretionaryStatus(str, Enum):
     """Valid discretionary status values."""
-    PENDING = "Pending"
-    CANCELLED = "Cancelled"
-    APPROVED = "Approved"
-    REJECTED = "Rejected"
+    PENDING = "pending"
+    CANCELLED = "cancelled"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
     @classmethod
     def values(cls) -> list[str]:

@@ -101,7 +101,7 @@ def derive_address_type_from_linkages(
         )
         if inst:
             it = inst.get("institution_type")
-            if it in ("Customer", "customer") or (hasattr(it, "value") and getattr(it, "value", None) == "Customer"):
+            if it in ("customer",) or (hasattr(it, "value") and getattr(it, "value", None) == "customer"):
                 # Check if user tagged this address as "other" via map_center_label
                 sp_label = db_read(
                     "SELECT map_center_label FROM core.address_subpremise WHERE address_id = %s AND map_center_label = 'other' LIMIT 1",
@@ -410,9 +410,9 @@ class AddressBusinessService:
             self._create_geolocation_from_place_details(new_addr, geoloc_from_place, current_user, db, commit=commit)
         elif isinstance(address_types, list):
             should_geocode = (
-                "Restaurant" in address_types or
-                "Customer Employer" in address_types or
-                "Customer Home" in address_types
+                "restaurant" in address_types or
+                "customer_employer" in address_types or
+                "customer_home" in address_types
             )
             if should_geocode:
                 self._geocode_address(new_addr, address_data, current_user, db, commit=commit, country_name=country_name_for_log)
@@ -591,7 +591,7 @@ class AddressBusinessService:
         """
         # Check required fields for restaurant addresses
         address_types = address_data.get("address_type", [])
-        if isinstance(address_types, list) and "Restaurant" in address_types:
+        if isinstance(address_types, list) and "restaurant" in address_types:
             required_fields = ["building_number", "street_name", "city", "province", "country_code"]
             missing_fields = [field for field in required_fields if not address_data.get(field)]
             
@@ -797,7 +797,7 @@ class AddressBusinessService:
         types = getattr(address, "address_type", None) or []
         if not isinstance(types, list):
             types = [types] if types else []
-        if not any(t in types for t in ("Restaurant", "Customer Employer", "Customer Home")):
+        if not any(t in types for t in ("restaurant", "customer_employer", "customer_home")):
             return
         addr_dict = {
             "building_number": address.building_number,

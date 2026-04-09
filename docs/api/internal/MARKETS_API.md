@@ -239,7 +239,7 @@ CREATE TABLE market_info (
 ### **Manual Testing**
 ```bash
 # 1. Start the application
-cd /Users/cdeachaval/Desktop/local/kitchen
+cd /Users/cdeachaval/learn/kitchen
 source venv/bin/activate
 python3 application.py
 

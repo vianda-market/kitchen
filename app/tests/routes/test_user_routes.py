@@ -22,8 +22,8 @@ def customer_user():
     uid = uuid4()
     return {
         "user_id": uid,
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": uuid4(),
     }
 
@@ -33,8 +33,8 @@ def supplier_user():
     """Supplier user (cannot assign employer)."""
     return {
         "user_id": uuid4(),
-        "role_type": "Supplier",
-        "role_name": "Admin",
+        "role_type": "supplier",
+        "role_name": "admin",
         "institution_id": uuid4(),
     }
 
@@ -114,8 +114,8 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         institution_id=uuid4(),
         user_id=user_id,
         employer_id=employer_id,
-        address_type=["Customer Employer"],
-        street_type="St",
+        address_type=["customer_employer"],
+        street_type="st",
         street_name="Main St",
         building_number="123",
         city="Buenos Aires",
@@ -200,8 +200,8 @@ def test_assign_employer_address_not_belonging_to_employer(client_customer, cust
         institution_id=uuid4(),
         user_id=user_id,
         employer_id=other_employer_id,
-        address_type=["Customer Employer"],
-        street_type="St",
+        address_type=["customer_employer"],
+        street_type="st",
         street_name="Main St",
         building_number="123",
         city="Buenos Aires",
@@ -319,8 +319,8 @@ def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer
         "user_id": user_id,
         "institution_id": inst_id,
         "institution_name": "Vianda Customers",
-        "role_name": "Comensal",
-        "role_type": "Customer",
+        "role_name": "comensal",
+        "role_type": "customer",
         "username": "customer",
         "email": "test@example.com",
         "first_name": "Test",

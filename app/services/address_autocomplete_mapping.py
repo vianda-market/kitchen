@@ -16,14 +16,14 @@ from app.utils.country import country_alpha3_to_alpha2, country_name_to_alpha2, 
 
 # Route prefix patterns to street_type (short). Order matters: longer matches first.
 _ROUTE_PREFIXES = [
-    ("avenida", "Ave"), ("av.", "Ave"), ("av ", "Ave"), ("av. ", "Ave"),
-    ("calle", "St"), ("cal ", "St"), ("cal. ", "St"),
-    ("boulevard", "Blvd"), ("bulevar", "Blvd"), ("blvd.", "Blvd"), ("blvd ", "Blvd"),
-    ("road", "Rd"), ("rd.", "Rd"), ("rd ", "Rd"),
-    ("drive", "Dr"), ("dr.", "Dr"), ("dr ", "Dr"),
-    ("lane", "Ln"), ("ln.", "Ln"), ("ln ", "Ln"),
-    ("way", "Way"), ("court", "Ct"), ("ct.", "Ct"), ("place", "Pl"), ("circle", "Cir"),
-    ("cir.", "Cir"), ("circuit", "Cir"),
+    ("avenida", "ave"), ("av.", "ave"), ("av ", "ave"), ("av. ", "ave"),
+    ("calle", "st"), ("cal ", "st"), ("cal. ", "st"),
+    ("boulevard", "blvd"), ("bulevar", "blvd"), ("blvd.", "blvd"), ("blvd ", "blvd"),
+    ("road", "rd"), ("rd.", "rd"), ("rd ", "rd"),
+    ("drive", "dr"), ("dr.", "dr"), ("dr ", "dr"),
+    ("lane", "ln"), ("ln.", "ln"), ("ln ", "ln"),
+    ("way", "way"), ("court", "ct"), ("ct.", "ct"), ("place", "pl"), ("circle", "cir"),
+    ("cir.", "cir"), ("circuit", "cir"),
 ]
 
 
@@ -33,7 +33,7 @@ def _route_to_street_type_and_name(route: str) -> Tuple[str, str]:
     Returns (street_type, street_name). street_type defaults to 'St' if no match.
     """
     if not (route and route.strip()):
-        return "St", ""
+        return "st", ""
     r = route.strip()
     r_lower = r.lower()
     for prefix, st in _ROUTE_PREFIXES:
@@ -42,7 +42,7 @@ def _route_to_street_type_and_name(route: str) -> Tuple[str, str]:
             # Remove leading punctuation/dot
             rest = re.sub(r"^[\s.,]+", "", rest)
             return st, rest or r
-    return "St", r
+    return "st", r
 
 
 def _extract_from_context(context: Dict[str, Any]) -> Dict[str, str]:
@@ -98,7 +98,7 @@ def map_place_details_to_address(
     province = ctx.get("region", "")
     postal_code = ctx.get("postcode", "")
 
-    street_type, street_name = _route_to_street_type_and_name(street) if street else ("St", "")
+    street_type, street_name = _route_to_street_type_and_name(street) if street else ("st", "")
 
     # Country code resolution
     if country_override:

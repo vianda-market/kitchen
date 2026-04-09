@@ -27,10 +27,10 @@ def create_program(
         raise HTTPException(status_code=404, detail="Institution not found")
     inst_type = getattr(institution, "institution_type", None)
     inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
-    if inst_type_str != "Employer":
+    if inst_type_str != "employer":
         raise HTTPException(
             status_code=400,
-            detail=f"Institution must be of type 'Employer', got '{inst_type_str}'",
+            detail=f"Institution must be of type 'employer', got '{inst_type_str}'",
         )
 
     existing = get_program_by_institution(institution_id, db)

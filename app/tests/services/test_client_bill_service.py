@@ -163,20 +163,20 @@ class TestClientBillService:
         """Test that bills by status filtering works correctly."""
         # Arrange
         mock_bills = [
-            Mock(status="Pending"),
-            Mock(status="Paid"),
-            Mock(status="Pending")
+            Mock(status="pending"),
+            Mock(status="paid"),
+            Mock(status="pending")
         ]
-        
+
         with patch('app.services.client_bill_service.client_bill_service') as mock_bill_service:
             mock_bill_service.get_all.return_value = mock_bills
-            
+
             # Act
-            result = client_bill_business_service.get_bills_by_status("Pending", mock_db)
-            
+            result = client_bill_business_service.get_bills_by_status("pending", mock_db)
+
             # Assert
             assert len(result) == 2
-            assert all(bill.status == "Pending" for bill in result)
+            assert all(bill.status == "pending" for bill in result)
 
     def test_get_bills_by_currency_filters_correctly(self, mock_db):
         """Test that bills by currency filtering works correctly."""

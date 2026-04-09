@@ -41,8 +41,8 @@ def _get_supplier_admin_email(institution_id: UUID, connection) -> Optional[str]
         """
         SELECT email FROM core.user_info
         WHERE institution_id = %s
-          AND role_type = 'Supplier' AND role_name = 'Admin'
-          AND status = 'Active' AND NOT is_archived
+          AND role_type = 'supplier' AND role_name = 'admin'
+          AND status = 'active' AND NOT is_archived
         ORDER BY created_date ASC
         LIMIT 1
         """,
@@ -112,8 +112,8 @@ def run_supplier_stall_detection() -> Dict[str, Any]:
             SELECT institution_id, name, institution_type,
                    support_email_suppressed_until, last_support_email_date
             FROM core.institution_info
-            WHERE institution_type = 'Supplier'
-              AND status = 'Active'
+            WHERE institution_type = 'supplier'
+              AND status = 'active'
               AND NOT is_archived
             """,
             connection=connection,
@@ -130,7 +130,7 @@ def run_supplier_stall_detection() -> Dict[str, Any]:
             inst_name = inst["name"]
 
             try:
-                status = get_onboarding_status(inst_id, "Supplier", connection)
+                status = get_onboarding_status(inst_id, "supplier", connection)
                 if not status:
                     continue
 

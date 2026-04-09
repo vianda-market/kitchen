@@ -35,7 +35,7 @@ def get_public_restaurants(
                r.average_rating, r.review_count, r.cover_image_url
         FROM restaurant_info r
         LEFT JOIN cuisine cu ON r.cuisine_id = cu.cuisine_id
-        WHERE r.is_archived = FALSE AND r.status = 'Active'
+        WHERE r.is_archived = FALSE AND r.status = 'active'
           {featured_clause}
         ORDER BY r.is_featured DESC, r.average_rating DESC NULLS LAST
         LIMIT %s
@@ -66,7 +66,7 @@ def get_public_plans(
         FROM plan_info p
         JOIN market_info m ON p.market_id = m.market_id
         JOIN credit_currency_info cc ON m.credit_currency_id = cc.credit_currency_id
-        WHERE p.is_archived = FALSE AND p.status = 'Active'
+        WHERE p.is_archived = FALSE AND p.status = 'active'
           AND p.market_id != '00000000-0000-0000-0000-000000000001'::uuid
         ORDER BY p.price ASC
         """,
@@ -130,7 +130,7 @@ def get_leads_cuisines(
         SELECT cuisine_id,
                COALESCE(cuisine_name_i18n->>%s, cuisine_name) AS cuisine_name
         FROM cuisine
-        WHERE NOT is_archived AND status = 'Active'
+        WHERE NOT is_archived AND status = 'active'
         ORDER BY display_order NULLS LAST, cuisine_name
         """,
         (locale,),
@@ -156,7 +156,7 @@ def create_lead_interest(
     cuisine_id = data.get("cuisine_id")
     if cuisine_id:
         exists = db_read(
-            "SELECT 1 FROM cuisine WHERE cuisine_id = %s AND NOT is_archived AND status = 'Active'",
+            "SELECT 1 FROM cuisine WHERE cuisine_id = %s AND NOT is_archived AND status = 'active'",
             (str(cuisine_id),),
             connection=db,
             fetch_one=True,

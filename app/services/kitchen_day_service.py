@@ -22,7 +22,7 @@ from app.config.settings import settings
 
 # Re-export for backward compatibility
 VALID_KITCHEN_DAYS = tuple(KitchenDay.values())
-WEEKDAY_NUM_TO_NAME = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+WEEKDAY_NUM_TO_NAME = ("monday", "tuesday", "wednesday", "thursday", "friday")
 
 
 def _get_kitchen_close_time(country_code: Optional[str], day_name: Optional[str] = None) -> time:
@@ -50,7 +50,7 @@ def _get_kitchen_close_time(country_code: Optional[str], day_name: Optional[str]
             config = MarketConfiguration.get_market_config(country_code.upper())
             if config and config.kitchen_day_config:
                 # Use provided day or Monday as default (all same in config)
-                day = day_name or "Monday"
+                day = day_name or "monday"
                 day_config = config.kitchen_day_config.get(day)
                 if day_config and day_config.get("kitchen_close"):
                     return day_config["kitchen_close"]
@@ -83,8 +83,8 @@ def get_effective_current_day(
         Day name (e.g., "Monday", "Tuesday")
     """
     if settings.DEV_OVERRIDE_DAY and settings.DEV_OVERRIDE_DAY.strip():
-        override_day = settings.DEV_OVERRIDE_DAY.strip().title()
-        valid_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        override_day = settings.DEV_OVERRIDE_DAY.strip().lower()
+        valid_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         if override_day in valid_days:
             return override_day
 
@@ -94,12 +94,12 @@ def get_effective_current_day(
         tz = pytz.timezone("America/Argentina/Buenos_Aires")
 
     now = datetime.now(tz)
-    close_time = _get_kitchen_close_time(country_code, now.strftime("%A"))
+    close_time = _get_kitchen_close_time(country_code, now.strftime("%A").lower())
 
     if now.time() < close_time:
-        current_day = (now - timedelta(days=1)).strftime("%A")
+        current_day = (now - timedelta(days=1)).strftime("%A").lower()
     else:
-        current_day = now.strftime("%A")
+        current_day = now.strftime("%A").lower()
 
     return current_day
 
@@ -156,12 +156,12 @@ def date_to_kitchen_day(target_date: date) -> str:
         Day name (e.g., "Monday", "Tuesday")
     """
     if settings.DEV_OVERRIDE_DAY and settings.DEV_OVERRIDE_DAY.strip():
-        override_day = settings.DEV_OVERRIDE_DAY.strip().title()
-        valid_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        override_day = settings.DEV_OVERRIDE_DAY.strip().lower()
+        valid_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         if override_day in valid_days:
             return override_day
 
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     return day_names[target_date.weekday()]
 
 

@@ -10,9 +10,9 @@ from enum import Enum
 
 class CuisineSuggestionStatus(str, Enum):
     """Valid status values for cuisine suggestions."""
-    PENDING = "Pending"
-    APPROVED = "Approved"
-    REJECTED = "Rejected"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
     @classmethod
     def values(cls) -> list[str]:

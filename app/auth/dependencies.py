@@ -205,11 +205,11 @@ def get_super_admin_user(current_user: dict = Depends(get_current_user)):
     role_name = current_user.get("role_name")
     
     # Check for positive outcomes: Super Admin must have both Internal role_type AND Super Admin role_name
-    if role_type == "Internal" and role_name == "Super Admin":
+    if role_type == "internal" and role_name == "super_admin":
         return current_user
-    
+
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, 
+        status_code=status.HTTP_403_FORBIDDEN,
         detail="Super-admin access required for discretionary credit operations"
     )
 
@@ -234,11 +234,11 @@ def get_employee_user(current_user: dict = Depends(get_current_user)):
     role_type = current_user.get("role_type")
     
     # Check for positive outcome: Internal role_type required for system configuration
-    if role_type == "Internal":
+    if role_type == "internal":
         return current_user
-    
+
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, 
+        status_code=status.HTTP_403_FORBIDDEN,
         detail="Internal access required for system configuration operations"
     )
 
@@ -262,11 +262,11 @@ def get_client_user(current_user: dict = Depends(get_current_user)):
     role_type = current_user.get("role_type")
     
     # Check for positive outcome: Customer role_type required
-    if role_type == "Customer":
+    if role_type == "customer":
         return current_user
-    
+
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, 
+        status_code=status.HTTP_403_FORBIDDEN,
         detail="Customer access required for this operation"
     )
 
@@ -290,7 +290,7 @@ def get_client_or_employee_user(current_user: dict = Depends(get_current_user)):
     role_type = current_user.get("role_type")
     
     # Check for positive outcomes: Customer or Internal role_type required
-    if role_type in ["Customer", "Internal"]:
+    if role_type in ["customer", "internal"]:
         return current_user
     
     raise HTTPException(
@@ -316,7 +316,7 @@ def get_client_employee_or_supplier_user(current_user: dict = Depends(get_curren
         HTTPException: If user has unrecognized role_type
     """
     role_type = current_user.get("role_type")
-    if role_type in ["Customer", "Internal", "Supplier"]:
+    if role_type in ["customer", "internal", "supplier"]:
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -349,14 +349,14 @@ def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)
     role_type = current_user.get("role_type")
     
     # Explicitly block Suppliers
-    if role_type == "Supplier":
+    if role_type == "supplier":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Suppliers cannot access this resource"
         )
-    
+
     # Allow Internal and Customers
-    if role_type in ["Internal", "Customer"]:
+    if role_type in ["internal", "customer"]:
         return current_user
     
     raise HTTPException(
@@ -382,7 +382,7 @@ def get_employee_or_supplier_user(current_user: dict = Depends(get_current_user)
         HTTPException(403): If user is Customer
     """
     role_type = current_user.get("role_type")
-    if role_type in ["Internal", "Supplier"]:
+    if role_type in ["internal", "supplier"]:
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -411,11 +411,11 @@ def get_admin_user(current_user: dict = Depends(get_current_user)):
     role_name = current_user.get("role_name")
     
     # Check for positive outcomes: Admin users must be Internal role_type with Admin or Super Admin role_name
-    if role_type == "Internal" and role_name in ["Admin", "Super Admin"]:
+    if role_type == "internal" and role_name in ["admin", "super_admin"]:
         return current_user
-    
+
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, 
+        status_code=status.HTTP_403_FORBIDDEN,
         detail="Admin access required for discretionary credit operations"
     )
 
@@ -437,8 +437,8 @@ def require_supplier_admin_or_employee_admin(current_user: dict = Depends(get_cu
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     allowed = (
-        (role_type == "Supplier" and role_name == "Admin")
-        or (role_type == "Internal" and role_name in ("Admin", "Super Admin"))
+        (role_type == "supplier" and role_name == "admin")
+        or (role_type == "internal" and role_name in ("admin", "super_admin"))
     )
     if not allowed:
         raise HTTPException(

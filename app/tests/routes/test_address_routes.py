@@ -22,8 +22,8 @@ def customer_user_with_institution():
     iid = uuid4()
     return {
         "user_id": uid,
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": iid,
     }
 
@@ -33,8 +33,8 @@ def customer_user_without_institution():
     """Customer user without institution_id (should get 400)."""
     return {
         "user_id": uuid4(),
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "institution_id": None,
     }
 
@@ -45,7 +45,7 @@ def b2b_employee_user():
     return {
         "user_id": uuid4(),
         "role_type": "Employee",
-        "role_name": "Admin",
+        "role_name": "admin",
         "institution_id": uuid4(),
     }
 
@@ -61,7 +61,7 @@ def _minimal_address_body(include_institution_and_user=False, institution_id=Non
         "province": "CABA",
         "city": "Buenos Aires",
         "postal_code": "C1043AAZ",
-        "street_type": "Ave",
+        "street_type": "ave",
         "street_name": "Corrientes",
         "building_number": "1234",
         "country_code": "AR",
@@ -167,7 +167,7 @@ class TestAddressCreateInstitutionSafeguard:
             province="CABA",
             city="Buenos Aires",
             postal_code="C1043AAZ",
-            street_type="Ave",
+            street_type="ave",
             street_name="Corrientes",
             building_number="1234",
             apartment_unit=None,

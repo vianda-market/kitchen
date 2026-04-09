@@ -50,3 +50,16 @@ sendgrid>=6.11.0
 
 # Jinja2 (email template rendering)
 Jinja2>=3.1.0
+
+# Ads platform: async job queue + Redis
+arq>=0.26                   # Async Redis Queue (ARQ) for deferred conversion uploads
+redis[hiredis]>=5.0         # Redis client with C parser (ARQ backend)
+
+# Ads platform: GCP Secret Manager (runtime credential fetch)
+google-cloud-secret-manager>=2.18.0
+
+# Ads platform: Google Ads API (conversion uploads, campaign management)
+google-ads>=24.0.0
+
+# Ads platform: Meta Marketing API + Conversions API (CAPI)
+facebook-business>=25.0.0

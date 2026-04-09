@@ -29,7 +29,7 @@ def search_cuisines(
     params: list = []
 
     if not include_archived:
-        conditions.append("NOT is_archived AND status = 'Active'")
+        conditions.append("NOT is_archived AND status = 'active'")
 
     if search:
         conditions.append("(cuisine_name ILIKE %s OR slug ILIKE %s)")
@@ -60,7 +60,7 @@ def create_suggestion(
                 suggested_name, suggested_by, restaurant_id,
                 suggestion_status, created_by, modified_by
             )
-            VALUES (%s, %s, %s, 'Pending', %s, %s)
+            VALUES (%s, %s, %s, 'pending', %s, %s)
             RETURNING *
             """,
             (
@@ -92,7 +92,7 @@ def approve_suggestion(
     """
     # Fetch suggestion (must be Pending)
     suggestion = db_read(
-        "SELECT * FROM cuisine_suggestion WHERE suggestion_id = %s AND suggestion_status = 'Pending'",
+        "SELECT * FROM cuisine_suggestion WHERE suggestion_id = %s AND suggestion_status = 'pending'",
         (str(suggestion_id),),
         connection=db,
         fetch_one=True,
@@ -138,14 +138,14 @@ def approve_suggestion(
         cursor.execute(
             """
             UPDATE cuisine_suggestion
-            SET suggestion_status = 'Approved',
+            SET suggestion_status = 'approved',
                 reviewed_by = %s,
                 reviewed_date = %s,
                 review_notes = %s,
                 resolved_cuisine_id = %s,
                 modified_by = %s,
                 modified_date = %s
-            WHERE suggestion_id = %s AND suggestion_status = 'Pending'
+            WHERE suggestion_id = %s AND suggestion_status = 'pending'
             RETURNING *
             """,
             (
@@ -184,13 +184,13 @@ def reject_suggestion(
         cursor.execute(
             """
             UPDATE cuisine_suggestion
-            SET suggestion_status = 'Rejected',
+            SET suggestion_status = 'rejected',
                 reviewed_by = %s,
                 reviewed_date = %s,
                 review_notes = %s,
                 modified_by = %s,
                 modified_date = %s
-            WHERE suggestion_id = %s AND suggestion_status = 'Pending'
+            WHERE suggestion_id = %s AND suggestion_status = 'pending'
             RETURNING *
             """,
             (
@@ -210,7 +210,7 @@ def reject_suggestion(
 def get_pending_suggestions(db: psycopg2.extensions.connection) -> List[dict]:
     """List all Pending cuisine suggestions."""
     rows = db_read(
-        "SELECT * FROM cuisine_suggestion WHERE suggestion_status = 'Pending' AND NOT is_archived ORDER BY created_date",
+        "SELECT * FROM cuisine_suggestion WHERE suggestion_status = 'pending' AND NOT is_archived ORDER BY created_date",
         (),
         connection=db,
         fetch_one=False,

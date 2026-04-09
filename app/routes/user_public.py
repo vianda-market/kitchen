@@ -126,7 +126,12 @@ def signup_request(
     Returns 409 when the email is already registered so the frontend can prompt the user to log in.
     """
     def _request():
-        return user_signup_service.request_customer_signup(user.model_dump(), db)
+        data = user.model_dump()
+        # Pass device_id for referral code fallback (deep link lifecycle)
+        device_id = request.headers.get("X-Device-Id")
+        if device_id:
+            data["_device_id"] = device_id
+        return user_signup_service.request_customer_signup(data, db)
 
     result = handle_business_operation(
         _request,

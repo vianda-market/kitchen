@@ -16,8 +16,8 @@ def client_internal_enums():
     def _user():
         return {
             "user_id": uid,
-            "role_type": "Internal",
-            "role_name": "Admin",
+            "role_type": "internal",
+            "role_name": "admin",
             "institution_id": uuid4(),
         }
 
@@ -46,15 +46,17 @@ def test_get_enums_spanish_street_type_label(client_internal_enums):
     data = r.json()
     st = data["street_type"]
     assert "values" in st and "labels" in st
-    assert "St" in st["labels"]
-    assert st["labels"]["St"] == "Calle"
+    assert "st" in st["labels"]
+    assert st["labels"]["st"] == "Calle"
 
 
 def test_get_enums_unlabeled_enum_identity_map(client_internal_enums):
+    """All enums now have labels. For labeled enums, labels map value→display (not identity)."""
     r = client_internal_enums.get("/api/v1/enums", params={"language": "en"})
     assert r.status_code == 200
     data = r.json()
     status = data["status"]
     assert status["values"]
-    for v in status["values"]:
-        assert status["labels"][v] == v
+    # All enum values are lowercase slugs; labels are Title Case display names
+    assert "active" in status["values"]
+    assert status["labels"]["active"] == "Active"

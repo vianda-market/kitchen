@@ -123,7 +123,7 @@ class PlatePickupService:
             # Get the pickup record
             pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db)
             
-            if pickup_record.status not in ['Arrived', 'Pending', 'Handed Out']:
+            if pickup_record.status not in ['arrived', 'pending', 'handed_out']:
                 raise HTTPException(status_code=400, detail=f"Cannot complete order with status {pickup_record.status}")
 
             # Handle disputes: log and auto-complete with was_collected=False (interim until support queue)
@@ -266,13 +266,13 @@ class PlatePickupService:
         FROM qr_code 
         WHERE qr_code_payload = %s 
         AND is_archived = FALSE 
-        AND status = 'Active'
+        AND status = 'active'
         LIMIT 1
         """
         result = db_read(query, (qr_code_payload,), connection=db, fetch_one=True)
         if not result:
             raise HTTPException(status_code=400, detail="This QR code is not recognized")
-        
+
         return QRCodeDTO(**result)
     
     def _validate_restaurant_match(
@@ -501,10 +501,10 @@ class PlatePickupService:
         LEFT JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id
         LEFT JOIN plate_info p ON ps.plate_id = p.plate_id
         LEFT JOIN product_info prod ON p.product_id = prod.product_id
-        WHERE ppl.status IN ('Pending', 'Arrived') 
+        WHERE ppl.status IN ('pending', 'arrived')
         AND ppl.is_archived = FALSE
         AND qc.is_archived = FALSE
-        AND qc.status = 'Active'
+        AND qc.status = 'active'
         AND (
             ppl.user_id = %s
             OR pp.user_id = %s
@@ -664,7 +664,7 @@ class PlatePickupService:
         # 2. Look up QR code by ID
         qr_row = db_read(
             """SELECT restaurant_id FROM qr_code
-               WHERE qr_code_id = %s AND is_archived = FALSE AND status = 'Active'
+               WHERE qr_code_id = %s AND is_archived = FALSE AND status = 'active'
                LIMIT 1""",
             (str(qr_code_id),), connection=db, fetch_one=True
         )
@@ -683,7 +683,7 @@ class PlatePickupService:
                 """SELECT r.name AS restaurant_name
                    FROM plate_pickup_live ppl
                    JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-                   WHERE ppl.status = 'Pending' AND ppl.is_archived = FALSE AND ppl.user_id = %s
+                   WHERE ppl.status = 'pending' AND ppl.is_archived = FALSE AND ppl.user_id = %s
                    LIMIT 1""",
                 (str(user_id),), connection=db, fetch_one=True
             )
@@ -786,7 +786,7 @@ class PlatePickupService:
         SELECT 1 FROM qr_code 
         WHERE qr_code_payload = %s 
         AND is_archived = FALSE 
-        AND status = 'Active'
+        AND status = 'active'
         LIMIT 1
         """
         result = db_read(query, (qr_code_payload,), connection=db, fetch_one=True)
@@ -812,18 +812,18 @@ class PlatePickupService:
         FROM plate_pickup_live ppl
         LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
         WHERE ppl.restaurant_id = %s
-        AND ppl.status = 'Pending' 
+        AND ppl.status = 'pending'
         AND ppl.is_archived = FALSE
         AND (
             ppl.user_id = %s
             OR pp.user_id = %s
             OR pp.matched_with_preference_id IN (
-                SELECT preference_id FROM pickup_preferences 
+                SELECT preference_id FROM pickup_preferences
                 WHERE user_id = %s
             )
         )
         """
-        
+
         result = db_read(query, (
             str(restaurant_id),
             str(user_id), str(user_id), str(user_id)
@@ -846,13 +846,13 @@ class PlatePickupService:
         FROM plate_pickup_live ppl
         LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
         LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-        WHERE ppl.status = 'Pending' 
+        WHERE ppl.status = 'pending'
         AND ppl.is_archived = FALSE
         AND (
             ppl.user_id = %s
             OR pp.user_id = %s
             OR pp.matched_with_preference_id IN (
-                SELECT preference_id FROM pickup_preferences 
+                SELECT preference_id FROM pickup_preferences
                 WHERE user_id = %s
             )
         )
@@ -898,7 +898,7 @@ class PlatePickupService:
             JOIN plate_info pl ON ps.plate_id = pl.plate_id
             JOIN product_info prod ON pl.product_id = prod.product_id
             WHERE ppl.restaurant_id = %s
-            AND ppl.status IN ('Pending', 'Arrived')
+            AND ppl.status IN ('pending', 'arrived')
             AND ppl.is_archived = FALSE
             AND (
                 ppl.user_id = %s
@@ -947,12 +947,12 @@ class PlatePickupService:
             SELECT ppl.plate_selection_id, ppl.plate_id
             FROM plate_pickup_live ppl
             WHERE ppl.restaurant_id = %s
-            AND ppl.status = 'Pending'
+            AND ppl.status = 'pending'
             AND ppl.is_archived = FALSE
             AND (
                 ppl.user_id = %s
                 OR ppl.plate_selection_id IN (
-                    SELECT plate_selection_id FROM pickup_preferences 
+                    SELECT plate_selection_id FROM pickup_preferences
                     WHERE user_id = %s
                 )
             )
@@ -970,14 +970,14 @@ class PlatePickupService:
         with db.cursor() as cursor:
             update_pickup_query = """
             UPDATE plate_pickup_live
-            SET status = 'Arrived',
+            SET status = 'arrived',
                 arrival_time = %s,
                 expected_completion_time = %s,
                 confirmation_code = %s,
                 was_collected = TRUE,
                 modified_date = CURRENT_TIMESTAMP
             WHERE restaurant_id = %s
-            AND status = 'Pending'
+            AND status = 'pending'
             AND is_archived = FALSE
             AND (
                 user_id = %s
@@ -1043,7 +1043,7 @@ class PlatePickupService:
                         was_collected = TRUE,
                         collected_timestamp = %s,
                         final_amount = %s,
-                        status = 'Arrived',
+                        status = 'arrived',
                         modified_by = %s,
                         modified_date = CURRENT_TIMESTAMP
                     WHERE plate_selection_id = %s
@@ -1083,7 +1083,7 @@ class PlatePickupService:
             else:
                 log_error(f"Failed to update restaurant balance for arrival at {restaurant_id}")
         
-        log_info(f"Updated {len(selections)} order(s) for user {user_id} at restaurant {restaurant_id} to 'Arrived' status")
+        log_info(f"Updated {len(selections)} order(s) for user {user_id} at restaurant {restaurant_id} to 'arrived' status")
 
 # Create service instance
 plate_pickup_service = PlatePickupService()

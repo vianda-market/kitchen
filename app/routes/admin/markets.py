@@ -247,7 +247,7 @@ async def update_market(
     - 403: Insufficient permissions (Supplier; or Internal Admin trying to edit Global Marketplace)
     - 404: Market not found
     """
-    if is_global_market(market_id) and current_user.get("role_name") != "Super Admin":
+    if is_global_market(market_id) and current_user.get("role_name") != "super_admin":
         raise HTTPException(
             status_code=403,
             detail="Only Super Admin can edit the Global Marketplace.",
@@ -307,7 +307,7 @@ async def archive_market(
     not removed from the database.
     """
     if is_global_market(market_id):
-        if current_user.get("role_name") != "Super Admin":
+        if current_user.get("role_name") != "super_admin":
             raise HTTPException(
                 status_code=403,
                 detail="Only Super Admin can archive the Global Marketplace.",

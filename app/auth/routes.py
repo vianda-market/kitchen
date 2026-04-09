@@ -89,7 +89,7 @@ async def login(
     
     # Block Customer Comensal login on B2B platform (x-client-type: b2b)
     client_type = request.headers.get("x-client-type", "").strip().lower()
-    if client_type == "b2b" and role_type == "Customer" and role_name == "Comensal":
+    if client_type == "b2b" and role_type == "customer" and role_name == "comensal":
         from app.config.settings import get_settings
         settings = get_settings()
         raise HTTPException(

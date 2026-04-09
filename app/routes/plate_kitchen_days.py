@@ -97,7 +97,7 @@ def list_plate_kitchen_days(
     effective_institution_id = resolve_institution_filter(institution_id, scope)
     if effective_institution_id is not None:
         effective_scope = InstitutionScope(
-            institution_id=str(effective_institution_id), role_type="Internal", role_name="Manager"
+            institution_id=str(effective_institution_id), role_type="internal", role_name="manager"
         )
     else:
         effective_scope = scope
@@ -218,7 +218,7 @@ def create_plate_kitchen_day(
         
         # Prepare data for batch insert
         data_list = []
-        status_value = payload.status or 'Active'  # Default to 'Active' if not provided
+        status_value = payload.status or 'active'  # Default to 'active' if not provided
         for day in payload.kitchen_days:
             data_list.append({
                 "plate_id": str(payload.plate_id),

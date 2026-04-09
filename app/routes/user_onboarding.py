@@ -24,7 +24,7 @@ def get_my_onboarding_status(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Customer onboarding status (user-level). Returns checklist with has_verified_email and has_active_subscription."""
-    if current_user.get("role_type") != "Customer":
+    if current_user.get("role_type") != "customer":
         raise HTTPException(status_code=404, detail="Onboarding status is only available for Customer users")
 
     user_id = current_user["user_id"]

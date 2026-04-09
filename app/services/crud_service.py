@@ -1064,7 +1064,7 @@ class CRUDService(Generic[T]):
         """
         query = f"""
             SELECT * FROM {self.table_name}
-            WHERE status = 'Pending'
+            WHERE status = 'pending'
             AND is_archived = FALSE
             ORDER BY period_end ASC
         """
@@ -1087,7 +1087,7 @@ class CRUDService(Generic[T]):
                 from app.config.enums import BillResolution
                 query = f"""
                     UPDATE {self.table_name}
-                    SET status = 'Processed', resolution = %s,
+                    SET status = 'processed', resolution = %s,
                         modified_by = %s, modified_date = CURRENT_TIMESTAMP
                     WHERE {self.id_column} = %s AND is_archived = FALSE
                 """
@@ -1313,7 +1313,7 @@ class CRUDService(Generic[T]):
                     0,  # Initial transaction count
                     0.00,  # Initial balance
                     currency_code,
-                    'Active',  # Initial status
+                    'active',  # Initial status
                     False,  # Not archived
                     str(modified_by)
                 ))
@@ -1591,6 +1591,7 @@ from app.dto.models import (
     SupplierInvoiceDTO, SupplierInvoiceARDTO, SupplierInvoicePEDTO, SupplierInvoiceUSDTO,
     BillInvoiceMatchDTO, SupplierW9DTO, SupplierTermsDTO,
     CuisineDTO, CuisineSuggestionDTO,
+    ReferralConfigDTO, ReferralInfoDTO,
 )
 
 # Core entity services
@@ -1848,7 +1849,7 @@ def get_credit_cost_local_currency_of_most_expensive_plan_for_market(market_id: 
     """Return credit_cost_local_currency of the highest-price active plan in the market, or None. Used for explore fallback when user has no subscription in that market."""
     query = """
         SELECT credit_cost_local_currency FROM plan_info
-        WHERE market_id = %s AND is_archived = FALSE AND status = 'Active'
+        WHERE market_id = %s AND is_archived = FALSE AND status = 'active'
         ORDER BY price DESC
         LIMIT 1
     """
@@ -1943,7 +1944,7 @@ def get_active_plates_today_by_restaurant_address(address_id: UUID, db: psycopg2
         JOIN plate_kitchen_days pkd ON p.plate_id = pkd.plate_id
         WHERE a.address_id = %s 
         AND p.is_archived = FALSE 
-        AND p.status = 'Active'
+        AND p.status = 'active'
         AND pkd.is_archived = FALSE
         AND pkd.kitchen_day = UPPER(TO_CHAR(CURRENT_DATE, 'DAY'))
         ORDER BY p.name
@@ -2058,7 +2059,7 @@ def mark_plate_selection_complete(transaction_id: UUID, modified_by: UUID, db: p
         cursor.execute(
             """
             UPDATE client_transaction 
-            SET status = 'Completed',
+            SET status = 'completed',
                 modified_by = %s,
                 modified_date = CURRENT_TIMESTAMP
             WHERE transaction_id = %s AND is_archived = FALSE
@@ -2399,7 +2400,7 @@ def get_active_plates_today_by_user_city(address_id: UUID, db: psycopg2.extensio
           AND pkd.kitchen_day = %s
           AND pkd.is_archived = %s
     """
-    results = db_read(query, (city, False, 'Active', current_day, False), connection=db)
+    results = db_read(query, (city, False, 'active', current_day, False), connection=db)
     if not results:
         return []
     
@@ -2496,3 +2497,7 @@ discretionary_resolution_service = CRUDService("discretionary_resolution_info", 
 
 # Ingredient catalog — global, no institution scoping
 ingredient_catalog_service = CRUDService("ingredient_catalog", IngredientCatalogDTO, "ingredient_id")
+
+# Referral services
+referral_config_service = CRUDService("referral_config", ReferralConfigDTO, "referral_config_id")
+referral_info_service = CRUDService("referral_info", ReferralInfoDTO, "referral_id")

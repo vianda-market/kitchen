@@ -34,22 +34,22 @@ class TestDiscretionaryService:
         """Sample admin user for testing"""
         return {
             "user_id": uuid4(),
-            "role_type": "Admin",
+            "role_type": "admin",
             "institution_id": uuid4()
         }
-    
+
     @pytest.fixture
     def sample_super_admin(self):
         """Sample super-admin user for testing
-        
-        Super Admin users have role_type='Internal' and role_name='Super Admin'.
-        This allows them to have global access (via Internal role_type) plus special 
+
+        Super Admin users have role_type='internal' and role_name='super_admin'.
+        This allows them to have global access (via Internal role_type) plus special
         approval permissions (via role_name).
         """
         return {
             "user_id": uuid4(),
-            "role_type": "Internal",
-            "role_name": "Super Admin",
+            "role_type": "internal",
+            "role_name": "super_admin",
             "institution_id": uuid4()
         }
     
@@ -433,7 +433,7 @@ class TestDiscretionaryService:
         mock_resolution = DiscretionaryResolutionDTO(
             approval_id=uuid4(),
             discretionary_id=discretionary_id,
-            resolution="Approved",
+            resolution="approved",
             is_archived=False,
             status=Status.ACTIVE,
             resolved_by=sample_super_admin["user_id"],
@@ -501,7 +501,7 @@ class TestDiscretionaryService:
                 )
             
             assert exc_info.value.status_code == 400
-            assert "Cannot approve request with status: Approved" in str(exc_info.value.detail)
+            assert "Cannot approve request with status: approved" in str(exc_info.value.detail)
     
     # =============================================================================
     # REJECT DISCRETIONARY REQUEST TESTS
@@ -519,7 +519,7 @@ class TestDiscretionaryService:
         mock_resolution = DiscretionaryResolutionDTO(
             approval_id=uuid4(),
             discretionary_id=discretionary_id,
-            resolution="Rejected",
+            resolution="rejected",
             is_archived=False,
             status=Status.ACTIVE,
             resolved_by=sample_super_admin["user_id"],
@@ -585,7 +585,7 @@ class TestDiscretionaryService:
                 )
             
             assert exc_info.value.status_code == 400
-            assert "Cannot reject request with status: Rejected" in str(exc_info.value.detail)
+            assert "Cannot reject request with status: rejected" in str(exc_info.value.detail)
     
     # =============================================================================
     # GET PENDING REQUESTS TESTS

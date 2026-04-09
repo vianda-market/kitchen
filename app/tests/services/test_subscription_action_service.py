@@ -265,6 +265,6 @@ class TestReconcileHoldSubscriptions:
         reconcile_hold_subscriptions(mock_db)
         call_args = mock_cursor.execute.call_args[0]
         assert "UPDATE subscription_info" in call_args[0]
-        assert "Active" in call_args[1]
-        assert "On Hold" in call_args[1]
+        assert "active" in call_args[1]
+        assert "on_hold" in call_args[1]
         mock_db.commit.assert_called_once()

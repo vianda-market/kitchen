@@ -956,9 +956,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """List subscriptions with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
-            if role_type == "Supplier":
+            if role_type == "supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
+            if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -977,9 +977,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """Get subscription by ID with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
-            if role_type == "Supplier":
+            if role_type == "supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
+            if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -1006,7 +1006,7 @@ def create_subscription_routes() -> APIRouter:
         ):
             """Update early renewal threshold for the current user's active subscription.
             Send an integer (>= 1) to set the threshold, or null to disable early renewal (period-end only)."""
-            if current_user.get("role_type") != "Customer":
+            if current_user.get("role_type") != "customer":
                 raise HTTPException(status_code=403, detail="Only customers can update renewal preferences.")
             user_id = current_user.get("user_id")
             if not user_id:
@@ -1051,7 +1051,7 @@ def create_subscription_routes() -> APIRouter:
                 raise HTTPException(status_code=404, detail="No employer benefit program found")
             inst_type = getattr(inst, "institution_type", None)
             inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
-            if inst_type_str != "Employer":
+            if inst_type_str != "employer":
                 raise HTTPException(status_code=404, detail="No employer benefit program found")
 
             program = get_program_by_institution(institution_id, db)
@@ -1114,9 +1114,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """List subscriptions. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
-            if role_type == "Supplier":
+            if role_type == "supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
+            if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -1135,9 +1135,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """Get a single subscription by ID. Internal: global. Customers: own only. Suppliers: 403."""
             role_type = current_user.get("role_type")
-            if role_type == "Supplier":
+            if role_type == "supplier":
                 raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
-            if role_type == "Customer":
+            if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -1164,7 +1164,7 @@ def create_subscription_routes() -> APIRouter:
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Put a subscription on hold. Only the owning customer. Hold duration max 3 months."""
-            if current_user.get("role_type") != "Customer":
+            if current_user.get("role_type") != "customer":
                 raise HTTPException(status_code=403, detail="Forbidden: Only customers can put their subscription on hold.")
             user_id = current_user.get("user_id")
             if not user_id:
@@ -1178,7 +1178,7 @@ def create_subscription_routes() -> APIRouter:
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Resume a subscription from hold. Only the owning customer."""
-            if current_user.get("role_type") != "Customer":
+            if current_user.get("role_type") != "customer":
                 raise HTTPException(status_code=403, detail="Forbidden: Only customers can resume their own subscription.")
             user_id = current_user.get("user_id")
             if not user_id:
@@ -1216,7 +1216,7 @@ def create_institution_routes() -> APIRouter:
     def _institution_scope(current_user: dict):
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
-        if role_type == "Internal" and role_name in ("Admin", "Super Admin"):
+        if role_type == "internal" and role_name in ("admin", "super_admin"):
             return None  # Global access
         return get_institution_scope(current_user)
     
@@ -1262,7 +1262,7 @@ def create_institution_routes() -> APIRouter:
             if "modified_by" not in data:
                 data["modified_by"] = current_user["user_id"]
 
-            if current_user.get("role_type") != "Internal" or current_user.get("role_name") not in ("Admin", "Super Admin"):
+            if current_user.get("role_type") != "internal" or current_user.get("role_name") not in ("admin", "super_admin"):
                 raise HTTPException(status_code=403, detail="Only Admin or Super Admin can edit institutions.")
 
             existing = institution_service.get_by_id(entity_id, db, scope=scope)
@@ -1273,12 +1273,12 @@ def create_institution_routes() -> APIRouter:
             effective_type_str = (
                 (new_type.value if hasattr(new_type, "value") else str(new_type)) if new_type is not None else inst_type_str
             )
-            if effective_type_str in ("Internal", "Customer") and current_user.get("role_name") != "Super Admin":
+            if effective_type_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
                 raise HTTPException(
                     status_code=403,
                     detail="Only Super Admin can set institution_type to Internal or Customer.",
                 )
-            if inst_type_str == "Supplier":
+            if inst_type_str == "supplier":
                 data.pop("market_id", None)
             def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
                 return institution_service.update(target_id, payload, connection, scope=scope)
@@ -1307,8 +1307,8 @@ def create_institution_routes() -> APIRouter:
             """Create a new institution - Internal Admin and Super Admin only"""
             data = create_data.model_dump(exclude_none=True)
             inst_type = data.get("institution_type")
-            inst_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type) if inst_type else "Supplier"
-            if inst_str in ("Internal", "Customer") and current_user.get("role_name") != "Super Admin":
+            inst_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type) if inst_type else "supplier"
+            if inst_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
                 raise HTTPException(
                     status_code=403,
                     detail="Only Super Admin can create Internal or Customer-type institutions.",
@@ -1454,7 +1454,7 @@ def create_plate_routes() -> APIRouter:
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """Get all plates - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
-            if current_user.get("role_type") == "Customer":
+            if current_user.get("role_type") == "customer":
                 scope = None
             else:
                 scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
@@ -1472,7 +1472,7 @@ def create_plate_routes() -> APIRouter:
             """List plates with enriched data - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 from app.i18n.locale_names import resolve_cuisine_name
-                if current_user.get("role_type") == "Customer":
+                if current_user.get("role_type") == "customer":
                     scope = None
                 else:
                     scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
@@ -1501,7 +1501,7 @@ def create_plate_routes() -> APIRouter:
         ):
             """Get plate by ID with enriched data. Non-archived only."""
             try:
-                if current_user.get("role_type") == "Customer":
+                if current_user.get("role_type") == "customer":
                     scope = None
                 else:
                     scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
@@ -1542,7 +1542,7 @@ def create_plate_routes() -> APIRouter:
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """Get plate by ID - Customers: any. Internal/Suppliers: institution-scoped. Non-archived only."""
-            if current_user.get("role_type") == "Customer":
+            if current_user.get("role_type") == "customer":
                 scope = None
             else:
                 scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)

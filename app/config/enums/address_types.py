@@ -9,13 +9,13 @@ from enum import Enum
 
 class AddressType(str, Enum):
     """Valid address types"""
-    RESTAURANT = "Restaurant"
-    ENTITY_BILLING = "Entity Billing"
-    ENTITY_ADDRESS = "Entity Address"
-    CUSTOMER_HOME = "Customer Home"
-    CUSTOMER_BILLING = "Customer Billing"
-    CUSTOMER_EMPLOYER = "Customer Employer"
-    CUSTOMER_OTHER = "Customer Other"
+    RESTAURANT = "restaurant"
+    ENTITY_BILLING = "entity_billing"
+    ENTITY_ADDRESS = "entity_address"
+    CUSTOMER_HOME = "customer_home"
+    CUSTOMER_BILLING = "customer_billing"
+    CUSTOMER_EMPLOYER = "customer_employer"
+    CUSTOMER_OTHER = "customer_other"
 
     @classmethod
     def values(cls) -> list[str]:

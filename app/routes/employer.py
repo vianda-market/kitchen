@@ -157,7 +157,7 @@ def add_employer_address(
         assign_to_user = False
 
         # Only Customers can use assign_employer parameter
-        if role_type == "Customer":
+        if role_type == "customer":
             assign_to_user = address_create.assign_employer if address_create.assign_employer is not None else True  # Default True
         # Internal/Suppliers: assign_employer parameter is ignored (always False)
 
@@ -247,7 +247,7 @@ def create_employer(
         assign_to_user = False
         
         # Only Customers can use assign_employer parameter
-        if role_type == "Customer":
+        if role_type == "customer":
             assign_to_user = employer_create.assign_employer  # Use value from request (default True)
         # Internal/Suppliers: assign_employer parameter is ignored (always False)
         
@@ -263,7 +263,7 @@ def create_employer(
         address_data["modified_by"] = current_user["user_id"]
 
         # Customer-reported employer addresses always use Vianda Customers institution (config). B2B requires institution_id.
-        if role_type == "Customer":
+        if role_type == "customer":
             address_data["institution_id"] = get_vianda_customers_institution_id()
             # user_id not defaulted for employer addresses (per plan)
         else:

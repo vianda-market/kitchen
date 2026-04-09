@@ -16,12 +16,12 @@ class DiscretionaryReason(str, Enum):
     """Valid categories for discretionary credit requests (formerly 'reasons')"""
     
     # General categories (user or restaurant)
-    MARKETING_CAMPAIGN = "Marketing Campaign"
-    CREDIT_REFUND = "Credit Refund"
-    
+    MARKETING_CAMPAIGN = "marketing_campaign"
+    CREDIT_REFUND = "credit_refund"
+
     # Restaurant-specific categories (require restaurant_id)
-    ORDER_INCORRECTLY_MARKED = "Order incorrectly marked as not collected"
-    FULL_ORDER_REFUND = "Full Order Refund"
+    ORDER_INCORRECTLY_MARKED = "order_incorrectly_marked"
+    FULL_ORDER_REFUND = "full_order_refund"
     
     @classmethod
     def values(cls) -> list[str]:

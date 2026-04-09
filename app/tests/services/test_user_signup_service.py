@@ -159,8 +159,8 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "role_type": "Supplier",
-            "role_name": "Admin"
+            "role_type": "supplier",
+            "role_name": "admin"
         }
         current_user = {"user_id": str(UUID("12345678-1234-1234-1234-123456789012"))}
 
@@ -201,8 +201,8 @@ class TestUserSignupService:
             "first_name": "John",
             "last_name": "Doe",
             "password": "Password123!",
-            "role_type": "Internal",
-            "role_name": "Admin"
+            "role_type": "internal",
+            "role_name": "admin"
         }
         mock_create_user.return_value = sample_user_dto
         
@@ -228,8 +228,8 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "role_type": "Internal",
-            "role_name": "Admin"
+            "role_type": "internal",
+            "role_name": "admin"
         }
         mock_create_user.return_value = sample_user_dto
         mock_secrets.return_value = 'a'  # Mock random character
@@ -262,8 +262,8 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "password": "SecurePass123!",
-            "role_type": "Internal",
-            "role_name": "Admin"
+            "role_type": "internal",
+            "role_name": "admin"
         }
 
         result = user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)

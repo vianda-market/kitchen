@@ -26,7 +26,7 @@ class TestRestaurantHasActiveQRCode:
         call_kw = mock_db_read.call_args[1]
         assert call_kw.get("fetch_one") is True
         assert "qr_code" in mock_db_read.call_args[0][0]
-        assert "Active" in mock_db_read.call_args[0][0]
+        assert "active" in mock_db_read.call_args[0][0].lower()
 
     @patch("app.services.restaurant_visibility.db_read")
     def test_returns_false_when_no_active_qr_code(self, mock_db_read):

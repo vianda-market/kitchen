@@ -170,8 +170,8 @@ class TestSeedDataRecords:
             username, role_type, role_name, email = result
             
             assert username == 'superadmin', f"Super Admin username should be 'superadmin', got '{username}'"
-            assert role_type == 'Internal', f"Super Admin role_type should be 'Internal', got '{role_type}'"
-            assert role_name == 'Super Admin', f"Super Admin role_name should be 'Super Admin', got '{role_name}'"
+            assert role_type == 'internal', f"Super Admin role_type should be 'internal', got '{role_type}'"
+            assert role_name == 'super_admin', f"Super Admin role_name should be 'super_admin', got '{role_name}'"
             assert email == 'viandallc@gmail.com', f"Super Admin email should be 'viandallc@gmail.com', got '{email}'"
     
     def test_vianda_enterprises_name(self, db_transaction):

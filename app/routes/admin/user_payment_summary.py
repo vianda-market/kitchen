@@ -45,7 +45,7 @@ LEFT JOIN payment_method pm
       AND pm.method_type = 'Stripe'
 LEFT JOIN external_payment_method epm
        ON epm.payment_method_id = pm.payment_method_id
-WHERE u.role_type = 'Customer'
+WHERE u.role_type = 'customer'
   AND u.is_archived = FALSE
 GROUP BY
     u.user_id,

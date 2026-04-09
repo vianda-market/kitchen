@@ -117,7 +117,7 @@ def update_discretionary_request(
     if not request:
         raise HTTPException(status_code=404, detail="Discretionary request not found")
     
-    if request.status != "Pending":
+    if request.status != "pending":
         raise HTTPException(
             status_code=400, 
             detail=f"Cannot update request with status: {request.status}"
@@ -141,8 +141,8 @@ def get_pending_discretionary_requests(
     """
     Get all pending discretionary requests for admin dashboard.
     
-    Returns all requests with status 'Pending' for approval/rejection.
-    Available to Admin and Super Admin Internal users (role_type='Internal' AND role_name IN ('Admin', 'Super Admin')).
+    Returns all requests with status 'pending' for approval/rejection.
+    Available to Admin and Super Admin Internal users (role_type='internal' AND role_name IN ('admin', 'super_admin')).
     Admin users can see pending requests to verify their submitted requests have been recorded.
     """
     log_info(f"Admin {current_user['user_id']} retrieving pending discretionary requests")

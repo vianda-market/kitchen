@@ -9,10 +9,10 @@ from enum import Enum
 
 class AuditOperation(str, Enum):
     """Valid audit operations - fixed at compile time"""
-    CREATE = "CREATE"
-    UPDATE = "UPDATE"
-    ARCHIVE = "ARCHIVE"
-    DELETE = "DELETE"
+    CREATE = "create"
+    UPDATE = "update"
+    ARCHIVE = "archive"
+    DELETE = "delete"
 
     @classmethod
     def values(cls) -> list[str]:

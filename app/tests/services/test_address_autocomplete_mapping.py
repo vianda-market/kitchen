@@ -37,27 +37,27 @@ MAPBOX_FEATURE_SANTA_FE = {
 class TestRouteToStreetTypeAndName:
     def test_avenida(self):
         st, name = _route_to_street_type_and_name("Avenida Corrientes")
-        assert st == "Ave"
+        assert st == "ave"
         assert name == "Corrientes"
 
     def test_av_prefix(self):
         st, name = _route_to_street_type_and_name("Av. Santa Fe")
-        assert st == "Ave"
+        assert st == "ave"
         assert "Santa Fe" in name
 
     def test_calle(self):
         st, name = _route_to_street_type_and_name("Calle Florida")
-        assert st == "St"
+        assert st == "st"
         assert name == "Florida"
 
     def test_unknown_prefix_defaults_to_st(self):
         st, name = _route_to_street_type_and_name("Some Road Name")
-        assert st == "St"
+        assert st == "st"
         assert name == "Some Road Name"
 
     def test_empty_input(self):
         st, name = _route_to_street_type_and_name("")
-        assert st == "St"
+        assert st == "st"
         assert name == ""
 
 
@@ -65,7 +65,7 @@ class TestMapPlaceDetailsToAddress:
     def test_full_mapbox_feature(self):
         out = map_place_details_to_address(MAPBOX_FEATURE_SANTA_FE)
         assert out["building_number"] == "2567"
-        assert out["street_type"] == "Ave"
+        assert out["street_type"] == "ave"
         assert "Santa Fe" in out["street_name"]
         assert out["city"] == "Buenos Aires"
         assert out["province"] == "Buenos Aires"

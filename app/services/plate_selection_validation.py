@@ -50,10 +50,10 @@ def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
     # Only 'Active' restaurants can accept plate selections
     if restaurant.status != Status.ACTIVE:
         status_message = {
-            'Inactive': 'is currently inactive',
-            'Closed': 'is currently closed',
-            'Suspended': 'is currently suspended',
-            'Maintenance': 'is under maintenance'
+            'inactive': 'is currently inactive',
+            'closed': 'is currently closed',
+            'suspended': 'is currently suspended',
+            'maintenance': 'is under maintenance'
         }.get(restaurant.status, f'has status "{restaurant.status}"')
         
         log_warning(f"Restaurant {restaurant.restaurant_id} ({restaurant.name}) {status_message} - cannot accept plate selections")
@@ -340,7 +340,7 @@ def _find_next_available_kitchen_day_in_week(current_day: str, available_kitchen
     from datetime import datetime, timedelta
     from app.services.kitchen_day_service import VALID_KITCHEN_DAYS
 
-    weekday_names = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+    weekday_names = ("monday", "tuesday", "wednesday", "thursday", "friday")
 
     # Get current date (timezone-aware when timezone_str provided)
     if timezone_str:

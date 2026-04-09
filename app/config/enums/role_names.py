@@ -11,12 +11,12 @@ from app.config.enums.role_types import RoleType
 
 class RoleName(str, Enum):
     """Valid role names - fixed at compile time"""
-    ADMIN = "Admin"
-    SUPER_ADMIN = "Super Admin"
-    MANAGER = "Manager"
-    OPERATOR = "Operator"
-    COMENSAL = "Comensal"
-    GLOBAL_MANAGER = "Global Manager"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    MANAGER = "manager"
+    OPERATOR = "operator"
+    COMENSAL = "comensal"
+    GLOBAL_MANAGER = "global_manager"
 
     @classmethod
     def values(cls) -> list[str]:

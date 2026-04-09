@@ -161,7 +161,7 @@ async def get_featured_restaurant(
                r.verified_badge, r.member_perks, r.member_perks_i18n
         FROM restaurant_info r
         LEFT JOIN cuisine cu ON r.cuisine_id = cu.cuisine_id
-        WHERE r.is_featured = TRUE AND r.is_archived = FALSE AND r.status = 'Active'
+        WHERE r.is_featured = TRUE AND r.is_archived = FALSE AND r.status = 'active'
         LIMIT 1
         """,
         (locale, locale, locale),

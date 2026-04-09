@@ -12,8 +12,8 @@ def test_put_me_invalid_locale_returns_422():
     def _user():
         return {
             "user_id": uuid4(),
-            "role_type": "Internal",
-            "role_name": "Admin",
+            "role_type": "internal",
+            "role_name": "admin",
             "institution_id": uuid4(),
         }
 

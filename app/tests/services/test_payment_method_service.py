@@ -35,10 +35,10 @@ class TestPaymentMethodService:
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Stripe",
+            method_type="stripe",
             method_type_id=None,
             is_archived=False,
-            status="Pending",
+            status="pending",
             is_default=False,
             created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
@@ -51,10 +51,10 @@ class TestPaymentMethodService:
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Stripe",
+            method_type="stripe",
             method_type_id=uuid4(),
             is_archived=False,
-            status="Active",
+            status="active",
             is_default=False,
             created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
@@ -67,10 +67,10 @@ class TestPaymentMethodService:
         return PaymentMethodDTO(
             payment_method_id=uuid4(),
             user_id=uuid4(),
-            method_type="Mercado Pago",
+            method_type="mercado_pago",
             method_type_id=None,
             is_archived=False,
-            status="Pending",
+            status="pending",
             is_default=False,
             created_date=datetime.now(timezone.utc),
             modified_by=uuid4(),
@@ -93,8 +93,9 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_pending.payment_method_id,
-                method_type="Stripe",
+                method_type="stripe",
                 type_id=type_id,
+
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -121,8 +122,9 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_active.payment_method_id,
-                method_type="Stripe",
+                method_type="stripe",
                 type_id=type_id,
+
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -144,7 +146,7 @@ class TestPaymentMethodService:
             method_type=sample_payment_method_pending.method_type,
             method_type_id=sample_payment_method_pending.method_type_id,
             is_archived=sample_payment_method_pending.is_archived,
-            status="Active",
+            status="active",
             is_default=sample_payment_method_pending.is_default,
             created_date=sample_payment_method_pending.created_date,
             modified_by=sample_payment_method_pending.modified_by,
@@ -156,8 +158,9 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=payment_method.payment_method_id,
-                method_type="Stripe",
+                method_type="stripe",
                 type_id=type_id,
+
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -177,7 +180,7 @@ class TestPaymentMethodService:
             with pytest.raises(ValueError, match="not found"):
                 link_payment_method_to_type(
                     payment_method_id=payment_method_id,
-                    method_type="Stripe",
+                    method_type="stripe",
                     type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
@@ -196,7 +199,7 @@ class TestPaymentMethodService:
             with pytest.raises(ValueError, match="type mismatch"):
                 link_payment_method_to_type(
                     payment_method_id=sample_payment_method_wrong_type.payment_method_id,
-                    method_type="Stripe",
+                    method_type="stripe",
                     type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
@@ -216,7 +219,7 @@ class TestPaymentMethodService:
             with pytest.raises(Exception):
                 link_payment_method_to_type(
                     payment_method_id=sample_payment_method_pending.payment_method_id,
-                    method_type="Stripe",
+                    method_type="stripe",
                     type_id=type_id,
                     current_user_id=user_id,
                     db=mock_db
@@ -240,8 +243,9 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=sample_payment_method_pending.payment_method_id,
-                method_type="Stripe",
+                method_type="stripe",
                 type_id=type_id,
+
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -260,7 +264,7 @@ class TestPaymentMethodService:
         payment_method = PaymentMethodDTO(
             payment_method_id=sample_payment_method_pending.payment_method_id,
             user_id=sample_payment_method_pending.user_id,
-            method_type="Stripe",
+            method_type="stripe",
             method_type_id=sample_payment_method_pending.method_type_id,
             is_archived=sample_payment_method_pending.is_archived,
             status=sample_payment_method_pending.status,
@@ -279,8 +283,9 @@ class TestPaymentMethodService:
             
             result = link_payment_method_to_type(
                 payment_method_id=payment_method.payment_method_id,
-                method_type="Stripe",
+                method_type="stripe",
                 type_id=type_id,
+
                 current_user_id=user_id,
                 db=mock_db
             )
@@ -288,5 +293,5 @@ class TestPaymentMethodService:
             assert result is True
             # Verify method_type was checked in UPDATE query
             call_args = mock_cursor.execute.call_args
-            assert "Stripe" in call_args[0][1]
+            assert "stripe" in call_args[0][1]
 

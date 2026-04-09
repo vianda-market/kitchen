@@ -93,6 +93,8 @@ BEGIN
         market_id,
         city_id,
         locale,
+        referral_code,
+        referred_by_code,
         is_archived,
         status,
         created_date,
@@ -123,6 +125,8 @@ BEGIN
         NEW.market_id,
         NEW.city_id,
         NEW.locale,
+        NEW.referral_code,
+        NEW.referred_by_code,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -687,7 +691,7 @@ BEGIN
     NEW.plate_selection_id,
     -NEW.credit,
     FALSE,                       -- mirror the default
-    'Active',                    -- mirror the default
+    'active',                    -- mirror the default
     now(),                       -- explicit timestamp
     NEW.modified_by
   );
@@ -700,7 +704,7 @@ DROP TRIGGER IF EXISTS trg_plate_selection_ct ON customer.plate_selection_info;
 CREATE TRIGGER trg_plate_selection_ct
   AFTER INSERT ON customer.plate_selection_info
   FOR EACH ROW
-  WHEN (NEW.status = 'Active')  -- guard clause
+  WHEN (NEW.status = 'active')  -- guard clause
   EXECUTE FUNCTION log_plate_selection_txn();
 
 -- Trigger function for customer.plate_selection_info history logging
@@ -952,10 +956,10 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Only activate if transitioning from Pending to positive balance
     -- Condition: status is 'Pending' AND balance transitions from <= 0 to > 0
-    IF OLD.status = 'Pending' AND NEW.balance > 0 AND OLD.balance <= 0 THEN
-        NEW.status := 'Active';
+    IF OLD.status = 'pending' AND NEW.balance > 0 AND OLD.balance <= 0 THEN
+        NEW.status := 'active';
         -- Log the status change (visible in PostgreSQL logs)
-        RAISE NOTICE 'Subscription % status automatically changed from Pending to Active (balance: % -> %)', 
+        RAISE NOTICE 'Subscription % status automatically changed from pending to active (balance: % -> %)',
             NEW.subscription_id, OLD.balance, NEW.balance;
     END IF;
     RETURN NEW;
@@ -967,7 +971,7 @@ DROP TRIGGER IF EXISTS subscription_status_activation ON customer.subscription_i
 CREATE TRIGGER subscription_status_activation
 BEFORE UPDATE ON customer.subscription_info
 FOR EACH ROW
-WHEN (OLD.status = 'Pending' AND NEW.balance > 0 AND OLD.balance <= 0)
+WHEN (OLD.status = 'pending' AND NEW.balance > 0 AND OLD.balance <= 0)
 EXECUTE FUNCTION subscription_status_activation_trigger();
 
 -- Trigger function for billing.client_bill_info history logging
@@ -1471,15 +1475,15 @@ DECLARE
     v_operation audit_operation_enum;
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        v_operation := 'CREATE'::audit_operation_enum;
+        v_operation := 'create'::audit_operation_enum;
     ELSIF TG_OP = 'UPDATE' THEN
         IF OLD.is_archived = FALSE AND NEW.is_archived = TRUE THEN
-            v_operation := 'ARCHIVE'::audit_operation_enum;
+            v_operation := 'archive'::audit_operation_enum;
         ELSE
-            v_operation := 'UPDATE'::audit_operation_enum;
+            v_operation := 'update'::audit_operation_enum;
         END IF;
     ELSIF TG_OP = 'DELETE' THEN
-        v_operation := 'DELETE'::audit_operation_enum;
+        v_operation := 'delete'::audit_operation_enum;
     END IF;
 
     -- Mark previous records as not current
@@ -1553,15 +1557,15 @@ DECLARE
     v_operation audit_operation_enum;
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        v_operation := 'CREATE'::audit_operation_enum;
+        v_operation := 'create'::audit_operation_enum;
     ELSIF TG_OP = 'UPDATE' THEN
         IF OLD.is_archived = FALSE AND NEW.is_archived = TRUE THEN
-            v_operation := 'ARCHIVE'::audit_operation_enum;
+            v_operation := 'archive'::audit_operation_enum;
         ELSE
-            v_operation := 'UPDATE'::audit_operation_enum;
+            v_operation := 'update'::audit_operation_enum;
         END IF;
     ELSIF TG_OP = 'DELETE' THEN
-        v_operation := 'DELETE'::audit_operation_enum;
+        v_operation := 'delete'::audit_operation_enum;
     END IF;
 
     -- Mark previous records as not current
@@ -1626,10 +1630,10 @@ BEGIN
     -- Only care when we are removing an active row (UPDATE is_archived to TRUE, or status to Inactive, or DELETE of an active row)
     IF TG_OP = 'UPDATE' AND (
         (OLD.is_archived = FALSE AND NEW.is_archived = TRUE) OR
-        (OLD.status = 'Active'::status_enum AND NEW.status != 'Active'::status_enum)
+        (OLD.status = 'active'::status_enum AND NEW.status != 'active'::status_enum)
     ) THEN
         NULL; -- fall through to get restaurant and check
-    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'Active'::status_enum THEN
+    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'active'::status_enum THEN
         NULL; -- fall through
     ELSE
         RETURN COALESCE(NEW, OLD);
@@ -1645,14 +1649,14 @@ BEGIN
 
     SELECT COUNT(*) INTO v_active_count
     FROM ops.plate_info p
-    INNER JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'::status_enum
+    INNER JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'::status_enum
     WHERE p.restaurant_id = v_restaurant_id AND p.is_archived = FALSE;
 
     IF v_active_count = 0 THEN
         UPDATE ops.restaurant_info
-        SET status = 'Inactive'::status_enum,
+        SET status = 'inactive'::status_enum,
             modified_date = CURRENT_TIMESTAMP
-        WHERE restaurant_id = v_restaurant_id AND status = 'Active'::status_enum;
+        WHERE restaurant_id = v_restaurant_id AND status = 'active'::status_enum;
     END IF;
 
     RETURN COALESCE(NEW, OLD);
@@ -1675,10 +1679,10 @@ BEGIN
     -- Only care when we are removing an active QR code (UPDATE is_archived to TRUE, or status to Inactive, or DELETE of an active row)
     IF TG_OP = 'UPDATE' AND (
         (OLD.is_archived = FALSE AND NEW.is_archived = TRUE) OR
-        (OLD.status = 'Active'::status_enum AND NEW.status != 'Active'::status_enum)
+        (OLD.status = 'active'::status_enum AND NEW.status != 'active'::status_enum)
     ) THEN
         NULL; -- fall through
-    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'Active'::status_enum THEN
+    ELSIF TG_OP = 'DELETE' AND OLD.is_archived = FALSE AND OLD.status = 'active'::status_enum THEN
         NULL; -- fall through
     ELSE
         RETURN COALESCE(NEW, OLD);
@@ -1694,13 +1698,13 @@ BEGIN
     FROM ops.qr_code
     WHERE restaurant_id = v_restaurant_id
       AND is_archived = FALSE
-      AND status = 'Active'::status_enum;
+      AND status = 'active'::status_enum;
 
     IF v_active_count = 0 THEN
         UPDATE ops.restaurant_info
-        SET status = 'Inactive'::status_enum,
+        SET status = 'inactive'::status_enum,
             modified_date = CURRENT_TIMESTAMP
-        WHERE restaurant_id = v_restaurant_id AND status = 'Active'::status_enum;
+        WHERE restaurant_id = v_restaurant_id AND status = 'active'::status_enum;
     END IF;
 
     RETURN COALESCE(NEW, OLD);
@@ -1972,3 +1976,151 @@ CREATE TRIGGER supplier_terms_history_trigger
 AFTER INSERT OR UPDATE ON billing.supplier_terms
 FOR EACH ROW
 EXECUTE FUNCTION supplier_terms_history_trigger_func();
+
+-- =============================================================================
+-- Referral Config History Trigger
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION referral_config_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.referral_config_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE referral_config_id = OLD.referral_config_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.referral_config_history (
+        event_id,
+        referral_config_id,
+        market_id,
+        is_enabled,
+        referrer_bonus_rate,
+        referrer_bonus_cap,
+        referrer_monthly_cap,
+        min_plan_price_to_qualify,
+        cooldown_days,
+        held_reward_expiry_hours,
+        pending_expiry_days,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.referral_config_id,
+        NEW.market_id,
+        NEW.is_enabled,
+        NEW.referrer_bonus_rate,
+        NEW.referrer_bonus_cap,
+        NEW.referrer_monthly_cap,
+        NEW.min_plan_price_to_qualify,
+        NEW.cooldown_days,
+        NEW.held_reward_expiry_hours,
+        NEW.pending_expiry_days,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS referral_config_history_trigger ON customer.referral_config;
+CREATE TRIGGER referral_config_history_trigger
+AFTER INSERT OR UPDATE ON customer.referral_config
+FOR EACH ROW
+EXECUTE FUNCTION referral_config_history_trigger_func();
+
+-- =============================================================================
+-- Referral Info History Trigger
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION referral_info_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.referral_info_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE referral_id = OLD.referral_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.referral_info_history (
+        event_id,
+        referral_id,
+        referrer_user_id,
+        referee_user_id,
+        referral_code_used,
+        market_id,
+        referral_status,
+        bonus_credits_awarded,
+        bonus_plan_price,
+        bonus_rate_applied,
+        qualified_date,
+        rewarded_date,
+        reward_held_until,
+        expired_date,
+        cancelled_date,
+        transaction_id,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.referral_id,
+        NEW.referrer_user_id,
+        NEW.referee_user_id,
+        NEW.referral_code_used,
+        NEW.market_id,
+        NEW.referral_status,
+        NEW.bonus_credits_awarded,
+        NEW.bonus_plan_price,
+        NEW.bonus_rate_applied,
+        NEW.qualified_date,
+        NEW.rewarded_date,
+        NEW.reward_held_until,
+        NEW.expired_date,
+        NEW.cancelled_date,
+        NEW.transaction_id,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS referral_info_history_trigger ON customer.referral_info;
+CREATE TRIGGER referral_info_history_trigger
+AFTER INSERT OR UPDATE ON customer.referral_info
+FOR EACH ROW
+EXECUTE FUNCTION referral_info_history_trigger_func();

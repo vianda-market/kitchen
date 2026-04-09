@@ -74,5 +74,5 @@ class TestPasswordRecoveryService:
         ]
         assert len(user_update_calls) >= 1, "Expected UPDATE user_info to be called"
         update_sql = user_update_calls[0].args[0]
-        assert "status" in update_sql and "Active" in update_sql
+        assert "status" in update_sql and "active" in update_sql.lower()
         assert "email_verified" in update_sql and "email_verified_at" in update_sql

@@ -22,6 +22,10 @@ CREATE SCHEMA IF NOT EXISTS audit;     -- trigger-managed history (app never wri
 -- DROP TABLES FIRST (with CASCADE to handle dependencies)
 -- =============================================================================
 
+-- Drop ads platform tables
+DROP TABLE IF EXISTS core.ad_click_tracking CASCADE;
+DROP TABLE IF EXISTS core.ad_zone CASCADE;
+
 -- Drop dependent/history/resolution tables first
 DROP TABLE IF EXISTS audit.archival_config_history CASCADE;
 DROP TABLE IF EXISTS core.archival_config CASCADE;
@@ -64,6 +68,11 @@ DROP TABLE IF EXISTS customer.pickup_preferences CASCADE;
 DROP TABLE IF EXISTS client_payment_attempt CASCADE;
 DROP TABLE IF EXISTS billing.restaurant_transaction CASCADE;
 DROP TABLE IF EXISTS institution_payment_attempt CASCADE;
+DROP TABLE IF EXISTS customer.referral_code_assignment CASCADE;
+DROP TABLE IF EXISTS audit.referral_info_history CASCADE;
+DROP TABLE IF EXISTS audit.referral_config_history CASCADE;
+DROP TABLE IF EXISTS customer.referral_info CASCADE;
+DROP TABLE IF EXISTS customer.referral_config CASCADE;
 DROP TABLE IF EXISTS audit.discretionary_history CASCADE;
 DROP TABLE IF EXISTS billing.discretionary_info CASCADE;
 DROP TABLE IF EXISTS billing.client_transaction CASCADE;
@@ -138,6 +147,8 @@ DROP TABLE IF EXISTS role_info CASCADE;
 -- DROP ENUM TYPES (after dropping tables that use them)
 -- =============================================================================
 
+DROP TYPE IF EXISTS flywheel_state_enum CASCADE;
+DROP TYPE IF EXISTS referral_status_enum CASCADE;
 DROP TYPE IF EXISTS notification_banner_type_enum CASCADE;
 DROP TYPE IF EXISTS notification_banner_priority_enum CASCADE;
 DROP TYPE IF EXISTS notification_banner_action_status_enum CASCADE;
@@ -173,107 +184,107 @@ DROP TYPE IF EXISTS payment_frequency_enum CASCADE;
 
 \echo 'Creating enum type: address_type_enum'
 CREATE TYPE address_type_enum AS ENUM (
-    'Restaurant',
-    'Entity Billing',
-    'Entity Address',
-    'Customer Home',
-    'Customer Billing',
-    'Customer Employer',
-    'Customer Other'
+    'restaurant',
+    'entity_billing',
+    'entity_address',
+    'customer_home',
+    'customer_billing',
+    'customer_employer',
+    'customer_other'
 );
 
 \echo 'Creating enum type: status_enum'
 CREATE TYPE status_enum AS ENUM (
-    'Active',
-    'Inactive',
-    'Pending',
-    'Arrived',
-    'Handed Out',
-    'Completed',
-    'Cancelled',
-    'Processed'
+    'active',
+    'inactive',
+    'pending',
+    'arrived',
+    'handed_out',
+    'completed',
+    'cancelled',
+    'processed'
 );
 
 \echo 'Creating enum type: discretionary_status_enum'
 CREATE TYPE discretionary_status_enum AS ENUM (
-    'Pending',
-    'Cancelled',
-    'Approved',
-    'Rejected'
+    'pending',
+    'cancelled',
+    'approved',
+    'rejected'
 );
 
 \echo 'Creating enum type: bill_resolution_enum'
 CREATE TYPE bill_resolution_enum AS ENUM (
-    'Pending',
-    'Paid',
-    'Rejected',
-    'Failed'
+    'pending',
+    'paid',
+    'rejected',
+    'failed'
 );
 
 \echo 'Creating enum type: bill_payout_status_enum'
 CREATE TYPE bill_payout_status_enum AS ENUM (
-    'Pending',
-    'Completed',
-    'Failed'
+    'pending',
+    'completed',
+    'failed'
 );
 
 \echo 'Creating enum type: supplier_invoice_status_enum'
 CREATE TYPE supplier_invoice_status_enum AS ENUM (
-    'Pending Review',
-    'Approved',
-    'Rejected'
+    'pending_review',
+    'approved',
+    'rejected'
 );
 
 \echo 'Creating enum type: supplier_invoice_type_enum'
 CREATE TYPE supplier_invoice_type_enum AS ENUM (
-    'Factura Electronica',
-    'CPE',
-    '1099 NEC'
+    'factura_electronica',
+    'cpe',
+    '1099_nec'
 );
 
 \echo 'Creating enum type: role_type_enum'
 CREATE TYPE role_type_enum AS ENUM (
-    'Internal',
-    'Supplier',
-    'Customer',
-    'Employer'
+    'internal',
+    'supplier',
+    'customer',
+    'employer'
 );
 
 \echo 'Creating enum type: institution_type_enum'
 CREATE TYPE institution_type_enum AS ENUM (
-    'Internal',
-    'Customer',
-    'Supplier',
-    'Employer'
+    'internal',
+    'customer',
+    'supplier',
+    'employer'
 );
 
 \echo 'Creating enum type: role_name_enum'
 CREATE TYPE role_name_enum AS ENUM (
-    'Admin',
-    'Super Admin',
-    'Manager',
-    'Operator',
-    'Comensal',
-    'Global Manager'
+    'admin',
+    'super_admin',
+    'manager',
+    'operator',
+    'comensal',
+    'global_manager'
 );
 
 \echo 'Creating enum type: transaction_type_enum'
 CREATE TYPE transaction_type_enum AS ENUM (
-    'Order',
-    'Credit',
-    'Debit',
-    'Refund',
-    'Discretionary',
-    'Payment'
+    'order',
+    'credit',
+    'debit',
+    'refund',
+    'discretionary',
+    'payment'
 );
 
 \echo 'Creating enum type: kitchen_day_enum'
 CREATE TYPE kitchen_day_enum AS ENUM (
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday'
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday'
 );
 
 \echo 'Creating enum type: pickup_type_enum'
@@ -285,32 +296,32 @@ CREATE TYPE pickup_type_enum AS ENUM (
 
 \echo 'Creating enum type: street_type_enum'
 CREATE TYPE street_type_enum AS ENUM (
-    'St',
-    'Ave',
-    'Blvd',
-    'Rd',
-    'Dr',
-    'Ln',
-    'Way',
-    'Ct',
-    'Pl',
-    'Cir'
+    'st',
+    'ave',
+    'blvd',
+    'rd',
+    'dr',
+    'ln',
+    'way',
+    'ct',
+    'pl',
+    'cir'
 );
 
 \echo 'Creating enum type: audit_operation_enum'
 CREATE TYPE audit_operation_enum AS ENUM (
-    'CREATE',
-    'UPDATE',
-    'ARCHIVE',
-    'DELETE'
+    'create',
+    'update',
+    'archive',
+    'delete'
 );
 
 \echo 'Creating enum type: discretionary_reason_enum'
 CREATE TYPE discretionary_reason_enum AS ENUM (
-    'Marketing Campaign',
-    'Credit Refund',
-    'Order incorrectly marked as not collected',
-    'Full Order Refund'
+    'marketing_campaign',
+    'credit_refund',
+    'order_incorrectly_marked',
+    'full_order_refund'
 );
 
 \echo 'Creating enum type: favorite_entity_type_enum'
@@ -343,10 +354,10 @@ CREATE TYPE payment_frequency_enum AS ENUM ('daily', 'weekly', 'biweekly', 'mont
 
 \echo 'Creating enum type: employer_bill_payment_status_enum'
 CREATE TYPE employer_bill_payment_status_enum AS ENUM (
-    'Pending',
-    'Paid',
-    'Failed',
-    'Overdue'
+    'pending',
+    'paid',
+    'failed',
+    'overdue'
 );
 
 \echo 'Creating enum type: interest_type_enum'
@@ -377,6 +388,25 @@ CREATE TYPE notification_banner_action_status_enum AS ENUM (
     'expired'
 );
 
+\echo 'Creating enum type: referral_status_enum'
+CREATE TYPE referral_status_enum AS ENUM (
+    'pending',
+    'qualified',
+    'rewarded',
+    'expired',
+    'cancelled'
+);
+
+\echo 'Creating enum type: flywheel_state_enum'
+CREATE TYPE flywheel_state_enum AS ENUM (
+    'monitoring',
+    'supply_acquisition',
+    'demand_activation',
+    'growth',
+    'mature',
+    'paused'
+);
+
 -- =============================================================================
 -- CREATE TABLES (enum types now exist)
 -- =============================================================================
@@ -390,7 +420,7 @@ CREATE TABLE IF NOT EXISTS core.national_holidays (
     is_recurring BOOLEAN DEFAULT FALSE,
     recurring_month INTEGER CHECK (recurring_month IS NULL OR recurring_month BETWEEN 1 AND 12),
     recurring_day INTEGER CHECK (recurring_day IS NULL OR recurring_day BETWEEN 1 AND 31),
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN DEFAULT FALSE,
     created_date TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID NULL,
@@ -441,9 +471,9 @@ CREATE TABLE IF NOT EXISTS audit.national_holidays_history (
 CREATE TABLE IF NOT EXISTS core.institution_info (
     institution_id UUID PRIMARY KEY DEFAULT uuidv7(),
     name VARCHAR(50) NOT NULL,
-    institution_type institution_type_enum NOT NULL DEFAULT 'Supplier'::institution_type_enum,
+    institution_type institution_type_enum NOT NULL DEFAULT 'supplier'::institution_type_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     support_email_suppressed_until TIMESTAMPTZ NULL,
@@ -463,12 +493,12 @@ CREATE TABLE IF NOT EXISTS core.address_info (
     province VARCHAR(50) NOT NULL,
     city VARCHAR(50) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
-    street_type street_type_enum NOT NULL DEFAULT 'St'::street_type_enum,
+    street_type street_type_enum NOT NULL DEFAULT 'st'::street_type_enum,
     street_name VARCHAR(100) NOT NULL,
     building_number VARCHAR(20) NOT NULL,
     timezone VARCHAR(50) NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -517,7 +547,7 @@ CREATE TABLE IF NOT EXISTS core.employer_info (
     name VARCHAR(100) NOT NULL,
     address_id UUID NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -573,7 +603,7 @@ CREATE TABLE IF NOT EXISTS core.employer_benefits_program (
     -- Status
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -620,7 +650,7 @@ CREATE TABLE IF NOT EXISTS core.employer_domain (
     domain VARCHAR(255) NOT NULL UNIQUE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -673,8 +703,11 @@ CREATE TABLE IF NOT EXISTS core.user_info (
     employer_address_id UUID NULL REFERENCES core.address_info(address_id) ON DELETE SET NULL,
     support_email_suppressed_until TIMESTAMPTZ NULL,
     last_support_email_date TIMESTAMPTZ NULL,
+    -- Referral tracking
+    referral_code VARCHAR(20) UNIQUE,
+    referred_by_code VARCHAR(20),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -745,7 +778,7 @@ CREATE TABLE IF NOT EXISTS core.credit_currency_info (
     credit_value_local_currency NUMERIC NOT NULL,
     currency_conversion_usd NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -802,7 +835,7 @@ CREATE TABLE IF NOT EXISTS core.market_info (
     phone_dial_code VARCHAR(6) NULL,   -- E.164 country prefix e.g. '+54'; NULL for pseudo-markets
     phone_local_digits SMALLINT NULL,  -- Max national digits after dial code; UI maxLength hint e.g. 10
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -847,7 +880,7 @@ CREATE TABLE IF NOT EXISTS core.city_info (
     country_code VARCHAR(2) NOT NULL,
     province_code VARCHAR(10),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -955,6 +988,8 @@ CREATE TABLE IF NOT EXISTS audit.user_history (
     market_id UUID NOT NULL,
     city_id UUID NOT NULL,
     locale VARCHAR(5) NOT NULL CHECK (locale IN ('en', 'es', 'pt')),
+    referral_code VARCHAR(20),
+    referred_by_code VARCHAR(20),
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
@@ -976,7 +1011,7 @@ CREATE TABLE IF NOT EXISTS customer.credential_recovery (
     token_expiry TIMESTAMPTZ NOT NULL,
     is_used BOOLEAN NOT NULL DEFAULT FALSE,
     used_date TIMESTAMPTZ,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
@@ -993,7 +1028,7 @@ CREATE TABLE IF NOT EXISTS customer.email_change_request (
     token_expiry TIMESTAMPTZ NOT NULL,
     is_used BOOLEAN NOT NULL DEFAULT FALSE,
     used_date TIMESTAMPTZ,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
@@ -1013,7 +1048,8 @@ CREATE TABLE IF NOT EXISTS customer.pending_customer_signup (
     last_name VARCHAR(50),
     mobile_number VARCHAR(16) CHECK (mobile_number IS NULL OR mobile_number ~ E'^\\+[1-9][0-9]{6,14}$'),
     market_id UUID NOT NULL REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
-    city_id UUID NOT NULL REFERENCES core.city_info(city_id) ON DELETE RESTRICT
+    city_id UUID NOT NULL REFERENCES core.city_info(city_id) ON DELETE RESTRICT,
+    referral_code VARCHAR(20)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_code ON customer.pending_customer_signup(verification_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_email_active ON customer.pending_customer_signup(email) WHERE used = FALSE;
@@ -1029,7 +1065,7 @@ CREATE TABLE IF NOT EXISTS core.geolocation_info (
     viewport JSONB NULL,
     formatted_address_google VARCHAR(500) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1071,7 +1107,7 @@ CREATE TABLE IF NOT EXISTS ops.institution_entity_info (
     payout_aggregator          VARCHAR(50)  NULL,
     payout_onboarding_status   VARCHAR(50)  NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1117,7 +1153,7 @@ CREATE TABLE IF NOT EXISTS ops.cuisine (
     origin_source VARCHAR(20) NOT NULL DEFAULT 'seed' CHECK (origin_source IN ('seed', 'supplier')),
     display_order INT,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1126,7 +1162,7 @@ CREATE TABLE IF NOT EXISTS ops.cuisine (
 );
 CREATE INDEX IF NOT EXISTS idx_cuisine_slug ON ops.cuisine(slug);
 CREATE INDEX IF NOT EXISTS idx_cuisine_parent ON ops.cuisine(parent_cuisine_id) WHERE parent_cuisine_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_cuisine_active ON ops.cuisine(cuisine_id) WHERE NOT is_archived AND status = 'Active';
+CREATE INDEX IF NOT EXISTS idx_cuisine_active ON ops.cuisine(cuisine_id) WHERE NOT is_archived AND status = 'active';
 
 \echo 'Creating table: audit.cuisine_history'
 CREATE TABLE IF NOT EXISTS audit.cuisine_history (
@@ -1173,7 +1209,7 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_info (
     member_perks_i18n JSONB,
     require_kiosk_code_verification BOOLEAN NOT NULL DEFAULT FALSE,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
+    status status_enum NOT NULL DEFAULT 'pending'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1224,20 +1260,20 @@ CREATE TABLE IF NOT EXISTS ops.cuisine_suggestion (
     suggested_name VARCHAR(120) NOT NULL,
     suggested_by UUID NOT NULL REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     restaurant_id UUID REFERENCES ops.restaurant_info(restaurant_id) ON DELETE SET NULL,
-    suggestion_status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (suggestion_status IN ('Pending', 'Approved', 'Rejected')),
+    suggestion_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (suggestion_status IN ('pending', 'approved', 'rejected')),
     reviewed_by UUID REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     reviewed_date TIMESTAMPTZ,
     review_notes VARCHAR(500),
     resolved_cuisine_id UUID REFERENCES ops.cuisine(cuisine_id) ON DELETE SET NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
-CREATE INDEX IF NOT EXISTS idx_cuisine_suggestion_pending ON ops.cuisine_suggestion(suggestion_status) WHERE suggestion_status = 'Pending';
+CREATE INDEX IF NOT EXISTS idx_cuisine_suggestion_pending ON ops.cuisine_suggestion(suggestion_status) WHERE suggestion_status = 'pending';
 
 \echo 'Creating table: ops.qr_code'
 CREATE TABLE IF NOT EXISTS ops.qr_code (
@@ -1248,7 +1284,7 @@ CREATE TABLE IF NOT EXISTS ops.qr_code (
     image_storage_path VARCHAR(500) NOT NULL,
     qr_code_checksum VARCHAR(128),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1269,7 +1305,7 @@ CREATE TABLE IF NOT EXISTS ops.product_info (
     description_i18n JSONB,
     dietary TEXT[] NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     image_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
     image_checksum VARCHAR(128) NOT NULL DEFAULT '7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c',
     image_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
@@ -1322,7 +1358,7 @@ CREATE TABLE IF NOT EXISTS ops.plate_info (
     expected_payout_local_currency NUMERIC NOT NULL DEFAULT 0,
     delivery_time_minutes INTEGER NOT NULL DEFAULT 15,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1342,7 +1378,7 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_holidays (
     is_recurring BOOLEAN DEFAULT FALSE,
     recurring_month INTEGER CHECK (recurring_month IS NULL OR recurring_month BETWEEN 1 AND 12),
     recurring_day INTEGER CHECK (recurring_day IS NULL OR recurring_day BETWEEN 1 AND 31),
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -1381,7 +1417,7 @@ CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
     plate_kitchen_day_id UUID PRIMARY KEY DEFAULT uuidv7(),
     plate_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -1398,7 +1434,7 @@ CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
     plate_kitchen_day_id UUID NOT NULL,
     plate_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -1445,18 +1481,18 @@ CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
     pickup_intent VARCHAR(20) NOT NULL DEFAULT 'self' CHECK (pickup_intent IN ('offer', 'request', 'self')),
     flexible_on_time BOOLEAN NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_plate_selection_pickup_date_weekday CHECK (
         EXTRACT(ISODOW FROM pickup_date) = CASE kitchen_day
-            WHEN 'Monday' THEN 1
-            WHEN 'Tuesday' THEN 2
-            WHEN 'Wednesday' THEN 3
-            WHEN 'Thursday' THEN 4
-            WHEN 'Friday' THEN 5
+            WHEN 'monday' THEN 1
+            WHEN 'tuesday' THEN 2
+            WHEN 'wednesday' THEN 3
+            WHEN 'thursday' THEN 4
+            WHEN 'friday' THEN 5
         END
     ),
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
@@ -1483,7 +1519,7 @@ CREATE TABLE IF NOT EXISTS audit.plate_selection_history (
     pickup_intent VARCHAR(20) NOT NULL DEFAULT 'self',
     flexible_on_time BOOLEAN NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1548,7 +1584,7 @@ CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
     qr_code_id UUID NOT NULL,
     qr_code_payload VARCHAR(255) NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     was_collected BOOLEAN DEFAULT FALSE,
     arrival_time TIMESTAMPTZ,
     completion_time TIMESTAMPTZ,
@@ -1631,7 +1667,7 @@ CREATE TABLE IF NOT EXISTS customer.pickup_preferences (
     is_matched BOOLEAN DEFAULT FALSE,
     matched_with_preference_id UUID NULL, -- reference to matched preference
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1662,7 +1698,7 @@ CREATE TABLE IF NOT EXISTS customer.plan_info (
     rollover BOOLEAN NOT NULL DEFAULT TRUE,
     rollover_cap NUMERIC,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1716,7 +1752,7 @@ CREATE TABLE IF NOT EXISTS billing.discretionary_info (
     amount NUMERIC,
     comment TEXT,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status discretionary_status_enum NOT NULL DEFAULT 'Pending'::discretionary_status_enum,
+    status discretionary_status_enum NOT NULL DEFAULT 'pending'::discretionary_status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1755,9 +1791,9 @@ CREATE TABLE IF NOT EXISTS audit.discretionary_history (
 CREATE TABLE IF NOT EXISTS billing.discretionary_resolution_info (
     approval_id UUID PRIMARY KEY DEFAULT uuidv7(),
     discretionary_id UUID NOT NULL,
-    resolution discretionary_status_enum NOT NULL DEFAULT 'Pending'::discretionary_status_enum,
+    resolution discretionary_status_enum NOT NULL DEFAULT 'pending'::discretionary_status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     resolved_by UUID NOT NULL,
     resolved_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1792,7 +1828,7 @@ DECLARE
     v_changed_by UUID;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        v_operation := 'CREATE'::audit_operation_enum;
+        v_operation := 'create'::audit_operation_enum;
         v_changed_by := NEW.modified_by;
         INSERT INTO audit.discretionary_history (
             discretionary_id,
@@ -1831,7 +1867,7 @@ BEGIN
         );
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
-        v_operation := 'UPDATE'::audit_operation_enum;
+        v_operation := 'update'::audit_operation_enum;
         v_changed_by := NEW.modified_by;
         INSERT INTO audit.discretionary_history (
             discretionary_id,
@@ -1870,7 +1906,7 @@ BEGIN
         );
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
-        v_operation := 'DELETE'::audit_operation_enum;
+        v_operation := 'delete'::audit_operation_enum;
         v_changed_by := OLD.modified_by;
         INSERT INTO audit.discretionary_history (
             discretionary_id,
@@ -1926,7 +1962,7 @@ DECLARE
     v_changed_by UUID;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        v_operation := 'CREATE'::audit_operation_enum;
+        v_operation := 'create'::audit_operation_enum;
         v_changed_by := NEW.resolved_by;
         INSERT INTO audit.discretionary_resolution_history (
             approval_id,
@@ -1955,7 +1991,7 @@ BEGIN
         );
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
-        v_operation := 'UPDATE'::audit_operation_enum;
+        v_operation := 'update'::audit_operation_enum;
         v_changed_by := NEW.resolved_by;
         INSERT INTO audit.discretionary_resolution_history (
             approval_id,
@@ -1984,7 +2020,7 @@ BEGIN
         );
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
-        v_operation := 'DELETE'::audit_operation_enum;
+        v_operation := 'delete'::audit_operation_enum;
         v_changed_by := OLD.resolved_by;
         INSERT INTO audit.discretionary_resolution_history (
             approval_id,
@@ -2029,9 +2065,10 @@ CREATE TABLE IF NOT EXISTS billing.client_transaction (
     source VARCHAR(50) NOT NULL,  -- e.g., 'plate_selection' or 'discretionary_promotion'
     plate_selection_id UUID, -- references a plate_selection record when source = 'order'
     discretionary_id UUID, -- references a discretionary record when source = 'discretionary'
+    referral_id UUID, -- references a referral record when source = 'referral_program'
     credit NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2042,6 +2079,135 @@ CREATE TABLE IF NOT EXISTS billing.client_transaction (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
+-- =============================================================================
+-- REFERRAL SYSTEM
+-- =============================================================================
+
+\echo 'Creating table: customer.referral_config'
+CREATE TABLE IF NOT EXISTS customer.referral_config (
+    referral_config_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    market_id UUID NOT NULL,
+    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    referrer_bonus_rate INTEGER NOT NULL DEFAULT 15,
+    referrer_bonus_cap NUMERIC NULL,
+    referrer_monthly_cap INTEGER NULL DEFAULT 5,
+    min_plan_price_to_qualify NUMERIC NOT NULL DEFAULT 0,
+    cooldown_days INTEGER NOT NULL DEFAULT 0,
+    held_reward_expiry_hours INTEGER NOT NULL DEFAULT 48,
+    pending_expiry_days INTEGER NOT NULL DEFAULT 90,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_config_market_active ON customer.referral_config(market_id) WHERE is_archived = FALSE;
+
+\echo 'Creating table: customer.referral_info'
+CREATE TABLE IF NOT EXISTS customer.referral_info (
+    referral_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    referrer_user_id UUID NOT NULL,
+    referee_user_id UUID NOT NULL,
+    referral_code_used VARCHAR(20) NOT NULL,
+    market_id UUID NOT NULL,
+    referral_status referral_status_enum NOT NULL DEFAULT 'pending'::referral_status_enum,
+    bonus_credits_awarded NUMERIC NULL,
+    bonus_plan_price NUMERIC NULL,
+    bonus_rate_applied INTEGER NULL,
+    qualified_date TIMESTAMPTZ NULL,
+    rewarded_date TIMESTAMPTZ NULL,
+    reward_held_until TIMESTAMPTZ NULL,
+    expired_date TIMESTAMPTZ NULL,
+    cancelled_date TIMESTAMPTZ NULL,
+    transaction_id UUID NULL,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referrer_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (referee_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
+    FOREIGN KEY (transaction_id) REFERENCES billing.client_transaction(transaction_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_referral_info_referrer ON customer.referral_info(referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_info_referee ON customer.referral_info(referee_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_info_referee_unique ON customer.referral_info(referee_user_id) WHERE referral_status NOT IN ('cancelled');
+
+-- Deferred FK: client_transaction.referral_id -> referral_info (circular dependency)
+ALTER TABLE billing.client_transaction
+    ADD CONSTRAINT fk_client_transaction_referral
+    FOREIGN KEY (referral_id) REFERENCES customer.referral_info(referral_id) ON DELETE RESTRICT;
+
+\echo 'Creating table: audit.referral_config_history'
+CREATE TABLE IF NOT EXISTS audit.referral_config_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    referral_config_id UUID NOT NULL,
+    market_id UUID NOT NULL,
+    is_enabled BOOLEAN NOT NULL,
+    referrer_bonus_rate INTEGER NOT NULL,
+    referrer_bonus_cap NUMERIC NULL,
+    referrer_monthly_cap INTEGER NULL,
+    min_plan_price_to_qualify NUMERIC NOT NULL,
+    cooldown_days INTEGER NOT NULL,
+    held_reward_expiry_hours INTEGER NOT NULL,
+    pending_expiry_days INTEGER NOT NULL,
+    is_archived BOOLEAN NOT NULL,
+    status status_enum NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (referral_config_id) REFERENCES customer.referral_config(referral_config_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Creating table: audit.referral_info_history'
+CREATE TABLE IF NOT EXISTS audit.referral_info_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    referral_id UUID NOT NULL,
+    referrer_user_id UUID NOT NULL,
+    referee_user_id UUID NOT NULL,
+    referral_code_used VARCHAR(20) NOT NULL,
+    market_id UUID NOT NULL,
+    referral_status referral_status_enum NOT NULL,
+    bonus_credits_awarded NUMERIC NULL,
+    bonus_plan_price NUMERIC NULL,
+    bonus_rate_applied INTEGER NULL,
+    qualified_date TIMESTAMPTZ NULL,
+    rewarded_date TIMESTAMPTZ NULL,
+    reward_held_until TIMESTAMPTZ NULL,
+    transaction_id UUID NULL,
+    is_archived BOOLEAN NOT NULL,
+    status status_enum NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (referral_id) REFERENCES customer.referral_info(referral_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Creating table: customer.referral_code_assignment'
+CREATE TABLE IF NOT EXISTS customer.referral_code_assignment (
+    assignment_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    device_id VARCHAR(255) NOT NULL,
+    referral_code VARCHAR(20) NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_assignment_device_active ON customer.referral_code_assignment(device_id) WHERE used = FALSE;
+CREATE INDEX IF NOT EXISTS idx_referral_assignment_created ON customer.referral_code_assignment(created_at);
+
 \echo 'Creating table: customer.subscription_info'
 CREATE TABLE IF NOT EXISTS customer.subscription_info (
     subscription_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -2050,12 +2216,12 @@ CREATE TABLE IF NOT EXISTS customer.subscription_info (
     plan_id UUID NOT NULL,
     renewal_date TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'),
     balance NUMERIC DEFAULT 0,
-    subscription_status VARCHAR(20) NOT NULL DEFAULT 'Pending',  -- 'Active', 'On Hold', 'Pending', 'Cancelled'
+    subscription_status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'active', 'on_hold', 'pending', 'cancelled'
     hold_start_date TIMESTAMPTZ,  -- When subscription was put on hold
     hold_end_date TIMESTAMPTZ,    -- When subscription will resume (NULL = indefinite)
     early_renewal_threshold INTEGER DEFAULT 10,  -- NULL = period-end only; >= 1 = early renew when balance below this
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,  -- Keep for backward compatibility
+    status status_enum NOT NULL DEFAULT 'pending'::status_enum,  -- Keep for backward compatibility
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2125,7 +2291,7 @@ CREATE TABLE IF NOT EXISTS customer.payment_method (
     method_type_id UUID,
     address_id UUID,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
+    status status_enum NOT NULL DEFAULT 'pending'::status_enum,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -2160,7 +2326,7 @@ CREATE TABLE IF NOT EXISTS customer.user_payment_provider (
     provider             VARCHAR(50)  NOT NULL,   -- 'stripe', 'paypal', etc.
     provider_customer_id VARCHAR(255) NOT NULL,
     is_archived          BOOLEAN NOT NULL DEFAULT FALSE,
-    status               status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status               status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by           UUID NULL,
     modified_by          UUID NOT NULL,
@@ -2209,7 +2375,7 @@ CREATE TABLE IF NOT EXISTS billing.client_bill_info (
     amount NUMERIC NOT NULL,
     currency_code VARCHAR(10),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2263,7 +2429,7 @@ CREATE TABLE IF NOT EXISTS billing.restaurant_transaction (
     currency_code VARCHAR(10),
     final_amount NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Pending'::status_enum,
+    status status_enum NOT NULL DEFAULT 'pending'::status_enum,
     created_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2283,7 +2449,7 @@ CREATE TABLE IF NOT EXISTS billing.restaurant_balance_info (
     balance NUMERIC NOT NULL,
     currency_code VARCHAR(10) NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2323,8 +2489,8 @@ CREATE TABLE IF NOT EXISTS billing.institution_bill_info (
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
-    resolution bill_resolution_enum NOT NULL DEFAULT 'Pending'::bill_resolution_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    resolution bill_resolution_enum NOT NULL DEFAULT 'pending'::bill_resolution_enum,
     tax_doc_external_id VARCHAR(255),
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -2370,7 +2536,7 @@ CREATE TABLE IF NOT EXISTS billing.institution_bill_payout (
     provider_transfer_id VARCHAR(255) NULL,
     amount               NUMERIC     NOT NULL,
     currency_code        VARCHAR(10) NOT NULL,
-    status               bill_payout_status_enum NOT NULL DEFAULT 'Pending'::bill_payout_status_enum,
+    status               bill_payout_status_enum NOT NULL DEFAULT 'pending'::bill_payout_status_enum,
     idempotency_key      VARCHAR(255) NOT NULL UNIQUE,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at         TIMESTAMPTZ NULL,
@@ -2410,7 +2576,7 @@ CREATE TABLE IF NOT EXISTS billing.institution_settlement (
     settlement_run_id UUID,
     institution_bill_id UUID,
     country_code VARCHAR(10) NOT NULL,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -2480,7 +2646,7 @@ CREATE TABLE IF NOT EXISTS billing.supplier_invoice (
     document_format         VARCHAR(20) NULL,
 
     -- Review
-    status                  supplier_invoice_status_enum NOT NULL DEFAULT 'Pending Review'::supplier_invoice_status_enum,
+    status                  supplier_invoice_status_enum NOT NULL DEFAULT 'pending_review'::supplier_invoice_status_enum,
     rejection_reason        TEXT        NULL,
     reviewed_by             UUID        NULL,
     reviewed_at             TIMESTAMPTZ NULL,
@@ -2615,10 +2781,10 @@ CREATE TABLE IF NOT EXISTS billing.employer_bill (
     billed_amount NUMERIC NOT NULL DEFAULT 0,
     currency_code VARCHAR(10) NOT NULL,
     stripe_invoice_id VARCHAR(255) NULL,
-    payment_status employer_bill_payment_status_enum NOT NULL DEFAULT 'Pending'::employer_bill_payment_status_enum,
+    payment_status employer_bill_payment_status_enum NOT NULL DEFAULT 'pending'::employer_bill_payment_status_enum,
     paid_date TIMESTAMPTZ NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2697,7 +2863,7 @@ CREATE TABLE IF NOT EXISTS billing.supplier_terms (
     invoice_hold_days       INTEGER     NULL CHECK (invoice_hold_days IS NULL OR invoice_hold_days > 0),
     -- Audit
     is_archived             BOOLEAN     NOT NULL DEFAULT FALSE,
-    status                  status_enum NOT NULL DEFAULT 'Active'::status_enum,
+    status                  status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by              UUID        NULL,
     modified_by             UUID        NOT NULL,
@@ -2811,6 +2977,84 @@ CREATE TABLE IF NOT EXISTS ops.ingredient_nutrition (
 );
 CREATE INDEX IF NOT EXISTS idx_ingredient_nutrition_ingredient_id
     ON ops.ingredient_nutrition (ingredient_id);
+
+-- =============================================================================
+-- ADS PLATFORM TABLES
+-- =============================================================================
+
+\echo 'Creating table: core.ad_click_tracking'
+CREATE TABLE IF NOT EXISTS core.ad_click_tracking (
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL REFERENCES core.user_info(user_id),
+    subscription_id UUID,
+    -- Google identifiers
+    gclid VARCHAR(255),
+    wbraid VARCHAR(255),
+    gbraid VARCHAR(255),
+    -- Meta identifiers
+    fbclid VARCHAR(255),
+    fbc VARCHAR(500),
+    fbp VARCHAR(255),
+    -- Dedup
+    event_id VARCHAR(255),
+    -- Shared
+    landing_url TEXT,
+    source_platform VARCHAR(20),
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Per-platform upload status
+    google_upload_status VARCHAR(50) DEFAULT 'pending',
+    google_uploaded_at TIMESTAMPTZ,
+    meta_upload_status VARCHAR(50) DEFAULT 'pending',
+    meta_uploaded_at TIMESTAMPTZ,
+    -- Timestamps
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ad_click_tracking_subscription
+    ON core.ad_click_tracking(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_ad_click_tracking_user
+    ON core.ad_click_tracking(user_id);
+CREATE INDEX IF NOT EXISTS idx_ad_click_tracking_pending
+    ON core.ad_click_tracking(google_upload_status)
+    WHERE google_upload_status = 'pending' OR meta_upload_status = 'pending';
+
+\echo 'Creating table: core.ad_zone'
+CREATE TABLE IF NOT EXISTS core.ad_zone (
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- Identity
+    name VARCHAR(100) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
+    city_name VARCHAR(100) NOT NULL,
+    neighborhood VARCHAR(100),
+    -- Geometry
+    latitude NUMERIC(10,7) NOT NULL,
+    longitude NUMERIC(10,7) NOT NULL,
+    radius_km NUMERIC(4,2) NOT NULL DEFAULT 2.0,
+    -- Flywheel state
+    flywheel_state flywheel_state_enum NOT NULL DEFAULT 'monitoring',
+    state_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    state_changed_by UUID REFERENCES core.user_info(user_id),
+    -- Metrics (updated by cron/advisor)
+    notify_me_lead_count INTEGER DEFAULT 0,
+    active_restaurant_count INTEGER DEFAULT 0,
+    active_subscriber_count INTEGER DEFAULT 0,
+    estimated_mau INTEGER,
+    mau_estimated_at TIMESTAMPTZ,
+    -- Budget
+    budget_allocation JSONB DEFAULT '{"b2c_subscriber": 0, "b2b_employer": 0, "b2b_restaurant": 100}',
+    daily_budget_cents INTEGER,
+    -- Ad platform references
+    meta_ad_set_ids JSONB DEFAULT '{}',
+    google_campaign_ids JSONB DEFAULT '{}',
+    -- Creation
+    created_by VARCHAR(30) NOT NULL DEFAULT 'operator',
+    approved_by UUID REFERENCES core.user_info(user_id),
+    -- Timestamps
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ad_zone_state ON core.ad_zone(flywheel_state);
+CREATE INDEX IF NOT EXISTS idx_ad_zone_country ON core.ad_zone(country_code);
 
 -- ─────────────────────────────────────────────────────────────
 -- IAM admin grants — applied when GCP IAM user exists

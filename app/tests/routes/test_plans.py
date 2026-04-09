@@ -18,8 +18,8 @@ from app.services.crud_service import plan_service
 def mock_employee_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Internal",
-        "role_name": "Admin",
+        "role_type": "internal",
+        "role_name": "admin",
         "institution_id": str(uuid4()),
     }
 
@@ -108,7 +108,7 @@ class TestPlanCreateRolloverDefaults:
         created.rollover = True
         created.rollover_cap = None
         created.is_archived = False
-        created.status = "Active"
+        created.status = "active"
         created.created_date = "2026-01-01T00:00:00Z"
         created.modified_date = "2026-01-01T00:00:00Z"
         created.modified_by = uuid4()

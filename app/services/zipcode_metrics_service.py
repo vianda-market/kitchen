@@ -39,15 +39,15 @@ def get_zipcode_metrics(
         WHERE a.country_code = %s
           AND a.is_archived = FALSE
           AND r.is_archived = FALSE
-          AND r.status = 'Active'
+          AND r.status = 'active'
           AND EXISTS (
             SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
             SELECT 1 FROM qr_code qc
-            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
+            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
           )
         ORDER BY a.postal_code
     """
@@ -73,15 +73,15 @@ def get_zipcode_metrics(
           AND a.postal_code = %s
           AND a.is_archived = FALSE
           AND r.is_archived = FALSE
-          AND r.status = 'Active'
+          AND r.status = 'active'
           AND EXISTS (
             SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'Active'
+            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
             SELECT 1 FROM qr_code qc
-            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'Active'
+            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
           )
     """
     count_row = db_read(query_count, (country, matched_zipcode), connection=db, fetch_one=True)

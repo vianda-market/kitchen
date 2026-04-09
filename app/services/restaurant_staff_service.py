@@ -59,7 +59,7 @@ def get_daily_orders(
     kitchen_day = _get_kitchen_day_for_date(order_date, user_institution_entity_id, db)
 
     # kitchen_day_enum only has Monday-Friday; weekends have no kitchen days
-    if kitchen_day not in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'):
+    if kitchen_day not in ('monday', 'tuesday', 'wednesday', 'thursday', 'friday'):
         log_info(f"No kitchen days on {kitchen_day}; returning empty orders for date={order_date}")
         from datetime import timezone as tz
         return {
@@ -278,7 +278,7 @@ def _group_orders_by_restaurant(rows: List[Dict[str, Any]]) -> List[Dict[str, An
             summary['pending'] += 1
         elif status_lower == 'arrived':
             summary['arrived'] += 1
-        elif status_lower == 'handed out':
+        elif status_lower in ('handed_out', 'handed out'):
             summary['handed_out'] += 1
         elif status_lower in ('complete', 'completed'):
             summary['completed'] += 1
@@ -394,7 +394,7 @@ def verify_and_handoff(
         INNER JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
         WHERE ppl.confirmation_code = %s
           AND ppl.restaurant_id = %s
-          AND ppl.status = 'Arrived'
+          AND ppl.status = 'arrived'
           AND ppl.is_archived = FALSE
           AND ps.kitchen_day = %s
         """,
@@ -412,7 +412,7 @@ def verify_and_handoff(
         db_write(
             """
             UPDATE plate_pickup_live
-            SET status = 'Handed Out', handed_out_time = %s,
+            SET status = 'handed_out', handed_out_time = %s,
                 code_verified = TRUE, code_verified_time = %s,
                 modified_by = %s, modified_date = CURRENT_TIMESTAMP
             WHERE plate_pickup_id = %s
@@ -449,7 +449,7 @@ def verify_and_handoff(
         "customer_initials": customer_initials,
         "plate_pickup_ids": pickup_ids,
         "plates": plates,
-        "status": "Handed Out",
+        "status": "handed_out",
         "arrival_time": first_row['arrival_time'],
         "expected_completion_time": first_row['expected_completion_time'],
         "handed_out_time": now,
@@ -483,14 +483,14 @@ def hand_out_pickup(
     )
     if not row:
         raise HTTPException(status_code=404, detail="Pickup not found")
-    if row['status'] != 'Arrived':
+    if row['status'] != 'arrived':
         raise HTTPException(status_code=400, detail=f"Cannot hand out pickup with status {row['status']}")
 
     now = datetime.now()
     db_write(
         """
         UPDATE plate_pickup_live
-        SET status = 'Handed Out', handed_out_time = %s,
+        SET status = 'handed_out', handed_out_time = %s,
             modified_by = %s, modified_date = CURRENT_TIMESTAMP
         WHERE plate_pickup_id = %s
         """,
@@ -509,7 +509,7 @@ def hand_out_pickup(
         log_warning(f"Push notification failed for hand-out {plate_pickup_id}: {push_err}")
 
     log_info(f"Hand-out: pickup={plate_pickup_id}, handed_out_time={now}")
-    return {"status": "Handed Out", "handed_out_time": now}
+    return {"status": "handed_out", "handed_out_time": now}
 
 
 def _get_institution_entity_for_restaurant(

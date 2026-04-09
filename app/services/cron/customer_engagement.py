@@ -104,13 +104,13 @@ def run_customer_engagement() -> Dict[str, Any]:
                    u.support_email_suppressed_until, u.last_support_email_date,
                    u.locale
             FROM core.user_info u
-            WHERE u.role_type = 'Customer'
-              AND u.status = 'Active'
+            WHERE u.role_type = 'customer'
+              AND u.status = 'active'
               AND NOT u.is_archived
               AND NOT EXISTS (
                   SELECT 1 FROM customer.subscription_info s
                   WHERE s.user_id = u.user_id
-                    AND s.subscription_status = 'Active'
+                    AND s.subscription_status = 'active'
                     AND NOT s.is_archived
               )
             """,

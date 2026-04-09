@@ -83,7 +83,7 @@ class TestAddressService:
             mock_address_service.create.return_value = mock_address
             mock_address_service.get_by_id.return_value = mock_address
             mock_get_timezone.return_value = "America/New_York"
-            mock_derive.return_value = ["Restaurant"]  # Derived from linkage
+            mock_derive.return_value = ["restaurant"]  # Derived from linkage
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_geocode_api.return_value = {"latitude": 40.7128, "longitude": -74.0060}
             mock_geo_service.create.return_value = mock_geolocation
@@ -129,7 +129,7 @@ class TestAddressService:
             mock_address_service.create.return_value = mock_address
             mock_address_service.get_by_id.return_value = mock_address
             mock_get_timezone.return_value = "America/New_York"
-            mock_derive.return_value = ["Restaurant"]
+            mock_derive.return_value = ["restaurant"]
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_geocode_api.return_value = None  # API failure
             mock_db_read.return_value = None
@@ -151,7 +151,7 @@ class TestAddressService:
             "building_number": "123",
             "street_name": "Main St",
             # Missing city, province, country
-            "address_type": ["Restaurant"]
+            "address_type": ["restaurant"]
         }
         
         # Act & Assert
@@ -281,7 +281,7 @@ class TestAddressService:
                     "province": "NY",
                     "city": "New York",
                     "postal_code": "10001",
-                    "street_type": "St",
+                    "street_type": "st",
                     "street_name": "Main",
                     "building_number": "123",
                     "floor": "2",
@@ -289,7 +289,7 @@ class TestAddressService:
                     "is_default": True,
                     "timezone": "America/New_York",
                     "is_archived": False,
-                    "status": "Active",
+                    "status": "active",
                     "created_date": datetime.now(timezone.utc),
                     "modified_by": sample_current_user["user_id"],
                     "modified_date": datetime.now(timezone.utc),

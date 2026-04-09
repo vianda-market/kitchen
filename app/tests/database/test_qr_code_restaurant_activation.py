@@ -44,9 +44,9 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
             address_id, institution_id, user_id, address_type, country_code,
             province, city, postal_code, street_type, street_name, building_number,
             timezone, is_archived, status, modified_by
-        ) VALUES (%s, %s, %s, ARRAY['Restaurant']::address_type_enum[], 'GL',
-            'Prov', 'City', '12345', 'St'::street_type_enum, 'Main', '1',
-            'UTC', FALSE, 'Active'::status_enum, %s)
+        ) VALUES (%s, %s, %s, ARRAY['restaurant']::address_type_enum[], 'GL',
+            'Prov', 'City', '12345', 'st'::street_type_enum, 'Main', '1',
+            'UTC', FALSE, 'active'::status_enum, %s)
         """,
         (address_id, str(SEED_INSTITUTION_VIANDA_ID), modified_by, modified_by),
     )
@@ -58,7 +58,7 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
             institution_entity_id, institution_id, address_id, credit_currency_id,
             tax_id, name, is_archived, status, modified_by
         ) VALUES (%s, %s, %s, '55555555-5555-5555-5555-555555555555',
-            'TAX1', 'Test Entity', FALSE, 'Active'::status_enum, %s)
+            'TAX1', 'Test Entity', FALSE, 'active'::status_enum, %s)
         """,
         (inst_entity_id, str(SEED_INSTITUTION_VIANDA_ID), address_id, modified_by),
     )
@@ -69,7 +69,7 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
         INSERT INTO restaurant_info (
             restaurant_id, institution_id, institution_entity_id, address_id,
             name, is_archived, status, modified_by
-        ) VALUES (%s, %s, %s, %s, 'QR Test Restaurant', FALSE, 'Active'::status_enum, %s)
+        ) VALUES (%s, %s, %s, %s, 'QR Test Restaurant', FALSE, 'active'::status_enum, %s)
         """,
         (restaurant_id, str(SEED_INSTITUTION_VIANDA_ID), inst_entity_id, address_id, modified_by),
     )
@@ -81,7 +81,7 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
             qr_code_id, restaurant_id, qr_code_payload, qr_code_image_url,
             image_storage_path, is_archived, status, modified_by
         ) VALUES (%s, %s, %s, 'http://example.com/qr.png', '/qr.png',
-            FALSE, 'Active'::status_enum, %s)
+            FALSE, 'active'::status_enum, %s)
         """,
         (qr_code_id, restaurant_id, f"restaurant_id:{restaurant_id}", modified_by),
     )
@@ -105,11 +105,11 @@ class TestQRCodeAutoDeactivationTrigger:
                 "SELECT status FROM restaurant_info WHERE restaurant_id = %s",
                 (restaurant_id,),
             )
-            assert cursor.fetchone()[0] == "Active"
+            assert cursor.fetchone()[0] == "active"
 
             cursor.execute(
                 """
-                UPDATE qr_code SET status = 'Inactive'::status_enum
+                UPDATE qr_code SET status = 'inactive'::status_enum
                 WHERE qr_code_id = %s
                 """,
                 (qr_code_id,),
@@ -121,7 +121,7 @@ class TestQRCodeAutoDeactivationTrigger:
             )
             row = cursor.fetchone()
             assert row is not None
-            assert row[0] == "Inactive", "Trigger should set restaurant to Inactive when last QR goes Inactive"
+            assert row[0] == "inactive", "Trigger should set restaurant to Inactive when last QR goes Inactive"
         finally:
             cursor.close()
 
@@ -145,6 +145,6 @@ class TestQRCodeAutoDeactivationTrigger:
             )
             row = cursor.fetchone()
             assert row is not None
-            assert row[0] == "Inactive", "Trigger should set restaurant to Inactive when last QR is archived"
+            assert row[0] == "inactive", "Trigger should set restaurant to Inactive when last QR is archived"
         finally:
             cursor.close()

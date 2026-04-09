@@ -181,7 +181,7 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
                     "minimum_fee_applied": True,
                     "billed_amount": adjustment,
                     "currency_code": "USD",
-                    "payment_status": "Pending",
+                    "payment_status": "pending",
                     "status": Status.ACTIVE.value,
                     "modified_by": str(SYSTEM_USER_ID),
                 }

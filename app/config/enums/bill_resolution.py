@@ -12,10 +12,10 @@ from enum import Enum
 
 class BillResolution(str, Enum):
     """Valid resolution values for institution bills."""
-    PENDING = "Pending"
-    PAID = "Paid"
-    REJECTED = "Rejected"
-    FAILED = "Failed"
+    PENDING = "pending"
+    PAID = "paid"
+    REJECTED = "rejected"
+    FAILED = "failed"
 
     @classmethod
     def values(cls) -> list[str]:

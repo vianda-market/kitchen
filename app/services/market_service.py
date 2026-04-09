@@ -75,7 +75,7 @@ def get_markets_with_coverage(db) -> List[dict]:
         SELECT m.country_code, m.country_name, m.language,
                m.phone_dial_code, m.phone_local_digits
         FROM market_info m
-        WHERE m.status = 'Active'
+        WHERE m.status = 'active'
           AND m.is_archived = FALSE
           AND m.market_id != %s
           AND EXISTS (
@@ -85,10 +85,10 @@ def get_markets_with_coverage(db) -> List[dict]:
               JOIN plate_info p ON p.restaurant_id = r.restaurant_id
               JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
               WHERE i.market_id = m.market_id
-                AND i.status = 'Active' AND i.is_archived = FALSE
-                AND r.status = 'Active' AND r.is_archived = FALSE
+                AND i.status = 'active' AND i.is_archived = FALSE
+                AND r.status = 'active' AND r.is_archived = FALSE
                 AND p.is_archived = FALSE
-                AND pkd.status = 'Active' AND pkd.is_archived = FALSE
+                AND pkd.status = 'active' AND pkd.is_archived = FALSE
           )
         ORDER BY m.country_name
     """

@@ -24,18 +24,18 @@ STATUS_CONTEXTS: Dict[str, List["Status"]] = {
 class Status(str, Enum):
     """Valid status values - fixed at compile time"""
     # General statuses (user, institution, product, etc.)
-    ACTIVE = "Active"
-    INACTIVE = "Inactive"
-    
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
     # Order / plate pickup statuses
-    PENDING = "Pending"
-    ARRIVED = "Arrived"
-    HANDED_OUT = "Handed Out"
-    COMPLETED = "Completed"
-    CANCELLED = "Cancelled"
-    
+    PENDING = "pending"
+    ARRIVED = "arrived"
+    HANDED_OUT = "handed_out"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
     # Transaction / bill statuses
-    PROCESSED = "Processed"
+    PROCESSED = "processed"
 
     @classmethod
     def values(cls) -> list[str]:

@@ -72,7 +72,7 @@ class PendingOrdersResponse(BaseModel):
     plate_pickup_ids: Optional[List[UUID]] = Field(None, description="IDs for POST /plate-pickup/{id}/complete")
     orders: List[PlateOrderSummary]
     pickup_window: PickupTimeWindow  # Informational only
-    status: str  # "Pending" or "Arrived"
+    status: str  # "pending" or "arrived"
     created_date: datetime
 
 class ScanQRResponse(BaseModel):
@@ -144,7 +144,7 @@ def get_enriched_plate_pickups_endpoint(
         user_id = None
         
         # For Customers, apply user-level filtering
-        if current_user.get("role_type") == "Customer":
+        if current_user.get("role_type") == "customer":
             try:
                 user_id_value = current_user["user_id"]
                 # Check if it's already a UUID object, otherwise convert from string
@@ -195,7 +195,7 @@ def hand_out_order(
 
     def _hand_out():
         # Validate user is Supplier or Internal
-        if current_user["role_type"] not in ("Supplier", "Internal"):
+        if current_user["role_type"] not in ("supplier", "internal"):
             raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
         return hand_out_pickup(pickup_id, current_user["user_id"], db)
 

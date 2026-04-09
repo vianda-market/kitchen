@@ -64,8 +64,8 @@ class TestUserProfileService:
         """Sample current user dict for testing."""
         return {
             "user_id": uuid4(),
-            "role_type": "Customer",
-            "role_name": "Comensal",
+            "role_type": "customer",
+            "role_name": "comensal",
             "institution_id": uuid4()
         }
 
@@ -147,8 +147,8 @@ class TestUserProfileService:
             institution_id=uuid4(),
             user_id=user_id,
             employer_id=employer_id,
-            address_type=["Customer Employer"],
-            street_type="St",
+            address_type=["customer_employer"],
+            street_type="st",
             street_name="Test St",
             building_number="123",
             city="Buenos Aires",
@@ -230,8 +230,8 @@ class TestUserProfileService:
             institution_id=uuid4(),
             user_id=user_id,
             employer_id=employer_id,
-            address_type=["Customer Employer"],
-            street_type="St",
+            address_type=["customer_employer"],
+            street_type="st",
             street_name="Test St",
             building_number="123",
             city="Buenos Aires",

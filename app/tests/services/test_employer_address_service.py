@@ -50,7 +50,7 @@ class TestEmployerAddressService:
             province="Buenos Aires",
             city="Buenos Aires",
             postal_code="1000",
-            street_type="St",
+            street_type="st",
             street_name="Test Street",
             building_number="123",
             apartment_unit=None,
@@ -67,8 +67,8 @@ class TestEmployerAddressService:
         """Sample current user dict for testing."""
         return {
             "user_id": uuid4(),
-            "role_type": "Customer",
-            "role_name": "Comensal",
+            "role_type": "customer",
+            "role_name": "comensal",
             "institution_id": uuid4()
         }
 
@@ -155,7 +155,7 @@ class TestEmployerAddressService:
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "St",
+            "street_type": "st",
             "street_name": "Test Street",
             "building_number": "123"
         }
@@ -226,7 +226,7 @@ class TestEmployerAddressService:
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "St",
+            "street_type": "st",
             "street_name": "Test Street",
             "building_number": "123",
             "employer_id": employer_id,
@@ -261,12 +261,12 @@ class TestEmployerAddressService:
         address_data = {
             "institution_id": str(uuid4()),
             "user_id": str(sample_current_user["user_id"]),
-            "address_type": ["Customer Home"],  # Client may send; route strips it
+            "address_type": ["customer_home"],  # Client may send; route strips it
             "country": "Argentina",
             "province": "Buenos Aires",
             "city": "Buenos Aires",
             "postal_code": "1000",
-            "street_type": "St",
+            "street_type": "st",
             "street_name": "Test Street",
             "building_number": "123",
         }

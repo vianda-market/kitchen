@@ -108,7 +108,7 @@ def _validate_user_update_market_id(update_data: dict, current_user: dict) -> No
     role_name = current_user.get("role_name")
     rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
     # Only Admin roles (Super Admin, Internal Admin, Supplier Admin) can assign Global; Manager/Operator cannot
-    if is_global_market(market_id) and rn_str not in ("Super Admin", "Admin"):
+    if is_global_market(market_id) and rn_str not in ("super_admin", "admin"):
         raise HTTPException(
             status_code=403,
             detail="Only Admin or Super Admin can assign Global market. Managers and Operators cannot assign themselves or others to Global.",
@@ -200,7 +200,7 @@ def list_users(
 ):
     """List all users. Non-archived only."""
     # Use institution scope for Internal users/Suppliers, user scope for Customers
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         # Customers can only see themselves
         def _get_users():
             user = user_service.get_by_id(current_user["user_id"], db, scope=None)
@@ -273,7 +273,7 @@ def search_users_route(
 
     # Effective institution: Internal users may pass any; non-Internal users only their own (resolve_institution_filter).
     if institution_id is not None:
-        if current_user.get("role_type") == "Internal":
+        if current_user.get("role_type") == "internal":
             effective_institution_id = institution_id
         else:
             effective_institution_id = resolve_institution_filter(institution_id, scope)
@@ -281,10 +281,10 @@ def search_users_route(
         effective_institution_id = None
 
     # market_id: market-scoped Internal users (Manager, Operator) may only pass one of their assigned markets.
-    if market_id is not None and current_user.get("role_type") == "Internal":
+    if market_id is not None and current_user.get("role_type") == "internal":
         role_name = current_user.get("role_name")
         rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-        if rn_str in ("Manager", "Operator"):
+        if rn_str in ("manager", "operator"):
             assigned = get_assigned_market_ids(
                 current_user["user_id"], db, fallback_primary=current_user.get("market_id")
             )
@@ -357,7 +357,7 @@ def update_current_user_profile(
     update_data.pop("password", None)
     update_data.pop("hashed_password", None)
     # Customers (Comensal, Customer Employer) and Suppliers: market is non-editable; only paid upgrade flow can add markets
-    if current_user.get("role_type") in ("Customer", "Supplier"):
+    if current_user.get("role_type") in ("customer", "supplier"):
         update_data.pop("market_id", None)
         update_data.pop("market_ids", None)
     _validate_user_update_market_id(update_data, current_user)
@@ -370,7 +370,7 @@ def update_current_user_profile(
     role_name = current_user.get("role_name")
     rt_str = (role_type.value if hasattr(role_type, "value") else str(role_type)) if role_type else ""
     rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-    if rt_str == "Customer" and rn_str == "Comensal" and "city_id" in update_data:
+    if rt_str == "customer" and rn_str == "comensal" and "city_id" in update_data:
         if update_data["city_id"] is None:
             raise HTTPException(status_code=400, detail="City is required and cannot be removed")
         cid = update_data["city_id"] if isinstance(update_data["city_id"], UUID) else UUID(str(update_data["city_id"]))
@@ -586,7 +586,7 @@ def assign_my_employer(
         f"employer_id={body.employer_id} address_id={body.address_id}"
     )
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type in ("Supplier", "Internal", "Employer"):
+    if role_type in ("supplier", "internal", "employer"):
         raise HTTPException(
             status_code=403,
             detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign an employer.",
@@ -739,7 +739,7 @@ def get_enriched_user_by_id_route(
         )
 
     # Apply user scoping for Customers and Internal Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -790,7 +790,7 @@ def get_user_by_id(
         )
 
     # Apply user scoping for Customers and Internal Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         # Customers and Internal Operators can only access their own user_id, so scope is None (no institution filtering needed)
@@ -830,7 +830,7 @@ def create(
 ):
     """Create a new user - Restricted to Internal users and Suppliers (Admin/Manager only)"""
     # Customers cannot create users
-    if current_user.get("role_type") == "Customer":
+    if current_user.get("role_type") == "customer":
         raise HTTPException(
             status_code=403,
             detail="Forbidden: customers cannot create users"
@@ -841,7 +841,7 @@ def create(
     user_data = user.model_dump()
     rt = user_data.get("role_type")
     rt_str = rt.value if hasattr(rt, "value") else str(rt)
-    if rt_str == "Customer":
+    if rt_str == "customer":
         raise HTTPException(
             status_code=400,
             detail="Customers must self-register via POST /customers/signup/request and /verify.",
@@ -867,7 +867,7 @@ def create(
         user_data.get("role_name"),
     )
     ensure_employer_not_for_supplier_employee(user_data.get("role_type"), user_data.get("employer_id"), context="create")
-    if rt_str in ("Supplier", "Internal", "Employer"):
+    if rt_str in ("supplier", "internal", "employer"):
         user_data["employer_id"] = None
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
@@ -911,7 +911,7 @@ def update(
 
     ensure_supplier_can_create_edit_users(current_user)
     # Apply user scoping for Customers and Internal Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None  # No institution filtering needed for Customers and Internal Operators
@@ -961,7 +961,7 @@ def update(
         existing_role_type = existing_role_type.value
     if "employer_id" in update_data:
         ensure_employer_not_for_supplier_employee(existing_role_type, update_data["employer_id"], context="update")
-    if existing_role_type in ("Supplier", "Internal", "Employer"):
+    if existing_role_type in ("supplier", "internal", "employer"):
         update_data.pop("employer_id", None)
     # When clearing employer, also clear employer_address_id
     if "employer_id" in update_data and update_data["employer_id"] is None:
@@ -976,7 +976,7 @@ def update(
         )
 
     # Target user is Customer (Comensal or Customer Employer) or Supplier: market is non-editable; only paid upgrade flow can add markets
-    if existing_role_type in ("Customer", "Supplier"):
+    if existing_role_type in ("customer", "supplier"):
         update_data.pop("market_id", None)
         update_data.pop("market_ids", None)
     _validate_user_update_market_id(update_data, current_user)
@@ -987,7 +987,7 @@ def update(
     # Customer Comensal: cannot remove city or set to Global (B2B updating Customer)
     existing_role_name = getattr(existing_user, "role_name", None)
     rn_str = (existing_role_name.value if hasattr(existing_role_name, "value") else str(existing_role_name)) if existing_role_name else ""
-    if existing_role_type == "Customer" and rn_str == "Comensal" and "city_id" in update_data:
+    if existing_role_type == "customer" and rn_str == "comensal" and "city_id" in update_data:
         if update_data["city_id"] is None:
             raise HTTPException(status_code=400, detail="City is required and cannot be removed")
         cid = update_data["city_id"] if isinstance(update_data["city_id"], UUID) else UUID(str(update_data["city_id"]))
@@ -1033,7 +1033,7 @@ def resend_user_invite(
     role_name = current_user.get("role_name")
 
     ensure_supplier_can_reset_user_password(current_user)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -1094,7 +1094,7 @@ def reset_user_password(
     current_user_id = current_user["user_id"]
 
     ensure_supplier_can_reset_user_password(current_user)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None
@@ -1146,7 +1146,7 @@ def delete_user(
     
     ensure_supplier_can_create_edit_users(current_user)
     # Apply user scoping for Customers and Internal Operators (self-only access)
-    if role_type == "Customer" or (role_type == "Internal" and role_name == "Operator"):
+    if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)
         user_scope.enforce_user(user_id)
         scope = None  # No institution filtering needed for Customers and Internal Operators

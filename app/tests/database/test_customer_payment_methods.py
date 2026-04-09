@@ -26,7 +26,7 @@ class TestUserPaymentProviderTable:
             INSERT INTO user_info (
                 user_id, institution_id, role_type, role_name,
                 username, email, hashed_password, market_id, modified_by
-            ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+            ) VALUES (%s, %s, 'customer'::role_type_enum, 'comensal'::role_name_enum,
                 %s, %s, 'hash', %s::uuid, %s)
             """,
             (
@@ -189,7 +189,7 @@ class TestCustomerPaymentMethodFlow:
             INSERT INTO user_info (
                 user_id, institution_id, role_type, role_name,
                 username, email, hashed_password, market_id, modified_by
-            ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+            ) VALUES (%s, %s, 'customer'::role_type_enum, 'comensal'::role_name_enum,
                 %s, %s, 'hash', %s::uuid, %s)
             """,
             (
@@ -213,7 +213,7 @@ class TestCustomerPaymentMethodFlow:
             cur.execute(
                 """
                 INSERT INTO payment_method (payment_method_id, user_id, method_type, is_archived, status, is_default, modified_by)
-                VALUES (%s, %s, 'Stripe', false, 'Active'::status_enum, true, %s)
+                VALUES (%s, %s, 'stripe', false, 'active'::status_enum, true, %s)
                 """,
                 (str(pm_id), str(user_id), admin_id),
             )
@@ -250,7 +250,7 @@ class TestCustomerPaymentMethodFlow:
             cur.execute(
                 """
                 INSERT INTO payment_method (payment_method_id, user_id, method_type, is_archived, status, is_default, modified_by)
-                VALUES (%s, %s, 'Stripe', false, 'Active'::status_enum, true, %s)
+                VALUES (%s, %s, 'stripe', false, 'active'::status_enum, true, %s)
                 """,
                 (str(pm_id), str(user_id), admin_id),
             )
@@ -288,8 +288,8 @@ class TestCustomerPaymentMethodFlow:
             cur.execute(
                 """
                 INSERT INTO payment_method (payment_method_id, user_id, method_type, is_archived, status, is_default, modified_by)
-                VALUES (%s, %s, 'Stripe', false, 'Active'::status_enum, true, %s),
-                       (%s, %s, 'Stripe', false, 'Active'::status_enum, false, %s)
+                VALUES (%s, %s, 'stripe', false, 'active'::status_enum, true, %s),
+                       (%s, %s, 'stripe', false, 'active'::status_enum, false, %s)
                 """,
                 (str(pm1), str(user_id), admin_id, str(pm2), str(user_id), admin_id),
             )

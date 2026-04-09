@@ -10,16 +10,16 @@ from enum import Enum
 class TransactionType(str, Enum):
     """Valid transaction types - fixed at compile time"""
     # Restaurant transaction types
-    ORDER = "Order"
-    
+    ORDER = "order"
+
     # Client transaction types
-    CREDIT = "Credit"
-    DEBIT = "Debit"
-    REFUND = "Refund"
-    DISCRETIONARY = "Discretionary"
-    
+    CREDIT = "credit"
+    DEBIT = "debit"
+    REFUND = "refund"
+    DISCRETIONARY = "discretionary"
+
     # Institution transaction types
-    PAYMENT = "Payment"
+    PAYMENT = "payment"
 
     @classmethod
     def values(cls) -> list[str]:

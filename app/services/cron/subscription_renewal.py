@@ -60,6 +60,15 @@ def run_subscription_renewals() -> Dict[str, Any]:
                     commit=True,
                 )
                 result["renewed_count"] += 1
+                # Best-effort ads conversion tracking (non-blocking)
+                try:
+                    import asyncio
+                    from app.services.ads.subscription_ads_hook import notify_ads_subscription_renewed
+                    asyncio.get_event_loop().create_task(
+                        notify_ads_subscription_renewed(subscription_id, connection)
+                    )
+                except Exception as ads_err:
+                    log_warning(f"Ads renewal tracking failed for {subscription_id}: {ads_err}")
             except Exception as e:
                 log_error(f"Subscription renewal failed for {subscription_id}: {e}")
                 result["errors"].append(f"{subscription_id}: {e}")

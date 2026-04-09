@@ -69,7 +69,7 @@ def approve_discretionary_request(
     
     Super-admin approves the request, which:
     1. Creates a resolution record
-    2. Updates request status to 'Approved'
+    2. Updates request status to 'approved'
     3. Creates appropriate transaction (client or restaurant)
     4. Updates balances automatically via existing services
     """
@@ -95,7 +95,7 @@ def reject_discretionary_request(
     
     Super-admin rejects the request, which:
     1. Creates a resolution record with rejection reason
-    2. Updates request status to 'Rejected'
+    2. Updates request status to 'rejected'
     3. No credits are loaded
     """
     log_info(f"Super-admin {current_user['user_id']} rejecting discretionary request {request_id}")
@@ -121,7 +121,7 @@ def get_pending_discretionary_requests(
     """
     log_info(f"Super-admin {current_user['user_id']} retrieving pending discretionary requests")
     all_enriched = get_enriched_discretionary_requests(db, include_archived=False)
-    pending = [r for r in all_enriched if (getattr(r.status, "value", r.status) or "") == "Pending"]
+    pending = [r for r in all_enriched if (getattr(r.status, "value", r.status) or "") == "pending"]
     summary_requests = [
         DiscretionarySummarySchema(
             discretionary_id=r.discretionary_id,

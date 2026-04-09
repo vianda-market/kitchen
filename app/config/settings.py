@@ -189,6 +189,55 @@ class Settings(BaseSettings):
     CAPTCHA_MAX_TRACKED_IPS: int = 10_000
     CAPTCHA_EVICTION_AGE_SECONDS: int = 1800
 
+    # --- Ads Platform: Shared Infrastructure ---
+    ADS_ENABLED_PLATFORMS: str = ""          # Comma-separated: "google,meta" or "" (disabled)
+    ADS_DRY_RUN: bool = False               # Log payloads without uploading (all platforms)
+
+    # --- Ads Platform: Redis / ARQ ---
+    REDIS_URL: str = "redis://localhost:6379"
+    ARQ_MAX_JOBS: int = 100
+    ARQ_JOB_TIMEOUT: int = 300              # Seconds per job
+    ARQ_MAX_RETRIES: int = 3
+
+    # --- Ads Platform: Google Ads ---
+    GOOGLE_ADS_PROVIDER: str = "mock"       # "mock" | "live"
+    GOOGLE_ADS_CUSTOMER_ID: str = ""
+    GOOGLE_ADS_CONVERSION_ACTION_ID: str = ""
+    GOOGLE_ADS_DEVELOPER_TOKEN: str = ""    # Local dev only; prod uses Secret Manager
+    GOOGLE_ADS_UPLOAD_DELAY_HOURS: int = 24
+
+    # --- Ads Platform: Meta Ads ---
+    META_ADS_PROVIDER: str = "mock"         # "mock" | "live"
+    META_ADS_PIXEL_ID: str = ""
+    META_ADS_AD_ACCOUNT_ID: str = ""
+    META_ADS_SYSTEM_USER_TOKEN: str = ""    # Local dev only; prod uses Secret Manager
+    META_ADS_APP_SECRET: str = ""           # Local dev only
+    META_ADS_UPLOAD_DELAY_MINUTES: int = 5
+    META_ADS_API_VERSION: str = "v25.0"
+
+    # --- Ads Platform: Geographic Zones ---
+    ZONE_MIN_RADIUS_KM: float = 1.5
+    ZONE_DEFAULT_RADIUS_KM: float = 2.0
+    ZONE_MIN_ESTIMATED_MAU: int = 40_000
+    ZONE_BUDGET_FLOOR_SMALL_RADIUS: int = 5000   # Cents/day for radius < 2km
+    ZONE_BUDGET_FLOOR_LARGE_RADIUS: int = 3000   # Cents/day for radius >= 2km
+    ZONE_DBSCAN_MIN_LEADS: int = 40
+    ZONE_DBSCAN_EPSILON_KM: float = 2.0
+    ZONE_MAU_CACHE_TTL_HOURS: int = 24
+
+    # --- Ads Platform: Marketing Collateral ---
+    GCS_MARKETING_BUCKET: str = ""
+    CREATIVE_SYNC_INTERVAL_HOURS: int = 24
+    CREATIVE_CRITIQUE_MIN_IMPRESSIONS: int = 5000
+    CREATIVE_AUTO_PUBLISH_MIN_SCORE: int = 7
+
+    # --- Ads Platform: Gemini Advisor ---
+    GEMINI_MODEL_ANALYSIS: str = "gemini-2.5-flash"
+    GEMINI_MODEL_CREATIVE: str = "gemini-2.5-pro"
+    GEMINI_ADVISOR_INTERVAL_HOURS: int = 1
+    GEMINI_BUDGET_CHANGE_LIMIT_PCT: float = 0.20
+    GEMINI_STRATEGY_SHIFT_LIMIT_PCT: float = 0.10
+
 settings = Settings()
 
 # Common email providers that cannot be registered as employer domains

@@ -46,8 +46,8 @@ def _create_benefit_employee(
 
     user_data = {
         "institution_id": str(institution_id),
-        "role_type": "Customer",
-        "role_name": "Comensal",
+        "role_type": "customer",
+        "role_name": "comensal",
         "username": employee_data["email"].lower().strip(),
         "email": employee_data["email"].lower().strip(),
         "hashed_password": hashed,
@@ -258,7 +258,7 @@ def list_benefit_employees(
         LEFT JOIN subscription_info s ON u.user_id = s.user_id AND s.is_archived = FALSE
         LEFT JOIN plan_info p ON s.plan_id = p.plan_id
         WHERE u.institution_id = %s::uuid
-          AND u.role_type = 'Customer'
+          AND u.role_type = 'customer'
           AND u.is_archived = FALSE
         ORDER BY u.created_date DESC
         """,

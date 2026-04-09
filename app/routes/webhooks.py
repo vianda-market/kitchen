@@ -69,7 +69,7 @@ def _handle_payment_intent_succeeded(
         log_info(f"Stripe webhook: subscription {subscription_id} already succeeded (idempotent)")
         return
 
-    if sp_row["subscription_status"] == "Active":
+    if sp_row["subscription_status"] == "active":
         log_info(f"Stripe webhook: subscription {subscription_id} already Active (idempotent)")
         return
 
@@ -91,6 +91,21 @@ def _handle_payment_intent_succeeded(
         )
         db.commit()
         log_info(f"Stripe webhook: activated subscription {subscription_id}")
+        # Best-effort referral reward processing (non-blocking)
+        try:
+            from app.services.referral_service import process_referral_reward
+            process_referral_reward(UUID(str(user_id)), db)
+        except Exception as ref_err:
+            log_warning(f"Referral reward processing failed for user {user_id}: {ref_err}")
+        # Best-effort ads conversion tracking (non-blocking)
+        try:
+            import asyncio
+            from app.services.ads.subscription_ads_hook import notify_ads_subscription_activated
+            asyncio.get_event_loop().create_task(
+                notify_ads_subscription_activated(subscription_id, db)
+            )
+        except Exception as ads_err:
+            log_warning(f"Ads conversion tracking failed for subscription {subscription_id}: {ads_err}")
     except Exception as e:
         db.rollback()
         log_warning(
@@ -227,8 +242,8 @@ def _handle_transfer_reversed(
             cur.execute(
                 """
                 UPDATE billing.institution_bill_payout
-                SET status = 'Failed'
-                WHERE provider_transfer_id = %s AND status != 'Failed'
+                SET status = 'failed'
+                WHERE provider_transfer_id = %s AND status != 'failed'
                 RETURNING institution_bill_id
                 """,
                 (transfer_id,),
@@ -239,8 +254,8 @@ def _handle_transfer_reversed(
                 cur.execute(
                     """
                     UPDATE billing.institution_bill_info
-                    SET resolution = 'Failed', modified_date = CURRENT_TIMESTAMP
-                    WHERE institution_bill_id = %s AND resolution = 'Pending'
+                    SET resolution = 'failed', modified_date = CURRENT_TIMESTAMP
+                    WHERE institution_bill_id = %s AND resolution = 'pending'
                     """,
                     (str(bill_id),),
                 )
@@ -269,8 +284,8 @@ def _handle_connect_payout_paid(
             cur.execute(
                 """
                 UPDATE billing.institution_bill_payout
-                SET status = 'Completed', completed_at = %s
-                WHERE provider_transfer_id = %s AND status = 'Pending'
+                SET status = 'completed', completed_at = %s
+                WHERE provider_transfer_id = %s AND status = 'pending'
                 RETURNING institution_bill_id
                 """,
                 (now, payout_id),
@@ -281,8 +296,8 @@ def _handle_connect_payout_paid(
                 cur.execute(
                     """
                     UPDATE billing.institution_bill_info
-                    SET resolution = 'Paid', modified_date = CURRENT_TIMESTAMP
-                    WHERE institution_bill_id = %s AND resolution = 'Pending'
+                    SET resolution = 'paid', modified_date = CURRENT_TIMESTAMP
+                    WHERE institution_bill_id = %s AND resolution = 'pending'
                     """,
                     (str(bill_id),),
                 )
@@ -307,8 +322,8 @@ def _handle_connect_payout_failed(
             cur.execute(
                 """
                 UPDATE billing.institution_bill_payout
-                SET status = 'Failed'
-                WHERE provider_transfer_id = %s AND status = 'Pending'
+                SET status = 'failed'
+                WHERE provider_transfer_id = %s AND status = 'pending'
                 RETURNING institution_bill_id
                 """,
                 (payout_id,),
@@ -319,8 +334,8 @@ def _handle_connect_payout_failed(
                 cur.execute(
                     """
                     UPDATE billing.institution_bill_info
-                    SET resolution = 'Failed', modified_date = CURRENT_TIMESTAMP
-                    WHERE institution_bill_id = %s AND resolution = 'Pending'
+                    SET resolution = 'failed', modified_date = CURRENT_TIMESTAMP
+                    WHERE institution_bill_id = %s AND resolution = 'pending'
                     """,
                     (str(bill_id),),
                 )

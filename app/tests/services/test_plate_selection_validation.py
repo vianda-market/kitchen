@@ -20,16 +20,16 @@ class TestValidatePickupTimeRange:
 
     def test_valid_window_ar_monday_passes(self):
         """AR market Monday: 12:00-12:15 is within 11:30-13:30."""
-        validate_pickup_time_range("AR", "Monday", date(2026, 3, 9), "12:00-12:15")
+        validate_pickup_time_range("AR", "monday", date(2026, 3, 9), "12:00-12:15")
 
     def test_valid_window_us_friday_passes(self):
         """US market Friday: 11:30-11:45 is valid."""
-        validate_pickup_time_range("US", "Friday", date(2026, 3, 13), "11:30-11:45")
+        validate_pickup_time_range("US", "friday", date(2026, 3, 13), "11:30-11:45")
 
     def test_invalid_window_raises_400(self):
         """Window outside allowed range raises 400 with allowed windows in detail."""
         with pytest.raises(HTTPException) as exc_info:
-            validate_pickup_time_range("AR", "Monday", date(2026, 3, 9), "08:00-08:15")
+            validate_pickup_time_range("AR", "monday", date(2026, 3, 9), "08:00-08:15")
         assert exc_info.value.status_code == 400
         assert "08:00-08:15" in str(exc_info.value.detail)
         assert "11:30" in str(exc_info.value.detail) or "Allowed" in str(exc_info.value.detail)
@@ -37,13 +37,13 @@ class TestValidatePickupTimeRange:
     def test_empty_pickup_time_range_raises_422(self):
         """Empty or missing pickup_time_range raises 422."""
         with pytest.raises(HTTPException) as exc_info:
-            validate_pickup_time_range("AR", "Monday", date(2026, 3, 9), "")
+            validate_pickup_time_range("AR", "monday", date(2026, 3, 9), "")
         assert exc_info.value.status_code == 422
 
     def test_unknown_country_raises_400(self):
         """Unknown country returns no windows -> 400."""
         with pytest.raises(HTTPException) as exc_info:
-            validate_pickup_time_range("XX", "Monday", date(2026, 3, 9), "12:00-12:15")
+            validate_pickup_time_range("XX", "monday", date(2026, 3, 9), "12:00-12:15")
         assert exc_info.value.status_code == 400
         assert "No pickup windows" in str(exc_info.value.detail)
 
@@ -62,45 +62,45 @@ class TestOneWeekAheadOrderWindow:
         """From Saturday, ordering for Monday (2 days ahead) is allowed."""
         plate = self._make_plate()
         result = determine_target_kitchen_day(
-            target_day="Monday",
+            target_day="monday",
             plate=plate,
-            current_day="Saturday",
-            available_kitchen_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            current_day="saturday",
+            available_kitchen_days=["monday", "tuesday", "wednesday", "thursday", "friday"],
             country_code="AR",
             db=None,
             timezone_str="America/Argentina/Buenos_Aires",
         )
-        assert result == "Monday"
+        assert result == "monday"
 
     @freeze_time("2026-03-03 12:00:00")  # Tuesday March 3
     def test_tuesday_to_next_monday_allowed(self):
         """From Tuesday, ordering for next Monday (6 days ahead) is allowed."""
         plate = self._make_plate()
         result = determine_target_kitchen_day(
-            target_day="Monday",
+            target_day="monday",
             plate=plate,
-            current_day="Tuesday",
-            available_kitchen_days=["Monday", "Wednesday", "Friday"],
+            current_day="tuesday",
+            available_kitchen_days=["monday", "wednesday", "friday"],
             country_code="AR",
             db=None,
             timezone_str="America/Argentina/Buenos_Aires",
         )
-        assert result == "Monday"
+        assert result == "monday"
 
     @freeze_time("2026-03-03 15:00:00")  # Tuesday March 3, 3pm
     def test_tuesday_to_next_tuesday_allowed(self):
         """From Tuesday 3pm, ordering for next Tuesday (7 days ahead) is allowed."""
         plate = self._make_plate()
         result = determine_target_kitchen_day(
-            target_day="Tuesday",
+            target_day="tuesday",
             plate=plate,
-            current_day="Tuesday",
-            available_kitchen_days=["Tuesday"],
+            current_day="tuesday",
+            available_kitchen_days=["tuesday"],
             country_code="AR",
             db=None,
             timezone_str="America/Argentina/Buenos_Aires",
         )
-        assert result == "Tuesday"
+        assert result == "tuesday"
 
     @freeze_time("2026-03-07 12:00:00")  # Saturday March 7
     def test_saturday_without_timezone_rejects(self):
@@ -108,10 +108,10 @@ class TestOneWeekAheadOrderWindow:
         plate = self._make_plate()
         with pytest.raises(HTTPException) as exc_info:
             determine_target_kitchen_day(
-                target_day="Monday",
+                target_day="monday",
                 plate=plate,
-                current_day="Saturday",
-                available_kitchen_days=["Monday"],
+                current_day="saturday",
+                available_kitchen_days=["monday"],
                 country_code="AR",
                 db=None,
                 timezone_str=None,
@@ -124,10 +124,10 @@ class TestOneWeekAheadOrderWindow:
         plate = self._make_plate()
         with pytest.raises(HTTPException) as exc_info:
             determine_target_kitchen_day(
-                target_day="Monday",
+                target_day="monday",
                 plate=plate,
-                current_day="Tuesday",
-                available_kitchen_days=["Tuesday", "Wednesday"],
+                current_day="tuesday",
+                available_kitchen_days=["tuesday", "wednesday"],
                 country_code="AR",
                 db=None,
                 timezone_str="America/Argentina/Buenos_Aires",

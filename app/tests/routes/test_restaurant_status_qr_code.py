@@ -16,8 +16,8 @@ from app.auth.dependencies import get_current_user, oauth2_scheme
 def mock_current_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Internal",
-        "role_name": "Admin",
+        "role_type": "internal",
+        "role_name": "admin",
         "institution_id": str(uuid4()),
     }
 
@@ -59,7 +59,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
 
         resp = client_with_auth.put(
             f"/api/v1/restaurants/{restaurant_id}",
-            json={"status": "Active"},
+            json={"status": "active"},
         )
         assert resp.status_code == 400
         assert "QR code" in resp.json().get("detail", "")
@@ -81,7 +81,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
 
         resp = client_with_auth.put(
             f"/api/v1/restaurants/{restaurant_id}",
-            json={"status": "Active"},
+            json={"status": "active"},
         )
         assert resp.status_code == 400
         assert "plate_kitchen_days" in resp.json().get("detail", "")
@@ -103,7 +103,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
 
         resp = client_with_auth.put(
             f"/api/v1/restaurants/{restaurant_id}",
-            json={"status": "Active"},
+            json={"status": "active"},
         )
         assert resp.status_code == 400
         detail = resp.json().get("detail", "")
@@ -127,7 +127,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
             restaurant_id=restaurant_id,
             institution_id=inst_id,
             institution_entity_id=inst_entity_id,
-            status="Pending",
+            status="pending",
             name="Test",
         )
         mock_has_pkd.return_value = True
@@ -138,7 +138,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
             restaurant_id=restaurant_id,
             institution_id=inst_id,
             institution_entity_id=inst_entity_id,
-            status="Active",
+            status="active",
             name="Test",
             address_id=addr_id,
             cuisine=None,
@@ -148,7 +148,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
                 "restaurant_id": restaurant_id,
                 "institution_id": str(inst_id),
                 "institution_entity_id": str(inst_entity_id),
-                "status": "Active",
+                "status": "active",
                 "name": "Test",
                 "address_id": str(addr_id),
                 "cuisine": None,
@@ -163,7 +163,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
 
         resp = client_with_auth.put(
             f"/api/v1/restaurants/{restaurant_id}",
-            json={"status": "Active"},
+            json={"status": "active"},
         )
         assert resp.status_code == 200
         mock_restaurant_service.update.assert_called_once()

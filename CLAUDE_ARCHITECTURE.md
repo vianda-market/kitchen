@@ -204,7 +204,7 @@ Enterprise meal subscription benefits — employers subsidize employee meal plan
 - **B2B login restriction:** Customer Comensals blocked from B2B platform login when `x-client-type: b2b` header is sent. Returns structured 403 with app store URLs.
 - **Benefit employee invite:** Dedicated email template via `email_service.send_benefit_employee_invite_email()` with app download links.
 - **Benefit plans endpoint:** `GET /subscriptions/benefit-plans` in `route_factory.py` returns plans with employer/employee split breakdown for B2C app.
-- **Enums:** `benefit_cap_period_enum` (per_renewal, monthly), `enrollment_mode_enum` (managed, domain_gated), `billing_cycle_enum` (daily, weekly, monthly), `employer_bill_payment_status_enum` (Pending, Paid, Failed, Overdue)
+- **Enums:** `benefit_cap_period_enum` (per_renewal, monthly), `enrollment_mode_enum` (managed, domain_gated), `billing_cycle_enum` (daily, weekly, monthly), `employer_bill_payment_status_enum` (pending, paid, failed, overdue)
 - **Roadmap:** `docs/plans/vianda_employer_benefits_program.md`
 
 ---
@@ -284,7 +284,7 @@ QR-code-based pickup confirmation flow for the B2C mobile app.
 
 Tablet/phone-optimized views for restaurant operators handling pickups during service hours.
 
-- **Handed Out status:** New `status_enum` value. Lifecycle: `Pending → Arrived → Handed Out → Completed`. Separates "customer is here" from "plate was given" from "customer confirms."
+- **Handed Out status:** New `status_enum` value. Lifecycle: `pending → arrived → handed_out → completed`. Separates "customer is here" from "plate was given" from "customer confirms."
 - **Numeric confirmation codes:** 6-digit numeric (not alphanumeric) for fast kiosk entry. Generated in `_generate_confirmation_code()` in `plate_pickup_service.py`.
 - **Enhanced daily-orders:** `GET /api/v1/restaurant-staff/daily-orders` now includes per-order: `plate_pickup_id`, `expected_completion_time`, `completion_time`, `countdown_seconds`, `extensions_used`, `was_collected`, `confirmation_code`, `pickup_type`. Per-restaurant: `pickup_window_start/end`, `require_kiosk_code_verification`. Response: `server_time` for timer sync. Privacy: initials only (M.G.).
 - **Verify-and-handoff:** `POST /api/v1/restaurant-staff/verify-and-handoff` — Layer 2 code verification. Clerk enters numeric code, system verifies and transitions to Handed Out. Consumes the code.

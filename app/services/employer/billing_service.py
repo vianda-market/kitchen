@@ -68,7 +68,7 @@ def _get_renewal_events(
         JOIN user_info u ON sh.user_id = u.user_id
         JOIN plan_info p ON si.plan_id = p.plan_id
         WHERE u.institution_id = %s::uuid
-          AND u.role_type = 'Customer'
+          AND u.role_type = 'customer'
           AND sh.balance > 0
           AND sh.modified_date >= %s
           AND sh.modified_date < %s
@@ -157,7 +157,7 @@ def generate_employer_bill(
         "minimum_fee_applied": minimum_fee_applied,
         "billed_amount": float(billed_amount),
         "currency_code": currency_code,
-        "payment_status": "Pending",
+        "payment_status": "pending",
         "status": Status.ACTIVE.value,
         "modified_by": str(modified_by),
     }

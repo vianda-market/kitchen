@@ -95,7 +95,7 @@ class TestBuildWhereClause:
         institution_id = str(uuid4())
         scope = InstitutionScope(
             institution_id=institution_id,
-            role_type="Supplier"
+            role_type="supplier"
         )
         where_clause, params = enriched_service._build_where_clause(
             scope=scope
@@ -103,13 +103,13 @@ class TestBuildWhereClause:
         assert "tt.institution_id = %s::uuid" in where_clause
         assert len(params) == 1
         assert params[0] == institution_id
-    
+
     def test_build_where_clause_global_scope(self, enriched_service):
         """Test WHERE clause with global scope (Internal Admin)"""
         scope = InstitutionScope(
             institution_id=str(uuid4()),
-            role_type="Internal",
-            role_name="Admin"  # Internal Admin has global access
+            role_type="internal",
+            role_name="admin"  # Internal Admin has global access
         )
         where_clause, params = enriched_service._build_where_clause(
             scope=scope
@@ -136,7 +136,7 @@ class TestBuildWhereClause:
         """Test WHERE clause when no institution column is configured"""
         scope = InstitutionScope(
             institution_id=str(uuid4()),
-            role_type="Supplier"
+            role_type="supplier"
         )
         where_clause, params = enriched_service_no_institution._build_where_clause(
             scope=scope
@@ -247,10 +247,10 @@ class TestGetEnriched:
         institution_id = str(uuid4())
         scope = InstitutionScope(
             institution_id=institution_id,
-            role_type="Supplier"
+            role_type="supplier"
         )
         mock_db_read.return_value = []
-        
+
         enriched_service.get_enriched(
             mock_db,
             select_fields=["tt.id", "tt.name"],
@@ -364,10 +364,10 @@ class TestGetEnrichedById:
         institution_id = str(uuid4())
         scope = InstitutionScope(
             institution_id=institution_id,
-            role_type="Supplier"
+            role_type="supplier"
         )
         mock_db_read.return_value = None
-        
+
         enriched_service.get_enriched_by_id(
             record_id,
             mock_db,

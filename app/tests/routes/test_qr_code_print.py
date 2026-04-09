@@ -15,8 +15,8 @@ from app.schemas.consolidated_schemas import QRCodePrintContextSchema
 def mock_current_user():
     return {
         "user_id": str(uuid4()),
-        "role_type": "Internal",
-        "role_name": "Admin",
+        "role_type": "internal",
+        "role_name": "admin",
         "institution_id": str(uuid4()),
     }
 
@@ -45,7 +45,7 @@ def _sample_print_ctx() -> QRCodePrintContextSchema:
         restaurant_id=uuid4(),
         restaurant_name="Test Bistro",
         country_code="US",
-        street_type="St",
+        street_type="st",
         street_name="Main",
         building_number="10",
         city="New York",

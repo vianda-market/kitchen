@@ -31,10 +31,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Grilled Chicken',
@@ -49,7 +49,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             # Main query, then reservations_by_plate, then live_locked_count (per restaurant)
             mock_db_read.side_effect = [mock_rows, [], {"count": 1}]
             
@@ -72,10 +72,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'M',
                 'last_initial': 'G',
                 'plate_name': 'Pasta',
@@ -90,7 +90,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.side_effect = [mock_rows, [], {"count": 1}]
             
             # Act
@@ -109,7 +109,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.return_value = []
             
             # Act
@@ -133,7 +133,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.return_value = []
             
             # Act
@@ -158,10 +158,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
@@ -173,10 +173,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'DEF456',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:30-13:00',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
@@ -188,10 +188,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'GHI789',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '13:00-13:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
@@ -206,7 +206,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             # Main query, then 2 restaurants: reservations + live each
             mock_db_read.side_effect = [mock_rows, [], {"count": 2}, [], {"count": 1}]
             
@@ -236,10 +236,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,  # Pending
-                'pickup_time_range': '23:00-23:30',
-                'kitchen_day': 'Tuesday',
+                'pickup_time_range': '23:55-23:59',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
@@ -251,10 +251,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'DEF456',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': datetime(2026, 2, 4, 12, 15),  # Arrived
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
@@ -266,10 +266,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'GHI789',
-                'status': 'Completed',
+                'status': 'completed',
                 'arrival_time': datetime(2026, 2, 4, 12, 0),
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
@@ -284,7 +284,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.side_effect = [mock_rows, [], {"count": 3}]
             
             # Act
@@ -307,10 +307,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'GHI789',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '13:00-13:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',
@@ -322,10 +322,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
@@ -337,10 +337,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'DEF456',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:30-13:00',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
@@ -355,7 +355,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.side_effect = [mock_rows, [], {"count": 3}]
             
             # Act
@@ -376,7 +376,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.return_value = []
             
             # Act
@@ -395,7 +395,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.return_value = []
             
             # Act
@@ -407,7 +407,7 @@ class TestRestaurantStaffService:
             params = call_args[0][1]
             
             assert 'ps.kitchen_day = %s' in query
-            assert 'Tuesday' in params
+            assert 'tuesday' in params
 
     def test_excludes_archived_records(self, mock_db):
         """Test that archived records are excluded from results."""
@@ -418,7 +418,7 @@ class TestRestaurantStaffService:
         with patch('app.services.restaurant_staff_service._get_kitchen_day_for_date') as mock_get_day, \
              patch('app.services.restaurant_staff_service.db_read') as mock_db_read:
             
-            mock_get_day.return_value = 'Tuesday'
+            mock_get_day.return_value = 'tuesday'
             mock_db_read.return_value = []
             
             # Act
@@ -442,7 +442,7 @@ class TestRestaurantStaffService:
              patch('app.services.restaurant_staff_service.get_kitchen_day_for_date') as mock_get_kitchen_day:
             
             mock_db_read.return_value = mock_timezone_result
-            mock_get_kitchen_day.return_value = 'Tuesday'
+            mock_get_kitchen_day.return_value = 'tuesday'
             
             # Act
             result = _get_kitchen_day_for_date(order_date, institution_entity_id, mock_db)
@@ -451,7 +451,7 @@ class TestRestaurantStaffService:
             mock_get_kitchen_day.assert_called_once_with(
                 order_date, 'America/New_York', None
             )
-            assert result == 'Tuesday'
+            assert result == 'tuesday'
 
     def test_group_orders_by_restaurant_sorts_alphabetically(self):
         """Test that restaurants are sorted alphabetically by name."""
@@ -463,10 +463,10 @@ class TestRestaurantStaffService:
         mock_rows = [
             {
                 'confirmation_code': 'ABC123',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'D',
                 'plate_name': 'Chicken',
@@ -478,10 +478,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'DEF456',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'J',
                 'last_initial': 'S',
                 'plate_name': 'Salad',
@@ -493,10 +493,10 @@ class TestRestaurantStaffService:
             },
             {
                 'confirmation_code': 'GHI789',
-                'status': 'Active',
+                'status': 'active',
                 'arrival_time': None,
                 'pickup_time_range': '12:00-12:30',
-                'kitchen_day': 'Tuesday',
+                'kitchen_day': 'tuesday',
                 'first_initial': 'B',
                 'last_initial': 'M',
                 'plate_name': 'Pasta',

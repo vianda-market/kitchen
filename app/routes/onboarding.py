@@ -25,7 +25,7 @@ router = APIRouter(
     response_model=OnboardingSummaryResponseSchema,
 )
 def list_onboarding_summary(
-    institution_type: str = Query("Supplier", description="Supplier or Employer"),
+    institution_type: str = Query("supplier", description="Supplier or Employer"),
     market_id: Optional[UUID] = Query(None),
     onboarding_status: Optional[str] = Query(None),
     stalled_days: Optional[int] = Query(None),
@@ -33,7 +33,7 @@ def list_onboarding_summary(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Aggregated onboarding funnel view — Internal Super Admin only."""
-    if institution_type not in ("Supplier", "Employer"):
+    if institution_type not in ("supplier", "employer"):
         raise HTTPException(status_code=400, detail="institution_type must be Supplier or Employer")
     result = get_onboarding_summary(
         db,
@@ -78,7 +78,7 @@ def get_institution_onboarding_status(
         raise HTTPException(status_code=404, detail="Institution not found")
 
     # Hide stalled status from non-Internal users
-    if result["onboarding_status"] == "stalled" and current_user.get("role_type") != "Internal":
+    if result["onboarding_status"] == "stalled" and current_user.get("role_type") != "internal":
         result["onboarding_status"] = "in_progress"
 
     return result

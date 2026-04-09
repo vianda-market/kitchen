@@ -109,7 +109,7 @@ class CityMapService:
               AND TRIM(a.city) = %s
               AND a.is_archived = FALSE
               AND r.is_archived = FALSE
-              AND r.status = 'Active'
+              AND r.status = 'active'
               AND g.latitude IS NOT NULL
               AND g.longitude IS NOT NULL
             ORDER BY r.name

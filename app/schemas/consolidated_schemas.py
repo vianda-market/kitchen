@@ -128,7 +128,7 @@ class UserUpdateSchema(BaseModel):
     market_id: Optional[UUID] = None
     city_id: Optional[UUID] = Field(None, description="Primary city for scoping (must match market's country)")
     market_ids: Optional[List[UUID]] = Field(None, description="v2: replace assigned market IDs (first is primary)")
-    status: Optional[Literal["Active", "Inactive"]] = Field(None, description="User status (Active/Inactive only)")
+    status: Optional[Literal["active", "inactive"]] = Field(None, description="User status (active/inactive only)")
     locale: Optional[str] = Field(None, min_length=2, max_length=5, description="ISO 639-1 UI locale: en, es, pt")
 
     @field_validator("locale")
@@ -263,7 +263,7 @@ class UserResponseSchema(BaseModel):
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Internal", "Employer"):
+        if rt in ("supplier", "internal", "employer"):
             return None
         return v
 
@@ -332,7 +332,7 @@ class UserEnrichedResponseSchema(BaseModel):
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Internal", "Employer"):
+        if rt in ("supplier", "internal", "employer"):
             return None
         return v
 
@@ -344,7 +344,7 @@ class UserEnrichedResponseSchema(BaseModel):
         if role_type is None:
             return v
         rt = role_type.value if hasattr(role_type, "value") else str(role_type)
-        if rt in ("Supplier", "Internal", "Employer"):
+        if rt in ("supplier", "internal", "employer"):
             return None
         return v
 
@@ -369,6 +369,7 @@ class CustomerSignupSchema(BaseModel):
     country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/leads/markets. Backend resolves to market.")
     city_id: Optional[UUID] = Field(None, description="City UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
     city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_id.")
+    referral_code: Optional[str] = Field(None, max_length=20, description="Referrer's referral code (e.g. MARIA-V7X2)")
     is_archived: Optional[bool] = False
     status: Optional[Status] = Field(default=Status.ACTIVE)
 
@@ -647,6 +648,8 @@ class RestaurantsByCityResponseSchema(BaseModel):
     center: Optional["ZipcodeCenterSchema"] = Field(None, description="Optional lat/lng center for the city")
     kitchen_day: Optional[str] = Field(None, description="Kitchen day used for plates (when market/kitchen_day resolved)")
     restaurants: List[RestaurantExplorerItemSchema] = Field(..., description="Restaurants in the city with name, cuisine_name, geolocation; plates when kitchen_day present")
+    next_cursor: Optional[str] = Field(None, description="Opaque cursor for the next page; null when no more results")
+    has_more: bool = Field(..., description="Whether more results exist after this page")
 
 
 class RestaurantResponseSchema(BaseModel):
@@ -2704,3 +2707,177 @@ class ProductIngredientResponseSchema(BaseModel):
 class ProductIngredientsSetSchema(BaseModel):
     """Request body for POST /products/{id}/ingredients (full replacement)."""
     ingredient_ids: List[UUID] = Field(..., max_length=30)
+
+
+# =============================================================================
+# Referral Schemas
+# =============================================================================
+
+class ReferralConfigUpdateSchema(BaseModel):
+    """Schema for updating referral configuration for a market"""
+    is_enabled: Optional[bool] = None
+    referrer_bonus_rate: Optional[int] = Field(None, ge=1, le=100)
+    referrer_bonus_cap: Optional[Decimal] = Field(None, ge=0)
+    referrer_monthly_cap: Optional[int] = Field(None, ge=1)
+    min_plan_price_to_qualify: Optional[Decimal] = Field(None, ge=0)
+    cooldown_days: Optional[int] = Field(None, ge=0)
+    held_reward_expiry_hours: Optional[int] = Field(None, ge=1)
+    pending_expiry_days: Optional[int] = Field(None, ge=1)
+
+
+class ReferralConfigResponseSchema(BaseModel):
+    """Schema for referral configuration response"""
+    referral_config_id: UUID
+    market_id: UUID
+    is_enabled: bool
+    referrer_bonus_rate: int
+    referrer_bonus_cap: Optional[Decimal] = None
+    referrer_monthly_cap: Optional[int] = None
+    min_plan_price_to_qualify: Decimal
+    cooldown_days: int
+    held_reward_expiry_hours: int
+    pending_expiry_days: int
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralConfigEnrichedResponseSchema(BaseModel):
+    """Schema for enriched referral config response with market name and country code"""
+    referral_config_id: UUID
+    market_id: UUID
+    market_name: str
+    country_code: str
+    is_enabled: bool
+    referrer_bonus_rate: int
+    referrer_bonus_cap: Optional[Decimal] = None
+    referrer_monthly_cap: Optional[int] = None
+    min_plan_price_to_qualify: Decimal
+    cooldown_days: int
+    held_reward_expiry_hours: int
+    pending_expiry_days: int
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralInfoResponseSchema(BaseModel):
+    """Schema for referral info response"""
+    referral_id: UUID
+    referrer_user_id: UUID
+    referee_user_id: UUID
+    referral_code_used: str
+    market_id: UUID
+    referral_status: str
+    bonus_credits_awarded: Optional[Decimal] = None
+    bonus_plan_price: Optional[Decimal] = None
+    bonus_rate_applied: Optional[int] = None
+    qualified_date: Optional[datetime] = None
+    rewarded_date: Optional[datetime] = None
+    is_archived: bool
+    status: Status
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralMyCodeResponseSchema(BaseModel):
+    """Schema for the user's own referral code"""
+    referral_code: str
+
+
+class ReferralStatsResponseSchema(BaseModel):
+    """Schema for referral stats summary"""
+    total_referrals: int
+    total_credits_earned: Decimal
+    pending_count: int
+
+
+# =============================================================================
+# AD CLICK TRACKING
+# =============================================================================
+
+class AdClickTrackingCreateSchema(BaseModel):
+    """POST body when capturing click identifiers from frontend."""
+    subscription_id: Optional[UUID] = None
+    gclid: Optional[str] = Field(None, max_length=255)
+    wbraid: Optional[str] = Field(None, max_length=255)
+    gbraid: Optional[str] = Field(None, max_length=255)
+    fbclid: Optional[str] = Field(None, max_length=255)
+    fbc: Optional[str] = Field(None, max_length=500)
+    fbp: Optional[str] = Field(None, max_length=255)
+    event_id: Optional[str] = Field(None, max_length=255)
+    landing_url: Optional[str] = Field(None, max_length=2000)
+    source_platform: Optional[str] = Field(None, max_length=20)
+
+
+class AdClickTrackingResponseSchema(BaseModel):
+    """Response for ad click tracking records."""
+    id: UUID
+    user_id: UUID
+    subscription_id: Optional[UUID] = None
+    source_platform: Optional[str] = None
+    google_upload_status: str
+    meta_upload_status: str
+    captured_at: datetime
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =============================================================================
+# AD ZONES (GEOGRAPHIC FLYWHEEL)
+# =============================================================================
+
+class AdZoneCreateSchema(BaseModel):
+    """POST body for operator-created zones."""
+    name: str = Field(..., max_length=100)
+    country_code: str = Field(..., min_length=2, max_length=2)
+    city_name: str = Field(..., max_length=100)
+    neighborhood: Optional[str] = Field(None, max_length=100)
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    radius_km: float = Field(default=2.0, ge=1.0, le=50.0)
+    flywheel_state: Optional[str] = Field("monitoring", description="Initial state. Operator can set directly for cold start.")
+    daily_budget_cents: Optional[int] = Field(None, ge=0)
+    budget_allocation: Optional[dict] = None
+
+
+class AdZoneUpdateSchema(BaseModel):
+    """PATCH body for updating zone state, budget, or metrics."""
+    name: Optional[str] = Field(None, max_length=100)
+    neighborhood: Optional[str] = Field(None, max_length=100)
+    flywheel_state: Optional[str] = None
+    daily_budget_cents: Optional[int] = Field(None, ge=0)
+    budget_allocation: Optional[dict] = None
+    radius_km: Optional[float] = Field(None, ge=1.0, le=50.0)
+
+
+class AdZoneResponseSchema(BaseModel):
+    """Response for ad zone records."""
+    id: UUID
+    name: str
+    country_code: str
+    city_name: str
+    neighborhood: Optional[str] = None
+    latitude: float
+    longitude: float
+    radius_km: float
+    flywheel_state: str
+    state_changed_at: datetime
+    notify_me_lead_count: int
+    active_restaurant_count: int
+    active_subscriber_count: int
+    estimated_mau: Optional[int] = None
+    budget_allocation: Optional[dict] = None
+    daily_budget_cents: Optional[int] = None
+    created_by: str
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)

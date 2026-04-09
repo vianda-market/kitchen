@@ -36,23 +36,23 @@ class TestEnumService(unittest.TestCase):
         status_values = enum_service.get_enum_by_name('status')
         
         self.assertIsInstance(status_values, list)
-        self.assertIn('Active', status_values)
-        self.assertIn('Inactive', status_values)
+        self.assertIn('active', status_values)
+        self.assertIn('inactive', status_values)
 
     def test_get_enum_by_name_with_context_user(self):
-        """Test that status with context=user returns only Active and Inactive"""
+        """Test that status with context=user returns only active and inactive"""
         status_values = enum_service.get_enum_by_name('status', context='user')
         self.assertIsInstance(status_values, list)
-        self.assertEqual(set(status_values), {'Active', 'Inactive'})
-        self.assertNotIn('Arrived', status_values)
+        self.assertEqual(set(status_values), {'active', 'inactive'})
+        self.assertNotIn('arrived', status_values)
 
     def test_get_enum_by_name_with_context_restaurant(self):
-        """Test that status with context=restaurant returns only Active, Pending, Inactive"""
+        """Test that status with context=restaurant returns only active, pending, inactive"""
         status_values = enum_service.get_enum_by_name('status', context='restaurant')
         self.assertIsInstance(status_values, list)
-        self.assertEqual(set(status_values), {'Active', 'Pending', 'Inactive'})
-        self.assertNotIn('Arrived', status_values)
-        self.assertNotIn('Processed', status_values)
+        self.assertEqual(set(status_values), {'active', 'pending', 'inactive'})
+        self.assertNotIn('arrived', status_values)
+        self.assertNotIn('processed', status_values)
 
     def test_get_enum_by_name_invalid(self):
         """Test that invalid enum name raises ValueError"""
@@ -67,7 +67,7 @@ class TestEnumService(unittest.TestCase):
         status_values = enums['status']
         
         # Check for expected status values (general: Active, Pending, Inactive)
-        expected_statuses = ['Active', 'Pending', 'Inactive']
+        expected_statuses = ['active', 'pending', 'inactive']
         for status in expected_statuses:
             self.assertIn(status, status_values, f"Status enum should include '{status}'")
 
@@ -77,7 +77,7 @@ class TestEnumService(unittest.TestCase):
         subscription_status_values = enums['subscription_status']
         
         # Check for expected subscription status values
-        expected_statuses = ['Active', 'On Hold', 'Pending', 'Cancelled']
+        expected_statuses = ['active', 'on_hold', 'pending', 'cancelled']
         for status in expected_statuses:
             self.assertIn(status, subscription_status_values, 
                          f"Subscription status enum should include '{status}'")
@@ -117,7 +117,7 @@ class TestEnumService(unittest.TestCase):
         role_type_values = enums['role_type']
         
         # Check for expected role type values
-        expected_roles = ['Internal', 'Supplier', 'Customer', 'Employer']
+        expected_roles = ['internal', 'supplier', 'customer', 'employer']
         self.assertEqual(len(role_type_values), len(expected_roles), 
                         "Should have exactly 3 role types")
         for role in expected_roles:
@@ -130,7 +130,7 @@ class TestEnumService(unittest.TestCase):
         kitchen_day_values = enums['kitchen_day']
         
         # Check for expected weekdays (Monday through Friday)
-        expected_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        expected_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
         self.assertEqual(len(kitchen_day_values), 5, 
                         "Should have exactly 5 kitchen days (weekdays)")
         for day in expected_days:
@@ -143,7 +143,7 @@ class TestEnumService(unittest.TestCase):
         method_type_values = enums['method_type']
         
         # Check for expected payment method providers (Stripe, Mercado Pago, PayU)
-        expected_methods = ['Stripe', 'Mercado Pago', 'PayU']
+        expected_methods = ['stripe', 'mercado_pago', 'payu']
         for method in expected_methods:
             self.assertIn(method, method_type_values, 
                          f"Payment method type enum should include '{method}'")
@@ -154,7 +154,7 @@ class TestEnumService(unittest.TestCase):
         street_type_values = enums['street_type']
         
         # Check for expected street type abbreviations
-        expected_types = ['St', 'Ave', 'Blvd', 'Rd', 'Dr']
+        expected_types = ['st', 'ave', 'blvd', 'rd', 'dr']
         for street_type in expected_types:
             self.assertIn(street_type, street_type_values, 
                          f"Street type enum should include '{street_type}'")
@@ -162,26 +162,26 @@ class TestEnumService(unittest.TestCase):
     def test_get_assignable_institution_types_super_admin(self):
         """Super Admin gets all four institution types."""
         result = EnumService.get_assignable_institution_types({
-            "role_type": "Internal",
-            "role_name": "Super Admin",
+            "role_type": "internal",
+            "role_name": "super_admin",
         })
-        self.assertEqual(set(result), {"Internal", "Supplier", "Customer", "Employer"})
+        self.assertEqual(set(result), {"internal", "supplier", "customer", "employer"})
 
     def test_get_assignable_institution_types_admin(self):
         """Admin gets Supplier, Employer only (no Internal, no Customer)."""
         result = EnumService.get_assignable_institution_types({
-            "role_type": "Internal",
-            "role_name": "Admin",
+            "role_type": "internal",
+            "role_name": "admin",
         })
-        self.assertEqual(set(result), {"Supplier", "Employer"})
-        self.assertNotIn("Internal", result)
-        self.assertNotIn("Customer", result)
+        self.assertEqual(set(result), {"supplier", "employer"})
+        self.assertNotIn("internal", result)
+        self.assertNotIn("customer", result)
 
     def test_get_assignable_institution_types_supplier(self):
         """Supplier gets empty list (cannot create institutions)."""
         result = EnumService.get_assignable_institution_types({
-            "role_type": "Supplier",
-            "role_name": "Admin",
+            "role_type": "supplier",
+            "role_name": "admin",
         })
         self.assertEqual(result, [])
 

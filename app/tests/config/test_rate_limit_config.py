@@ -16,28 +16,28 @@ from app.config.rate_limit_config import (
 
 class TestClassifyTier:
     def test_internal(self):
-        assert classify_tier("Internal", None) == TIER_INTERNAL
+        assert classify_tier("internal", None) == TIER_INTERNAL
 
     def test_internal_ignores_onboarding(self):
-        assert classify_tier("Internal", "complete") == TIER_INTERNAL
+        assert classify_tier("internal", "complete") == TIER_INTERNAL
 
     def test_supplier(self):
-        assert classify_tier("Supplier", "in_progress") == TIER_B2B
+        assert classify_tier("supplier", "in_progress") == TIER_B2B
 
     def test_employer(self):
-        assert classify_tier("Employer", "complete") == TIER_B2B
+        assert classify_tier("employer", "complete") == TIER_B2B
 
     def test_customer_free_no_status(self):
-        assert classify_tier("Customer", None) == TIER_FREE
+        assert classify_tier("customer", None) == TIER_FREE
 
     def test_customer_free_in_progress(self):
-        assert classify_tier("Customer", "in_progress") == TIER_FREE
+        assert classify_tier("customer", "in_progress") == TIER_FREE
 
     def test_customer_free_not_started(self):
-        assert classify_tier("Customer", "not_started") == TIER_FREE
+        assert classify_tier("customer", "not_started") == TIER_FREE
 
     def test_customer_onboarded(self):
-        assert classify_tier("Customer", "complete") == TIER_ONBOARDED
+        assert classify_tier("customer", "complete") == TIER_ONBOARDED
 
 
 # ── resolve_rule ─────────────────────────────────────────────────────────────

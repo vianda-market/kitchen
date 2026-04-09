@@ -132,7 +132,7 @@ The following WILL be uploaded to GitHub:
 
 ### Step 2: Initialize Git Locally (2 min)
 ```bash
-cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/Desktop/local/kitchen"
+cd "/Users/cdeachaval/Library/Mobile Documents/com~apple~CloudDocs/learn/kitchen"
 git init
 git add .
 git commit -m "Initial commit: Production-ready Kitchen API"

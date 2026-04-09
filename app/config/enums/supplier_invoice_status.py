@@ -10,9 +10,9 @@ from enum import Enum
 
 class SupplierInvoiceStatus(str, Enum):
     """Status of a supplier invoice through the review process."""
-    PENDING_REVIEW = "Pending Review"
-    APPROVED = "Approved"
-    REJECTED = "Rejected"
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
     @classmethod
     def values(cls) -> list[str]:

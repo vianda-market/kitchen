@@ -81,7 +81,7 @@ class TestSupplierOnboarding:
                 INSERT INTO user_info (
                     user_id, institution_id, role_type, role_name, 
                     username, email, hashed_password, mobile_number, market_id, modified_by
-                ) VALUES (%s, %s, 'Supplier'::role_type_enum, 'Admin'::role_name_enum,
+                ) VALUES (%s, %s, 'supplier'::role_type_enum, 'admin'::role_name_enum,
                     'supplier_user', 'supplier_crud_test@example.com', 'hashedpwd', '+15005550006',
                     '00000000-0000-0000-0000-000000000001'::uuid, %s)
             """, (str(user_id), str(institution_id), admin_user_id))

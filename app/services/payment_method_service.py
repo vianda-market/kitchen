@@ -90,13 +90,13 @@ def link_payment_method_to_type(
             query = """
                 UPDATE payment_method 
                 SET method_type_id = %s,
-                    status = 'Active',
+                    status = 'active',
                     modified_by = %s,
                     modified_date = CURRENT_TIMESTAMP
                 WHERE payment_method_id = %s
                   AND method_type = %s
                   AND method_type_id IS NULL
-                  AND status = 'Pending'
+                  AND status = 'pending'
             """
             cursor.execute(
                 query,

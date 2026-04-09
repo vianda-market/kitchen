@@ -17,37 +17,37 @@ class TestEnsureCanEditSupplierTerms:
     def test_internal_manager_can_edit(self):
         """Internal Manager can edit supplier terms."""
         ensure_can_edit_supplier_terms({
-            "role_type": "Internal",
-            "role_name": "Manager",
+            "role_type": "internal",
+            "role_name": "manager",
         })
 
     def test_internal_global_manager_can_edit(self):
         """Internal Global Manager can edit supplier terms."""
         ensure_can_edit_supplier_terms({
-            "role_type": "Internal",
-            "role_name": "Global Manager",
+            "role_type": "internal",
+            "role_name": "global_manager",
         })
 
     def test_internal_admin_can_edit(self):
         """Internal Admin can edit supplier terms."""
         ensure_can_edit_supplier_terms({
-            "role_type": "Internal",
-            "role_name": "Admin",
+            "role_type": "internal",
+            "role_name": "admin",
         })
 
     def test_internal_super_admin_can_edit(self):
         """Internal Super Admin can edit supplier terms."""
         ensure_can_edit_supplier_terms({
-            "role_type": "Internal",
-            "role_name": "Super Admin",
+            "role_type": "internal",
+            "role_name": "super_admin",
         })
 
     def test_supplier_admin_cannot_edit(self):
         """Supplier Admin cannot edit supplier terms."""
         with pytest.raises(HTTPException) as exc_info:
             ensure_can_edit_supplier_terms({
-                "role_type": "Supplier",
-                "role_name": "Admin",
+                "role_type": "supplier",
+                "role_name": "admin",
             })
         assert exc_info.value.status_code == 403
         assert "supplier terms" in str(exc_info.value.detail).lower()
@@ -56,8 +56,8 @@ class TestEnsureCanEditSupplierTerms:
         """Internal Operator cannot edit supplier terms."""
         with pytest.raises(HTTPException) as exc_info:
             ensure_can_edit_supplier_terms({
-                "role_type": "Internal",
-                "role_name": "Operator",
+                "role_type": "internal",
+                "role_name": "operator",
             })
         assert exc_info.value.status_code == 403
 
@@ -65,7 +65,7 @@ class TestEnsureCanEditSupplierTerms:
         """Customer cannot edit supplier terms."""
         with pytest.raises(HTTPException) as exc_info:
             ensure_can_edit_supplier_terms({
-                "role_type": "Customer",
-                "role_name": "Comensal",
+                "role_type": "customer",
+                "role_name": "comensal",
             })
         assert exc_info.value.status_code == 403

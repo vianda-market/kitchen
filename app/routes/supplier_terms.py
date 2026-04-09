@@ -22,12 +22,12 @@ router = APIRouter(
 def _resolve_supplier_institution(current_user: dict, institution_id: UUID) -> UUID:
     """Enforce institution scoping — Suppliers can only see their own terms."""
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type == "Supplier":
+    if role_type == "supplier":
         own_id = current_user.get("institution_id")
         if not own_id or str(own_id) != str(institution_id):
             raise HTTPException(status_code=403, detail="Suppliers can only view their own terms")
         return institution_id
-    if role_type == "Internal":
+    if role_type == "internal":
         return institution_id
     raise HTTPException(status_code=403, detail="Only Supplier and Internal users can access supplier terms")
 
@@ -65,7 +65,7 @@ def list_supplier_terms(
 ):
     """List all supplier terms. Internal only."""
     role_type = (current_user.get("role_type") or "").strip()
-    if role_type != "Internal":
+    if role_type != "internal":
         raise HTTPException(status_code=403, detail="Only Internal users can list all supplier terms.")
 
     def _list():

@@ -42,36 +42,36 @@ SELECT
     i.created_date,
     EXISTS(
         SELECT 1 FROM core.address_info
-        WHERE institution_id = %(iid)s AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_active_address,
     EXISTS(
         SELECT 1 FROM ops.institution_entity_info
-        WHERE institution_id = %(iid)s AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
               AND payout_onboarding_status = 'complete'
     ) AS has_active_entity_with_payouts,
     EXISTS(
         SELECT 1 FROM ops.restaurant_info
-        WHERE institution_id = %(iid)s AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_active_restaurant,
     EXISTS(
         SELECT 1 FROM ops.product_info
-        WHERE institution_id = %(iid)s AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_active_product,
     EXISTS(
         SELECT 1 FROM ops.plate_info p
         JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id
-        WHERE r.institution_id = %(iid)s AND p.status = 'Active' AND NOT p.is_archived
+        WHERE r.institution_id = %(iid)s AND p.status = 'active' AND NOT p.is_archived
     ) AS has_active_plate,
     EXISTS(
         SELECT 1 FROM ops.plate_kitchen_days pkd
         JOIN ops.plate_info p ON pkd.plate_id = p.plate_id
         JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id
-        WHERE r.institution_id = %(iid)s AND pkd.status = 'Active' AND NOT pkd.is_archived
+        WHERE r.institution_id = %(iid)s AND pkd.status = 'active' AND NOT pkd.is_archived
     ) AS has_active_kitchen_day,
     EXISTS(
         SELECT 1 FROM ops.qr_code q
         JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id
-        WHERE r.institution_id = %(iid)s AND q.status = 'Active' AND NOT q.is_archived
+        WHERE r.institution_id = %(iid)s AND q.status = 'active' AND NOT q.is_archived
     ) AS has_active_qr_code,
     GREATEST(
         (SELECT MAX(modified_date) FROM core.address_info WHERE institution_id = %(iid)s AND NOT is_archived),
@@ -109,22 +109,22 @@ SELECT
     i.created_date,
     EXISTS(
         SELECT 1 FROM core.employer_benefits_program
-        WHERE institution_id = %(iid)s AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_benefits_program,
     EXISTS(
         SELECT 1 FROM core.employer_domain
-        WHERE institution_id = %(iid)s AND is_active = TRUE AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND is_active = TRUE AND status = 'active' AND NOT is_archived
     ) AS has_email_domain,
     EXISTS(
         SELECT 1 FROM core.user_info
-        WHERE institution_id = %(iid)s AND role_type = 'Customer'
-              AND status = 'Active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND role_type = 'customer'
+              AND status = 'active' AND NOT is_archived
     ) AS has_enrolled_employee,
     EXISTS(
         SELECT 1 FROM customer.subscription_info s
         JOIN core.user_info u ON s.user_id = u.user_id
         WHERE u.institution_id = %(iid)s
-              AND s.subscription_status = 'Active' AND NOT s.is_archived
+              AND s.subscription_status = 'active' AND NOT s.is_archived
     ) AS has_active_subscription,
     GREATEST(
         (SELECT MAX(modified_date) FROM core.employer_benefits_program WHERE institution_id = %(iid)s AND NOT is_archived),
@@ -156,7 +156,7 @@ SELECT
     u.email_verified AS has_verified_email,
     EXISTS(
         SELECT 1 FROM customer.subscription_info
-        WHERE user_id = %(uid)s AND subscription_status = 'Active' AND NOT is_archived
+        WHERE user_id = %(uid)s AND subscription_status = 'active' AND NOT is_archived
     ) AS has_active_subscription,
     GREATEST(
         u.modified_date,
@@ -171,8 +171,8 @@ WHERE u.user_id = %(uid)s
 # =========================================================================
 
 _CHECKLIST_CONFIG = {
-    "Supplier": (_SUPPLIER_CHECKLIST_SQL, SUPPLIER_CHECKLIST_ORDER, SUPPLIER_NEXT_STEP_LABELS),
-    "Employer": (_EMPLOYER_CHECKLIST_SQL, EMPLOYER_CHECKLIST_ORDER, EMPLOYER_NEXT_STEP_LABELS),
+    "supplier": (_SUPPLIER_CHECKLIST_SQL, SUPPLIER_CHECKLIST_ORDER, SUPPLIER_NEXT_STEP_LABELS),
+    "employer": (_EMPLOYER_CHECKLIST_SQL, EMPLOYER_CHECKLIST_ORDER, EMPLOYER_NEXT_STEP_LABELS),
 }
 
 # Keep backward-compat aliases used by stall detection cron
@@ -309,7 +309,7 @@ def get_customer_onboarding_status(
 
     return {
         "institution_id": None,
-        "institution_type": "Customer",
+        "institution_type": "customer",
         "onboarding_status": _derive_status(checklist_bools, days_since_last_activity),
         "completion_percentage": completion_percentage,
         "next_step": _find_next_step(checklist, CUSTOMER_CHECKLIST_ORDER, CUSTOMER_NEXT_STEP_LABELS),
@@ -349,18 +349,18 @@ SELECT
 FROM core.institution_info i
 LEFT JOIN core.market_info m ON i.market_id = m.market_id
 WHERE i.institution_type = %(inst_type)s
-  AND i.status = 'Active'
+  AND i.status = 'active'
   AND NOT i.is_archived
 """
 
 _SUPPLIER_SUMMARY_CHECKLIST = """
-    EXISTS(SELECT 1 FROM core.address_info WHERE institution_id = i.institution_id AND status = 'Active' AND NOT is_archived) AS has_active_address,
-    EXISTS(SELECT 1 FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND status = 'Active' AND NOT is_archived AND payout_onboarding_status = 'complete') AS has_active_entity_with_payouts,
-    EXISTS(SELECT 1 FROM ops.restaurant_info WHERE institution_id = i.institution_id AND status = 'Active' AND NOT is_archived) AS has_active_restaurant,
-    EXISTS(SELECT 1 FROM ops.product_info WHERE institution_id = i.institution_id AND status = 'Active' AND NOT is_archived) AS has_active_product,
-    EXISTS(SELECT 1 FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND p.status = 'Active' AND NOT p.is_archived) AS has_active_plate,
-    EXISTS(SELECT 1 FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND pkd.status = 'Active' AND NOT pkd.is_archived) AS has_active_kitchen_day,
-    EXISTS(SELECT 1 FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND q.status = 'Active' AND NOT q.is_archived) AS has_active_qr_code,"""
+    EXISTS(SELECT 1 FROM core.address_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_address,
+    EXISTS(SELECT 1 FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived AND payout_onboarding_status = 'complete') AS has_active_entity_with_payouts,
+    EXISTS(SELECT 1 FROM ops.restaurant_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_restaurant,
+    EXISTS(SELECT 1 FROM ops.product_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_product,
+    EXISTS(SELECT 1 FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND p.status = 'active' AND NOT p.is_archived) AS has_active_plate,
+    EXISTS(SELECT 1 FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND pkd.status = 'active' AND NOT pkd.is_archived) AS has_active_kitchen_day,
+    EXISTS(SELECT 1 FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND q.status = 'active' AND NOT q.is_archived) AS has_active_qr_code,"""
 
 _SUPPLIER_SUMMARY_ACTIVITY = """
     GREATEST(
@@ -374,28 +374,28 @@ _SUPPLIER_SUMMARY_ACTIVITY = """
     ) AS last_activity_date"""
 
 _EMPLOYER_SUMMARY_CHECKLIST = """
-    EXISTS(SELECT 1 FROM core.employer_benefits_program WHERE institution_id = i.institution_id AND status = 'Active' AND NOT is_archived) AS has_benefits_program,
-    EXISTS(SELECT 1 FROM core.employer_domain WHERE institution_id = i.institution_id AND is_active = TRUE AND status = 'Active' AND NOT is_archived) AS has_email_domain,
-    EXISTS(SELECT 1 FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'Customer' AND status = 'Active' AND NOT is_archived) AS has_enrolled_employee,
-    EXISTS(SELECT 1 FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = i.institution_id AND s.subscription_status = 'Active' AND NOT s.is_archived) AS has_active_subscription,"""
+    EXISTS(SELECT 1 FROM core.employer_benefits_program WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_benefits_program,
+    EXISTS(SELECT 1 FROM core.employer_domain WHERE institution_id = i.institution_id AND is_active = TRUE AND status = 'active' AND NOT is_archived) AS has_email_domain,
+    EXISTS(SELECT 1 FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'customer' AND status = 'active' AND NOT is_archived) AS has_enrolled_employee,
+    EXISTS(SELECT 1 FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = i.institution_id AND s.subscription_status = 'active' AND NOT s.is_archived) AS has_active_subscription,"""
 
 _EMPLOYER_SUMMARY_ACTIVITY = """
     GREATEST(
         (SELECT MAX(modified_date) FROM core.employer_benefits_program WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM core.employer_domain WHERE institution_id = i.institution_id AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'Customer' AND NOT is_archived),
+        (SELECT MAX(modified_date) FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'customer' AND NOT is_archived),
         (SELECT MAX(modified_date) FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = i.institution_id AND NOT s.is_archived)
     ) AS last_activity_date"""
 
 _SUMMARY_CONFIG = {
-    "Supplier": (_SUPPLIER_SUMMARY_CHECKLIST, _SUPPLIER_SUMMARY_ACTIVITY, SUPPLIER_CHECKLIST_ORDER, SUPPLIER_NEXT_STEP_LABELS),
-    "Employer": (_EMPLOYER_SUMMARY_CHECKLIST, _EMPLOYER_SUMMARY_ACTIVITY, EMPLOYER_CHECKLIST_ORDER, EMPLOYER_NEXT_STEP_LABELS),
+    "supplier": (_SUPPLIER_SUMMARY_CHECKLIST, _SUPPLIER_SUMMARY_ACTIVITY, SUPPLIER_CHECKLIST_ORDER, SUPPLIER_NEXT_STEP_LABELS),
+    "employer": (_EMPLOYER_SUMMARY_CHECKLIST, _EMPLOYER_SUMMARY_ACTIVITY, EMPLOYER_CHECKLIST_ORDER, EMPLOYER_NEXT_STEP_LABELS),
 }
 
 
 def get_onboarding_summary(
     db: psycopg2.extensions.connection,
-    institution_type: str = "Supplier",
+    institution_type: str = "supplier",
     market_id: Optional[UUID] = None,
     onboarding_status_filter: Optional[str] = None,
     stalled_days: Optional[int] = None,
@@ -500,7 +500,7 @@ def check_onboarding_regression(
 
         # Only check Supplier/Employer institutions
         inst_row = db_read(
-            "SELECT institution_type FROM core.institution_info WHERE institution_id = %s AND institution_type IN ('Supplier', 'Employer')",
+            "SELECT institution_type FROM core.institution_info WHERE institution_id = %s AND institution_type IN ('supplier', 'employer')",
             (str(institution_id),),
             connection=db,
             fetch_one=True,

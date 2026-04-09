@@ -31,7 +31,7 @@ def _make_subscription_user(cur, admin_id: UUID) -> UUID:
         INSERT INTO user_info (
             user_id, institution_id, role_type, role_name, username, email,
             hashed_password, market_id, modified_by
-        ) VALUES (%s, %s, 'Customer'::role_type_enum, 'Comensal'::role_name_enum,
+        ) VALUES (%s, %s, 'customer'::role_type_enum, 'comensal'::role_name_enum,
             %s, %s, 'hash', %s::uuid, %s)
         """,
         (
@@ -75,7 +75,7 @@ class TestSubscriptionPaymentTable:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), admin_id),
             )
@@ -83,7 +83,7 @@ class TestSubscriptionPaymentTable:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Pending', 'Pending'::status_enum, 0, %s)
+                VALUES (%s, %s, %s, %s, 'pending', 'pending'::status_enum, 0, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), admin_id),
             )
@@ -138,7 +138,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -146,7 +146,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Pending', 'Pending'::status_enum, 0, %s)
+                VALUES (%s, %s, %s, %s, 'pending', 'pending'::status_enum, 0, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), str(admin_id)),
             )
@@ -159,11 +159,11 @@ class TestSubscriptionPaymentFlow:
             )
         subscription = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
         assert subscription is not None
-        assert subscription.subscription_status == "Pending"
+        assert subscription.subscription_status == "pending"
         activate_subscription_after_payment(sub_id, modified_by=admin_id, db=db_transaction)
         updated = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
         assert updated is not None
-        assert updated.subscription_status == "Active"
+        assert updated.subscription_status == "active"
 
     def test_create_and_process_bill_for_subscription_payment(self, db_transaction):
         """Confirm-payment path: create client_bill for subscription_payment and process (credits + Processed)."""
@@ -179,7 +179,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -187,7 +187,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 0, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 0, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), str(user_id)),
             )
@@ -203,7 +203,7 @@ class TestSubscriptionPaymentFlow:
         create_and_process_bill_for_subscription_payment(sub_id, UUID(str(sp_id)), user_id, db_transaction)
         bill = get_client_bill_by_subscription_payment(UUID(str(sp_id)), db_transaction)
         assert bill is not None
-        assert bill.status.value == "Processed"
+        assert bill.status.value == "processed"
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
         assert sub is not None
         assert float(sub.balance) >= 1
@@ -224,7 +224,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Entry Level', %s, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Entry Level', %s, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), plan_credits, str(admin_id)),
             )
@@ -232,7 +232,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Pending', 'Pending'::status_enum, 0, %s)
+                VALUES (%s, %s, %s, %s, 'pending', 'pending'::status_enum, 0, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), str(user_id)),
             )
@@ -250,7 +250,7 @@ class TestSubscriptionPaymentFlow:
         after = datetime.now(timezone.utc)
         bill = get_client_bill_by_subscription_payment(UUID(str(sp_id)), db_transaction)
         assert bill is not None
-        assert bill.status.value == "Processed"
+        assert bill.status.value == "processed"
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
         assert sub is not None
         assert float(sub.balance) == plan_credits, "First period should grant plan.credit"
@@ -279,7 +279,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan', 70, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Plan', 70, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -288,7 +288,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, renewal_date, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 50, %s, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 50, %s, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), old_renewal, str(user_id)),
             )
@@ -305,7 +305,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, credit_currency_id, amount, currency_code, status, modified_by)
-                VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'Active'::status_enum, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
                 (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(credit_currency_id), str(user_id)),
             )
@@ -332,7 +332,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Zero Credit Plan', 0, 0, 0.0, 0.0, false, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Zero Credit Plan', 0, 0, 0.0, 0.0, false, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -340,7 +340,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Pending', 'Pending'::status_enum, 0, %s)
+                VALUES (%s, %s, %s, %s, 'pending', 'pending'::status_enum, 0, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), str(user_id)),
             )
@@ -374,7 +374,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, rollover_cap, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan With Cap', 70, 100.0, 0.0, 0.0, true, 20, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Plan With Cap', 70, 100.0, 0.0, 0.0, true, 20, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -383,7 +383,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, renewal_date, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 50, %s, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 50, %s, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), old_renewal, str(user_id)),
             )
@@ -400,7 +400,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, credit_currency_id, amount, currency_code, status, modified_by)
-                VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'Active'::status_enum, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
                 (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(credit_currency_id), str(user_id)),
             )
@@ -422,7 +422,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Cron Plan', 30, 50.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Cron Plan', 30, 50.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -430,7 +430,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, renewal_date, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 5, %s, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 5, %s, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), past_renewal, str(user_id)),
             )
@@ -458,7 +458,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Cancel Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Cancel Test Plan', 10, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -466,7 +466,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 50, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 50, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id), str(user_id)),
             )
@@ -474,11 +474,11 @@ class TestSubscriptionPaymentFlow:
 
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
         assert sub is not None
-        assert sub.subscription_status == "Active"
+        assert sub.subscription_status == "active"
         assert sub.is_archived is False
 
         result = cancel_subscription(sub_id, user_id, db_transaction)
-        assert result.subscription_status == "Cancelled"
+        assert result.subscription_status == "cancelled"
         assert result.is_archived is True
 
         # Archived subscriptions are excluded from get_by_id and get_by_user
@@ -504,7 +504,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan A', 10, 100.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Plan A', 10, 100.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id_1), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -512,7 +512,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, modified_by)
-                VALUES (%s, %s, %s, %s, 'Active', 'Active'::status_enum, 10, %s)
+                VALUES (%s, %s, %s, %s, 'active', 'active'::status_enum, 10, %s)
                 """,
                 (str(sub_id), str(user_id), str(ARGENTINA_MARKET_ID), str(plan_id_1), str(user_id)),
             )
@@ -530,7 +530,7 @@ class TestSubscriptionPaymentFlow:
             cur.execute(
                 """
                 INSERT INTO plan_info (plan_id, market_id, name, credit, price, credit_cost_local_currency, credit_cost_usd, rollover, is_archived, status, modified_by)
-                VALUES (%s, %s, 'Plan B', 20, 200.0, 0.0, 0.0, true, false, 'Active'::status_enum, %s)
+                VALUES (%s, %s, 'Plan B', 20, 200.0, 0.0, 0.0, true, false, 'active'::status_enum, %s)
                 """,
                 (str(plan_id_2), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
@@ -538,8 +538,8 @@ class TestSubscriptionPaymentFlow:
             {
                 "plan_id": plan_id_2,
                 "user_id": user_id,
-                "status": "Active",
-                "subscription_status": "Active",
+                "status": "active",
+                "subscription_status": "active",
                 "modified_by": user_id,
             },
             db_transaction,
@@ -547,4 +547,4 @@ class TestSubscriptionPaymentFlow:
         )
         assert new_sub is not None
         assert new_sub.plan_id == plan_id_2
-        assert new_sub.subscription_status == "Active"
+        assert new_sub.subscription_status == "active"
