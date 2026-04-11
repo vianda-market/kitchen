@@ -95,7 +95,7 @@ class TestCreditLoadingService:
             restaurant_id=uuid4(),
             plate_selection_id=None,
             discretionary_id=uuid4(),
-            credit_currency_id=uuid4(),
+            currency_metadata_id=uuid4(),
             was_collected=False,
             ordered_timestamp=datetime.now(),
             collected_timestamp=None,
@@ -118,8 +118,7 @@ class TestCreditLoadingService:
     def sample_credit_currency_dto(self):
         """Sample CreditCurrencyDTO for testing"""
         return CreditCurrencyDTO(
-            credit_currency_id=uuid4(),
-            currency_name="Test Credits",
+            currency_metadata_id=uuid4(),
             currency_code="USD",
             credit_value_local_currency=Decimal("1.0"),
             currency_conversion_usd=Decimal("1.0"),
@@ -281,10 +280,10 @@ class TestCreditLoadingService:
         mock_restaurant.restaurant_id = sample_restaurant_id
         mock_transaction = sample_restaurant_transaction_dto
         
-        expected_cc_id = sample_credit_currency_dto.credit_currency_id
+        expected_cc_id = sample_credit_currency_dto.currency_metadata_id
         
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=expected_cc_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=expected_cc_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
             mock_restaurant_service.get_by_id.return_value = mock_restaurant
@@ -394,7 +393,7 @@ class TestCreditLoadingService:
         mock_restaurant = sample_restaurant_dto
         
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=sample_credit_currency_dto.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=sample_credit_currency_dto.currency_metadata_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
             
@@ -482,7 +481,7 @@ class TestCreditLoadingService:
         mock_transaction = sample_restaurant_transaction_dto
         
         with patch('app.services.credit_loading_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=sample_credit_currency_dto.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=sample_credit_currency_dto.currency_metadata_id), \
              patch('app.services.credit_loading_service.credit_currency_service') as mock_currency_service, \
              patch('app.services.credit_loading_service.create_with_conservative_balance_update') as mock_create_with_balance:
             mock_restaurant_service.get_by_id.return_value = mock_restaurant

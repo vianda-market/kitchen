@@ -97,9 +97,9 @@ class DiscretionaryService:
                     market = market_service.get_by_id(req_market_id)
                     if not market:
                         raise HTTPException(status_code=400, detail="Market not found")
-                    from app.services.entity_service import get_credit_currency_id_for_restaurant
-                    entity_credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
-                    if str(entity_credit_currency_id) != str(market.get("credit_currency_id")):
+                    from app.services.entity_service import get_currency_metadata_id_for_restaurant
+                    entity_currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+                    if str(entity_currency_metadata_id) != str(market.get("currency_metadata_id")):
                         raise HTTPException(
                             status_code=400,
                             detail="Selected restaurant is not in the specified market",

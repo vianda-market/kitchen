@@ -75,7 +75,7 @@ async def list_enriched_markets(
     **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer). Used for country dropdown when creating addresses.
 
     This enriched endpoint returns markets with currency information
-    (currency_name and currency_code) from the credit_currency_info table.
+    (currency_name and currency_code) from the currency_metadata table.
     Country and currency names are localized based on the user's resolved locale.
 
     **Returns**: List of markets with enriched currency data
@@ -184,7 +184,7 @@ async def create_market(
     
     **Request Body**: Market creation data (country_name is derived from country_code)
     - `country_code`: ISO 3166-1 alpha-2 code (e.g., "AR", "DE")
-    - `credit_currency_id`: FK to credit_currency_info (UUID)
+    - `currency_metadata_id`: FK to currency_metadata (UUID)
     - `timezone`: Timezone (e.g., "America/Argentina/Buenos_Aires")
     - `status`: Market status (default: Active)
     
@@ -208,7 +208,7 @@ async def create_market(
     market = market_service.create(
         country_name=country_name,
         country_code=country_code,
-        credit_currency_id=market_data.credit_currency_id,
+        currency_metadata_id=market_data.currency_metadata_id,
         timezone=market_data.timezone,
         modified_by=current_user["user_id"],
         status=market_data.status or Status.ACTIVE,
@@ -235,7 +235,7 @@ async def update_market(
     
     **Request Body**: Market update data (all fields optional). When country_code is provided, country_name is derived by the backend.
     - `country_code`: New ISO 3166-1 alpha-2 country code (if provided, country_name is resolved from it)
-    - `credit_currency_id`: New FK to credit_currency_info
+    - `currency_metadata_id`: New FK to currency_metadata
     - `timezone`: New timezone
     - `status`: New status
     - `is_archived`: Archive status
@@ -270,7 +270,7 @@ async def update_market(
         modified_by=current_user["user_id"],
         country_name=country_name,
         country_code=country_code,
-        credit_currency_id=market_data.credit_currency_id,
+        currency_metadata_id=market_data.currency_metadata_id,
         timezone=market_data.timezone,
         kitchen_close_time=kitchen_close_time,
         status=market_data.status,

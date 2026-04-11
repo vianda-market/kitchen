@@ -44,7 +44,7 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
             address_id, institution_id, user_id, address_type, country_code,
             province, city, postal_code, street_type, street_name, building_number,
             timezone, is_archived, status, modified_by
-        ) VALUES (%s, %s, %s, ARRAY['restaurant']::address_type_enum[], 'GL',
+        ) VALUES (%s, %s, %s, ARRAY['restaurant']::address_type_enum[], 'XG',
             'Prov', 'City', '12345', 'st'::street_type_enum, 'Main', '1',
             'UTC', FALSE, 'active'::status_enum, %s)
         """,
@@ -55,7 +55,7 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
     cursor.execute(
         """
         INSERT INTO institution_entity_info (
-            institution_entity_id, institution_id, address_id, credit_currency_id,
+            institution_entity_id, institution_id, address_id, currency_metadata_id,
             tax_id, name, is_archived, status, modified_by
         ) VALUES (%s, %s, %s, '55555555-5555-5555-5555-555555555555',
             'TAX1', 'Test Entity', FALSE, 'active'::status_enum, %s)

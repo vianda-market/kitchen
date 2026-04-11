@@ -51,7 +51,7 @@ class TestLeadsMarketsEndpoint:
     def test_excludes_global_marketplace_supplier_audience(self, mock_market_service, client):
         """Global Marketplace is excluded from supplier audience list."""
         mock_market_service.get_all.return_value = [
-            {"market_id": "00000000-0000-0000-0000-000000000001", "country_code": "GL", "country_name": "Global", "language": "en"},
+            {"market_id": "00000000-0000-0000-0000-000000000001", "country_code": "XG", "country_name": "Global", "language": "en"},
             {"market_id": "11111111-1111-1111-1111-111111111111", "country_code": "AR", "country_name": "Argentina", "language": "es"},
         ]
 

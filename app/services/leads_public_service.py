@@ -66,7 +66,7 @@ def get_public_plans(
                cc.currency_code AS currency
         FROM plan_info p
         JOIN market_info m ON p.market_id = m.market_id
-        JOIN credit_currency_info cc ON m.credit_currency_id = cc.credit_currency_id
+        JOIN currency_metadata cc ON m.currency_metadata_id = cc.currency_metadata_id
         WHERE p.is_archived = FALSE AND p.status = 'active'
           AND p.market_id != '00000000-0000-0000-0000-000000000001'::uuid
         ORDER BY p.price ASC

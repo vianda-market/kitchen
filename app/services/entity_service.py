@@ -638,7 +638,7 @@ def get_enriched_institution_entities(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "m.market_id",
             "m.country_name as market_name",
             "m.country_code",
@@ -697,7 +697,7 @@ def get_enriched_institution_entity_by_id(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "m.market_id",
             "m.country_name as market_name",
             "m.country_code",
@@ -1103,7 +1103,7 @@ def get_enriched_restaurants(
             "a.province",
             "a.city",
             "a.postal_code",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
             "r.cuisine_id",
@@ -1128,7 +1128,7 @@ def get_enriched_restaurants(
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
-            ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
+            ("INNER", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
@@ -1177,7 +1177,7 @@ def get_enriched_restaurant_by_id(
             "a.province",
             "a.city",
             "a.postal_code",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "cc.credit_value_local_currency as market_credit_value_local_currency",
             "r.name",
             "r.cuisine_id",
@@ -1202,7 +1202,7 @@ def get_enriched_restaurant_by_id(
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
-            ("INNER", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
+            ("INNER", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
@@ -1212,12 +1212,12 @@ def get_enriched_restaurant_by_id(
     )
 
 
-def get_credit_currency_id_for_restaurant(
+def get_currency_metadata_id_for_restaurant(
     restaurant,
     db: psycopg2.extensions.connection
 ) -> UUID:
     """
-    Get credit_currency_id for a restaurant. The credit currency comes from the
+    Get currency_metadata_id for a restaurant. The credit currency comes from the
     institution_entity, not the restaurant table directly.
 
     Args:
@@ -1225,17 +1225,17 @@ def get_credit_currency_id_for_restaurant(
         db: Database connection
 
     Returns:
-        UUID of the credit_currency_id for the restaurant's institution_entity
+        UUID of the currency_metadata_id for the restaurant's institution_entity
 
     Raises:
-        ValueError: If no credit_currency_id found for the restaurant
+        ValueError: If no currency_metadata_id found for the restaurant
     """
     institution_entity_id = getattr(restaurant, "institution_entity_id", None) or (
         restaurant.get("institution_entity_id") if isinstance(restaurant, dict) else None
     )
     if institution_entity_id:
         rows = db_read(
-            "SELECT credit_currency_id FROM institution_entity_info WHERE institution_entity_id = %s",
+            "SELECT currency_metadata_id FROM institution_entity_info WHERE institution_entity_id = %s",
             (str(institution_entity_id),),
             connection=db,
         )
@@ -1247,7 +1247,7 @@ def get_credit_currency_id_for_restaurant(
             raise ValueError("Restaurant must have institution_entity_id or restaurant_id")
         rows = db_read(
             """
-            SELECT ie.credit_currency_id FROM institution_entity_info ie
+            SELECT ie.currency_metadata_id FROM institution_entity_info ie
             INNER JOIN restaurant_info r ON r.institution_entity_id = ie.institution_entity_id
             WHERE r.restaurant_id = %s
             """,
@@ -1255,16 +1255,16 @@ def get_credit_currency_id_for_restaurant(
             connection=db,
         )
     if not rows:
-        raise ValueError("Could not find credit_currency_id for restaurant")
-    return UUID(str(rows[0]["credit_currency_id"]))
+        raise ValueError("Could not find currency_metadata_id for restaurant")
+    return UUID(str(rows[0]["currency_metadata_id"]))
 
 
-def derive_credit_currency_id_for_address(
+def derive_currency_metadata_id_for_address(
     address_id: UUID,
     db: psycopg2.extensions.connection
 ) -> UUID:
     """
-    Derive credit_currency_id from an address. The credit currency comes from the
+    Derive currency_metadata_id from an address. The credit currency comes from the
     market associated with the address's country_code (address.country_code -> market_info).
 
     Args:
@@ -1272,14 +1272,14 @@ def derive_credit_currency_id_for_address(
         db: Database connection
 
     Returns:
-        UUID of the credit_currency_id for the address's market
+        UUID of the currency_metadata_id for the address's market
 
     Raises:
         ValueError: If address not found or no market/credit_currency for the address's country
     """
     rows = db_read(
         """
-        SELECT m.credit_currency_id
+        SELECT m.currency_metadata_id
         FROM address_info a
         INNER JOIN market_info m ON a.country_code = m.country_code AND m.is_archived = FALSE
         WHERE a.address_id = %s
@@ -1288,8 +1288,8 @@ def derive_credit_currency_id_for_address(
         connection=db,
     )
     if not rows:
-        raise ValueError(f"Could not derive credit_currency_id for address {address_id}")
-    return UUID(str(rows[0]["credit_currency_id"]))
+        raise ValueError(f"Could not derive currency_metadata_id for address {address_id}")
+    return UUID(str(rows[0]["currency_metadata_id"]))
 
 
 def search_restaurants(
@@ -1343,7 +1343,7 @@ def search_restaurants(
 
     if market_id is not None:
         conditions.append(
-            "ie.credit_currency_id = (SELECT credit_currency_id FROM market_info WHERE market_id = %s AND is_archived = FALSE LIMIT 1)"
+            "ie.currency_metadata_id = (SELECT currency_metadata_id FROM market_info WHERE market_id = %s AND is_archived = FALSE LIMIT 1)"
         )
         params.append(str(market_id))
 
@@ -1947,7 +1947,7 @@ def get_enriched_markets(
             "m.market_id",
             "m.country_name",
             "m.country_code",
-            "m.credit_currency_id",
+            "m.currency_metadata_id",
             "c.currency_name",
             "c.currency_code",
             "c.credit_value_local_currency",
@@ -1963,7 +1963,7 @@ def get_enriched_markets(
             "m.modified_date"
         ],
         joins=[
-            ("LEFT", "credit_currency_info", "c", "m.credit_currency_id = c.credit_currency_id")
+            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id")
         ],
         scope=None,  # Markets don't have institution scoping
         include_archived=include_archived,
@@ -2000,7 +2000,7 @@ def get_enriched_market_by_id(
             "m.market_id",
             "m.country_name",
             "m.country_code",
-            "m.credit_currency_id",
+            "m.currency_metadata_id",
             "c.currency_name",
             "c.currency_code",
             "c.credit_value_local_currency",
@@ -2016,7 +2016,7 @@ def get_enriched_market_by_id(
             "m.modified_date"
         ],
         joins=[
-            ("LEFT", "credit_currency_info", "c", "m.credit_currency_id = c.credit_currency_id")
+            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id")
         ],
         scope=None,  # Markets don't have institution scoping
         include_archived=include_archived
@@ -2091,7 +2091,7 @@ def get_enriched_plans(
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
-            ("INNER", "credit_currency_info", "cc", "m.credit_currency_id = cc.credit_currency_id")
+            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id")
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived,
@@ -2153,7 +2153,7 @@ def get_enriched_plan_by_id(
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
-            ("INNER", "credit_currency_info", "cc", "m.credit_currency_id = cc.credit_currency_id")
+            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id")
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived
@@ -2166,9 +2166,9 @@ def get_enriched_plan_by_id(
 # Initialize EnrichedService instance for credit currencies
 # Note: Credit currencies don't have institution scoping, so we pass None for institution_column
 _credit_currency_enriched_service = EnrichedService(
-    base_table="credit_currency_info",
+    base_table="currency_metadata",
     table_alias="cc",
-    id_column="credit_currency_id",
+    id_column="currency_metadata_id",
     schema_class=CreditCurrencyEnrichedResponseSchema,
     institution_column=None,  # Credit currencies don't have institution scoping
     institution_table_alias=None
@@ -2199,7 +2199,7 @@ def get_enriched_credit_currencies(
     return _credit_currency_enriched_service.get_enriched(
         db,
         select_fields=[
-            "cc.credit_currency_id",
+            "cc.currency_metadata_id",
             "cc.currency_name",
             "cc.currency_code",
             "cc.credit_value_local_currency",
@@ -2213,7 +2213,7 @@ def get_enriched_credit_currencies(
             "cc.modified_date"
         ],
         joins=[
-            ("INNER", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+            ("INNER", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
         ],
         scope=None,  # Credit currencies don't have institution scoping
         include_archived=include_archived,
@@ -2222,7 +2222,7 @@ def get_enriched_credit_currencies(
     )
 
 def get_enriched_credit_currency_by_id(
-    credit_currency_id: UUID,
+    currency_metadata_id: UUID,
     db: psycopg2.extensions.connection,
     *,
     scope: Optional[InstitutionScope] = None,
@@ -2232,7 +2232,7 @@ def get_enriched_credit_currency_by_id(
     Get a single credit currency by ID with enriched data (market information).
     
     Args:
-        credit_currency_id: Credit Currency ID
+        currency_metadata_id: Credit Currency ID
         db: Database connection
         scope: Optional institution scope for filtering (not used for credit currencies, but kept for consistency)
         include_archived: Whether to include archived records (default: False)
@@ -2244,10 +2244,10 @@ def get_enriched_credit_currency_by_id(
         HTTPException: For system errors or database failures
     """
     return _credit_currency_enriched_service.get_enriched_by_id(
-        credit_currency_id,
+        currency_metadata_id,
         db,
         select_fields=[
-            "cc.credit_currency_id",
+            "cc.currency_metadata_id",
             "cc.currency_name",
             "cc.currency_code",
             "cc.credit_value_local_currency",
@@ -2261,7 +2261,7 @@ def get_enriched_credit_currency_by_id(
             "cc.modified_date"
         ],
         joins=[
-            ("INNER", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+            ("INNER", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
         ],
         scope=None,  # Credit currencies don't have institution scoping
         include_archived=include_archived
@@ -2315,7 +2315,7 @@ def get_enriched_discretionary_requests(
             "r.name as restaurant_name",
             "COALESCE(u.institution_id, ie.institution_id) as institution_id",
             "i.name as institution_name",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "cc.currency_name",
             "cc.currency_code",
             "m.market_id",
@@ -2338,8 +2338,8 @@ def get_enriched_discretionary_requests(
             ("LEFT", "restaurant_info", "r", "d.restaurant_id = r.restaurant_id"),
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
-            ("LEFT", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
-            ("LEFT", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+            ("LEFT", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
+            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
         ],
         scope=scope,
         include_archived=include_archived,
@@ -2381,7 +2381,7 @@ def get_enriched_discretionary_request_by_id(
             "r.name as restaurant_name",
             "COALESCE(u.institution_id, ie.institution_id) as institution_id",
             "i.name as institution_name",
-            "ie.credit_currency_id",
+            "ie.currency_metadata_id",
             "cc.currency_name",
             "cc.currency_code",
             "m.market_id",
@@ -2404,8 +2404,8 @@ def get_enriched_discretionary_request_by_id(
             ("LEFT", "restaurant_info", "r", "d.restaurant_id = r.restaurant_id"),
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
-            ("LEFT", "credit_currency_info", "cc", "ie.credit_currency_id = cc.credit_currency_id"),
-            ("LEFT", "market_info", "m", "cc.credit_currency_id = m.credit_currency_id")
+            ("LEFT", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
+            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
         ],
         scope=scope,
         include_archived=include_archived
@@ -3133,7 +3133,7 @@ def get_enriched_institution_bills(
             "COALESCE(i.name, '') as institution_name",
             "ibi.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
-            "ibi.credit_currency_id",
+            "ibi.currency_metadata_id",
             "m.market_id",
             "m.country_name as market_name",
             "m.country_code",
@@ -3152,7 +3152,7 @@ def get_enriched_institution_bills(
         joins=[
             ("LEFT", "institution_info", "i", "ibi.institution_id = i.institution_id"),
             ("LEFT", "institution_entity_info", "ie", "ibi.institution_entity_id = ie.institution_entity_id"),
-            ("INNER", "market_info", "m", "ibi.credit_currency_id = m.credit_currency_id")
+            ("INNER", "market_info", "m", "ibi.currency_metadata_id = m.currency_metadata_id")
         ],
         scope=scope,
         include_archived=include_archived,
@@ -3348,7 +3348,7 @@ def get_enriched_restaurant_balances(
             "COALESCE(r.name, '') as restaurant_name",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",
-            "rb.credit_currency_id",
+            "rb.currency_metadata_id",
             "rb.transaction_count",
             "rb.balance",
             "rb.currency_code",
@@ -3412,7 +3412,7 @@ def get_enriched_restaurant_balance_by_id(
             "COALESCE(r.name, '') as restaurant_name",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",
-            "rb.credit_currency_id",
+            "rb.currency_metadata_id",
             "rb.transaction_count",
             "rb.balance",
             "rb.currency_code",
@@ -3490,7 +3490,7 @@ def get_enriched_restaurant_transactions(
             "rt.plate_selection_id",
             "COALESCE(pr.name, '') as plate_name",
             "rt.discretionary_id",
-            "rt.credit_currency_id",
+            "rt.currency_metadata_id",
             "rt.currency_code",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",
@@ -3569,7 +3569,7 @@ def get_enriched_restaurant_transaction_by_id(
             "rt.plate_selection_id",
             "COALESCE(pr.name, '') as plate_name",
             "rt.discretionary_id",
-            "rt.credit_currency_id",
+            "rt.currency_metadata_id",
             "rt.currency_code",
             "COALESCE(m.country_name, '') as country_name",
             "a.country_code",

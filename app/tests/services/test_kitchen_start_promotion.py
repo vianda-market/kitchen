@@ -66,7 +66,7 @@ class TestPromotePlateSelectionToLive:
         mock_supplier_terms = Mock()
         mock_supplier_terms.no_show_discount = 0
 
-        credit_currency_id = uuid4()
+        currency_metadata_id = uuid4()
         with patch('app.services.plate_selection_promotion_service.plate_selection_service') as mock_sel_svc, \
              patch('app.services.plate_selection_promotion_service.db_read') as mock_db_read, \
              patch('app.services.plate_selection_promotion_service.plate_service') as mock_plate_svc, \
@@ -75,7 +75,7 @@ class TestPromotePlateSelectionToLive:
              patch('app.services.plate_selection_promotion_service.supplier_terms_service') as mock_st_svc, \
              patch('app.services.plate_selection_promotion_service.qr_code_service') as mock_qr_svc, \
              patch('app.services.plate_selection_promotion_service.credit_currency_service') as mock_cc_svc, \
-             patch('app.services.plate_selection_promotion_service.get_credit_currency_id_for_restaurant', return_value=credit_currency_id), \
+             patch('app.services.plate_selection_promotion_service.get_currency_metadata_id_for_restaurant', return_value=currency_metadata_id), \
              patch('app.services.plate_selection_promotion_service.validate_sufficient_credits') as mock_validate:
             mock_sel_svc.get_by_id_non_archived.return_value = mock_selection
             mock_db_read.return_value = None  # Not yet promoted
@@ -84,7 +84,7 @@ class TestPromotePlateSelectionToLive:
             mock_inst_svc.get_by_id.return_value = mock_institution
             mock_st_svc.get_by_field.return_value = mock_supplier_terms
             mock_qr_svc.get_by_restaurant.return_value = Mock(qr_code_id=uuid4(), qr_code_payload="test")
-            mock_cc_svc.get_by_id.return_value = Mock(credit_currency_id=uuid4(), currency_code="USD")
+            mock_cc_svc.get_by_id.return_value = Mock(currency_metadata_id=uuid4(), currency_code="USD")
 
             from app.services.credit_validation_service import CreditValidationResult
             mock_validate.return_value = CreditValidationResult(

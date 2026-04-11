@@ -1269,7 +1269,7 @@ class CRUDService(Generic[T]):
     def create_balance_record(
         self,
         restaurant_id: UUID,
-        credit_currency_id: UUID,
+        currency_metadata_id: UUID,
         currency_code: str,
         modified_by: UUID,
         db: psycopg2.extensions.connection,
@@ -1283,7 +1283,7 @@ class CRUDService(Generic[T]):
         
         Args:
             restaurant_id: Restaurant UUID
-            credit_currency_id: Credit currency UUID
+            currency_metadata_id: Credit currency UUID
             currency_code: Currency code (e.g., 'ARS', 'USD')
             modified_by: User UUID who is creating the record
             db: Database connection
@@ -1303,13 +1303,13 @@ class CRUDService(Generic[T]):
             with db.cursor() as cursor:
                 query = f"""
                     INSERT INTO {self.table_name}
-                    (restaurant_id, credit_currency_id, transaction_count, balance, 
+                    (restaurant_id, currency_metadata_id, transaction_count, balance, 
                      currency_code, status, is_archived, created_date, modified_date, modified_by)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s)
                 """
                 cursor.execute(query, (
                     str(restaurant_id),
-                    str(credit_currency_id),
+                    str(currency_metadata_id),
                     0,  # Initial transaction count
                     0.00,  # Initial balance
                     currency_code,
@@ -1606,7 +1606,7 @@ restaurant_service = CRUDService("restaurant_info", RestaurantDTO, "restaurant_i
 institution_bill_service = CRUDService("institution_bill_info", InstitutionBillDTO, "institution_bill_id")
 institution_settlement_service = CRUDService("institution_settlement", InstitutionSettlementDTO, "settlement_id")
 client_bill_service = CRUDService("client_bill_info", ClientBillDTO, "client_bill_id")
-credit_currency_service = CRUDService("credit_currency_info", CreditCurrencyDTO, "credit_currency_id")
+credit_currency_service = CRUDService("currency_metadata", CreditCurrencyDTO, "currency_metadata_id")
 supplier_invoice_service = CRUDService(
     "supplier_invoice", SupplierInvoiceDTO, "supplier_invoice_id",
     institution_join_path=[
@@ -2297,13 +2297,13 @@ def reset_restaurant_balance(restaurant_id: UUID, db: psycopg2.extensions.connec
     """
     return restaurant_balance_service.reset_balance(restaurant_id, db, commit=commit)
 
-def create_restaurant_balance_record(restaurant_id: UUID, credit_currency_id: UUID, currency_code: str, modified_by: UUID, db: psycopg2.extensions.connection, *, commit: bool = True) -> bool:
+def create_restaurant_balance_record(restaurant_id: UUID, currency_metadata_id: UUID, currency_code: str, modified_by: UUID, db: psycopg2.extensions.connection, *, commit: bool = True) -> bool:
     """
     Create initial restaurant balance record for a new restaurant.
     
     Args:
         restaurant_id: Restaurant ID
-        credit_currency_id: Credit currency ID
+        currency_metadata_id: Credit currency ID
         currency_code: Currency code
         modified_by: User ID who is creating the record
         db: Database connection
@@ -2321,11 +2321,11 @@ def create_restaurant_balance_record(restaurant_id: UUID, credit_currency_id: UU
     This function will be removed in a future version.
     Please update your code to use the service method:
         from app.services.crud_service import restaurant_balance_service
-        restaurant_balance_service.create_balance_record(restaurant_id, credit_currency_id, 
+        restaurant_balance_service.create_balance_record(restaurant_id, currency_metadata_id, 
                                                          currency_code, modified_by, db, commit=commit)
     """
     return restaurant_balance_service.create_balance_record(
-        restaurant_id, credit_currency_id, currency_code, modified_by, db, commit=commit
+        restaurant_id, currency_metadata_id, currency_code, modified_by, db, commit=commit
     )
 
 # Additional methods for institution entity service  
@@ -2478,13 +2478,13 @@ def get_by_address_id(address_id: UUID, db: psycopg2.extensions.connection) -> O
     return geolocation_service.get_by_address(address_id, db)
 
 # Additional methods for plate service
-def get_plates_by_credit_currency_id(credit_currency_id: UUID, db: psycopg2.extensions.connection) -> List[PlateDTO]:
+def get_plates_by_currency_metadata_id(currency_metadata_id: UUID, db: psycopg2.extensions.connection) -> List[PlateDTO]:
     """Get all non-archived plates for a specific credit currency"""
     query = """
         SELECT * FROM plate_info 
-        WHERE credit_currency_id = %s AND is_archived = FALSE
+        WHERE currency_metadata_id = %s AND is_archived = FALSE
     """
-    results = db_read(query, (str(credit_currency_id),), connection=db)
+    results = db_read(query, (str(currency_metadata_id),), connection=db)
     return [PlateDTO(**row) for row in results] if results else []
 
 # =============================================================================

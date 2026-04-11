@@ -86,8 +86,9 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
             UPDATE institution_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE name LIKE 'Test %%'
         """)
-        # 8. Archive non-seed credit currencies (seed has USD, ARS, PEN, CLP, MXN, BRL)
-        seed_credit_currency_ids = (
+        # 8. Archive non-seed currency_metadata rows (seed has USD, ARS, PEN, CLP, MXN, BRL).
+        # Renamed from currency_metadata cleanup — the old table has been retired.
+        seed_currency_metadata_ids = (
             '55555555-5555-5555-5555-555555555555',  # USD
             '66666666-6666-6666-6666-666666666601',  # ARS
             '66666666-6666-6666-6666-666666666602',  # PEN
@@ -96,9 +97,9 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
             '66666666-6666-6666-6666-666666666605',  # BRL
         )
         cur.execute("""
-            UPDATE credit_currency_info SET is_archived = TRUE, status = 'inactive'::status_enum
-            WHERE credit_currency_id NOT IN %s
-        """, (seed_credit_currency_ids,))
+            UPDATE core.currency_metadata SET is_archived = TRUE, status = 'inactive'::status_enum
+            WHERE currency_metadata_id NOT IN %s
+        """, (seed_currency_metadata_ids,))
     conn.commit()
 
 

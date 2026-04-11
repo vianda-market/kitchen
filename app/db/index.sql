@@ -30,7 +30,9 @@ CREATE INDEX IF NOT EXISTS idx_institution_entity_history_institution_entity_id 
 
 CREATE INDEX IF NOT EXISTS idx_address_history_address_id ON audit.address_history(address_id);
 
-CREATE INDEX IF NOT EXISTS idx_address_location ON core.address_info(country_code, province, city);
+-- idx_address_location on (country_code, province, city) retired — address_info.city is dropped.
+-- Location filtering now goes through address_info.city_metadata_id → core.city_metadata → external.geonames_city.
+CREATE INDEX IF NOT EXISTS idx_address_location_country_province ON core.address_info(country_code, province);
 
 CREATE INDEX IF NOT EXISTS idx_payment_method_address_id ON customer.payment_method(address_id);
 
@@ -62,7 +64,8 @@ CREATE INDEX IF NOT EXISTS idx_institution_bill_history_institution_bill_id ON a
 CREATE INDEX IF NOT EXISTS idx_institution_settlement_history_settlement_id ON audit.institution_settlement_history(settlement_id);
 CREATE INDEX IF NOT EXISTS idx_institution_settlement_history_current ON audit.institution_settlement_history(settlement_id, is_current);
 
-CREATE INDEX IF NOT EXISTS idx_credit_currency_history_credit_currency_id ON audit.credit_currency_history(credit_currency_id);
+-- idx_credit_currency_history_* retired — core.credit_currency_info + audit.credit_currency_history dropped.
+-- Currency history now lives on audit.currency_metadata_history (indexed via PK).
 
 CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_plate_id ON ops.plate_kitchen_days(plate_id);
 CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_kitchen_day ON ops.plate_kitchen_days(kitchen_day);
@@ -121,8 +124,8 @@ CREATE INDEX IF NOT EXISTS idx_address_info_address_type ON core.address_info US
 -- Location indexes for UI filtering (individual columns for dropdowns/filters)
 CREATE INDEX IF NOT EXISTS idx_address_info_country_code ON core.address_info(country_code) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_address_info_province ON core.address_info(province) WHERE NOT is_archived;
-CREATE INDEX IF NOT EXISTS idx_address_info_city ON core.address_info(city) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_address_info_postal_code ON core.address_info(postal_code) WHERE NOT is_archived;
+-- city filter now goes through city_metadata_id (index already created in schema.sql as idx_address_info_city_metadata_id)
 
 -- Partial index for employer_id queries (only non-NULL, non-archived addresses)
 CREATE INDEX IF NOT EXISTS idx_address_info_employer_id ON core.address_info(employer_id) WHERE employer_id IS NOT NULL AND NOT is_archived;
@@ -132,12 +135,12 @@ CREATE INDEX IF NOT EXISTS idx_address_subpremise_address_id ON core.address_sub
 CREATE INDEX IF NOT EXISTS idx_address_subpremise_user_id ON core.address_subpremise(user_id);
 
 -- Composite indexes for common query patterns
--- For location-based filtering (country_code, province, city, postal_code) - matches common UI filter patterns
-CREATE INDEX IF NOT EXISTS idx_address_info_location ON core.address_info(country_code, province, city, postal_code) WHERE NOT is_archived;
+-- For location-based filtering (country_code, province, postal_code) - matches common UI filter patterns
+-- The former `city` column on address_info has been replaced by a FK to core.city_metadata;
+-- refined location filters go through that FK join instead of a city string match.
+CREATE INDEX IF NOT EXISTS idx_address_info_location ON core.address_info(country_code, province, postal_code) WHERE NOT is_archived;
 -- For filtering by country_code + province (common hierarchical filter)
 CREATE INDEX IF NOT EXISTS idx_address_info_country_province ON core.address_info(country_code, province) WHERE NOT is_archived;
--- For filtering by country_code + province + city (refined location filter)
-CREATE INDEX IF NOT EXISTS idx_address_info_country_province_city ON core.address_info(country_code, province, city) WHERE NOT is_archived;
 
 -- Discretionary history: look up creator (CREATE row) by discretionary_id and operation
 CREATE INDEX IF NOT EXISTS idx_discretionary_history_discretionary_operation ON audit.discretionary_history(discretionary_id, operation);

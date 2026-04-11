@@ -97,6 +97,7 @@ DROP SCHEMA IF EXISTS ops      CASCADE;
 DROP SCHEMA IF EXISTS customer CASCADE;
 DROP SCHEMA IF EXISTS billing  CASCADE;
 DROP SCHEMA IF EXISTS audit    CASCADE;
+DROP SCHEMA IF EXISTS external CASCADE;
 -- Reset public to a clean slate (extensions only)
 DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;

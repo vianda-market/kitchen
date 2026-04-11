@@ -658,7 +658,7 @@ class RestaurantResponseSchema(BaseModel):
     institution_id: UUID
     institution_entity_id: UUID
     address_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     name: str
     cuisine_id: Optional[UUID] = None
     cuisine_name: Optional[str] = None
@@ -1061,7 +1061,7 @@ class CreditCurrencyUpdateSchema(BaseModel):
 
 class CreditCurrencyResponseSchema(BaseModel):
     """Schema for credit currency response data"""
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     currency_name: str
     currency_code: str
     credit_value_local_currency: Decimal
@@ -1075,7 +1075,7 @@ class CreditCurrencyResponseSchema(BaseModel):
 
 class CreditCurrencyEnrichedResponseSchema(BaseModel):
     """Schema for enriched credit currency response data with market information"""
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     currency_name: str
     currency_code: str
     credit_value_local_currency: Decimal
@@ -1217,8 +1217,8 @@ class InstitutionBillEnrichedResponseSchema(BaseModel):
     institution_name: str
     institution_entity_id: UUID
     institution_entity_name: str
-    credit_currency_id: UUID
-    market_id: UUID  # Via credit_currency_id → market_info
+    currency_metadata_id: UUID
+    market_id: UUID  # Via currency_metadata_id → market_info
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
     transaction_count: Optional[int] = None
@@ -1472,7 +1472,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     province: str
     city: str
     postal_code: str
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     market_credit_value_local_currency: Decimal = Field(
         ...,
         description="Credit value in local currency for this market; use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_local_currency)",
@@ -1502,7 +1502,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
 class RestaurantBalanceResponseSchema(BaseModel):
     """Schema for restaurant balance response data (read-only)"""
     restaurant_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: int
     balance: Decimal
     currency_code: str
@@ -1524,7 +1524,7 @@ class RestaurantBalanceEnrichedResponseSchema(BaseModel):
     restaurant_name: str
     country_name: str
     country_code: str
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: int
     balance: Decimal
     currency_code: str
@@ -1542,7 +1542,7 @@ class RestaurantTransactionResponseSchema(BaseModel):
     restaurant_id: UUID
     plate_selection_id: Optional[UUID]
     discretionary_id: Optional[UUID]
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     was_collected: bool
     ordered_timestamp: datetime
     collected_timestamp: Optional[datetime]
@@ -1574,7 +1574,7 @@ class RestaurantTransactionEnrichedResponseSchema(BaseModel):
     plate_selection_id: Optional[UUID]
     plate_name: Optional[str]  # Optional because plate_selection_id can be NULL for discretionary transactions
     discretionary_id: Optional[UUID]
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     currency_code: Optional[str]
     country_name: str
     country_code: str
@@ -1893,10 +1893,10 @@ class DiscretionaryEnrichedResponseSchema(BaseModel):
     restaurant_name: Optional[str] = None  # For Supplier requests
     institution_id: UUID
     institution_name: str
-    credit_currency_id: Optional[UUID] = None  # NULL for Client requests (no restaurant)
+    currency_metadata_id: Optional[UUID] = None  # NULL for Client requests (no restaurant)
     currency_name: Optional[str] = None
     currency_code: Optional[str] = None
-    market_id: Optional[UUID] = None  # Via credit_currency_id → market_info; NULL for Client
+    market_id: Optional[UUID] = None  # Via currency_metadata_id → market_info; NULL for Client
     market_name: Optional[str] = None  # country_name from market_info
     country_code: Optional[str] = None  # from market_info
     approval_id: Optional[UUID]
@@ -1985,7 +1985,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_id: UUID
     address_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     tax_id: str
     name: str
     payout_provider_account_id: Optional[str] = None
@@ -2004,7 +2004,7 @@ class InstitutionEntityEnrichedResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_id: UUID
     institution_name: str
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     market_id: UUID  # Via address country → market
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
@@ -2322,16 +2322,16 @@ class MarketResponseSchema(BaseModel):
     market_id: UUID = Field(..., description="Unique identifier for the market")
     country_name: str = Field(..., description="Full country name (e.g., 'Argentina')")
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 country code (e.g., 'AR')")
-    credit_currency_id: UUID = Field(..., description="FK to credit_currency_info")
+    currency_metadata_id: UUID = Field(..., description="FK to currency_metadata")
     currency_code: Optional[str] = Field(None, description="Currency code (enriched from JOIN)")
     currency_name: Optional[str] = Field(None, description="Currency name (enriched from JOIN)")
     credit_value_local_currency: Optional[Decimal] = Field(
         None,
-        description="Local currency amount per credit (from credit_currency_info). Use for plan form preview: credit_cost_local_currency = price / credit.",
+        description="Local currency amount per credit (from currency_metadata). Use for plan form preview: credit_cost_local_currency = price / credit.",
     )
     currency_conversion_usd: Optional[Decimal] = Field(
         None,
-        description="Local units per 1 USD (from credit_currency_info). Use for plan form preview: credit_cost_usd = credit_cost_local_currency / currency_conversion_usd.",
+        description="Local units per 1 USD (from currency_metadata). Use for plan form preview: credit_cost_usd = credit_cost_local_currency / currency_conversion_usd.",
     )
     timezone: str = Field(..., description="Timezone for this market (e.g., 'America/Argentina/Buenos_Aires')")
     kitchen_close_time: str = Field(..., description="Order cutoff time (HH:MM local, e.g. 13:30)")
@@ -2541,7 +2541,7 @@ class MarketPublicResponseSchema(BaseModel):
 class MarketCreateSchema(BaseModel):
     """Schema for creating a new market. country_name is derived from country_code by the backend."""
     country_code: str = Field(..., description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, ARG, DE, DEU). API normalizes to alpha-2.", min_length=2, max_length=3)
-    credit_currency_id: UUID = Field(..., description="FK to credit_currency_info")
+    currency_metadata_id: UUID = Field(..., description="FK to currency_metadata")
     timezone: str = Field(..., description="Timezone (e.g., 'America/Argentina/Buenos_Aires')", max_length=50)
     kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30). Default 13:30 if omitted.")
     status: Optional[Status] = Field(default=None, description="Optional; omit or null and backend assigns default (Active)")
@@ -2580,7 +2580,7 @@ class MarketCreateSchema(BaseModel):
 class MarketUpdateSchema(BaseModel):
     """Schema for updating a market. When country_code is provided, country_name is derived by the backend."""
     country_code: Optional[str] = Field(None, description="ISO 3166-1 alpha-2 or alpha-3. API normalizes to alpha-2.", min_length=2, max_length=3)
-    credit_currency_id: Optional[UUID] = Field(None, description="FK to credit_currency_info")
+    currency_metadata_id: Optional[UUID] = Field(None, description="FK to currency_metadata")
     timezone: Optional[str] = Field(None, description="Timezone", max_length=50)
     kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30)")
     status: Optional[Status] = Field(None, description="Market status")

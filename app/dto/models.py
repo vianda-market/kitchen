@@ -265,7 +265,7 @@ class InstitutionBillDTO(BaseModel):
     institution_bill_id: UUID
     institution_id: UUID
     institution_entity_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: Optional[int] = None
     amount: Optional[Decimal] = None
     currency_code: Optional[str] = None
@@ -293,7 +293,7 @@ class InstitutionSettlementDTO(BaseModel):
     kitchen_day: str
     amount: Decimal
     currency_code: str
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: int
     balance_event_id: Optional[UUID] = None
     settlement_number: str
@@ -316,7 +316,7 @@ class ClientBillDTO(BaseModel):
     subscription_id: UUID
     user_id: UUID
     plan_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     amount: Decimal
     currency_code: str
     is_archived: bool = False
@@ -329,10 +329,20 @@ class ClientBillDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CreditCurrencyDTO(BaseModel):
-    """Pure DTO for credit currency data"""
-    credit_currency_id: UUID
-    currency_name: str
+    """Pure DTO for core.currency_metadata (Vianda pricing policy).
+
+    Two-tier split: external.iso4217_currency holds raw ISO 4217 name/numeric/minor_unit;
+    core.currency_metadata holds Vianda-owned pricing fields below. The DTO class name
+    is kept as `CreditCurrencyDTO` to minimize churn across ~15 importers; the underlying
+    table and column are named currency_metadata / currency_metadata_id.
+
+    `currency_name` is a PR2-deprecated compat column on core.currency_metadata (populated
+    from external.iso4217_currency.name in seed). PR2 will migrate services to JOIN the
+    raw table and drop the column.
+    """
+    currency_metadata_id: UUID
     currency_code: str
+    currency_name: Optional[str] = None
     credit_value_local_currency: Decimal
     currency_conversion_usd: Decimal
     is_archived: bool = False
@@ -597,7 +607,7 @@ class RestaurantTransactionDTO(BaseModel):
     restaurant_id: UUID
     plate_selection_id: Optional[UUID] = None
     discretionary_id: Optional[UUID] = None
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     was_collected: bool = False
     ordered_timestamp: datetime
     collected_timestamp: Optional[datetime] = None
@@ -768,11 +778,11 @@ class PlanDTO(BaseModel):
 # =============================================================================
 
 class InstitutionEntityDTO(BaseModel):
-    """Pure DTO for institution entity data. credit_currency_id from market for entity address country."""
+    """Pure DTO for institution entity data. currency_metadata_id from market for entity address country."""
     institution_entity_id: UUID
     institution_id: UUID
     address_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     tax_id: str
     name: str
     payout_provider_account_id: Optional[str] = None
@@ -992,7 +1002,7 @@ class QRCodeDTO(BaseModel):
 class RestaurantBalanceDTO(BaseModel):
     """Pure DTO for restaurant balance data"""
     restaurant_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: int = Field(..., ge=0)
     balance: Decimal = Field(..., ge=0)
     currency_code: str = Field(..., max_length=10)

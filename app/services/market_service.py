@@ -124,7 +124,7 @@ class MarketService:
                         m.market_id,
                         m.country_name,
                         m.country_code,
-                        m.credit_currency_id,
+                        m.currency_metadata_id,
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
@@ -137,7 +137,7 @@ class MarketService:
                         m.created_date,
                         m.modified_date
                     FROM market_info m
-                    LEFT JOIN credit_currency_info c ON m.credit_currency_id = c.credit_currency_id
+                    LEFT JOIN currency_metadata c ON m.currency_metadata_id = c.currency_metadata_id
                     WHERE 1=1
                 """
                 params = []
@@ -183,7 +183,7 @@ class MarketService:
                         m.market_id,
                         m.country_name,
                         m.country_code,
-                        m.credit_currency_id,
+                        m.currency_metadata_id,
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
@@ -196,7 +196,7 @@ class MarketService:
                         m.created_date,
                         m.modified_date
                     FROM market_info m
-                    LEFT JOIN credit_currency_info c ON m.credit_currency_id = c.credit_currency_id
+                    LEFT JOIN currency_metadata c ON m.currency_metadata_id = c.currency_metadata_id
                     WHERE m.market_id = %s
                 """, (str(market_id),))
                 
@@ -235,7 +235,7 @@ class MarketService:
                         m.market_id,
                         m.country_name,
                         m.country_code,
-                        m.credit_currency_id,
+                        m.currency_metadata_id,
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
@@ -248,7 +248,7 @@ class MarketService:
                         m.created_date,
                         m.modified_date
                     FROM market_info m
-                    LEFT JOIN credit_currency_info c ON m.credit_currency_id = c.credit_currency_id
+                    LEFT JOIN currency_metadata c ON m.currency_metadata_id = c.currency_metadata_id
                     WHERE m.country_code = %s
                 """, (country_code.upper(),))
                 
@@ -271,7 +271,7 @@ class MarketService:
         self,
         country_name: str,
         country_code: str,
-        credit_currency_id: UUID,
+        currency_metadata_id: UUID,
         timezone: str,
         modified_by: UUID,
         status: Status = Status.ACTIVE,
@@ -284,7 +284,7 @@ class MarketService:
         Args:
             country_name: Full country name
             country_code: ISO 3166-1 alpha-2 country code
-            credit_currency_id: FK to credit_currency_info
+            currency_metadata_id: FK to currency_metadata
             timezone: Timezone for this market
             modified_by: User ID creating the market
             status: Market status (default: Active)
@@ -304,7 +304,7 @@ class MarketService:
                     INSERT INTO market_info (
                         country_name,
                         country_code,
-                        credit_currency_id,
+                        currency_metadata_id,
                         timezone,
                         kitchen_close_time,
                         language,
@@ -316,7 +316,7 @@ class MarketService:
                         market_id,
                         country_name,
                         country_code,
-                        credit_currency_id,
+                        currency_metadata_id,
                         timezone,
                         kitchen_close_time,
                         language,
@@ -327,7 +327,7 @@ class MarketService:
                 """, (
                     country_name,
                     country_code.upper(),
-                    str(credit_currency_id),
+                    str(currency_metadata_id),
                     timezone,
                     kct,
                     lang,
@@ -344,7 +344,7 @@ class MarketService:
                         m.market_id,
                         m.country_name,
                         m.country_code,
-                        m.credit_currency_id,
+                        m.currency_metadata_id,
                         c.currency_code,
                         c.currency_name,
                         m.timezone,
@@ -357,7 +357,7 @@ class MarketService:
                         m.created_date,
                         m.modified_date
                     FROM market_info m
-                    LEFT JOIN credit_currency_info c ON m.credit_currency_id = c.credit_currency_id
+                    LEFT JOIN currency_metadata c ON m.currency_metadata_id = c.currency_metadata_id
                     WHERE m.market_id = %s
                 """, (market['market_id'],))
                 
@@ -382,7 +382,7 @@ class MarketService:
         modified_by: UUID,
         country_name: Optional[str] = None,
         country_code: Optional[str] = None,
-        credit_currency_id: Optional[UUID] = None,
+        currency_metadata_id: Optional[UUID] = None,
         timezone: Optional[str] = None,
         kitchen_close_time: Optional[time] = None,
         status: Optional[Status] = None,
@@ -397,7 +397,7 @@ class MarketService:
             modified_by: User ID performing the update
             country_name: Optional new country name
             country_code: Optional new country code
-            credit_currency_id: Optional new FK to credit_currency_info
+            currency_metadata_id: Optional new FK to currency_metadata
             timezone: Optional new timezone
             kitchen_close_time: Optional new order cutoff time
             status: Optional new status
@@ -422,9 +422,9 @@ class MarketService:
                 updates.append("country_code = %s")
                 params.append(country_code.upper())
             
-            if credit_currency_id is not None:
-                updates.append("credit_currency_id = %s")
-                params.append(str(credit_currency_id))
+            if currency_metadata_id is not None:
+                updates.append("currency_metadata_id = %s")
+                params.append(str(currency_metadata_id))
             
             if timezone is not None:
                 updates.append("timezone = %s")

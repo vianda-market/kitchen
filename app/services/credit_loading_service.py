@@ -139,9 +139,9 @@ class CreditLoadingService:
             restaurant = restaurant_service.get_by_id(restaurant_id, db)
             if not restaurant:
                 raise entity_not_found("Restaurant", restaurant_id)
-            from app.services.entity_service import get_credit_currency_id_for_restaurant
-            credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
-            currency = credit_currency_service.get_by_id(credit_currency_id, db)
+            from app.services.entity_service import get_currency_metadata_id_for_restaurant
+            currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+            currency = credit_currency_service.get_by_id(currency_metadata_id, db)
             if not currency:
                 raise HTTPException(status_code=404, detail="Credit currency not found for restaurant")
 
@@ -151,7 +151,7 @@ class CreditLoadingService:
                 "restaurant_id": restaurant_id,
                 "plate_selection_id": None,
                 "discretionary_id": discretionary_id,
-                "credit_currency_id": credit_currency_id,
+                "currency_metadata_id": currency_metadata_id,
                 "was_collected": False,
                 "ordered_timestamp": now,
                 "collected_timestamp": None,

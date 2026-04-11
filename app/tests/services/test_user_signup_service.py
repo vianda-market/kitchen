@@ -538,7 +538,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="GL")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="XG")
         sample_user_data["city_id"] = GLOBAL_CITY_ID
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)

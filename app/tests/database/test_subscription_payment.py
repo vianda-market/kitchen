@@ -271,10 +271,10 @@ class TestSubscriptionPaymentFlow:
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
-            cur.execute("SELECT credit_currency_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
+            cur.execute("SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
             row = cur.fetchone()
             assert row is not None
-            credit_currency_id = row[0]
+            currency_metadata_id = row[0]
             plan_id = uuid4()
             cur.execute(
                 """
@@ -304,10 +304,10 @@ class TestSubscriptionPaymentFlow:
             bill_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, credit_currency_id, amount, currency_code, status, modified_by)
+                INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, currency_metadata_id, amount, currency_code, status, modified_by)
                 VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
-                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(credit_currency_id), str(user_id)),
+                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(currency_metadata_id), str(user_id)),
             )
         process_client_bill_internal(bill_id, db_transaction, user_id, commit=True)
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
@@ -366,10 +366,10 @@ class TestSubscriptionPaymentFlow:
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
-            cur.execute("SELECT credit_currency_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
+            cur.execute("SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
             row = cur.fetchone()
             assert row is not None
-            credit_currency_id = row[0]
+            currency_metadata_id = row[0]
             plan_id = uuid4()
             cur.execute(
                 """
@@ -399,10 +399,10 @@ class TestSubscriptionPaymentFlow:
             bill_id = uuid4()
             cur.execute(
                 """
-                INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, credit_currency_id, amount, currency_code, status, modified_by)
+                INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, currency_metadata_id, amount, currency_code, status, modified_by)
                 VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
-                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(credit_currency_id), str(user_id)),
+                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(currency_metadata_id), str(user_id)),
             )
         process_client_bill_internal(bill_id, db_transaction, user_id, commit=True)
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)

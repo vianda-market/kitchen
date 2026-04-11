@@ -119,7 +119,7 @@ class TestDiscretionaryService:
             restaurant_id=uuid4(),
             institution_id=uuid4(),
             institution_entity_id=uuid4(),
-            credit_currency_id=uuid4(),
+            currency_metadata_id=uuid4(),
             name="Test Restaurant",
             address_id=uuid4(),
             is_archived=False,
@@ -408,10 +408,10 @@ class TestDiscretionaryService:
             "market_id": uuid4(),
         }
         with patch("app.services.discretionary_service.restaurant_service") as mock_rest_service, \
-             patch("app.services.entity_service.get_credit_currency_id_for_restaurant", return_value=entity_cc_id), \
+             patch("app.services.entity_service.get_currency_metadata_id_for_restaurant", return_value=entity_cc_id), \
              patch("app.services.discretionary_service.market_service") as mock_market_service:
             mock_rest_service.get_by_id.return_value = sample_restaurant_dto
-            mock_market_service.get_by_id.return_value = {"credit_currency_id": uuid4()}  # different from entity
+            mock_market_service.get_by_id.return_value = {"currency_metadata_id": uuid4()}  # different from entity
             with pytest.raises(HTTPException) as exc_info:
                 discretionary_service.create_discretionary_request(
                     request_data, sample_admin_user, mock_db

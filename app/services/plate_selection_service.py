@@ -264,9 +264,9 @@ def _fetch_plate_selection_context(
         raise HTTPException(status_code=404, detail=f"No QR code found for restaurant {plate.restaurant_id}")
     
     # Fetch credit currency (from institution_entity, not restaurant)
-    from app.services.entity_service import get_credit_currency_id_for_restaurant
-    credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
-    credit_currency = credit_currency_service.get_by_id(credit_currency_id, db)
+    from app.services.entity_service import get_currency_metadata_id_for_restaurant
+    currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+    credit_currency = credit_currency_service.get_by_id(currency_metadata_id, db)
     if not credit_currency:
         raise HTTPException(status_code=404, detail=f"Credit currency not found for restaurant {plate.restaurant_id}")
     

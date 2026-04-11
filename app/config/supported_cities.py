@@ -9,9 +9,13 @@ from typing import List, Optional
 from uuid import UUID
 
 # Global city for B2B users (Internal, Supplier). No city filter in queries.
-# country_code 'GL' matches Global Marketplace. Seeded in seed.sql.
+# country_code 'XG' is Vianda's synthetic Global Marketplace. Uses the ISO 3166-1
+# user-assigned X-series range so it never collides with a real country code
+# (in particular, 'GL' is real ISO 3166 Greenland — which Vianda does not serve).
+# Seeded in app/db/seed/reference_data.sql alongside a synthetic external.geonames_country
+# row (also 'XG') so market_info.country_code FK resolves cleanly.
 GLOBAL_CITY_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-GLOBAL_CITY_COUNTRY_CODE = "GL"
+GLOBAL_CITY_COUNTRY_CODE = "XG"
 GLOBAL_CITY_NAME = "Global"
 
 

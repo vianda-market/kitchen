@@ -309,7 +309,7 @@ class InstitutionBillingService:
                 "kitchen_day": kitchen_day,
                 "amount": balance_record.balance,
                 "currency_code": balance_record.currency_code,
-                "credit_currency_id": balance_record.credit_currency_id,
+                "currency_metadata_id": balance_record.currency_metadata_id,
                 "transaction_count": balance_record.transaction_count,
                 "balance_event_id": balance_event_id,
                 "settlement_number": settlement_number,
@@ -502,7 +502,7 @@ class InstitutionBillingService:
                 bill_data = {
                     "institution_id": institution_id,
                     "institution_entity_id": institution_entity_id,
-                    "credit_currency_id": first.credit_currency_id,
+                    "currency_metadata_id": first.currency_metadata_id,
                     "transaction_count": transaction_count,
                     "amount": amount,
                     "currency_code": first.currency_code,
@@ -845,7 +845,7 @@ class InstitutionBillingService:
                     r.restaurant_id,
                     r.institution_id,
                     r.institution_entity_id,
-                    ie.credit_currency_id,
+                    ie.currency_metadata_id,
                     rb.transaction_count,
                     rb.balance,
                     rb.currency_code
@@ -878,7 +878,7 @@ class InstitutionBillingService:
                                 "restaurant_id": row["restaurant_id"] if isinstance(row.get("restaurant_id"), UUID) else UUID(str(row["restaurant_id"])),
                                 "institution_id": row["institution_id"] if isinstance(row.get("institution_id"), UUID) else UUID(str(row["institution_id"])),
                                 "institution_entity_id": row["institution_entity_id"] if isinstance(row.get("institution_entity_id"), UUID) else UUID(str(row["institution_entity_id"])),
-                                "credit_currency_id": row["credit_currency_id"] if isinstance(row.get("credit_currency_id"), UUID) else UUID(str(row["credit_currency_id"])),
+                                "currency_metadata_id": row["currency_metadata_id"] if isinstance(row.get("currency_metadata_id"), UUID) else UUID(str(row["currency_metadata_id"])),
                                 "transaction_count": row["transaction_count"],
                                 "balance": Decimal(str(row["balance"])),
                                 "currency_code": row["currency_code"]
@@ -889,7 +889,7 @@ class InstitutionBillingService:
                                 "restaurant_id": row[0] if isinstance(row[0], UUID) else UUID(str(row[0])),
                                 "institution_id": row[1] if isinstance(row[1], UUID) else UUID(str(row[1])),
                                 "institution_entity_id": row[2] if isinstance(row[2], UUID) else UUID(str(row[2])),
-                                "credit_currency_id": row[3] if isinstance(row[3], UUID) else UUID(str(row[3])),
+                                "currency_metadata_id": row[3] if isinstance(row[3], UUID) else UUID(str(row[3])),
                                 "transaction_count": row[4],
                                 "balance": Decimal(str(row[5])),
                                 "currency_code": row[6]
@@ -925,7 +925,7 @@ class InstitutionBillingService:
                 entity_aggregates[entity_id] = {
                     "institution_entity_id": entity_id,
                     "institution_id": restaurant["institution_id"],
-                    "credit_currency_id": restaurant["credit_currency_id"],
+                    "currency_metadata_id": restaurant["currency_metadata_id"],
                     "total_balance": Decimal('0.00'),
                     "total_transactions": 0,
                     "currency_code": restaurant["currency_code"],
@@ -1049,7 +1049,7 @@ class InstitutionBillingService:
             return {} 
 
     @staticmethod
-    def _reduce_restaurant_balances(restaurant_ids: List[UUID], bill_amount: Decimal, credit_currency_id: UUID, currency_code: str, system_user_id: UUID, connection=None):
+    def _reduce_restaurant_balances(restaurant_ids: List[UUID], bill_amount: Decimal, currency_metadata_id: UUID, currency_code: str, system_user_id: UUID, connection=None):
         """
         Reduce restaurant balances after successful billing to ensure daily balance starts from 0.
         
@@ -1121,7 +1121,7 @@ class InstitutionBillingService:
             
             # Get all restaurants with non-zero balances
             query = """
-                SELECT rb.restaurant_id, rb.balance, rb.currency_code, rb.credit_currency_id
+                SELECT rb.restaurant_id, rb.balance, rb.currency_code, rb.currency_metadata_id
                 FROM restaurant_balance_info rb
                 WHERE rb.is_archived = %s AND rb.balance > 0
             """
@@ -1140,12 +1140,12 @@ class InstitutionBillingService:
                     restaurant_id = row["restaurant_id"] if isinstance(row.get("restaurant_id"), UUID) else UUID(str(row["restaurant_id"]))
                     current_balance = Decimal(str(row["balance"]))
                     currency_code = row["currency_code"]
-                    credit_currency_id = row["credit_currency_id"] if isinstance(row.get("credit_currency_id"), UUID) else UUID(str(row["credit_currency_id"]))
+                    currency_metadata_id = row["currency_metadata_id"] if isinstance(row.get("currency_metadata_id"), UUID) else UUID(str(row["currency_metadata_id"]))
                 else:
                     restaurant_id = row[0]
                     current_balance = Decimal(str(row[1]))
                     currency_code = row[2]
-                    credit_currency_id = row[3]
+                    currency_metadata_id = row[3]
                 
                 try:
                     # Reset balance to 0

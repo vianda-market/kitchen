@@ -91,7 +91,7 @@ BEGIN
         support_email_suppressed_until,
         last_support_email_date,
         market_id,
-        city_id,
+        city_metadata_id,
         locale,
         referral_code,
         referred_by_code,
@@ -123,7 +123,7 @@ BEGIN
         NEW.support_email_suppressed_until,
         NEW.last_support_email_date,
         NEW.market_id,
-        NEW.city_id,
+        NEW.city_metadata_id,
         NEW.locale,
         NEW.referral_code,
         NEW.referred_by_code,
@@ -184,7 +184,7 @@ BEGIN
         institution_entity_id,
         institution_id,
         address_id,
-        credit_currency_id,
+        currency_metadata_id,
         tax_id,
         name,
         payout_provider_account_id,
@@ -204,7 +204,7 @@ BEGIN
         NEW.institution_entity_id,
         NEW.institution_id,
         NEW.address_id,
-        NEW.credit_currency_id,
+        NEW.currency_metadata_id,
         NEW.tax_id,
         NEW.name,
         NEW.payout_provider_account_id,
@@ -254,6 +254,7 @@ BEGIN
         country_code,
         province,
         city,
+        city_metadata_id,
         postal_code,
         street_type,
         street_name,
@@ -277,6 +278,7 @@ BEGIN
         NEW.country_code,
         NEW.province,
         NEW.city,
+        NEW.city_metadata_id,
         NEW.postal_code,
         NEW.street_type,
         NEW.street_name,
@@ -461,6 +463,8 @@ BEGIN
         member_perks,
         member_perks_i18n,
         require_kiosk_code_verification,
+        kitchen_open_time,
+        kitchen_close_time,
         is_archived,
         status,
         created_date,
@@ -491,6 +495,8 @@ BEGIN
         NEW.member_perks,
         NEW.member_perks_i18n,
         NEW.require_kiosk_code_verification,
+        NEW.kitchen_open_time,
+        NEW.kitchen_close_time,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -593,10 +599,10 @@ RETURNS TRIGGER AS $$
 DECLARE
     cv NUMERIC;
 BEGIN
-    SELECT cc.credit_value_local_currency INTO cv
+    SELECT cm.credit_value_local_currency INTO cv
     FROM ops.restaurant_info r
     JOIN ops.institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
-    JOIN core.credit_currency_info cc ON ie.credit_currency_id = cc.credit_currency_id
+    JOIN core.currency_metadata cm ON ie.currency_metadata_id = cm.currency_metadata_id
     WHERE r.restaurant_id = NEW.restaurant_id;
     NEW.expected_payout_local_currency := COALESCE(NEW.credit * NULLIF(cv, 0), 0);
     RETURN NEW;
@@ -784,9 +790,9 @@ DECLARE
     conv_usd NUMERIC;
 BEGIN
     NEW.credit_cost_local_currency := COALESCE(NEW.price / NULLIF(NEW.credit, 0), 0);
-    SELECT cc.currency_conversion_usd INTO conv_usd
+    SELECT cm.currency_conversion_usd INTO conv_usd
     FROM core.market_info m
-    JOIN core.credit_currency_info cc ON m.credit_currency_id = cc.credit_currency_id
+    JOIN core.currency_metadata cm ON m.currency_metadata_id = cm.currency_metadata_id
     WHERE m.market_id = NEW.market_id;
     NEW.credit_cost_usd := COALESCE(NEW.credit_cost_local_currency / NULLIF(conv_usd, 0), 0);
     RETURN NEW;
@@ -995,7 +1001,7 @@ BEGIN
         subscription_id,
         user_id,
         plan_id,
-        credit_currency_id,
+        currency_metadata_id,
         amount,
         currency_code,
         is_archived,
@@ -1014,7 +1020,7 @@ BEGIN
         NEW.subscription_id,
         NEW.user_id,
         NEW.plan_id,
-        NEW.credit_currency_id,
+        NEW.currency_metadata_id,
         NEW.amount,
         NEW.currency_code,
         NEW.is_archived,
@@ -1056,7 +1062,7 @@ BEGIN
     INSERT INTO audit.restaurant_balance_history (
         event_id,
         restaurant_id,
-        credit_currency_id,
+        currency_metadata_id,
         transaction_count,
         balance,
         currency_code,
@@ -1072,7 +1078,7 @@ BEGIN
     VALUES (
         new_event_id,
         NEW.restaurant_id,
-        NEW.credit_currency_id,
+        NEW.currency_metadata_id,
         NEW.transaction_count,
         NEW.balance,
         NEW.currency_code,
@@ -1116,7 +1122,7 @@ BEGIN
         institution_bill_id,
         institution_id,
         institution_entity_id,
-        credit_currency_id,
+        currency_metadata_id,
         transaction_count,
         amount,
         currency_code,
@@ -1138,7 +1144,7 @@ BEGIN
         NEW.institution_bill_id,
         NEW.institution_id,
         NEW.institution_entity_id,
-        NEW.credit_currency_id,
+        NEW.currency_metadata_id,
         NEW.transaction_count,
         NEW.amount,
         NEW.currency_code,
@@ -1190,7 +1196,7 @@ BEGIN
         kitchen_day,
         amount,
         currency_code,
-        credit_currency_id,
+        currency_metadata_id,
         transaction_count,
         balance_event_id,
         settlement_number,
@@ -1216,7 +1222,7 @@ BEGIN
         NEW.kitchen_day,
         NEW.amount,
         NEW.currency_code,
-        NEW.credit_currency_id,
+        NEW.currency_metadata_id,
         NEW.transaction_count,
         NEW.balance_event_id,
         NEW.settlement_number,
@@ -1319,88 +1325,11 @@ AFTER INSERT OR UPDATE ON billing.supplier_invoice
 FOR EACH ROW
 EXECUTE FUNCTION supplier_invoice_history_trigger_func();
 
--- Trigger function for core.credit_currency_info history logging
-CREATE OR REPLACE FUNCTION credit_currency_history_trigger_func()
-RETURNS TRIGGER AS $$
-DECLARE
-    new_event_id UUID := uuidv7();
-BEGIN
-    IF (TG_OP = 'UPDATE') THEN
-        -- Mark the previous history record for this credit_currency as not current
-        UPDATE audit.credit_currency_history
-        SET is_current = FALSE,
-            valid_until = CURRENT_TIMESTAMP
-        WHERE credit_currency_id = OLD.credit_currency_id AND is_current = TRUE;
-    END IF;
-
-    INSERT INTO audit.credit_currency_history (
-        event_id,
-        credit_currency_id,
-        currency_name,
-        currency_code,
-        credit_value_local_currency,
-        currency_conversion_usd,
-        is_archived,
-        status,
-        created_date,
-        created_by,
-        modified_by,
-        modified_date,
-        is_current,
-        valid_until
-    )
-    VALUES (
-        new_event_id,
-        NEW.credit_currency_id,
-        NEW.currency_name,
-        NEW.currency_code,
-        NEW.credit_value_local_currency,
-        NEW.currency_conversion_usd,
-        NEW.is_archived,
-        NEW.status,
-        NEW.created_date,
-        NEW.created_by,
-        NEW.modified_by,
-        NEW.modified_date,
-        TRUE,
-        'infinity'
-    );
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create the trigger on core.credit_currency_info
-DROP TRIGGER IF EXISTS credit_currency_history_trigger ON core.credit_currency_info;
-CREATE TRIGGER credit_currency_history_trigger
-AFTER INSERT OR UPDATE ON core.credit_currency_info
-FOR EACH ROW
-EXECUTE FUNCTION credit_currency_history_trigger_func();
-
--- WARNING: Bulk UPDATE on ops.plate_info — may be slow on large datasets (thousands of plates per market).
--- Consider async job for prod if plate count per credit_currency is large.
-CREATE OR REPLACE FUNCTION credit_currency_refresh_plate_payouts_func()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.credit_value_local_currency IS DISTINCT FROM NEW.credit_value_local_currency THEN
-        UPDATE ops.plate_info p
-        SET modified_date = CURRENT_TIMESTAMP,
-            modified_by = NEW.modified_by
-        FROM ops.restaurant_info r
-        JOIN ops.institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
-        WHERE p.restaurant_id = r.restaurant_id
-          AND ie.credit_currency_id = NEW.credit_currency_id
-          AND p.is_archived = FALSE;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS credit_currency_refresh_plate_payouts_trigger ON core.credit_currency_info;
-CREATE TRIGGER credit_currency_refresh_plate_payouts_trigger
-AFTER UPDATE ON core.credit_currency_info
-FOR EACH ROW
-EXECUTE FUNCTION credit_currency_refresh_plate_payouts_func();
+-- credit_currency_history_trigger and credit_currency_refresh_plate_payouts_trigger retired
+-- along with core.credit_currency_info. Currency is now a two-tier split
+-- (external.iso4217_currency raw + core.currency_metadata policy); metadata history
+-- is logged by currency_metadata_history_trigger_func further below.
+-- Plate-payout refresh on currency-rate change is a backlog service-layer concern.
 
 -- Trigger function for core.market_info history logging
 CREATE OR REPLACE FUNCTION market_history_trigger_func()
@@ -1419,10 +1348,11 @@ BEGIN
     INSERT INTO audit.market_history (
         event_id,
         market_id,
-        country_name,
         country_code,
-        credit_currency_id,
+        country_name,
+        currency_metadata_id,
         timezone,
+        kitchen_open_time,
         kitchen_close_time,
         language,
         phone_dial_code,
@@ -1439,10 +1369,11 @@ BEGIN
     VALUES (
         new_event_id,
         NEW.market_id,
-        NEW.country_name,
         NEW.country_code,
-        NEW.credit_currency_id,
+        NEW.country_name,
+        NEW.currency_metadata_id,
         NEW.timezone,
+        NEW.kitchen_open_time,
         NEW.kitchen_close_time,
         NEW.language,
         NEW.phone_dial_code,
@@ -2124,3 +2055,197 @@ CREATE TRIGGER referral_info_history_trigger
 AFTER INSERT OR UPDATE ON customer.referral_info
 FOR EACH ROW
 EXECUTE FUNCTION referral_info_history_trigger_func();
+
+-- =============================================================================
+-- METADATA LAYER HISTORY TRIGGERS
+-- =============================================================================
+-- core.country_metadata / core.city_metadata / core.currency_metadata are the
+-- writable Vianda-owned layer on top of external.*. Each gets a standard
+-- "mark prior current row as not current, insert new history row" trigger.
+-- external.* raw tables deliberately have NO history triggers — they're
+-- reproducible from source TSVs via app/scripts/import_geonames.py.
+
+-- ─────────────────────────────── country_metadata ───────────────────────────────
+
+CREATE OR REPLACE FUNCTION country_metadata_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.country_metadata_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE country_metadata_id = OLD.country_metadata_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.country_metadata_history (
+        event_id,
+        country_metadata_id,
+        country_iso,
+        market_id,
+        display_name_override,
+        display_name_i18n,
+        is_customer_audience,
+        is_supplier_audience,
+        is_employer_audience,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.country_metadata_id,
+        NEW.country_iso,
+        NEW.market_id,
+        NEW.display_name_override,
+        NEW.display_name_i18n,
+        NEW.is_customer_audience,
+        NEW.is_supplier_audience,
+        NEW.is_employer_audience,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS country_metadata_history_trigger ON core.country_metadata;
+CREATE TRIGGER country_metadata_history_trigger
+AFTER INSERT OR UPDATE ON core.country_metadata
+FOR EACH ROW
+EXECUTE FUNCTION country_metadata_history_trigger_func();
+
+-- ─────────────────────────────── city_metadata ───────────────────────────────
+
+CREATE OR REPLACE FUNCTION city_metadata_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.city_metadata_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE city_metadata_id = OLD.city_metadata_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.city_metadata_history (
+        event_id,
+        city_metadata_id,
+        geonames_id,
+        country_iso,
+        display_name_override,
+        display_name_i18n,
+        show_in_signup_picker,
+        show_in_supplier_form,
+        show_in_customer_form,
+        is_served,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.city_metadata_id,
+        NEW.geonames_id,
+        NEW.country_iso,
+        NEW.display_name_override,
+        NEW.display_name_i18n,
+        NEW.show_in_signup_picker,
+        NEW.show_in_supplier_form,
+        NEW.show_in_customer_form,
+        NEW.is_served,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS city_metadata_history_trigger ON core.city_metadata;
+CREATE TRIGGER city_metadata_history_trigger
+AFTER INSERT OR UPDATE ON core.city_metadata
+FOR EACH ROW
+EXECUTE FUNCTION city_metadata_history_trigger_func();
+
+-- ─────────────────────────────── currency_metadata ───────────────────────────────
+
+CREATE OR REPLACE FUNCTION currency_metadata_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.currency_metadata_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE currency_metadata_id = OLD.currency_metadata_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.currency_metadata_history (
+        event_id,
+        currency_metadata_id,
+        currency_code,
+        currency_name,
+        credit_value_local_currency,
+        currency_conversion_usd,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.currency_metadata_id,
+        NEW.currency_code,
+        NEW.currency_name,
+        NEW.credit_value_local_currency,
+        NEW.currency_conversion_usd,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS currency_metadata_history_trigger ON core.currency_metadata;
+CREATE TRIGGER currency_metadata_history_trigger
+AFTER INSERT OR UPDATE ON core.currency_metadata
+FOR EACH ROW
+EXECUTE FUNCTION currency_metadata_history_trigger_func();

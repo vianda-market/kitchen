@@ -10,7 +10,7 @@ from typing import List, Optional
 
 # (currency_name, currency_code) - ISO 4217. Names must be unique for name→code lookup.
 # Americas-focused plus common; sorted by code for maintainability; API returns sorted by name.
-# currency_name max 50 chars (credit_currency_info.currency_name).
+# currency_name max 50 chars (currency_metadata.currency_name).
 SUPPORTED_CURRENCIES: List[tuple] = [
     ("Argentine Peso", "ARS"),
     ("Bahamian Dollar", "BSD"),

@@ -104,7 +104,7 @@ def handle_database_exception(error: Exception, operation_type: str = "database 
             return HTTPException(status_code=400, detail=get_message("error.db_fk_user", locale))
         elif 'institution_id' in error_message:
             return HTTPException(status_code=400, detail=get_message("error.db_fk_institution", locale))
-        elif 'credit_currency_id' in error_message:
+        elif 'currency_metadata_id' in error_message:
             return HTTPException(status_code=400, detail=get_message("error.db_fk_currency", locale))
         elif 'payment_id' in error_message:
             return HTTPException(status_code=400, detail=get_message("error.db_fk_payment", locale))
@@ -146,7 +146,7 @@ def handle_database_exception(error: Exception, operation_type: str = "database 
 
 def get_duplicate_key_error_message(table_name: str, field_name: str, locale: str = "en") -> str:
     key_map = {
-        ('credit_currency_info', 'currency_code'): "error.db_duplicate_currency",
+        ('currency_metadata', 'currency_code'): "error.db_duplicate_currency",
         ('user_info', 'username'): "error.db_duplicate_username",
         ('user_info', 'email'): "error.db_duplicate_email",
         ('institution_info', 'name'): "error.db_duplicate_institution",
@@ -162,7 +162,7 @@ def get_foreign_key_error_message(table_name: str, field_name: str, locale: str 
     key_map = {
         'modified_by': "error.db_fk_user",
         'institution_id': "error.db_fk_institution",
-        'credit_currency_id': "error.db_fk_currency",
+        'currency_metadata_id': "error.db_fk_currency",
         'user_id': "error.db_fk_user",
         'restaurant_id': "error.db_fk_generic",
     }

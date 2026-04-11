@@ -121,7 +121,7 @@ TABLE_CATEGORY_MAPPING: Dict[str, ArchivalCategory] = {
     "plate_info": ArchivalCategory.REFERENCE_DATA,
     "plan_info": ArchivalCategory.REFERENCE_DATA,
     "qr_code": ArchivalCategory.REFERENCE_DATA,
-    "credit_currency_info": ArchivalCategory.REFERENCE_DATA,
+    "currency_metadata": ArchivalCategory.REFERENCE_DATA,
     "plate_kitchen_days": ArchivalCategory.REFERENCE_DATA,
     "external_payment_method": ArchivalCategory.REFERENCE_DATA,
 

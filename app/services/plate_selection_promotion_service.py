@@ -25,7 +25,7 @@ from app.services.crud_service import (
     create_with_conservative_balance_update,
     update_balance, mark_plate_selection_complete,
 )
-from app.services.entity_service import get_credit_currency_id_for_restaurant
+from app.services.entity_service import get_currency_metadata_id_for_restaurant
 from app.services.credit_validation_service import validate_sufficient_credits
 from app.utils.log import log_info, log_warning, log_error
 from app.utils.db import db_read
@@ -85,8 +85,8 @@ def promote_plate_selection_to_live(
         log_error(f"QR code not found for restaurant {selection.restaurant_id}, promotion of {plate_selection_id}")
         return None
 
-    credit_currency_id = get_credit_currency_id_for_restaurant(restaurant, db)
-    credit_currency = credit_currency_service.get_by_id(credit_currency_id, db)
+    currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+    credit_currency = credit_currency_service.get_by_id(currency_metadata_id, db)
     if not credit_currency:
         log_error(f"Credit currency not found for restaurant {selection.restaurant_id}, promotion of {plate_selection_id}")
         return None
@@ -222,7 +222,7 @@ def _create_restaurant_transaction_for_promotion(
         "restaurant_id": plate.restaurant_id,
         "plate_selection_id": selection.plate_selection_id,
         "discretionary_id": None,
-        "credit_currency_id": credit_currency.credit_currency_id,
+        "currency_metadata_id": credit_currency.currency_metadata_id,
         "was_collected": False,
         "ordered_timestamp": pickup_record.created_date,
         "collected_timestamp": None,

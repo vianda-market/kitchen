@@ -58,8 +58,8 @@ def update_client_bill(
         update_data = payload.model_dump(exclude_unset=True)
         update_data["modified_by"] = current_user["user_id"]
         
-        # If updating credit_currency_id, also update currency_code using centralized service
-        if "credit_currency_id" in update_data:
+        # If updating currency_metadata_id, also update currency_code using centralized service
+        if "currency_metadata_id" in update_data:
             resolve_currency_code(update_data, db)
         
         success = client_bill_service.update(client_bill_id, update_data, db)

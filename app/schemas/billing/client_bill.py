@@ -22,7 +22,7 @@ class ClientBillResponseSchema(BaseModel):
     subscription_id: UUID
     user_id: UUID
     plan_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     amount: float
     currency_code: Optional[str]
     is_archived: bool

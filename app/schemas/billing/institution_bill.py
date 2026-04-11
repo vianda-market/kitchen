@@ -19,7 +19,7 @@ class InstitutionBillCreateSchema(BaseModel):
 class InstitutionBillCreateFullSchema(BaseModel):
     institution_id: UUID
     institution_entity_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: Optional[int] = 0
     amount: Optional[Decimal] = Decimal('0')
     currency_code: Optional[str] = "USD"
@@ -39,7 +39,7 @@ class InstitutionBillResponseSchema(BaseModel):
     institution_bill_id: UUID
     institution_id: UUID
     institution_entity_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     transaction_count: Optional[int] = None
     amount: Optional[Decimal] = None
     currency_code: Optional[str] = None

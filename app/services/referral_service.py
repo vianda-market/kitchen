@@ -277,7 +277,7 @@ def _compute_bonus_credits(
         """
         SELECT cc.credit_value_local_currency
         FROM market_info m
-        JOIN credit_currency_info cc ON m.credit_currency_id = cc.credit_currency_id
+        JOIN currency_metadata cc ON m.currency_metadata_id = cc.currency_metadata_id
         WHERE m.market_id = %s
         """,
         (str(market_id),),

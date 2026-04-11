@@ -42,8 +42,10 @@ GeoNames data is licensed under [Creative Commons Attribution 4.0 International 
 
 ## Known exceptions
 
-### `GL` pseudo-country
+### `XG` synthetic Global pseudo-country
 
-Vianda's historic data model uses `GL` (`'Global'`) as a market-level sentinel for institution entities that aren't tied to a specific country. GeoNames has no `GL` row — `GL` is ISO 3166 Greenland. To preserve the FK constraint from `market_info.country_code → external.geonames_country.iso_alpha2`, the bootstrap seed in `app/db/seed/reference_data.sql` inserts a **synthetic row** into `external.geonames_country` with `iso_alpha2 = 'GL'`, `name = 'Global'`, and other fields left NULL. This is the one documented exception to "raw is verbatim GeoNames data."
+Vianda uses `XG` (`'Global'`) as a market-level sentinel for institution entities that aren't tied to a specific country. `XG` sits in ISO 3166-1's **user-assigned X-series** range (`XA`–`XZ`), which the ISO 3166 maintenance agency has reserved for private use and has guaranteed will never be assigned to a real country. This means `XG` can never collide with a future GeoNames entry.
 
-If GeoNames ever fills in their GL row with real Greenland data, the synthetic bootstrap will conflict on the PK and the load will fail — intentionally. Investigate and resolve by choosing either (a) renaming Vianda's Global sentinel to a non-ISO code, or (b) moving Greenland to the real ISO 3166 Greenland code `GL` and auditing downstream references.
+To preserve the FK constraint from `market_info.country_code → external.geonames_country.iso_alpha2`, the bootstrap seed in `app/db/seed/reference_data.sql` inserts a **synthetic row** into `external.geonames_country` with `iso_alpha2 = 'XG'`, `iso_alpha3 = 'XGL'`, `name = 'Global'`, and other GeoNames-specific fields left NULL. A matching synthetic city row is inserted into `external.geonames_city` with `geonames_id = -1` (negative IDs never collide with real GeoNames entities, which always use positive integers). This is the one documented exception to "raw is verbatim GeoNames data."
+
+The historic Greenland collision (`GL` is real ISO 3166 Greenland) is **no longer** an issue: `XG` is a deliberately chosen non-ISO-conflicting code, so the import script loads GeoNames' real `GL` → Greenland row verbatim alongside our synthetic `XG` row without any special handling.

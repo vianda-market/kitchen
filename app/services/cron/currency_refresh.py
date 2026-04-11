@@ -2,7 +2,7 @@
 Currency Rate Refresh Cron - Fetch USD exchange rates from open.er-api.com.
 
 Appends raw API payloads to currency_rate_raw for audit trail, validates rates
-(outlier detection, zero check), and updates credit_currency_info.currency_conversion_usd.
+(outlier detection, zero check), and updates currency_metadata.currency_conversion_usd.
 """
 
 from datetime import datetime, timezone
@@ -53,10 +53,10 @@ def fetch_usd_rate_for_currency(currency_code: str) -> Tuple[Optional[float], Op
 
 
 def _get_target_currencies(connection) -> List[str]:
-    """Get non-USD currency codes from credit_currency_info (non-archived)."""
+    """Get non-USD currency codes from currency_metadata (non-archived)."""
     query = """
         SELECT currency_code
-        FROM credit_currency_info
+        FROM currency_metadata
         WHERE currency_code != 'USD' AND is_archived = FALSE
     """
     rows = db_read(query, connection=connection)
@@ -78,10 +78,10 @@ def _get_previous_rate(currency_code: str, connection) -> float | None:
 
 def run_currency_refresh() -> Dict[str, Any]:
     """
-    Fetch latest USD exchange rates and update credit_currency_info.
+    Fetch latest USD exchange rates and update currency_metadata.
 
     Single API call to open.er-api.com returns all rates. Filters to target
-    currencies from credit_currency_info. Appends raw payload to currency_rate_raw
+    currencies from currency_metadata. Appends raw payload to currency_rate_raw
     for audit trail. Validates each rate (zero check, outlier detection).
     """
     result: Dict[str, Any] = {
@@ -94,7 +94,7 @@ def run_currency_refresh() -> Dict[str, Any]:
     with get_db_connection_context() as db:
         target_currencies = _get_target_currencies(db)
         if not target_currencies:
-            log_info("Currency refresh: no non-USD currencies in credit_currency_info")
+            log_info("Currency refresh: no non-USD currencies in currency_metadata")
             return result
 
         try:
@@ -172,11 +172,11 @@ def run_currency_refresh() -> Dict[str, Any]:
             }
             db_insert("currency_rate_raw", insert_data, connection=db)
 
-            # Only update credit_currency_info if rate is valid
+            # Only update currency_metadata if rate is valid
             if is_valid:
                 now = datetime.now(timezone.utc)
                 db_update(
-                    "credit_currency_info",
+                    "currency_metadata",
                     {
                         "currency_conversion_usd": rate_val,
                         "modified_by": SYSTEM_USER_ID,

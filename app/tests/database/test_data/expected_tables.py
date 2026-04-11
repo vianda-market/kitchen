@@ -9,7 +9,9 @@ Tables are organized by category for easier maintenance and testing.
 BASE_TABLES = [
     'user_info',
     'institution_info',
-    'credit_currency_info',
+    'currency_metadata',       # replaces retired currency_metadata (two-tier: external.iso4217_currency + core.currency_metadata)
+    'country_metadata',        # new — metadata layer on top of external.geonames_country
+    'city_metadata',           # new — metadata layer on top of external.geonames_city (replaces retired city_info)
     'address_info',
     'institution_entity_info',
     'restaurant_info',
@@ -44,7 +46,9 @@ HISTORY_TABLES = [
     'product_history',
     'plate_history',
     'plan_history',
-    'credit_currency_history',
+    'currency_metadata_history',   # replaces retired credit_currency_history
+    'country_metadata_history',    # new
+    'city_metadata_history',       # new
     'geolocation_history',
     'subscription_history',
     'client_bill_history',

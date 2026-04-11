@@ -522,7 +522,7 @@ def kitchen_start_promotion_entry(location_id: Optional[str] = None):
 
 
 def currency_refresh_entry():
-    """Entry point for currency rate refresh cron. Fetches USD rates from open.er-api.com and updates credit_currency_info."""
+    """Entry point for currency rate refresh cron. Fetches USD rates from open.er-api.com and updates currency_metadata."""
     from app.services.cron.currency_refresh import run_currency_refresh
     return run_currency_refresh()
 

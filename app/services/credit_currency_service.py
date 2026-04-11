@@ -1,7 +1,7 @@
 """
 Credit Currency Service
 
-Centralized service for resolving currency_code from credit_currency_id.
+Centralized service for resolving currency_code from currency_metadata_id.
 This ensures consistency across all tables that store both currency_id and currency_code.
 """
 
@@ -18,19 +18,19 @@ from app.utils.error_messages import credit_currency_not_found
 def resolve_currency_code(
     data: Dict[str, Any],
     db: psycopg2.extensions.connection,
-    currency_id_field: str = "credit_currency_id"
+    currency_id_field: str = "currency_metadata_id"
 ) -> None:
     """
-    Resolve currency_code from credit_currency_id and add it to the data dictionary.
+    Resolve currency_code from currency_metadata_id and add it to the data dictionary.
     
     This function should be called before creating or updating records in tables
-    that have both credit_currency_id and currency_code fields. The currency_code
-    is resolved from the credit_currency_info table and added to the data dict.
+    that have both currency_metadata_id and currency_code fields. The currency_code
+    is resolved from the currency_metadata table and added to the data dict.
     
     Args:
-        data: Data dictionary (modified in place) - must contain credit_currency_id
+        data: Data dictionary (modified in place) - must contain currency_metadata_id
         db: Database connection
-        currency_id_field: Name of the currency ID field (default: "credit_currency_id")
+        currency_id_field: Name of the currency ID field (default: "currency_metadata_id")
         
     Raises:
         HTTPException: If currency_id is missing or currency not found

@@ -35,7 +35,7 @@ def process_client_bill_internal(
     if not subscription:
         raise Exception("Subscription not found")
 
-    credit_currency = credit_currency_service.get_by_id(bill.credit_currency_id, db)
+    credit_currency = credit_currency_service.get_by_id(bill.currency_metadata_id, db)
     if not credit_currency:
         raise Exception("Credit currency not found")
 
@@ -75,7 +75,7 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     if not subscription:
         raise Exception("Subscription not found")
 
-    credit_currency = credit_currency_service.get_by_id(bill.credit_currency_id, db)
+    credit_currency = credit_currency_service.get_by_id(bill.currency_metadata_id, db)
     if not credit_currency:
         raise Exception("Credit currency not found")
 

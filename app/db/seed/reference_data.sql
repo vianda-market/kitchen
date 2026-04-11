@@ -2,11 +2,22 @@
 SET search_path = core, ops, customer, billing, audit, public;
 
 -- Minimal seed so the app can start after tear-down and rebuild.
---   • 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) and 7 markets — each market has its correct credit currency (e.g. Argentina -> ARS).
---   • 2 institutions: Vianda Enterprises, Vianda Customers (both use Global market).
---   • 2 users: superadmin (human Super Admin), system bot (automated operations: signup modified_by, billing cron, etc.).
---   • user_market_assignment for super_admin only (bot is not used for login/scoping).
--- FKs are dropped so modified_by can reference superadmin before user insert; re-added at end.
+--   • Loads external.* raw reference data (GeoNames countries/admin1/cities/alt-names + ISO 4217) from committed TSVs.
+--   • Inserts a synthetic GL (Global) row in external.geonames_country and external.geonames_city
+--     to support Vianda's B2B Global market (see app/db/seed/external/README.md).
+--   • 6 currency_metadata rows (USD, ARS, PEN, CLP, MXN, BRL) on top of external.iso4217_currency.
+--   • 7 market_info rows (AR, PE, US, CL, MX, BR, XG). XG is Vianda's synthetic Global
+--     (ISO 3166-1 user-assigned X-series; never a real country code).
+--   • 2 institutions: Vianda Enterprises, Vianda Customers (both in Global market).
+--   • 22+1 city_metadata rows (Global + the historic signup cities) on top of external.geonames_city.
+--   • 7 country_metadata rows (6 real markets + GL) with audience flags enabled.
+--   • 2 users: superadmin (human Super Admin), system bot (automated operations).
+-- FKs that point at user_info / city_metadata are dropped so self-referential seed inserts work;
+-- re-added at the end.
+
+-- -----------------------------------------------------------------------------
+-- Drop FKs temporarily so we can insert in the right order despite cycles
+-- -----------------------------------------------------------------------------
 
 ALTER TABLE institution_info
   DROP CONSTRAINT IF EXISTS fk_institution_info_modified_by,
@@ -19,49 +30,131 @@ ALTER TABLE institution_history
 ALTER TABLE user_info
   DROP CONSTRAINT IF EXISTS fk_user_info_modified_by,
   DROP CONSTRAINT IF EXISTS fk_user_info_institution_id,
-  DROP CONSTRAINT IF EXISTS user_info_market_id_fkey;
+  DROP CONSTRAINT IF EXISTS user_info_market_id_fkey,
+  DROP CONSTRAINT IF EXISTS user_info_city_metadata_id_fkey;
 
-ALTER TABLE credit_currency_info
-  DROP CONSTRAINT IF EXISTS credit_currency_info_modified_by_fkey;
-ALTER TABLE credit_currency_history
-  DROP CONSTRAINT IF EXISTS credit_currency_history_modified_by_fkey;
-ALTER TABLE market_info
+ALTER TABLE core.currency_metadata
+  DROP CONSTRAINT IF EXISTS currency_metadata_modified_by_fkey;
+ALTER TABLE audit.currency_metadata_history
+  DROP CONSTRAINT IF EXISTS currency_metadata_history_modified_by_fkey;
+ALTER TABLE core.market_info
   DROP CONSTRAINT IF EXISTS market_info_modified_by_fkey;
-ALTER TABLE market_history
+ALTER TABLE audit.market_history
   DROP CONSTRAINT IF EXISTS market_history_modified_by_fkey;
 
--- Drop city_info modified_by FK so we can insert cities before users (circular: users need city_id, cities need modified_by)
-ALTER TABLE city_info
-  DROP CONSTRAINT IF EXISTS city_info_modified_by_fkey;
+ALTER TABLE core.country_metadata
+  DROP CONSTRAINT IF EXISTS country_metadata_modified_by_fkey;
+ALTER TABLE audit.country_metadata_history
+  DROP CONSTRAINT IF EXISTS country_metadata_history_modified_by_fkey;
 
--- Drop user_info city_id FK so we can insert users (cities inserted first, then users with city_id)
-ALTER TABLE user_info
-  DROP CONSTRAINT IF EXISTS user_info_city_id_fkey;
+ALTER TABLE core.city_metadata
+  DROP CONSTRAINT IF EXISTS city_metadata_modified_by_fkey;
+ALTER TABLE audit.city_metadata_history
+  DROP CONSTRAINT IF EXISTS city_metadata_history_modified_by_fkey;
 
--- client_bill_info and institution_bill_info no longer have payment_id (payment attempts deprecated)
-TRUNCATE user_market_assignment, user_info, institution_info, market_info, credit_currency_info, city_info CASCADE;
+-- -----------------------------------------------------------------------------
+-- Wipe writable application state. external.* is NOT truncated here; it's
+-- fully replaced by the COPY blocks below.
+-- -----------------------------------------------------------------------------
 
--- 6 credit currencies (USD, ARS, PEN, CLP, MXN, BRL) for seeded markets. Insert first; market_info FK references these.
-INSERT INTO credit_currency_info (credit_currency_id, currency_name, currency_code, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('55555555-5555-5555-5555-555555555555', 'US Dollar', 'USD', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666601', 'Argentine Peso', 'ARS', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666602', 'Peruvian Sol', 'PEN', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666603', 'Chilean Peso', 'CLP', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666604', 'Mexican Peso', 'MXN', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666605', 'Brazilian Real', 'BRL', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+TRUNCATE
+  user_market_assignment,
+  user_info,
+  institution_info,
+  market_info,
+  core.country_metadata,
+  core.city_metadata,
+  core.currency_metadata,
+  external.geonames_alternate_name,
+  external.geonames_city,
+  external.geonames_admin1,
+  external.geonames_country,
+  external.iso4217_currency
+CASCADE;
 
--- Markets: each references its country's credit currency so JOINs return correct currency_code (e.g. Argentina -> ARS)
-INSERT INTO market_info (market_id, country_name, country_code, credit_currency_id, timezone, kitchen_close_time, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('00000000-0000-0000-0000-000000000001', 'Global Marketplace', 'GL', '55555555-5555-5555-5555-555555555555', 'UTC',                           '13:30'::TIME, 'en', NULL,   NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000002', 'Argentina',          'AR', '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '13:30'::TIME, 'es', '+54',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000003', 'Peru',               'PE', '66666666-6666-6666-6666-666666666602', 'America/Lima',                  '13:30'::TIME, 'es', '+51',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000004', 'United States',      'US', '55555555-5555-5555-5555-555555555555', 'America/New_York',              '13:30'::TIME, 'en', '+1',   10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000005', 'Chile',              'CL', '66666666-6666-6666-6666-666666666603', 'America/Santiago',              '13:30'::TIME, 'es', '+56',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000006', 'Mexico',             'MX', '66666666-6666-6666-6666-666666666604', 'America/Mexico_City',           '13:30'::TIME, 'es', '+52',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000007', 'Brazil',             'BR', '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo',             '13:30'::TIME, 'pt', '+55',  11,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+-- =============================================================================
+-- LOAD external.* FROM COMMITTED TSVs
+-- =============================================================================
+-- Generated by app/scripts/import_geonames.py. See app/db/seed/external/README.md.
+
+\echo 'Loading external.iso4217_currency from TSV'
+\copy external.iso4217_currency (code, name, numeric_code, minor_unit) FROM 'app/db/seed/external/iso4217_currencies.tsv' WITH (FORMAT csv, DELIMITER E'\t', HEADER false, QUOTE E'\b')
+
+\echo 'Loading external.geonames_country from TSV'
+\copy external.geonames_country (iso_alpha2, iso_alpha3, iso_numeric, fips, name, capital, area_sq_km, population, continent, tld, currency_code, currency_name, phone_prefix, postal_format, postal_regex, languages, geonames_id, neighbours, equivalent_fips) FROM 'app/db/seed/external/geonames_country_info.tsv' WITH (FORMAT csv, DELIMITER E'\t', HEADER false, QUOTE E'\b', NULL '')
+
+\echo 'Loading external.geonames_admin1 from TSV'
+\copy external.geonames_admin1 (admin1_full_code, country_iso, admin1_code, name, ascii_name, geonames_id) FROM 'app/db/seed/external/geonames_admin1_codes.tsv' WITH (FORMAT csv, DELIMITER E'\t', HEADER false, QUOTE E'\b', NULL '')
+
+\echo 'Loading external.geonames_city from TSV'
+\copy external.geonames_city (geonames_id, name, ascii_name, alternate_names, latitude, longitude, feature_class, feature_code, country_iso, cc2, admin1_code, admin2_code, admin3_code, admin4_code, population, elevation, dem, timezone, modification_date) FROM 'app/db/seed/external/geonames_cities5000.tsv' WITH (FORMAT csv, DELIMITER E'\t', HEADER false, QUOTE E'\b', NULL '')
+
+\echo 'Loading external.geonames_alternate_name from TSV'
+\copy external.geonames_alternate_name (alternate_name_id, geonames_id, iso_language, alternate_name, is_preferred, is_short, is_colloquial, is_historic) FROM 'app/db/seed/external/geonames_alternate_names.tsv' WITH (FORMAT csv, DELIMITER E'\t', HEADER false, QUOTE E'\b', NULL '')
+
+-- =============================================================================
+-- SYNTHETIC 'XG' GLOBAL MARKETPLACE ROWS
+-- =============================================================================
+-- Vianda uses 'XG' as a pseudo-country for internal/global institutions.
+-- 'XG' is in ISO 3166-1's user-assigned X-series range (guaranteed to never
+-- be assigned to a real country), so it will never collide with a real GeoNames
+-- entry — unlike 'GL' which is real ISO 3166 Greenland.
+-- The synthetic city uses geonames_id = -1 which never collides with real
+-- GeoNames IDs (GeoNames uses positive integers). Documented as the "one
+-- Vianda exception" in app/db/seed/external/README.md.
+
+INSERT INTO external.geonames_country (
+    iso_alpha2, iso_alpha3, iso_numeric, fips, name, capital,
+    area_sq_km, population, continent, tld, currency_code, currency_name,
+    phone_prefix, postal_format, postal_regex, languages, geonames_id,
+    neighbours, equivalent_fips
+) VALUES (
+    'XG', 'XGL', 0, NULL, 'Global', NULL,
+    NULL, NULL, NULL, NULL, 'USD', 'US Dollar',
+    NULL, NULL, NULL, 'en', NULL,
+    NULL, NULL
+);
+
+INSERT INTO external.geonames_city (
+    geonames_id, name, ascii_name, alternate_names, latitude, longitude,
+    feature_class, feature_code, country_iso, cc2, admin1_code, admin2_code,
+    admin3_code, admin4_code, population, elevation, dem, timezone, modification_date
+) VALUES (
+    -1, 'Global', 'Global', NULL, 0, 0,
+    'P', 'PPLC', 'XG', NULL, NULL, NULL,
+    NULL, NULL, 0, NULL, NULL, 'UTC', CURRENT_DATE
+);
+
+-- =============================================================================
+-- SEED APPLICATION-OWNED METADATA + OPERATIONAL ROWS
+-- =============================================================================
+
+-- 6 currency_metadata rows. UUIDs are preserved from the old credit_currency_info
+-- seed for continuity (so tests and dev_fixtures that hardcoded these UUIDs still work).
+-- currency_name is a PR2-deprecated compat column; populated here to match legacy
+-- credit_currency_info.currency_name values. credit_value_local_currency and
+-- currency_conversion_usd are Vianda pricing policy.
+INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, currency_name, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('55555555-5555-5555-5555-555555555555', 'USD', 'US Dollar',      1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666601', 'ARS', 'Argentine Peso', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666602', 'PEN', 'Peruvian Sol',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666603', 'CLP', 'Chilean Peso',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666604', 'MXN', 'Mexican Peso',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666605', 'BRL', 'Brazilian Real', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+
+-- Markets: country_name + timezone dropped. country_code FKs external.geonames_country.
+-- currency_metadata_id (renamed from currency_metadata_id) FKs core.currency_metadata. Same UUIDs preserved.
+-- kitchen_open_time + kitchen_close_time are naive wall-clock TIME templates inherited by restaurants at create time.
+INSERT INTO market_info (market_id, country_code, country_name, currency_metadata_id, timezone, kitchen_open_time, kitchen_close_time, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('00000000-0000-0000-0000-000000000001', 'XG', 'Global Marketplace', '55555555-5555-5555-5555-555555555555', 'UTC',                           '09:00'::TIME, '13:30'::TIME, 'en', NULL,   NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000002', 'AR', 'Argentina',          '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '09:00'::TIME, '13:30'::TIME, 'es', '+54',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000003', 'PE', 'Peru',               '66666666-6666-6666-6666-666666666602', 'America/Lima',                  '09:00'::TIME, '13:30'::TIME, 'es', '+51',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000004', 'US', 'United States',      '55555555-5555-5555-5555-555555555555', 'America/New_York',              '09:00'::TIME, '13:30'::TIME, 'en', '+1',   10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000005', 'CL', 'Chile',              '66666666-6666-6666-6666-666666666603', 'America/Santiago',              '09:00'::TIME, '13:30'::TIME, 'es', '+56',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000006', 'MX', 'Mexico',             '66666666-6666-6666-6666-666666666604', 'America/Mexico_City',           '09:00'::TIME, '13:30'::TIME, 'es', '+52',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000007', 'BR', 'Brazil',             '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo',             '09:00'::TIME, '13:30'::TIME, 'pt', '+55',  11,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
--- created_by: dddddddd (superadmin) — FK dropped before insert, re-added after users exist.
 INSERT INTO institution_info (institution_id, name, institution_type, market_id, is_archived, status, created_date, created_by, modified_by, modified_date)
 VALUES (
   '11111111-1111-1111-1111-111111111111',           -- Vianda Enterprises (employees)
@@ -71,7 +164,7 @@ VALUES (
   False,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
-  'dddddddd-dddd-dddd-dddd-dddddddddddd',           -- created_by (superadmin)
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   CURRENT_TIMESTAMP
 ),
@@ -83,92 +176,137 @@ VALUES (
   False,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
-  'dddddddd-dddd-dddd-dddd-dddddddddddd',           -- created_by (superadmin)
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   CURRENT_TIMESTAMP
 );
 
--- Cities from supported_cities config (insert BEFORE users so user_info.city_id FK can reference them).
--- Global city first (B2B users get this; country_code GL matches Global Marketplace).
-INSERT INTO city_info (city_id, name, country_code, province_code, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Global', 'GL', NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+-- -----------------------------------------------------------------------------
+-- city_metadata seed — one row for the Global synthetic city, plus 22 historic
+-- signup cities resolved from external.geonames_city by (country_iso, ascii_name).
+-- -----------------------------------------------------------------------------
 
-INSERT INTO city_info (name, country_code, province_code, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('Buenos Aires', 'AR', 'CABA', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Cordoba', 'AR', 'CO', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('La Plata', 'AR', 'BA', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Mendoza', 'AR', 'MN', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Misiones', 'AR', 'MI', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Rosario', 'AR', 'SF', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Tierra del Fuego', 'AR', 'TF', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Rio de Janeiro', 'BR', 'RJ', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Sao Paulo', 'BR', 'SP', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Santiago', 'CL', 'RM', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Mexico DF', 'MX', 'CDMX', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Monterrey', 'MX', 'NL', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Arequipa', 'PE', 'ARE', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Lima', 'PE', 'LIM', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Trujillo', 'PE', 'LAL', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Austin', 'US', 'TX', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Chicago', 'US', 'IL', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Los Angeles', 'US', 'CA', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Miami', 'US', 'FL', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('New York', 'US', 'NY', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('San Francisco', 'US', 'CA', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('Seattle', 'US', 'WA', FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+-- Global synthetic city_metadata — uses the historic city_id UUID so user_info.city_metadata_id
+-- DEFAULT value still resolves. References external.geonames_city.geonames_id = -1 (the synthetic GL row).
+INSERT INTO core.city_metadata (city_metadata_id, geonames_id, country_iso, show_in_signup_picker, show_in_supplier_form, show_in_customer_form, is_served, status, created_date, created_by, modified_by, modified_date) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', -1, 'XG', TRUE, FALSE, FALSE, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
--- Seeded users: Super Admin (human), system bot (automated operations only; do not use for login).
--- Both get Global city (aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa).
+-- 22 historic signup cities: resolve geonames_id via JOIN on external.geonames_city,
+-- picking the most populous match when multiple cities share a name in the same country.
+-- Each row gets all three audience flags TRUE + is_served=TRUE + status='active'
+-- (preserving the semantics these cities had under the old core.city_info).
+INSERT INTO core.city_metadata (
+    geonames_id, country_iso,
+    show_in_signup_picker, show_in_supplier_form, show_in_customer_form, is_served,
+    status, created_by, modified_by
+)
+SELECT DISTINCT ON (v.country_iso, v.ascii_name)
+    gc.geonames_id,
+    v.country_iso,
+    TRUE, TRUE, TRUE, TRUE,
+    'active'::status_enum,
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+FROM (VALUES
+    ('AR', 'Buenos Aires'),
+    ('AR', 'Cordoba'),
+    ('AR', 'La Plata'),
+    ('AR', 'Mendoza'),
+    ('AR', 'Posadas'),         -- legacy row was 'Misiones' (a province); use Posadas, capital of Misiones
+    ('AR', 'Rosario'),
+    ('AR', 'Ushuaia'),         -- legacy row was 'Tierra del Fuego' (a province); use Ushuaia, its capital
+    ('BR', 'Rio de Janeiro'),
+    ('BR', 'Sao Paulo'),
+    ('CL', 'Santiago'),
+    ('MX', 'Mexico City'),   -- canonical GeoNames name (was 'Mexico DF' in legacy city_info)
+    ('MX', 'Monterrey'),
+    ('PE', 'Arequipa'),
+    ('PE', 'Lima'),
+    ('PE', 'Trujillo'),
+    ('US', 'Austin'),
+    ('US', 'Chicago'),
+    ('US', 'Los Angeles'),
+    ('US', 'Miami'),
+    ('US', 'New York City'),
+    ('US', 'San Francisco'),
+    ('US', 'Seattle')
+) AS v(country_iso, ascii_name)
+JOIN external.geonames_city gc
+  ON gc.country_iso = v.country_iso
+ AND LOWER(gc.ascii_name) = LOWER(v.ascii_name)
+ORDER BY v.country_iso, v.ascii_name, gc.population DESC NULLS LAST;
+
+-- -----------------------------------------------------------------------------
+-- country_metadata seed — one row per real market + GL.
+-- status='active' for the 6 operational markets + GL; audience flags enable
+-- customer + supplier. modified_by is superadmin (FK temporarily dropped).
+-- -----------------------------------------------------------------------------
+
+INSERT INTO core.country_metadata (country_iso, market_id, is_customer_audience, is_supplier_audience, is_employer_audience, status, created_by, modified_by)
+VALUES
+    ('XG', '00000000-0000-0000-0000-000000000001', FALSE, FALSE, FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('AR', '00000000-0000-0000-0000-000000000002', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('PE', '00000000-0000-0000-0000-000000000003', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('US', '00000000-0000-0000-0000-000000000004', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('CL', '00000000-0000-0000-0000-000000000005', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('MX', '00000000-0000-0000-0000-000000000006', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd'),
+    ('BR', '00000000-0000-0000-0000-000000000007', TRUE,  TRUE,  FALSE, 'active'::status_enum, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd');
+
+-- -----------------------------------------------------------------------------
+-- Seeded users: Super Admin (human), system bot (automated operations only).
+-- Both get the Global city_metadata row (aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa).
+-- -----------------------------------------------------------------------------
+
 INSERT INTO user_info (
-  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, mobile_number, email_verified, email_verified_at, market_id, city_id, locale, is_archived, status, created_date, created_by, modified_by, modified_date
+  user_id, username, hashed_password, first_name, last_name, institution_id, role_type, role_name, email, mobile_number, email_verified, email_verified_at, market_id, city_metadata_id, locale, is_archived, status, created_date, created_by, modified_by, modified_date
 ) VALUES (
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'superadmin',
   '$2b$12$H7UZ/eImB4SmjzNybAqKl.rL2JYyGZRlJhcHjivhNAz7qRIfAZLUq',   -- SuperAdmin1 (no special chars)
   'Super',
   'Admin',
-  '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
+  '11111111-1111-1111-1111-111111111111',
   'internal'::role_type_enum,
   'super_admin'::role_name_enum,
   'viandallc@gmail.com',
   '+14155552671',
   TRUE,
   CURRENT_TIMESTAMP,
-  '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  '00000000-0000-0000-0000-000000000001',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'en',
   FALSE,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
-  'dddddddd-dddd-dddd-dddd-dddddddddddd',            -- created_by (self for superadmin)
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   CURRENT_TIMESTAMP
 ),
 (
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',           -- System bot: customer signup modified_by, billing cron, etc. Do not use for login.
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   'system_bot',
-  '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3VjGgaSTlF.K',   -- bcrypt for "secret"; not for login
+  '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3VjGgaSTlF.K',
   'System',
   'Bot',
-  '11111111-1111-1111-1111-111111111111',            -- Vianda Enterprises
+  '11111111-1111-1111-1111-111111111111',
   'internal'::role_type_enum,
   'admin'::role_name_enum,
   'admin@vianda.market',
   NULL,
   TRUE,
   CURRENT_TIMESTAMP,
-  '00000000-0000-0000-0000-000000000001',            -- Global Marketplace
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',            -- Global city (B2B)
+  '00000000-0000-0000-0000-000000000001',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'en',
   FALSE,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
-  'dddddddd-dddd-dddd-dddd-dddddddddddd',            -- created_by (superadmin created system bot)
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   CURRENT_TIMESTAMP
 );
 
--- Populate user_market_assignment so the Super Admin has market scope (e.g. get_assigned_market_ids). Bot is not assigned; automated only.
+-- Populate user_market_assignment so the Super Admin has market scope (e.g. get_assigned_market_ids).
 INSERT INTO user_market_assignment (user_id, market_id, is_primary)
 SELECT user_id, market_id, true FROM user_info WHERE user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 
@@ -183,6 +321,10 @@ FROM core.market_info WHERE country_code = 'PE';
 
 -- No address_info, plan_info, subscription_info, national_holidays in seed; create via API.
 
+-- -----------------------------------------------------------------------------
+-- Re-add FKs that were dropped for seed ordering
+-- -----------------------------------------------------------------------------
+
 ALTER TABLE institution_info
   ADD CONSTRAINT fk_institution_info_modified_by FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
   ADD CONSTRAINT fk_institution_info_created_by FOREIGN KEY (created_by) REFERENCES user_info(user_id) ON DELETE SET NULL;
@@ -194,22 +336,27 @@ ALTER TABLE institution_history
 ALTER TABLE user_info
   ADD CONSTRAINT fk_user_info_modified_by FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT,
   ADD CONSTRAINT fk_user_info_institution_id FOREIGN KEY (institution_id) REFERENCES institution_info(institution_id) ON DELETE RESTRICT,
-  ADD CONSTRAINT user_info_market_id_fkey FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT;
+  ADD CONSTRAINT user_info_market_id_fkey FOREIGN KEY (market_id) REFERENCES market_info(market_id) ON DELETE RESTRICT,
+  ADD CONSTRAINT user_info_city_metadata_id_fkey FOREIGN KEY (city_metadata_id) REFERENCES core.city_metadata(city_metadata_id) ON DELETE RESTRICT;
 
-ALTER TABLE credit_currency_info
-  ADD CONSTRAINT credit_currency_info_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
-ALTER TABLE credit_currency_history
-  ADD CONSTRAINT credit_currency_history_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
-ALTER TABLE market_info
+ALTER TABLE core.currency_metadata
+  ADD CONSTRAINT currency_metadata_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
+ALTER TABLE audit.currency_metadata_history
+  ADD CONSTRAINT currency_metadata_history_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
+ALTER TABLE core.market_info
   ADD CONSTRAINT market_info_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
-ALTER TABLE market_history
+ALTER TABLE audit.market_history
   ADD CONSTRAINT market_history_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
 
-ALTER TABLE city_info
-  ADD CONSTRAINT city_info_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
+ALTER TABLE core.country_metadata
+  ADD CONSTRAINT country_metadata_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
+ALTER TABLE audit.country_metadata_history
+  ADD CONSTRAINT country_metadata_history_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
 
-ALTER TABLE user_info
-  ADD CONSTRAINT user_info_city_id_fkey FOREIGN KEY (city_id) REFERENCES city_info(city_id) ON DELETE RESTRICT;
+ALTER TABLE core.city_metadata
+  ADD CONSTRAINT city_metadata_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
+ALTER TABLE audit.city_metadata_history
+  ADD CONSTRAINT city_metadata_history_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES user_info(user_id) ON DELETE RESTRICT;
 
 -- role_info, role_history, status_info, status_history, transaction_type_info, transaction_type_history
 -- tables removed - no foreign key constraints needed

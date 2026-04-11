@@ -1589,21 +1589,21 @@ def create_geolocation_routes() -> APIRouter:
 
 def create_institution_entity_routes() -> APIRouter:
     """Create routes for InstitutionEntity entity. Supplier Admin and Internal Admin/Super Admin can access (GET, POST, PUT, DELETE).
-    credit_currency_id is derived from address.country_code -> market (Option A); client does not send it.
+    currency_metadata_id is derived from address.country_code -> market (Option A); client does not send it.
     Note: Enriched endpoints (/enriched, /enriched/{entity_id}) are in app/routes/institution_entity.py,
     registered before this router so /enriched matches before /{entity_id}."""
     from app.services.crud_service import institution_entity_service
     from app.schemas.consolidated_schemas import InstitutionEntityCreateSchema, InstitutionEntityUpdateSchema, InstitutionEntityResponseSchema
     from app.auth.dependencies import require_supplier_admin_or_employee_admin
-    from app.services.entity_service import derive_credit_currency_id_for_address
+    from app.services.entity_service import derive_currency_metadata_id_for_address
 
     def _before_create(data: dict, connection: psycopg2.extensions.connection) -> dict:
-        data["credit_currency_id"] = derive_credit_currency_id_for_address(data["address_id"], connection)
+        data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
         return data
 
     def _before_update(data: dict, connection: psycopg2.extensions.connection, entity_id: UUID) -> dict:
         if "address_id" in data:
-            data["credit_currency_id"] = derive_credit_currency_id_for_address(data["address_id"], connection)
+            data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
         return data
 
     config = RouteConfig(

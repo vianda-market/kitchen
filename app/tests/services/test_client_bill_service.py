@@ -92,7 +92,7 @@ class TestClientBillService:
         # Arrange
         incomplete_data = {
             "amount": 25.50
-            # Missing credit_currency_id
+            # Missing currency_metadata_id
         }
         
         # Act & Assert
@@ -101,13 +101,13 @@ class TestClientBillService:
         
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Missing required fields" in str(exc_info.value.detail)
-        assert "credit_currency_id" in str(exc_info.value.detail)
+        assert "currency_metadata_id" in str(exc_info.value.detail)
 
     def test_validate_bill_data_validates_amount(self, mock_db):
         """Test that bill data validation validates amount is positive."""
         # Arrange
         invalid_amount_data = {
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "amount": -10.0  # Invalid - negative amount
         }
         
@@ -122,7 +122,7 @@ class TestClientBillService:
         """Test that bill data validation validates currency ID format."""
         # Arrange
         invalid_currency_data = {
-            "credit_currency_id": "invalid-uuid",  # Invalid UUID format
+            "currency_metadata_id": "invalid-uuid",  # Invalid UUID format
             "amount": 25.50
         }
         
@@ -131,7 +131,7 @@ class TestClientBillService:
             client_bill_business_service._validate_bill_data(invalid_currency_data)
         
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid credit_currency_id format" in str(exc_info.value.detail)
+        assert "Invalid currency_metadata_id format" in str(exc_info.value.detail)
 
     def test_validate_bill_amount_validates_positive_amount(self, mock_db):
         """Test that bill amount validation checks for positive amounts."""
@@ -183,9 +183,9 @@ class TestClientBillService:
         # Arrange
         currency_id = uuid4()
         mock_bills = [
-            Mock(credit_currency_id=currency_id),
-            Mock(credit_currency_id=uuid4()),
-            Mock(credit_currency_id=currency_id)
+            Mock(currency_metadata_id=currency_id),
+            Mock(currency_metadata_id=uuid4()),
+            Mock(currency_metadata_id=currency_id)
         ]
         
         with patch('app.services.client_bill_service.client_bill_service') as mock_bill_service:
@@ -196,4 +196,4 @@ class TestClientBillService:
             
             # Assert
             assert len(result) == 2
-            assert all(bill.credit_currency_id == currency_id for bill in result)
+            assert all(bill.currency_metadata_id == currency_id for bill in result)

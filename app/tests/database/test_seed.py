@@ -39,12 +39,13 @@ class TestSeedDataCounts:
             f"Expected at least {expected} institutions in institution_info, found {count}"
         )
     
-    def test_credit_currency_info_seed_count(self, db_transaction):
-        """Test that seed has the expected number of credit currencies (6: USD, ARS, PEN, CLP, MXN, BRL; excludes archived)."""
-        count = count_non_archived_rows(db_transaction, 'credit_currency_info')
+    def test_currency_metadata_seed_count(self, db_transaction):
+        """Test that seed has the expected number of currency_metadata rows (6: USD, ARS, PEN, CLP, MXN, BRL; excludes archived).
+        Renamed from currency_metadata — two-tier split: external.iso4217_currency (raw) + core.currency_metadata (policy)."""
+        count = count_non_archived_rows(db_transaction, 'currency_metadata')
         expected = get_expected_currency_count()
         assert count == expected, (
-            f"Expected {expected} credit currency/currencies in seed, found {count}"
+            f"Expected {expected} currency_metadata row(s) in seed, found {count}"
         )
 
     def test_market_info_seed_count(self, db_transaction):
@@ -86,38 +87,40 @@ class TestSeedDataRecords:
         ), f"Vianda Enterprises institution with ID {SEED_INSTITUTION_VIANDA_ID} should be seeded"
     
     def test_usd_currency_seeded(self, db_transaction):
-        """Test that USD (minimal bootstrap currency) is seeded."""
-        usd_currency_id = '55555555-5555-5555-5555-555555555555'
+        """Test that USD (minimal bootstrap currency) is seeded in core.currency_metadata.
+        Preserved UUID for continuity with the retired currency_metadata seed."""
+        usd_currency_metadata_id = '55555555-5555-5555-5555-555555555555'
         assert record_exists(
             db_transaction,
-            'credit_currency_info',
-            'credit_currency_id',
-            usd_currency_id
-        ), "US Dollar (USD) bootstrap currency should be seeded"
+            'currency_metadata',
+            'currency_metadata_id',
+            usd_currency_metadata_id
+        ), "US Dollar (USD) bootstrap currency_metadata row should be seeded"
         with db_transaction.cursor() as cur:
             cur.execute("""
-                SELECT currency_name, currency_code
-                FROM credit_currency_info
-                WHERE credit_currency_id = %s
-            """, (usd_currency_id,))
+                SELECT ic.name, cm.currency_code
+                FROM core.currency_metadata cm
+                JOIN external.iso4217_currency ic ON cm.currency_code = ic.code
+                WHERE cm.currency_metadata_id = %s
+            """, (usd_currency_metadata_id,))
             result = cur.fetchone()
-            assert result is not None, "USD currency should exist"
+            assert result is not None, "USD currency_metadata should exist"
             currency_name, currency_code = result
             assert currency_name == 'US Dollar', f"Expected 'US Dollar', got '{currency_name}'"
             assert currency_code == 'USD', f"Expected 'USD', got '{currency_code}'"
 
     def test_argentina_market_has_ars_currency(self, db_transaction):
-        """Test that Argentina market resolves to ARS via credit_currency join (not USD)."""
+        """Test that Argentina market resolves to ARS via the currency_metadata join (not USD)."""
         argentina_market_id = '00000000-0000-0000-0000-000000000002'
         with db_transaction.cursor() as cur:
             cur.execute("""
-                SELECT cc.currency_code
+                SELECT cm.currency_code
                 FROM market_info m
-                JOIN credit_currency_info cc ON m.credit_currency_id = cc.credit_currency_id
+                JOIN core.currency_metadata cm ON m.currency_metadata_id = cm.currency_metadata_id
                 WHERE m.market_id = %s
             """, (argentina_market_id,))
             result = cur.fetchone()
-            assert result is not None, "Argentina market should exist with credit currency"
+            assert result is not None, "Argentina market should exist with currency metadata"
             currency_code = result[0]
             assert currency_code == 'ARS', f"Argentina market should have ARS, got '{currency_code}'"
 

@@ -35,7 +35,7 @@ from app.services.entity_service import (
     get_enriched_restaurant_by_id,
     search_restaurants,
     get_assigned_market_ids,
-    get_credit_currency_id_for_restaurant,
+    get_currency_metadata_id_for_restaurant,
 )
 from app.services.city_metrics_service import get_cities_with_coverage
 from app.services.restaurant_explorer_service import (
@@ -102,7 +102,7 @@ def create_restaurant(
         if not entity:
             raise HTTPException(status_code=404, detail="Institution entity not found")
 
-        credit_currency = credit_currency_service.get_by_id(entity.credit_currency_id, db)
+        credit_currency = credit_currency_service.get_by_id(entity.currency_metadata_id, db)
         if not credit_currency:
             raise HTTPException(status_code=404, detail=f"Credit currency not found for institution entity")
 
@@ -119,14 +119,14 @@ def create_restaurant(
         
         # Create the restaurant balance record atomically (commit=False)
         log_info(f"🔍 Creating restaurant balance record for restaurant {restaurant.restaurant_id}")
-        log_info(f"🔍 Credit currency ID: {entity.credit_currency_id}")
+        log_info(f"🔍 Credit currency ID: {entity.currency_metadata_id}")
         log_info(f"🔍 Currency code: {credit_currency.currency_code}")
         log_info(f"🔍 Modified by: {current_user['user_id']}")
         
         try:
             balance_created = restaurant_balance_service.create_balance_record(
                 restaurant.restaurant_id,
-                entity.credit_currency_id,
+                entity.currency_metadata_id,
                 currency_code=credit_currency.currency_code,
                 modified_by=current_user["user_id"],
                 db=db,
@@ -169,10 +169,10 @@ def create_restaurant(
         raise HTTPException(status_code=500, detail="Failed to create restaurant")
 
 def _restaurant_to_response(restaurant, db: psycopg2.extensions.connection) -> dict:
-    """Enrich restaurant DTO with credit_currency_id from institution_entity for response schema."""
+    """Enrich restaurant DTO with currency_metadata_id from institution_entity for response schema."""
     to_dict = getattr(restaurant, "model_dump", None) or getattr(restaurant, "dict", None)
     d = to_dict() if to_dict else dict(restaurant)
-    d["credit_currency_id"] = get_credit_currency_id_for_restaurant(restaurant, db)
+    d["currency_metadata_id"] = get_currency_metadata_id_for_restaurant(restaurant, db)
     return d
 
 
@@ -702,7 +702,7 @@ def create_balance_for_restaurant(
         entity = institution_entity_service.get_by_id(restaurant.institution_entity_id, db, scope=scope)
         if not entity:
             raise HTTPException(status_code=404, detail="Institution entity not found for restaurant")
-        credit_currency = credit_currency_service.get_by_id(entity.credit_currency_id, db)
+        credit_currency = credit_currency_service.get_by_id(entity.currency_metadata_id, db)
         if not credit_currency:
             raise HTTPException(status_code=404, detail=f"Credit currency not found")
         
@@ -710,7 +710,7 @@ def create_balance_for_restaurant(
         log_info(f"Creating balance record for restaurant {restaurant_id}")
         balance_created = restaurant_balance_service.create_balance_record(
             restaurant.restaurant_id,
-            entity.credit_currency_id,
+            entity.currency_metadata_id,
             currency_code=credit_currency.currency_code,
             modified_by=current_user["user_id"],
             db=db

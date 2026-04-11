@@ -51,7 +51,7 @@ class TestCreateMarketCountryCodeOnly:
             "market_id": str(uuid4()),
             "country_name": "Argentina",
             "country_code": "AR",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "currency_code": "ARS",
             "currency_name": "Argentine Peso",
             "timezone": "America/Argentina/Buenos_Aires",
@@ -63,7 +63,7 @@ class TestCreateMarketCountryCodeOnly:
         }
         payload = {
             "country_code": "AR",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
             "status": "active",
         }
@@ -81,7 +81,7 @@ class TestCreateMarketCountryCodeOnly:
         """Invalid country_code returns 400; service create is not called."""
         payload = {
             "country_code": "XX",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
         }
         with patch("app.routes.admin.markets.market_service") as mock_market_service:
@@ -98,7 +98,7 @@ class TestCreateMarketCountryCodeOnly:
             "market_id": str(uuid4()),
             "country_name": "Argentina",
             "country_code": "AR",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "currency_code": "ARS",
             "currency_name": "Argentine Peso",
             "timezone": "America/Argentina/Buenos_Aires",
@@ -110,7 +110,7 @@ class TestCreateMarketCountryCodeOnly:
         }
         payload = {
             "country_code": "ar",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
             "status": "active",
         }
@@ -124,7 +124,7 @@ class TestCreateMarketCountryCodeOnly:
         """Schema does not accept country_name; request with only country_code is valid."""
         payload = {
             "country_code": "AR",
-            "credit_currency_id": str(uuid4()),
+            "currency_metadata_id": str(uuid4()),
             "timezone": "America/Argentina/Buenos_Aires",
         }
         with patch("app.routes.admin.markets.market_service") as mock_market_service:
@@ -132,7 +132,7 @@ class TestCreateMarketCountryCodeOnly:
                 "market_id": str(uuid4()),
                 "country_name": "Argentina",
                 "country_code": "AR",
-                "credit_currency_id": payload["credit_currency_id"],
+                "currency_metadata_id": payload["currency_metadata_id"],
                 "currency_code": "ARS",
                 "currency_name": "Argentine Peso",
                 "timezone": payload["timezone"],

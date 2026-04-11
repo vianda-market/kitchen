@@ -109,7 +109,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
         detail = resp.json().get("detail", "")
         assert "plate_kitchen_days" in detail or "QR code" in detail
 
-    @patch("app.routes.restaurant.get_credit_currency_id_for_restaurant")
+    @patch("app.routes.restaurant.get_currency_metadata_id_for_restaurant")
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
     @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
@@ -122,7 +122,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
         inst_entity_id = uuid4()
         inst_id = uuid4()
         addr_id = uuid4()
-        credit_currency_id = uuid4()
+        currency_metadata_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(
             restaurant_id=restaurant_id,
             institution_id=inst_id,
@@ -132,7 +132,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
         )
         mock_has_pkd.return_value = True
         mock_has_qr.return_value = True
-        mock_get_credit_currency.return_value = credit_currency_id
+        mock_get_credit_currency.return_value = currency_metadata_id
         now = datetime.now(timezone.utc)
         updated = MagicMock(
             restaurant_id=restaurant_id,
@@ -156,7 +156,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
                 "is_archived": False,
                 "created_date": now,
                 "modified_date": now,
-                "credit_currency_id": str(credit_currency_id),
+                "currency_metadata_id": str(currency_metadata_id),
             },
         )
         mock_restaurant_service.update.return_value = updated

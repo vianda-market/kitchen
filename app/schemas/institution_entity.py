@@ -28,7 +28,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_id: UUID
     address_id: UUID
-    credit_currency_id: UUID
+    currency_metadata_id: UUID
     tax_id: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
     is_archived: bool

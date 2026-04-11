@@ -103,7 +103,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE  # Required for validation
         
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
         
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -111,7 +111,7 @@ class TestPlateSelectionService:
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service:
             mock_plate_service.get_by_id.return_value = mock_plate
@@ -146,7 +146,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE  # Required for validation
         
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
         
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -157,7 +157,7 @@ class TestPlateSelectionService:
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service:
@@ -196,7 +196,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE  # Required for validation
         
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
         
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -206,11 +206,11 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
         
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \
@@ -307,7 +307,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE  # Required for validation
         
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
         
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -318,11 +318,11 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
         
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \
@@ -395,7 +395,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE  # Required for validation
         
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
         
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -405,14 +405,14 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
         
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
         
         mock_selection = Mock()
         mock_selection.plate_selection_id = uuid4()
         
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \
@@ -489,7 +489,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE
 
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
 
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -500,11 +500,11 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
 
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
 
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \
@@ -567,7 +567,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE
 
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
 
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -578,14 +578,14 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
 
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
 
         mock_selection = Mock()
         mock_selection.plate_selection_id = uuid4()
 
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \
@@ -668,7 +668,7 @@ class TestPlateSelectionService:
         mock_restaurant.status = Status.ACTIVE
 
         mock_entity = Mock()
-        mock_entity.credit_currency_id = uuid4()
+        mock_entity.currency_metadata_id = uuid4()
 
         mock_address = Mock()
         mock_address.address_id = mock_restaurant.address_id
@@ -679,11 +679,11 @@ class TestPlateSelectionService:
         mock_qr_code.qr_code_id = uuid4()
 
         mock_currency = Mock()
-        mock_currency.credit_currency_id = uuid4()
+        mock_currency.currency_metadata_id = uuid4()
 
         with patch('app.services.plate_selection_service.plate_service') as mock_plate_service, \
              patch('app.services.plate_selection_service.restaurant_service') as mock_restaurant_service, \
-             patch('app.services.entity_service.get_credit_currency_id_for_restaurant', return_value=mock_entity.credit_currency_id), \
+             patch('app.services.entity_service.get_currency_metadata_id_for_restaurant', return_value=mock_entity.currency_metadata_id), \
              patch('app.services.crud_service.address_service') as mock_address_service, \
              patch('app.services.plate_selection_service.qr_code_service') as mock_qr_service, \
              patch('app.services.plate_selection_service.credit_currency_service') as mock_currency_service, \

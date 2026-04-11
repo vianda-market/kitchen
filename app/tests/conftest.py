@@ -278,7 +278,7 @@ def sample_restaurant_transaction():
         restaurant_id=uuid4(),
         plate_selection_id=None,
         discretionary_id=None,
-        credit_currency_id=uuid4(),
+        currency_metadata_id=uuid4(),
         was_collected=False,
         ordered_timestamp=datetime.now(timezone.utc),
         collected_timestamp=None,
@@ -306,7 +306,7 @@ def sample_restaurant_transaction():
 def sample_bill_data():
     """Sample client bill data for testing."""
     return {
-        "credit_currency_id": str(uuid4()),
+        "currency_metadata_id": str(uuid4()),
         "amount": 25.50,
         "status": "pending"
     }
@@ -317,8 +317,7 @@ def sample_credit_currency_dto():
     """Sample CreditCurrencyDTO for testing."""
     from app.dto.models import CreditCurrencyDTO
     return CreditCurrencyDTO(
-        credit_currency_id=uuid4(),
-        currency_name="Test Credits",
+        currency_metadata_id=uuid4(),
         currency_code="USD",
         credit_value_local_currency=Decimal("1.0"),
         currency_conversion_usd=Decimal("1.0"),

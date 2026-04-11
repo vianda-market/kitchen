@@ -248,7 +248,7 @@ def create_and_process_bill_for_subscription_payment(
         raise HTTPException(status_code=404, detail="Subscription payment not found")
 
     amount = float(sp_row["amount_cents"]) / 100.0
-    credit_currency_id = market["credit_currency_id"]
+    currency_metadata_id = market["currency_metadata_id"]
     currency_code = (sp_row.get("currency") or "USD").upper()
 
     bill_data = {
@@ -256,7 +256,7 @@ def create_and_process_bill_for_subscription_payment(
         "subscription_id": subscription_id,
         "user_id": subscription.user_id,
         "plan_id": subscription.plan_id,
-        "credit_currency_id": credit_currency_id,
+        "currency_metadata_id": currency_metadata_id,
         "amount": amount,
         "currency_code": currency_code,
         "modified_by": modified_by,

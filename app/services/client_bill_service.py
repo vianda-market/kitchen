@@ -56,8 +56,8 @@ class ClientBillBusinessService:
         # Set modified_by field
         bill_data["modified_by"] = current_user["user_id"]
         
-        # Resolve currency code if credit_currency_id is being updated
-        if "credit_currency_id" in bill_data:
+        # Resolve currency code if currency_metadata_id is being updated
+        if "currency_metadata_id" in bill_data:
             self._resolve_currency_code(bill_data, db)
         
         # Apply business rules
@@ -92,7 +92,7 @@ class ClientBillBusinessService:
             return None
         
         # Get currency information
-        currency = credit_currency_service.get_by_id(bill.credit_currency_id, db)
+        currency = credit_currency_service.get_by_id(bill.currency_metadata_id, db)
         
         result = {
             "bill": bill,
@@ -181,7 +181,7 @@ class ClientBillBusinessService:
         Raises:
             HTTPException: For validation failures
         """
-        required_fields = ["credit_currency_id", "amount"]
+        required_fields = ["currency_metadata_id", "amount"]
         missing_fields = [field for field in required_fields if not bill_data.get(field)]
         
         if missing_fields:
@@ -198,13 +198,13 @@ class ClientBillBusinessService:
                 detail="Amount must be a positive number"
             )
         
-        # Validate credit_currency_id format
+        # Validate currency_metadata_id format
         try:
-            UUID(str(bill_data["credit_currency_id"]))
+            UUID(str(bill_data["currency_metadata_id"]))
         except (ValueError, TypeError):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid credit_currency_id format"
+                detail="Invalid currency_metadata_id format"
             )
     
     def _resolve_currency_code(
@@ -279,7 +279,7 @@ class ClientBillBusinessService:
         # This would typically be implemented in the CRUD service
         # For now, we'll use the generic get_all and filter
         all_bills = client_bill_service.get_all(db)
-        return [bill for bill in all_bills if bill.credit_currency_id == currency_id]
+        return [bill for bill in all_bills if bill.currency_metadata_id == currency_id]
 
 
 # Create service instance

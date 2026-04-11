@@ -352,7 +352,7 @@ class AddressBusinessService:
             market = market_service.get_by_country_code(country_code)
             if not market:
                 raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
-            if market.get("country_code") == "GL":
+            if market.get("country_code") == "XG":
                 raise HTTPException(
                     status_code=400,
                     detail="Addresses cannot be registered to Global Marketplace. Please select a specific country (e.g. Argentina, Peru, Chile).",
@@ -526,7 +526,7 @@ class AddressBusinessService:
                 detail="Address is outside our service area.",
             )
         market = market_service.get_by_country_code(country_code)
-        if not market or market.get("country_code") == "GL":
+        if not market or market.get("country_code") == "XG":
             raise HTTPException(
                 status_code=400,
                 detail="Address is outside our service area.",
