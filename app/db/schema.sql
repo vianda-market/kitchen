@@ -3145,47 +3145,8 @@ CREATE INDEX IF NOT EXISTS idx_ad_zone_state ON core.ad_zone(flywheel_state);
 CREATE INDEX IF NOT EXISTS idx_ad_zone_country ON core.ad_zone(country_code);
 
 -- ─────────────────────────────────────────────────────────────
--- IAM admin grants — applied when GCP IAM user exists
--- Role: viandallc@gmail.com (Cloud SQL IAM user for Cloud SQL Studio / DBeaver)
--- Safe to run locally: IF EXISTS check skips if role is absent
---
--- After a full rebuild (DROP SCHEMA / fresh objects), ALTER DEFAULT PRIVILEGES alone
--- does not grant on tables that already exist; GRANT ALL ON ALL TABLES/SEQUENCES/FUNCTIONS
--- must run after CREATE so IAM access is restored every time this script is applied.
--- GRANT USAGE ON SCHEMA public is required for Cloud SQL Studio / clients to resolve public.*.
+-- IAM grants are applied by build_kitchen_db.sh via env vars:
+--   IAM_OWNER_ACCOUNT → full access (DB object owner role)
+--   IAM_ADMIN_EMAIL  → read-only access
+-- See build_kitchen_db.sh header for details.
 -- ─────────────────────────────────────────────────────────────
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT FROM pg_roles WHERE rolname = 'viandallc@gmail.com'
-    ) THEN
-        GRANT USAGE ON SCHEMA core, ops, customer, billing, audit, public TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ops TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA customer TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA billing TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA audit TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA core TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA core TO "viandallc@gmail.com";
-        GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA core
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA ops
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA customer
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA billing
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA audit
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public
-            GRANT ALL ON TABLES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA core
-            GRANT ALL ON SEQUENCES TO "viandallc@gmail.com";
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public
-            GRANT ALL ON SEQUENCES TO "viandallc@gmail.com";
-    END IF;
-END
-$$;

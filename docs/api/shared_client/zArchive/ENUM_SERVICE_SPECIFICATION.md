@@ -1,5 +1,7 @@
 # Enum Service API Specification
 
+> **ARCHIVED** — This was the original frontend request (2026-02-08). The feature has been fully implemented. For the current API contract, see **[ENUM_SERVICE_API.md](./ENUM_SERVICE_API.md)**. For the enum value/title convention, see **[DATA_STRUCTURES.md](../DATA_STRUCTURES.md#frontend-backend-enum-contract)**.
+
 ## Request from Frontend Team
 
 **Date**: 2026-02-08  

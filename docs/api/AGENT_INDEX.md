@@ -59,7 +59,8 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/ONBOARDING_CLARIFICATIONS_B2C.md` | Clarifications: JWT on all flows, sync status, deep links, email suppression, deferred endpoints |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/MARKET_SELECTION_AT_SIGNUP.md` | Country dropdown for signup — use `GET /leads/markets`, send `country_code` |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/LEADS_ENDPOINTS_MIGRATION.md` | Market dropdown migrated from `/markets` to `/leads` — migration guide |
-| Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/ENUM_SERVICE_SPECIFICATION.md` | Fetch enum values dynamically from `/enums/` instead of hardcoding |
+| Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/ENUM_SERVICE_API.md` | Enum Service API — endpoints, value/title contract, caching, role filtering, TypeScript types |
+| Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/zArchive/ENUM_SERVICE_SPECIFICATION.md` | _(Archived)_ Original frontend request — superseded by ENUM_SERVICE_API.md |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/LANGUAGE_AND_LOCALE_FOR_CLIENTS.md` | i18n scaffolding — locales endpoint, locale-aware market names, BCP 47 locale field, enum labels, JWT locale claim |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/MARKETS_API_CLIENT.md` | Markets API — multi-currency, multi-timezone, institution scoping |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/INSTITUTION_MARKET_ID.md` | Every institution must have `market_id` — not nullable, required on create |

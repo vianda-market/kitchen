@@ -6,11 +6,17 @@ The Enum Service API provides centralized access to all system enum values used 
 
 **Base Path**: `/api/v1/enums/`
 
-**Language (Phase 1 i18n):** `GET /api/v1/enums` accepts **`?language=en|es|pt`** (default `en`) and returns each enum key as **`{ "values": string[], "labels": Record<string,string> }`** instead of a bare string array. **`GET /api/v1/enums/{enum_name}`** is still a flat JSON array of codes. Invalid `language` → **422**. Full client guide: [LANGUAGE_AND_LOCALE_FOR_CLIENTS.md](./LANGUAGE_AND_LOCALE_FOR_CLIENTS.md).
+**Language (Phase 1 i18n):** `GET /api/v1/enums` accepts **`?language=en|es|pt`** (default `en`) and returns each enum key as **`{ "values": string[], "labels": Record<string,string> }`**. **`GET /api/v1/enums/{enum_name}`** is still a flat JSON array of codes. Invalid `language` → **422**. Full client guide: [LANGUAGE_AND_LOCALE_FOR_CLIENTS.md](./LANGUAGE_AND_LOCALE_FOR_CLIENTS.md).
 
 **Authentication**: Required (all authenticated users can access)
 
-**Supported Roles**: Employee, Supplier, Customer (varies by endpoint; see Role access rules below)
+**Supported Roles**: Internal, Supplier, Customer (varies by endpoint; see Role access rules below)
+
+> **Enum contract** — see [DATA_STRUCTURES.md](../DATA_STRUCTURES.md#frontend-backend-enum-contract) for the authoritative standard.
+> - **Values** are always lowercase slugs: `"active"`, `"internal"`, `"super_admin"`.
+> - **Titles/labels** are locale-aware display strings: `"Active"`, `"Internal"`, `"Super Admin"`.
+> - Entity endpoints return **values only**. Frontend resolves titles from cached `GET /enums` response.
+> - Frontend sends **values** in all requests (query params, bodies, filters). Never send a title.
 
 ---
 
@@ -21,8 +27,8 @@ Who can read role enums (`role_type`, `role_name`):
 | Actor | Can read roles? | How |
 |-------|-----------------|-----|
 | **Customer** | No | `role_type` and `role_name` are omitted from `GET /api/v1/enums/` and `GET /api/v1/enums/{enum_name}` responses. Requesting `role_type` or `role_name` returns **403 Forbidden**. |
-| **Supplier** | Yes, subset only | Use `GET /api/v1/enums/roles/assignable` – returns only assignable roles (Supplier role_type; Admin, Manager, Operator role_names) |
-| **Employee** | Yes, all | `GET /api/v1/enums/` includes role_type and role_name; `GET /api/v1/enums/roles/assignable` returns full set |
+| **Supplier** | Yes, subset only | Use `GET /api/v1/enums/roles/assignable` — returns only assignable roles (`supplier` role_type; `admin`, `manager`, `operator` role_names) |
+| **Internal** | Yes, all | `GET /api/v1/enums/` includes role_type and role_name; `GET /api/v1/enums/roles/assignable` returns full set |
 
 **Note**: `GET /api/v1/roles/` does not exist. Roles are enums; use the enum endpoints above.
 
@@ -50,24 +56,23 @@ Who can read role enums (`role_type`, `role_name`):
 
 The API exposes the following enum types:
 
-| Enum Type | Description | Example Values |
-|-----------|-------------|----------------|
-| `status` | General status (use context-scoped keys for forms) | Active, Pending, Inactive |
-| `status_user` | **User status only** (e.g. user edit form) | Active, Inactive |
-| `status_restaurant` | **Restaurant status only** (e.g. restaurant create/edit) | Active, Pending, Inactive |
-| `status_discretionary` | Discretionary request lifecycle | Pending, Cancelled, Approved, Rejected |
-| `status_plate_pickup` | Plate pickup / order status | Pending, Arrived, Completed, Cancelled |
-| `status_bill` | Bill status | Pending, Processed, Cancelled |
-| `address_type` | Address classification | Restaurant, Customer Home, Entity Billing |
-| `role_type` | User role types | Employee, Supplier, Customer |
-| `role_name` | Specific role names | Admin, Super Admin, Comensal |
-| `subscription_status` | Subscription lifecycle status | Active, **On Hold**, Pending, Cancelled |
-| `method_type` | Payment method types | Credit Card, Debit Card, Bank Transfer, Cash |
-| `transaction_type` | Transaction categories | Order, Credit, Debit, Refund, Discretionary |
-| `street_type` | Street type abbreviations | St, Ave, Blvd, Rd, Dr, Ln, Way, Ct, Pl, Cir |
-| `kitchen_day` | Valid kitchen days | Monday, Tuesday, Wednesday, Thursday, Friday |
-| `pickup_type` | Pickup classifications | self, for_others, by_others |
-| `discretionary_reason` | Discretionary credit reasons | Marketing Campaign, Credit Refund, Full Order Refund |
+| Enum Type | Description | Example values (lowercase slugs) |
+|-----------|-------------|----------------------------------|
+| `status` | General status (use context-scoped keys for forms) | `active`, `pending`, `inactive` |
+| `status_user` | **User status only** (e.g. user edit form) | `active`, `inactive` |
+| `status_restaurant` | **Restaurant status only** (e.g. restaurant create/edit) | `active`, `pending`, `inactive` |
+| `status_discretionary` | Discretionary request lifecycle | `pending`, `cancelled`, `approved`, `rejected` |
+| `status_plate_pickup` | Plate pickup / order status | `pending`, `arrived`, `completed`, `cancelled` |
+| `status_bill` | Bill status | `pending`, `processed`, `cancelled` |
+| `address_type` | Address classification | `restaurant`, `customer_home`, `entity_billing` |
+| `role_type` | User role types | `internal`, `supplier`, `customer`, `employer` |
+| `role_name` | Specific role names | `admin`, `super_admin`, `comensal` |
+| `subscription_status` | Subscription lifecycle status | `active`, `on_hold`, `pending`, `cancelled` |
+| `transaction_type` | Transaction categories | `order`, `credit`, `debit`, `refund`, `discretionary` |
+| `street_type` | Street type abbreviations | `st`, `ave`, `blvd`, `rd`, `dr`, `ln`, `way`, `ct`, `pl`, `cir` |
+| `kitchen_day` | Valid kitchen days | `monday`, `tuesday`, `wednesday`, `thursday`, `friday` |
+| `pickup_type` | Pickup classifications | `offer`, `request`, `self` |
+| `discretionary_reason` | Discretionary credit reasons | `marketing_campaign`, `credit_refund`, `full_order_refund` |
 
 ---
 
@@ -77,24 +82,24 @@ Status values are **context-specific**. The backend exposes a single `status_enu
 
 ### Why filter status?
 
-- **User** entity: only `Active` and `Inactive` are valid. Showing "Arrived" or "Processed" in the user edit form would be wrong and can be rejected by the API.
-- **Restaurant** entity: only `Active`, `Pending`, and `Inactive` are valid. Use `status_restaurant` or `GET /api/v1/enums/status?context=restaurant` for the restaurant status dropdown.
-- **Discretionary** requests: Pending, Cancelled, Approved, Rejected.
-- **Plate pickup / orders**: Pending, Arrived, Completed, Cancelled.
-- **Bills**: Pending, Processed, Cancelled.
+- **User** entity: only `active` and `inactive` are valid. Showing `arrived` or `processed` in the user edit form would be wrong and can be rejected by the API.
+- **Restaurant** entity: only `active`, `pending`, and `inactive` are valid. Use `status_restaurant` or `GET /api/v1/enums/status?context=restaurant` for the restaurant status dropdown.
+- **Discretionary** requests: `pending`, `cancelled`, `approved`, `rejected`.
+- **Plate pickup / orders**: `pending`, `arrived`, `completed`, `cancelled`.
+- **Bills**: `pending`, `processed`, `cancelled`.
 
 ### Option 1: Use context-scoped keys from GET /enums/
 
-When you call `GET /api/v1/enums/`, the response includes both the full list and context-scoped lists:
+When you call `GET /api/v1/enums/`, the response includes both the full list and context-scoped lists. The `values` array contains lowercase slugs; the `labels` map provides the display title for each.
 
 | Use case | Key to use | Values |
 |----------|------------|--------|
-| User create/edit (status field) | `status_user` | `["Active", "Inactive"]` |
-| Restaurant create/edit (status field) | `status_restaurant` | `["Active", "Pending", "Inactive"]` |
-| Discretionary request forms | `status_discretionary` | `["Pending", "Cancelled", "Approved", "Rejected"]` |
-| Plate pickup / order status | `status_plate_pickup` | `["Pending", "Arrived", "Completed", "Cancelled"]` |
-| Bill status | `status_bill` | `["Pending", "Processed", "Cancelled"]` |
-| Generic / unknown entity | `status` | `["Active", "Pending", "Inactive"]` |
+| User create/edit (status field) | `status_user` | `["active", "inactive"]` |
+| Restaurant create/edit (status field) | `status_restaurant` | `["active", "pending", "inactive"]` |
+| Discretionary request forms | `status_discretionary` | `["pending", "cancelled", "approved", "rejected"]` |
+| Plate pickup / order status | `status_plate_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
+| Bill status | `status_bill` | `["pending", "processed", "cancelled"]` |
+| Generic / unknown entity | `status` | `["active", "pending", "inactive"]` |
 
 **Example**: For the user edit form, use `enums.status_user` (or `enums['status_user']`) for the status dropdown, not `enums.status`.
 
@@ -108,12 +113,12 @@ For a single enum fetch, you can request status filtered by context:
 
 | Request | Response |
 |---------|----------|
-| `GET /api/v1/enums/status` | `["Active", "Pending", "Inactive"]` |
-| `GET /api/v1/enums/status?context=user` | `["Active", "Inactive"]` |
-| `GET /api/v1/enums/status?context=restaurant` | `["Active", "Pending", "Inactive"]` |
-| `GET /api/v1/enums/status?context=plate_pickup` | `["Pending", "Arrived", "Completed", "Cancelled"]` |
-| `GET /api/v1/enums/status?context=bill` | `["Pending", "Processed", "Cancelled"]` |
-| `GET /api/v1/enums/status?context=discretionary` | `["Pending", "Cancelled", "Approved", "Rejected"]` |
+| `GET /api/v1/enums/status` | `["active", "pending", "inactive"]` |
+| `GET /api/v1/enums/status?context=user` | `["active", "inactive"]` |
+| `GET /api/v1/enums/status?context=restaurant` | `["active", "pending", "inactive"]` |
+| `GET /api/v1/enums/status?context=plate_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
+| `GET /api/v1/enums/status?context=bill` | `["pending", "processed", "cancelled"]` |
+| `GET /api/v1/enums/status?context=discretionary` | `["pending", "cancelled", "approved", "rejected"]` |
 
 Use this when you only need status values for one context and want to avoid loading all enums.
 
@@ -127,29 +132,30 @@ The **`subscription_status`** enum describes the lifecycle of a subscription rec
 
 ### Values
 
-| Value | Description |
-|-------|-------------|
-| **Active** | Subscription is active; user can use the service. |
-| **On Hold** | Subscription is temporarily paused. When set, the subscription record includes **`hold_start_date`** (when the hold started) and optionally **`hold_end_date`** (when it will resume; `null` = indefinite). |
-| **Pending** | Subscription is pending (e.g. awaiting payment or activation). |
-| **Cancelled** | Subscription has been cancelled. |
+| Value (API) | Title (en) | Description |
+|-------------|-----------|-------------|
+| `active` | Active | Subscription is active; user can use the service. |
+| `on_hold` | On Hold | Subscription is temporarily paused. Includes `hold_start_date` and optionally `hold_end_date`. |
+| `pending` | Pending | Subscription is pending (e.g. awaiting payment or activation). |
+| `cancelled` | Cancelled | Subscription has been cancelled. |
 
 ### On Hold and hold dates
 
-- When **`subscription_status`** is **`"On Hold"`**, the API includes:
+- When **`subscription_status`** is **`”on_hold”`**, the API includes:
   - **`hold_start_date`** (ISO 8601): when the subscription was put on hold.
   - **`hold_end_date`** (ISO 8601 or `null`): when the subscription is expected to resume; `null` means indefinite hold.
-- Clients should use **On Hold** (not a generic “Inactive”) so that UI can show hold dates and a “Resume” or “Cancel” action correctly.
+- Clients should display the title **”On Hold”** (from `enums.subscription_status.labels[“on_hold”]`) — not a generic “Inactive” — so UI can show hold dates and a “Resume” or “Cancel” action correctly.
 - Subscription list and detail responses return `subscription_status`, `hold_start_date`, and `hold_end_date`; see subscription API docs for the exact response shape.
 
 ### TypeScript
 
 ```typescript
-export type SubscriptionStatus =
-  | 'Active'
-  | 'On Hold'
-  | 'Pending'
-  | 'Cancelled';
+// Values — what travels in API requests and responses
+export type SubscriptionStatusValue = 'active' | 'on_hold' | 'pending' | 'cancelled';
+
+// Titles — resolved from GET /enums?language={locale}, for display only
+// en: “Active”, “On Hold”, “Pending”, “Cancelled”
+// es: “Activo”, “En Espera”, “Pendiente”, “Cancelado”
 ```
 
 ---
@@ -159,7 +165,7 @@ export type SubscriptionStatus =
 The filtering is in the **backend response**: `GET /api/v1/enums/` must return the key **`status_user`** with value `["Active", "Inactive"]`. The User (create/edit) form should use **`enums.status_user`** for the Status dropdown so only Active and Inactive are shown.
 
 - **If the backend returns `status_user`**: Use it directly; no fallback needed.
-- **If the backend returns only `status` (no `status_user`)**: Client can derive user options from `status` by keeping only `"Active"` and `"Inactive"`, or use a hardcoded fallback `["Active", "Inactive"]` and log a console warning so you know the backend needs updating.
+- **If the backend returns only `status` (no `status_user`)**: Client can derive user options from `status` by keeping only `"active"` and `"inactive"`, or use a hardcoded fallback `["active", "inactive"]` and log a console warning so you know the backend needs updating.
 - **If the enums request fails**: Use the same fallback and existing console.warn.
 
 **Backend**: The backend always injects `status_user`, `status_discretionary`, `status_plate_pickup`, and `status_bill` into the response. If your response doesn’t include them, ensure the server was restarted after the latest code and test with browser cache disabled (e.g. DevTools → Network → "Disable cache") or a hard refresh.
@@ -180,26 +186,42 @@ Retrieve all system enum values in a single request.
 
 **Role enums and Customers**: When the authenticated user is a Customer, `role_type` and `role_name` are omitted from the response.
 
+Each enum key maps to an object with `values` (canonical lowercase codes) and `labels` (locale-aware display titles):
+
 ```json
 {
-  "status": ["Active", "Pending", "Inactive"],
-  "status_user": ["Active", "Inactive"],
-  "status_restaurant": ["Active", "Pending", "Inactive"],
-  "status_discretionary": ["Pending", "Cancelled", "Approved", "Rejected"],
-  "status_plate_pickup": ["Pending", "Arrived", "Completed", "Cancelled"],
-  "status_bill": ["Pending", "Processed", "Cancelled"],
-  "address_type": ["Restaurant", "Entity Billing", "Entity Address", "Customer Home", "Customer Billing", "Customer Employer"],
-  "role_type": ["Employee", "Supplier", "Customer"],
-  "role_name": ["Admin", "Super Admin", "Manager", "Operator", "Comensal"],
-  "subscription_status": ["Active", "On Hold", "Pending", "Cancelled"],
-  "method_type": ["Credit Card", "Debit Card", "Bank Transfer", "Cash", "Mercado Pago"],
-  "transaction_type": ["Order", "Credit", "Debit", "Refund", "Discretionary", "Payment"],
-  "street_type": ["St", "Ave", "Blvd", "Rd", "Dr", "Ln", "Way", "Ct", "Pl", "Cir"],
-  "kitchen_day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-  "pickup_type": ["self", "for_others", "by_others"],
-  "discretionary_reason": ["Marketing Campaign", "Credit Refund", "Order incorrectly marked as not collected", "Full Order Refund"]
+  "status": {
+    "values": ["active", "inactive", "pending", "arrived", "handed_out", "completed", "cancelled", "processed"],
+    "labels": { "active": "Active", "inactive": "Inactive", "pending": "Pending", "arrived": "Arrived", "handed_out": "Handed Out", "completed": "Completed", "cancelled": "Cancelled", "processed": "Processed" }
+  },
+  "status_user": {
+    "values": ["active", "inactive"],
+    "labels": { "active": "Active", "inactive": "Inactive" }
+  },
+  "status_bill": {
+    "values": ["pending", "processed", "cancelled"],
+    "labels": { "pending": "Pending", "processed": "Processed", "cancelled": "Cancelled" }
+  },
+  "role_type": {
+    "values": ["internal", "supplier", "customer", "employer"],
+    "labels": { "internal": "Internal", "supplier": "Supplier", "customer": "Customer", "employer": "Employer" }
+  },
+  "role_name": {
+    "values": ["admin", "super_admin", "manager", "operator", "comensal", "global_manager"],
+    "labels": { "admin": "Admin", "super_admin": "Super Admin", "manager": "Manager", "operator": "Operator", "comensal": "Comensal", "global_manager": "Global Manager" }
+  },
+  "subscription_status": {
+    "values": ["active", "on_hold", "pending", "cancelled"],
+    "labels": { "active": "Active", "on_hold": "On Hold", "pending": "Pending", "cancelled": "Cancelled" }
+  },
+  "kitchen_day": {
+    "values": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    "labels": { "monday": "Monday", "tuesday": "Tuesday", "wednesday": "Wednesday", "thursday": "Thursday", "friday": "Friday" }
+  }
 }
 ```
+
+> **Note**: Example above shows English labels (`?language=en`). With `?language=es`, labels would be localized: `"active": "Activo"`, `"internal": "Interno"`, etc. All other enum keys (address_type, street_type, transaction_type, pickup_type, discretionary_reason, etc.) follow the same `{values, labels}` structure.
 
 Use `status_user`, `status_restaurant`, `status_discretionary`, `status_plate_pickup`, or `status_bill` for entity-specific status dropdowns (see [Filtering Status by Context](#filtering-status-by-context)).
 
@@ -229,12 +251,12 @@ Retrieve values for a single enum type.
 
 Example without context (full status list):
 ```json
-["Active", "Pending", "Inactive"]
+["active", "pending", "inactive"]
 ```
 
 Example with `?context=user` (user edit form):
 ```json
-["Active", "Inactive"]
+["active", "inactive"]
 ```
 
 **Error Responses**:
@@ -265,19 +287,19 @@ Retrieve role_type and role_name values that the current user can assign when cr
 
 **Endpoint**: `GET /api/v1/enums/roles/assignable`
 
-**Authorization**: Employee and Supplier only. Customers get **403 Forbidden**.
+**Authorization**: Internal and Supplier only. Customers get **403 Forbidden**.
 
 **Response** (Supplier):
 ```json
 {
-  "role_type": ["Supplier"],
+  "role_type": ["supplier"],
   "role_name_by_role_type": {
-    "Supplier": ["Admin", "Manager", "Operator"]
+    "supplier": ["admin", "manager", "operator"]
   }
 }
 ```
 
-**Response** (Employee): Full set per valid role combinations (Employee, Supplier, Customer for role_type; role_name varies by role_type).
+**Response** (Internal): Full set per valid role combinations (`internal`, `supplier`, `customer`, `employer` for role_type; role_name varies by role_type).
 
 **Use Case**: Populate the Role dropdown in user create/edit forms. Use `role_type` and `role_name_by_role_type[selected_role_type]` for cascading dropdowns.
 
@@ -296,20 +318,20 @@ Retrieve institution types the current user can create/assign when creating or e
 **Response** (Super Admin):
 ```json
 {
-  "institution_type": ["Employee", "Supplier", "Customer", "Employer"]
+  "institution_type": ["internal", "supplier", "customer", "employer"]
 }
 ```
 
 **Response** (Admin):
 ```json
 {
-  "institution_type": ["Supplier", "Employer"]
+  "institution_type": ["supplier", "employer"]
 }
 ```
 
 **Response** (Supplier / Customer): `{"institution_type": []}` (cannot create institutions).
 
-**Use Case**: Populate the institution type dropdown in institution create/edit forms. **Do not hardcode** — use this endpoint so Employer (benefits-program institutions) is included and Employee/Customer are correctly restricted to Super Admin only.
+**Use Case**: Populate the institution type dropdown in institution create/edit forms. **Do not hardcode** — use this endpoint so `employer` (benefits-program institutions) is included and `internal`/`customer` are correctly restricted to Super Admin only.
 
 ---
 
@@ -334,22 +356,19 @@ curl -X GET "http://localhost:8000/api/v1/enums/status?context=user" \
 ### JavaScript (Fetch API)
 
 ```javascript
-// Get all enums (use enums.status_user for user edit form)
-const response = await fetch('http://localhost:8000/api/v1/enums/', {
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
+// Get all enums with localized titles
+const response = await fetch('http://localhost:8000/api/v1/enums/?language=en', {
+  headers: { 'Authorization': `Bearer ${accessToken}` }
 });
 const enums = await response.json();
-// User status dropdown: enums.status_user → ["Active", "Inactive"]
+// enums.status_user.values → ["active", "inactive"]
+// enums.status_user.labels → { "active": "Active", "inactive": "Inactive" }
 
-// Get status for a specific context (e.g. user form)
+// Get status values for a specific context (flat array, no labels)
 const statusResponse = await fetch('http://localhost:8000/api/v1/enums/status?context=user', {
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
+  headers: { 'Authorization': `Bearer ${accessToken}` }
 });
-const statusValues = await statusResponse.json(); // ["Active", "Inactive"]
+const statusValues = await statusResponse.json(); // ["active", "inactive"]
 ```
 
 ### Python (requests)
@@ -377,7 +396,7 @@ user_status_response = requests.get(
     params={'context': 'user'},
     headers={'Authorization': f'Bearer {access_token}'}
 )
-user_status_values = user_status_response.json()  # ["Active", "Inactive"]
+user_status_values = user_status_response.json()  # ["active", "inactive"]
 ```
 
 ---
@@ -390,128 +409,101 @@ user_status_values = user_status_response.json()  # ["Active", "Inactive"]
 // services/enumService.ts
 import { api } from './api';
 
-interface EnumValues {
-  status: string[];
-  status_user: string[];
-  status_discretionary: string[];
-  status_plate_pickup: string[];
-  status_bill: string[];
-  address_type: string[];
-  role_type: string[];
-  // ... other enum types
+// Response shape from GET /api/v1/enums?language={locale}
+interface EnumEntry {
+  values: string[];                  // Canonical lowercase codes
+  labels: Record<string, string>;    // code → localized display title
 }
 
-let cachedEnums: EnumValues | null = null;
+type EnumMap = Record<string, EnumEntry>;
+
+let cachedEnums: EnumMap | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 3600000; // 1 hour in milliseconds
 
-export async function getEnums(): Promise<EnumValues> {
+export async function getEnums(locale: string = 'en'): Promise<EnumMap> {
   const now = Date.now();
   
-  // Return cached values if still valid
   if (cachedEnums && (now - cacheTimestamp) < CACHE_DURATION) {
     return cachedEnums;
   }
   
-  // Fetch fresh values
-  const response = await api.get('/api/v1/enums/');
+  const response = await api.get(`/api/v1/enums/?language=${locale}`);
   cachedEnums = response.data;
   cacheTimestamp = now;
   
   return cachedEnums;
 }
 
-export async function getEnumValues(enumName: string): Promise<string[]> {
-  const enums = await getEnums();
-  return enums[enumName as keyof EnumValues] || [];
+// Get the values array for a specific enum
+export function getValues(enums: EnumMap, key: string): string[] {
+  return enums[key]?.values ?? [];
+}
+
+// Resolve a value to its display title
+export function getTitle(enums: EnumMap, key: string, value: string): string {
+  return enums[key]?.labels[value] ?? value;
 }
 ```
 
 ### 2. Use in Form Components
 
-Use **context-scoped** status so the dropdown only shows valid values for that entity (e.g. user = Active/Inactive only).
+Use **context-scoped** status so the dropdown only shows valid values for that entity. Submit the **value** (lowercase slug); display the **title** (from labels).
 
 ```tsx
-// components/StatusDropdown.tsx – use status_user for user edit form
+// components/StatusDropdown.tsx
 import React, { useEffect, useState } from 'react';
-import { getEnums } from '../services/enumService';
+import { getEnums, type EnumMap } from '../services/enumService';
 
 type StatusContext = 'user' | 'discretionary' | 'plate_pickup' | 'bill';
 
 interface StatusDropdownProps {
   value: string;
   onChange: (value: string) => void;
-  /** Which entity: use 'user' for user edit form so only Active/Inactive are shown */
   context?: StatusContext;
 }
 
 export function StatusDropdown({ value, onChange, context = 'user' }: StatusDropdownProps) {
-  const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  const [enumEntry, setEnumEntry] = useState<{ values: string[]; labels: Record<string, string> } | null>(null);
 
   useEffect(() => {
     getEnums().then((enums) => {
-      const key = context === 'user' ? 'status_user' : `status_${context}` as const;
-      setStatusOptions((enums as Record<string, string[]>)[key] ?? []);
+      const key = context === 'user' ? 'status_user' : `status_${context}`;
+      setEnumEntry(enums[key] ?? null);
     });
   }, [context]);
 
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">Select status...</option>
-      {statusOptions.map((status) => (
-        <option key={status} value={status}>{status}</option>
+      {enumEntry?.values.map((val) => (
+        <option key={val} value={val}>{enumEntry.labels[val] ?? val}</option>
       ))}
     </select>
   );
 }
 ```
 
-Alternative: fetch status for one context only via query param:
-```tsx
-// GET /api/v1/enums/status?context=user
-const res = await api.get('/api/v1/enums/status', { params: { context: 'user' } });
-const statusOptions = res.data; // ["Active", "Inactive"]
-```
+The `<option value>` holds the **value** (sent to API), the display text shows the **title** (from labels). No hardcoded display strings needed.
 
 ### 3. Generate TypeScript Types
 
-Use context-specific types for status where applicable so forms only allow valid values:
+All enum types use lowercase slug values — these are what the API sends and accepts:
 
 ```typescript
-// types/enums.ts (align with API; use context-scoped for forms)
-export type Status = 
-  | 'Active' 
-  | 'Inactive' 
-  | 'Pending' 
-  | 'Arrived' 
-  | 'Completed' 
-  | 'Cancelled' 
-  | 'Processed';
-
-/** User entity status only – use for user create/edit status field */
-export type UserStatus = 'Active' | 'Inactive';
-
-/** Restaurant entity status only – use for restaurant create/edit status field */
-export type RestaurantStatus = 'Active' | 'Pending' | 'Inactive';
-
-/** Plate pickup / order status */
-export type PlatePickupStatus = 'Pending' | 'Arrived' | 'Completed' | 'Cancelled';
-
-/** Bill status */
-export type BillStatus = 'Pending' | 'Processed';
-
-export type SubscriptionStatus = 
-  | 'Active' 
-  | 'On Hold' 
-  | 'Pending' 
-  | 'Cancelled';
-
-export type RoleType = 
-  | 'Employee' 
-  | 'Supplier' 
-  | 'Customer';
-
+// types/enums.ts — values (what travels in API requests/responses)
+export type Status = 'active' | 'inactive' | 'pending' | 'arrived' | 'handed_out' | 'completed' | 'cancelled' | 'processed';
+export type UserStatus = 'active' | 'inactive';
+export type RestaurantStatus = 'active' | 'pending' | 'inactive';
+export type PlatePickupStatus = 'pending' | 'arrived' | 'handed_out' | 'completed' | 'cancelled';
+export type BillStatus = 'pending' | 'processed' | 'cancelled';
+export type SubscriptionStatus = 'active' | 'on_hold' | 'pending' | 'cancelled';
+export type RoleType = 'internal' | 'supplier' | 'customer' | 'employer';
+export type RoleName = 'admin' | 'super_admin' | 'manager' | 'operator' | 'comensal' | 'global_manager';
 // ... other enum types
+
+// Titles are NOT typed — they come from GET /enums?language={locale} labels map
+// and vary by locale. Never hardcode title strings.
 ```
 
 ---
@@ -609,13 +601,14 @@ To add a new enum type to the API:
    from enum import Enum
 
    class NewEnum(str, Enum):
-       VALUE_ONE = "Value One"
-       VALUE_TWO = "Value Two"
+       VALUE_ONE = "value_one"      # lowercase slug — stored in DB, sent in API
+       VALUE_TWO = "value_two"
 
        @classmethod
        def values(cls) -> list[str]:
            return [item.value for item in cls]
    ```
+   Then add display titles in `app/i18n/enum_labels.py` for each locale.
 
 2. **Export in `__init__.py`** (`app/config/enums/__init__.py`)
    ```python
@@ -730,6 +723,15 @@ pytest app/tests/services/test_enum_service.py -v
 
 ## Changelog
 
+### 2026-04-09 - Enum value/title contract and lowercase standardization
+
+- Established **frontend-backend enum contract**: values are lowercase slugs, titles are locale-aware display strings from `GET /enums`. See [DATA_STRUCTURES.md](../DATA_STRUCTURES.md#frontend-backend-enum-contract).
+- Fixed all examples in this doc to use **lowercase slug values** (`"active"`, `"internal"`, `"super_admin"`) instead of stale capitalized forms (`"Active"`, `"Employee"`, `"Super Admin"`).
+- Updated response examples to show the `{values, labels}` structure (Phase 1 i18n format).
+- Updated TypeScript types to use lowercase values.
+- Added FAQ entry clarifying value vs. title usage.
+- Archived `ENUM_SERVICE_SPECIFICATION.md` (superseded by this doc).
+
 ### 2026-02-21 - Subscription status: On Hold and hold dates
 
 - **`subscription_status`** enum includes **`"On Hold"`** (with Pending, Cancelled, Active). Use it for subscription lifecycle and forms.
@@ -785,11 +787,14 @@ A: Cache for 1 hour (as indicated by Cache-Control header). Refetch on app start
 A: Submit a backend feature request following the "Extensibility" section above.
 
 **Q: Can Customers see all enum values?**  
-A: Yes, all authenticated users (Employee, Supplier, Customer) can read all enum values.
+A: Yes, all authenticated users (Internal, Supplier, Customer) can read all enum values except role enums (restricted for Customers).
 
 **Q: Why is `audit_operation_enum` not exposed?**  
 A: It's an internal enum used only by database triggers, not needed in frontend.
 
-**Q: Why does the user edit form show "Arrived" or "Processed" in the status dropdown?**  
-A: Use the context-scoped key or query param so the dropdown only shows valid values. For user edit, use `enums.status_user` from GET /enums/ or GET /enums/status?context=user. Only Active and Inactive are valid for users; the API will reject other status values.
+**Q: Why does the user edit form show "arrived" or "processed" in the status dropdown?**  
+A: Use the context-scoped key or query param so the dropdown only shows valid values. For user edit, use `enums.status_user` from GET /enums/ or GET /enums/status?context=user. Only `active` and `inactive` are valid for users; the API will reject other status values.
+
+**Q: Should I send display titles or values to the API?**  
+A: Always send **values** (lowercase slugs). Never send titles. Example: `?status=active`, not `?status=Active`. See the [enum contract](../DATA_STRUCTURES.md#frontend-backend-enum-contract).
 

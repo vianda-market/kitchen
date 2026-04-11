@@ -7,8 +7,49 @@ Every enum in the system follows this structure:
 | Concern | Where | Format | Example |
 |---------|-------|--------|---------|
 | **Member name** | Python class | UPPER_SNAKE_CASE | `Status.HANDED_OUT` |
-| **Value** | DB column, API response, API request | lowercase slug | `"handed_out"` |
-| **Display label** | `GET /api/v1/enums` response | Title Case (locale-dependent) | `"Handed Out"` (en), `"Entregado"` (es) |
+| **Value** | DB column, API request/response payloads, query params | lowercase slug | `"handed_out"` |
+| **Title** | `GET /api/v1/enums` response `labels` map | Title Case (locale-dependent) | `"Handed Out"` (en), `"Entregado"` (es) |
+
+---
+
+## Frontend-Backend Enum Contract
+
+This is the authoritative standard for how enum data flows between frontend and backend.
+
+### The rule
+
+| Direction | What travels | Format | Example |
+|-----------|-------------|--------|---------|
+| **Frontend → Backend** (request body, query param, filter) | **value** | lowercase slug | `?status=active`, `{ "role_type": "internal" }` |
+| **Backend → Frontend** (entity response) | **value** | lowercase slug | `{ "status": "active", "role_type": "internal" }` |
+| **Backend → Frontend** (enum lookup) | **value + title** | `{ values: [...], labels: {value: title} }` | See [Enum API Endpoint](#enum-api-endpoint) below |
+
+### How it works
+
+1. **Frontend fetches `GET /api/v1/enums?language={locale}` once** on login, caches for 1 hour.
+2. The response contains both `values` (canonical codes) and `labels` (localized display titles) for every enum.
+3. **Entity endpoints** (`/users/me`, `/institution-bills`, `/plate-pickup/pending`, etc.) return **values only** — never titles.
+4. **Frontend resolves titles locally** by looking up the cached enum labels: `enums.status.labels["active"]` → `"Active"` (en) / `"Activo"` (es).
+5. **Frontend sends values in all requests** — query params, request bodies, filters. Never send a title to the API.
+
+### Why this pattern
+
+- **DRY**: Titles live in one place (`GET /enums`), not duplicated across every entity response.
+- **i18n-ready**: The same value maps to different titles per locale. Entity responses are locale-agnostic.
+- **Cache-friendly**: Enum labels change rarely; entity data changes constantly. Decoupling them lets each be cached independently.
+
+### Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Sending `?status=Active` (capitalized) | Send `?status=active` (lowercase slug) |
+| Sending `?status=active` for bills | Bills don't have `active` status — valid bill statuses: `pending`, `processed`, `cancelled` |
+| Displaying `role_type: "internal"` as-is in UI | Look up `enums.role_type.labels["internal"]` → `"Internal"` |
+| Hardcoding display labels in frontend code | Use `GET /enums?language={locale}` — labels update without frontend deploy |
+
+Full enum API docs: [ENUM_SERVICE_API.md](shared_client/ENUM_SERVICE_API.md)
+
+---
 
 ## Enum API Endpoint
 
@@ -36,9 +77,9 @@ Returns all system enums. Each enum key contains:
 
 ### Usage Rules
 
-- **`value`** (lowercase slug) — use for logic, comparisons, API payloads, URL params
-- **`label`** (display string) — use for UI rendering only
-- **`Accept-Language`** header or `?language=` param controls locale for labels (en, es, pt)
+- **`value`** (lowercase slug) — use in API requests, query params, comparisons, and business logic
+- **`label`** / title (display string) — use for UI rendering only; never send to the API
+- **`?language=`** param controls locale for labels (`en`, `es`, `pt`). Default: `en`
 
 ### JWT Token Values
 

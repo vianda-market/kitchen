@@ -10,8 +10,11 @@
 #   DB_NAME      default: kitchen
 #   DB_USER      default: cdeachaval
 #   PGPASSWORD   set when the DB user requires a password (e.g. GCP / kitchen_app)
-#   DB_SSLMODE   optional; non-local DB_HOST defaults to require (Cloud SQL TLS).
-#                For local Postgres without SSL, use DB_SSLMODE=prefer or disable.
+#   DB_SSLMODE       optional; non-local DB_HOST defaults to require (Cloud SQL TLS).
+#                    For local Postgres without SSL, use DB_SSLMODE=prefer or disable.
+#   IAM_OWNER_ACCOUNT  optional; Cloud SQL IAM user for full access (Cloud SQL Studio / DBeaver)
+#   IAM_ADMIN_EMAIL  optional; Cloud SQL IAM user for read-only access (monitoring / support)
+#                    Both from Pulumi config. Skipped if not set or role doesn't exist.
 #
 # GCP / CI toggles:
 #   SKIP_IMAGE_CLEANUP=1     Skip clearing static/qr_codes and static/product_images
@@ -104,6 +107,86 @@ CREATE SCHEMA public;
 \i app/db/archival_indexes.sql
 \i app/db/seed/reference_data.sql
 SQL
+
+# ---------------------------------------------------------------------------
+# IAM grants (optional — env-var-driven, safe to skip locally)
+# ---------------------------------------------------------------------------
+
+# IAM_OWNER_ACCOUNT: full access (Cloud SQL Studio, DBeaver, admin operations)
+if [ -n "${IAM_OWNER_ACCOUNT:-}" ]; then
+  echo "→ Granting full access to IAM owner: ${IAM_OWNER_ACCOUNT}…"
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d "${DB_NAME}" \
+    -q -X -v ON_ERROR_STOP=1 <<EOSQL
+DO \$\$
+BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = '${IAM_OWNER_ACCOUNT}') THEN
+        GRANT USAGE ON SCHEMA core, ops, customer, billing, audit, public TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ops TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA customer TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA billing TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA audit TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA core TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA core TO "${IAM_OWNER_ACCOUNT}";
+        GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA core GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA ops GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA customer GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA billing GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA audit GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA core GRANT ALL ON SEQUENCES TO "${IAM_OWNER_ACCOUNT}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${IAM_OWNER_ACCOUNT}";
+        RAISE NOTICE 'Full-access grants applied for %', '${IAM_OWNER_ACCOUNT}';
+    ELSE
+        RAISE NOTICE 'IAM role % does not exist — skipping owner grants', '${IAM_OWNER_ACCOUNT}';
+    END IF;
+END
+\$\$;
+EOSQL
+else
+  echo "→ Skipping IAM owner grants (IAM_OWNER_ACCOUNT not set)"
+fi
+
+# IAM_ADMIN_EMAIL: read-only access (monitoring, dashboards, support)
+if [ -n "${IAM_ADMIN_EMAIL:-}" ]; then
+  echo "→ Granting read-only access to IAM admin: ${IAM_ADMIN_EMAIL}…"
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d "${DB_NAME}" \
+    -q -X -v ON_ERROR_STOP=1 <<EOSQL
+DO \$\$
+BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = '${IAM_ADMIN_EMAIL}') THEN
+        GRANT USAGE ON SCHEMA core, ops, customer, billing, audit TO "${IAM_ADMIN_EMAIL}";
+        GRANT SELECT ON ALL TABLES IN SCHEMA core TO "${IAM_ADMIN_EMAIL}";
+        GRANT SELECT ON ALL TABLES IN SCHEMA ops TO "${IAM_ADMIN_EMAIL}";
+        GRANT SELECT ON ALL TABLES IN SCHEMA customer TO "${IAM_ADMIN_EMAIL}";
+        GRANT SELECT ON ALL TABLES IN SCHEMA billing TO "${IAM_ADMIN_EMAIL}";
+        GRANT SELECT ON ALL TABLES IN SCHEMA audit TO "${IAM_ADMIN_EMAIL}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA core GRANT SELECT ON TABLES TO "${IAM_ADMIN_EMAIL}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA ops GRANT SELECT ON TABLES TO "${IAM_ADMIN_EMAIL}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA customer GRANT SELECT ON TABLES TO "${IAM_ADMIN_EMAIL}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA billing GRANT SELECT ON TABLES TO "${IAM_ADMIN_EMAIL}";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA audit GRANT SELECT ON TABLES TO "${IAM_ADMIN_EMAIL}";
+        RAISE NOTICE 'Read-only grants applied for %', '${IAM_ADMIN_EMAIL}';
+    ELSE
+        RAISE NOTICE 'IAM role % does not exist — skipping admin grants', '${IAM_ADMIN_EMAIL}';
+    END IF;
+END
+\$\$;
+EOSQL
+else
+  echo "→ Skipping IAM admin grants (IAM_ADMIN_EMAIL not set)"
+fi
 
 # Dev fixtures (dev only — never loaded in staging/production)
 if [ "${ENV}" = "dev" ]; then
