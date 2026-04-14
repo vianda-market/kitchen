@@ -83,6 +83,7 @@ class RouteConfig:
         entity_type: Optional[str] = None,
         immutable_update_fields: Optional[List[str]] = None,
         paginatable: bool = False,
+        pre_archive_validator: Optional[Callable] = None,
     ):
         self.prefix = prefix
         self.tags = tags
@@ -93,6 +94,7 @@ class RouteConfig:
         self.entity_type = entity_type  # Entity type for EntityScopingService
         self.immutable_update_fields = immutable_update_fields or []
         self.paginatable = paginatable
+        self.pre_archive_validator = pre_archive_validator
 
 
 def create_crud_routes(
@@ -356,6 +358,9 @@ def create_crud_routes(
         else:
             scope = None
 
+        if config.pre_archive_validator:
+            config.pre_archive_validator(entity_id, db)
+
         def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
             return service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
 
@@ -391,8 +396,9 @@ def create_product_routes() -> APIRouter:
     from app.services.error_handling import handle_create
     from app.utils.error_messages import entity_not_found
     from app.utils.log import log_error
+    from app.security.field_policies import ensure_supplier_admin_or_manager
     from typing import List, Optional
-    
+
     config = RouteConfig(
         prefix="/products",
         tags=["Products"],
@@ -490,8 +496,11 @@ def create_product_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Create a new product with image validation"""
+            """Create a new product with image validation.
+            Supports composite creation: embed ingredient_ids for atomic product + ingredients."""
+            from app.services.ingredient_service import set_product_ingredients
             data = create_data.model_dump()
+            ingredient_ids = data.pop("ingredient_ids", None)
             data["modified_by"] = current_user["user_id"]
             scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
             validated = product_image_service.validate_product_image_at_creation(
@@ -504,9 +513,75 @@ def create_product_routes() -> APIRouter:
             data["image_thumbnail_storage_path"] = validated["thumbnail_storage_path"]
             data["image_thumbnail_url"] = validated["thumbnail_url"]
             data["image_checksum"] = validated["checksum"]
-            def create_callable(payload: dict, connection: psycopg2.extensions.connection):
-                return product_service.create(payload, connection, scope=scope)
-            return handle_create(create_callable, data, db, "product")
+            has_ingredients = ingredient_ids is not None and len(ingredient_ids) > 0
+
+            try:
+                product = product_service.create(data, db, scope=scope, commit=not has_ingredients)
+                if not product:
+                    raise HTTPException(status_code=500, detail="Failed to create product")
+
+                if has_ingredients:
+                    market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+                    set_product_ingredients(
+                        product.product_id, ingredient_ids, current_user["user_id"],
+                        market_id, db, commit=False,
+                    )
+                    db.commit()
+
+                from app.utils.gcs import resolve_product_image_urls
+                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+            except HTTPException:
+                raise
+            except Exception as e:
+                db.rollback()
+                log_error(f"Error creating product: {e}")
+                raise HTTPException(status_code=500, detail="Error creating product")
+
+        @router.put("/{product_id}", response_model=ProductResponseSchema)
+        def update_product_with_ingredients(
+            product_id: UUID,
+            update_data: ProductUpdateSchema,
+            current_user: dict = Depends(get_current_user),
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ):
+            """Update a product. If ingredient_ids is provided, full-replaces ingredient set atomically."""
+            from app.services.ingredient_service import set_product_ingredients
+            ensure_supplier_admin_or_manager(current_user)
+            data = update_data.model_dump(exclude_unset=True)
+            ingredient_ids = data.pop("ingredient_ids", None)
+            data["modified_by"] = current_user["user_id"]
+            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
+            has_ingredients = ingredient_ids is not None
+
+            try:
+                product = product_service.update(product_id, data, db, scope=scope, commit=not has_ingredients)
+                if not product:
+                    raise HTTPException(status_code=500, detail="Failed to update product")
+
+                if has_ingredients:
+                    market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+                    if len(ingredient_ids) > 0:
+                        set_product_ingredients(
+                            product_id, ingredient_ids, current_user["user_id"],
+                            market_id, db, commit=False,
+                        )
+                    else:
+                        # Empty list = remove all ingredients
+                        cursor = db.cursor()
+                        cursor.execute(
+                            "DELETE FROM ops.product_ingredient WHERE product_id = %s",
+                            (str(product_id),),
+                        )
+                    db.commit()
+
+                from app.utils.gcs import resolve_product_image_urls
+                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+            except HTTPException:
+                raise
+            except Exception as e:
+                db.rollback()
+                log_error(f"Error updating product {product_id}: {e}")
+                raise HTTPException(status_code=500, detail="Error updating product")
 
         @router.post("/{product_id}/image", response_model=ProductResponseSchema)
         async def upload_product_image(
@@ -795,7 +870,7 @@ def create_restaurant_routes() -> APIRouter:
 def create_credit_currency_routes() -> APIRouter:
     """Create routes for CreditCurrency entity with Internal-only access"""
     from app.services.crud_service import credit_currency_service
-    from app.schemas.consolidated_schemas import CreditCurrencyCreateSchema, CreditCurrencyUpdateSchema, CreditCurrencyResponseSchema
+    from app.schemas.consolidated_schemas import CreditCurrencyCreateSchema, CreditCurrencyUpdateSchema, CreditCurrencyResponseSchema, CreditCurrencyEnrichedResponseSchema
     from typing import List
     
     config = RouteConfig(
@@ -825,6 +900,29 @@ def create_credit_currency_routes() -> APIRouter:
             return credit_currency_service.get_all(connection, scope=scope, include_archived=False)
         return handle_get_all(service_callable, db, "credit currencies")
     
+    # Enriched routes MUST be before /{currency_id} so /enriched is not parsed as currency_id
+    @router.get("/enriched", response_model=List[CreditCurrencyEnrichedResponseSchema])
+    def get_all_credit_currencies_enriched(
+        current_user: dict = Depends(get_employee_user),
+        db: psycopg2.extensions.connection = Depends(get_db),
+    ):
+        """Get all credit currencies with enriched data (market name, country code). Internal-only. Non-archived only."""
+        from app.services.entity_service import get_enriched_credit_currencies
+        return get_enriched_credit_currencies(db, include_archived=False)
+
+    @router.get("/enriched/{currency_id}", response_model=CreditCurrencyEnrichedResponseSchema)
+    def get_credit_currency_enriched(
+        currency_id: UUID,
+        current_user: dict = Depends(get_employee_user),
+        db: psycopg2.extensions.connection = Depends(get_db),
+    ):
+        """Get a single credit currency by ID with enriched data. Internal-only. Non-archived only."""
+        from app.services.entity_service import get_enriched_credit_currency_by_id
+        result = get_enriched_credit_currency_by_id(currency_id, db, include_archived=False)
+        if not result:
+            raise HTTPException(status_code=404, detail="Credit currency not found")
+        return result
+
     @router.get("/{currency_id}", response_model=CreditCurrencyResponseSchema)
     def get_credit_currency(
         currency_id: UUID,
@@ -1034,7 +1132,7 @@ def create_subscription_routes() -> APIRouter:
             Returns plans in the user's market with employer/employee split.
             Non-benefit users get 404."""
             from app.services.crud_service import institution_service, plan_service as _plan_service
-            from app.services.employer.program_service import get_program_by_institution
+            from app.services.employer.program_service import resolve_effective_program
             from app.services.employer.billing_service import compute_employee_benefit
             from app.utils.db import db_read
 
@@ -1054,22 +1152,22 @@ def create_subscription_routes() -> APIRouter:
             if inst_type_str != "employer":
                 raise HTTPException(status_code=404, detail="No employer benefit program found")
 
-            program = get_program_by_institution(institution_id, db)
-            if not program or not program.is_active:
-                raise HTTPException(status_code=404, detail="No active employer benefit program found")
-
-            # Get user's market
+            # Get user's market and employer_entity_id
             user_row = db_read(
-                "SELECT market_id FROM user_info WHERE user_id = %s::uuid", (str(user_id),),
+                "SELECT market_id, employer_entity_id FROM user_info WHERE user_id = %s::uuid", (str(user_id),),
                 connection=db, fetch_one=True,
             )
             if not user_row or not user_row.get("market_id"):
                 raise HTTPException(status_code=400, detail="User has no market assigned")
 
+            employer_entity_id = user_row.get("employer_entity_id")
+            program = resolve_effective_program(institution_id, employer_entity_id, db)
+            if not program or not program.is_active:
+                raise HTTPException(status_code=404, detail="No active employer benefit program found")
+
             # Get plans in market
-            plans = _plan_service.get_all(
-                db, scope=None,
-                additional_conditions=[("market_id = %s::uuid", str(user_row["market_id"]))],
+            plans = _plan_service.get_all_by_field(
+                "market_id", user_row["market_id"], db, scope=None,
             )
 
             # Compute monthly cap usage
@@ -1121,7 +1219,7 @@ def create_subscription_routes() -> APIRouter:
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
                 def _get_subscriptions():
-                    return subscription_service.get_all(db, scope=None, include_archived=False, additional_conditions=[("user_id = %s::uuid", str(user_id))])
+                    return subscription_service.get_all_by_field("user_id", user_id, db, scope=None)
             else:
                 def _get_subscriptions():
                     return subscription_service.get_all(db, scope=None, include_archived=False)
@@ -1200,10 +1298,14 @@ def create_subscription_routes() -> APIRouter:
 def create_institution_routes() -> APIRouter:
     """Create routes for Institution entity with POST/PUT/DELETE restricted to Internal Admin and Super Admin only.
     GET endpoints scoped: Suppliers, Customers, and Internal Management see only their institution."""
-    from app.services.crud_service import institution_service
+    from app.services.crud_service import institution_service, supplier_terms_service
     from app.schemas.consolidated_schemas import InstitutionCreateSchema, InstitutionUpdateSchema, InstitutionResponseSchema
     from app.auth.dependencies import get_admin_user
     from app.services.error_handling import handle_create, handle_get_all, handle_get_by_id, handle_update, handle_delete
+    from app.utils.log import log_info, log_error
+    from app.services.entity_service import (
+        attach_institution_market_ids, attach_institution_market_ids_bulk,
+    )
     config = RouteConfig(
         prefix="/institutions",
         tags=["Institutions"],
@@ -1231,7 +1333,11 @@ def create_institution_routes() -> APIRouter:
             scope = _institution_scope(current_user)
             def service_callable(connection: psycopg2.extensions.connection):
                 return institution_service.get_all(connection, scope=scope, include_archived=False)
-            return handle_get_all(service_callable, db, "institutions")
+            institutions = handle_get_all(service_callable, db, "institutions")
+            if not institutions:
+                return institutions
+            enriched = attach_institution_market_ids_bulk(institutions, db)
+            return [InstitutionResponseSchema(**d) for d in enriched]
         
         @router.get("/{entity_id}", response_model=InstitutionResponseSchema)
         def get_institution(
@@ -1241,13 +1347,16 @@ def create_institution_routes() -> APIRouter:
         ):
             """Get institution by ID. Suppliers, Customers, Internal Management: own institution only. Admin/Super Admin: any. Non-archived only."""
             scope = _institution_scope(current_user)
-            return handle_get_by_id(
+            institution = handle_get_by_id(
                 institution_service.get_by_id,
                 entity_id,
                 db,
                 "institution",
                 extra_kwargs={"scope": scope} if scope else None
             )
+            if institution is None:
+                return institution
+            return InstitutionResponseSchema(**attach_institution_market_ids(institution, db))
         
         @router.put("/{entity_id}", response_model=InstitutionResponseSchema)
         def update_institution(
@@ -1278,12 +1387,34 @@ def create_institution_routes() -> APIRouter:
                     status_code=403,
                     detail="Only Super Admin can set institution_type to Internal or Customer.",
                 )
-            if inst_type_str == "supplier":
-                data.pop("market_id", None)
-            def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
-                return institution_service.update(target_id, payload, connection, scope=scope)
+            # Extract market_ids for junction table handling
+            market_ids = data.pop("market_ids", None)
+            data.pop("market_id", None)
 
-            return handle_update(update_callable, entity_id, data, db, "institution")
+            if market_ids is not None:
+                # Update institution_market junction: delete old rows, insert new ones
+                def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
+                    result = institution_service.update(target_id, payload, connection, scope=scope, commit=False)
+                    cursor = connection.cursor()
+                    cursor.execute(
+                        "DELETE FROM core.institution_market WHERE institution_id = %s",
+                        (str(target_id),),
+                    )
+                    for idx, mid in enumerate(market_ids):
+                        cursor.execute(
+                            "INSERT INTO core.institution_market (institution_id, market_id, is_primary) VALUES (%s, %s, %s)",
+                            (str(target_id), str(mid), idx == 0),
+                        )
+                    connection.commit()
+                    return result
+            else:
+                def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
+                    return institution_service.update(target_id, payload, connection, scope=scope)
+
+            updated = handle_update(update_callable, entity_id, data, db, "institution")
+            if updated is None:
+                return updated
+            return InstitutionResponseSchema(**attach_institution_market_ids(updated, db))
         
         @router.delete("/{entity_id}", response_model=dict)
         def delete_institution(
@@ -1291,7 +1422,15 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_admin_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Delete institution (soft delete) - Internal Admin and Super Admin only."""
+            """Delete institution (soft delete) - Internal Admin and Super Admin only.
+            System institutions (Vianda Enterprises, Vianda Customers) cannot be archived."""
+            from app.config.restricted_institutions import get_restricted_institution_ids
+            uid = entity_id if isinstance(entity_id, UUID) else UUID(str(entity_id))
+            if uid in get_restricted_institution_ids():
+                raise HTTPException(
+                    status_code=400,
+                    detail="System institutions (Vianda Enterprises, Vianda Customers) cannot be archived.",
+                )
             scope = _institution_scope(current_user)
             def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
                 return institution_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
@@ -1304,8 +1443,12 @@ def create_institution_routes() -> APIRouter:
             current_user: dict = Depends(get_admin_user),
             db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Create a new institution - Internal Admin and Super Admin only"""
+            """Create a new institution - Internal Admin and Super Admin only.
+            Supports composite creation: embed supplier_terms for atomic institution + terms creation."""
             data = create_data.model_dump(exclude_none=True)
+            supplier_terms_data = data.pop("supplier_terms", None)
+            market_ids = data.pop("market_ids", [])
+            data.pop("market_id", None)
             inst_type = data.get("institution_type")
             inst_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type) if inst_type else "supplier"
             if inst_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
@@ -1313,11 +1456,60 @@ def create_institution_routes() -> APIRouter:
                     status_code=403,
                     detail="Only Super Admin can create Internal or Customer-type institutions.",
                 )
+            if supplier_terms_data is not None and inst_str != "supplier":
+                raise HTTPException(
+                    status_code=422,
+                    detail="supplier_terms can only be provided when institution_type is Supplier.",
+                )
+            # Treat empty supplier_terms (all defaults) as absent
+            if supplier_terms_data is not None and all(
+                v is None or v == field.default
+                for v, field in zip(
+                    supplier_terms_data.values(),
+                    create_data.supplier_terms.__class__.model_fields.values()
+                )
+            ):
+                supplier_terms_data = None
+
             data["modified_by"] = current_user["user_id"]
-            scope = None
-            def create_callable(payload: dict, connection: psycopg2.extensions.connection):
-                return institution_service.create(payload, connection, scope=scope)
-            return handle_create(create_callable, data, db, "institution")
+            is_supplier = inst_str == "supplier"
+
+            try:
+                # Always defer commit — junction rows and optional supplier_terms are part of the same transaction
+                institution = institution_service.create(data, db, scope=None, commit=False)
+                if not institution:
+                    raise HTTPException(status_code=500, detail="Failed to create institution")
+
+                # Insert institution_market junction rows
+                if market_ids:
+                    cursor = db.cursor()
+                    for idx, mid in enumerate(market_ids):
+                        cursor.execute(
+                            "INSERT INTO core.institution_market (institution_id, market_id, is_primary) VALUES (%s, %s, %s)",
+                            (str(institution.institution_id), str(mid), idx == 0),
+                        )
+
+                if is_supplier:
+                    terms_payload = {
+                        **(supplier_terms_data or {}),
+                        "institution_id": str(institution.institution_id),
+                        "modified_by": current_user["user_id"],
+                    }
+                    terms = supplier_terms_service.create(terms_payload, db, commit=False)
+                    if not terms:
+                        db.rollback()
+                        raise HTTPException(status_code=500, detail="Failed to create supplier terms")
+                    log_info(f"Created institution {institution.institution_id} with supplier terms")
+
+                db.commit()
+
+                return InstitutionResponseSchema(**attach_institution_market_ids(institution, db))
+            except HTTPException:
+                raise
+            except Exception as e:
+                db.rollback()
+                log_error(f"Error creating institution: {e}")
+                raise HTTPException(status_code=500, detail="Error creating institution")
     
     router = create_crud_routes(
         config=config,
@@ -1505,7 +1697,7 @@ def create_plate_routes() -> APIRouter:
                     scope = None
                 else:
                     scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
-                employer_id = None
+                employer_entity_id = None
                 employer_address_id = None
                 user_id = None
                 if kitchen_day and current_user.get("user_id"):
@@ -1515,11 +1707,11 @@ def create_plate_routes() -> APIRouter:
                         user_id = uid_raw if isinstance(uid_raw, UUID) else UUID(uid_raw)
                     except (ValueError, TypeError):
                         user_id = None
-                    user_row = db_read("SELECT employer_id, employer_address_id FROM user_info WHERE user_id = %s", (str(uid_raw),), connection=db, fetch_one=True)
-                    if user_row and user_row.get("employer_id"):
-                        employer_id = user_row["employer_id"]
+                    user_row = db_read("SELECT employer_entity_id, employer_address_id FROM user_info WHERE user_id = %s", (str(uid_raw),), connection=db, fetch_one=True)
+                    if user_row and user_row.get("employer_entity_id"):
+                        employer_entity_id = user_row["employer_entity_id"]
                         employer_address_id = user_row.get("employer_address_id")
-                enriched_plate = get_enriched_plate_by_id(plate_id, db, scope=scope, include_archived=False, kitchen_day=kitchen_day, employer_id=employer_id, employer_address_id=employer_address_id, user_id=user_id)
+                enriched_plate = get_enriched_plate_by_id(plate_id, db, scope=scope, include_archived=False, kitchen_day=kitchen_day, employer_entity_id=employer_entity_id, employer_address_id=employer_address_id, user_id=user_id)
                 if not enriched_plate:
                     raise entity_not_found("Plate", plate_id, locale=locale)
                 if locale != "en":
@@ -1598,13 +1790,49 @@ def create_institution_entity_routes() -> APIRouter:
     from app.services.entity_service import derive_currency_metadata_id_for_address
 
     def _before_create(data: dict, connection: psycopg2.extensions.connection) -> dict:
+        from app.utils.db import db_read as _db_read
+        from app.config.tax_id_config import validate_tax_id_for_country
         data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
+        # Validate that the entity's address country maps to a market assigned to the institution
+        market_check = _db_read(
+            "SELECT a.country_code FROM core.institution_market im "
+            "JOIN core.market_info m ON im.market_id = m.market_id "
+            "JOIN core.address_info a ON a.country_code = m.country_code "
+            "WHERE im.institution_id = %s AND a.address_id = %s",
+            (str(data["institution_id"]), str(data["address_id"])),
+            connection=connection,
+            fetch_one=True,
+        )
+        if not market_check:
+            raise HTTPException(
+                status_code=400,
+                detail="Entity's address country is not in institution's assigned markets",
+            )
+        # Validate tax_id format for the entity's country
+        if data.get("tax_id"):
+            validate_tax_id_for_country(data["tax_id"], market_check["country_code"])
         return data
 
     def _before_update(data: dict, connection: psycopg2.extensions.connection, entity_id: UUID) -> dict:
+        from app.utils.db import db_read as _db_read
+        from app.config.tax_id_config import validate_tax_id_for_country
         if "address_id" in data:
             data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
+        # Validate tax_id format if being updated
+        if data.get("tax_id"):
+            addr_row = _db_read(
+                "SELECT a.country_code FROM ops.institution_entity_info ie "
+                "JOIN core.address_info a ON a.address_id = COALESCE(%s, ie.address_id) "
+                "WHERE ie.institution_entity_id = %s",
+                (data.get("address_id") and str(data["address_id"]), str(entity_id)),
+                connection=connection,
+                fetch_one=True,
+            )
+            if addr_row:
+                validate_tax_id_for_country(data["tax_id"], addr_row["country_code"])
         return data
+
+    from app.services.entity_service import validate_entity_can_be_archived
 
     config = RouteConfig(
         prefix="/institution-entities",
@@ -1615,6 +1843,7 @@ def create_institution_entity_routes() -> APIRouter:
         entity_type=ENTITY_INSTITUTION_ENTITY,
         immutable_update_fields=["institution_id"],
         paginatable=True,
+        pre_archive_validator=validate_entity_can_be_archived,
     )
 
     router = create_crud_routes(

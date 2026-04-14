@@ -56,9 +56,10 @@ class UserCreateSchema(BaseModel):
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     mobile_number: Optional[str] = Field(default=None)
-    employer_id: Optional[UUID] = None
+    employer_entity_id: Optional[UUID] = None
+    workplace_group_id: Optional[UUID] = None
     market_id: Optional[UUID] = None
-    city_id: Optional[UUID] = Field(None, description="Primary city for scoping (must match market's country)")
+    city_metadata_id: Optional[UUID] = Field(None, description="Primary city for scoping (FK to core.city_metadata; must match market's country)")
     market_ids: Optional[List[UUID]] = Field(None, description="v2: list of assigned market IDs (first is primary)")
 
     @field_validator("mobile_number", mode="before")
@@ -124,9 +125,10 @@ class UserUpdateSchema(BaseModel):
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     mobile_number: Optional[str] = Field(default=None)
-    employer_id: Optional[UUID] = None
+    employer_entity_id: Optional[UUID] = None
+    workplace_group_id: Optional[UUID] = None
     market_id: Optional[UUID] = None
-    city_id: Optional[UUID] = Field(None, description="Primary city for scoping (must match market's country)")
+    city_metadata_id: Optional[UUID] = Field(None, description="Primary city for scoping (FK to core.city_metadata; must match market's country)")
     market_ids: Optional[List[UUID]] = Field(None, description="v2: replace assigned market IDs (first is primary)")
     status: Optional[Literal["active", "inactive"]] = Field(None, description="User status (active/inactive only)")
     locale: Optional[str] = Field(None, min_length=2, max_length=5, description="ISO 639-1 UI locale: en, es, pt")
@@ -171,9 +173,9 @@ class EmailChangeVerifySchema(BaseModel):
 
 
 class AssignEmployerRequest(BaseModel):
-    """Schema for PUT /users/me/employer - assign existing employer and address to current user."""
-    employer_id: UUID = Field(..., description="Employer ID to assign")
-    address_id: UUID = Field(..., description="Address (office) where user works; must belong to employer")
+    """Schema for PUT /users/me/employer-entity - assign employer entity and work address to current user."""
+    employer_entity_id: UUID = Field(..., description="Employer entity ID to assign (institution_entity_info)")
+    address_id: UUID = Field(..., description="Address (office) where user works")
     floor: Optional[str] = Field(None, max_length=50, description="Floor at this office (stored per-user in address_subpremise)")
     apartment_unit: Optional[str] = Field(None, max_length=20, description="Unit at this office (stored per-user in address_subpremise)")
 
@@ -244,10 +246,11 @@ class UserResponseSchema(BaseModel):
         None,
         description="Set when an email change was requested: verification sent to new address; email field unchanged until verified.",
     )
-    employer_id: Optional[UUID]
+    employer_entity_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
+    workplace_group_id: Optional[UUID] = None
     market_id: UUID
-    city_id: Optional[UUID] = None
+    city_metadata_id: Optional[UUID] = None
     market_ids: List[UUID] = Field(default_factory=list, description="v2: all assigned market IDs (primary first)")
     locale: str = Field("en", description="ISO 639-1 UI locale: en, es, pt")
     is_archived: bool
@@ -255,7 +258,7 @@ class UserResponseSchema(BaseModel):
     created_date: datetime
     modified_date: datetime
 
-    @field_validator("employer_id")
+    @field_validator("employer_entity_id")
     @classmethod
     def employer_null_for_supplier_employee(cls, v, info: ValidationInfo):
         """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
@@ -310,12 +313,14 @@ class UserEnrichedResponseSchema(BaseModel):
     mobile_number_verified_at: Optional[datetime] = None
     email_verified: bool = False
     email_verified_at: Optional[datetime] = None
-    employer_id: Optional[UUID]
+    employer_entity_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
-    employer_name: Optional[str] = None
+    employer_entity_name: Optional[str] = None
+    workplace_group_id: Optional[UUID] = None
+    workplace_group_name: Optional[str] = None
     market_id: UUID
     market_name: str
-    city_id: Optional[UUID] = None
+    city_metadata_id: Optional[UUID] = None
     city_name: Optional[str] = None
     market_ids: List[UUID] = Field(default_factory=list, description="v2: all assigned market IDs (primary first)")
     locale: str = Field("en", description="ISO 639-1 UI locale: en, es, pt")
@@ -324,7 +329,7 @@ class UserEnrichedResponseSchema(BaseModel):
     created_date: datetime
     modified_date: datetime
 
-    @field_validator("employer_id")
+    @field_validator("employer_entity_id")
     @classmethod
     def employer_null_for_supplier_employee(cls, v, info: ValidationInfo):
         """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
@@ -336,7 +341,7 @@ class UserEnrichedResponseSchema(BaseModel):
             return None
         return v
 
-    @field_validator("employer_name")
+    @field_validator("employer_entity_name")
     @classmethod
     def employer_name_null_for_supplier_employee(cls, v, info: ValidationInfo):
         """Supplier, Internal, and Employer users do not have an Employer; return None in response."""
@@ -351,7 +356,7 @@ class UserEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CustomerSignupSchema(BaseModel):
-    """Schema for customer signup. country_code required (from GET /api/v1/leads/markets). Provide city_id OR city_name (backend resolves city_name to city_id)."""
+    """Schema for customer signup. country_code required (from GET /api/v1/leads/markets). Provide city_metadata_id OR city_name (backend resolves city_name → city_metadata_id via the city_metadata + external.geonames_city join)."""
     username: str = Field(..., min_length=3, max_length=100)
     password: str = Field(..., min_length=8, max_length=255)
     first_name: Optional[str] = Field(None, max_length=50)
@@ -367,8 +372,8 @@ class CustomerSignupSchema(BaseModel):
             return v
         return v.strip().lower()
     country_code: str = Field(..., min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, US, ARG). From GET /api/v1/leads/markets. Backend resolves to market.")
-    city_id: Optional[UUID] = Field(None, description="City UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
-    city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_id.")
+    city_metadata_id: Optional[UUID] = Field(None, description="City metadata UUID (optional if city_name provided). From GET /api/v1/cities/ or resolved from city_name.")
+    city_name: Optional[str] = Field(None, max_length=100, description="City name (optional if city_metadata_id provided). From GET /api/v1/leads/cities?country_code=... Backend resolves to city_metadata_id.")
     referral_code: Optional[str] = Field(None, max_length=20, description="Referrer's referral code (e.g. MARIA-V7X2)")
     is_archived: Optional[bool] = False
     status: Optional[Status] = Field(default=Status.ACTIVE)
@@ -381,32 +386,44 @@ class CustomerSignupSchema(BaseModel):
 
     @model_validator(mode="after")
     def require_city_and_normalize_mobile(self):
-        if not self.city_id and not (self.city_name or "").strip():
-            raise ValueError("Either city_id or city_name is required")
+        if not self.city_metadata_id and not (self.city_name or "").strip():
+            raise ValueError("Either city_metadata_id or city_name is required")
         normalized = normalize_mobile_for_schema(self.mobile_number, self.country_code)
         if normalized != self.mobile_number:
             return self.model_copy(update={"mobile_number": normalized})
         return self
 
+class SupplierTermsEmbedSchema(BaseModel):
+    """Optional embedded supplier terms for composite institution creation.
+    All fields have defaults — an empty object is treated as absent."""
+    no_show_discount: int = Field(0, ge=0, le=100, description="Percentage 0-100 deducted on no-show")
+    payment_frequency: PaymentFrequency = Field(PaymentFrequency.DAILY, description="daily, weekly, biweekly, or monthly")
+    kitchen_open_time: Optional[str] = Field(None, description="Pickup available time (HH:MM, e.g. 09:00). NULL = inherit from market default.")
+    kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM, e.g. 13:30). NULL = inherit from market default.")
+    require_invoice: Optional[bool] = Field(None, description="NULL = inherit from market; TRUE/FALSE = override")
+    invoice_hold_days: Optional[int] = Field(None, gt=0, description="NULL = inherit from market default")
+
 class InstitutionCreateSchema(BaseModel):
-    """Schema for creating a new institution. market_id is required."""
+    """Schema for creating a new institution. market_ids assigns markets via institution_market junction.
+    Optionally embed supplier_terms for atomic creation (valid only when institution_type is Supplier)."""
     name: str = Field(..., max_length=100)
     institution_type: Optional[RoleType] = None  # Defaults to Supplier in DB if omitted
-    market_id: UUID = Field(..., description="Required: market UUID (e.g. Global Marketplace or a country market from GET /api/v1/markets/enriched/)")
+    market_ids: List[UUID] = Field(..., min_length=1, description="Markets to assign (first is primary). At least one required.")
+    supplier_terms: Optional[SupplierTermsEmbedSchema] = Field(None, description="Embedded supplier terms — only valid when institution_type is Supplier")
 
 class InstitutionUpdateSchema(BaseModel):
     """Schema for updating institution information"""
     name: Optional[str] = Field(None, max_length=100)
     institution_type: Optional[RoleType] = None
-    market_id: Optional[UUID] = None  # When provided, must be a valid market UUID (single, global, or multi)
+    market_ids: Optional[List[UUID]] = Field(None, description="Replace assigned markets (first is primary). Omit to leave unchanged.")
     support_email_suppressed_until: Optional[datetime] = Field(None, description="Manual override: suppress onboarding emails until this date")
 
 class InstitutionResponseSchema(BaseModel):
-    """Schema for institution response data. market_id is always present (never null)."""
+    """Schema for institution response data. market_ids lists assigned markets (primary first)."""
     institution_id: UUID
     name: str
     institution_type: RoleType
-    market_id: UUID = Field(..., description="Required: market UUID (Global = all markets, one UUID = local market)")
+    market_ids: List[UUID] = Field(default_factory=list, description="Assigned markets (primary first)")
     support_email_suppressed_until: Optional[datetime] = None
     last_support_email_date: Optional[datetime] = None
     is_archived: bool
@@ -688,7 +705,8 @@ PLACEHOLDER_IMAGE_CHECKSUM = "7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b
 
 
 class ProductCreateSchema(BaseModel):
-    """Schema for creating a new product"""
+    """Schema for creating a new product.
+    Optionally embed ingredient_ids for atomic product + ingredients creation."""
     institution_id: UUID
     name: str = Field(..., max_length=100)
     name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
@@ -700,9 +718,11 @@ class ProductCreateSchema(BaseModel):
     image_url: str = Field(default=PLACEHOLDER_IMAGE_URL, max_length=500)
     image_storage_path: str = Field(default=PLACEHOLDER_IMAGE_PATH, max_length=500)
     image_checksum: str = Field(default=PLACEHOLDER_IMAGE_CHECKSUM, max_length=128)
+    ingredient_ids: Optional[List[UUID]] = Field(None, max_length=30, description="Ingredient UUIDs — atomic assignment at creation")
 
 class ProductUpdateSchema(BaseModel):
-    """Schema for updating product information"""
+    """Schema for updating product information.
+    If ingredient_ids is provided, the ingredient set is full-replaced atomically."""
     institution_id: Optional[UUID] = None
     name: Optional[str] = Field(None, max_length=100)
     name_i18n: Optional[dict] = Field(None, description="Locale map: {en: '...', es: '...'}")
@@ -714,6 +734,7 @@ class ProductUpdateSchema(BaseModel):
     image_url: Optional[str] = Field(None, max_length=500)
     image_storage_path: Optional[str] = Field(None, max_length=500)
     image_checksum: Optional[str] = Field(None, max_length=128)
+    ingredient_ids: Optional[List[UUID]] = Field(None, max_length=30, description="Full-replace ingredient set; absent = no change, [] = remove all")
 
 class ProductResponseSchema(BaseModel):
     """Schema for product response data. Includes full _i18n locale maps for B2B edit forms."""
@@ -1060,9 +1081,14 @@ class CreditCurrencyUpdateSchema(BaseModel):
     credit_value_local_currency: Optional[Decimal] = Field(None, gt=0)
 
 class CreditCurrencyResponseSchema(BaseModel):
-    """Schema for credit currency response data"""
+    """Schema for credit currency response data.
+
+    currency_name is Optional because the underlying column was dropped in PR2a.
+    Basic CRUD responses omit it (=None); use CreditCurrencyEnrichedResponseSchema
+    to get the display name resolved via JOIN external.iso4217_currency.
+    """
     currency_metadata_id: UUID
-    currency_name: str
+    currency_name: Optional[str] = None
     currency_code: str
     credit_value_local_currency: Decimal
     currency_conversion_usd: Decimal
@@ -1073,16 +1099,22 @@ class CreditCurrencyResponseSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class CreditCurrencyMarketSchema(BaseModel):
+    """Nested market reference within a credit currency response."""
+    market_id: str
+    market_name: Optional[str] = None
+    country_code: str
+
 class CreditCurrencyEnrichedResponseSchema(BaseModel):
-    """Schema for enriched credit currency response data with market information"""
+    """Schema for enriched credit currency response data with aggregated market information.
+    One row per currency; markets that use this currency are nested in the markets array.
+    currency_name is populated via JOIN external.iso4217_currency."""
     currency_metadata_id: UUID
     currency_name: str
     currency_code: str
     credit_value_local_currency: Decimal
     currency_conversion_usd: Decimal
-    market_id: UUID  # Market that uses this currency
-    market_name: str  # country_name from market_info
-    country_code: str  # from market_info
+    markets: List[CreditCurrencyMarketSchema] = Field(default_factory=list, description="Markets that use this currency")
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1247,7 +1279,7 @@ class AddressCreateSchema(BaseModel):
     session_token: Optional[str] = Field(None, description="Session token from suggest flow for billing optimization")
     institution_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
-    employer_id: Optional[UUID] = None  # Links address to employer (nullable)
+    workplace_group_id: Optional[UUID] = None
     address_type: Optional[List[str]] = Field(
         None,
         description="Read-only: ignored on create. Backend derives address_type from connected objects (restaurant, bank account, employer, payment method).",
@@ -1270,6 +1302,15 @@ class AddressCreateSchema(BaseModel):
 
     is_default: bool = False
     floor: Optional[str] = Field(None, max_length=50)
+    city_metadata_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "FK to core.city_metadata. Required in the manual/structured path (schema validator "
+            "enforces when place_id is absent); resolve via GET /api/v1/cities?country_code=... "
+            "In the place_id path, omit — the backend resolves it server-side from Mapbox place "
+            "details. Either way, core.address_info.city_metadata_id is always NOT NULL."
+        ),
+    )
     country_code: Optional[str] = Field(None, min_length=2, max_length=3, description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR or ARG). API normalizes to alpha-2 (uppercase).")
     country: Optional[str] = Field(None, max_length=100, description="Country name (e.g. Argentina); used to derive country_code when form has only 'country'")
     province: Optional[str] = Field(None, max_length=50)
@@ -1327,6 +1368,10 @@ class AddressCreateSchema(BaseModel):
             val = getattr(self, field, None) or ""
             if not str(val).strip():
                 raise ValueError(f"{field} is required when place_id is not provided")
+        # PR4c: city_metadata_id is required in the manual/structured path.
+        # In the place_id path the writer resolves it from the Mapbox place details.
+        if not getattr(self, "city_metadata_id", None):
+            raise ValueError("city_metadata_id is required when place_id is not provided. Resolve via GET /api/v1/cities?country_code=...")
         return self
 
 
@@ -1339,11 +1384,15 @@ class AddressUpdateSchema(BaseModel):
 
 
 class CityResponseSchema(BaseModel):
-    """Schema for city response (from city_info). Used for employer address scoping and user profile."""
-    city_id: UUID
+    """Schema for city response (from core.city_metadata + external.geonames_city JOIN).
+
+    `name` is populated by the query via `external.geonames_city.name` or
+    `COALESCE(cm.display_name_override, gc.name)`; `country_code` is the ISO
+    alpha-2 from city_metadata.country_iso.
+    """
+    city_metadata_id: UUID
     name: str
     country_code: str
-    province_code: Optional[str] = None
     is_archived: bool
     status: Status
 
@@ -1351,8 +1400,9 @@ class CityResponseSchema(BaseModel):
 
 
 class SupportedCitySchema(BaseModel):
-    """One supported city for dropdowns (e.g. user onboarding, employer address filter)."""
-    city_id: UUID
+    """One supported city for dropdowns (e.g. user onboarding, employer address filter).
+    Backed by core.city_metadata + external.geonames_city."""
+    city_metadata_id: UUID
     city_name: str = Field(..., description="City name (e.g. Lima, Buenos Aires)")
     country_code: str = Field(..., description="ISO 3166-1 alpha-2 code (e.g. PE, AR)")
 
@@ -1362,7 +1412,7 @@ class AddressResponseSchema(BaseModel):
     address_id: UUID
     institution_id: UUID
     user_id: Optional[UUID] = None
-    employer_id: Optional[UUID] = None  # Links address to employer (nullable)
+    workplace_group_id: Optional[UUID] = None
     address_type: List[str]
     is_default: bool
     floor: Optional[str]
@@ -1396,7 +1446,6 @@ class AddressEnrichedResponseSchema(BaseModel):
     user_first_name: Optional[str] = None
     user_last_name: Optional[str] = None
     user_full_name: str = ""  # Empty when no user
-    employer_id: Optional[UUID] = None  # Links address to employer (nullable)
     address_type: List[str]
     is_default: bool
     floor: Optional[str]
@@ -1641,59 +1690,35 @@ class QRCodePrintContextSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class EmployerCreateSchema(BaseModel):
-    """Schema for creating a new employer with embedded address"""
-    name: str = Field(..., max_length=100, description="Employer company name")
-    address: 'AddressCreateSchema' = Field(..., description="Complete address information for the employer location")
-    assign_employer: bool = Field(
-        True,
-        description="If True (default), assign this employer to the current user after creation. Only applies to Customers. Internal/Suppliers ignore this parameter."
-    )
+## Employer schemas REMOVED — employer identity is institution_info (type=employer) + institution_entity_info.
+## See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
-class EmployerUpdateSchema(BaseModel):
-    """Schema for updating employer information"""
-    name: Optional[str] = Field(None, max_length=100)
-    address_id: Optional[UUID] = None
+# =============================================================================
+# WORKPLACE GROUPS (B2C coworker pickup coordination)
+# =============================================================================
 
-class EmployerResponseSchema(BaseModel):
-    """Schema for employer response data"""
-    employer_id: UUID
+class WorkplaceGroupCreateSchema(BaseModel):
+    name: str = Field(..., max_length=100, description="Workplace name")
+    email_domain: Optional[str] = Field(None, max_length=255)
+
+class WorkplaceGroupResponseSchema(BaseModel):
+    workplace_group_id: UUID
     name: str
-    address_id: UUID
+    email_domain: Optional[str] = None
+    require_domain_verification: bool = False
     is_archived: bool
     status: Status
     created_date: datetime
-    modified_date: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
-class EmployerEnrichedResponseSchema(BaseModel):
-    """Schema for enriched employer response data with address details"""
-    employer_id: UUID
+class WorkplaceGroupSearchResultSchema(BaseModel):
+    workplace_group_id: UUID
     name: str
-    address_id: UUID
-    address_country: Optional[str] = None
-    address_country_code: Optional[str] = None
-    address_province: Optional[str] = None
-    address_city: Optional[str] = None
-    address_postal_code: Optional[str] = None
-    address_street_type: Optional[str] = None
-    address_street_name: Optional[str] = None
-    address_building_number: Optional[str] = None
-    address_display: Optional[str] = None
-    address_floor: Optional[str] = None
-    address_apartment_unit: Optional[str] = None
-    is_archived: bool
-    status: Status
-    created_date: datetime
-    modified_date: datetime
+    member_count: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
-
-class EmployerSearchSchema(BaseModel):
-    """Schema for employer search functionality"""
-    search_term: Optional[str] = Field(None, description="Search term for employer name")
-    limit: Optional[int] = Field(10, ge=1, le=50, description="Maximum number of results")
+class AssignWorkplaceRequest(BaseModel):
+    workplace_group_id: UUID = Field(..., description="Workplace group to join")
+    address_id: UUID = Field(..., description="Office address for pickup scoping")
 
 # =============================================================================
 # 5. PLATE SELECTION & PICKUP SCHEMAS
@@ -1969,6 +1994,7 @@ class InstitutionEntityCreateSchema(BaseModel):
     address_id: UUID
     tax_id: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255, description="Email domain for enrollment gating (employer) or SSO (all types)")
     is_archived: bool = False
 
 class InstitutionEntityUpdateSchema(BaseModel):
@@ -1977,6 +2003,7 @@ class InstitutionEntityUpdateSchema(BaseModel):
     address_id: Optional[UUID] = None
     tax_id: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255, description="Email domain for enrollment gating (employer) or SSO (all types)")
     is_archived: Optional[bool] = None
     status: Optional[Status] = None
 
@@ -1991,6 +2018,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     payout_provider_account_id: Optional[str] = None
     payout_aggregator: Optional[str] = None
     payout_onboarding_status: Optional[str] = None
+    email_domain: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime
@@ -2004,6 +2032,7 @@ class InstitutionEntityEnrichedResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_id: UUID
     institution_name: str
+    institution_type: RoleType
     currency_metadata_id: UUID
     market_id: UUID  # Via address country → market
     market_name: str  # country_name from market_info
@@ -2018,6 +2047,7 @@ class InstitutionEntityEnrichedResponseSchema(BaseModel):
     payout_provider_account_id: Optional[str] = None
     payout_aggregator: Optional[str] = None
     payout_onboarding_status: Optional[str] = None
+    email_domain: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime
@@ -2031,6 +2061,8 @@ class SupplierTermsCreateSchema(BaseModel):
     """Schema for creating supplier terms for an institution."""
     no_show_discount: int = Field(0, ge=0, le=100, description="Percentage 0-100 deducted on no-show")
     payment_frequency: PaymentFrequency = Field(PaymentFrequency.DAILY, description="daily, weekly, biweekly, or monthly")
+    kitchen_open_time: Optional[str] = Field(None, description="Pickup available time (HH:MM, e.g. 09:00). NULL = inherit from market default.")
+    kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM, e.g. 13:30). NULL = inherit from market default.")
     require_invoice: Optional[bool] = Field(None, description="NULL = inherit from market; TRUE/FALSE = override")
     invoice_hold_days: Optional[int] = Field(None, gt=0, description="NULL = inherit from market default")
 
@@ -2038,6 +2070,8 @@ class SupplierTermsUpdateSchema(BaseModel):
     """Schema for updating supplier terms."""
     no_show_discount: Optional[int] = Field(None, ge=0, le=100)
     payment_frequency: Optional[PaymentFrequency] = None
+    kitchen_open_time: Optional[str] = Field(None, description="HH:MM format (e.g. 09:00). NULL = inherit from market default.")
+    kitchen_close_time: Optional[str] = Field(None, description="HH:MM format (e.g. 13:30). NULL = inherit from market default.")
     require_invoice: Optional[bool] = None
     invoice_hold_days: Optional[int] = Field(None, gt=0)
 
@@ -2045,8 +2079,13 @@ class SupplierTermsResponseSchema(BaseModel):
     """Schema for supplier terms response with resolved effective values."""
     supplier_terms_id: UUID
     institution_id: UUID
+    institution_entity_id: Optional[UUID] = None
     no_show_discount: int
     payment_frequency: PaymentFrequency
+    kitchen_open_time: Optional[str] = None
+    kitchen_close_time: Optional[str] = None
+    effective_kitchen_open_time: str
+    effective_kitchen_close_time: str
     require_invoice: Optional[bool]
     invoice_hold_days: Optional[int]
     effective_require_invoice: bool
@@ -2096,6 +2135,27 @@ class BillPayoutEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MarketBillingConfigEmbedSchema(BaseModel):
+    """Optional embedded billing config for composite market creation.
+    All fields have defaults — an empty object is treated as absent."""
+    aggregator: str = Field("stripe", max_length=50, description="Payout provider: 'stripe' or 'none'")
+    is_active: bool = Field(True, description="Whether payouts are enabled for this market")
+    require_invoice: bool = Field(False, description="Whether invoices are required before payout")
+    max_unmatched_bill_days: int = Field(30, ge=1, description="Max days for unmatched bills before hold")
+    kitchen_open_time: str = Field("09:00", description="Market default pickup available time (HH:MM). Suppliers inherit if not overridden.")
+    kitchen_close_time: str = Field("13:30", description="Market default order cutoff time (HH:MM). Suppliers inherit if not overridden.")
+    notes: Optional[str] = Field(None, description="Admin notes")
+
+class MarketBillingConfigUpdateSchema(BaseModel):
+    """Schema for updating market billing config. All fields optional."""
+    aggregator: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+    require_invoice: Optional[bool] = None
+    max_unmatched_bill_days: Optional[int] = Field(None, ge=1)
+    kitchen_open_time: Optional[str] = Field(None, description="Market default pickup available time (HH:MM).")
+    kitchen_close_time: Optional[str] = Field(None, description="Market default order cutoff time (HH:MM).")
+    notes: Optional[str] = None
+
 class MarketPayoutAggregatorResponseSchema(BaseModel):
     """Schema for the payout aggregator configured for a market."""
     market_id: UUID
@@ -2103,6 +2163,14 @@ class MarketPayoutAggregatorResponseSchema(BaseModel):
     is_active: bool
     require_invoice: bool
     max_unmatched_bill_days: int
+    kitchen_open_time: str
+    kitchen_close_time: str
+    notes: Optional[str] = None
+    is_archived: bool = False
+    status: Status = Status.ACTIVE
+    created_date: Optional[datetime] = None
+    modified_by: Optional[UUID] = None
+    modified_date: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -2333,11 +2401,14 @@ class MarketResponseSchema(BaseModel):
         None,
         description="Local units per 1 USD (from currency_metadata). Use for plan form preview: credit_cost_usd = credit_cost_local_currency / currency_conversion_usd.",
     )
-    timezone: str = Field(..., description="Timezone for this market (e.g., 'America/Argentina/Buenos_Aires')")
-    kitchen_close_time: str = Field(..., description="Order cutoff time (HH:MM local, e.g. 13:30)")
+    timezone: Optional[str] = Field(None, description="DEPRECATED (PR2) — operational timezone now lives on address_info per-restaurant. Responses return None. Callers that need a runtime tz should look it up on the restaurant's address.")
     language: str = Field("en", description="Default UI locale for this market: en, es, pt")
     phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix for this market (e.g. '+54'). Use as default country in phone input fields.")
     phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
+    tax_id_label: Optional[str] = Field(None, description="Country-specific label for tax ID field (e.g. 'CUIT', 'RUC', 'EIN'). Use as form field label.")
+    tax_id_mask: Optional[str] = Field(None, description="Display mask for tax ID input (e.g. '##-#######'). '#' = digit slot. Frontend auto-inserts literal characters as user types, but must strip them before sending the API payload.")
+    tax_id_regex: Optional[str] = Field(None, description="Regex pattern for raw-digit tax ID validation (e.g. '^\\d{9}$'). Validates digits only — no dashes or separators.")
+    tax_id_example: Optional[str] = Field(None, description="Example tax ID in raw digits for placeholder text (e.g. '123456789').")
     is_archived: bool = Field(..., description="Whether this market is archived")
     status: Status = Field(..., description="Market status (Active/Inactive)")
     created_date: datetime = Field(..., description="When this market was created")
@@ -2348,16 +2419,6 @@ class MarketResponseSchema(BaseModel):
     def locale(self) -> str:
         """BCP 47 locale derived from language + country_code (e.g. es-AR)."""
         return f"{self.language}-{self.country_code}"
-
-    @field_validator("kitchen_close_time", mode="before")
-    @classmethod
-    def parse_kitchen_close_time(cls, v):
-        """Convert time object to HH:MM string for API responses."""
-        if v is None:
-            return "13:30"
-        if hasattr(v, "strftime"):
-            return v.strftime("%H:%M")
-        return str(v)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -2511,11 +2572,15 @@ class MarketPublicResponseSchema(BaseModel):
     market_id: UUID = Field(..., description="Unique identifier for the market")
     country_code: str = Field(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 (e.g. AR)")
     country_name: str = Field(..., description="Full country name (e.g. Argentina)")
-    timezone: str = Field(..., description="Timezone for this market")
-    kitchen_close_time: str = Field(..., description="Order cutoff time (HH:MM local, e.g. 13:30)")
+    timezone: Optional[str] = Field(None, description="DEPRECATED (PR2) — operational timezone now per-restaurant. Responses return None.")
+    kitchen_close_time: str = Field(..., description="Kitchen close time template (HH:MM naive wall-clock, e.g. 13:30)")
     language: str = Field("en", description="Default UI locale for this market: en, es, pt")
     phone_dial_code: Optional[str] = Field(None, description="E.164 dial code prefix (e.g. '+54'). Use as default country in phone input fields.")
     phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).")
+    tax_id_label: Optional[str] = Field(None, description="Country-specific label for tax ID field (e.g. 'CUIT', 'RUC', 'EIN'). Use as form field label.")
+    tax_id_mask: Optional[str] = Field(None, description="Display mask for tax ID input (e.g. '##-#######'). '#' = digit slot.")
+    tax_id_regex: Optional[str] = Field(None, description="Regex pattern for raw-digit tax ID validation (e.g. '^\\d{9}$').")
+    tax_id_example: Optional[str] = Field(None, description="Example tax ID in raw digits for placeholder text.")
     currency_code: Optional[str] = Field(None, description="Currency code")
     currency_name: Optional[str] = Field(None, description="Currency name")
 
@@ -2543,11 +2608,11 @@ class MarketCreateSchema(BaseModel):
     country_code: str = Field(..., description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, ARG, DE, DEU). API normalizes to alpha-2.", min_length=2, max_length=3)
     currency_metadata_id: UUID = Field(..., description="FK to currency_metadata")
     timezone: str = Field(..., description="Timezone (e.g., 'America/Argentina/Buenos_Aires')", max_length=50)
-    kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30). Default 13:30 if omitted.")
     status: Optional[Status] = Field(default=None, description="Optional; omit or null and backend assigns default (Active)")
     language: Optional[str] = Field(None, min_length=2, max_length=5, description="Default UI locale: en, es, pt; derived from country if omitted")
     phone_dial_code: Optional[str] = Field(None, max_length=6, description="E.164 dial code prefix (e.g. '+54'). Derived from country_code if omitted.")
     phone_local_digits: Optional[int] = Field(None, description="Max digits in the national number after the dial code (e.g. 10).")
+    billing_config: Optional[MarketBillingConfigEmbedSchema] = Field(None, description="Embedded billing configuration. If omitted, defaults are created automatically for non-global markets.")
 
     @field_validator("country_code")
     @classmethod
@@ -2565,16 +2630,6 @@ class MarketCreateSchema(BaseModel):
             raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
         return v
 
-    @field_validator("kitchen_close_time")
-    @classmethod
-    def validate_kitchen_close_time_format(cls, v):
-        """Validate HH:MM format (00:00-23:59)."""
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return v
-        import re
-        if not re.match(r"^([01]?\d|2[0-3]):([0-5]\d)$", v.strip()):
-            raise ValueError("kitchen_close_time must be HH:MM format (e.g. 13:30)")
-        return v.strip()
 
 
 class MarketUpdateSchema(BaseModel):
@@ -2582,7 +2637,6 @@ class MarketUpdateSchema(BaseModel):
     country_code: Optional[str] = Field(None, description="ISO 3166-1 alpha-2 or alpha-3. API normalizes to alpha-2.", min_length=2, max_length=3)
     currency_metadata_id: Optional[UUID] = Field(None, description="FK to currency_metadata")
     timezone: Optional[str] = Field(None, description="Timezone", max_length=50)
-    kitchen_close_time: Optional[str] = Field(None, description="Order cutoff time (HH:MM local, e.g. 13:30)")
     status: Optional[Status] = Field(None, description="Market status")
     is_archived: Optional[bool] = Field(None, description="Archive status")
     language: Optional[str] = Field(None, min_length=2, max_length=5, description="Default UI locale: en, es, pt")
@@ -2608,16 +2662,6 @@ class MarketUpdateSchema(BaseModel):
             raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
         return v
 
-    @field_validator("kitchen_close_time")
-    @classmethod
-    def validate_kitchen_close_time_format(cls, v):
-        """Validate HH:MM format (00:00-23:59)."""
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return v
-        import re
-        if not re.match(r"^([01]?\d|2[0-3]):([0-5]\d)$", v.strip()):
-            raise ValueError("kitchen_close_time must be HH:MM format (e.g. 13:30)")
-        return v.strip()
 
 
 # =============================================================================
@@ -2918,3 +2962,71 @@ class AdZoneResponseSchema(BaseModel):
     created_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# =============================================================================
+# WORKPLACE GROUP SCHEMAS
+# =============================================================================
+
+class WorkplaceGroupCreateSchema(BaseModel):
+    """Schema for creating a workplace group."""
+    name: str = Field(..., min_length=1, max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255)
+    require_domain_verification: bool = False
+
+
+class WorkplaceGroupUpdateSchema(BaseModel):
+    """Schema for updating a workplace group."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255)
+    require_domain_verification: Optional[bool] = None
+    status: Optional[Status] = None
+
+
+class WorkplaceGroupResponseSchema(BaseModel):
+    """Response schema for workplace group."""
+    workplace_group_id: UUID
+    name: str
+    email_domain: Optional[str] = None
+    require_domain_verification: bool
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkplaceGroupSearchResultSchema(BaseModel):
+    """Search result for workplace group fuzzy search."""
+    workplace_group_id: UUID
+    name: str
+    sim: float
+    member_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkplaceGroupEnrichedResponseSchema(BaseModel):
+    """Enriched response for workplace group with member count."""
+    workplace_group_id: UUID
+    name: str
+    email_domain: Optional[str] = None
+    require_domain_verification: bool
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+    member_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AssignWorkplaceRequest(BaseModel):
+    """Schema for PUT /users/me/workplace — assign workplace group and address to current user."""
+    workplace_group_id: UUID = Field(..., description="Workplace group to join")
+    address_id: UUID = Field(..., description="Workplace group address where user picks up")

@@ -361,3 +361,156 @@ class EnrichedService(Generic[T]):
                 detail=f"Failed to get enriched {self.base_table}: {str(e)}"
             )
 
+    def get_distinct_enriched(
+        self,
+        db: psycopg2.extensions.connection,
+        *,
+        select_fields: List[str],
+        aggregate_fields: List[Dict[str, str]],
+        joins: List[Tuple[str, str, str, str]],
+        group_by_fields: Optional[List[str]] = None,
+        scope: Optional[InstitutionScope] = None,
+        include_archived: bool = False,
+        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
+        order_by: Optional[str] = None,
+        row_transform: Optional[Callable[[dict], dict]] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+    ) -> Union[List[T], "PaginatedList[T]"]:
+        """
+        Get enriched records grouped by the base table's primary key, with
+        joined rows aggregated into JSON arrays via json_agg(json_build_object(...)).
+
+        Use this instead of get_enriched() when a 1:N JOIN would produce
+        duplicate base rows (e.g. one currency used by multiple markets).
+
+        Args:
+            db: Database connection
+            select_fields: Scalar SELECT fields on the base/1:1 tables
+                (e.g. ["cc.currency_metadata_id", "cc.currency_code"]).
+                These go into both SELECT and GROUP BY.
+            aggregate_fields: List of dicts describing each json_agg column.
+                Each dict: {
+                    "alias": "markets",           -- output field name
+                    "fields": {                    -- keys = JSON keys, values = SQL expressions
+                        "market_id": "m.market_id",
+                        "market_name": "gc.name",
+                        "country_code": "m.country_code",
+                    },
+                    "filter": "m.market_id IS NOT NULL",  -- optional FILTER (WHERE ...) on the agg
+                    "order_by": "gc.name",                -- optional ORDER BY inside json_agg
+                }
+            joins: JOIN tuples (join_type, table, alias, condition)
+            group_by_fields: Explicit GROUP BY list. If None, defaults to select_fields.
+            scope, include_archived, additional_conditions, order_by,
+            row_transform, page, page_size: same as get_enriched()
+
+        Returns:
+            List of schema objects (aggregate columns arrive as Python lists of dicts)
+        """
+        paginate = page is not None and page_size is not None
+        if paginate:
+            page_size = max(1, min(page_size, 100))
+            page = max(1, page)
+            offset = (page - 1) * page_size
+
+        try:
+            where_clause, params = self._build_where_clause(
+                include_archived=include_archived,
+                scope=scope,
+                additional_conditions=additional_conditions,
+            )
+
+            join_clauses = []
+            for join_type, table, alias, condition in joins:
+                join_clauses.append(f"{join_type} JOIN {table} {alias} ON {condition}")
+
+            # Build json_agg expressions
+            agg_expressions = []
+            for agg in aggregate_fields:
+                kv_pairs = ", ".join(
+                    f"'{k}', {v}" for k, v in agg["fields"].items()
+                )
+                inner = f"json_build_object({kv_pairs})"
+                # Optional ORDER BY inside json_agg
+                order = f" ORDER BY {agg['order_by']}" if agg.get("order_by") else ""
+                expr = f"json_agg({inner}{order})"
+                # Optional FILTER
+                if agg.get("filter"):
+                    expr += f" FILTER (WHERE {agg['filter']})"
+                agg_expressions.append(f"{expr} AS {agg['alias']}")
+
+            all_select = list(select_fields) + agg_expressions
+            if group_by_fields:
+                gb_fields = group_by_fields
+            else:
+                # Strip "AS alias" from select_fields for GROUP BY
+                # e.g. "ic.name as currency_name" → "ic.name"
+                import re
+                gb_fields = [re.split(r'\s+[aA][sS]\s+', f)[0].strip() for f in select_fields]
+            order_by_clause = order_by or self.default_order_by
+
+            # COUNT for pagination (count distinct base rows)
+            total_count = 0
+            if paginate:
+                count_query = f"""
+                    SELECT COUNT(DISTINCT {self.table_alias}.{self.id_column})
+                    FROM {self.base_table} {self.table_alias}
+                    {' '.join(join_clauses)}
+                    {where_clause}
+                """
+                count_result = self._execute_query(count_query, list(params), db, fetch_one=True)
+                total_count = count_result[0]["count"] if count_result else 0
+
+            pagination_clause = ""
+            query_params = list(params)
+            if paginate:
+                pagination_clause = "LIMIT %s OFFSET %s"
+                query_params.extend([page_size, offset])
+
+            query = f"""
+                SELECT
+                    {', '.join(all_select)}
+                FROM {self.base_table} {self.table_alias}
+                {' '.join(join_clauses)}
+                {where_clause}
+                GROUP BY {', '.join(gb_fields)}
+                ORDER BY {order_by_clause}
+                {pagination_clause}
+            """
+
+            results = self._execute_query(query, query_params, db, fetch_one=False)
+
+            if not results:
+                if paginate:
+                    return PaginatedList([], total_count=total_count)
+                return []
+
+            enriched_items = []
+            for row in results:
+                row_dict = dict(row)
+                row_dict = self._convert_uuids_to_strings(row_dict)
+                # json_agg returns a Python list of dicts via psycopg2 — no extra parsing needed.
+                # Coalesce NULL aggregates (from LEFT JOINs with no matches) to empty list.
+                for agg in aggregate_fields:
+                    if row_dict.get(agg["alias"]) is None:
+                        row_dict[agg["alias"]] = []
+                if row_transform:
+                    row_dict = row_transform(row_dict)
+                enriched_items.append(self.schema_class(**row_dict))
+
+            if paginate:
+                return PaginatedList(enriched_items, total_count=total_count)
+            return enriched_items
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            log_error(f"Error getting distinct enriched {self.base_table}: {e}\nTraceback: {error_trace}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get distinct enriched {self.base_table}: {str(e)}"
+            )
+

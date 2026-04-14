@@ -86,7 +86,7 @@ Admin (B2B portal)                    Backend                         Invited us
 | 400 | User has no email address |
 | 403/404 | Access denied / user not found |
 
-Generates a new 6-digit code, invalidates prior unused codes, sends a new invite email. User sets password via the link → `POST /auth/reset-password`. See [CHANGE_PASSWORD_AND_ADMIN_RESET.md](./CHANGE_PASSWORD_AND_ADMIN_RESET.md#4-resend-b2b-invite-email-set-password-link) for full details.
+Generates a new 6-digit code, invalidates prior unused codes, sends a new invite email. User sets password via the link → `POST /auth/reset-password`. See [API_CLIENT_PASSWORD_MANAGEMENT.md](./API_CLIENT_PASSWORD_MANAGEMENT.md#4-resend-b2b-invite-email-set-password-link) for full details.
 
 ---
 

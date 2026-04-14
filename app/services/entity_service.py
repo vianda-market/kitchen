@@ -17,10 +17,10 @@ from typing import Optional, List, Any, Tuple, Dict
 from uuid import UUID
 from datetime import datetime
 import psycopg2
-from app.dto.models import UserDTO, ProductDTO, PlateDTO, InstitutionBillDTO, GeolocationDTO, EmployerDTO
+from app.dto.models import UserDTO, ProductDTO, PlateDTO, InstitutionBillDTO, GeolocationDTO
 from app.services.crud_service import (
     user_service, product_service, plate_service, institution_bill_service,
-    address_service, employer_service, geolocation_service
+    address_service, geolocation_service
 )
 from app.utils.log import log_info, log_warning, log_error
 from app.utils.db import db_read
@@ -28,7 +28,7 @@ from app.utils.address_formatting import format_address_display, format_street_d
 from app.utils.portion_size import bucket_portion_size
 from fastapi import HTTPException
 from app.security.institution_scope import InstitutionScope
-from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, QRCodePrintContextSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, EmployerEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema, SupplierInvoiceEnrichedResponseSchema
+from app.schemas.consolidated_schemas import UserEnrichedResponseSchema, InstitutionEntityEnrichedResponseSchema, AddressEnrichedResponseSchema, RestaurantEnrichedResponseSchema, QRCodeEnrichedResponseSchema, QRCodePrintContextSchema, ProductEnrichedResponseSchema, PlateEnrichedResponseSchema, PlanEnrichedResponseSchema, SubscriptionEnrichedResponseSchema, PlatePickupEnrichedResponseSchema, InstitutionBillEnrichedResponseSchema, RestaurantBalanceEnrichedResponseSchema, RestaurantTransactionEnrichedResponseSchema, PlateKitchenDayEnrichedResponseSchema, MarketResponseSchema, CreditCurrencyEnrichedResponseSchema, DiscretionaryEnrichedResponseSchema, SupplierInvoiceEnrichedResponseSchema
 from app.schemas.payment_method import PaymentMethodEnrichedResponseSchema
 from app.schemas.restaurant_holidays import RestaurantHolidayEnrichedResponseSchema
 from app.services.enriched_service import EnrichedService
@@ -152,6 +152,33 @@ def set_user_market_assignments(
             status_code=400,
             detail=f"Invalid or archived market_id(s): {missing}",
         )
+    # Validate that requested markets are assigned to the user's institution
+    # Skip for Internal (global access) and Customer (Vianda Customers institution is Global, users get local markets)
+    user_inst_row = db_read(
+        "SELECT u.institution_id, i.institution_type "
+        "FROM user_info u "
+        "JOIN institution_info i ON u.institution_id = i.institution_id "
+        "WHERE u.user_id = %s",
+        (str(user_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if user_inst_row:
+        inst_type = str(user_inst_row["institution_type"]).lower()
+        if inst_type not in ("internal", "customer"):
+            institution_id = user_inst_row["institution_id"]
+            inst_markets = db_read(
+                "SELECT market_id FROM core.institution_market WHERE institution_id = %s",
+                (str(institution_id),),
+                connection=db,
+            )
+            inst_market_set = {str(r["market_id"]) for r in (inst_markets or [])}
+            for mid in market_ids:
+                if str(mid) not in inst_market_set:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Market {mid} is not assigned to the user's institution",
+                    )
     cur = db.cursor()
     try:
         cur.execute(
@@ -183,6 +210,65 @@ def set_user_market_assignments(
         raise HTTPException(status_code=500, detail="Failed to update market assignments")
     finally:
         cur.close()
+
+
+# =============================================================================
+# INSTITUTION MARKET HELPERS
+# =============================================================================
+
+def get_institution_market_ids(
+    institution_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> List[UUID]:
+    """Return list of market_ids for an institution from core.institution_market (primary first)."""
+    rows = db_read(
+        "SELECT market_id FROM core.institution_market WHERE institution_id = %s ORDER BY is_primary DESC",
+        (str(institution_id),),
+        connection=db,
+    )
+    return [r["market_id"] for r in (rows or [])]
+
+
+def get_institution_market_ids_bulk(
+    institution_ids: List[UUID],
+    db: psycopg2.extensions.connection,
+) -> Dict[str, List[UUID]]:
+    """Bulk fetch institution -> market_ids map to avoid N+1 queries on list endpoints."""
+    if not institution_ids:
+        return {}
+    placeholders = ",".join(["%s"] * len(institution_ids))
+    rows = db_read(
+        f"SELECT institution_id, market_id FROM core.institution_market "
+        f"WHERE institution_id IN ({placeholders}) ORDER BY is_primary DESC",
+        tuple(str(iid) for iid in institution_ids),
+        connection=db,
+    )
+    result: Dict[str, List[UUID]] = {}
+    for r in (rows or []):
+        key = str(r["institution_id"])
+        result.setdefault(key, []).append(r["market_id"])
+    return result
+
+
+def attach_institution_market_ids(institution, db: psycopg2.extensions.connection) -> dict:
+    """Convert a single institution DTO to a dict with market_ids attached."""
+    d = institution.dict() if hasattr(institution, "dict") else dict(institution)
+    d["market_ids"] = get_institution_market_ids(institution.institution_id, db)
+    return d
+
+
+def attach_institution_market_ids_bulk(institutions: list, db: psycopg2.extensions.connection) -> List[dict]:
+    """Convert a list of institution DTOs to dicts with market_ids attached (bulk, no N+1)."""
+    if not institutions:
+        return []
+    ids = [inst.institution_id for inst in institutions]
+    bulk = get_institution_market_ids_bulk(ids, db)
+    result = []
+    for inst in institutions:
+        d = inst.dict() if hasattr(inst, "dict") else dict(inst)
+        d["market_ids"] = bulk.get(str(inst.institution_id), [])
+        result.append(d)
+    return result
 
 
 def get_user_by_username(
@@ -355,13 +441,15 @@ def get_enriched_users(
             "u.mobile_number_verified_at",
             "u.email_verified",
             "u.email_verified_at",
-            "u.employer_id",
+            "u.employer_entity_id",
             "u.employer_address_id",
-            "e.name as employer_name",
+            "emp_entity.name as employer_entity_name",
+            "u.workplace_group_id",
+            "wg.name as workplace_group_name",
             "u.market_id",
-            "m.country_name as market_name",
-            "u.city_id",
-            "c.name as city_name",
+            "gc_country.name as market_name",
+            "u.city_metadata_id",
+            "COALESCE(cm.display_name_override, gc_city.name) as city_name",
             "u.locale",
             "u.is_archived",
             "u.status",
@@ -369,10 +457,13 @@ def get_enriched_users(
             "u.modified_date"
         ],
         joins=[
-            ("INNER", "institution_info", "i", "u.institution_id = i.institution_id"),
-            ("INNER", "market_info", "m", "u.market_id = m.market_id"),
-            ("LEFT", "employer_info", "e", "u.employer_id = e.employer_id"),
-            ("LEFT", "city_info", "c", "u.city_id = c.city_id")
+            ("INNER", "core.institution_info", "i", "u.institution_id = i.institution_id"),
+            ("INNER", "core.market_info", "m", "u.market_id = m.market_id"),
+            ("LEFT", "ops.institution_entity_info", "emp_entity", "u.employer_entity_id = emp_entity.institution_entity_id"),
+            ("LEFT", "core.workplace_group", "wg", "u.workplace_group_id = wg.workplace_group_id"),
+            ("LEFT", "core.city_metadata", "cm", "u.city_metadata_id = cm.city_metadata_id"),
+            ("LEFT", "external.geonames_city", "gc_city", "gc_city.geonames_id = cm.geonames_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -442,23 +533,28 @@ def get_enriched_user_by_id(
                 u.mobile_number_verified_at,
                 u.email_verified,
                 u.email_verified_at,
-                u.employer_id,
+                u.employer_entity_id,
                 u.employer_address_id,
-                e.name as employer_name,
+                emp_entity.name as employer_entity_name,
+                u.workplace_group_id,
+                wg.name as workplace_group_name,
                 u.market_id,
-                m.country_name as market_name,
-                u.city_id,
-                c.name as city_name,
+                gc_country.name as market_name,
+                u.city_metadata_id,
+                COALESCE(cm.display_name_override, gc_city.name) as city_name,
                 u.locale,
                 u.is_archived,
                 u.status,
                 u.created_date,
                 u.modified_date
-            FROM user_info u
-            JOIN institution_info i ON u.institution_id = i.institution_id
-            JOIN market_info m ON u.market_id = m.market_id
-            LEFT JOIN employer_info e ON u.employer_id = e.employer_id
-            LEFT JOIN city_info c ON u.city_id = c.city_id
+            FROM core.user_info u
+            JOIN core.institution_info i ON u.institution_id = i.institution_id
+            JOIN core.market_info m ON u.market_id = m.market_id
+            LEFT JOIN external.geonames_country gc_country ON gc_country.iso_alpha2 = m.country_code
+            LEFT JOIN ops.institution_entity_info emp_entity ON u.employer_entity_id = emp_entity.institution_entity_id
+            LEFT JOIN core.workplace_group wg ON u.workplace_group_id = wg.workplace_group_id
+            LEFT JOIN core.city_metadata cm ON u.city_metadata_id = cm.city_metadata_id
+            LEFT JOIN external.geonames_city gc_city ON gc_city.geonames_id = cm.geonames_id
             WHERE {' AND '.join(conditions)}
         """
         
@@ -638,12 +734,13 @@ def get_enriched_institution_entities(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
+            "i.institution_type",
             "ie.currency_metadata_id",
             "m.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "ie.address_id",
-            "m.country_name as address_country_name",
+            "gc_country.name as address_country_name",
             "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
@@ -652,6 +749,7 @@ def get_enriched_institution_entities(
             "ie.payout_provider_account_id",
             "ie.payout_aggregator",
             "ie.payout_onboarding_status",
+            "ie.email_domain",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -661,7 +759,8 @@ def get_enriched_institution_entities(
         joins=[
             ("INNER", "institution_info", "i", "ie.institution_id = i.institution_id"),
             ("INNER", "address_info", "a", "ie.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -697,12 +796,13 @@ def get_enriched_institution_entity_by_id(
             "ie.institution_entity_id",
             "ie.institution_id",
             "i.name as institution_name",
+            "i.institution_type",
             "ie.currency_metadata_id",
             "m.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "ie.address_id",
-            "m.country_name as address_country_name",
+            "gc_country.name as address_country_name",
             "a.country_code as address_country_code",
             "a.province as address_province",
             "a.city as address_city",
@@ -711,6 +811,7 @@ def get_enriched_institution_entity_by_id(
             "ie.payout_provider_account_id",
             "ie.payout_aggregator",
             "ie.payout_onboarding_status",
+            "ie.email_domain",
             "ie.is_archived",
             "ie.status",
             "ie.created_date",
@@ -720,7 +821,8 @@ def get_enriched_institution_entity_by_id(
         joins=[
             ("INNER", "institution_info", "i", "ie.institution_id = i.institution_id"),
             ("INNER", "address_info", "a", "ie.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -801,12 +903,12 @@ def get_enriched_addresses(
             "u.first_name as user_first_name",
             "u.last_name as user_last_name",
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as user_full_name",
-            "a.employer_id",
+            # a.employer_id REMOVED
             "a.address_type",
             "FALSE as is_default",
             "NULL::varchar as floor",
             "NULL::varchar as apartment_unit",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -827,7 +929,8 @@ def get_enriched_addresses(
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -878,12 +981,12 @@ def get_enriched_address_by_id(
             "u.first_name as user_first_name",
             "u.last_name as user_last_name",
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as user_full_name",
-            "a.employer_id",
+            # a.employer_id REMOVED
             "a.address_type",
             "FALSE as is_default",
             "NULL::varchar as floor",
             "NULL::varchar as apartment_unit",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -904,7 +1007,8 @@ def get_enriched_address_by_id(
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -980,12 +1084,12 @@ def get_enriched_addresses_search(
             "u.first_name as user_first_name",
             "u.last_name as user_last_name",
             "TRIM(COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), '')) as user_full_name",
-            "a.employer_id",
+            # a.employer_id REMOVED
             "a.address_type",
             "FALSE as is_default",
             "NULL::varchar as floor",
             "NULL::varchar as apartment_unit",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1006,7 +1110,8 @@ def get_enriched_addresses_search(
             ("INNER", "institution_info", "i", "a.institution_id = i.institution_id"),
             ("LEFT", "user_info", "u", "a.user_id = u.user_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE")
+            ("LEFT", "geolocation_info", "g", "g.address_id = a.address_id AND g.is_archived = FALSE"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=effective_scope,
         include_archived=include_archived,
@@ -1098,7 +1203,7 @@ def get_enriched_restaurants(
             "r.institution_entity_id",
             "ie.name as institution_entity_name",
             "r.address_id",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1131,7 +1236,8 @@ def get_enriched_restaurants(
             ("INNER", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1172,7 +1278,7 @@ def get_enriched_restaurant_by_id(
             "r.institution_entity_id",
             "ie.name as institution_entity_name",
             "r.address_id",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1205,7 +1311,8 @@ def get_enriched_restaurant_by_id(
             ("INNER", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -1427,7 +1534,7 @@ def get_enriched_qr_codes(
             "r.name as restaurant_name",
             "r.institution_id",
             "i.name as institution_name",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1447,7 +1554,8 @@ def get_enriched_qr_codes(
             ("INNER", "restaurant_info", "r", "q.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1489,7 +1597,7 @@ def get_enriched_qr_code_by_id(
             "r.name as restaurant_name",
             "r.institution_id",
             "i.name as institution_name",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1508,7 +1616,8 @@ def get_enriched_qr_code_by_id(
         joins=[
             ("INNER", "restaurant_info", "r", "q.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
-            ("INNER", "address_info", "a", "r.address_id = a.address_id")
+            ("INNER", "address_info", "a", "r.address_id = a.address_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = a.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -1537,7 +1646,7 @@ def get_qr_code_print_context_by_id(
             "a.city",
             "a.province",
             "a.postal_code",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "q.image_storage_path",
         ],
         joins=[
@@ -1545,6 +1654,7 @@ def get_qr_code_print_context_by_id(
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1730,7 +1840,7 @@ def get_enriched_plates(
             "cu.cuisine_name",
             "cu.cuisine_name_i18n",
             "r.pickup_instructions",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1770,7 +1880,8 @@ def get_enriched_plates(
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "geolocation_info", "g", "a.address_id = g.address_id AND g.is_archived = FALSE"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1801,14 +1912,14 @@ def get_enriched_plate_by_id(
     scope: Optional[InstitutionScope] = None,
     include_archived: bool = False,
     kitchen_day: Optional[str] = None,
-    employer_id: Optional[UUID] = None,
+    employer_entity_id: Optional[UUID] = None,
     employer_address_id: Optional[UUID] = None,
     user_id: Optional[UUID] = None,
 ) -> Optional[PlateEnrichedResponseSchema]:
     """
     Get a single plate by ID with enriched data (institution, restaurant, product, address details).
 
-    Optionally accepts kitchen_day, employer_id, employer_address_id, user_id for future
+    Optionally accepts kitchen_day, employer_entity_id, employer_address_id, user_id for future
     has_coworker_offer / has_coworker_request support; currently accepted but not used.
 
     Args:
@@ -1817,7 +1928,7 @@ def get_enriched_plate_by_id(
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
         kitchen_day: Optional; for future coworker flags (has_coworker_offer, has_coworker_request)
-        employer_id: Optional; for future coworker flags
+        employer_entity_id: Optional; for future coworker flags
         employer_address_id: Optional; for future coworker flags
         user_id: Optional; for future coworker flags
 
@@ -1842,7 +1953,7 @@ def get_enriched_plate_by_id(
             "cu.cuisine_name",
             "cu.cuisine_name_i18n",
             "r.pickup_instructions",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "a.province",
             "a.city",
@@ -1882,7 +1993,8 @@ def get_enriched_plate_by_id(
             ("INNER", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "geolocation_info", "g", "a.address_id = g.address_id AND g.is_archived = FALSE"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id")
+            ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -1919,6 +2031,17 @@ _market_enriched_service = EnrichedService(
     institution_table_alias=None
 )
 
+def _enrich_market_row_with_tax_id(row: dict) -> dict:
+    """Inject tax_id config fields (label, regex, example) based on country_code."""
+    from app.config.tax_id_config import get_tax_id_config
+    cfg = get_tax_id_config(row.get("country_code", ""))
+    row["tax_id_label"] = cfg["label"] if cfg else None
+    row["tax_id_mask"] = cfg["mask"] if cfg else None
+    row["tax_id_regex"] = cfg["regex"] if cfg else None
+    row["tax_id_example"] = cfg["example"] if cfg else None
+    return row
+
+
 def get_enriched_markets(
     db: psycopg2.extensions.connection,
     *,
@@ -1929,15 +2052,15 @@ def get_enriched_markets(
 ) -> List[MarketResponseSchema]:
     """
     Get all markets with enriched data (currency name and code).
-    
+
     Args:
         db: Database connection
         scope: Optional institution scope for filtering (not used for markets, but kept for consistency)
         include_archived: Whether to include archived records (default: False)
-        
+
     Returns:
         List of MarketResponseSchema with currency name and code
-        
+
     Raises:
         HTTPException: For system errors or database failures
     """
@@ -1945,15 +2068,13 @@ def get_enriched_markets(
         db,
         select_fields=[
             "m.market_id",
-            "m.country_name",
+            "gc_country.name as country_name",
             "m.country_code",
             "m.currency_metadata_id",
-            "c.currency_name",
+            "ic.name as currency_name",
             "c.currency_code",
             "c.credit_value_local_currency",
             "c.currency_conversion_usd",
-            "m.timezone",
-            "m.kitchen_close_time",
             "m.language",
             "m.phone_dial_code",
             "m.phone_local_digits",
@@ -1963,12 +2084,16 @@ def get_enriched_markets(
             "m.modified_date"
         ],
         joins=[
-            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id")
+            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = c.currency_code"),
         ],
         scope=None,  # Markets don't have institution scoping
         include_archived=include_archived,
+        order_by="gc_country.name ASC",
         page=page,
         page_size=page_size,
+        row_transform=_enrich_market_row_with_tax_id,
     )
 
 def get_enriched_market_by_id(
@@ -1998,15 +2123,13 @@ def get_enriched_market_by_id(
         db,
         select_fields=[
             "m.market_id",
-            "m.country_name",
+            "gc_country.name as country_name",
             "m.country_code",
             "m.currency_metadata_id",
-            "c.currency_name",
+            "ic.name as currency_name",
             "c.currency_code",
             "c.credit_value_local_currency",
             "c.currency_conversion_usd",
-            "m.timezone",
-            "m.kitchen_close_time",
             "m.language",
             "m.phone_dial_code",
             "m.phone_local_digits",
@@ -2016,10 +2139,13 @@ def get_enriched_market_by_id(
             "m.modified_date"
         ],
         joins=[
-            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id")
+            ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = c.currency_code"),
         ],
         scope=None,  # Markets don't have institution scoping
-        include_archived=include_archived
+        include_archived=include_archived,
+        row_transform=_enrich_market_row_with_tax_id,
     )
 
 # =============================================================================
@@ -2066,9 +2192,9 @@ def get_enriched_plans(
         select_fields=[
             "pl.plan_id",
             "pl.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
-            "cc.currency_name",
+            "ic.name as currency_name",
             "cc.currency_code",
             "pl.name",
             "pl.name_i18n",
@@ -2091,7 +2217,9 @@ def get_enriched_plans(
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
-            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id")
+            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = cc.currency_code"),
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived,
@@ -2128,9 +2256,9 @@ def get_enriched_plan_by_id(
         select_fields=[
             "pl.plan_id",
             "pl.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
-            "cc.currency_name",
+            "ic.name as currency_name",
             "cc.currency_code",
             "pl.name",
             "pl.name_i18n",
@@ -2153,7 +2281,9 @@ def get_enriched_plan_by_id(
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
-            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id")
+            ("INNER", "currency_metadata", "cc", "m.currency_metadata_id = cc.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = cc.currency_code"),
         ],
         scope=None,  # Plans don't have institution scoping
         include_archived=include_archived
@@ -2174,6 +2304,36 @@ _credit_currency_enriched_service = EnrichedService(
     institution_table_alias=None
 )
 
+_CREDIT_CURRENCY_SELECT = [
+    "cc.currency_metadata_id",
+    "ic.name as currency_name",
+    "cc.currency_code",
+    "cc.credit_value_local_currency",
+    "cc.currency_conversion_usd",
+    "cc.is_archived",
+    "cc.status",
+    "cc.created_date",
+    "cc.modified_date",
+]
+
+_CREDIT_CURRENCY_JOINS = [
+    ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id"),
+    ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+    ("LEFT", "external.iso4217_currency", "ic", "ic.code = cc.currency_code"),
+]
+
+_CREDIT_CURRENCY_MARKETS_AGG = {
+    "alias": "markets",
+    "fields": {
+        "market_id": "m.market_id",
+        "market_name": "gc_country.name",
+        "country_code": "m.country_code",
+    },
+    "filter": "m.market_id IS NOT NULL",
+    "order_by": "gc_country.name",
+}
+
+
 def get_enriched_credit_currencies(
     db: psycopg2.extensions.connection,
     *,
@@ -2183,43 +2343,20 @@ def get_enriched_credit_currencies(
     page_size: Optional[int] = None
 ) -> List[CreditCurrencyEnrichedResponseSchema]:
     """
-    Get all credit currencies with enriched data (market information).
-    
-    Args:
-        db: Database connection
-        scope: Optional institution scope for filtering (not used for credit currencies, but kept for consistency)
-        include_archived: Whether to include archived records (default: False)
-        
-    Returns:
-        List of CreditCurrencyEnrichedResponseSchema with market data
-        
-    Raises:
-        HTTPException: For system errors or database failures
+    Get all credit currencies with enriched data. One row per currency;
+    markets that use the currency are aggregated into a nested array.
     """
-    return _credit_currency_enriched_service.get_enriched(
+    return _credit_currency_enriched_service.get_distinct_enriched(
         db,
-        select_fields=[
-            "cc.currency_metadata_id",
-            "cc.currency_name",
-            "cc.currency_code",
-            "cc.credit_value_local_currency",
-            "cc.currency_conversion_usd",
-            "m.market_id",
-            "m.country_name as market_name",
-            "m.country_code",
-            "cc.is_archived",
-            "cc.status",
-            "cc.created_date",
-            "cc.modified_date"
-        ],
-        joins=[
-            ("INNER", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
-        ],
-        scope=None,  # Credit currencies don't have institution scoping
+        select_fields=_CREDIT_CURRENCY_SELECT,
+        aggregate_fields=[_CREDIT_CURRENCY_MARKETS_AGG],
+        joins=_CREDIT_CURRENCY_JOINS,
+        scope=None,
         include_archived=include_archived,
         page=page,
         page_size=page_size,
     )
+
 
 def get_enriched_credit_currency_by_id(
     currency_metadata_id: UUID,
@@ -2229,43 +2366,18 @@ def get_enriched_credit_currency_by_id(
     include_archived: bool = False
 ) -> Optional[CreditCurrencyEnrichedResponseSchema]:
     """
-    Get a single credit currency by ID with enriched data (market information).
-    
-    Args:
-        currency_metadata_id: Credit Currency ID
-        db: Database connection
-        scope: Optional institution scope for filtering (not used for credit currencies, but kept for consistency)
-        include_archived: Whether to include archived records (default: False)
-        
-    Returns:
-        CreditCurrencyEnrichedResponseSchema with market data, or None if not found
-        
-    Raises:
-        HTTPException: For system errors or database failures
+    Get a single credit currency by ID with enriched data. Markets aggregated into nested array.
     """
-    return _credit_currency_enriched_service.get_enriched_by_id(
-        currency_metadata_id,
+    results = _credit_currency_enriched_service.get_distinct_enriched(
         db,
-        select_fields=[
-            "cc.currency_metadata_id",
-            "cc.currency_name",
-            "cc.currency_code",
-            "cc.credit_value_local_currency",
-            "cc.currency_conversion_usd",
-            "m.market_id",
-            "m.country_name as market_name",
-            "m.country_code",
-            "cc.is_archived",
-            "cc.status",
-            "cc.created_date",
-            "cc.modified_date"
-        ],
-        joins=[
-            ("INNER", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
-        ],
-        scope=None,  # Credit currencies don't have institution scoping
-        include_archived=include_archived
+        select_fields=_CREDIT_CURRENCY_SELECT,
+        aggregate_fields=[_CREDIT_CURRENCY_MARKETS_AGG],
+        joins=_CREDIT_CURRENCY_JOINS,
+        additional_conditions=[(f"cc.currency_metadata_id = %s", str(currency_metadata_id))],
+        scope=None,
+        include_archived=include_archived,
     )
+    return results[0] if results else None
 
 # =============================================================================
 # DISCRETIONARY ENRICHED BUSINESS LOGIC
@@ -2316,10 +2428,10 @@ def get_enriched_discretionary_requests(
             "COALESCE(u.institution_id, ie.institution_id) as institution_id",
             "i.name as institution_name",
             "ie.currency_metadata_id",
-            "cc.currency_name",
+            "ic.name as currency_name",
             "cc.currency_code",
             "m.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "d.approval_id",
             "d.category",
@@ -2330,8 +2442,8 @@ def get_enriched_discretionary_requests(
             "d.status",
             "d.created_date",
             "d.modified_date",
-            "(SELECT dh.changed_by FROM discretionary_history dh WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'CREATE' ORDER BY dh.changed_at ASC LIMIT 1) as created_by",
-            "(SELECT TRIM(COALESCE(CONCAT_WS(' ', u2.first_name, u2.last_name), '')) FROM discretionary_history dh JOIN user_info u2 ON u2.user_id = dh.changed_by WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'CREATE' ORDER BY dh.changed_at ASC LIMIT 1) as created_by_name",
+            "(SELECT dh.changed_by FROM discretionary_history dh WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'create' ORDER BY dh.changed_at ASC LIMIT 1) as created_by",
+            "(SELECT TRIM(COALESCE(CONCAT_WS(' ', u2.first_name, u2.last_name), '')) FROM discretionary_history dh JOIN user_info u2 ON u2.user_id = dh.changed_by WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'create' ORDER BY dh.changed_at ASC LIMIT 1) as created_by_name",
         ],
         joins=[
             ("LEFT", "user_info", "u", "d.user_id = u.user_id"),
@@ -2339,7 +2451,9 @@ def get_enriched_discretionary_requests(
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
             ("LEFT", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
-            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
+            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = cc.currency_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -2382,10 +2496,10 @@ def get_enriched_discretionary_request_by_id(
             "COALESCE(u.institution_id, ie.institution_id) as institution_id",
             "i.name as institution_name",
             "ie.currency_metadata_id",
-            "cc.currency_name",
+            "ic.name as currency_name",
             "cc.currency_code",
             "m.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "d.approval_id",
             "d.category",
@@ -2396,8 +2510,8 @@ def get_enriched_discretionary_request_by_id(
             "d.status",
             "d.created_date",
             "d.modified_date",
-            "(SELECT dh.changed_by FROM discretionary_history dh WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'CREATE' ORDER BY dh.changed_at ASC LIMIT 1) as created_by",
-            "(SELECT TRIM(COALESCE(CONCAT_WS(' ', u2.first_name, u2.last_name), '')) FROM discretionary_history dh JOIN user_info u2 ON u2.user_id = dh.changed_by WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'CREATE' ORDER BY dh.changed_at ASC LIMIT 1) as created_by_name",
+            "(SELECT dh.changed_by FROM discretionary_history dh WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'create' ORDER BY dh.changed_at ASC LIMIT 1) as created_by",
+            "(SELECT TRIM(COALESCE(CONCAT_WS(' ', u2.first_name, u2.last_name), '')) FROM discretionary_history dh JOIN user_info u2 ON u2.user_id = dh.changed_by WHERE dh.discretionary_id = d.discretionary_id AND dh.operation = 'create' ORDER BY dh.changed_at ASC LIMIT 1) as created_by_name",
         ],
         joins=[
             ("LEFT", "user_info", "u", "d.user_id = u.user_id"),
@@ -2405,7 +2519,9 @@ def get_enriched_discretionary_request_by_id(
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("INNER", "institution_info", "i", "COALESCE(u.institution_id, ie.institution_id) = i.institution_id"),
             ("LEFT", "currency_metadata", "cc", "ie.currency_metadata_id = cc.currency_metadata_id"),
-            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id")
+            ("LEFT", "market_info", "m", "cc.currency_metadata_id = m.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            ("LEFT", "external.iso4217_currency", "ic", "ic.code = cc.currency_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -2620,289 +2736,12 @@ def get_bills_by_status(institution_id: UUID, status: str, db: psycopg2.extensio
         raise HTTPException(status_code=500, detail=f"Failed to get bills for institution")
 
 # =============================================================================
-# EMPLOYER BUSINESS LOGIC
+# EMPLOYER BUSINESS LOGIC — REMOVED
+# employer identity is now institution_info (type=employer) + institution_entity_info.
+# Removed: create_employer_with_address(), get_employers_by_name(),
+#          get_enriched_employers(), get_enriched_employer_by_id(), _employer_enriched_service
+# See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 # =============================================================================
-
-def create_employer_with_address(
-    employer_data: dict, 
-    address_data: dict, 
-    user_id: UUID, 
-    db: psycopg2.extensions.connection,
-    *,
-    assign_to_user: bool = False
-) -> EmployerDTO:
-    """
-    Create employer with address - business logic with atomic transaction.
-    
-    All operations (address creation, employer creation, address update, user assignment)
-    are performed atomically - either all succeed or all are rolled back.
-    
-    Args:
-        employer_data: Employer data dictionary
-        address_data: Address data dictionary
-        user_id: ID of user creating the employer
-        db: Database connection
-        assign_to_user: If True, automatically assign employer to user after creation.
-                        Only applies to Customers. Must be set by the route handler based on role_type.
-        
-    Returns:
-        Created EmployerDTO
-        
-    Raises:
-        HTTPException: If creation fails (triggers rollback of all operations)
-    """
-    try:
-        # All operations use commit=False for atomic transaction
-        # Create address using business service (sets timezone, handles geocoding)
-        from app.services.address_service import address_business_service
-        from app.config.settings import get_vianda_customers_institution_id
-
-        # Safety net: customer-reported employer addresses use Vianda Customers institution (routes set this; ensure it here if missing)
-        if address_data.get("institution_id") is None:
-            address_data["institution_id"] = get_vianda_customers_institution_id()
-
-        # Convert user_id to current_user dict format expected by business service
-        current_user_dict = {"user_id": user_id}
-
-        # Note: address_data["modified_by"] will be set by business service
-        address = address_business_service.create_address_with_geocoding(
-            address_data,
-            current_user_dict,
-            db,
-            scope=None,
-            commit=False
-        )
-        if not address:
-            db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to create address")
-        
-        # Create employer with address reference
-        employer_data["address_id"] = address.address_id
-        employer_data["modified_by"] = user_id
-        employer = employer_service.create(employer_data, db, commit=False)
-        if not employer:
-            db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to create employer")
-        
-        # Update address to link it to the employer (set employer_id)
-        # This creates the bidirectional relationship: employer -> address and address -> employer
-        address_update_data = {
-            "employer_id": employer.employer_id,
-            "modified_by": user_id
-        }
-        updated_address = address_service.update(address.address_id, address_update_data, db, commit=False)
-        if not updated_address:
-            db.rollback()
-            log_error(f"Failed to link address {address.address_id} to employer {employer.employer_id}")
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to link address to employer"
-            )
-
-        # Refresh address_type from linkages (now includes Customer Employer)
-        from app.services.address_service import update_address_type_from_linkages
-        update_address_type_from_linkages(address.address_id, db, commit=False)
-        
-        # Assign employer to user if requested (atomic within same transaction)
-        if assign_to_user:
-            user_update_data = {
-                "employer_id": employer.employer_id,
-                "employer_address_id": address.address_id,
-                "modified_by": user_id
-            }
-            updated_user = user_service.update(user_id, user_update_data, db, scope=None, commit=False)
-            if not updated_user:
-                db.rollback()
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to assign employer to user"
-                )
-            log_info(f"Assigned employer {employer.employer_id} to user {user_id}")
-        
-        # Commit all operations atomically
-        db.commit()
-        log_info(f"Successfully created employer {employer.employer_id} with address {address.address_id} (atomic transaction)")
-
-        # Geocode address now that type is Customer Employer (non-blocking)
-        from app.services.address_service import address_business_service
-        try:
-            current_user_dict = {"user_id": user_id}
-            address_business_service.geocode_address_if_required(
-                address.address_id, current_user_dict, db, commit=True
-            )
-        except Exception as geocode_err:
-            log_warning(f"Geocode after employer link skipped for address {address.address_id}: {geocode_err}")
-        
-        return employer
-    except HTTPException:
-        # HTTPException already handled rollback, just re-raise
-        raise
-    except Exception as e:
-        # Rollback on any unexpected error
-        db.rollback()
-        log_error(f"Error creating employer with address: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create employer: {e}")
-
-def get_employers_by_name(name: str, db: psycopg2.extensions.connection) -> List[EmployerDTO]:
-    """
-    Search employers by name - business logic only.
-    
-    Args:
-        name: Name to search for
-        db: Database connection
-        
-    Returns:
-        List of matching EmployerDTOs
-        
-    Raises:
-        HTTPException: For system errors or database failures
-    """
-    try:
-        # Use service layer instead of direct db_read
-        all_employers = employer_service.get_all(db)
-        
-        # Filter by name (case-insensitive search - business logic)
-        name_lower = name.lower()
-        matching_employers = [
-            employer for employer in all_employers 
-            if name_lower in employer.name.lower()
-        ]
-        
-        # Sort by name (business logic)
-        matching_employers.sort(key=lambda e: e.name)
-        
-        return matching_employers
-    except Exception as e:
-        log_error(f"Error searching employers by name {name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to search employers")
-
-# Initialize EnrichedService instance for employers
-_employer_enriched_service = EnrichedService(
-    base_table="employer_info",
-    table_alias="e",
-    id_column="employer_id",
-    schema_class=EmployerEnrichedResponseSchema,
-    institution_column=None,  # Employers don't have institution_id
-    institution_table_alias=None
-)
-
-def get_enriched_employers(
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False,
-    page: Optional[int] = None,
-    page_size: Optional[int] = None
-) -> List[EmployerEnrichedResponseSchema]:
-    """
-    Get all employers with enriched address data.
-    Uses SQL JOINs to avoid N+1 queries.
-    
-    Args:
-        db: Database connection
-        scope: Optional institution scope for filtering (not used for employers)
-        include_archived: Whether to include archived records
-        
-    Returns:
-        List of enriched employer schemas with address details
-    """
-    employers = _employer_enriched_service.get_enriched(
-        db,
-        select_fields=[
-            "e.employer_id",
-            "e.name",
-            "e.address_id",
-            "COALESCE(m.country_name, '') as address_country",
-            "a.country_code as address_country_code",
-            "a.province as address_province",
-            "a.city as address_city",
-            "a.postal_code as address_postal_code",
-            "a.street_type as address_street_type",
-            "a.street_name as address_street_name",
-            "a.building_number as address_building_number",
-            "e.is_archived",
-            "e.status",
-            "e.created_date",
-            "e.modified_date"
-        ],
-        joins=[
-            ("LEFT", "address_info", "a", "e.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
-        ],
-        scope=None,  # Employers don't have institution scope
-        include_archived=include_archived,
-        page=page,
-        page_size=page_size,
-    )
-    for emp in employers:
-        emp.address_display = format_address_display(
-            (emp.address_country_code or "") if hasattr(emp, "address_country_code") else "",
-            emp.address_street_type,
-            emp.address_street_name,
-            emp.address_building_number,
-            emp.address_city,
-            emp.address_postal_code,
-        )
-    return employers
-
-def get_enriched_employer_by_id(
-    employer_id: UUID,
-    db: psycopg2.extensions.connection,
-    *,
-    scope: Optional[InstitutionScope] = None,
-    include_archived: bool = False
-) -> Optional[EmployerEnrichedResponseSchema]:
-    """
-    Get a single employer by ID with enriched address data.
-    Uses SQL JOINs to avoid N+1 queries.
-    
-    Args:
-        employer_id: Employer ID
-        db: Database connection
-        scope: Optional institution scope for filtering (not used for employers)
-        include_archived: Whether to include archived records
-        
-    Returns:
-        Enriched employer schema with address details, or None if not found
-    """
-    emp = _employer_enriched_service.get_enriched_by_id(
-        employer_id,
-        db,
-        select_fields=[
-            "e.employer_id",
-            "e.name",
-            "e.address_id",
-            "COALESCE(m.country_name, '') as address_country",
-            "a.country_code as address_country_code",
-            "a.province as address_province",
-            "a.city as address_city",
-            "a.postal_code as address_postal_code",
-            "a.street_type as address_street_type",
-            "a.street_name as address_street_name",
-            "a.building_number as address_building_number",
-            "e.is_archived",
-            "e.status",
-            "e.created_date",
-            "e.modified_by",
-            "e.modified_date"
-        ],
-        joins=[
-            ("LEFT", "address_info", "a", "e.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
-        ],
-        scope=None,  # Employers don't have institution scope
-        include_archived=include_archived
-    )
-    if emp:
-        emp.address_display = format_address_display(
-            emp.address_country_code or "",
-            emp.address_street_type,
-            emp.address_street_name,
-            emp.address_building_number,
-            emp.address_city,
-            emp.address_postal_code,
-        )
-    return emp
 
 # =============================================================================
 # GEOLOCATION BUSINESS LOGIC
@@ -2992,7 +2831,7 @@ def get_enriched_subscriptions(
             "p.rollover_cap as plan_rollover_cap",
             "p.status as plan_status",
             "p.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "s.renewal_date",
             "s.balance",
@@ -3009,7 +2848,8 @@ def get_enriched_subscriptions(
         joins=[
             ("INNER", "user_info", "u", "s.user_id = u.user_id"),
             ("INNER", "plan_info", "p", "s.plan_id = p.plan_id"),
-            ("INNER", "market_info", "m", "p.market_id = m.market_id")
+            ("INNER", "market_info", "m", "p.market_id = m.market_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -3061,7 +2901,7 @@ def get_enriched_subscription_by_id(
             "p.rollover_cap as plan_rollover_cap",
             "p.status as plan_status",
             "p.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "s.renewal_date",
             "s.balance",
@@ -3078,7 +2918,8 @@ def get_enriched_subscription_by_id(
         joins=[
             ("INNER", "user_info", "u", "s.user_id = u.user_id"),
             ("INNER", "plan_info", "p", "s.plan_id = p.plan_id"),
-            ("INNER", "market_info", "m", "p.market_id = m.market_id")
+            ("INNER", "market_info", "m", "p.market_id = m.market_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -3135,7 +2976,7 @@ def get_enriched_institution_bills(
             "COALESCE(ie.name, '') as institution_entity_name",
             "ibi.currency_metadata_id",
             "m.market_id",
-            "m.country_name as market_name",
+            "gc_country.name as market_name",
             "m.country_code",
             "ibi.transaction_count",
             "ibi.amount",
@@ -3152,7 +2993,8 @@ def get_enriched_institution_bills(
         joins=[
             ("LEFT", "institution_info", "i", "ibi.institution_id = i.institution_id"),
             ("LEFT", "institution_entity_info", "ie", "ibi.institution_entity_id = ie.institution_entity_id"),
-            ("INNER", "market_info", "m", "ibi.currency_metadata_id = m.currency_metadata_id")
+            ("INNER", "market_info", "m", "ibi.currency_metadata_id = m.currency_metadata_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -3346,7 +3188,7 @@ def get_enriched_restaurant_balances(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "rb.currency_metadata_id",
             "rb.transaction_count",
@@ -3363,7 +3205,8 @@ def get_enriched_restaurant_balances(
             ("LEFT", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("LEFT", "address_info", "a", "r.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -3410,7 +3253,7 @@ def get_enriched_restaurant_balance_by_id(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "rb.currency_metadata_id",
             "rb.transaction_count",
@@ -3427,7 +3270,8 @@ def get_enriched_restaurant_balance_by_id(
             ("LEFT", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("LEFT", "address_info", "a", "r.address_id = a.address_id"),
-            ("LEFT", "market_info", "m", "a.country_code = m.country_code")
+            ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -3492,7 +3336,7 @@ def get_enriched_restaurant_transactions(
             "rt.discretionary_id",
             "rt.currency_metadata_id",
             "rt.currency_code",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "rt.was_collected",
             "rt.ordered_timestamp",
@@ -3518,7 +3362,8 @@ def get_enriched_restaurant_transactions(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "plate_selection_info", "ps", "rt.plate_selection_id = ps.plate_selection_id"),
             ("LEFT", "plate_info", "pi", "ps.plate_id = pi.plate_id"),
-            ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id")
+            ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -3571,7 +3416,7 @@ def get_enriched_restaurant_transaction_by_id(
             "rt.discretionary_id",
             "rt.currency_metadata_id",
             "rt.currency_code",
-            "COALESCE(m.country_name, '') as country_name",
+            "gc_country.name as country_name",
             "a.country_code",
             "rt.was_collected",
             "rt.ordered_timestamp",
@@ -3597,7 +3442,8 @@ def get_enriched_restaurant_transaction_by_id(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "plate_selection_info", "ps", "rt.plate_selection_id = ps.plate_selection_id"),
             ("LEFT", "plate_info", "pi", "ps.plate_id = pi.plate_id"),
-            ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id")
+            ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id"),
+            ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
         scope=scope,
         include_archived=include_archived
@@ -3668,7 +3514,7 @@ def get_enriched_plate_pickups(
                 ppl.user_id,
                 ppl.restaurant_id,
                 COALESCE(r.name, '') as restaurant_name,
-                COALESCE(m.country_name, '') as country_name,
+                gc_country.name as country_name,
                 a.country_code,
                 a.street_type,
                 a.street_name,
@@ -3696,6 +3542,7 @@ def get_enriched_plate_pickups(
             LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
             LEFT JOIN address_info a ON r.address_id = a.address_id
             LEFT JOIN market_info m ON a.country_code = m.country_code
+            LEFT JOIN external.geonames_country gc_country ON gc_country.iso_alpha2 = m.country_code
             LEFT JOIN product_info prod ON ppl.product_id = prod.product_id
             LEFT JOIN plate_info p ON ppl.plate_id = p.plate_id
             {where_clause}
@@ -4247,4 +4094,75 @@ def get_enriched_payment_method_by_id(
         scope=scope,
         include_archived=include_archived
     )
+
+
+# ---------------------------------------------------------------------------
+# Archive guardrails
+# ---------------------------------------------------------------------------
+
+def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.connection) -> None:
+    """Raise HTTPException if entity has active dependencies that prevent archival.
+
+    Checks (in order):
+    1. Active plate pickups via entity's restaurants
+    2. Active restaurants
+    """
+    from fastapi import HTTPException
+
+    active_pickups = db_read(
+        """
+        SELECT COUNT(*) as cnt
+        FROM customer.plate_pickup_live pp
+        JOIN ops.restaurant_info r ON pp.restaurant_id = r.restaurant_id
+        WHERE r.institution_entity_id = %s
+          AND pp.is_archived = FALSE
+          AND pp.status IN ('pending', 'active')
+        """,
+        (str(entity_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if active_pickups and active_pickups["cnt"] > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot archive entity: {active_pickups['cnt']} active plate pickup(s) exist. Complete or cancel them first.",
+        )
+
+    active_restaurants = db_read(
+        """
+        SELECT r.name FROM ops.restaurant_info r
+        WHERE r.institution_entity_id = %s AND r.is_archived = FALSE
+        """,
+        (str(entity_id),),
+        connection=db,
+    )
+    if active_restaurants:
+        names = [r["name"] for r in active_restaurants]
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot archive entity: {len(names)} active restaurant(s) must be archived first: {', '.join(names)}",
+        )
+
+
+def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extensions.connection) -> None:
+    """Raise HTTPException if restaurant has active plate pickups that prevent archival."""
+    from fastapi import HTTPException
+
+    active_pickups = db_read(
+        """
+        SELECT COUNT(*) as cnt
+        FROM customer.plate_pickup_live pp
+        WHERE pp.restaurant_id = %s
+          AND pp.is_archived = FALSE
+          AND pp.status IN ('pending', 'active')
+        """,
+        (str(restaurant_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if active_pickups and active_pickups["cnt"] > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot archive restaurant: {active_pickups['cnt']} active plate pickup(s) exist. Complete or cancel them first.",
+        )
 

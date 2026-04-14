@@ -78,9 +78,9 @@ SELECT
         (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = %(iid)s AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.restaurant_info WHERE institution_id = %(iid)s AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.product_info WHERE institution_id = %(iid)s AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT p.is_archived),
-        (SELECT MAX(modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT pkd.is_archived),
-        (SELECT MAX(modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT q.is_archived)
+        (SELECT MAX(p.modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT p.is_archived),
+        (SELECT MAX(pkd.modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT pkd.is_archived),
+        (SELECT MAX(q.modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT q.is_archived)
     ) AS last_activity_date
 FROM core.institution_info i
 WHERE i.institution_id = %(iid)s
@@ -112,8 +112,8 @@ SELECT
         WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_benefits_program,
     EXISTS(
-        SELECT 1 FROM core.employer_domain
-        WHERE institution_id = %(iid)s AND is_active = TRUE AND status = 'active' AND NOT is_archived
+        SELECT 1 FROM ops.institution_entity_info
+        WHERE institution_id = %(iid)s AND email_domain IS NOT NULL AND is_archived = FALSE
     ) AS has_email_domain,
     EXISTS(
         SELECT 1 FROM core.user_info
@@ -128,8 +128,8 @@ SELECT
     ) AS has_active_subscription,
     GREATEST(
         (SELECT MAX(modified_date) FROM core.employer_benefits_program WHERE institution_id = %(iid)s AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM core.employer_domain WHERE institution_id = %(iid)s AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM core.user_info WHERE institution_id = %(iid)s AND role_type = 'Customer' AND NOT is_archived),
+        (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = %(iid)s AND NOT is_archived),
+        (SELECT MAX(modified_date) FROM core.user_info WHERE institution_id = %(iid)s AND role_type = 'customer' AND NOT is_archived),
         (SELECT MAX(modified_date) FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = %(iid)s AND NOT s.is_archived)
     ) AS last_activity_date
 FROM core.institution_info i
@@ -347,7 +347,8 @@ SELECT
     {checklist_columns}
     {last_activity_subquery}
 FROM core.institution_info i
-LEFT JOIN core.market_info m ON i.market_id = m.market_id
+LEFT JOIN core.institution_market im ON i.institution_id = im.institution_id AND im.is_primary = TRUE
+LEFT JOIN core.market_info m ON im.market_id = m.market_id
 WHERE i.institution_type = %(inst_type)s
   AND i.status = 'active'
   AND NOT i.is_archived
@@ -368,21 +369,21 @@ _SUPPLIER_SUMMARY_ACTIVITY = """
         (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.restaurant_info WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.product_info WHERE institution_id = i.institution_id AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT p.is_archived),
-        (SELECT MAX(modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT pkd.is_archived),
-        (SELECT MAX(modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT q.is_archived)
+        (SELECT MAX(p.modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT p.is_archived),
+        (SELECT MAX(pkd.modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT pkd.is_archived),
+        (SELECT MAX(q.modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT q.is_archived)
     ) AS last_activity_date"""
 
 _EMPLOYER_SUMMARY_CHECKLIST = """
     EXISTS(SELECT 1 FROM core.employer_benefits_program WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_benefits_program,
-    EXISTS(SELECT 1 FROM core.employer_domain WHERE institution_id = i.institution_id AND is_active = TRUE AND status = 'active' AND NOT is_archived) AS has_email_domain,
+    EXISTS(SELECT 1 FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND email_domain IS NOT NULL AND NOT is_archived) AS has_email_domain,
     EXISTS(SELECT 1 FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'customer' AND status = 'active' AND NOT is_archived) AS has_enrolled_employee,
     EXISTS(SELECT 1 FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = i.institution_id AND s.subscription_status = 'active' AND NOT s.is_archived) AS has_active_subscription,"""
 
 _EMPLOYER_SUMMARY_ACTIVITY = """
     GREATEST(
         (SELECT MAX(modified_date) FROM core.employer_benefits_program WHERE institution_id = i.institution_id AND NOT is_archived),
-        (SELECT MAX(modified_date) FROM core.employer_domain WHERE institution_id = i.institution_id AND NOT is_archived),
+        (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM core.user_info WHERE institution_id = i.institution_id AND role_type = 'customer' AND NOT is_archived),
         (SELECT MAX(modified_date) FROM customer.subscription_info s JOIN core.user_info u ON s.user_id = u.user_id WHERE u.institution_id = i.institution_id AND NOT s.is_archived)
     ) AS last_activity_date"""
@@ -413,7 +414,7 @@ def get_onboarding_summary(
     params: Dict[str, Any] = {"inst_type": institution_type}
 
     if market_id:
-        query += " AND i.market_id = %(market_id)s"
+        query += " AND im.market_id = %(market_id)s"
         params["market_id"] = str(market_id)
 
     rows = db_read(query, params, connection=db)
@@ -472,7 +473,7 @@ _ONBOARDING_TABLES = {
     "qr_code": "SELECT r.institution_id FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE q.qr_code_id = %s",
     # Employer tables
     "employer_benefits_program": "SELECT institution_id FROM core.employer_benefits_program WHERE program_id = %s",
-    "employer_domain": "SELECT institution_id FROM core.employer_domain WHERE domain_id = %s",
+    "institution_entity_info": "SELECT institution_id FROM ops.institution_entity_info WHERE institution_entity_id = %s",
 }
 
 
@@ -515,5 +516,13 @@ def check_onboarding_regression(
                 f"is now '{status}' after {table_name} record {record_id} was archived/deactivated"
             )
     except Exception as e:
-        # Never let regression detection break the calling operation
+        # Never let regression detection break the calling operation.
+        # IMPORTANT: if the failure was a DB error, the psycopg2 connection is now in
+        # "current transaction is aborted" state — any subsequent query on the same
+        # request (or on a subsequent request if the connection is pool-reused) will
+        # 500. Roll back to clear the aborted state so the caller can proceed.
         log_warning(f"Onboarding regression check failed for {table_name}/{record_id}: {e}")
+        try:
+            db.rollback()
+        except Exception as rollback_err:
+            log_warning(f"Failed to rollback after regression check failure: {rollback_err}")

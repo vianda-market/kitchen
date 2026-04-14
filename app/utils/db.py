@@ -170,8 +170,7 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('client_bill_history', 'status'): 'status_enum',
         ('geolocation_info', 'status'): 'status_enum',
         ('geolocation_history', 'status'): 'status_enum',
-        ('employer_info', 'status'): 'status_enum',
-        ('employer_history', 'status'): 'status_enum',
+        # employer_info/employer_history REMOVED
         ('currency_metadata', 'status'): 'status_enum',
         ('credit_currency_history', 'status'): 'status_enum',
         ('institution_entity_info', 'status'): 'status_enum',
@@ -211,6 +210,7 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
         ('notification_banner', 'notification_type'): 'notification_banner_type_enum',
         ('notification_banner', 'priority'): 'notification_banner_priority_enum',
         ('notification_banner', 'action_status'): 'notification_banner_action_status_enum',
+        ('workplace_group', 'status'): 'status_enum',
     }
     
     # Handle enum arrays for address_type (special case - must come before scalar enum handling)
@@ -240,13 +240,10 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection=None) 
     if isinstance(value, UUID):
         return str(value)
 
-    # JSONB columns: psycopg2 cannot adapt Python dict; use Json() for JSONB
-    jsonb_columns = {
-        ("geolocation_info", "viewport"),
-        ("geolocation_history", "viewport"),
-        ("currency_rate_raw", "raw_payload"),
-    }
-    if (table, column) in jsonb_columns and isinstance(value, dict):
+    # JSONB columns: psycopg2 cannot adapt Python dict natively.
+    # Wrap with Json() so it serialises to JSONB. Lists are left as-is
+    # because psycopg2 adapts them natively to Postgres arrays (TEXT[], etc.).
+    if isinstance(value, dict):
         return psycopg2.extras.Json(value)
 
     return value
@@ -269,8 +266,27 @@ PRIMARY_KEY_MAPPING = {
     "email_change_request": "email_change_request_id",
     "address_info": "address_id",
     "address_subpremise": "subpremise_id",
-    "employer_info": "employer_id",
+    # "employer_info" REMOVED
     "institution_entity_info": "institution_entity_id",
+    "supplier_terms": "supplier_terms_id",
+    "supplier_invoice": "supplier_invoice_id",
+    "supplier_invoice_ar": "supplier_invoice_id",
+    "supplier_invoice_pe": "supplier_invoice_id",
+    "supplier_invoice_us": "supplier_invoice_id",
+    "supplier_w9": "w9_id",
+    "employer_benefits_program": "program_id",
+    "employer_domain": "domain_id",
+    "employer_bill": "employer_bill_id",
+    "employer_bill_line": "line_id",
+    "bill_invoice_match": "match_id",
+    "city_metadata": "city_metadata_id",
+    "cuisine": "cuisine_id",
+    "cuisine_suggestion": "suggestion_id",
+    "pickup_preferences_info": "preference_id",
+    "national_holidays": "holiday_id",
+    "ingredient_catalog": "ingredient_id",
+    "referral_config": "referral_config_id",
+    "referral_info": "referral_id",
     "restaurant_info": "restaurant_id",
     "qr_code": "qr_code_id",
     "discretionary_info": "discretionary_id",
@@ -300,6 +316,7 @@ PRIMARY_KEY_MAPPING = {
     "plate_kitchen_days": "plate_kitchen_day_id",
     "restaurant_holidays": "holiday_id",
     "notification_banner": "notification_id",
+    "workplace_group": "workplace_group_id",
     # role_info, status_info, transaction_type_info removed
 }
 

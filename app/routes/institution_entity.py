@@ -46,9 +46,10 @@ def list_enriched_institution_entities(
     effective_institution_id = resolve_institution_filter(institution_id, scope)
     institution_market_id: Optional[UUID] = None
     if effective_institution_id is not None:
-        inst = institution_service.get_by_id(effective_institution_id, db, scope=None)
-        if inst and getattr(inst, "market_id", None) is not None and not is_global_market(inst.market_id):
-            institution_market_id = inst.market_id
+        from app.services.entity_service import get_institution_market_ids
+        inst_markets = get_institution_market_ids(effective_institution_id, db)
+        if inst_markets and len(inst_markets) == 1 and not is_global_market(inst_markets[0]):
+            institution_market_id = inst_markets[0]
 
     def _get_enriched_entities():
         return get_enriched_institution_entities(
@@ -124,30 +125,36 @@ def get_payout_aggregator(
     institution_id = entity.institution_id
     with db.cursor() as cur:
         cur.execute(
-            "SELECT market_id FROM core.institution_info WHERE institution_id = %s",
+            "SELECT market_id FROM core.institution_market WHERE institution_id = %s ORDER BY is_primary DESC LIMIT 1",
             (str(institution_id),),
         )
         row = cur.fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Institution not found for entity")
+        raise HTTPException(status_code=404, detail="Institution has no assigned markets")
     market_id = row[0]
 
-    with db.cursor() as cur:
+    from psycopg2.extras import RealDictCursor
+    with db.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            "SELECT market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days FROM billing.market_payout_aggregator WHERE market_id = %s",
+            """SELECT market_id, aggregator, is_active, require_invoice,
+                      max_unmatched_bill_days, kitchen_open_time, kitchen_close_time,
+                      notes, is_archived, status,
+                      created_date, modified_by, modified_date
+               FROM billing.market_payout_aggregator
+               WHERE market_id = %s AND is_archived = FALSE""",
             (str(market_id),),
         )
         agg_row = cur.fetchone()
     if not agg_row:
         raise HTTPException(status_code=404, detail="No payout aggregator configured for this market")
 
-    return MarketPayoutAggregatorResponseSchema(
-        market_id=agg_row[0],
-        aggregator=agg_row[1],
-        is_active=agg_row[2],
-        require_invoice=agg_row[3],
-        max_unmatched_bill_days=agg_row[4],
-    )
+    # Convert time objects to HH:MM strings for schema serialization
+    row = dict(agg_row)
+    for tf in ("kitchen_open_time", "kitchen_close_time"):
+        v = row.get(tf)
+        if v is not None and hasattr(v, "strftime"):
+            row[tf] = v.strftime("%H:%M")
+    return MarketPayoutAggregatorResponseSchema(**row)
 
 
 @router.post("/{entity_id}/stripe-connect/account-session")

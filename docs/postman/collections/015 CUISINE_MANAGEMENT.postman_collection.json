@@ -1,792 +1,923 @@
 {
-	"info": {
-		"_postman_id": "cuisine-management-2026-v1",
-		"name": "015 CUISINE_MANAGEMENT",
-		"description": "015 – Cuisine Management. Flow: (1) Login Super Admin, (2) Public cuisine list and search, (3) Admin CRUD for cuisines, (4) Supplier suggestion approval flow, (5) Supplier suggestion rejection flow. Requires seeded DB with 22 cuisines. Uses /api/v1/ prefix.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "Auth",
-			"item": [
-				{
-					"name": "Login Super Admin",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response has access_token\", function () {",
-									"    pm.expect(response).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.collectionVariables.set(\"superAdminAuthToken\", response.access_token);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/x-www-form-urlencoded"
-							}
-						],
-						"body": {
-							"mode": "urlencoded",
-							"urlencoded": [
-								{
-									"key": "username",
-									"value": "{{superAdminUsername}}"
-								},
-								{
-									"key": "password",
-									"value": "{{superAdminPassword}}"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/auth/token",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "auth", "token"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Public Cuisines API",
-			"item": [
-				{
-					"name": "List All Active Cuisines",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response is an array\", function () {",
-									"    pm.expect(response).to.be.an('array');",
-									"});",
-									"",
-									"pm.test(\"At least 22 seeded cuisines returned\", function () {",
-									"    pm.expect(response.length).to.be.at.least(22);",
-									"});",
-									"",
-									"pm.test(\"Each cuisine has required fields\", function () {",
-									"    const first = response[0];",
-									"    pm.expect(first).to.have.property('cuisine_id');",
-									"    pm.expect(first).to.have.property('cuisine_name');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines"]
-						}
-					}
-				},
-				{
-					"name": "Search Cuisines by Name",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response is an array\", function () {",
-									"    pm.expect(response).to.be.an('array');",
-									"});",
-									"",
-									"pm.test(\"Search results contain 'ita' match\", function () {",
-									"    pm.expect(response.length).to.be.at.least(1);",
-									"    const names = response.map(c => c.cuisine_name.toLowerCase());",
-									"    const hasMatch = names.some(n => n.includes('ita'));",
-									"    pm.expect(hasMatch).to.be.true;",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines?search=ita",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines"],
-							"query": [
-								{
-									"key": "search",
-									"value": "ita"
-								}
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Admin Cuisine CRUD",
-			"item": [
-				{
-					"name": "Create Cuisine (Korean)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 201\", function () {",
-									"    pm.response.to.have.status(201);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response has cuisine_id\", function () {",
-									"    pm.expect(response).to.have.property('cuisine_id');",
-									"});",
-									"",
-									"pm.test(\"Cuisine name is Korean\", function () {",
-									"    pm.expect(response.cuisine_name).to.eql('Korean');",
-									"});",
-									"",
-									"pm.collectionVariables.set(\"cuisineId\", response.cuisine_id);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"cuisine_name\": \"Korean\",\n    \"description\": \"Korean cuisine\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines"]
-						}
-					}
-				},
-				{
-					"name": "Get Cuisine by ID",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Cuisine ID matches\", function () {",
-									"    pm.expect(response.cuisine_id).to.eql(pm.collectionVariables.get('cuisineId'));",
-									"});",
-									"",
-									"pm.test(\"Cuisine name is Korean\", function () {",
-									"    pm.expect(response.cuisine_name).to.eql('Korean');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "{{cuisineId}}"]
-						}
-					}
-				},
-				{
-					"name": "Update Cuisine (Korean to K-Food)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Cuisine name updated to K-Food\", function () {",
-									"    pm.expect(response.cuisine_name).to.eql('K-Food');",
-									"});",
-									"",
-									"pm.test(\"Description updated\", function () {",
-									"    pm.expect(response.description).to.eql('Korean fusion cuisine');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"cuisine_name\": \"K-Food\",\n    \"description\": \"Korean fusion cuisine\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "{{cuisineId}}"]
-						}
-					}
-				},
-				{
-					"name": "Verify K-Food in Public List",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"K-Food appears in public cuisine list\", function () {",
-									"    const names = response.map(c => c.cuisine_name);",
-									"    pm.expect(names).to.include('K-Food');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines"]
-						}
-					}
-				},
-				{
-					"name": "Soft-Delete Cuisine",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "{{cuisineId}}"]
-						}
-					}
-				},
-				{
-					"name": "Verify Deleted Cuisine Gone from Public List",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"K-Food no longer in public cuisine list\", function () {",
-									"    const names = response.map(c => c.cuisine_name);",
-									"    pm.expect(names).to.not.include('K-Food');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines"]
-						}
-					}
-				},
-				{
-					"name": "Admin List All Cuisines (includes inactive)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response is an array\", function () {",
-									"    pm.expect(response).to.be.an('array');",
-									"});",
-									"",
-									"pm.test(\"Admin list includes the soft-deleted K-Food\", function () {",
-									"    const names = response.map(c => c.cuisine_name);",
-									"    pm.expect(names).to.include('K-Food');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Supplier Suggestion Flow",
-			"item": [
-				{
-					"name": "Create Suggestion (Nikkei)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 201\", function () {",
-									"    pm.response.to.have.status(201);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response has suggestion_id\", function () {",
-									"    pm.expect(response).to.have.property('suggestion_id');",
-									"});",
-									"",
-									"pm.test(\"Suggested name is Nikkei\", function () {",
-									"    pm.expect(response.suggested_name).to.eql('Nikkei');",
-									"});",
-									"",
-									"pm.collectionVariables.set(\"suggestionId\", response.suggestion_id);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"suggested_name\": \"Nikkei\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines/suggestions",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines", "suggestions"]
-						}
-					}
-				},
-				{
-					"name": "List Pending Suggestions",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response is an array\", function () {",
-									"    pm.expect(response).to.be.an('array');",
-									"});",
-									"",
-									"pm.test(\"Nikkei suggestion is in pending list\", function () {",
-									"    const names = response.map(s => s.suggested_name);",
-									"    pm.expect(names).to.include('Nikkei');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "suggestions"]
-						}
-					}
-				},
-				{
-					"name": "Approve Suggestion (Nikkei)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Suggestion status is approved\", function () {",
-									"    pm.expect(response.status).to.be.oneOf(['approved', 'Approved']);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"review_notes\": \"Approved\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions/{{suggestionId}}/approve",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "suggestions", "{{suggestionId}}", "approve"]
-						}
-					}
-				},
-				{
-					"name": "Verify Nikkei in Public Cuisine List",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Nikkei now appears in public cuisine list\", function () {",
-									"    const names = response.map(c => c.cuisine_name);",
-									"    pm.expect(names).to.include('Nikkei');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Suggestion Reject Flow",
-			"item": [
-				{
-					"name": "Create Suggestion (Fusion XYZ)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 201\", function () {",
-									"    pm.response.to.have.status(201);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Response has suggestion_id\", function () {",
-									"    pm.expect(response).to.have.property('suggestion_id');",
-									"});",
-									"",
-									"pm.test(\"Suggested name is Fusion XYZ\", function () {",
-									"    pm.expect(response.suggested_name).to.eql('Fusion XYZ');",
-									"});",
-									"",
-									"pm.collectionVariables.set(\"rejectSuggestionId\", response.suggestion_id);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"suggested_name\": \"Fusion XYZ\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cuisines/suggestions",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "cuisines", "suggestions"]
-						}
-					}
-				},
-				{
-					"name": "Reject Suggestion (Fusion XYZ)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Suggestion status is rejected\", function () {",
-									"    pm.expect(response.status).to.be.oneOf(['rejected', 'Rejected']);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"review_notes\": \"Not a cuisine\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions/{{rejectSuggestionId}}/reject",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "suggestions", "{{rejectSuggestionId}}", "reject"]
-						}
-					}
-				},
-				{
-					"name": "Verify Rejected Suggestion Not in Pending",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test(\"Fusion XYZ is not in pending suggestions\", function () {",
-									"    const names = response.map(s => s.suggested_name);",
-									"    pm.expect(names).to.not.include('Fusion XYZ');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{superAdminAuthToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "admin", "cuisines", "suggestions"]
-						}
-					}
-				}
-			]
-		}
-	],
-	"variable": [
-		{
-			"key": "baseUrl",
-			"value": "http://localhost:8000",
-			"type": "string"
-		},
-		{
-			"key": "superAdminUsername",
-			"value": "superadmin",
-			"type": "string"
-		},
-		{
-			"key": "superAdminPassword",
-			"value": "SuperAdmin1!",
-			"type": "string"
-		},
-		{
-			"key": "superAdminAuthToken",
-			"value": "",
-			"type": "string",
-			"description": "Set by Login Super Admin request"
-		},
-		{
-			"key": "cuisineId",
-			"value": "",
-			"type": "string",
-			"description": "Set by Create Cuisine request"
-		},
-		{
-			"key": "suggestionId",
-			"value": "",
-			"type": "string",
-			"description": "Set by Create Suggestion (Nikkei) request"
-		},
-		{
-			"key": "rejectSuggestionId",
-			"value": "",
-			"type": "string",
-			"description": "Set by Create Suggestion (Fusion XYZ) request"
-		}
-	]
+  "info": {
+    "_postman_id": "cuisine-management-2026-v1",
+    "name": "015 CUISINE_MANAGEMENT",
+    "description": "015 – Cuisine Management. Flow: (1) Login Super Admin, (2) Public cuisine list and search, (3) Admin CRUD for cuisines, (4) Supplier suggestion approval flow, (5) Supplier suggestion rejection flow. Requires seeded DB with 22 cuisines. Uses /api/v1/ prefix.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login Super Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response has access_token\", function () {",
+                  "    pm.expect(response).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "// Set at all three scopes so environment/global overrides do not mask the token.",
+                  "// Postman's variable resolution is: local > data > env > coll > global; an empty",
+                  "// env-level `superAdminAuthToken` from a prior session shadows the collection set.",
+                  "const token = response.access_token;",
+                  "pm.collectionVariables.set(\"superAdminAuthToken\", token);",
+                  "pm.environment.set(\"superAdminAuthToken\", token);",
+                  "pm.globals.set(\"superAdminAuthToken\", token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{superAdminUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{superAdminPassword}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Cuisines API",
+      "item": [
+        {
+          "name": "List All Active Cuisines",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    pm.expect(response).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"At least 22 seeded cuisines returned\", function () {",
+                  "    pm.expect(response.length).to.be.at.least(22);",
+                  "});",
+                  "",
+                  "pm.test(\"Each cuisine has required fields\", function () {",
+                  "    const first = response[0];",
+                  "    pm.expect(first).to.have.property('cuisine_id');",
+                  "    pm.expect(first).to.have.property('cuisine_name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Cuisines by Name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    pm.expect(response).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Search results contain 'ita' match\", function () {",
+                  "    pm.expect(response.length).to.be.at.least(1);",
+                  "    const names = response.map(c => c.cuisine_name.toLowerCase());",
+                  "    const hasMatch = names.some(n => n.includes('ita'));",
+                  "    pm.expect(hasMatch).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines?search=ita",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "ita"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Cuisine CRUD",
+      "item": [
+        {
+          "name": "Create Cuisine (Korean)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response has cuisine_id\", function () {",
+                  "    pm.expect(response).to.have.property('cuisine_id');",
+                  "});",
+                  "",
+                  "pm.test(\"Cuisine name is Korean\", function () {",
+                  "    pm.expect(response.cuisine_name).to.eql('Korean');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"cuisineId\", response.cuisine_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cuisine_name\": \"Korean\",\n    \"description\": \"Korean cuisine\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Cuisine by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Cuisine ID matches\", function () {",
+                  "    pm.expect(response.cuisine_id).to.eql(pm.collectionVariables.get('cuisineId'));",
+                  "});",
+                  "",
+                  "pm.test(\"Cuisine name is Korean\", function () {",
+                  "    pm.expect(response.cuisine_name).to.eql('Korean');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "{{cuisineId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Cuisine (Korean to K-Food)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Cuisine name updated to K-Food\", function () {",
+                  "    pm.expect(response.cuisine_name).to.eql('K-Food');",
+                  "});",
+                  "",
+                  "pm.test(\"Description updated\", function () {",
+                  "    pm.expect(response.description).to.eql('Korean fusion cuisine');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cuisine_name\": \"K-Food\",\n    \"description\": \"Korean fusion cuisine\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "{{cuisineId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify K-Food in Public List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"K-Food appears in public cuisine list\", function () {",
+                  "    const names = response.map(c => c.cuisine_name);",
+                  "    pm.expect(names).to.include('K-Food');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Soft-Delete Cuisine",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/{{cuisineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "{{cuisineId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Deleted Cuisine Gone from Public List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"K-Food no longer in public cuisine list\", function () {",
+                  "    const names = response.map(c => c.cuisine_name);",
+                  "    pm.expect(names).to.not.include('K-Food');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin List All Cuisines (includes inactive)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    pm.expect(response).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Admin list includes the soft-deleted K-Food\", function () {",
+                  "    const names = response.map(c => c.cuisine_name);",
+                  "    pm.expect(names).to.include('K-Food');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Supplier Suggestion Flow",
+      "item": [
+        {
+          "name": "Create Suggestion (Nikkei)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response has suggestion_id\", function () {",
+                  "    pm.expect(response).to.have.property('suggestion_id');",
+                  "});",
+                  "",
+                  "pm.test(\"Suggested name is Nikkei\", function () {",
+                  "    pm.expect(response.suggested_name).to.eql('Nikkei');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"suggestionId\", response.suggestion_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"suggested_name\": \"Nikkei\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines",
+                "suggestions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Pending Suggestions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    pm.expect(response).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Nikkei suggestion is in pending list\", function () {",
+                  "    const names = response.map(s => s.suggested_name);",
+                  "    pm.expect(names).to.include('Nikkei');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "suggestions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve Suggestion (Nikkei)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Suggestion status is approved\", function () {",
+                  "    pm.expect(response.suggestion_status).to.be.oneOf(['approved', 'Approved']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"review_notes\": \"Approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions/{{suggestionId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "suggestions",
+                "{{suggestionId}}",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Nikkei in Public Cuisine List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Nikkei now appears in public cuisine list\", function () {",
+                  "    const names = response.map(c => c.cuisine_name);",
+                  "    pm.expect(names).to.include('Nikkei');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suggestion Reject Flow",
+      "item": [
+        {
+          "name": "Create Suggestion (Fusion XYZ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Response has suggestion_id\", function () {",
+                  "    pm.expect(response).to.have.property('suggestion_id');",
+                  "});",
+                  "",
+                  "pm.test(\"Suggested name is Fusion XYZ\", function () {",
+                  "    pm.expect(response.suggested_name).to.eql('Fusion XYZ');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"rejectSuggestionId\", response.suggestion_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"suggested_name\": \"Fusion XYZ\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines",
+                "suggestions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reject Suggestion (Fusion XYZ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Suggestion status is rejected\", function () {",
+                  "    pm.expect(response.suggestion_status).to.be.oneOf(['rejected', 'Rejected']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"review_notes\": \"Not a cuisine\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions/{{rejectSuggestionId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "suggestions",
+                "{{rejectSuggestionId}}",
+                "reject"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Rejected Suggestion Not in Pending",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test(\"Fusion XYZ is not in pending suggestions\", function () {",
+                  "    const names = response.map(s => s.suggested_name);",
+                  "    pm.expect(names).to.not.include('Fusion XYZ');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cuisines/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "suggestions"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "superAdminUsername",
+      "value": "superadmin",
+      "type": "string"
+    },
+    {
+      "key": "superAdminPassword",
+      "value": "SuperAdmin1",
+      "type": "string"
+    },
+    {
+      "key": "superAdminAuthToken",
+      "value": "",
+      "type": "string",
+      "description": "Set by Login Super Admin request"
+    },
+    {
+      "key": "cuisineId",
+      "value": "",
+      "type": "string",
+      "description": "Set by Create Cuisine request"
+    },
+    {
+      "key": "suggestionId",
+      "value": "",
+      "type": "string",
+      "description": "Set by Create Suggestion (Nikkei) request"
+    },
+    {
+      "key": "rejectSuggestionId",
+      "value": "",
+      "type": "string",
+      "description": "Set by Create Suggestion (Fusion XYZ) request"
+    }
+  ]
 }

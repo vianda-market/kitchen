@@ -346,7 +346,7 @@ After backend is complete, produce tailored docs in `docs/api/` for each fronten
 |---------------|-------------|---------|
 | `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | vianda-home | Coverage checker endpoints, interest form contracts (all 3 types), CAPTCHA frontend integration, SEO requirements, analytics events |
 | `docs/api/b2c_client/LEADS_SIMPLIFICATION.md` | vianda-app | What to remove, what to keep, "not served" → marketing site link behavior |
-| `docs/api/b2b_client/INTEREST_DASHBOARD.md` | vianda-platform | `GET /leads/interest` contract, filters, columns, Internal-only auth |
+| `docs/api/b2b_client/API_CLIENT_INTEREST_DASHBOARD.md` | vianda-platform | `GET /leads/interest` contract, filters, columns, Internal-only auth |
 | `docs/infrastructure/LEADS_MIGRATION_INFRA.md` | infra-kitchen-gcp | New env vars (`RECAPTCHA_SECRET_KEY`, `RECAPTCHA_SCORE_THRESHOLD`, `CORS_ALLOWED_ORIGINS`), per-environment values, reCAPTCHA v3 site key for vianda-home |
 
 ### Phase 1c: Frontend implementation (vianda-home) — COMPLETE
@@ -423,4 +423,4 @@ Moved to `docs/plans/LEAD_INTEREST_ALERT_CRONS.md`. Zipcode + city alert crons t
 | `docs/plans/LEAD_INTEREST_ALERT_CRONS.md` | Alert crons for lead interest (Phase 3, extracted to separate plan). |
 | `docs/plans/B2C_EXPLORE_ZIPCODE.md` | Zipcode refinement in B2C explore (authenticated). Unaffected by this migration — explore is post-signup. |
 | `docs/api/b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md` | Current signup spec. Phase 2 simplifies the pre-signup steps but the signup/verify flow itself is unchanged. |
-| `docs/api/b2c_client/MARKET_SELECTION_AT_SIGNUP.md` | Market selection at signup. Unaffected — country/city dropdowns stay in the app. |
+| `docs/api/b2c_client/MARKET_CITY_COUNTRY.md` | Market selection at signup. Unaffected — country/city dropdowns stay in the app. |

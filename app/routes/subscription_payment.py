@@ -526,18 +526,21 @@ def cancel_subscription(
                 connection=db,
                 commit=False,
             )
+        # Set status to cancelled FIRST (while row is still visible to get_by_id),
+        # then archive via soft_delete. CRUDService.update() with is_archived=True would
+        # re-fetch via get_by_id(is_archived=FALSE) → None → silent failure.
         subscription_service.update(
             subscription_id,
             {
                 "subscription_status": SubscriptionStatus.CANCELLED.value,
                 "status": Status.CANCELLED.value,
-                "is_archived": True,
                 "modified_by": user_id,
             },
             db,
             scope=None,
-            commit=True,
+            commit=False,
         )
+        subscription_service.soft_delete(subscription_id, user_id, db, scope=None)
     else:
         # Active or On Hold: use subscription_action_service (archives)
         cancel_subscription_action(subscription_id, user_id, db)

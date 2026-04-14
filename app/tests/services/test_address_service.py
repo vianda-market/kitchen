@@ -22,6 +22,7 @@ class TestAddressService:
         """Test that address creation sets timezone based on country and city. address_type is derived, not from client."""
         # Arrange
         address_data = {
+            "city_metadata_id": "11111111-1111-1111-1111-111111111111",
             "building_number": "123",
             "street_name": "Main St",
             "city": "New York",
@@ -43,7 +44,10 @@ class TestAddressService:
             mock_get_timezone.return_value = "America/New_York"
             mock_derive.return_value = []
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
-            mock_db_read.return_value = None  # No existing subpremise
+            mock_db_read.side_effect = lambda q, *a, **kw: (
+                {"tz": "America/New_York", "country_iso": "US"}
+                if "city_metadata" in (q or "") else None
+            )
             mock_db_insert.return_value = None
 
             # Act
@@ -60,6 +64,7 @@ class TestAddressService:
         """Test that address creation calls geocoding API when derived type is Restaurant."""
         # Arrange: address_type is derived from linkages, not from client
         restaurant_address_data = {
+            "city_metadata_id": "11111111-1111-1111-1111-111111111111",
             "building_number": "123",
             "street_name": "Main St",
             "city": "New York",
@@ -87,7 +92,10 @@ class TestAddressService:
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_geocode_api.return_value = {"latitude": 40.7128, "longitude": -74.0060}
             mock_geo_service.create.return_value = mock_geolocation
-            mock_db_read.return_value = None
+            mock_db_read.side_effect = lambda q, *a, **kw: (
+                {"tz": "America/New_York", "country_iso": "US"}
+                if "city_metadata" in (q or "") else None
+            )
             mock_db_insert.return_value = None
 
             # Act
@@ -109,6 +117,7 @@ class TestAddressService:
     def test_create_address_with_geocoding_handles_api_failure(self, sample_current_user, mock_db):
         """Test that address creation handles geocoding API failure gracefully (non-blocking)."""
         restaurant_address_data = {
+            "city_metadata_id": "11111111-1111-1111-1111-111111111111",
             "building_number": "123",
             "street_name": "Main St",
             "city": "New York",
@@ -132,7 +141,10 @@ class TestAddressService:
             mock_derive.return_value = ["restaurant"]
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_geocode_api.return_value = None  # API failure
-            mock_db_read.return_value = None
+            mock_db_read.side_effect = lambda q, *a, **kw: (
+                {"tz": "America/New_York", "country_iso": "US"}
+                if "city_metadata" in (q or "") else None
+            )
             mock_db_insert.return_value = None
 
             result = address_business_service.create_address_with_geocoding(
@@ -166,6 +178,7 @@ class TestAddressService:
     def test_create_address_without_place_id_returns_403_in_production(self, sample_current_user, mock_db):
         """Structured (manual) create without place_id returns 403 when DEV_MODE=False."""
         address_data = {
+            "city_metadata_id": "11111111-1111-1111-1111-111111111111",
             "building_number": "123",
             "street_name": "Main St",
             "city": "New York",
@@ -205,6 +218,7 @@ class TestAddressService:
         """Test that full address string is built correctly for geocoding."""
         # Arrange
         address_data = {
+            "city_metadata_id": "11111111-1111-1111-1111-111111111111",
             "building_number": "123",
             "street_name": "Main St",
             "city": "New York",
@@ -278,6 +292,7 @@ class TestAddressService:
                     "address_type": [],
                     "country_name": "United States",
                     "country_code": "US",
+                    "city_metadata_id": UUID("11111111-1111-1111-1111-111111111111"),
                     "province": "NY",
                     "city": "New York",
                     "postal_code": "10001",

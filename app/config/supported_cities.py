@@ -1,8 +1,10 @@
 """
 Supported cities for user onboarding and address scoping.
 
-Single source of truth: Cities managed by Vianda (business development).
-Used by GET /api/v1/cities/ and for city_info seed. Users pick from this list.
+Historical note: this module predates the PR1 city_info → city_metadata migration.
+The in-module `SUPPORTED_CITIES` tuple is now used only by the legacy GET /api/v1/cities/
+helper — the authoritative city list lives in `core.city_metadata` joined to
+`external.geonames_city`. Users pick cities from that query, not from this tuple.
 """
 
 from typing import List, Optional
@@ -19,9 +21,9 @@ GLOBAL_CITY_COUNTRY_CODE = "XG"
 GLOBAL_CITY_NAME = "Global"
 
 
-def is_global_city(city_id: Optional[UUID]) -> bool:
-    """Return True if city_id is the Global city sentinel (B2B users, no city filter)."""
-    return city_id is not None and city_id == GLOBAL_CITY_ID
+def is_global_city(city_metadata_id: Optional[UUID]) -> bool:
+    """Return True if city_metadata_id is the Global city sentinel (B2B users, no city filter)."""
+    return city_metadata_id is not None and city_metadata_id == GLOBAL_CITY_ID
 
 
 # (country_code, province_code, city_name) - ISO 3166-1 alpha-2. Cities managed by Vianda.

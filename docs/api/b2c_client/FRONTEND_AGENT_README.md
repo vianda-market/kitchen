@@ -19,7 +19,7 @@ B2C app users are Customers. Do NOT call Employee-only or Supplier-only APIs.
 3. [USER_MODEL_FOR_CLIENTS.md](../shared_client/USER_MODEL_FOR_CLIENTS.md) — roles, `mobile_number` (E.164), `/users/me`, markets, recovery
 4. [ENRICHED_ENDPOINT_PATTERN.md](../shared_client/ENRICHED_ENDPOINT_PATTERN.md)
 5. [ARCHIVED_RECORDS_PATTERN.md](../shared_client/ARCHIVED_RECORDS_PATTERN.md)
-6. [MARKET_SELECTION_AT_SIGNUP.md](./MARKET_SELECTION_AT_SIGNUP.md) — Country dropdown for signup: use GET /leads/markets (returns `country_code`, `country_name` only); send `country_code` in signup request. Do not persist or hardcode; refresh when entering signup.
+6. [MARKET_CITY_COUNTRY.md](./MARKET_CITY_COUNTRY.md) — Country dropdown for signup: use GET /leads/markets (returns `country_code`, `country_name` only); send `country_code` in signup request. Do not persist or hardcode; refresh when entering signup.
 7. [CUSTOMER_PAYMENT_METHODS_B2C.md](./CUSTOMER_PAYMENT_METHODS_B2C.md) — Saved cards (list, add via Setup Session, delete, set default)
 8. [PAYMENT_PROVIDERS_B2C.md](./PAYMENT_PROVIDERS_B2C.md) — Connected payment provider accounts (Stripe link, disconnect flow)
 

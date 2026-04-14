@@ -130,7 +130,7 @@ Not planned. Sequential creation via the step-by-step wizard aligns with the B2B
 
 | Document | Description |
 |----------|-------------|
-| `kitchen/docs/api/b2b_client/ONBOARDING_STATUS_B2B.md` | Full endpoint contract + frontend integration guide |
+| `kitchen/docs/api/b2b_client/API_CLIENT_ONBOARDING_STATUS.md` | Full endpoint contract + frontend integration guide |
 | `kitchen/docs/cron/CRON_JOBS_CHEATSHEET.md` | Cron job inventory (stall detection + customer engagement) |
 | `kitchen/docs/api/infrastructure/SENDGRID_EMAIL_INFRASTRUCTURE.md` | SendGrid infra setup guide |
 | `kitchen/docs/plans/SUPPLIER_SUCCESS_MANAGEMENT_ROADMAP.md` | Full roadmap with phase status |

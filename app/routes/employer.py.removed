@@ -18,6 +18,7 @@ from app.auth.dependencies import get_current_user, get_employee_user, oauth2_sc
 from app.config.settings import get_vianda_customers_institution_id
 from app.security.field_policies import ensure_supplier_can_create_edit_addresses
 from app.dependencies.database import get_db
+from app.utils.db import db_read
 from app.utils.log import log_info, log_warning
 from app.utils.query_params import limit_query
 from app.utils.error_messages import employer_not_found
@@ -88,11 +89,11 @@ def get_employer_enriched(
 @router.get("/{employer_id}/addresses", response_model=List[AddressResponseSchema])
 def get_employer_addresses(
     employer_id: UUID,
-    city_id: Optional[UUID] = Query(None, description="Filter addresses by city (address_info.city must match city_info.name)"),
+    city_metadata_id: Optional[UUID] = Query(None, description="Filter addresses by city_metadata_id (address_info.city_metadata_id must match)"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Get all addresses for a specific employer. Optional city_id filters to addresses in that city. Non-archived only."""
+    """Get all addresses for a specific employer. Optional city_metadata_id filters to addresses in that city. Non-archived only."""
     from app.services.crud_service import address_service, city_service
 
     def _get_employer_addresses():
@@ -110,14 +111,29 @@ def get_employer_addresses(
             scope=None
         )
 
-        # Filter by city_id when provided (address_info.city matches city_info.name)
-        if city_id:
-            city = city_service.get_by_id(city_id, db, scope=None)
+        # Filter by city_metadata_id when provided. NOTE: PR1-cleanup left the legacy
+        # free-text address_info.city column untouched (deferred to PR2a.5). We use
+        # name-match against the city_metadata's resolved display name until the
+        # writer-path rewire populates address_info.city_metadata_id directly.
+        if city_metadata_id:
+            city = city_service.get_by_id(city_metadata_id, db, scope=None)
             if not city:
-                raise HTTPException(status_code=400, detail=f"City not found: {city_id}")
+                raise HTTPException(status_code=400, detail=f"City not found: {city_metadata_id}")
             if city.is_archived:
-                raise HTTPException(status_code=400, detail=f"City is archived: {city_id}")
-            city_name = (city.name or "").strip()
+                raise HTTPException(status_code=400, detail=f"City is archived: {city_metadata_id}")
+            # Resolve display name from external.geonames_city via the city_metadata FK
+            name_row = db_read(
+                """
+                SELECT COALESCE(cm.display_name_override, gc.name) AS name
+                FROM core.city_metadata cm
+                JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+                WHERE cm.city_metadata_id = %s
+                """,
+                (str(city_metadata_id),),
+                connection=db,
+                fetch_one=True,
+            )
+            city_name = (name_row.get("name") if name_row else "").strip()
             addresses = [addr for addr in addresses if (addr.city or "").strip() == city_name]
 
         # Filter out archived addresses

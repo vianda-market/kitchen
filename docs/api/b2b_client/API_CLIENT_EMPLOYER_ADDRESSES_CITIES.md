@@ -116,5 +116,5 @@ GET /api/v1/employers/{employer_id}/addresses?city_id={city_id}
 
 ## References
 
-- [EMPLOYER_ASSIGNMENT_WORKFLOW.md](./EMPLOYER_ASSIGNMENT_WORKFLOW.md) — Backoffice employer management
+- [API_CLIENT_EMPLOYER_ASSIGNMENT.md](./API_CLIENT_EMPLOYER_ASSIGNMENT.md) — Backoffice employer management
 - [ADDRESSES_API_CLIENT.md](../shared_client/ADDRESSES_API_CLIENT.md) — Full address API

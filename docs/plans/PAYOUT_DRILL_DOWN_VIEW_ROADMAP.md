@@ -98,4 +98,4 @@ Progressive disclosure: each level loads on demand, not upfront.
 ## References
 
 - [FINANCIAL_DATA_HIERARCHY.md](../api/internal/FINANCIAL_DATA_HIERARCHY.md) — Full financial data model
-- [PAYOUT_HISTORY_ENRICHED_B2B.md](../api/b2b_client/PAYOUT_HISTORY_ENRICHED_B2B.md) — Current flat payout list
+- [API_CLIENT_PAYOUT_HISTORY.md](../api/b2b_client/API_CLIENT_PAYOUT_HISTORY.md) — Current flat payout list

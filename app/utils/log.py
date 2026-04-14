@@ -1,13 +1,21 @@
 import logging
 import os
 
+# Log level is env-controlled. Set LOG_LEVEL=ERROR (or WARNING/DEBUG/etc.) to change.
+# Default is INFO for dev visibility.
+_LOG_LEVEL = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
+
+# Apply LOG_LEVEL to the root logger too so module-scoped loggers
+# (e.g. app.gateways.base_gateway uses logging.getLogger(__name__)) are also quieted.
+logging.getLogger().setLevel(_LOG_LEVEL)
+
 # Create a custom logger
 logger = logging.getLogger("my_app")
-logger.setLevel(logging.INFO)
+logger.setLevel(_LOG_LEVEL)
 
 # Create a console handler
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(_LOG_LEVEL)
 
 # Create a formatter and set it for the handler
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

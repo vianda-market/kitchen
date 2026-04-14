@@ -104,7 +104,7 @@ Use the `country_code` value from the leads/markets response (e.g. `US`, `AR`). 
 
 ### Country selection
 
-The app must call **`GET /api/v1/leads/markets`** (no auth) to get the list of countries. The response returns `country_code` and `country_name` only. The user selects one in the UI; send its `country_code` in the signup request body. `country_code` is **required**. See [MARKET_SELECTION_AT_SIGNUP.md](MARKET_SELECTION_AT_SIGNUP.md) and [Markets API](../../b2b_client/MARKETS_API_CLIENT.md).
+The app must call **`GET /api/v1/leads/markets`** (no auth) to get the list of countries. The response returns `country_code` and `country_name` only. The user selects one in the UI; send its `country_code` in the signup request body. `country_code` is **required**. See [MARKET_CITY_COUNTRY.md](MARKET_CITY_COUNTRY.md) and [Markets API](../../b2b_client/API_CLIENT_MARKETS.md).
 
 **City selection:** Call `GET /api/v1/leads/cities?country_code={country_code}` (no auth) to get city names for the signup picker. Send the selected `city_name` in the signup body; the backend resolves it to `city_id`. One of `city_id` or `city_name` is **required** at signup.
 

@@ -79,7 +79,7 @@ def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
     try:
         rows = db_read(
             """
-            SELECT program_id, institution_id, billing_cycle, billing_day, billing_day_of_week,
+            SELECT program_id, institution_id, institution_entity_id, billing_cycle, billing_day, billing_day_of_week,
                    benefit_rate, benefit_cap, benefit_cap_period, price_discount, minimum_monthly_fee
             FROM employer_benefits_program
             WHERE is_active = TRUE AND is_archived = FALSE
@@ -107,17 +107,19 @@ def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
                 continue
 
             institution_id = row["institution_id"]
+            entity_id = row.get("institution_entity_id")
             period_start, period_end = _compute_billing_period(p, today)
 
             try:
                 bill_result = generate_employer_bill(
-                    institution_id, period_start, period_end, connection, modified_by=SYSTEM_USER_ID
+                    institution_id, period_start, period_end, connection, modified_by=SYSTEM_USER_ID,
+                    institution_entity_id=entity_id,
                 )
                 result["bills_generated"] += 1
-                log_info(f"Generated employer bill for institution {institution_id}: period {period_start}-{period_end}")
+                log_info(f"Generated employer bill for institution {institution_id} entity {entity_id}: period {period_start}-{period_end}")
             except Exception as e:
-                log_error(f"Employer billing failed for institution {institution_id}: {e}")
-                result["errors"].append(f"{institution_id}: {e}")
+                log_error(f"Employer billing failed for institution {institution_id} entity {entity_id}: {e}")
+                result["errors"].append(f"{institution_id}/{entity_id}: {e}")
                 result["success"] = False
 
         # Month-end minimum fee reconciliation for daily/weekly billing
@@ -147,17 +149,19 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
             continue
 
         institution_id = row["institution_id"]
-        # Sum all bills this month for this institution
+        entity_id = row.get("institution_entity_id")
+        # Sum all bills this month for this institution + entity
         bills_total = db_read(
             """
             SELECT COALESCE(SUM(billed_amount), 0) as total
             FROM employer_bill
             WHERE institution_id = %s::uuid
+              AND institution_entity_id = %s::uuid
               AND billing_period_start >= %s
               AND billing_period_end <= %s
               AND is_archived = FALSE
             """,
-            (str(institution_id), str(month_start), str(today + timedelta(days=1))),
+            (str(institution_id), str(entity_id), str(month_start), str(today + timedelta(days=1))),
             connection=connection,
             fetch_one=True,
         )
@@ -169,8 +173,22 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
             try:
                 from app.services.crud_service import employer_bill_service
                 from app.config import Status
+                # Resolve currency from entity's currency_metadata
+                currency_row = db_read(
+                    """
+                    SELECT cm.currency_code
+                    FROM institution_entity_info ie
+                    JOIN currency_metadata cm ON ie.currency_metadata_id = cm.currency_metadata_id
+                    WHERE ie.institution_entity_id = %s::uuid
+                    """,
+                    (str(entity_id),),
+                    connection=connection,
+                    fetch_one=True,
+                )
+                currency_code = currency_row["currency_code"] if currency_row else "USD"
                 adjustment_bill = {
                     "institution_id": str(institution_id),
+                    "institution_entity_id": str(entity_id),
                     "billing_period_start": str(month_start),
                     "billing_period_end": str(today),
                     "billing_cycle": row["billing_cycle"],
@@ -180,13 +198,13 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
                     "discounted_amount": 0,
                     "minimum_fee_applied": True,
                     "billed_amount": adjustment,
-                    "currency_code": "USD",
+                    "currency_code": currency_code,
                     "payment_status": "pending",
                     "status": Status.ACTIVE.value,
                     "modified_by": str(SYSTEM_USER_ID),
                 }
                 employer_bill_service.create(adjustment_bill, connection, scope=None)
-                log_info(f"Minimum fee adjustment bill created for institution {institution_id}: ${adjustment:.2f}")
+                log_info(f"Minimum fee adjustment bill created for institution {institution_id} entity {entity_id}: ${adjustment:.2f} {currency_code}")
             except Exception as e:
-                log_error(f"Minimum fee reconciliation failed for {institution_id}: {e}")
-                result["errors"].append(f"min_fee {institution_id}: {e}")
+                log_error(f"Minimum fee reconciliation failed for institution {institution_id} entity {entity_id}: {e}")
+                result["errors"].append(f"min_fee {institution_id}/{entity_id}: {e}")

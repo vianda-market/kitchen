@@ -117,7 +117,7 @@ The enriched plate response includes institution, restaurant, product, address, 
 
 Savings are **not stored** on plates. They are computed on the fly for B2C explore using the user's plan `credit_cost_local_currency`, plate price, and plate credit. The plate API does **not** accept or return `savings` for create/update or for the enriched plate list/detail.
 
-**No-show discount** is configured per supplier via `billing.supplier_terms` (not per plate or per institution). Configure it via the Supplier Terms API (`PUT /api/v1/supplier-terms/{institution_id}`). See [SUPPLIER_TERMS_B2B.md](../b2b_client/SUPPLIER_TERMS_B2B.md).
+**No-show discount** is configured per supplier via `billing.supplier_terms` (not per plate or per institution). Configure it via the Supplier Terms API (`PUT /api/v1/supplier-terms/{institution_id}`). See [API_CLIENT_SUPPLIER_TERMS.md](../b2b_client/API_CLIENT_SUPPLIER_TERMS.md).
 
 ### Create
 

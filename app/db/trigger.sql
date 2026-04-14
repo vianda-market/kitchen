@@ -18,7 +18,7 @@ BEGIN
         institution_id,
         name,
         institution_type,
-        market_id,
+        -- market_id REMOVED — institution markets now in core.institution_market junction
         support_email_suppressed_until,
         last_support_email_date,
         is_archived,
@@ -35,7 +35,6 @@ BEGIN
         NEW.institution_id,
         NEW.name,
         NEW.institution_type,
-        NEW.market_id,
         NEW.support_email_suppressed_until,
         NEW.last_support_email_date,
         NEW.is_archived,
@@ -190,6 +189,7 @@ BEGIN
         payout_provider_account_id,
         payout_aggregator,
         payout_onboarding_status,
+        email_domain,
         is_archived,
         status,
         created_date,
@@ -210,6 +210,7 @@ BEGIN
         NEW.payout_provider_account_id,
         NEW.payout_aggregator,
         NEW.payout_onboarding_status,
+        NEW.email_domain,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -1349,11 +1350,7 @@ BEGIN
         event_id,
         market_id,
         country_code,
-        country_name,
         currency_metadata_id,
-        timezone,
-        kitchen_open_time,
-        kitchen_close_time,
         language,
         phone_dial_code,
         phone_local_digits,
@@ -1370,11 +1367,7 @@ BEGIN
         new_event_id,
         NEW.market_id,
         NEW.country_code,
-        NEW.country_name,
         NEW.currency_metadata_id,
-        NEW.timezone,
-        NEW.kitchen_open_time,
-        NEW.kitchen_close_time,
         NEW.language,
         NEW.phone_dial_code,
         NEW.phone_local_digits,
@@ -1768,7 +1761,7 @@ BEGIN
     END IF;
 
     INSERT INTO audit.employer_benefits_program_history (
-        event_id, program_id, institution_id,
+        event_id, program_id, institution_id, institution_entity_id,
         benefit_rate, benefit_cap, benefit_cap_period,
         price_discount, minimum_monthly_fee,
         billing_cycle, billing_day, billing_day_of_week,
@@ -1779,7 +1772,7 @@ BEGIN
         is_current, valid_until
     )
     VALUES (
-        new_event_id, NEW.program_id, NEW.institution_id,
+        new_event_id, NEW.program_id, NEW.institution_id, NEW.institution_entity_id,
         NEW.benefit_rate, NEW.benefit_cap, NEW.benefit_cap_period,
         NEW.price_discount, NEW.minimum_monthly_fee,
         NEW.billing_cycle, NEW.billing_day, NEW.billing_day_of_week,
@@ -1816,7 +1809,7 @@ BEGIN
     END IF;
 
     INSERT INTO audit.employer_bill_history (
-        event_id, employer_bill_id, institution_id,
+        event_id, employer_bill_id, institution_id, institution_entity_id,
         billing_period_start, billing_period_end, billing_cycle,
         total_renewal_events, gross_employer_share,
         price_discount, discounted_amount,
@@ -1828,7 +1821,7 @@ BEGIN
         is_current, valid_until
     )
     VALUES (
-        new_event_id, NEW.employer_bill_id, NEW.institution_id,
+        new_event_id, NEW.employer_bill_id, NEW.institution_id, NEW.institution_entity_id,
         NEW.billing_period_start, NEW.billing_period_end, NEW.billing_cycle,
         NEW.total_renewal_events, NEW.gross_employer_share,
         NEW.price_discount, NEW.discounted_amount,
@@ -1867,8 +1860,11 @@ BEGIN
         event_id,
         supplier_terms_id,
         institution_id,
+        institution_entity_id,
         no_show_discount,
         payment_frequency,
+        kitchen_open_time,
+        kitchen_close_time,
         require_invoice,
         invoice_hold_days,
         is_archived,
@@ -1884,8 +1880,11 @@ BEGIN
         new_event_id,
         NEW.supplier_terms_id,
         NEW.institution_id,
+        NEW.institution_entity_id,
         NEW.no_show_discount,
         NEW.payment_frequency,
+        NEW.kitchen_open_time,
+        NEW.kitchen_close_time,
         NEW.require_invoice,
         NEW.invoice_hold_days,
         NEW.is_archived,
@@ -2211,7 +2210,6 @@ BEGIN
         event_id,
         currency_metadata_id,
         currency_code,
-        currency_name,
         credit_value_local_currency,
         currency_conversion_usd,
         is_archived,
@@ -2227,7 +2225,6 @@ BEGIN
         new_event_id,
         NEW.currency_metadata_id,
         NEW.currency_code,
-        NEW.currency_name,
         NEW.credit_value_local_currency,
         NEW.currency_conversion_usd,
         NEW.is_archived,
@@ -2249,3 +2246,98 @@ CREATE TRIGGER currency_metadata_history_trigger
 AFTER INSERT OR UPDATE ON core.currency_metadata
 FOR EACH ROW
 EXECUTE FUNCTION currency_metadata_history_trigger_func();
+
+-- =============================================================================
+-- Market Payout Aggregator History Trigger
+-- =============================================================================
+CREATE OR REPLACE FUNCTION market_payout_aggregator_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.market_payout_aggregator_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE market_id = OLD.market_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.market_payout_aggregator_history (
+        event_id,
+        market_id,
+        aggregator,
+        is_active,
+        require_invoice,
+        max_unmatched_bill_days,
+        kitchen_open_time,
+        kitchen_close_time,
+        notes,
+        is_archived,
+        status,
+        created_date,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.market_id,
+        NEW.aggregator,
+        NEW.is_active,
+        NEW.require_invoice,
+        NEW.max_unmatched_bill_days,
+        NEW.kitchen_open_time,
+        NEW.kitchen_close_time,
+        NEW.notes,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS market_payout_aggregator_history_trigger ON billing.market_payout_aggregator;
+CREATE TRIGGER market_payout_aggregator_history_trigger
+AFTER INSERT OR UPDATE ON billing.market_payout_aggregator
+FOR EACH ROW
+EXECUTE FUNCTION market_payout_aggregator_history_trigger_func();
+
+-- Trigger function for core.workplace_group history logging
+CREATE OR REPLACE FUNCTION workplace_group_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.workplace_group_history
+        SET is_current = FALSE, valid_until = CURRENT_TIMESTAMP
+        WHERE workplace_group_id = OLD.workplace_group_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.workplace_group_history (
+        event_id, workplace_group_id, name, email_domain, require_domain_verification,
+        is_archived, status, created_date, created_by, modified_by, modified_date,
+        is_current, valid_until
+    )
+    VALUES (
+        new_event_id, NEW.workplace_group_id, NEW.name, NEW.email_domain, NEW.require_domain_verification,
+        NEW.is_archived, NEW.status, NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date,
+        TRUE, 'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS workplace_group_history_trigger ON core.workplace_group;
+CREATE TRIGGER workplace_group_history_trigger
+AFTER INSERT OR UPDATE ON core.workplace_group
+FOR EACH ROW
+EXECUTE FUNCTION workplace_group_history_trigger_func();

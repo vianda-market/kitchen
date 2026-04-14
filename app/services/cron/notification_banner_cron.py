@@ -23,9 +23,10 @@ def _generate_reservation_reminders(connection) -> int:
     Find active plate selections with a pickup window starting within the next
     hour and create reservation_reminder notifications for each.
 
-    The query joins plate_selection_info with product_info and restaurant_info
-    to build the notification payload. Market timezone is used to compare
-    pickup_date + pickup_time_range start against the current local time.
+    The query joins plate_selection_info with product_info, restaurant_info, and
+    the restaurant's address_info to use the **restaurant's** local timezone
+    (where the pickup physically happens). This is more accurate than the
+    customer's market timezone for multi-TZ countries (US, AR, BR, MX).
 
     Dedup key ensures each (plate_selection_id, pickup_date) pair only
     generates one notification.
@@ -38,18 +39,17 @@ def _generate_reservation_reminders(connection) -> int:
             ps.pickup_time_range,
             p.name  AS plate_name,
             r.name  AS restaurant_name,
-            m.timezone
+            a.timezone
         FROM customer.plate_selection_info ps
         JOIN ops.product_info p   ON p.product_id = ps.product_id
         JOIN ops.restaurant_info r ON r.restaurant_id = ps.restaurant_id
-        JOIN core.user_info u     ON u.user_id = ps.user_id
-        JOIN core.market_info m   ON m.market_id = u.market_id
+        JOIN core.address_info a  ON a.address_id = r.address_id
         WHERE ps.status = 'active'
           AND ps.is_archived = FALSE
-          AND ps.pickup_date = (CURRENT_TIMESTAMP AT TIME ZONE m.timezone)::date
+          AND ps.pickup_date = (CURRENT_TIMESTAMP AT TIME ZONE a.timezone)::date
           AND SPLIT_PART(ps.pickup_time_range, '-', 1)::time
-              BETWEEN (CURRENT_TIMESTAMP AT TIME ZONE m.timezone)::time
-                  AND (CURRENT_TIMESTAMP AT TIME ZONE m.timezone)::time + INTERVAL '1 hour'
+              BETWEEN (CURRENT_TIMESTAMP AT TIME ZONE a.timezone)::time
+                  AND (CURRENT_TIMESTAMP AT TIME ZONE a.timezone)::time + INTERVAL '1 hour'
     """
     rows = db_read(sql, (), connection=connection)
     created_count = 0

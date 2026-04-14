@@ -514,7 +514,7 @@ class PlatePickupService:
             )
         )
         GROUP BY ppl.restaurant_id, r.name, qc.qr_code_id, qc.qr_code_payload, ppl.status
-        ORDER BY MAX(ppl.plate_pickup_id) DESC
+        ORDER BY MAX(ppl.created_date) DESC
         LIMIT 1
         """
         
@@ -583,10 +583,16 @@ class PlatePickupService:
         if not plate_pickup_ids and orders:
             plate_pickup_ids = [o['plate_pickup_id'] for o in orders if o.get('plate_pickup_id')]
         
+        # Compute HMAC signature so clients can build the scan request
+        from app.utils.qr_hmac import sign_qr_code_id
+        qr_code_id_str = str(result['qr_code_id'])
+        qr_sig = sign_qr_code_id(qr_code_id_str)
+
         return {
             'restaurant_id': UUID(result['restaurant_id']),
             'restaurant_name': result['restaurant_name'],
             'qr_code_id': UUID(result['qr_code_id']),
+            'qr_code_sig': qr_sig,
             'qr_code_payload': result['qr_code_payload'],
             'total_orders': result['total_orders'],
             'total_plate_count': result['total_orders'],  # Same: count of plates for assigned user

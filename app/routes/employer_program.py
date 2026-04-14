@@ -18,9 +18,7 @@ from app.schemas.employer_program import (
     EmployerBillResponseSchema,
     EmployerBillDetailResponseSchema,
     GenerateBillRequestSchema,
-    DomainCreateSchema,
-    DomainCreateResponseSchema,
-    DomainResponseSchema,
+    # Domain schemas REMOVED — email_domain is on institution_entity_info
 )
 from app.services.employer import program_service, enrollment_service, billing_service
 
@@ -52,31 +50,66 @@ def create_program(
 @router.get("/program", response_model=ProgramResponseSchema)
 def get_program(
     institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level program. Omit for institution-level."),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """View own program config. Employer Admin or Internal (pass institution_id query param)."""
+    """View program config. Pass institution_entity_id for entity-level override, omit for institution default."""
     institution_id = _resolve_employer_institution(current_user, institution_id_param)
-    program = program_service.get_program_by_institution(institution_id, db)
+    if institution_entity_id:
+        program = program_service.get_program_by_scope(institution_id, institution_entity_id, db)
+    else:
+        program = program_service.get_program_by_institution(institution_id, db)
     if not program:
-        raise HTTPException(status_code=404, detail="No benefits program found for your institution")
+        scope = f"entity {institution_entity_id}" if institution_entity_id else "your institution"
+        raise HTTPException(status_code=404, detail=f"No benefits program found for {scope}")
     return program
+
+
+@router.get("/programs", response_model=List[ProgramResponseSchema])
+def list_programs(
+    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """List all programs for an institution (institution-level default + entity overrides)."""
+    institution_id = _resolve_employer_institution(current_user, institution_id_param)
+    return program_service.get_all_programs_for_institution(institution_id, db)
 
 
 @router.put("/program", response_model=ProgramResponseSchema)
 def update_program(
     body: ProgramUpdateSchema,
     institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level program. Omit for institution-level."),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """Update program config. Internal only. Requires institution_id query param or body."""
-    institution_id = current_user.get("institution_id")
-    program = program_service.get_program_by_institution(institution_id, db) if institution_id else None
+    """Update program config. Pass institution_entity_id for entity-level override, omit for institution default."""
+    institution_id = _resolve_employer_institution(current_user, institution_id_param)
+    program = program_service.get_program_by_scope(institution_id, institution_entity_id, db)
     if not program:
-        raise HTTPException(status_code=404, detail="No benefits program found")
+        scope = f"entity {institution_entity_id}" if institution_entity_id else "institution"
+        raise HTTPException(status_code=404, detail=f"No benefits program found for {scope}")
     updates = body.model_dump(exclude_unset=True)
     return program_service.update_program(program.program_id, updates, db, modified_by=current_user["user_id"])
+
+
+@router.delete("/program", status_code=204)
+def archive_entity_program(
+    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_entity_id: UUID = Query(..., description="Entity ID whose program override to archive (required)"),
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Archive entity-level program override. Entity reverts to institution defaults. Internal only."""
+    institution_id = _resolve_employer_institution(current_user, institution_id_param)
+    program = program_service.get_program_by_scope(institution_id, institution_entity_id, db)
+    if not program:
+        raise HTTPException(status_code=404, detail="Entity-level program not found")
+    program_service.update_program(
+        program.program_id, {"is_archived": True}, db, modified_by=current_user["user_id"],
+    )
 
 
 # =============================================================================
@@ -94,12 +127,9 @@ def enroll_employee(
     institution_id = _resolve_employer_institution(current_user, institution_id_param)
     employee_data = body.model_dump()
 
-    from app.services.crud_service import city_service
-    city = city_service.get_by_id(employee_data["city_id"], db)
-    if not city:
-        raise HTTPException(status_code=400, detail="City not found")
-    employee_data["market_id"] = getattr(city, "market_id", None)
-    employee_data["locale"] = getattr(city, "language", "en") or "en"
+    market_id, locale = _resolve_market_and_locale_for_city(employee_data["city_metadata_id"], db)
+    employee_data["market_id"] = market_id
+    employee_data["locale"] = locale
 
     user = enrollment_service.enroll_single_employee(
         institution_id, employee_data, db, modified_by=current_user["user_id"]
@@ -110,7 +140,7 @@ def enroll_employee(
 @router.post("/employees/bulk", response_model=BulkEnrollResultSchema)
 async def enroll_employees_bulk(
     file: UploadFile = File(..., description="CSV file with columns: email, first_name, last_name"),
-    city_id: UUID = Form(..., description="City for all employees in this batch"),
+    city_metadata_id: UUID = Form(..., description="City for all employees in this batch"),
     institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -119,18 +149,13 @@ async def enroll_employees_bulk(
     institution_id = _resolve_employer_institution(current_user, institution_id_param)
     _require_employer_admin(current_user)
 
-    from app.services.crud_service import city_service
-    city = city_service.get_by_id(city_id, db)
-    if not city:
-        raise HTTPException(status_code=400, detail="City not found")
-    market_id = getattr(city, "market_id", None)
-    locale = getattr(city, "language", "en") or "en"
+    market_id, locale = _resolve_market_and_locale_for_city(city_metadata_id, db)
 
     contents = await file.read()
     csv_text = contents.decode("utf-8")
 
     result = enrollment_service.enroll_bulk_employees(
-        institution_id, csv_text, city_id, market_id, locale, db, modified_by=current_user["user_id"]
+        institution_id, csv_text, city_metadata_id, market_id, locale, db, modified_by=current_user["user_id"]
     )
     return result
 
@@ -175,92 +200,8 @@ def subscribe_employee(
     return subscription
 
 
-# =============================================================================
-# Domain Management
-# =============================================================================
-
-@router.post("/domains", response_model=DomainCreateResponseSchema, status_code=201)
-def add_domain(
-    body: DomainCreateSchema,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db),
-):
-    """Add an allowed email domain for domain-gated enrollment. Employer Admin only.
-    Existing users with matching emails in Vianda Customers will be migrated to this institution."""
-    institution_id = _resolve_employer_institution(current_user, institution_id_param)
-    _require_employer_admin(current_user)
-
-    from app.config.settings import EMPLOYER_DOMAIN_BLACKLIST
-    domain = body.domain.lower().strip()
-    if domain in EMPLOYER_DOMAIN_BLACKLIST:
-        raise HTTPException(status_code=400, detail=f"'{domain}' is a common email provider and cannot be registered as an employer domain")
-
-    from app.services.crud_service import employer_domain_service
-    existing = employer_domain_service.get_all(
-        db, scope=None,
-        additional_conditions=[("domain = %s", domain)],
-    )
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Domain '{domain}' is already registered")
-
-    domain_data = {
-        "institution_id": str(institution_id),
-        "domain": domain,
-        "modified_by": str(current_user["user_id"]),
-    }
-    created = employer_domain_service.create(domain_data, db, scope=None)
-    if not created:
-        raise HTTPException(status_code=500, detail="Failed to create domain")
-
-    migrated_count = enrollment_service.migrate_existing_users_for_domain(
-        domain, institution_id, db, modified_by=current_user["user_id"]
-    )
-
-    return {
-        "domain_id": created.domain_id,
-        "institution_id": created.institution_id,
-        "domain": created.domain,
-        "is_active": created.is_active,
-        "migrated_user_count": migrated_count,
-        "created_date": created.created_date,
-    }
-
-
-@router.get("/domains", response_model=List[DomainResponseSchema])
-def list_domains(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db),
-):
-    """List configured email domains for this employer institution."""
-    institution_id = _resolve_employer_institution(current_user, institution_id_param)
-    from app.services.crud_service import employer_domain_service
-    return employer_domain_service.get_all(
-        db, scope=None,
-        additional_conditions=[("institution_id = %s::uuid", str(institution_id))],
-    )
-
-
-@router.delete("/domains/{domain_id}", status_code=204)
-def remove_domain(
-    domain_id: UUID,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db),
-):
-    """Remove an email domain. Employer Admin only. Existing users are NOT migrated back."""
-    institution_id = _resolve_employer_institution(current_user, institution_id_param)
-    _require_employer_admin(current_user)
-    from app.services.crud_service import employer_domain_service
-    domain = employer_domain_service.get_by_id(domain_id, db, scope=None)
-    if not domain or str(domain.institution_id) != str(institution_id):
-        raise HTTPException(status_code=404, detail="Domain not found")
-    employer_domain_service.update(
-        domain_id,
-        {"is_archived": True, "is_active": False, "modified_by": str(current_user["user_id"])},
-        db, scope=None,
-    )
+# Domain Management REMOVED — email_domain is now a column on institution_entity_info,
+# managed via entity CRUD. See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
 
 # =============================================================================
@@ -339,6 +280,30 @@ def _resolve_employer_institution(current_user: dict, institution_id_override: O
             raise HTTPException(status_code=403, detail="No institution found for your account")
         return inst_id if isinstance(inst_id, UUID) else UUID(str(inst_id))
     raise HTTPException(status_code=403, detail="Only Employer and Internal users can access this resource")
+
+
+def _resolve_market_and_locale_for_city(
+    city_metadata_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> tuple:
+    """Resolve (market_id, locale) from a city_metadata row.
+    city_metadata doesn't carry market_id/language directly — both come from
+    core.market_info joined on country_iso → country_code."""
+    from app.utils.db import db_read
+    row = db_read(
+        """
+        SELECT m.market_id, m.language
+        FROM core.city_metadata cm
+        JOIN core.market_info m ON m.country_code = cm.country_iso
+        WHERE cm.city_metadata_id = %s AND cm.is_archived = FALSE AND m.is_archived = FALSE
+        """,
+        (str(city_metadata_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if not row:
+        raise HTTPException(status_code=400, detail="City not found or has no active market")
+    return str(row["market_id"]), (row.get("language") or "en")
 
 
 def _require_employer_admin(current_user: dict):

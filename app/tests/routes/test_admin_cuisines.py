@@ -149,16 +149,34 @@ class TestAdminCuisineCRUD:
 
     @patch("app.routes.admin.cuisines.cuisine_crud_service")
     def test_delete_cuisine_soft_delete(self, mock_crud, client_with_admin):
-        """DELETE /admin/cuisines/{id} soft-deletes (is_archived=true, status=Inactive)."""
+        """DELETE /admin/cuisines/{id} soft-deletes via get_by_id + soft_delete and returns the
+        pre-archive DTO with is_archived flipped. Direct CRUDService.update with is_archived=True
+        is the wrong path because CRUDService.update re-fetches via get_by_id (filters archived)
+        and returns None for the just-archived row."""
         cuisine_id = str(uuid4())
-        mock_crud.update.return_value = _cuisine_dict(
-            cuisine_id=cuisine_id, is_archived=True, status="inactive"
+        # get_by_id returns the CuisineDTO-shaped dict (route wraps it in the response model)
+        from app.dto.models import CuisineDTO
+        from app.config import Status
+        mock_crud.get_by_id.return_value = CuisineDTO(
+            cuisine_id=UUID(cuisine_id),
+            cuisine_name="Italian",
+            cuisine_name_i18n=None,
+            slug="italian",
+            parent_cuisine_id=None,
+            description=None,
+            origin_source="seed",
+            display_order=None,
+            is_archived=False,
+            status=Status.ACTIVE,
+            created_date=datetime.now(timezone.utc),
+            modified_by=UUID(str(uuid4())),
+            modified_date=datetime.now(timezone.utc),
         )
+        mock_crud.soft_delete.return_value = True
         resp = client_with_admin.delete(f"/api/v1/admin/cuisines/{cuisine_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["is_archived"] is True
-        assert data["status"] == "inactive"
 
 
 # ---- Suggestion Review Tests ----

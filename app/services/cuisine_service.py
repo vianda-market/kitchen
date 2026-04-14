@@ -39,7 +39,7 @@ def search_cuisines(
     if conditions:
         base += " WHERE " + " AND ".join(conditions)
 
-    base += " ORDER BY display_order NULLS LAST, cuisine_name"
+    base += " ORDER BY cuisine_name ASC"
 
     rows = db_read(base, tuple(params), connection=db, fetch_one=False)
     return rows or []

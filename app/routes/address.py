@@ -263,8 +263,8 @@ def create_address(
                 detail="Customer address requires institution context; missing institution_id on user.",
             )
         addr_data["institution_id"] = current_user["institution_id"]
-        # Only Comensal creating home/other (not employer address) gets user_id set
-        if current_user.get("role_name") == "comensal" and not addr_data.get("employer_id"):
+        # Comensal always gets user_id set (address type is user-selected: home/work/other)
+        if current_user.get("role_name") == "comensal":
             addr_data["user_id"] = current_user["user_id"]
     else:
         # For Suppliers/Internal: user_id optional; if provided, validate target user belongs to their institution
@@ -327,12 +327,12 @@ def update_address(
     # Exception: Customer may update subpremise (floor, unit, is_default) on their assigned employer address
     customer_editing_own_employer_subpremise = False
     if current_user.get("role_type") == "customer":
+        # Allow customer to edit subpremise (floor/unit) on their work address
         user_scope = get_user_scope(current_user)
         user = user_service.get_by_id(user_scope.user_id, db, scope=None)
         employer_address_id = getattr(user, "employer_address_id", None) if user else None
         if (
-            getattr(existing_address, "employer_id", None) is not None
-            and employer_address_id
+            employer_address_id
             and str(existing_address.address_id) == str(employer_address_id)
             and set(update_data.keys()) <= _SUBPREMISE_UPDATE_KEYS
         ):

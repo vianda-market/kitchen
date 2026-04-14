@@ -21,14 +21,25 @@ from app.utils.log import log_info, log_error
 router = APIRouter(prefix="/enums", tags=["Enums"])
 
 
+# Status variants (context-scoped subsets) share labels with the parent "status" enum.
+_LABEL_SOURCE = {
+    "status_user": "status",
+    "status_restaurant": "status",
+    "status_discretionary": "status",
+    "status_plate_pickup": "status",
+    "status_bill": "status",
+}
+
+
 def _enums_with_labels(flat: Dict[str, List[str]], language: str) -> Dict[str, dict]:
     """Map enum name -> {values, labels}; labeled enums use i18n maps, others use identity labels."""
     out: Dict[str, dict] = {}
     for k, v in flat.items():
         if not isinstance(v, list):
             continue
-        if k in LABELED_ENUM_TYPES:
-            labels = labels_for_values(k, v, language)
+        label_key = _LABEL_SOURCE.get(k, k)
+        if label_key in LABELED_ENUM_TYPES:
+            labels = labels_for_values(label_key, v, language)
         else:
             labels = {x: x for x in v}
         out[k] = {"values": v, "labels": labels}

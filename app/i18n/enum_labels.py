@@ -25,7 +25,7 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "completed": "Completed",
             "cancelled": "Cancelled",
         },
-        "kitchen_days": {
+        "kitchen_day": {
             "monday": "Monday",
             "tuesday": "Tuesday",
             "wednesday": "Wednesday",
@@ -68,8 +68,15 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "customer_home": "Customer Home",
             "customer_billing": "Customer Billing",
             "customer_employer": "Customer Employer",
+            "customer_other": "Other",
         },
         "role_type": {
+            "internal": "Internal",
+            "supplier": "Supplier",
+            "customer": "Customer",
+            "employer": "Employer",
+        },
+        "institution_type": {
             "internal": "Internal",
             "supplier": "Supplier",
             "customer": "Customer",
@@ -158,7 +165,7 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "completed": "Completado",
             "cancelled": "Cancelado",
         },
-        "kitchen_days": {
+        "kitchen_day": {
             "monday": "Lunes",
             "tuesday": "Martes",
             "wednesday": "Miércoles",
@@ -201,8 +208,15 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "customer_home": "Domicilio",
             "customer_billing": "Facturación del cliente",
             "customer_employer": "Empleador del cliente",
+            "customer_other": "Otro",
         },
         "role_type": {
+            "internal": "Interno",
+            "supplier": "Proveedor",
+            "customer": "Cliente",
+            "employer": "Empleador",
+        },
+        "institution_type": {
             "internal": "Interno",
             "supplier": "Proveedor",
             "customer": "Cliente",
@@ -291,7 +305,7 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "completed": "Concluído",
             "cancelled": "Cancelado",
         },
-        "kitchen_days": {
+        "kitchen_day": {
             "monday": "Segunda-feira",
             "tuesday": "Terça-feira",
             "wednesday": "Quarta-feira",
@@ -334,8 +348,15 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
             "customer_home": "Residência",
             "customer_billing": "Faturamento do cliente",
             "customer_employer": "Empregador do cliente",
+            "customer_other": "Outro",
         },
         "role_type": {
+            "internal": "Interno",
+            "supplier": "Fornecedor",
+            "customer": "Cliente",
+            "employer": "Empregador",
+        },
+        "institution_type": {
             "internal": "Interno",
             "supplier": "Fornecedor",
             "customer": "Cliente",
@@ -407,8 +428,8 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
 
 LABELED_ENUM_TYPES = frozenset({
     "street_type", "address_type", "bill_resolution", "bill_payout_status",
-    "status", "kitchen_days", "subscription_status", "discretionary_status",
-    "pickup_type", "role_type", "role_name", "transaction_type",
+    "status", "kitchen_day", "subscription_status", "discretionary_status",
+    "pickup_type", "role_type", "institution_type", "role_name", "transaction_type",
     "employer_bill_payment_status", "supplier_invoice_status",
     "supplier_invoice_type", "cuisine_suggestion_status",
     "payment_method_provider", "audit_operation", "discretionary_reason",

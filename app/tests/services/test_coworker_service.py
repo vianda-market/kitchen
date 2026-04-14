@@ -14,12 +14,12 @@ from app.services.coworker_service import get_coworkers_with_eligibility
 class TestCoworkerServiceIneligibilityReason:
     """Tests for ineligibility_reason in get_coworkers_with_eligibility."""
 
-    def _make_ps_row(self, kitchen_day="monday", restaurant_id=None, pickup_time_range="12:00-12:15", employer_id=None, employer_address_id=None):
+    def _make_ps_row(self, kitchen_day="monday", restaurant_id=None, pickup_time_range="12:00-12:15", employer_entity_id=None, employer_address_id=None):
         return {
             "kitchen_day": kitchen_day,
             "restaurant_id": str(restaurant_id or uuid4()),
             "pickup_time_range": pickup_time_range,
-            "employer_id": str(employer_id or uuid4()),
+            "employer_entity_id": str(employer_entity_id or uuid4()),
             "employer_address_id": str(employer_address_id) if employer_address_id else None,
         }
 
@@ -42,7 +42,7 @@ class TestCoworkerServiceIneligibilityReason:
 
         ps_row = self._make_ps_row(
             restaurant_id=restaurant_id,
-            employer_id=uuid4(),
+            employer_entity_id=uuid4(),
             employer_address_id=uuid4(),
         )
         owner_check = self._make_owner_check(current_user_id)
@@ -171,11 +171,11 @@ class TestCoworkerServiceIneligibilityReason:
         """Coworkers with can_participate_in_plate_pickups=false are excluded from the list."""
         current_user_id = uuid4()
         plate_selection_id = uuid4()
-        employer_id = uuid4()
+        employer_entity_id = uuid4()
         employer_address_id = uuid4()
 
         ps_row = self._make_ps_row(
-            employer_id=employer_id,
+            employer_entity_id=employer_entity_id,
             employer_address_id=employer_address_id,
         )
         owner_check = self._make_owner_check(current_user_id)

@@ -41,10 +41,10 @@ _Routes: `/auth/token`, `/users/`, `/users/me`, `/customers/signup/`_
 |----------|------|-------------|
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/USER_MODEL_FOR_CLIENTS.md` | User model, roles, `/users/me`, mobile number format, recovery |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/API_PERMISSIONS_BY_ROLE.md` | Which endpoints each role (Customer, Supplier, Employee) can access |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/ROLE_AND_FIELD_ACCESS_CLIENT.md` | Route-level and field-level access matrix by role |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_ROLE_FIELD_ACCESS.md` | Route-level and field-level access matrix by role |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md` | Customer signup flow with email verification |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/B2B_USER_INVITE_FLOW.md` | Invited users set their own password via email link |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/CHANGE_PASSWORD_AND_ADMIN_RESET.md` | Password change and admin-triggered user reset |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_PASSWORD_MANAGEMENT.md` | Password change and admin-triggered user reset |
 
 ---
 
@@ -53,21 +53,21 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 
 | Audience | File | Description |
 |----------|------|-------------|
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/ONBOARDING_STATUS_B2B.md` | Supplier/employer onboarding status — 7-item checklist, JWT claim, gated navigation, dashboard progress |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_ONBOARDING_STATUS.md` | Supplier/employer onboarding status — 7-item checklist, JWT claim, gated navigation, dashboard progress |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/ONBOARDING_STATUS_DELIVERY_RESPONSE.md` | Delivery response: all 6 items complete, summary endpoint shape, stall detection, activity tracking, open questions answered |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/CUSTOMER_ONBOARDING_STATUS_B2C.md` | Customer onboarding — email verification + subscription checklist, JWT claim, subscribe prompts |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/ONBOARDING_CLARIFICATIONS_B2C.md` | Clarifications: JWT on all flows, sync status, deep links, email suppression, deferred endpoints |
-| B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/MARKET_SELECTION_AT_SIGNUP.md` | Country dropdown for signup — use `GET /leads/markets`, send `country_code` |
+| Both | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/MARKET_CITY_COUNTRY.md` | Market, city & country selection — `/leads/markets`, `/leads/cities` (audience-aware), `/cities` (auth), `/admin/external/*` picker, `city_metadata_id` requirement for addresses |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/LEADS_ENDPOINTS_MIGRATION.md` | Market dropdown migrated from `/markets` to `/leads` — migration guide |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/ENUM_SERVICE_API.md` | Enum Service API — endpoints, value/title contract, caching, role filtering, TypeScript types |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/zArchive/ENUM_SERVICE_SPECIFICATION.md` | _(Archived)_ Original frontend request — superseded by ENUM_SERVICE_API.md |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/LANGUAGE_AND_LOCALE_FOR_CLIENTS.md` | i18n scaffolding — locales endpoint, locale-aware market names, BCP 47 locale field, enum labels, JWT locale claim |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/MARKETS_API_CLIENT.md` | Markets API — multi-currency, multi-timezone, institution scoping |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/INSTITUTION_MARKET_ID.md` | Every institution must have `market_id` — not nullable, required on create |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_MARKETS.md` | Markets API — multi-currency, multi-timezone, institution scoping |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_INSTITUTIONS.md` | Multinational institution model — `market_ids` array, entity-based employers, `email_domain` |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/ZIPCODE_METRICS_LEAD_API.md` | Pre-signup coverage check with restaurant count by zipcode |
 | Marketing | `/Users/cdeachaval/learn/kitchen/docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Coverage checker, interest forms, reCAPTCHA, restaurant/plan endpoints for marketing site |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/LEADS_SIMPLIFICATION.md` | Remove coverage check from app, simplify signup, add "not served" → marketing site link |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
 | Infra | `/Users/cdeachaval/learn/kitchen/docs/api/infrastructure/LEADS_MIGRATION_INFRA.md` | reCAPTCHA and CORS env vars for Cloud Run |
 
 ---
@@ -92,11 +92,11 @@ _Routes: `/institution-bills/`, `/supplier-invoices/`, `/admin/discretionary/`, 
 
 | Audience | File | Description |
 |----------|------|-------------|
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/SUPPLIER_INVOICE_REGISTRATION_B2B.md` | Supplier invoice registration — bill matching, AR/US validation, W-9 collection, review flow |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_SUPPLIER_INVOICES.md` | Supplier invoice registration — bill matching, AR/US validation, W-9 collection, review flow |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/DISCRETIONARY_REQUEST_FORM_GUIDE.md` | Discretionary credit request form — category/reason schema |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/SUPPLIER_TERMS_B2B.md` | Supplier terms — no-show discount, payment frequency, invoice compliance overrides |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_SUPPLIER_TERMS.md` | Supplier terms — no-show discount, payment frequency, invoice compliance overrides |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md` | Removed features: fintech links, manual bill creation, bank accounts |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/PAYOUT_HISTORY_ENRICHED_B2B.md` | Enriched payout history list — entity-level view with institution, billing period |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_PAYOUT_HISTORY.md` | Enriched payout history list — entity-level view with institution, billing period |
 
 ---
 
@@ -105,7 +105,7 @@ _Routes: `/user-payment-summary`_
 
 | Audience | File | Description |
 |----------|------|-------------|
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/USER_PAYMENT_SUMMARY_B2B.md` | Employee portal — read-only view of which customers have Stripe payment methods registered |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_USER_PAYMENT_SUMMARY.md` | Employee portal — read-only view of which customers have Stripe payment methods registered |
 
 ---
 
@@ -117,8 +117,8 @@ _Routes: `/restaurants/`, `/plates/`, `/plate-kitchen-days/`, `/cuisines/`, `/qr
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation — status logic and kitchen day requirements |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/PLATE_API_CLIENT.md` | Plate CRUD, enriched endpoints, bulk kitchen day assignment |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/CUISINES_API_CLIENT.md` | List supported cuisines for restaurant dropdown validation |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/PRODUCT_API_B2B.md` | Product CRUD, enriched endpoints, and image upload |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md` | Manage country-scoped holiday calendar |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_PRODUCTS.md` | Product CRUD, enriched endpoints, and image upload |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_NATIONAL_HOLIDAYS.md` | Manage country-scoped holiday calendar |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation logic with status and kitchen day requirements |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/SUPPLIER_DASHBOARD_METRICS_B2B.md` | Metrics and APIs for supplier/restaurant dashboard |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/PORTION_SIZE_DISPLAY_B2B.md` | Show portion feedback from reviews to restaurant staff |
@@ -145,14 +145,26 @@ _Routes: `/plate-selections/`, `/plate-pickup/`, `/favorites/`_
 
 ---
 
-## Employers & Institution Entities
-_Routes: `/employers/`, `/institution-entities/`_
+## Institutions, Entities & Employers
+_Routes: `/institutions/`, `/institution-entities/`, `/employer/program`, `/employer/employees`, `/employer/billing`_
 
 | Audience | File | Description |
 |----------|------|-------------|
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/EMPLOYER_ASSIGNMENT_WORKFLOW.md` | Employee/admin guide for employer catalog management |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md` | Employer address restrictions and cities API behavior |
-| B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/EMPLOYER_MANAGEMENT_B2C.md` | Register, search, and assign employers in the customer flow |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_INSTITUTIONS.md` | **Multinational model** — `market_ids` array, employer flow via entities, `email_domain` |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_THREE_TIER_CASCADE.md` | **Three-tier cascade** — entity → institution → market config resolution for supplier terms and employer programs |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md` | Employer address restrictions and cities API behavior |
+| B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/EMPLOYER_MANAGEMENT_B2C.md` | Assign employer entity to customer — `employer_entity_id`, user-selected address types |
+| Both | `/Users/cdeachaval/learn/kitchen/docs/plans/MULTINATIONAL_INSTITUTIONS.md` | Full design doc — institution_market junction, employer_info removal, three-tier cascade, migration plan |
+
+---
+
+## Workplace Groups (Coworker Pickup)
+_Routes: `/workplace-groups/`, `/admin/workplace-groups/`, `/users/me/workplace`_
+
+| Audience | File | Description |
+|----------|------|-------------|
+| B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/WORKPLACE_GROUPS_B2C.md` | Search, create, join workplace groups; select office address; coworker matching |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_WORKPLACE_GROUPS.md` | Admin list/enriched, rename, archive, bulk create, group address management |
 
 ---
 
@@ -175,7 +187,7 @@ _Routes: `/referrals/`, `/admin/referral-config/`_
 | Audience | File | Description |
 |----------|------|-------------|
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/REFERRAL_SYSTEM_B2C.md` | Referral code in signup, share code, view referral activity and stats |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/REFERRAL_ADMIN_B2B.md` | Admin referral config per market — bonus rates, caps, enable/disable, cron trigger |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_REFERRAL_ADMIN.md` | Admin referral config per market — bonus rates, caps, enable/disable, cron trigger |
 
 ---
 
@@ -196,7 +208,7 @@ _Routes: `/ad-tracking`, `/admin/ad-zones/`_
 |----------|------|-------------|
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/ADS_TRACKING_INTEGRATION.md` | Click ID capture API, Meta Pixel JS (web), Meta SDK (native), event_id dedup, platform detection |
 | Marketing | `/Users/cdeachaval/learn/kitchen/docs/api/marketing_site/ADS_LANDING_PAGES.md` | Pixel JS installation, `/for-restaurants` + `/for-employers` landing pages, click ID capture in forms |
-| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/AD_ZONE_MANAGEMENT.md` | Zone CRUD, flywheel state transitions, metrics refresh, overlap detection, audience export, Pixel on B2B portal |
+| B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_AD_ZONES.md` | Zone CRUD, flywheel state transitions, metrics refresh, overlap detection, audience export, Pixel on B2B portal |
 | Both | `docs/plans/GOOGLE_META_ADS_INTEGRATION_V2.md` | Full ads platform design (34 sections) -- conversion pipeline, geographic flywheel, campaign management, Gemini advisor |
 | Both | `docs/plans/RESTAURANT_VETTING_SYSTEM.md` | Restaurant supplier application form, vetting pipeline, approval workflow |
 
@@ -302,6 +314,7 @@ _Architecture decisions, design patterns, and implementation guides for agents w
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/SINGLE_ENDPOINT_ARRAY_DESIGN.md` | POST endpoint accepting an array of kitchen days — design rationale |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/BATCH_KITCHEN_DAYS_DESIGN_ANALYSIS.md` | Client queuing vs. batch endpoint for kitchen day assignment — trade-off analysis |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/BATCH_TRANSACTION_HANDLING_ANALYSIS.md` | Atomic batch operation design — required atomicity behavior |
+| `/Users/cdeachaval/learn/kitchen/docs/api/internal/COMPOSITE_CREATE_PATTERN.md` | Composite create — atomic multi-table creation with `commit=False` chaining (institutions+supplier_terms, products+ingredients) |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/ENRICHED_ENDPOINTS_TESTING_STRATEGY.md` | Testing strategy for enriched endpoints using centralized `EnrichedService` |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/CRUD_VS_ENRICHED_SERVICE_ANALYSIS.md` | Whether `EnrichedService` should merge into `CRUDService` — consolidation analysis |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/DB_INSERT_REFACTORING_ANALYSIS.md` | `db_insert` refactoring options for DRY and improved code structure |
@@ -309,3 +322,4 @@ _Architecture decisions, design patterns, and implementation guides for agents w
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/SYSTEM_CONFIGURATION_TABLES_ANALYSIS.md` | Which system configuration tables are accessible and how they are managed |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/CITY_REQUIRED_AT_SIGNUP_IMPLEMENTATION_PLAN.md` | Plan to require `city_id` at signup with global city sentinel for B2B users |
 | `/Users/cdeachaval/learn/kitchen/docs/api/internal/CUSTOMER_EMPLOYER_ADDRESS_VIANDA_CUSTOMERS_ONLY.md` | Scoping customer employer addresses to the Vianda Customers institution |
+| `/Users/cdeachaval/learn/kitchen/docs/api/internal/COUNTRY_CITY_DATA_STRUCTURE.md` | Two-tier country/city/currency data model — external GeoNames/ISO 4217 layer + Vianda metadata layer, audience flags, timezone strategy, XG pseudo-country |

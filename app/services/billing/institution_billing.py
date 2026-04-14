@@ -62,7 +62,7 @@ def _check_invoice_compliance(
 
     Returns True if payout is allowed, False if held due to uninvoiced bills.
     """
-    config = resolve_effective_invoice_config(institution_id, db)
+    config = resolve_effective_invoice_config(institution_id, db, institution_entity_id=institution_entity_id)
     if not config["effective_require_invoice"]:
         return True
 
@@ -404,10 +404,10 @@ class InstitutionBillingService:
                             continue
                     day_to_use = kitchen_day
                     if not MarketConfiguration.is_kitchen_day_enabled(entity_country, day_to_use):
-                        if day_to_use in ('Saturday', 'Sunday'):
-                            if MarketConfiguration.is_kitchen_day_enabled(entity_country, 'Friday'):
-                                day_to_use = 'Friday'
-                                log_info(f"Using Friday config for {entity_country} weekend billing")
+                        if day_to_use in ('saturday', 'sunday'):
+                            if MarketConfiguration.is_kitchen_day_enabled(entity_country, 'friday'):
+                                day_to_use = 'friday'
+                                log_info(f"Using friday config for {entity_country} weekend billing")
                             else:
                                 continue
                         else:
@@ -491,7 +491,7 @@ class InstitutionBillingService:
                     log_warning(f"Institution not found for entity {institution_entity_id}, skipping")
                     continue
                 # Payment frequency gate: skip bill creation if not due today
-                freq = get_supplier_payment_frequency(institution_id, connection)
+                freq = get_supplier_payment_frequency(institution_id, connection, institution_entity_id=institution_entity_id)
                 today = date.today()
                 if not _is_supplier_payout_due(freq, today):
                     log_info(f"Skipping bill for entity {institution_entity_id}: payment_frequency={freq}, not due on {today}")

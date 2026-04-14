@@ -253,11 +253,17 @@ def set_product_ingredients(
     user_id: UUID,
     market_id: Optional[str],
     db,
+    *,
+    commit: bool = True,
 ) -> List[dict]:
     """
     Full-replace: delete existing product ingredients, then insert provided list.
     Verifies each ingredient_id exists (404 on first missing).
     Returns updated ingredient list ordered by sort_order.
+
+    Args:
+        commit: Whether to commit immediately (default: True).
+                Set to False for atomic multi-operation transactions.
     """
     # Verify all ingredient_ids exist
     for iid in ingredient_ids:
@@ -291,7 +297,8 @@ def set_product_ingredients(
                 str(product_id), str(iid), idx, str(user_id),
             ))
 
-        db.commit()
+        if commit:
+            db.commit()
     except HTTPException:
         raise
     except Exception as exc:

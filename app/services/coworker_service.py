@@ -30,19 +30,20 @@ def get_coworkers_with_eligibility(
 
     Args:
         plate_selection_id: The plate selection (offer) to scope coworkers for
-        current_user_id: Current user (must have employer_id)
+        current_user_id: Current user (must have employer_entity_id)
         db: Database connection
 
     Returns:
         List of { user_id, first_name, last_initial, eligible: bool, ineligibility_reason: str | None }
 
     Raises:
-        HTTPException 403 if current user has no employer_id
+        HTTPException 403 if current user has no employer_entity_id
     """
-    # Get current user's employer_id, employer_address_id, and plate_selection details
+    # Get current user's employer_entity_id, employer_address_id, and plate_selection details
     ps_row = db_read(
         """
-        SELECT ps.kitchen_day, ps.restaurant_id, ps.pickup_time_range, u.employer_id, u.employer_address_id
+        SELECT ps.kitchen_day, ps.restaurant_id, ps.pickup_time_range,
+               u.employer_entity_id, u.employer_address_id, u.workplace_group_id
         FROM plate_selection_info ps
         JOIN user_info u ON ps.user_id = u.user_id
         WHERE ps.plate_selection_id = %s AND ps.is_archived = FALSE
@@ -54,8 +55,16 @@ def get_coworkers_with_eligibility(
     if not ps_row:
         raise HTTPException(status_code=404, detail="Plate selection not found")
 
-    employer_id = ps_row.get("employer_id")
-    if not employer_id:
+    workplace_group_id = ps_row.get("workplace_group_id")
+    employer_entity_id = ps_row.get("employer_entity_id")
+
+    if workplace_group_id:
+        match_field = "workplace_group_id"
+        match_value = workplace_group_id
+    elif employer_entity_id:
+        match_field = "employer_entity_id"
+        match_value = employer_entity_id
+    else:
         raise HTTPException(
             status_code=403,
             detail="You must have an employer assigned to list coworkers. Assign an employer in your profile.",
@@ -75,22 +84,38 @@ def get_coworkers_with_eligibility(
     if owner_check and str(owner_check.get("user_id")) != str(current_user_id):
         raise HTTPException(status_code=403, detail="Not authorized to access this plate selection")
 
-    # Get coworkers (same employer AND same office/employer_address_id; exclude current user;
+    # Get coworkers (same workplace_group or employer; exclude current user;
     # only include users with can_participate_in_plate_pickups = TRUE)
     employer_address_id = ps_row.get("employer_address_id")
-    if employer_address_id is not None:
+
+    if match_field == "workplace_group_id":
+        # workplace_group_id takes precedence — match all users in the same group
         coworkers = db_read(
             """
             SELECT u.user_id, u.first_name, u.last_name
             FROM user_info u
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
-            WHERE u.employer_id = %s AND u.user_id != %s
+            WHERE u.workplace_group_id = %s AND u.user_id != %s
+              AND u.is_archived = FALSE AND u.status = 'active'
+              AND ump.can_participate_in_plate_pickups = TRUE
+            ORDER BY u.first_name, u.last_name
+            """,
+            (str(match_value), str(current_user_id)),
+            connection=db,
+        ) or []
+    elif employer_address_id is not None:
+        coworkers = db_read(
+            """
+            SELECT u.user_id, u.first_name, u.last_name
+            FROM user_info u
+            INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
+            WHERE u.employer_entity_id = %s AND u.user_id != %s
               AND u.employer_address_id = %s
               AND u.is_archived = FALSE AND u.status = 'active'
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
-            (str(employer_id), str(current_user_id), str(employer_address_id)),
+            (str(match_value), str(current_user_id), str(employer_address_id)),
             connection=db,
         ) or []
     else:
@@ -100,13 +125,13 @@ def get_coworkers_with_eligibility(
             SELECT u.user_id, u.first_name, u.last_name
             FROM user_info u
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
-            WHERE u.employer_id = %s AND u.user_id != %s
+            WHERE u.employer_entity_id = %s AND u.user_id != %s
               AND u.employer_address_id IS NULL
               AND u.is_archived = FALSE AND u.status = 'active'
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
-            (str(employer_id), str(current_user_id)),
+            (str(match_value), str(current_user_id)),
             connection=db,
         ) or []
 

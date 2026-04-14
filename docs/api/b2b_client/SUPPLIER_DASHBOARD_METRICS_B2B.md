@@ -127,4 +127,4 @@ See [PORTION_SIZE_DISPLAY_B2B.md](./PORTION_SIZE_DISPLAY_B2B.md) for display rul
 - **Supplier:** Can access restaurants within their institution_entity_id.
 - **Employee:** Can access all restaurants (must pass `restaurant_id` for daily-orders).
 
-See [ROLE_AND_FIELD_ACCESS_CLIENT.md](./ROLE_AND_FIELD_ACCESS_CLIENT.md) for role-based access.
+See [API_CLIENT_ROLE_FIELD_ACCESS.md](./API_CLIENT_ROLE_FIELD_ACCESS.md) for role-based access.

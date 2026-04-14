@@ -167,4 +167,4 @@ The same endpoint works for Employer institutions with a different checklist:
 | Document | Relationship |
 |----------|-------------|
 | `docs/plans/SUPPLIER_SUCCESS_MANAGEMENT_ROADMAP.md` | Full roadmap with rationale and phases |
-| `docs/api/b2b_client/SUPPLIER_INVOICE_REGISTRATION_B2B.md` | Related B2B API pattern |
+| `docs/api/b2b_client/API_CLIENT_SUPPLIER_INVOICES.md` | Related B2B API pattern |

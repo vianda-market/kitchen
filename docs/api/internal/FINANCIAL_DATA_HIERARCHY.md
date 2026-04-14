@@ -97,6 +97,6 @@ A bill can cover 5 restaurants for the same entity. Adding `restaurant_id` to th
 
 - [SUPPLIER_INSTITUTION_PAYMENT.md](SUPPLIER_INSTITUTION_PAYMENT.md) — Settlement → bill → payout pipeline details, pipeline entry points, debugging
 - [RESTAURANT_PAYMENT_FLOW_AND_APIS.md](RESTAURANT_PAYMENT_FLOW_AND_APIS.md) — Credit/currency → balance → settlement → bill flow; balance unit semantics
-- [STRIPE_CONNECT_SUPPLIER_PAYOUT_B2B.md](../b2b_client/STRIPE_CONNECT_SUPPLIER_PAYOUT_B2B.md) — B2B integration guide for payout onboarding and trigger
-- [PAYOUT_HISTORY_ENRICHED_B2B.md](../b2b_client/PAYOUT_HISTORY_ENRICHED_B2B.md) — B2B integration guide for enriched payout list
-- [SUPPLIER_INVOICE_REGISTRATION_B2B.md](../b2b_client/SUPPLIER_INVOICE_REGISTRATION_B2B.md) — Invoice upload and bill matching
+- [API_CLIENT_SUPPLIER_PAYOUT.md](../b2b_client/API_CLIENT_SUPPLIER_PAYOUT.md) — B2B integration guide for payout onboarding and trigger
+- [API_CLIENT_PAYOUT_HISTORY.md](../b2b_client/API_CLIENT_PAYOUT_HISTORY.md) — B2B integration guide for enriched payout list
+- [API_CLIENT_SUPPLIER_INVOICES.md](../b2b_client/API_CLIENT_SUPPLIER_INVOICES.md) — Invoice upload and bill matching

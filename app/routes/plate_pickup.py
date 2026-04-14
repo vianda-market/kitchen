@@ -67,6 +67,7 @@ class PendingOrdersResponse(BaseModel):
     restaurant_id: UUID
     restaurant_name: str
     qr_code_id: UUID
+    qr_code_sig: str = Field(..., description="HMAC signature for scan-qr endpoint")
     total_orders: int  # Total count of all plates
     total_plate_count: Optional[int] = Field(None, description="Same as total_orders; plates the assigned user picks up")
     plate_pickup_ids: Optional[List[UUID]] = Field(None, description="IDs for POST /plate-pickup/{id}/complete")
@@ -234,4 +235,24 @@ def delete_plate_pickup(
     def _delete_plate_pickup():
         return plate_pickup_service.delete_pickup_record(pickup_id, current_user, db)
     
-    return handle_business_operation(_delete_plate_pickup, "plate pickup deletion") 
+    return handle_business_operation(_delete_plate_pickup, "plate pickup deletion")
+
+
+# POST /plate-pickup/run-promotion – Manual trigger for kitchen-start promotion cron
+@router.post("/run-promotion", response_model=dict, status_code=200)
+def run_kitchen_start_promotion_manual(
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """
+    Manually trigger the kitchen-start promotion: promote active plate_selection_info
+    rows to plate_pickup_live (creates pickup records + restaurant transactions).
+
+    Normally triggered by cron at kitchen-open time. This endpoint allows manual/test
+    runs — essential for Postman E2E collections and dev testing.
+
+    **Authorization**: Internal only (employee).
+    """
+    from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
+    result = run_kitchen_start_promotion()
+    return result

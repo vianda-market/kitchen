@@ -18,23 +18,23 @@ cp -r docs/api/b2b_client /path/to/kitchen-web/docs/api/
 |------|-----|
 | FRONTEND_AGENT_README.md | Agent onboarding |
 | [LOCAL_NETWORK_DEV.md](./LOCAL_NETWORK_DEV.md) | Local backend run scripts; API URL config for trusted/untrusted network |
-| EMPLOYER_ASSIGNMENT_WORKFLOW.md | Backoffice employer management |
-| EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md | Employer address protection (Customers 403); Cities API; `city_id` filter |
-| ROLE_AND_FIELD_ACCESS_CLIENT.md | Role/field access for B2B |
+| API_CLIENT_EMPLOYER_ASSIGNMENT.md | Backoffice employer management |
+| API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md | Employer address protection (Customers 403); Cities API; `city_id` filter |
+| API_CLIENT_ROLE_FIELD_ACCESS.md | Role/field access for B2B |
 | (CREDIT_AND_CURRENCY_CLIENT in shared_client) | Credit currency create/edit, plan/restaurant/entity currency from market, plate payouts, B2C savings |
 | DISCRETIONARY_REQUEST_FORM_GUIDE.md | Discretionary credit requests |
-| CHANGE_PASSWORD_AND_ADMIN_RESET.md | Password change, admin reset |
+| API_CLIENT_PASSWORD_MANAGEMENT.md | Password change, admin reset |
 | (MARKET_SCOPE_FOR_CLIENTS in shared_client) | Markets API and market scope – shared |
 | **USER_MODEL_FOR_CLIENTS.md** (shared_client) | **User model:** roles, **`mobile_number` (E.164)**, `/users/me`, markets, forgot-username, password recovery. Long UI samples: [zArchive/.../PASSWORD_RECOVERY_CLIENT.md](../../zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md) |
 | (ENUM_SERVICE_API in shared_client) | Enum service – shared |
 | TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md | Timezone deduction UI |
 | TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md | Timezone deduction |
-| [PRODUCT_API_B2B.md](./PRODUCT_API_B2B.md) | Product CRUD, image upload (1 upload → 2 stored: thumbnail + full-size); enriched returns both image sizes for suppliers. |
+| [API_CLIENT_PRODUCTS.md](./API_CLIENT_PRODUCTS.md) | Product CRUD, image upload (1 upload → 2 stored: thumbnail + full-size); enriched returns both image sizes for suppliers. |
 | feedback_from_client/ | B2B team feedback (addressed items moved to [zArchive/api/b2b_client](../../zArchive/api/b2b_client/)) |
 | [PAYMENT_METHOD_CHANGES_B2B](./PAYMENT_METHOD_CHANGES_B2B.md) | **B2B:** Institution bank account and fintech links removed; subscription payment flow; migration checklist. |
-| [QR_CODE_B2B.md](./QR_CODE_B2B.md) | **B2B:** QR code create flow (restaurant only), display (print vs screen), relationship to restaurant activation. |
+| [API_CLIENT_QR_CODES.md](./API_CLIENT_QR_CODES.md) | **B2B:** QR code create flow (restaurant only), display (print vs screen), relationship to restaurant activation. |
 | [SUPPLIER_DASHBOARD_METRICS_B2B.md](./SUPPLIER_DASHBOARD_METRICS_B2B.md) | **B2B:** Supplier dashboard metrics: reservations by plate, live locked, people waiting, plates delivered, daily balance, average portion size, average plate rating. |
-| [NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md](./NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md) | **Internal only:** National holidays (country-wide), Nager.Date import, **`POST .../sync-from-provider`** for manual refresh button, CRUD/bulk for gaps. |
+| [API_CLIENT_NATIONAL_HOLIDAYS.md](./API_CLIENT_NATIONAL_HOLIDAYS.md) | **Internal only:** National holidays (country-wide), Nager.Date import, **`POST .../sync-from-provider`** for manual refresh button, CRUD/bulk for gaps. |
 | [PAYMENT_AND_BILLING_CLIENT_CHANGES](../shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md) | **Shared:** Payment atomic with billing; remove fintech link pages/modals and manual bill create/process flows. |
 
 ## Shared Docs (from shared_client/)

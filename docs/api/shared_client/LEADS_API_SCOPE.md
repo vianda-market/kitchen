@@ -88,6 +88,6 @@ Lead-capture endpoints serve pre-signup flows: country/city selection, coverage 
 
 ## Related
 
-- [MARKETS_API_CLIENT.md](../b2b_client/MARKETS_API_CLIENT.md) — Authenticated markets (full data, `market_id`)
-- [MARKET_SELECTION_AT_SIGNUP.md](../b2c_client/MARKET_SELECTION_AT_SIGNUP.md) — B2C signup flow
+- [API_CLIENT_MARKETS.md](../b2b_client/API_CLIENT_MARKETS.md) — Authenticated markets (full data, `market_id`)
+- [MARKET_CITY_COUNTRY.md](../b2c_client/MARKET_CITY_COUNTRY.md) — B2C signup flow
 - [ZIPCODE_METRICS_LEAD_API.md](./ZIPCODE_METRICS_LEAD_API.md) — Zipcode metrics detail

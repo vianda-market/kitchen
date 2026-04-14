@@ -11,7 +11,7 @@ import psycopg2.extensions
 from fastapi import HTTPException, status
 
 from app.services.crud_service import user_service, subscription_service
-from app.services.employer.program_service import get_program_by_institution
+from app.services.employer.program_service import get_program_by_institution, resolve_effective_program
 from app.services.subscription_action_service import cancel_subscription
 from app.auth.security import hash_password
 from app.config import Status
@@ -55,7 +55,7 @@ def _create_benefit_employee(
         "last_name": employee_data.get("last_name", ""),
         "mobile_number": employee_data.get("mobile_number"),
         "email_verified": False,
-        "city_id": str(employee_data["city_id"]),
+        "city_metadata_id": str(employee_data["city_metadata_id"]),
         "market_id": str(employee_data["market_id"]) if employee_data.get("market_id") else None,
         "locale": employee_data.get("locale", "en"),
         "modified_by": str(modified_by),
@@ -115,7 +115,7 @@ def enroll_single_employee(
     modified_by: UUID,
 ):
     """Enroll a single benefit employee. Creates user in employer institution and sends invite."""
-    program = get_program_by_institution(institution_id, db)
+    program = resolve_effective_program(institution_id, None, db)
     if not program or not program.is_active:
         raise HTTPException(status_code=400, detail="No active benefits program for this institution")
 
@@ -135,14 +135,14 @@ def enroll_single_employee(
 def enroll_bulk_employees(
     institution_id: UUID,
     csv_content: str,
-    city_id: UUID,
+    city_metadata_id: UUID,
     market_id: UUID,
     locale: str,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
 ) -> Dict[str, Any]:
     """Enroll employees from CSV. Never fails the batch on one bad row."""
-    program = get_program_by_institution(institution_id, db)
+    program = resolve_effective_program(institution_id, None, db)
     if not program or not program.is_active:
         raise HTTPException(status_code=400, detail="No active benefits program for this institution")
 
@@ -177,7 +177,7 @@ def enroll_bulk_employees(
                 "email": email,
                 "first_name": first_name,
                 "last_name": last_name,
-                "city_id": city_id,
+                "city_metadata_id": city_metadata_id,
                 "market_id": market_id,
                 "locale": locale,
             }
@@ -279,15 +279,16 @@ def subscribe_employee(
     Creates an active subscription immediately."""
     from app.services.crud_service import plan_service
 
-    program = get_program_by_institution(institution_id, db)
-    if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
-
     user = user_service.get_by_id(user_id, db, scope=None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if str(getattr(user, "institution_id", "")) != str(institution_id):
         raise HTTPException(status_code=403, detail="User does not belong to this institution")
+
+    employer_entity_id = getattr(user, "employer_entity_id", None)
+    program = resolve_effective_program(institution_id, employer_entity_id, db)
+    if not program or not program.is_active:
+        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
 
     existing = subscription_service.get_by_user(user_id, db)
     if existing and existing.subscription_status in (
@@ -358,7 +359,7 @@ def migrate_existing_users_for_domain(
         SELECT user_id FROM user_info
         WHERE email LIKE %s
           AND institution_id = %s::uuid
-          AND role_type = 'Customer'
+          AND role_type = 'customer'
           AND is_archived = FALSE
         """,
         (f"%@{domain.lower()}", str(vianda_customers_id)),
@@ -367,7 +368,7 @@ def migrate_existing_users_for_domain(
     if not rows:
         return 0
 
-    program = get_program_by_institution(institution_id, db)
+    program = resolve_effective_program(institution_id, None, db)
     early_threshold = None if (program and not program.allow_early_renewal) else 10
 
     count = 0

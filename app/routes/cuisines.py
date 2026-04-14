@@ -74,7 +74,7 @@ def create_cuisine_suggestion(
 
     **Authorization**: Internal or Supplier.
     """
-    user_id = UUID(current_user["user_id"])
+    user_id = UUID(str(current_user["user_id"]))
     row = cuisine_service.create_suggestion(
         suggested_name=data.suggested_name,
         suggested_by=user_id,

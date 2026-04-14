@@ -158,7 +158,7 @@ class CreditLoadingService:
                 "arrival_time": None,
                 "completion_time": None,
                 "expected_completion_time": None,
-                "transaction_type": "Discretionary",
+                "transaction_type": "discretionary",
                 "credit": amount,  # Allow partial credits
                 "no_show_discount": None,
                 "currency_code": currency.currency_code,

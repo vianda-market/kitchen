@@ -229,7 +229,7 @@ def _create_restaurant_transaction_for_promotion(
         "arrival_time": None,
         "completion_time": None,
         "expected_completion_time": None,
-        "transaction_type": "Order",
+        "transaction_type": "order",
         "credit": credit_decimal,
         "no_show_discount": discount_decimal,
         "currency_code": credit_currency.currency_code,

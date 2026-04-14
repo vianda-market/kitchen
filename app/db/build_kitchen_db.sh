@@ -294,7 +294,7 @@ if [ "${SKIP_POST_REBUILD_SYNC:-0}" != "1" ]; then
     source "${_SYNC_VENV}"
     export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE DB_SSLMODE
     export PYTHONPATH=.
-    python app/db/post_rebuild_external_sync.py
+    python3 app/db/post_rebuild_external_sync.py
   else
     echo "⚠️  Skipping post-rebuild sync - venv not found. Set SKIP_POST_REBUILD_SYNC=1 to silence, or create a venv."
   fi

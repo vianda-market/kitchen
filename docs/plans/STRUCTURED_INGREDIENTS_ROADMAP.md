@@ -533,7 +533,7 @@ What Phase 5 adds (code only, no schema change):
 
 - `app/db/schema.sql` — `ops.product_info` (current `ingredients VARCHAR(255)` field)
 - `docs/guidelines/SCHEMA_CHANGE_GUIDE.md` — required sync order for schema additions
-- `docs/api/b2b_client/PRODUCT_API_B2B.md` — existing product CRUD endpoints
+- `docs/api/b2b_client/API_CLIENT_PRODUCTS.md` — existing product CRUD endpoints
 - `docs/api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md` — existing favorites signal
 - Open Food Facts taxonomy API: https://wiki.openfoodfacts.org/API
 - Open Food Facts ODbL license: https://opendatacommons.org/licenses/odbl/

@@ -91,24 +91,27 @@ class TestDateService:
 
     @patch('app.services.kitchen_day_service.settings')
     def test_get_effective_current_day_handles_invalid_timezone(self, mock_settings):
-        """Test that invalid timezone falls back to default."""
+        """Test that invalid timezone falls back to default.
+        In DEV_MODE, weekends are mapped to friday so Postman/dev testing works any day."""
         # Arrange
         mock_settings.DEV_OVERRIDE_DAY = None
-        
+        mock_settings.DEV_MODE = True  # Default dev setting
+
         with patch('app.services.kitchen_day_service.datetime') as mock_datetime, \
              patch('app.services.kitchen_day_service.pytz.timezone') as mock_timezone:
             mock_timezone.side_effect = [
                 pytz.exceptions.UnknownTimeZoneError("Invalid timezone"),
                 pytz.timezone("America/Argentina/Buenos_Aires"),
             ]
-            
+
             mock_now = Mock()
             mock_now.time.return_value = time(14, 0)
             mock_now.strftime.return_value = "Saturday"
             mock_datetime.now.return_value = mock_now
-            
+
             result = get_effective_current_day("Invalid/Timezone")
-            assert result == "saturday"
+            # DEV_MODE maps Saturday → friday (kitchen operations work any day in dev)
+            assert result == "friday"
             assert mock_timezone.call_count >= 2
 
     @patch('app.services.date_service.settings')

@@ -83,8 +83,13 @@ def create_restaurant(
     """
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
-        # Create restaurant data dict (credit_currency comes from institution_entity)
-        restaurant_dict = restaurant_data.model_dump()
+        # Create restaurant data dict (credit_currency comes from institution_entity).
+        # exclude_none=True: fields the client didn't send (e.g. is_featured, review_count,
+        # verified_badge) stay out of the INSERT column list so the DB's NOT NULL DEFAULT
+        # values apply. Without this, Pydantic's Optional[bool] = None default gets
+        # passed to the CRUD service which builds an explicit `NULL` INSERT and violates
+        # the NOT NULL constraint.
+        restaurant_dict = restaurant_data.model_dump(exclude_none=True)
         if not scope.is_global:
             provided_institution = restaurant_dict.get("institution_id")
             if provided_institution and not scope.matches(provided_institution):
@@ -428,19 +433,22 @@ def get_restaurants_by_city_route(
     elif not user_id:
         user_id = None
 
-    employer_id: Optional[UUID] = None
+    employer_entity_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
+    workplace_group_id: Optional[UUID] = None
     if user_id:
         from app.utils.db import db_read
         user_row = db_read(
-            "SELECT employer_id, employer_address_id FROM user_info WHERE user_id = %s",
+            "SELECT employer_entity_id, employer_address_id, workplace_group_id FROM user_info WHERE user_id = %s",
             (str(user_id),),
             connection=db,
             fetch_one=True,
         )
-        if user_row and user_row.get("employer_id"):
-            employer_id = user_row["employer_id"]
-            employer_address_id = user_row.get("employer_address_id")
+        if user_row:
+            if user_row.get("employer_entity_id"):
+                employer_entity_id = user_row["employer_entity_id"]
+                employer_address_id = user_row.get("employer_address_id")
+            workplace_group_id = user_row.get("workplace_group_id")
 
     try:
         data = get_restaurants_by_city(
@@ -451,8 +459,9 @@ def get_restaurants_by_city_route(
             kitchen_day=kitchen_day,
             credit_cost_local_currency=credit_cost_local_currency,
             user_id=user_id,
-            employer_id=employer_id,
+            employer_entity_id=employer_entity_id,
             employer_address_id=employer_address_id,
+            workplace_group_id=workplace_group_id,
             locale=locale,
             cursor=cursor,
             limit=limit,
@@ -484,9 +493,10 @@ def list_enriched_restaurants(
         effective_institution_id = resolve_institution_filter(institution_id, scope)
         institution_market_id: Optional[UUID] = None
         if effective_institution_id is not None:
-            inst = institution_service.get_by_id(effective_institution_id, db, scope=None)
-            if inst and getattr(inst, "market_id", None) is not None and not is_global_market(inst.market_id):
-                institution_market_id = inst.market_id
+            from app.services.entity_service import get_institution_market_ids
+            inst_markets = get_institution_market_ids(effective_institution_id, db)
+            if inst_markets and len(inst_markets) == 1 and not is_global_market(inst_markets[0]):
+                institution_market_id = inst_markets[0]
         enriched_restaurants = get_enriched_restaurants(
             db,
             scope=scope,
@@ -671,6 +681,9 @@ def delete_restaurant(
         if not existing_restaurant:
             raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {restaurant_id}")
         
+        from app.services.entity_service import validate_restaurant_can_be_archived
+        validate_restaurant_can_be_archived(restaurant_id, db)
+
         # Soft delete the restaurant
         success = restaurant_service.soft_delete(restaurant_id, current_user["user_id"], db, scope=scope)
         if not success:

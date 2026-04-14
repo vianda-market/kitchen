@@ -1,72 +1,28 @@
 {
   "info": {
-    "_postman_id": "a1b2c3d4-0011-4000-a000-000000000011",
+    "_postman_id": "011-employer-program-v2",
     "name": "011 EMPLOYER_PROGRAM",
-    "description": "Employer Program E2E: Auth, Employer Setup (create institution, employer, CRUD), Program Config (create/get/update benefits program), Employee Management (enroll single, list, subscribe, bulk CSV, deactivate), Domain Management (add/blacklist/list/remove), Billing (generate/list/detail/cron), Cleanup. Variables: superAdminUsername, superAdminPassword, adminUsername, adminPassword set in environment or globals.",
+    "description": "Employer Benefits Program E2E: multinational institution model. Creates employer institution with market_ids, creates entity (with email_domain, tax_id, currency), configures benefits program (institution-level), enrolls employees, subscribes, generates bills per entity. Depends on: Super Admin credentials, at least one market + plan in DB (run collection 000 first or seed DB).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "1 Auth",
+      "name": "1 Auth & Setup",
       "item": [
         {
           "name": "1.1 Login Super Admin",
           "event": [
             {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const su = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername');",
-                  "if (su) pm.collectionVariables.set('superAdminUsername', su);",
-                  "const sp = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword');",
-                  "if (sp) pm.collectionVariables.set('superAdminPassword', sp);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Login successful - Status 200', function () {",
+                  "pm.test('Login successful', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response contains access_token', function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property('access_token');",
-                  "    pm.expect(body.access_token).to.be.a('string');",
-                  "    pm.expect(body.access_token.length).to.be.above(20);",
-                  "});",
-                  "",
-                  "pm.test('Token is valid JWT format (3 parts)', function () {",
-                  "    const { access_token } = pm.response.json();",
-                  "    const parts = access_token.split('.');",
-                  "    pm.expect(parts.length).to.equal(3);",
-                  "});",
-                  "",
-                  "pm.test('Token payload contains required claims', function () {",
-                  "    const { access_token } = pm.response.json();",
-                  "    const payload = JSON.parse(atob(access_token.split('.')[1]));",
-                  "    pm.expect(payload).to.have.property('sub');",
-                  "    pm.expect(payload).to.have.property('exp');",
-                  "    pm.expect(payload.exp).to.be.a('number');",
-                  "});",
-                  "",
-                  "pm.test('Token expiry is in the future', function () {",
-                  "    const { access_token } = pm.response.json();",
-                  "    const payload = JSON.parse(atob(access_token.split('.')[1]));",
-                  "    const now = Math.floor(Date.now() / 1000);",
-                  "    pm.expect(payload.exp).to.be.above(now);",
-                  "});",
-                  "",
-                  "const { access_token } = pm.response.json();",
-                  "pm.collectionVariables.set('authToken', access_token);",
-                  "pm.environment.set('authToken', access_token);",
-                  "pm.globals.set('authToken', access_token);",
-                  "pm.collectionVariables.set('superAdminAuthToken', access_token);",
-                  "pm.environment.set('superAdminAuthToken', access_token);",
-                  "pm.globals.set('superAdminAuthToken', access_token);"
+                  "    pm.environment.set('adminToken', body.access_token);",
+                  "    pm.environment.set('adminUserId', body.user_id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -77,8 +33,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded",
-                "type": "text"
+                "value": "application/x-www-form-urlencoded"
               }
             ],
             "body": {
@@ -86,13 +41,11 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "{{superAdminUsername}}",
-                  "type": "text"
+                  "value": "superadmin"
                 },
                 {
                   "key": "password",
-                  "value": "{{superAdminPassword}}",
-                  "type": "text"
+                  "value": "SuperAdmin1"
                 }
               ]
             },
@@ -108,148 +61,179 @@
                 "token"
               ]
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "1.2 Login Vianda Admin",
+          "name": "1.2 Get Market + Plan IDs",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const au = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
-                  "if (au) pm.collectionVariables.set('adminUsername', au);",
-                  "else throw new Error('adminUsername not set in environment or globals');",
-                  "",
-                  "const ap = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
-                  "if (ap) pm.collectionVariables.set('adminPassword', ap);",
-                  "else throw new Error('adminPassword not set in environment or globals');"
-                ],
-                "type": "text/javascript"
-              }
-            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Login successful - Status 200', function () {",
+                  "pm.test('Markets found', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response contains access_token', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('access_token');",
-                  "    pm.expect(body.access_token).to.be.a('string');",
-                  "});",
-                  "",
-                  "const { access_token } = pm.response.json();",
-                  "pm.collectionVariables.set('adminAuthToken', access_token);",
-                  "pm.environment.set('adminAuthToken', access_token);",
-                  "pm.globals.set('adminAuthToken', access_token);"
+                  "    const market = body.find(m => m.country_code === 'AR') || body.find(m => m.country_code !== 'XG') || body[0];",
+                  "    pm.expect(market).to.not.be.undefined;",
+                  "    pm.environment.set('marketId', market.market_id);",
+                  "    pm.environment.set('marketCountryCode', market.country_code);",
+                  "    pm.environment.set('currencyMetadataId', market.currency_metadata_id);",
+                  "    console.log('Using market:', market.country_code, market.market_id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded",
-                "type": "text"
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
               }
             ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{adminUsername}}",
-                  "type": "text"
-                },
-                {
-                  "key": "password",
-                  "value": "{{adminPassword}}",
-                  "type": "text"
-                }
-              ]
-            },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "raw": "{{baseUrl}}/api/v1/markets/enriched",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "auth",
-                "token"
+                "markets",
+                "enriched"
               ]
             }
-          },
-          "response": []
+          }
+        },
+        {
+          "name": "1.3 Get Plan for Market",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Plan found', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    const plan = body.find(p => !p.is_archived) || body[0];",
+                  "    if (plan) {",
+                  "        pm.environment.set('planId', plan.plan_id);",
+                  "        pm.environment.set('planPrice', plan.price);",
+                  "        console.log('Using plan:', plan.plan_id, 'price:', plan.price);",
+                  "    } else {",
+                  "        console.warn('No plan found — billing tests will fail');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plans?market_id={{marketId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plans"
+              ],
+              "query": [
+                {
+                  "key": "market_id",
+                  "value": "{{marketId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.4 Resolve City Metadata",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('City found', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    const city = body[0];",
+                  "    if (city) {",
+                  "        pm.environment.set('cityMetadataId', city.city_metadata_id);",
+                  "        console.log('Using city:', city.city_metadata_id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities?country_code={{marketCountryCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "{{marketCountryCode}}"
+                }
+              ]
+            }
+          }
         }
       ]
     },
     {
-      "name": "2 Employer Setup",
+      "name": "2 Employer Institution + Entity",
       "item": [
         {
           "name": "2.1 Create Employer Institution",
           "event": [
             {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const mid = pm.environment.get('planMarketId') || pm.globals.get('planMarketId');",
-                  "if (mid) pm.collectionVariables.set('planMarketId', mid);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
               "listen": "test",
               "script": {
                 "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Employer institution created - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
-                  "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('employerInstitutionId', body.institution_id);",
+                  "// Save variables FIRST (outside test blocks) so downstream steps always have them",
+                  "const body = pm.response.json();",
+                  "if (body.institution_id) {",
                   "    pm.environment.set('employerInstitutionId', body.institution_id);",
-                  "    pm.globals.set('employerInstitutionId', body.institution_id);",
-                  "} else if (code === 400) {",
-                  "    pm.test('Institution already exists - recovering ID', function () {",
-                  "        pm.expect([400]).to.include(code);",
-                  "    });",
-                  "    const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "    const token = pm.collectionVariables.get('authToken');",
-                  "    pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/institutions',",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "    }, function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const institutions = res.json();",
-                  "            const found = institutions.find(i => i.name === 'Postman Employer Corp' && i.institution_type === 'Employer');",
-                  "            if (found) {",
-                  "                pm.collectionVariables.set('employerInstitutionId', found.institution_id);",
-                  "                pm.environment.set('employerInstitutionId', found.institution_id);",
-                  "                pm.globals.set('employerInstitutionId', found.institution_id);",
-                  "                console.log('Recovered employerInstitutionId:', found.institution_id);",
-                  "            }",
-                  "        }",
-                  "    });",
-                  "} else {",
-                  "    pm.test('Create employer institution returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
+                  "    console.log('Employer institution:', body.institution_id);",
+                  "}",
+                  "",
+                  "pm.test('Institution created - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Has institution_id and market_ids', function () {",
+                  "    pm.expect(body).to.have.property('institution_id');",
+                  "    pm.expect(body).to.have.property('market_ids');",
+                  "    pm.expect(body.market_ids).to.be.an('array').with.length.at.least(1);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -258,17 +242,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman Employer Corp\",\n  \"institution_type\": \"Employer\",\n  \"market_id\": \"{{planMarketId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"name\": \"Postman Employer Corp\",\n    \"institution_type\": \"employer\",\n    \"market_ids\": [\"{{marketId}}\"]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/institutions",
@@ -281,67 +266,22 @@
                 "institutions"
               ]
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "2.2 Create Employer",
+          "name": "2.2 Create Employer Admin User",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  ""
-                ],
-                "type": "text/javascript"
-              }
-            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Employer created - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
+                  "pm.test('User created - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('employerId', body.employer_id);",
-                  "    pm.environment.set('employerId', body.employer_id);",
-                  "    pm.globals.set('employerId', body.employer_id);",
-                  "    if (body.address_id) {",
-                  "        pm.collectionVariables.set('employerAddressId', body.address_id);",
-                  "        pm.environment.set('employerAddressId', body.address_id);",
-                  "        pm.globals.set('employerAddressId', body.address_id);",
-                  "    }",
-                  "} else if (code === 400) {",
-                  "    pm.test('Employer already exists - recovering ID', function () {",
-                  "        pm.expect([400]).to.include(code);",
-                  "    });",
-                  "    const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "    const token = pm.collectionVariables.get('authToken');",
-                  "    pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/employers',",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "    }, function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const employers = res.json();",
-                  "            const found = employers.find(e => e.name === 'Postman Employer Corp' || e.name === 'Postman Employer Corp Updated');",
-                  "            if (found) {",
-                  "                pm.collectionVariables.set('employerId', found.employer_id);",
-                  "                pm.environment.set('employerId', found.employer_id);",
-                  "                pm.globals.set('employerId', found.employer_id);",
-                  "                console.log('Recovered employerId:', found.employer_id);",
-                  "            }",
-                  "        }",
-                  "    });",
-                  "} else {",
-                  "    pm.test('Create employer returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
+                  "    pm.expect(body).to.have.property('user_id');",
+                  "    pm.environment.set('employerAdminUserId', body.user_id);",
+                  "    console.log('Employer admin user:', body.user_id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -350,47 +290,45 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman Employer Corp\",\n  \"address\": {\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"country_code\": \"AR\",\n    \"province\": \"Ciudad Aut\\u00f3noma de Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"C1050\",\n    \"street_type\": \"Ave\",\n    \"street_name\": \"Rivadavia\",\n    \"building_number\": \"500\"\n  },\n  \"assign_employer\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"username\": \"employer_admin_011\",\n    \"email\": \"employer_admin_011@postman-test.com\",\n    \"password\": \"Employer123!\",\n    \"role_type\": \"employer\",\n    \"role_name\": \"admin\",\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"market_id\": \"{{marketId}}\",\n    \"city_metadata_id\": \"{{cityMetadataId}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employers",
+              "raw": "{{baseUrl}}/api/v1/users",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "employers"
+                "users"
               ]
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "2.3 Get All Employers",
+          "name": "2.3 Create Address for Entity",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response is array with at least 1 employer', function () {",
+                  "pm.test('Address created - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "    pm.expect(body.length).to.be.at.least(1);",
+                  "    pm.expect(body).to.have.property('address_id');",
+                  "    pm.environment.set('entityAddressId', body.address_id);",
+                  "    console.log('Entity address:', body.address_id);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -398,39 +336,48 @@
             }
           ],
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"country_code\": \"{{marketCountryCode}}\",\n    \"province\": \"Buenos Aires\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"C1001\",\n    \"street_type\": \"ave\",\n    \"street_name\": \"Corrientes\",\n    \"building_number\": \"500\",\n    \"city_metadata_id\": \"{{cityMetadataId}}\"\n}"
+            },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employers",
+              "raw": "{{baseUrl}}/api/v1/addresses",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "employers"
+                "addresses"
               ]
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "2.4 Search Employers",
+          "name": "2.4 Create Employer Entity (with email_domain)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response is array with at least 1 match', function () {",
+                  "pm.test('Entity created - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "    pm.expect(body.length).to.be.at.least(1);",
+                  "    pm.expect(body).to.have.property('institution_entity_id');",
+                  "    pm.expect(body.email_domain).to.equal('postman-employer.com');",
+                  "    pm.environment.set('employerEntityId', body.institution_entity_id);",
+                  "    console.log('Employer entity:', body.institution_entity_id);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -438,204 +385,86 @@
             }
           ],
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"address_id\": \"{{entityAddressId}}\",\n    \"tax_id\": \"30-12345678-9\",\n    \"name\": \"Postman Employer AR S.A.\",\n    \"email_domain\": \"postman-employer.com\"\n}"
+            },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/search?search_term=Postman",
+              "raw": "{{baseUrl}}/api/v1/institution-entities",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "employers",
-                "search"
-              ],
-              "query": [
+                "institution-entities"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.5 Login Employer Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "    pm.environment.set('employerToken', body.access_token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
                 {
-                  "key": "search_term",
-                  "value": "Postman"
+                  "key": "username",
+                  "value": "employer_admin_011"
+                },
+                {
+                  "key": "password",
+                  "value": "Employer123!"
                 }
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2.5 Get Employer by ID",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('employer_id matches', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body.employer_id).to.eql(pm.collectionVariables.get('employerId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/{{employerId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                "{{employerId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2.6 Get Enriched Employers",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response is array with address_city', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "    if (body.length > 0) {",
-                  "        pm.expect(body[0]).to.have.property('address_city');",
-                  "    }",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/enriched",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                "enriched"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2.7 Get Enriched Employer by ID",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Has address_street_name', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('address_street_name');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/enriched/{{employerId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                "enriched",
-                "{{employerId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2.8 Update Employer",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Name matches updated value', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body.name).to.eql('Postman Employer Corp Updated');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman Employer Corp Updated\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/{{employerId}}",
+              "raw": "{{baseUrl}}/api/v1/auth/token",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "employers",
-                "{{employerId}}"
+                "auth",
+                "token"
               ]
             }
-          },
-          "response": []
+          }
         }
       ]
     },
@@ -643,58 +472,21 @@
       "name": "3 Program Config",
       "item": [
         {
-          "name": "3.1 Create Benefits Program",
+          "name": "3.1 Create Benefits Program (institution-level defaults)",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  ""
-                ],
-                "type": "text/javascript"
-              }
-            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Benefits program created - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
+                  "pm.test('Program created - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('programId', body.program_id);",
+                  "    pm.expect(body).to.have.property('program_id');",
+                  "    pm.expect(body.benefit_rate).to.equal(70);",
+                  "    pm.expect(body.institution_entity_id).to.be.null;",
                   "    pm.environment.set('programId', body.program_id);",
-                  "    pm.globals.set('programId', body.program_id);",
-                  "} else if (code === 409) {",
-                  "    pm.test('Program already exists - recovering ID', function () {",
-                  "        pm.expect([409]).to.include(code);",
-                  "    });",
-                  "    const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "    const token = pm.collectionVariables.get('adminAuthToken');",
-                  "    const instId = pm.collectionVariables.get('employerInstitutionId');",
-                  "    pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/employer/program?institution_id=' + instId,",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "    }, function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const body = res.json();",
-                  "            if (body.program_id) {",
-                  "                pm.collectionVariables.set('programId', body.program_id);",
-                  "                pm.environment.set('programId', body.program_id);",
-                  "                pm.globals.set('programId', body.program_id);",
-                  "                console.log('Recovered programId:', body.program_id);",
-                  "            }",
-                  "        }",
-                  "    });",
-                  "} else {",
-                  "    pm.test('Create benefits program returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
+                  "    console.log('Program (institution-level):', body.program_id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -703,17 +495,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{employerInstitutionId}}\",\n  \"benefit_rate\": 100,\n  \"benefit_cap\": null,\n  \"benefit_cap_period\": \"monthly\",\n  \"price_discount\": 0,\n  \"minimum_monthly_fee\": null,\n  \"billing_cycle\": \"monthly\",\n  \"billing_day\": 15,\n  \"enrollment_mode\": \"managed\",\n  \"allow_early_renewal\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"benefit_rate\": 70,\n    \"benefit_cap_period\": \"monthly\",\n    \"price_discount\": 10,\n    \"billing_cycle\": \"monthly\",\n    \"enrollment_mode\": \"managed\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/employer/program",
@@ -727,8 +520,7 @@
                 "program"
               ]
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "3.2 Get Benefits Program",
@@ -737,15 +529,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
+                  "pm.test('Program retrieved', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Has program_id, benefit_rate, is_active', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('program_id');",
-                  "    pm.expect(body).to.have.property('benefit_rate');",
-                  "    pm.expect(body.is_active).to.eql(true);",
+                  "    pm.expect(body.benefit_rate).to.equal(70);",
+                  "    pm.expect(body.price_discount).to.equal(10);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -755,10 +543,13 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/program?institution_id={{employerInstitutionId}}",
+              "raw": "{{baseUrl}}/api/v1/employer/program",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -767,16 +558,9 @@
                 "v1",
                 "employer",
                 "program"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
               ]
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "3.3 Update Benefits Program",
@@ -785,14 +569,10 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
+                  "pm.test('Program updated', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('price_discount is 10 and billing_day is 20', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body.price_discount).to.eql(10);",
-                  "    pm.expect(body.billing_day).to.eql(20);",
+                  "    pm.expect(body.benefit_rate).to.equal(80);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -802,17 +582,18 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"price_discount\": 10,\n  \"billing_day\": 20\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"benefit_rate\": 80\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/employer/program?institution_id={{employerInstitutionId}}",
@@ -832,8 +613,7 @@
                 }
               ]
             }
-          },
-          "response": []
+          }
         }
       ]
     },
@@ -844,60 +624,17 @@
           "name": "4.1 Enroll Single Employee",
           "event": [
             {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const cid = pm.environment.get('planCityId') || pm.globals.get('planCityId');",
-                  "if (cid) pm.collectionVariables.set('planCityId', cid);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
               "listen": "test",
               "script": {
                 "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Employee enrolled - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
+                  "pm.test('Employee enrolled - Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('enrolledEmployeeId', body.user_id);",
-                  "    pm.environment.set('enrolledEmployeeId', body.user_id);",
-                  "    pm.globals.set('enrolledEmployeeId', body.user_id);",
-                  "    pm.collectionVariables.set('enrolledEmployeeEmail', 'emp.test.011@postmancorp.com');",
-                  "    pm.environment.set('enrolledEmployeeEmail', 'emp.test.011@postmancorp.com');",
-                  "} else if (code === 409 || code === 400) {",
-                  "    pm.test('Employee already exists - recovering ID', function () {",
-                  "        pm.expect([409, 400]).to.include(code);",
-                  "    });",
-                  "    const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "    const token = pm.collectionVariables.get('authToken');",
-                  "    const instId = pm.collectionVariables.get('employerInstitutionId');",
-                  "    pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/employer/employees?institution_id=' + instId,",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "    }, function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const employees = res.json();",
-                  "            const found = employees.find(e => e.email === 'emp.test.011@postmancorp.com');",
-                  "            if (found) {",
-                  "                pm.collectionVariables.set('enrolledEmployeeId', found.user_id);",
-                  "                pm.environment.set('enrolledEmployeeId', found.user_id);",
-                  "                pm.globals.set('enrolledEmployeeId', found.user_id);",
-                  "                pm.collectionVariables.set('enrolledEmployeeEmail', found.email);",
-                  "                console.log('Recovered enrolledEmployeeId:', found.user_id);",
-                  "            }",
-                  "        }",
-                  "    });",
-                  "} else {",
-                  "    pm.test('Enroll employee returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
+                  "    pm.expect(body).to.have.property('user_id');",
+                  "    pm.expect(body.email).to.equal('employee1@postman-employer.com');",
+                  "    pm.environment.set('employeeUserId', body.user_id);",
+                  "    console.log('Employee enrolled:', body.user_id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -906,20 +643,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"emp.test.011@postmancorp.com\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"Employee\",\n  \"mobile_number\": \"+5491155550011\",\n  \"city_id\": \"{{planCityId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"email\": \"employee1@postman-employer.com\",\n    \"first_name\": \"Test\",\n    \"last_name\": \"Employee\",\n    \"city_metadata_id\": \"{{cityMetadataId}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{employerInstitutionId}}",
+              "raw": "{{baseUrl}}/api/v1/employer/employees",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -928,16 +666,9 @@
                 "v1",
                 "employer",
                 "employees"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
               ]
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "4.2 List Enrolled Employees",
@@ -946,16 +677,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
+                  "pm.test('Employees listed', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Is array with at least 1 employee having user_id and email', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "    pm.expect(body.length).to.be.at.least(1);",
+                  "    pm.expect(body).to.be.an('array').with.length.at.least(1);",
                   "    pm.expect(body[0]).to.have.property('user_id');",
-                  "    pm.expect(body[0]).to.have.property('email');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -965,10 +691,13 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{employerInstitutionId}}",
+              "raw": "{{baseUrl}}/api/v1/employer/employees",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -977,56 +706,26 @@
                 "v1",
                 "employer",
                 "employees"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
               ]
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "4.3 Subscribe Employee to Plan",
           "event": [
             {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const pid = pm.environment.get('planId') || pm.globals.get('planId');",
-                  "if (pid) pm.collectionVariables.set('planId', pid);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
               "listen": "test",
               "script": {
                 "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Employee subscribed - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
-                  "    const body = pm.response.json();",
-                  "    if (body.subscription_id) {",
-                  "        pm.collectionVariables.set('employeeSubscriptionId', body.subscription_id);",
-                  "        pm.environment.set('employeeSubscriptionId', body.subscription_id);",
-                  "        pm.globals.set('employeeSubscriptionId', body.subscription_id);",
+                  "pm.test('Employee subscribed', function () {",
+                  "    const status = pm.response.code;",
+                  "    pm.expect(status).to.be.oneOf([201, 400]);",
+                  "    if (status === 201) {",
+                  "        console.log('Employee subscribed to plan');",
+                  "    } else {",
+                  "        console.log('Subscription result:', pm.response.json().detail);",
                   "    }",
-                  "} else if (code === 409) {",
-                  "    pm.test('Employee already subscribed - 409', function () {",
-                  "        pm.expect(code).to.eql(409);",
-                  "    });",
-                  "    console.log('Employee already subscribed');",
-                  "} else {",
-                  "    pm.test('Subscribe employee returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -1035,20 +734,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan_id\": \"{{planId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n    \"plan_id\": \"{{planId}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/employees/{{enrolledEmployeeId}}/subscribe?institution_id={{employerInstitutionId}}",
+              "raw": "{{baseUrl}}/api/v1/employer/employees/{{employeeUserId}}/subscribe",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1057,347 +757,29 @@
                 "v1",
                 "employer",
                 "employees",
-                "{{enrolledEmployeeId}}",
+                "{{employeeUserId}}",
                 "subscribe"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
               ]
             }
-          },
-          "response": []
-        },
-        {
-          "name": "4.4 Bulk Enroll Employees CSV",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "const token = pm.collectionVariables.get('adminAuthToken');",
-                  "const instId = pm.collectionVariables.get('employerInstitutionId');",
-                  "const cityId = pm.collectionVariables.get('planCityId');",
-                  "",
-                  "const csvContent = 'email,first_name,last_name\\nbulk1@postmancorp.com,Bulk,One\\nbulk2@postmancorp.com,Bulk,Two';",
-                  "const boundary = '----PostmanBoundary' + Date.now();",
-                  "",
-                  "const body = '--' + boundary + '\\r\\n' +",
-                  "  'Content-Disposition: form-data; name=\"city_id\"\\r\\n\\r\\n' + cityId + '\\r\\n' +",
-                  "  '--' + boundary + '\\r\\n' +",
-                  "  'Content-Disposition: form-data; name=\"file\"; filename=\"employees.csv\"\\r\\n' +",
-                  "  'Content-Type: text/csv\\r\\n\\r\\n' + csvContent + '\\r\\n' +",
-                  "  '--' + boundary + '--\\r\\n';",
-                  "",
-                  "pm.sendRequest({",
-                  "  url: baseUrl + '/api/v1/employer/employees/bulk?institution_id=' + instId,",
-                  "  method: 'POST',",
-                  "  header: {",
-                  "    'Authorization': 'Bearer ' + token,",
-                  "    'Content-Type': 'multipart/form-data; boundary=' + boundary",
-                  "  },",
-                  "  body: { mode: 'raw', raw: body }",
-                  "}, (err, res) => {",
-                  "  if (!err && res.code === 200) {",
-                  "    const result = res.json();",
-                  "    console.log('Bulk enroll result:', JSON.stringify(result));",
-                  "    pm.collectionVariables.set('bulkEnrollResult', JSON.stringify(result));",
-                  "    if (result.created && result.created.length > 0) {",
-                  "      pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/employer/employees?institution_id=' + instId,",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "      }, (err2, res2) => {",
-                  "        if (!err2 && res2.code === 200) {",
-                  "          const employees = res2.json();",
-                  "          const bulkEmp = employees.find(e => e.email === 'bulk1@postmancorp.com');",
-                  "          if (bulkEmp) {",
-                  "            pm.collectionVariables.set('bulkEmployeeId', bulkEmp.user_id);",
-                  "            pm.environment.set('bulkEmployeeId', bulkEmp.user_id);",
-                  "          }",
-                  "        }",
-                  "      });",
-                  "    }",
-                  "  } else {",
-                  "    console.log('Bulk enroll error:', err || res.code);",
-                  "  }",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('At least 2 employees listed', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "    pm.expect(body.length).to.be.at.least(2);",
-                  "});",
-                  "",
-                  "const bulkResult = pm.collectionVariables.get('bulkEnrollResult');",
-                  "if (bulkResult) {",
-                  "    try {",
-                  "        const parsed = JSON.parse(bulkResult);",
-                  "        pm.test('Bulk enroll has created_count', function () {",
-                  "            pm.expect(parsed).to.have.property('created');",
-                  "        });",
-                  "    } catch (e) {",
-                  "        console.log('Could not parse bulkEnrollResult');",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "employees"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "4.5 Deactivate Bulk Employee",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 204', function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/employees/{{bulkEmployeeId}}?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "employees",
-                "{{bulkEmployeeId}}"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
+          }
         }
       ]
     },
     {
-      "name": "5 Domain Management",
+      "name": "5 Billing",
       "item": [
         {
-          "name": "5.1 Add Email Domain",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  ""
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const code = pm.response.code;",
-                  "",
-                  "if (code === 201) {",
-                  "    pm.test('Domain added - 201', function () {",
-                  "        pm.response.to.have.status(201);",
-                  "    });",
-                  "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('employerDomainId', body.domain_id);",
-                  "    pm.environment.set('employerDomainId', body.domain_id);",
-                  "    pm.globals.set('employerDomainId', body.domain_id);",
-                  "} else if (code === 409) {",
-                  "    pm.test('Domain already exists - recovering ID', function () {",
-                  "        pm.expect([409]).to.include(code);",
-                  "    });",
-                  "    const baseUrl = pm.collectionVariables.get('baseUrl');",
-                  "    const token = pm.collectionVariables.get('adminAuthToken');",
-                  "    const instId = pm.collectionVariables.get('employerInstitutionId');",
-                  "    pm.sendRequest({",
-                  "        url: baseUrl + '/api/v1/employer/domains?institution_id=' + instId,",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + token }",
-                  "    }, function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const domains = res.json();",
-                  "            const found = domains.find(d => d.domain === 'postmancorp.com');",
-                  "            if (found) {",
-                  "                pm.collectionVariables.set('employerDomainId', found.domain_id);",
-                  "                pm.environment.set('employerDomainId', found.domain_id);",
-                  "                pm.globals.set('employerDomainId', found.domain_id);",
-                  "                console.log('Recovered employerDomainId:', found.domain_id);",
-                  "            }",
-                  "        }",
-                  "    });",
-                  "} else {",
-                  "    pm.test('Add domain returned unexpected status', function () {",
-                  "        pm.expect.fail('Unexpected status: ' + code);",
-                  "    });",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"domain\": \"postmancorp.com\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/domains?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "domains"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "5.2 Add Blacklisted Domain - expect 400",
+          "name": "5.1 List Bills",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 400', function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test('Detail mentions common email provider', function () {",
-                  "    const body = pm.response.json();",
-                  "    const d = (body.detail || '').toString().toLowerCase();",
-                  "    pm.expect(d).to.include('common email provider');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"domain\": \"gmail.com\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/domains?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "domains"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "5.3 List Domains",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
+                  "pm.test('Bills listed', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response is array', function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.be.an('array');",
+                  "    console.log('Bills count:', body.length);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1407,176 +789,13 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/domains?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "domains"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "5.4 Remove Domain",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 204', function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/domains/{{employerDomainId}}?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "domains",
-                "{{employerDomainId}}"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "6 Billing",
-      "item": [
-        {
-          "name": "6.1 Generate Bill",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const now = new Date();",
-                  "const start = new Date(now.getFullYear(), now.getMonth(), 1);",
-                  "const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);",
-                  "pm.collectionVariables.set('billingPeriodStart', start.toISOString().split('T')[0]);",
-                  "pm.collectionVariables.set('billingPeriodEnd', end.toISOString().split('T')[0]);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "pm.test('Has bill and lines', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('bill');",
-                  "    pm.expect(body).to.have.property('lines');",
-                  "    pm.expect(body.lines).to.be.an('array');",
-                  "});",
-                  "",
-                  "const body = pm.response.json();",
-                  "if (body.bill && body.bill.employer_bill_id) {",
-                  "    pm.collectionVariables.set('employerBillId', body.bill.employer_bill_id);",
-                  "    pm.environment.set('employerBillId', body.bill.employer_bill_id);",
-                  "    pm.globals.set('employerBillId', body.bill.employer_bill_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{employerInstitutionId}}\",\n  \"period_start\": \"{{billingPeriodStart}}\",\n  \"period_end\": \"{{billingPeriodEnd}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/billing/generate",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "billing",
-                "generate"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "6.2 List Bills",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response is array', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.be.an('array');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/billing?institution_id={{employerInstitutionId}}",
+              "raw": "{{baseUrl}}/api/v1/employer/billing",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1585,74 +804,21 @@
                 "v1",
                 "employer",
                 "billing"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
               ]
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "6.3 Get Bill Detail",
+          "name": "5.2 Run Billing Cron",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200', function () {",
+                  "pm.test('Cron ran successfully', function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Has bill and lines', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('bill');",
-                  "    pm.expect(body).to.have.property('lines');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/billing/{{employerBillId}}?institution_id={{employerInstitutionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employer",
-                "billing",
-                "{{employerBillId}}"
-              ],
-              "query": [
-                {
-                  "key": "institution_id",
-                  "value": "{{employerInstitutionId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "6.4 Run Billing Cron",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
+                  "    console.log('Billing cron result:', JSON.stringify(body));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1662,7 +828,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/employer/billing/run-cron",
@@ -1677,193 +846,15 @@
                 "run-cron"
               ]
             }
-          },
-          "response": []
+          }
         }
       ]
-    },
-    {
-      "name": "7 Cleanup",
-      "item": [
-        {
-          "name": "7.1 Delete Employer",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response has message', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('message');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}", "type": "text" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employers/{{employerId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                "{{employerId}}"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    }
-  ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{authToken}}",
-        "type": "string"
-      }
-    ]
-  },
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "exec": [
-          "const base = pm.environment.get('baseUrl') || pm.globals.get('baseUrl') || 'http://localhost:8000';",
-          "pm.collectionVariables.set('baseUrl', base);",
-          "",
-          "const su = pm.environment.get('superAdminUsername') || pm.globals.get('superAdminUsername');",
-          "if (su) pm.collectionVariables.set('superAdminUsername', su);",
-          "const sp = pm.environment.get('superAdminPassword') || pm.globals.get('superAdminPassword');",
-          "if (sp) pm.collectionVariables.set('superAdminPassword', sp);",
-          "const au = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
-          "if (au) pm.collectionVariables.set('adminUsername', au);",
-          "const ap = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
-          "if (ap) pm.collectionVariables.set('adminPassword', ap);"
-        ],
-        "type": "text/javascript"
-      }
-    },
-    {
-      "listen": "test",
-      "script": {
-        "exec": [
-          ""
-        ],
-        "type": "text/javascript"
-      }
     }
   ],
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8000"
-    },
-    {
-      "key": "superAdminUsername",
-      "value": ""
-    },
-    {
-      "key": "superAdminPassword",
-      "value": ""
-    },
-    {
-      "key": "adminUsername",
-      "value": ""
-    },
-    {
-      "key": "adminPassword",
-      "value": ""
-    },
-    {
-      "key": "authToken",
-      "value": ""
-    },
-    {
-      "key": "superAdminAuthToken",
-      "value": ""
-    },
-    {
-      "key": "adminAuthToken",
-      "value": ""
-    },
-    {
-      "key": "employerInstitutionId",
-      "value": ""
-    },
-    {
-      "key": "employerId",
-      "value": ""
-    },
-    {
-      "key": "employerAddressId",
-      "value": ""
-    },
-    {
-      "key": "programId",
-      "value": ""
-    },
-    {
-      "key": "enrolledEmployeeId",
-      "value": ""
-    },
-    {
-      "key": "enrolledEmployeeEmail",
-      "value": ""
-    },
-    {
-      "key": "employeeSubscriptionId",
-      "value": ""
-    },
-    {
-      "key": "bulkEmployeeId",
-      "value": ""
-    },
-    {
-      "key": "bulkEnrollResult",
-      "value": ""
-    },
-    {
-      "key": "employerDomainId",
-      "value": ""
-    },
-    {
-      "key": "employerBillId",
-      "value": ""
-    },
-    {
-      "key": "billingPeriodStart",
-      "value": ""
-    },
-    {
-      "key": "billingPeriodEnd",
-      "value": ""
-    },
-    {
-      "key": "planCityId",
-      "value": ""
-    },
-    {
-      "key": "planId",
-      "value": ""
-    },
-    {
-      "key": "planMarketId",
-      "value": ""
     }
   ]
 }

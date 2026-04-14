@@ -32,7 +32,7 @@ Each entry should include:
 **Frontend action required**:
 - B2B: Remove `no_show_discount` from institution create/edit forms. Add Supplier Terms tab/section on institution detail (Supplier type only). Call `PUT /supplier-terms/{id}` to configure terms after creating a Supplier institution. Re-run TypeScript codegen (`npx openapi-typescript`).
 **Backward compatible?**: No
-**Migration doc**: `docs/api/b2b_client/SUPPLIER_TERMS_B2B.md`
+**Migration doc**: `docs/api/b2b_client/API_CLIENT_SUPPLIER_TERMS.md`
 
 ---
 

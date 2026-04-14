@@ -33,6 +33,7 @@ from app.schemas.consolidated_schemas import (
     ChangePasswordSchema,
     AdminResetPasswordSchema,
     AssignEmployerRequest,
+    AssignWorkplaceRequest,
     MessagingPreferencesResponseSchema,
     MessagingPreferencesUpdateSchema,
 )
@@ -62,25 +63,25 @@ from app.utils.pagination import PaginationParams, get_pagination_params, set_pa
 import psycopg2.extensions
 
 
-def _validate_user_update_city_id(
-    city_id: UUID,
+def _validate_user_update_city_metadata_id(
+    city_metadata_id: UUID,
     market_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Validate that city_id belongs to a city whose country_code matches the user's market."""
+    """Validate that city_metadata_id belongs to a city whose country_code matches the user's market."""
     # Global city (B2B sentinel) is allowed with any market; skip country check
-    if is_global_city(city_id):
+    if is_global_city(city_metadata_id):
         return
-    city = city_service.get_by_id(city_id, db, scope=None)
+    city = city_service.get_by_id(city_metadata_id, db, scope=None)
     if not city:
-        raise HTTPException(status_code=400, detail=f"City not found: {city_id}")
+        raise HTTPException(status_code=400, detail=f"City not found: {city_metadata_id}")
     if city.is_archived:
-        raise HTTPException(status_code=400, detail=f"City is archived: {city_id}")
+        raise HTTPException(status_code=400, detail=f"City is archived: {city_metadata_id}")
     market = market_service.get_by_id(market_id)
     if not market:
         raise HTTPException(status_code=400, detail=f"Market not found: {market_id}")
     market_country = (market.get("country_code") or "").strip().upper()
-    city_country = (city.country_code or "").strip().upper()
+    city_country = (city.country_iso or "").strip().upper()
     if market_country != city_country:
         raise HTTPException(
             status_code=400,
@@ -370,18 +371,18 @@ def update_current_user_profile(
     role_name = current_user.get("role_name")
     rt_str = (role_type.value if hasattr(role_type, "value") else str(role_type)) if role_type else ""
     rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-    if rt_str == "customer" and rn_str == "comensal" and "city_id" in update_data:
-        if update_data["city_id"] is None:
+    if rt_str == "customer" and rn_str == "comensal" and "city_metadata_id" in update_data:
+        if update_data["city_metadata_id"] is None:
             raise HTTPException(status_code=400, detail="City is required and cannot be removed")
-        cid = update_data["city_id"] if isinstance(update_data["city_id"], UUID) else UUID(str(update_data["city_id"]))
+        cid = update_data["city_metadata_id"] if isinstance(update_data["city_metadata_id"], UUID) else UUID(str(update_data["city_metadata_id"]))
         if is_global_city(cid):
             raise HTTPException(status_code=400, detail="Customers must have a specific city")
-    # Validate city_id matches user's market country (use effective market: update or existing)
-    if "city_id" in update_data and update_data["city_id"] is not None:
+    # Validate city_metadata_id matches user's market country (use effective market: update or existing)
+    if "city_metadata_id" in update_data and update_data["city_metadata_id"] is not None:
         effective_market_id = update_data.get("market_id") or existing_user.market_id
-        _validate_user_update_city_id(update_data["city_id"], effective_market_id, db)
+        _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
     # When clearing employer, also clear employer_address_id
-    if "employer_id" in update_data and update_data["employer_id"] is None:
+    if "employer_entity_id" in update_data and update_data["employer_entity_id"] is None:
         update_data["employer_address_id"] = None
 
     _apply_mobile_number_verification_reset(update_data, existing_user)
@@ -580,10 +581,10 @@ def assign_my_employer(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
-    """Assign an existing employer and address to current user. Both employer_id and address_id required; address must belong to employer. Only Customer users can have an employer; Supplier and Internal get 403."""
+    """Assign an existing employer entity and address to current user. Both employer_entity_id and address_id required; address must belong to employer. Only Customer users can have an employer; Supplier and Internal get 403."""
     log_employer_assign_debug(
         f"PUT /users/me/employer received: user_id={current_user.get('user_id')} "
-        f"employer_id={body.employer_id} address_id={body.address_id}"
+        f"employer_entity_id={body.employer_entity_id} address_id={body.address_id}"
     )
     role_type = (current_user.get("role_type") or "").strip()
     if role_type in ("supplier", "internal", "employer"):
@@ -591,18 +592,18 @@ def assign_my_employer(
             status_code=403,
             detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign an employer.",
         )
-    from app.services.crud_service import employer_service, address_service
-    from app.utils.error_messages import employer_not_found
-    
+    from app.services.crud_service import institution_entity_service, address_service
+    from app.utils.error_messages import entity_not_found
+
     def _assign_employer():
-        employer_id = body.employer_id
+        employer_entity_id = body.employer_entity_id
         address_id = body.address_id
-        
-        # Validate employer exists
-        employer = employer_service.get_by_id(employer_id, db)
-        if not employer:
-            raise employer_not_found(employer_id)
-        
+
+        # Validate employer entity exists
+        employer_entity = institution_entity_service.get_by_id(employer_entity_id, db, scope=None)
+        if not employer_entity:
+            raise entity_not_found("Employer entity", employer_entity_id)
+
         # Validate address exists, not archived, and belongs to employer
         address = address_service.get_by_id(address_id, db, scope=None)
         if not address:
@@ -615,16 +616,17 @@ def assign_my_employer(
                 status_code=400,
                 detail=f"Address is archived: {address_id}. Use an active address.",
             )
-        addr_employer_id = getattr(address, "employer_id", None)
-        if not addr_employer_id or str(addr_employer_id) != str(employer_id):
+        addr_institution_id = getattr(address, "institution_id", None)
+        employer_institution_id = getattr(employer_entity, "institution_id", None)
+        if not addr_institution_id or str(addr_institution_id) != str(employer_institution_id):
             raise HTTPException(
                 status_code=400,
-                detail="Address does not belong to the specified employer. Use an address from GET /employers/{id}/addresses.",
+                detail="Address does not belong to the specified employer. Use an address from the employer's institution.",
             )
-        
-        # Update user's employer_id and employer_address_id
+
+        # Update user's employer_entity_id and employer_address_id
         update_data = {
-            "employer_id": employer_id,
+            "employer_entity_id": employer_entity_id,
             "employer_address_id": address_id,
             "modified_by": current_user["user_id"]
         }
@@ -652,7 +654,7 @@ def assign_my_employer(
         
         if not updated:
             log_employer_assign_debug(
-                f"employer assignment FAILED: user_service.update returned None for user_id={current_user['user_id']}"
+                f"employer entity assignment FAILED: user_service.update returned None for user_id={current_user['user_id']}"
             )
             # Diagnostic: check if user exists (including archived) to surface actionable errors
             from app.utils.db import db_read
@@ -681,11 +683,78 @@ def assign_my_employer(
             )
         log_employer_assign_debug(
             f"employer assignment SUCCESS: user_id={current_user['user_id']} "
-            f"employer_id={employer_id} employer_address_id={address_id}"
+            f"employer_entity_id={employer_entity_id} employer_address_id={address_id}"
         )
         return _user_dto_to_response(updated, db)
 
     return handle_business_operation(_assign_employer, "employer assignment")
+
+
+# PUT /users/me/workplace - Assign workplace group and pickup address to current user (Customers only)
+@router.put("/me/workplace", response_model=UserResponseSchema)
+def assign_my_workplace(
+    body: AssignWorkplaceRequest = Body(..., description="Workplace group ID and pickup address ID"),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Assign a workplace group and pickup address to the current user. Only Customer users."""
+    role_type = (current_user.get("role_type") or "").strip()
+    if role_type in ("supplier", "internal", "employer"):
+        raise HTTPException(
+            status_code=403,
+            detail="Workplace group is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign a workplace group.",
+        )
+    from app.services.crud_service import workplace_group_service, address_service
+
+    def _assign_workplace():
+        group_id = body.workplace_group_id
+        address_id = body.address_id
+
+        # Validate workplace group exists and is active
+        group = workplace_group_service.get_by_id(group_id, db, scope=None)
+        if not group:
+            raise HTTPException(status_code=400, detail=f"Workplace group not found: {group_id}")
+        if group.is_archived:
+            raise HTTPException(status_code=400, detail=f"Workplace group is archived: {group_id}")
+
+        # Validate address exists and is not archived
+        address = address_service.get_by_id(address_id, db, scope=None)
+        if not address:
+            raise HTTPException(status_code=400, detail=f"Address not found: {address_id}")
+        if address.is_archived:
+            raise HTTPException(status_code=400, detail=f"Address is archived: {address_id}. Use an active address.")
+
+        # Validate address belongs to the workplace group
+        addr_wg_id = getattr(address, "workplace_group_id", None)
+        if not addr_wg_id or str(addr_wg_id) != str(group_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Address does not belong to the specified workplace group.",
+            )
+
+        # Update user: workplace_group_id + employer_address_id (pickup location)
+        update_data = {
+            "workplace_group_id": group_id,
+            "employer_address_id": address_id,
+            "modified_by": current_user["user_id"],
+        }
+
+        updated = user_service.update(
+            current_user["user_id"],
+            update_data,
+            db,
+            scope=None,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to assign workplace group")
+        log_info(
+            f"Workplace assignment SUCCESS: user_id={current_user['user_id']} "
+            f"workplace_group_id={group_id} employer_address_id={address_id}"
+        )
+        return _user_dto_to_response(updated, db)
+
+    return handle_business_operation(_assign_workplace, "workplace assignment")
+
 
 # =============================================================================
 # ENRICHED USER ENDPOINTS (with role_name, role_type, institution_name)
@@ -866,9 +935,9 @@ def create(
         user_data.get("role_type"),
         user_data.get("role_name"),
     )
-    ensure_employer_not_for_supplier_employee(user_data.get("role_type"), user_data.get("employer_id"), context="create")
+    ensure_employer_not_for_supplier_employee(user_data.get("role_type"), user_data.get("employer_entity_id"), context="create")
     if rt_str in ("supplier", "internal", "employer"):
-        user_data["employer_id"] = None
+        user_data["employer_entity_id"] = None
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
@@ -959,12 +1028,12 @@ def update(
     existing_role_type = getattr(existing_user, "role_type", None)
     if existing_role_type and hasattr(existing_role_type, "value"):
         existing_role_type = existing_role_type.value
-    if "employer_id" in update_data:
-        ensure_employer_not_for_supplier_employee(existing_role_type, update_data["employer_id"], context="update")
+    if "employer_entity_id" in update_data:
+        ensure_employer_not_for_supplier_employee(existing_role_type, update_data["employer_entity_id"], context="update")
     if existing_role_type in ("supplier", "internal", "employer"):
-        update_data.pop("employer_id", None)
+        update_data.pop("employer_entity_id", None)
     # When clearing employer, also clear employer_address_id
-    if "employer_id" in update_data and update_data["employer_id"] is None:
+    if "employer_entity_id" in update_data and update_data["employer_entity_id"] is None:
         update_data["employer_address_id"] = None
     if "role_name" in update_data:
         ensure_user_role_name_allowed(existing_role_type, update_data["role_name"], current_user, "update")
@@ -987,18 +1056,18 @@ def update(
     # Customer Comensal: cannot remove city or set to Global (B2B updating Customer)
     existing_role_name = getattr(existing_user, "role_name", None)
     rn_str = (existing_role_name.value if hasattr(existing_role_name, "value") else str(existing_role_name)) if existing_role_name else ""
-    if existing_role_type == "customer" and rn_str == "comensal" and "city_id" in update_data:
-        if update_data["city_id"] is None:
+    if existing_role_type == "customer" and rn_str == "comensal" and "city_metadata_id" in update_data:
+        if update_data["city_metadata_id"] is None:
             raise HTTPException(status_code=400, detail="City is required and cannot be removed")
-        cid = update_data["city_id"] if isinstance(update_data["city_id"], UUID) else UUID(str(update_data["city_id"]))
+        cid = update_data["city_metadata_id"] if isinstance(update_data["city_metadata_id"], UUID) else UUID(str(update_data["city_metadata_id"]))
         if is_global_city(cid):
             raise HTTPException(status_code=400, detail="Customers must have a specific city")
         effective_market_id = update_data.get("market_id") or existing_user.market_id
-        _validate_user_update_city_id(update_data["city_id"], effective_market_id, db)
-    elif "city_id" in update_data and update_data["city_id"] is not None:
+        _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
+    elif "city_metadata_id" in update_data and update_data["city_metadata_id"] is not None:
         # Non-Comensal or non-Customer: validate city matches market when provided
         effective_market_id = update_data.get("market_id") or existing_user.market_id
-        _validate_user_update_city_id(update_data["city_id"], effective_market_id, db)
+        _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
 
     _apply_mobile_number_verification_reset(update_data, existing_user)
     email_change_message = _apply_email_change_request(user_id, existing_user, update_data, db)

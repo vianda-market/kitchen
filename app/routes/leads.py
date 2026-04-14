@@ -8,7 +8,7 @@ City-first so coverage grows faster; zipcode refinement can be added later.
 import time
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, Response
 import psycopg2.extensions
 
 from app.config import Status
@@ -183,20 +183,59 @@ async def get_featured_restaurant(
     return LeadsFeaturedRestaurantSchema(**result)
 
 
+# Cities cache — keyed by (country, audience), 600s TTL (same pattern as _markets_cache)
+_cities_cache: dict[str, tuple[List[str], float]] = {}
+CITIES_CACHE_TTL_SECONDS = 600  # 10 minutes
+
+
+def _get_cached_cities(country: str, audience: str, db) -> List[str]:
+    """Return cached city list for the (country, audience) pair."""
+    global _cities_cache
+    now = time.time()
+    key = f"{country}:{audience}"
+    entry = _cities_cache.get(key)
+    if entry and now < entry[1]:
+        return entry[0]
+
+    if audience == "supplier":
+        from app.services.city_metrics_service import get_supplier_cities_for_country
+        cities = get_supplier_cities_for_country(country, db)
+    else:
+        cities = get_cities_with_coverage(country, db)
+
+    if cities is not None:
+        _cities_cache[key] = (cities, now + CITIES_CACHE_TTL_SECONDS)
+    return cities or []
+
+
 @router.get("/cities", response_model=LeadsCitiesResponseSchema)
 @limiter.limit("20/minute")
 async def get_leads_cities(
     request: Request,
+    response: Response,
     country_code: Optional[str] = "US",
+    audience: str = Query(
+        None,
+        description=(
+            "Optional. Pass 'supplier' for the broader lead-capture dropdown (includes all "
+            "cities in markets that accept supplier interest, from GeoNames + curated + crowd-sourced). "
+            "Default returns only served cities (active restaurants with plates + QR)."
+        ),
+    ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    List city names (from city_info) that have at least one restaurant in the given country.
-    Single public API for lead flow, signup picker, and explore. No auth; rate-limited per IP.
-    Use market's country_code (e.g. from GET /api/v1/leads/markets). Client sends selected city_name in signup.
+    List city names for lead forms. No auth; rate-limited per IP.
+
+    Default (no audience): cities with ≥1 active restaurant with plate_kitchen_days + QR.
+    ?audience=supplier: all cities in supplier-audience countries (GeoNames ∪ city_metadata ∪ restaurant_lead).
+
+    Client sends selected city_name in the lead/signup form body.
     """
     country = normalize_country_code(country_code, default="US")
-    cities = get_cities_with_coverage(country, db)
+    effective_audience = "supplier" if audience == "supplier" else "customer"
+    cities = _get_cached_cities(country, effective_audience, db)
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return LeadsCitiesResponseSchema(cities=cities)
 
 

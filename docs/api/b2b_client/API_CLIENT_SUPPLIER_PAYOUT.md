@@ -274,7 +274,7 @@ The payout table is append-only. Retries insert a new row. A bill with `resoluti
 
 ## References
 
-- Payout history list: `docs/api/b2b_client/PAYOUT_HISTORY_ENRICHED_B2B.md`
+- Payout history list: `docs/api/b2b_client/API_CLIENT_PAYOUT_HISTORY.md`
 - Financial data hierarchy: `docs/api/internal/FINANCIAL_DATA_HIERARCHY.md`
 - Entity list: `GET /api/v1/institution-entities/enriched/`
 - Bill list: `GET /api/v1/institution-bills/`

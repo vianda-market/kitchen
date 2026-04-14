@@ -1,7 +1,7 @@
 """
 Restaurant explorer service for B2C explore-by-city flow.
 
-- Cities for dropdown: use get_cities_with_coverage from city_metrics_service (city_info + has restaurant).
+- Cities for dropdown: use get_cities_with_coverage from city_metrics_service (city_metadata + has restaurant).
 - get_restaurants_by_city(city, country_code, db, ...): list of restaurants in that city
   with name, cuisine, lat/lng for list and map; optional market filter and plates for a kitchen day.
 - resolve_kitchen_day_for_explore(country_code, timezone_str, db): next available kitchen day (or today if still open).
@@ -71,16 +71,20 @@ def get_coworker_pickup_windows(
         return []
 
     user_row = db_read(
-        "SELECT employer_id, employer_address_id FROM user_info WHERE user_id = %s",
+        "SELECT employer_entity_id, employer_address_id, workplace_group_id FROM user_info WHERE user_id = %s",
         (str(user_id),),
         connection=db,
         fetch_one=True,
     )
-    if not user_row or not user_row.get("employer_id"):
+    if not user_row:
         return []
 
-    employer_id = user_row["employer_id"]
+    workplace_group_id = user_row.get("workplace_group_id")
+    employer_entity_id = user_row.get("employer_entity_id")
     employer_address_id = user_row.get("employer_address_id")
+
+    if not workplace_group_id and not employer_entity_id:
+        return []
 
     # Get country_code from restaurant for market windows
     addr_row = db_read(
@@ -99,7 +103,8 @@ def get_coworker_pickup_windows(
     if not all_windows:
         return []
 
-    if employer_address_id is not None:
+    if workplace_group_id:
+        # workplace_group_id takes precedence — match all users in the same group
         sel_query = """
             SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
             FROM plate_selection_info ps
@@ -109,9 +114,22 @@ def get_coworker_pickup_windows(
               AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
               AND ump.coworkers_can_see_my_orders = TRUE
               AND ump.can_participate_in_plate_pickups = TRUE
-              AND u_ps.employer_id = %s AND u_ps.employer_address_id = %s
+              AND u_ps.workplace_group_id = %s
         """
-        params = (str(restaurant_id), kitchen_day, str(employer_id), str(employer_address_id))
+        params = (str(restaurant_id), kitchen_day, str(workplace_group_id))
+    elif employer_address_id is not None:
+        sel_query = """
+            SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
+            FROM plate_selection_info ps
+            INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
+            INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
+            WHERE ps.restaurant_id = %s AND ps.kitchen_day = %s
+              AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
+              AND ump.coworkers_can_see_my_orders = TRUE
+              AND ump.can_participate_in_plate_pickups = TRUE
+              AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id = %s
+        """
+        params = (str(restaurant_id), kitchen_day, str(employer_entity_id), str(employer_address_id))
     else:
         sel_query = """
             SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
@@ -122,9 +140,9 @@ def get_coworker_pickup_windows(
               AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
               AND ump.coworkers_can_see_my_orders = TRUE
               AND ump.can_participate_in_plate_pickups = TRUE
-              AND u_ps.employer_id = %s AND u_ps.employer_address_id IS NULL
+              AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id IS NULL
         """
-        params = (str(restaurant_id), kitchen_day, str(employer_id))
+        params = (str(restaurant_id), kitchen_day, str(employer_entity_id))
 
     rows = db_read(sel_query, params, connection=db) or []
     seen: set = set()
@@ -186,7 +204,13 @@ def get_allowed_kitchen_date_range(timezone_str: str) -> Tuple[date, date]:
 
 
 def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> date:
-    """Return the next occurrence of the given weekday (Monday–Friday) from today in the given TZ."""
+    """Return the next occurrence of the given weekday (Monday–Friday) from today in the given TZ.
+
+    In DEV_MODE, when today is a weekend and the target day was mapped to friday,
+    return TODAY instead of next Friday — so plate pickups, QR scans, and billing
+    all operate on the same date and the E2E flow works any day of the week.
+    """
+    from app.config.settings import settings as _settings
     try:
         tz = pytz.timezone(timezone_str or "UTC")
     except Exception:
@@ -196,6 +220,11 @@ def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> 
     if target is None:
         raise ValueError(f"Invalid kitchen_day: {weekday_name!r}")
     days_ahead = (target - today.weekday() + 7) % 7
+    # DEV_MODE: if today is a weekend, return today so the full E2E pipeline
+    # (plate selection → QR scan → complete → billing) all operates on the same date.
+    # The DB CHECK constraint on pickup_date DOW was removed — business logic owns the guard.
+    if _settings.DEV_MODE and today.weekday() >= 5 and days_ahead > 0:
+        return today
     return today + timedelta(days=days_ahead)
 
 
@@ -437,8 +466,9 @@ def get_restaurants_by_city(
     kitchen_day: Optional[str] = None,
     credit_cost_local_currency: Optional[float] = None,
     user_id: Optional[UUID] = None,
-    employer_id: Optional[UUID] = None,
+    employer_entity_id: Optional[UUID] = None,
     employer_address_id: Optional[UUID] = None,
+    workplace_group_id: Optional[UUID] = None,
     locale: str = "en",
     cursor: Optional[str] = None,
     limit: Optional[int] = None,
@@ -454,7 +484,8 @@ def get_restaurants_by_city(
     credit_cost_local_currency: optional plan credit cost (local currency per credit); when set, savings
     are computed per plate; otherwise savings=0.
     user_id: optional; when set, favorites are surfaced at top and is_favorite set on items.
-    employer_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
+    workplace_group_id: optional; takes precedence over employer_entity_id for coworker matching.
+    employer_entity_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
     and has_coworker_request are computed per restaurant for coworker-scoped pickup intents.
     No institution scope; B2C explore by market (country + city).
     """
@@ -595,66 +626,50 @@ def get_restaurants_by_city(
         for r in restaurants:
             r["has_volunteer"] = r["restaurant_id"] in volunteer_rest_ids
 
-        # 3.41) has_coworker_offer, has_coworker_request: coworker-scoped when user has employer
+        # 3.41) has_coworker_offer, has_coworker_request: coworker-scoped when user has employer/workplace_group
         # Exclude current user's own offer/request so pills show only when another coworker has need
-        if employer_id and resolved_kitchen_day:
+        # workplace_group_id takes precedence over employer_entity_id
+        coworker_match_active = (workplace_group_id or employer_entity_id) and resolved_kitchen_day
+        if coworker_match_active:
             exclude_self_clause = " AND ps.user_id != %s" if user_id else ""
-            if employer_address_id is not None:
-                coworker_offer_query = """
-                    SELECT DISTINCT ps.restaurant_id
-                    FROM plate_selection_info ps
-                    INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                    INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                    WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                      AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
-                      AND ump.coworkers_can_see_my_orders = TRUE
-                      AND ump.can_participate_in_plate_pickups = TRUE
-                      AND u_ps.employer_id = %s AND u_ps.employer_address_id = %s
-                """ + exclude_self_clause
-                coworker_request_query = """
-                    SELECT DISTINCT ps.restaurant_id
-                    FROM plate_selection_info ps
-                    INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                    INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                    WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                      AND ps.pickup_intent = 'request' AND ps.is_archived = FALSE
-                      AND ump.coworkers_can_see_my_orders = TRUE
-                      AND ump.can_participate_in_plate_pickups = TRUE
-                      AND u_ps.employer_id = %s AND u_ps.employer_address_id = %s
-                """ + exclude_self_clause
-                offer_params = (rest_ids_str, resolved_kitchen_day, str(employer_id), str(employer_address_id))
-                request_params = (rest_ids_str, resolved_kitchen_day, str(employer_id), str(employer_address_id))
-                if user_id:
-                    offer_params += (str(user_id),)
-                    request_params += (str(user_id),)
+            if workplace_group_id:
+                # Match by workplace_group_id (takes precedence)
+                coworker_match_clause = "AND u_ps.workplace_group_id = %s"
+                match_params = (str(workplace_group_id),)
+            elif employer_address_id is not None:
+                coworker_match_clause = "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id = %s"
+                match_params = (str(employer_entity_id), str(employer_address_id))
             else:
-                coworker_offer_query = """
-                    SELECT DISTINCT ps.restaurant_id
-                    FROM plate_selection_info ps
-                    INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                    INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                    WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                      AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
-                      AND ump.coworkers_can_see_my_orders = TRUE
-                      AND ump.can_participate_in_plate_pickups = TRUE
-                      AND u_ps.employer_id = %s AND u_ps.employer_address_id IS NULL
-                """ + exclude_self_clause
-                coworker_request_query = """
-                    SELECT DISTINCT ps.restaurant_id
-                    FROM plate_selection_info ps
-                    INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                    INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                    WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                      AND ps.pickup_intent = 'request' AND ps.is_archived = FALSE
-                      AND ump.coworkers_can_see_my_orders = TRUE
-                      AND ump.can_participate_in_plate_pickups = TRUE
-                      AND u_ps.employer_id = %s AND u_ps.employer_address_id IS NULL
-                """ + exclude_self_clause
-                offer_params = (rest_ids_str, resolved_kitchen_day, str(employer_id))
-                request_params = (rest_ids_str, resolved_kitchen_day, str(employer_id))
-                if user_id:
-                    offer_params += (str(user_id),)
-                    request_params += (str(user_id),)
+                coworker_match_clause = "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id IS NULL"
+                match_params = (str(employer_entity_id),)
+
+            coworker_offer_query = f"""
+                SELECT DISTINCT ps.restaurant_id
+                FROM plate_selection_info ps
+                INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
+                INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
+                WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
+                  AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
+                  AND ump.coworkers_can_see_my_orders = TRUE
+                  AND ump.can_participate_in_plate_pickups = TRUE
+                  {coworker_match_clause}
+            """ + exclude_self_clause
+            coworker_request_query = f"""
+                SELECT DISTINCT ps.restaurant_id
+                FROM plate_selection_info ps
+                INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
+                INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
+                WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
+                  AND ps.pickup_intent = 'request' AND ps.is_archived = FALSE
+                  AND ump.coworkers_can_see_my_orders = TRUE
+                  AND ump.can_participate_in_plate_pickups = TRUE
+                  {coworker_match_clause}
+            """ + exclude_self_clause
+            offer_params = (rest_ids_str, resolved_kitchen_day) + match_params
+            request_params = (rest_ids_str, resolved_kitchen_day) + match_params
+            if user_id:
+                offer_params += (str(user_id),)
+                request_params += (str(user_id),)
             offer_rows = db_read(coworker_offer_query, offer_params, connection=db) or []
             request_rows = db_read(coworker_request_query, request_params, connection=db) or []
             coworker_offer_rest_ids = {r["restaurant_id"] for r in offer_rows}

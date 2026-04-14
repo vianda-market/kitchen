@@ -101,5 +101,5 @@ For **Internal** users, also show `institution_name` column (Suppliers only see 
 ## References
 
 - Financial data hierarchy: `docs/api/internal/FINANCIAL_DATA_HIERARCHY.md`
-- Payout onboarding guide: `docs/api/b2b_client/STRIPE_CONNECT_SUPPLIER_PAYOUT_B2B.md`
+- Payout onboarding guide: `docs/api/b2b_client/API_CLIENT_SUPPLIER_PAYOUT.md`
 - Drill-down roadmap: `docs/plans/PAYOUT_DRILL_DOWN_VIEW_ROADMAP.md`

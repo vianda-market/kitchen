@@ -14,7 +14,6 @@ from fastapi import HTTPException
 from app.services.entity_service import (
     get_user_by_username, get_user_by_email, get_products_by_institution,
     get_plates_by_restaurant, get_bills_by_status,
-    get_employers_by_name,
     get_enriched_discretionary_requests,
     get_enriched_discretionary_request_by_id,
     search_users,
@@ -22,7 +21,7 @@ from app.services.entity_service import (
     get_enriched_plates,
     get_enriched_plate_by_id,
 )
-from app.dto.models import UserDTO, ProductDTO, PlateDTO, InstitutionBillDTO, EmployerDTO
+from app.dto.models import UserDTO, ProductDTO, PlateDTO, InstitutionBillDTO
 from app.config import Status, RoleType, RoleName
 from decimal import Decimal
 
@@ -385,62 +384,6 @@ class TestEntityService:
             
             # Assert
             assert result == []
-
-    def test_get_employers_by_name_returns_employers_when_found(self, mock_db):
-        """Test that get_employers_by_name returns employers when found."""
-        # Arrange
-        employer_name = "Test Company"
-        mock_employers = [
-            EmployerDTO(
-                employer_id=uuid4(),
-                name=employer_name,
-                address_id=uuid4(),
-                status="active",
-                modified_by=uuid4(),
-                is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
-            )
-        ]
-        
-        with patch('app.services.entity_service.employer_service') as mock_employer_service:
-            mock_employer_service.get_all.return_value = mock_employers
-            
-            # Act
-            result = get_employers_by_name(employer_name, mock_db)
-            
-            # Assert
-            assert len(result) == 1
-            assert result[0].name == employer_name
-
-    def test_get_employers_by_name_returns_empty_when_not_found(self, mock_db):
-        """Test that get_employers_by_name returns empty list when employer not found."""
-        # Arrange
-        employer_name = "Nonexistent Company"
-        
-        with patch('app.services.entity_service.employer_service') as mock_employer_service:
-            mock_employer_service.get_all.return_value = []
-            
-            # Act
-            result = get_employers_by_name(employer_name, mock_db)
-            
-            # Assert
-            assert result == []
-
-    def test_get_employers_by_name_handles_database_error(self, mock_db):
-        """Test that get_employers_by_name handles database errors gracefully."""
-        # Arrange
-        employer_name = "Test Company"
-        
-        with patch('app.services.entity_service.employer_service') as mock_employer_service:
-            mock_employer_service.get_all.side_effect = Exception("Database error")
-            
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                get_employers_by_name(employer_name, mock_db)
-            
-            assert exc_info.value.status_code == 500
-            assert "Failed to search employers" in str(exc_info.value.detail)
 
     def test_get_products_by_institution_handles_service_error(self, mock_db):
         """Test that get_products_by_institution handles service errors gracefully."""

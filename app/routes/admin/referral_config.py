@@ -47,15 +47,16 @@ def list_referral_configs_enriched(
     rows = db_read(
         """
         SELECT rc.referral_config_id, rc.market_id,
-               m.country_name AS market_name, m.country_code,
+               gc.name AS market_name, m.country_code,
                rc.is_enabled, rc.referrer_bonus_rate, rc.referrer_bonus_cap,
                rc.referrer_monthly_cap, rc.min_plan_price_to_qualify,
                rc.cooldown_days, rc.held_reward_expiry_hours, rc.pending_expiry_days,
                rc.is_archived, rc.status, rc.created_date, rc.modified_date
         FROM referral_config rc
         JOIN market_info m ON rc.market_id = m.market_id
+        LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
         WHERE rc.is_archived = FALSE
-        ORDER BY m.country_name
+        ORDER BY gc.name
         """,
         connection=db,
     )

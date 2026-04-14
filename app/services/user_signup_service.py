@@ -72,8 +72,8 @@ class UserSignupService:
         return rt_str == "internal"
 
     @staticmethod
-    def _check_employer_domain(email: Optional[str], db: Optional[psycopg2.extensions.connection]) -> Optional[UUID]:
-        """Check if the email's domain matches an active employer domain. Returns institution_id or None."""
+    def _check_employer_domain(email: Optional[str], db: Optional[psycopg2.extensions.connection]) -> Optional[Dict[str, UUID]]:
+        """Check if the email's domain matches an active employer entity. Returns dict with institution_id and institution_entity_id, or None."""
         if not email or not db or "@" not in email:
             return None
         domain = email.split("@")[1].lower().strip()
@@ -82,11 +82,10 @@ class UserSignupService:
         from app.utils.db import db_read
         row = db_read(
             """
-            SELECT ed.institution_id
-            FROM employer_domain ed
-            JOIN employer_benefits_program ebp ON ed.institution_id = ebp.institution_id
-            WHERE ed.domain = %s
-              AND ed.is_active = TRUE AND ed.is_archived = FALSE
+            SELECT ie.institution_id, ie.institution_entity_id
+            FROM ops.institution_entity_info ie
+            JOIN core.employer_benefits_program ebp ON ie.institution_id = ebp.institution_id
+            WHERE ie.email_domain = %s AND ie.is_archived = FALSE
               AND ebp.is_active = TRUE AND ebp.is_archived = FALSE
             LIMIT 1
             """,
@@ -94,7 +93,12 @@ class UserSignupService:
             connection=db,
             fetch_one=True,
         )
-        return UUID(str(row["institution_id"])) if row else None
+        if not row:
+            return None
+        return {
+            "institution_id": UUID(str(row["institution_id"])),
+            "institution_entity_id": UUID(str(row["institution_entity_id"])),
+        }
 
     def process_customer_signup(
         self, 
@@ -194,20 +198,20 @@ class UserSignupService:
             user_data["market_id"] = market_ids_list[0]
         # Supplier and Employer: user's market must be within institution's market(s)
         self._ensure_user_market_within_institution(user_data, db)
-        # Internal or Supplier: default city_id to Global when not provided
+        # Internal or Supplier: default city_metadata_id to Global when not provided
         rt_str = (user_data.get("role_type").value if hasattr(user_data.get("role_type"), "value") else str(user_data.get("role_type") or "")) if user_data.get("role_type") else ""
         rn_str = (user_data.get("role_name").value if hasattr(user_data.get("role_name"), "value") else str(user_data.get("role_name") or "")) if user_data.get("role_name") else ""
-        if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_id"):
-            user_data["city_id"] = GLOBAL_CITY_ID
-            log_info(f"Defaulted city_id to Global for {rt_str}/{rn_str}")
-        # Customer+Comensal created via B2B: require city_id, reject Global
+        if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_metadata_id"):
+            user_data["city_metadata_id"] = GLOBAL_CITY_ID
+            log_info(f"Defaulted city_metadata_id to Global for {rt_str}/{rn_str}")
+        # Customer+Comensal created via B2B: require city_metadata_id, reject Global
         if self._is_customer_comensal(user_data):
-            if not user_data.get("city_id"):
+            if not user_data.get("city_metadata_id"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="city_id is required for Customer (Comensal). Use GET /api/v1/cities/?country_code=... (not the Global city).",
+                    detail="city_metadata_id is required for Customer (Comensal). Use GET /api/v1/cities/?country_code=... (not the Global city).",
                 )
-            cid = user_data["city_id"] if isinstance(user_data["city_id"], UUID) else UUID(str(user_data["city_id"]))
+            cid = user_data["city_metadata_id"] if isinstance(user_data["city_metadata_id"], UUID) else UUID(str(user_data["city_metadata_id"]))
             if is_global_city(cid):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -354,17 +358,17 @@ class UserSignupService:
             )
         user_data["market_id"] = market_id
 
-    def _validate_and_resolve_city_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
+    def _validate_and_resolve_city_metadata_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
         """
-        Require and validate city for B2C signup. Accepts city_id or city_name.
-        If city_name provided, resolve to city_id by matching name (case-insensitive) in market's country.
-        city_id must not be Global; city must exist, not archived, and match market's country.
+        Require and validate city for B2C signup. Accepts city_metadata_id or city_name.
+        If city_name provided, resolve to city_metadata_id by matching name (case-insensitive) in market's country.
+        city_metadata_id must not be Global; city must exist, not archived, and match market's country.
         """
-        city_id_raw = user_data.get("city_id")
+        city_metadata_id_raw = user_data.get("city_metadata_id")
         city_name_raw = (user_data.get("city_name") or "").strip()
 
-        if city_id_raw is not None:
-            city_id = city_id_raw if isinstance(city_id_raw, UUID) else UUID(str(city_id_raw))
+        if city_metadata_id_raw is not None:
+            city_metadata_id = city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
         elif city_name_raw:
             market_id = user_data.get("market_id")
             if not market_id:
@@ -379,53 +383,64 @@ class UserSignupService:
                     detail="Invalid market_id. Use GET /api/v1/leads/markets.",
                 )
             market_country = (market.get("country_code") or "").strip().upper()
-            cities = city_service.get_all_by_field("country_code", market_country, db, scope=None)
-            city_name_lower = city_name_raw.lower()
-            matched = None
-            for c in cities:
-                if c.city_id != GLOBAL_CITY_ID and not c.is_archived and (c.name or "").strip().lower() == city_name_lower:
-                    matched = c
-                    break
-            if not matched:
+            # Resolve city_name → city_metadata_id via JOIN to external.geonames_city (display name source).
+            # Matches case-insensitively against the display override (if set) or the canonical GeoNames name.
+            resolve_query = """
+                SELECT cm.city_metadata_id
+                FROM core.city_metadata cm
+                JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+                WHERE cm.country_iso = %s
+                  AND cm.is_archived = FALSE
+                  AND cm.city_metadata_id != %s
+                  AND LOWER(COALESCE(cm.display_name_override, gc.name)) = LOWER(%s)
+                LIMIT 1
+            """
+            matched_row = db_read(
+                resolve_query,
+                (market_country, str(GLOBAL_CITY_ID), city_name_raw),
+                connection=db,
+                fetch_one=True,
+            )
+            if not matched_row:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"City '{city_name_raw}' not found for country {market_country}. Use GET /api/v1/leads/cities?country_code={market_country}.",
                 )
-            city_id = matched.city_id
+            city_metadata_id = matched_row["city_metadata_id"]
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either city_id or city_name is required. Use GET /api/v1/leads/cities?country_code=... for city names.",
+                detail="Either city_metadata_id or city_name is required. Use GET /api/v1/leads/cities?country_code=... for city names.",
             )
 
-        if is_global_city(city_id):
+        if is_global_city(city_metadata_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Global city cannot be assigned to B2C customers. Use a city from GET /api/v1/cities/?country_code=... for your market.",
             )
-        city = city_service.get_by_id(city_id, db, scope=None)
+        city = city_service.get_by_id(city_metadata_id, db, scope=None)
         if not city:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived city_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
+                detail="Invalid or archived city_metadata_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
             )
         if city.is_archived:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived city_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
+                detail="Invalid or archived city_metadata_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
             )
         market_id = user_data.get("market_id")
         if market_id:
             market = market_service.get_by_id(market_id if isinstance(market_id, UUID) else UUID(str(market_id)))
             if market:
                 market_country = (market.get("country_code") or "").strip().upper()
-                city_country = (city.country_code or "").strip().upper()
+                city_country = (city.country_iso or "").strip().upper()
                 if market_country != city_country:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"City must be in the same country as your market. City country: {city_country}, market country: {market_country}.",
                     )
-        user_data["city_id"] = city_id
+        user_data["city_metadata_id"] = city_metadata_id
 
     def _apply_customer_signup_rules(self, user_data: Dict[str, Any], db: Optional[psycopg2.extensions.connection] = None) -> None:
         """
@@ -436,11 +451,12 @@ class UserSignupService:
             user_data: User data dictionary (modified in place)
             db: Optional DB connection for re-validation at verify
         """
-        # Check if email domain matches an active employer domain (domain-gated enrollment)
-        employer_inst_id = self._check_employer_domain(user_data.get("email"), db)
-        if employer_inst_id:
-            user_data["institution_id"] = str(employer_inst_id)
-            log_info(f"Domain-gated signup: assigned employer institution {employer_inst_id} for email {user_data.get('email')}")
+        # Check if email domain matches an active employer entity (domain-gated enrollment)
+        employer_match = self._check_employer_domain(user_data.get("email"), db)
+        if employer_match:
+            user_data["institution_id"] = str(employer_match["institution_id"])
+            user_data["employer_entity_id"] = str(employer_match["institution_entity_id"])
+            log_info(f"Domain-gated signup: assigned employer institution {employer_match['institution_id']} entity {employer_match['institution_entity_id']} for email {user_data.get('email')}")
         else:
             user_data["institution_id"] = get_vianda_customers_institution_id()
         user_data["role_type"] = self.CUSTOMER_ROLE_TYPE
@@ -477,29 +493,29 @@ class UserSignupService:
         mkt_lang = market_service.get_by_id(market_id)
         user_data["locale"] = (mkt_lang.get("language") if mkt_lang else None) or "en"
 
-        # city_id is required; must come from client (request) or pending row (verify)
-        if user_data.get("city_id") is None:
+        # city_metadata_id is required; must come from client (request) or pending row (verify)
+        if user_data.get("city_metadata_id") is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="city_id is required for customer signup.",
+                detail="city_metadata_id is required for customer signup.",
             )
-        city_id_raw = user_data["city_id"]
-        city_id = city_id_raw if isinstance(city_id_raw, UUID) else UUID(str(city_id_raw))
-        if is_global_city(city_id):
+        city_metadata_id_raw = user_data["city_metadata_id"]
+        city_metadata_id = city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
+        if is_global_city(city_metadata_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Global city cannot be assigned to B2C customers.",
             )
         if db:
-            city = city_service.get_by_id(city_id, db, scope=None)
+            city = city_service.get_by_id(city_metadata_id, db, scope=None)
             if not city or city.is_archived:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or archived city_id from signup. Please request a new verification code.",
+                    detail="Invalid or archived city_metadata_id from signup. Please request a new verification code.",
                 )
-        user_data["city_id"] = city_id
+        user_data["city_metadata_id"] = city_metadata_id
 
-        log_info(f"Applied customer signup rules: institution={get_vianda_customers_institution_id()}, market_id={market_id}, city_id={city_id}, role_type={self.CUSTOMER_ROLE_TYPE.value}, role_name={self.CUSTOMER_ROLE_NAME.value}")
+        log_info(f"Applied customer signup rules: institution={get_vianda_customers_institution_id()}, market_id={market_id}, city_metadata_id={city_metadata_id}, role_type={self.CUSTOMER_ROLE_TYPE.value}, role_name={self.CUSTOMER_ROLE_NAME.value}")
     
     def _apply_admin_creation_rules(self, user_data: Dict[str, Any], current_user: Dict[str, Any]) -> None:
         """
@@ -627,17 +643,17 @@ class UserSignupService:
                     inst_id = inst_id if isinstance(inst_id, UUID) else UUID(str(inst_id))
                     with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                         cursor.execute(
-                            "SELECT market_id FROM institution_info WHERE institution_id = %s",
+                            "SELECT market_id FROM core.institution_market WHERE institution_id = %s ORDER BY is_primary DESC LIMIT 1",
                             (str(inst_id),),
                         )
                         row = cursor.fetchone()
                     if row and row.get("market_id"):
                         user_data["market_id"] = row["market_id"] if isinstance(row["market_id"], UUID) else UUID(str(row["market_id"]))
-                        log_info(f"Defaulted market_id to institution's market for {rt_str}/{rn_str}")
+                        log_info(f"Defaulted market_id to institution's primary market for {rt_str}/{rn_str}")
                     else:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="institution_id is required for Supplier and Employer; institution must have a market_id",
+                            detail="institution_id is required for Supplier and Employer; institution must have assigned markets",
                         )
                 else:
                     raise HTTPException(
@@ -725,23 +741,21 @@ class UserSignupService:
         market_id = market_id if isinstance(market_id, UUID) else UUID(str(market_id))
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
-                "SELECT market_id FROM institution_info WHERE institution_id = %s",
+                "SELECT market_id FROM core.institution_market WHERE institution_id = %s",
                 (str(institution_id),),
             )
-            row = cursor.fetchone()
-        if not row:
+            rows = cursor.fetchall()
+        if not rows:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institution not found",
+                detail="Institution not found or has no assigned markets",
             )
-        inst_market_id = row["market_id"]
-        if isinstance(inst_market_id, str):
-            inst_market_id = UUID(inst_market_id)
-        if market_id != inst_market_id:
+        inst_market_ids = {UUID(str(r["market_id"])) for r in rows}
+        if market_id not in inst_market_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Supplier and Employer users must be assigned the same market as their institution. "
-                       "User market_id does not match institution's market_id.",
+                detail="Supplier and Employer users must be assigned a market from their institution's assigned markets. "
+                       f"User market_id {market_id} is not in institution's markets.",
             )
 
     def _apply_scope_constraints(
@@ -825,7 +839,7 @@ class UserSignupService:
         """
         self._validate_signup_data(user_data)
         self._resolve_country_code_to_market_id(user_data, db)
-        self._validate_and_resolve_city_id(user_data, db)
+        self._validate_and_resolve_city_metadata_id(user_data, db)
         self._process_password_security(user_data)
         email = user_data.get("email", "").strip().lower()
         username = user_data.get("username", "").strip().lower()
@@ -886,7 +900,7 @@ class UserSignupService:
                 """
                 INSERT INTO pending_customer_signup (
                     email, verification_code, token_expiry,
-                    username, hashed_password, first_name, last_name, mobile_number, market_id, city_id,
+                    username, hashed_password, first_name, last_name, mobile_number, market_id, city_metadata_id,
                     referral_code
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
@@ -900,7 +914,7 @@ class UserSignupService:
                     user_data.get("last_name"),
                     user_data.get("mobile_number"),
                     str(user_data["market_id"]),
-                    str(user_data["city_id"]),
+                    str(user_data["city_metadata_id"]),
                     signup_referral_code,
                 ),
             )
@@ -948,7 +962,7 @@ class UserSignupService:
             cursor.execute(
                 """
                 SELECT pending_id, email, verification_code, token_expiry, used,
-                       username, hashed_password, first_name, last_name, mobile_number, market_id, city_id,
+                       username, hashed_password, first_name, last_name, mobile_number, market_id, city_metadata_id,
                        referral_code
                 FROM pending_customer_signup
                 WHERE verification_code = %s
@@ -984,7 +998,7 @@ class UserSignupService:
             "last_name": row["last_name"],
             "mobile_number": row["mobile_number"],
             "market_id": row["market_id"],
-            "city_id": row["city_id"],
+            "city_metadata_id": row["city_metadata_id"],
             "email_verified": True,
             "email_verified_at": datetime.now(timezone.utc),
             "referred_by_code": signup_referral_code,

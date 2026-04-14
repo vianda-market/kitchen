@@ -282,7 +282,7 @@ PUT /api/v1/addresses/{address_id}
 }
 ```
 
-**UI:** Do not show Edit/Delete for employer addresses when the user is a Customer. Employees and Suppliers (Admin, Manager) can edit/delete employer addresses. See [EMPLOYER_MANAGEMENT_B2C.md](../b2c_client/EMPLOYER_MANAGEMENT_B2C.md) (B2C) and [EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md](../b2b_client/EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md) (B2B).
+**UI:** Do not show Edit/Delete for employer addresses when the user is a Customer. Employees and Suppliers (Admin, Manager) can edit/delete employer addresses. See [EMPLOYER_MANAGEMENT_B2C.md](../b2c_client/EMPLOYER_MANAGEMENT_B2C.md) (B2C) and [API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md](../b2b_client/API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md) (B2B).
 
 ---
 

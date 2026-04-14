@@ -294,25 +294,38 @@ class TimezoneService:
         )
         return default_timezone
     
+    # Primary timezone per seeded market (ops-curated; single-TZ countries use this directly,
+    # multi-TZ countries (US, BR, CA, MX) use PROVINCE_TIMEZONE_MAPPING and fall back to this).
+    # Replaces the former SELECT m.timezone from market_info (column dropped in PR2b).
+    _MARKET_PRIMARY_TIMEZONE = {
+        "XG": "UTC",
+        "AR": "America/Argentina/Buenos_Aires",
+        "PE": "America/Lima",
+        "CL": "America/Santiago",
+        "US": "America/New_York",
+        "MX": "America/Mexico_City",
+        "BR": "America/Sao_Paulo",
+    }
+
     @classmethod
     def _get_market_timezone(cls, country_code: str, db: psycopg2.extensions.connection) -> Optional[Dict]:
         """
-        Query market_info table for country's default timezone.
-        
+        Return a primary timezone for a country. Used by address-create fallback for
+        single-TZ countries. `db` is unused (kept for signature compatibility with callers
+        that pass a connection); the mapping is ops-curated in `_MARKET_PRIMARY_TIMEZONE`.
+
         Args:
             country_code: ISO 3166-1 alpha-2 country code
-            db: Database connection
-            
+            db: Database connection (unused, kept for compat)
+
         Returns:
-            Dict with 'timezone' and 'country_name' keys, or None if not found
+            Dict with 'timezone' and 'country_name' keys, or None if country_code unknown.
         """
-        query = """
-            SELECT timezone, country_name 
-            FROM market_info 
-            WHERE country_code = %s AND is_archived = FALSE
-        """
-        result = db_read(query, [country_code], connection=db, fetch_one=True)
-        return result
+        cc = (country_code or "").strip().upper()
+        tz = cls._MARKET_PRIMARY_TIMEZONE.get(cc)
+        if tz is None:
+            return None
+        return {"timezone": tz, "country_name": cc}
     
     @classmethod
     def _normalize_province_name(cls, province: str) -> str:

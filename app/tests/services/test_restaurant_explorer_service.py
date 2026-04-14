@@ -588,7 +588,7 @@ class TestGetRestaurantsByCity:
         """When only the current user has pickup_intent=request, has_coworker_request is False (exclude self)."""
         rid = uuid4()
         user_id = uuid4()
-        employer_id = uuid4()
+        employer_entity_id = uuid4()
         employer_address_id = uuid4()
         mock_get_favorite_ids.return_value = {"plate_ids": [], "restaurant_ids": []}
         mock_db_read.side_effect = [
@@ -622,7 +622,7 @@ class TestGetRestaurantsByCity:
             "Buenos Aires", "AR", mock_db,
             kitchen_day="monday",
             user_id=user_id,
-            employer_id=employer_id,
+            employer_entity_id=employer_entity_id,
             employer_address_id=employer_address_id,
         )
 
@@ -638,7 +638,7 @@ class TestGetRestaurantsByCity:
         """When another coworker has pickup_intent=request, has_coworker_request is True."""
         rid = uuid4()
         user_id = uuid4()
-        employer_id = uuid4()
+        employer_entity_id = uuid4()
         employer_address_id = uuid4()
         mock_get_favorite_ids.return_value = {"plate_ids": [], "restaurant_ids": []}
         mock_db_read.side_effect = [
@@ -672,7 +672,7 @@ class TestGetRestaurantsByCity:
             "Buenos Aires", "AR", mock_db,
             kitchen_day="monday",
             user_id=user_id,
-            employer_id=employer_id,
+            employer_entity_id=employer_entity_id,
             employer_address_id=employer_address_id,
         )
 
@@ -686,7 +686,7 @@ class TestGetCoworkerPickupWindows:
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_returns_empty_when_no_employer(self, mock_db_read, mock_get_windows):
         """When user has no employer, returns empty list."""
-        mock_db_read.side_effect = [{"employer_id": None, "employer_address_id": None}]
+        mock_db_read.side_effect = [{"employer_entity_id": None, "employer_address_id": None}]
         mock_db = MagicMock()
         result = get_coworker_pickup_windows(uuid4(), "monday", uuid4(), mock_db)
         assert result == []
@@ -699,7 +699,7 @@ class TestGetCoworkerPickupWindows:
         uid = uuid4()
         mock_get_windows.return_value = ["11:30-11:45", "11:45-12:00", "12:00-12:15"]
         mock_db_read.side_effect = [
-            {"employer_id": uuid4(), "employer_address_id": None},
+            {"employer_entity_id": uuid4(), "employer_address_id": None},
             {"country_code": "AR"},
             [{"pickup_time_range": "12:00-12:15", "pickup_intent": "offer", "flexible_on_time": False}],
         ]
@@ -720,7 +720,7 @@ class TestGetCoworkerPickupWindows:
             "11:30-11:45", "11:45-12:00", "12:00-12:15", "12:15-12:30", "12:30-12:45",
         ]
         mock_db_read.side_effect = [
-            {"employer_id": uuid4(), "employer_address_id": None},
+            {"employer_entity_id": uuid4(), "employer_address_id": None},
             {"country_code": "AR"},
             [{"pickup_time_range": "12:00-12:15", "pickup_intent": "request", "flexible_on_time": True}],
         ]

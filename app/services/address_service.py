@@ -4,9 +4,8 @@ Address Business Logic Service
 This service contains all business logic related to address operations,
 including geocoding integration, timezone calculation, and address validation.
 
-Address type is derived from linkages only (restaurant, institution entity,
-employer, payment method). The API does not accept address_type
-from clients; it is computed server-side and returned for display.
+Address type for customer addresses (home/work/other) is user-selected.
+Address type for restaurant, entity, and billing addresses is derived from linkages.
 """
 
 from datetime import datetime, timezone
@@ -31,8 +30,7 @@ def derive_address_type_from_linkages(
 ) -> List[str]:
     """
     Derive address_type from connected objects (restaurant, institution entity,
-    employer, payment method). Address type is never taken from
-    client input; it reflects actual linkages.
+    payment method). Customer address types (home/work/other) are user-selected.
     """
     types: List[str] = []
     aid = str(address_id)
@@ -58,23 +56,6 @@ def derive_address_type_from_linkages(
         types.append(AddressType.ENTITY_ADDRESS.value)
         types.append(AddressType.ENTITY_BILLING.value)
 
-    # Customer Employer: address is employer's primary address (employer_info.address_id) or address has employer_id set
-    emp_primary = db_read(
-        "SELECT 1 FROM employer_info WHERE address_id = %s AND NOT is_archived",
-        (aid,),
-        connection=db,
-        fetch_one=True,
-    )
-    addr_employer = db_read(
-        "SELECT employer_id FROM address_info WHERE address_id = %s AND employer_id IS NOT NULL",
-        (aid,),
-        connection=db,
-        fetch_one=True,
-    )
-    is_employer_linked = bool(emp_primary or addr_employer)
-    if is_employer_linked:
-        types.append(AddressType.CUSTOMER_EMPLOYER.value)
-
     # Customer Billing (payment method)
     pm = db_read(
         "SELECT 1 FROM payment_method WHERE address_id = %s AND NOT is_archived",
@@ -85,9 +66,8 @@ def derive_address_type_from_linkages(
     if pm:
         types.append(AddressType.CUSTOMER_BILLING.value)
 
-    # Customer Home or Customer Other: address belongs to Customer institution and is NOT linked to employer or payment method
-    # Must exclude both employer primary (employer_info) and employer-linked (address_info.employer_id)
-    if not is_employer_linked and not pm:
+    # Customer Home or Customer Other: address belongs to Customer institution and is NOT linked to payment method
+    if not pm:
         inst = db_read(
             """
             SELECT i.institution_type
@@ -193,38 +173,24 @@ def get_addresses_for_customer(
     """
     Get addresses visible to a Customer for GET /addresses and GET /addresses/enriched.
 
-    - Home and billing: address.user_id = user_id OR subpremise (address_id, user_id) exists
-    - Employer: only the address assigned as employer_address_id (from user_info)
+    - Addresses owned by user (user_id) or linked via subpremise
+    - Address type (home/work/other) is user-selected, not auto-derived
     - Enriches with floor, apartment_unit, is_default from address_subpremise
     """
-    from app.services.crud_service import user_service
-
-    user = user_service.get_by_id(user_id, db, scope=None)
-    if not user:
-        return []
-
-    employer_id = getattr(user, "employer_id", None)
-    employer_address_id = getattr(user, "employer_address_id", None)
     uid = str(user_id)
 
-    # Single query: addresses where (a.user_id = uid OR sp exists) OR a is assigned employer address
-    # LEFT JOIN subpremise for this user to get floor, unit, is_default
     params: List[Any] = [uid, uid]
-    employer_clause = ""
-    if employer_address_id and employer_id:
-        employer_clause = " OR (a.address_id = %s::uuid AND a.employer_id = %s::uuid)"
-        params.extend([str(employer_address_id), str(employer_id)])
-
     archived = "" if include_archived else " AND a.is_archived = FALSE"
     q = f"""
-        SELECT a.*, COALESCE(m.country_name, '') AS country_name,
+        SELECT a.*, gc.name AS country_name,
                sp.floor, sp.apartment_unit, sp.is_default,
                g.latitude, g.longitude
         FROM address_info a
         LEFT JOIN market_info m ON a.country_code = m.country_code
+        LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
         LEFT JOIN address_subpremise sp ON sp.address_id = a.address_id AND sp.user_id = %s
         LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
-        WHERE (a.user_id = %s OR sp.user_id IS NOT NULL{employer_clause}){archived}
+        WHERE (a.user_id = %s OR sp.user_id IS NOT NULL){archived}
     """
     rows = db_read(q, tuple(params), connection=db)
     if not rows:
@@ -232,14 +198,6 @@ def get_addresses_for_customer(
 
     result: List[AddressDTO] = []
     for r in rows:
-        # For employer address filter: only include if it's the assigned one
-        if r.get("employer_id") and employer_address_id:
-            if str(r.get("address_id")) != str(employer_address_id):
-                continue
-            if employer_id and str(r.get("employer_id")) != str(employer_id):
-                continue
-        elif r.get("employer_id") and not employer_address_id:
-            continue  # employer address but user has none assigned
         d = {**r, "floor": r.get("floor"), "apartment_unit": r.get("apartment_unit"), "is_default": r.get("is_default") or False}
         result.append(AddressDTO(**d))
 
@@ -366,13 +324,88 @@ class AddressBusinessService:
 
         # Validate address data (required fields, country-province-city combination)
         self.validate_address_data(address_data)
-        
-        # Automatically set timezone based on country_code (alpha-2) and province
-        from app.services.geolocation_service import get_timezone_from_address
-        province = address_data.get("province", "")
-        timezone = get_timezone_from_address(country_code, province, db)
-        address_data["timezone"] = timezone
-        log_info(f"Set timezone '{timezone}' for address in {province}, {country_name_for_log} ({country_code})")
+
+        # Timezone resolution: city_metadata_id is the authoritative input — always NOT NULL in DB.
+        # Manual/structured path: client provides city_metadata_id (enforced by schema validator).
+        # place_id path: resolved server-side from Mapbox-derived (country_code, city) against
+        # core.city_metadata JOIN external.geonames_city. If no exact ascii_name match, falls
+        # back to any seeded city_metadata row in the same country.
+        city_metadata_id = address_data.get("city_metadata_id")
+        if not city_metadata_id:
+            city_name_from_place = (address_data.get("city") or "").strip()
+            if city_name_from_place:
+                resolve_row = db_read(
+                    """
+                    SELECT cm.city_metadata_id
+                    FROM core.city_metadata cm
+                    JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+                    WHERE cm.country_iso = %s
+                      AND cm.is_archived = FALSE
+                      AND LOWER(gc.ascii_name) = LOWER(%s)
+                    ORDER BY gc.population DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    (country_code, city_name_from_place),
+                    connection=db,
+                    fetch_one=True,
+                )
+                if resolve_row and resolve_row.get("city_metadata_id"):
+                    city_metadata_id = resolve_row["city_metadata_id"]
+            if not city_metadata_id:
+                # Fallback: pick any active seeded city_metadata for this country.
+                fallback_row = db_read(
+                    """
+                    SELECT cm.city_metadata_id
+                    FROM core.city_metadata cm
+                    WHERE cm.country_iso = %s AND cm.is_archived = FALSE
+                    LIMIT 1
+                    """,
+                    (country_code,),
+                    connection=db,
+                    fetch_one=True,
+                )
+                if fallback_row and fallback_row.get("city_metadata_id"):
+                    city_metadata_id = fallback_row["city_metadata_id"]
+            if not city_metadata_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Could not resolve a city_metadata_id for country {country_code}. "
+                        "Either send city_metadata_id in the body or ensure core.city_metadata "
+                        "has at least one active row for this country."
+                    ),
+                )
+            address_data["city_metadata_id"] = city_metadata_id
+            log_info(f"Resolved city_metadata_id {city_metadata_id} from place_id → ({country_code}, {city_name_from_place or '<fallback>'})")
+        row = db_read(
+            """
+            SELECT gc.timezone AS tz, cm.country_iso
+            FROM core.city_metadata cm
+            JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+            WHERE cm.city_metadata_id = %s::uuid
+              AND cm.is_archived = FALSE
+            """,
+            (str(city_metadata_id),),
+            connection=db,
+            fetch_one=True,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid city_metadata_id: {city_metadata_id}. Use GET /api/v1/cities?country_code=... to resolve a valid city.",
+            )
+        resolved_iso = (row.get("country_iso") or "").upper()
+        if resolved_iso and resolved_iso != country_code:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"city_metadata_id country ({resolved_iso}) does not match address country_code ({country_code}). "
+                    "Resolve a city in the same country via GET /api/v1/cities?country_code=..."
+                ),
+            )
+        tz = row.get("tz") or "UTC"  # Global synthetic row has no GeoNames tz — fall back to UTC.
+        address_data["timezone"] = tz
+        log_info(f"Set timezone '{tz}' from city_metadata_id for address in {country_name_for_log} ({country_code})")
 
         # Create the address first (even for restaurants), so we get an address_id
         # NOTE: address_service.create() should ONLY be called from this business service.
@@ -712,11 +745,12 @@ class AddressBusinessService:
             return None
         row = db_read(
             """
-            SELECT a.*, COALESCE(m.country_name, '') AS country_name,
+            SELECT a.*, gc.name AS country_name,
                    sp.floor, sp.apartment_unit, sp.is_default,
                    g.latitude, g.longitude
             FROM address_info a
             LEFT JOIN market_info m ON a.country_code = m.country_code
+            LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
             LEFT JOIN address_subpremise sp ON sp.address_id = a.address_id AND sp.user_id = %s
             LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
             WHERE a.address_id = %s AND a.is_archived = FALSE

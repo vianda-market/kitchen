@@ -4,7 +4,10 @@ CREATE INDEX IF NOT EXISTS idx_institution_history_institution_id ON audit.insti
 
 CREATE INDEX IF NOT EXISTS idx_user_history_user_id ON audit.user_history(user_id);
 
+CREATE INDEX IF NOT EXISTS idx_user_info_employer_entity_id ON core.user_info(employer_entity_id) WHERE employer_entity_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_user_info_employer_address_id ON core.user_info(employer_address_id) WHERE employer_address_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_info_workplace_group_id ON core.user_info(workplace_group_id) WHERE workplace_group_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_address_info_workplace_group_id ON core.address_info(workplace_group_id) WHERE workplace_group_id IS NOT NULL;
 
 -- Drop legacy UNIQUE constraints if present (e.g. from pre-migration DBs). Fresh schema has no UNIQUE on username/email.
 ALTER TABLE core.user_info DROP CONSTRAINT IF EXISTS user_info_username_key;
@@ -127,8 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_address_info_province ON core.address_info(provin
 CREATE INDEX IF NOT EXISTS idx_address_info_postal_code ON core.address_info(postal_code) WHERE NOT is_archived;
 -- city filter now goes through city_metadata_id (index already created in schema.sql as idx_address_info_city_metadata_id)
 
--- Partial index for employer_id queries (only non-NULL, non-archived addresses)
-CREATE INDEX IF NOT EXISTS idx_address_info_employer_id ON core.address_info(employer_id) WHERE employer_id IS NOT NULL AND NOT is_archived;
+-- employer_id index REMOVED — employer_id column dropped from address_info (multinational institutions normalization)
 
 -- core.address_subpremise: unique (address_id, user_id) already enforced; index for lookups by address_id
 CREATE INDEX IF NOT EXISTS idx_address_subpremise_address_id ON core.address_subpremise(address_id);

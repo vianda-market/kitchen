@@ -73,7 +73,7 @@ DROP TABLE IF EXISTS status_info CASCADE;
 DROP TABLE IF EXISTS status_history CASCADE;
 DROP TABLE IF EXISTS transaction_type_info CASCADE;
 DROP TABLE IF EXISTS transaction_type_history CASCADE;
-DROP TABLE IF EXISTS audit.employer_history CASCADE;
+-- audit.employer_history REMOVED (multinational institutions normalization)
 DROP TABLE IF EXISTS audit.national_holidays_history CASCADE;
 DROP TABLE IF EXISTS core.national_holidays CASCADE;
 DROP TABLE IF EXISTS audit.restaurant_holidays_history CASCADE;
@@ -114,7 +114,7 @@ DROP TABLE IF EXISTS audit.employer_benefits_program_history CASCADE;
 DROP TABLE IF EXISTS core.restaurant_lead_cuisine CASCADE;
 DROP TABLE IF EXISTS core.restaurant_lead CASCADE;
 DROP TABLE IF EXISTS core.lead_interest CASCADE;
-DROP TABLE IF EXISTS core.employer_domain CASCADE;
+-- core.employer_domain REMOVED (replaced by email_domain on institution_entity_info)
 DROP TABLE IF EXISTS core.employer_benefits_program CASCADE;
 DROP TABLE IF EXISTS billing.client_bill_info CASCADE;
 DROP TABLE IF EXISTS customer.subscription_payment CASCADE;
@@ -158,7 +158,7 @@ DROP TABLE IF EXISTS core.user_market_assignment CASCADE;
 DROP TABLE IF EXISTS core.user_fcm_token CASCADE;
 DROP TABLE IF EXISTS core.user_messaging_preferences CASCADE;
 DROP TABLE IF EXISTS core.user_info CASCADE;
-DROP TABLE IF EXISTS core.employer_info CASCADE;
+-- core.employer_info REMOVED (replaced by institution_info + institution_entity_info)
 DROP TABLE IF EXISTS customer.pending_customer_signup CASCADE;
 DROP TABLE IF EXISTS customer.email_change_request CASCADE;
 DROP TABLE IF EXISTS customer.credential_recovery CASCADE;
@@ -665,7 +665,7 @@ CREATE TABLE IF NOT EXISTS core.address_info (
     address_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
     user_id UUID NULL,  -- Required only for Customer Comensal home/other; nullable for Supplier, Employee, Employer
-    employer_id UUID NULL,  -- Links address to employer (nullable)
+    workplace_group_id UUID NULL,  -- Links office address to a workplace group; FK added via deferred ALTER after workplace_group exists
     address_type address_type_enum[] NOT NULL,
     country_code VARCHAR(2) NOT NULL,  -- ISO 3166-1 alpha-2; FK to external.geonames_country via deferred ALTER after external schema populates
     province VARCHAR(50) NOT NULL,     -- display-only; structural province data lives on external.geonames_admin1 via city_metadata → geonames_city.admin1_code
@@ -683,7 +683,6 @@ CREATE TABLE IF NOT EXISTS core.address_info (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT
     -- Note: user_id and modified_by FKs added via ALTER TABLE after core.user_info is created
-    -- Note: employer_id foreign key will be added after core.employer_info table is created
     -- Note: country_code FK to external.geonames_country added via deferred ALTER below
     -- Note: city_metadata_id column + FK added via deferred ALTER after core.city_metadata is created
     -- Note: composite FK (city_metadata_id, country_code) → city_metadata(city_metadata_id, country_iso) added via deferred ALTER
@@ -698,7 +697,7 @@ CREATE TABLE IF NOT EXISTS audit.address_history (
     address_id UUID NOT NULL,
     institution_id UUID NOT NULL,
     user_id UUID NULL,
-    employer_id UUID NULL,
+    workplace_group_id UUID NULL,
     address_type address_type_enum[],
     country_code VARCHAR(2),
     province VARCHAR(50),
@@ -723,46 +722,17 @@ CREATE TABLE IF NOT EXISTS audit.address_history (
     -- Note: floor, apartment_unit, is_default in core.address_subpremise
 );
 
-\echo 'Creating table: core.employer_info'
-CREATE TABLE IF NOT EXISTS core.employer_info (
-    employer_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    name VARCHAR(100) NOT NULL,
-    address_id UUID NOT NULL,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NULL,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (address_id) REFERENCES core.address_info(address_id) ON DELETE RESTRICT
-);
-
-\echo 'Adding foreign key constraint: core.address_info.employer_id -> core.employer_info.employer_id'
-ALTER TABLE core.address_info 
-ADD CONSTRAINT fk_address_info_employer_id 
-FOREIGN KEY (employer_id) REFERENCES core.employer_info(employer_id) ON DELETE SET NULL;
-
-\echo 'Creating table: audit.employer_history'
-CREATE TABLE IF NOT EXISTS audit.employer_history (
-    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    employer_id UUID NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    address_id UUID NOT NULL,
-    is_archived BOOLEAN NOT NULL,
-    status status_enum NOT NULL,
-    created_date TIMESTAMPTZ NOT NULL,
-    created_by UUID NULL,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL,
-    is_current BOOLEAN DEFAULT TRUE,
-    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
-    FOREIGN KEY (employer_id) REFERENCES core.employer_info(employer_id) ON DELETE RESTRICT
-);
+-- core.employer_info REMOVED — employer identity is institution_info (type=employer) + institution_entity_info per country.
+-- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
 \echo 'Creating table: core.employer_benefits_program'
 CREATE TABLE IF NOT EXISTS core.employer_benefits_program (
     program_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    institution_id UUID NOT NULL UNIQUE,
+    institution_id UUID NOT NULL,
+    -- Three-tier cascade: entity override → institution default
+    -- institution_entity_id IS NULL = institution-level defaults
+    -- institution_entity_id IS NOT NULL = entity-level override (currency-tied fields: benefit_cap, minimum_monthly_fee, stripe_*)
+    institution_entity_id UUID NULL,
     -- Benefit config
     benefit_rate INTEGER NOT NULL CHECK (benefit_rate >= 0 AND benefit_rate <= 100),
     benefit_cap NUMERIC NULL,
@@ -790,8 +760,10 @@ CREATE TABLE IF NOT EXISTS core.employer_benefits_program (
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT
+    FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
+    CONSTRAINT uq_employer_program_scope UNIQUE (institution_id, institution_entity_id)
     -- Note: modified_by FK added via ALTER TABLE after core.user_info is created
+    -- Note: institution_entity_id FK to ops.institution_entity_info added via deferred ALTER (entity table created later)
 );
 
 \echo 'Creating table: audit.employer_benefits_program_history'
@@ -799,6 +771,7 @@ CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     program_id UUID NOT NULL,
     institution_id UUID NOT NULL,
+    institution_entity_id UUID NULL,
     benefit_rate INTEGER NOT NULL,
     benefit_cap NUMERIC NULL,
     benefit_cap_period benefit_cap_period_enum NOT NULL,
@@ -825,23 +798,8 @@ CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
     -- Note: modified_by FK not enforced on audit tables (history rows must survive user changes)
 );
 
-\echo 'Creating table: core.employer_domain'
-CREATE TABLE IF NOT EXISTS core.employer_domain (
-    domain_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    institution_id UUID NOT NULL,
-    domain VARCHAR(255) NOT NULL UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    status status_enum NOT NULL DEFAULT 'active'::status_enum,
-    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NULL,
-    modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT
-    -- Note: modified_by FK added via ALTER TABLE after core.user_info is created
-);
-CREATE INDEX IF NOT EXISTS idx_employer_domain_institution ON core.employer_domain(institution_id);
-CREATE INDEX IF NOT EXISTS idx_employer_domain_domain ON core.employer_domain(domain) WHERE is_active = TRUE AND is_archived = FALSE;
+-- core.employer_domain REMOVED — replaced by email_domain column on ops.institution_entity_info.
+-- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
 \echo 'Creating table: core.lead_interest'
 CREATE TABLE IF NOT EXISTS core.lead_interest (
@@ -910,6 +868,45 @@ CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON core.restaurant_lead(con
 -- restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
 -- Deferred: see after cuisine table is created
 
+\echo 'Creating table: core.workplace_group'
+CREATE TABLE IF NOT EXISTS core.workplace_group (
+    workplace_group_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    name               VARCHAR(100) NOT NULL,
+    email_domain       VARCHAR(255) NULL,
+    require_domain_verification BOOLEAN NOT NULL DEFAULT FALSE,
+    is_archived        BOOLEAN     NOT NULL DEFAULT FALSE,
+    status             status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by         UUID        NULL,
+    modified_by        UUID        NOT NULL,
+    modified_date      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_workplace_group_name ON core.workplace_group USING gin (name gin_trgm_ops);
+
+\echo 'Creating table: audit.workplace_group_history'
+CREATE TABLE IF NOT EXISTS audit.workplace_group_history (
+    event_id           UUID        PRIMARY KEY DEFAULT uuidv7(),
+    workplace_group_id UUID        NOT NULL,
+    name               VARCHAR(100) NOT NULL,
+    email_domain       VARCHAR(255) NULL,
+    require_domain_verification BOOLEAN NOT NULL,
+    is_archived        BOOLEAN     NOT NULL,
+    status             status_enum NOT NULL,
+    created_date       TIMESTAMPTZ NOT NULL,
+    created_by         UUID        NULL,
+    modified_by        UUID        NOT NULL,
+    modified_date      TIMESTAMPTZ NOT NULL,
+    is_current         BOOLEAN     DEFAULT TRUE,
+    valid_until        TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (workplace_group_id) REFERENCES core.workplace_group(workplace_group_id) ON DELETE RESTRICT
+);
+
+-- Deferred FK: address_info.workplace_group_id → workplace_group (address_info created before workplace_group)
+\echo 'Adding deferred FK: address_info.workplace_group_id -> workplace_group'
+ALTER TABLE core.address_info
+    ADD CONSTRAINT fk_address_workplace_group
+    FOREIGN KEY (workplace_group_id) REFERENCES core.workplace_group(workplace_group_id) ON DELETE SET NULL;
+
 \echo 'Creating table: core.user_info'
 CREATE TABLE IF NOT EXISTS core.user_info (
     user_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -927,8 +924,10 @@ CREATE TABLE IF NOT EXISTS core.user_info (
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     email_verified_at TIMESTAMPTZ,
     -- Employer tracking fields (only applicable to Customer role_type)
-    employer_id UUID NULL, -- For end-customers: links to their employer
+    employer_entity_id UUID NULL, -- For end-customers: links to their employer's entity (institution_entity_info)
     employer_address_id UUID NULL REFERENCES core.address_info(address_id) ON DELETE SET NULL,
+    -- Workplace group for coworker pickup coordination (B2C)
+    workplace_group_id UUID NULL REFERENCES core.workplace_group(workplace_group_id) ON DELETE SET NULL,
     support_email_suppressed_until TIMESTAMPTZ NULL,
     last_support_email_date TIMESTAMPTZ NULL,
     -- Referral tracking
@@ -939,8 +938,8 @@ CREATE TABLE IF NOT EXISTS core.user_info (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (employer_id) REFERENCES core.employer_info(employer_id) ON DELETE SET NULL
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    -- Note: employer_entity_id FK to ops.institution_entity_info added via deferred ALTER (entity table created later)
 );
 
 -- =============================================================================
@@ -967,20 +966,14 @@ ALTER TABLE core.address_info
     ADD CONSTRAINT fk_address_info_modified_by
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT;
 
--- core.employer_info
-ALTER TABLE core.employer_info
-    ADD CONSTRAINT fk_employer_info_modified_by
-    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT;
+-- core.employer_info REMOVED — see MULTINATIONAL_INSTITUTIONS.md
 
 -- core.employer_benefits_program
 ALTER TABLE core.employer_benefits_program
     ADD CONSTRAINT fk_employer_benefits_program_modified_by
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT;
 
--- core.employer_domain
-ALTER TABLE core.employer_domain
-    ADD CONSTRAINT fk_employer_domain_modified_by
-    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT;
+-- core.employer_domain REMOVED — see MULTINATIONAL_INSTITUTIONS.md
 
 -- core.restaurant_lead
 ALTER TABLE core.restaurant_lead
@@ -1031,15 +1024,14 @@ CREATE INDEX idx_currency_rate_raw_target_fetched
 -- FKs market_info, and the layout reads most naturally with the market alongside them.
 
 \echo 'Creating table: core.currency_metadata'
--- PR1 note: currency_name is a PR2-deprecated compatibility column, populated in seed
--- from external.iso4217_currency.name. Retained so existing service queries against
--- the old credit_currency_info.currency_name column keep working unchanged.
--- PR2 migrates services to JOIN external.iso4217_currency for display name and drops this column.
+-- PR2a note: currency_name column dropped — display name now derives from
+-- external.iso4217_currency.name via JOIN on currency_code (see market_service,
+-- entity_service). Services that used core.credit_currency_info.currency_name
+-- now use JOIN external.iso4217_currency ic ON ic.code = cc.currency_code.
 CREATE TABLE IF NOT EXISTS core.currency_metadata (
     currency_metadata_id        UUID PRIMARY KEY DEFAULT uuidv7(),
     currency_code               VARCHAR(3) NOT NULL UNIQUE
                                 REFERENCES external.iso4217_currency(code) ON DELETE RESTRICT,
-    currency_name               VARCHAR(100) NULL,   -- DEPRECATED (PR2) — JOIN external.iso4217_currency for the canonical name
     credit_value_local_currency NUMERIC NOT NULL,    -- Vianda-owned pricing policy: "1 credit" local currency value
     currency_conversion_usd     NUMERIC NOT NULL,    -- operational USD conversion rate (snapshotted; updated via ops flow)
     is_archived                 BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1056,7 +1048,6 @@ CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
     event_id                    UUID PRIMARY KEY DEFAULT uuidv7(),
     currency_metadata_id        UUID NOT NULL,
     currency_code               VARCHAR(3) NOT NULL,
-    currency_name               VARCHAR(100) NULL,   -- DEPRECATED (PR2), mirrors core.currency_metadata
     credit_value_local_currency NUMERIC NOT NULL,
     currency_conversion_usd     NUMERIC NOT NULL,
     is_archived                 BOOLEAN NOT NULL,
@@ -1072,21 +1063,18 @@ CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
 );
 
 \echo 'Creating table: core.market_info'
--- PR1 note: country_name + timezone kept as NULLABLE compatibility columns until
--- service code (market_service, entity_service, address_service, crud_service,
--- routes/admin/markets, etc.) is migrated to JOIN external.geonames_country for
--- country_name and read timezone from address_info.timezone per-restaurant. That
--- migration is PR2. Until then these columns are populated in reference_data.sql
--- from GeoNames-derived values so downstream queries continue to work unchanged.
--- Target end state (PR2): drop both columns; see docs/plans/country_city_data_structure.md.
+-- PR2a/PR2b note: country_name and timezone columns dropped. country_name derives
+-- from external.geonames_country.name via JOIN on country_code; operational timezone
+-- lives on core.address_info.timezone (per-restaurant) and notification_banner_cron
+-- joins restaurant → address to use the restaurant's local timezone. Single-country
+-- fallback lookups live in app/services/timezone_service._MARKET_PRIMARY_TIMEZONE.
+-- kitchen_open_time + kitchen_close_time moved to billing.market_payout_aggregator
+-- (market defaults) and billing.supplier_terms (per-supplier overrides). Resolution:
+-- supplier_terms → market_payout_aggregator → hardcoded 09:00/13:30.
 CREATE TABLE IF NOT EXISTS core.market_info (
     market_id UUID PRIMARY KEY DEFAULT uuidv7(),
     country_code VARCHAR(2) NOT NULL UNIQUE,            -- ISO 3166-1 alpha-2; FK to external.geonames_country
-    country_name VARCHAR(100) NULL,                     -- DEPRECATED (PR2) — derives from external.geonames_country.name
     currency_metadata_id UUID NOT NULL,                 -- FK to core.currency_metadata (two-tier ISO 4217 layer)
-    timezone VARCHAR(50) NULL,                          -- DEPRECATED (PR2) — operational timezone now lives on address_info
-    kitchen_open_time  TIME NOT NULL DEFAULT '09:00',   -- Onboarding template: restaurants inherit at create time (naive wall-clock)
-    kitchen_close_time TIME NOT NULL DEFAULT '13:30',   -- Onboarding template: restaurants inherit at create time (naive wall-clock)
     language VARCHAR(5) NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'es', 'pt')),
     phone_dial_code VARCHAR(6) NULL,                    -- E.164 country prefix e.g. '+54'; NULL for pseudo-markets
     phone_local_digits SMALLINT NULL,                   -- Max national digits after dial code; UI maxLength hint e.g. 10
@@ -1105,24 +1093,20 @@ CREATE TABLE IF NOT EXISTS core.market_info (
 \echo 'Adding foreign key: core.address_info.country_code -> external.geonames_country.iso_alpha2'
 ALTER TABLE core.address_info ADD CONSTRAINT fk_address_country_code FOREIGN KEY (country_code) REFERENCES external.geonames_country(iso_alpha2) ON DELETE RESTRICT;
 
--- core.address_info.city_metadata_id column added here (plain UUID, no FK yet).
--- FK + composite-consistency FK added at the bottom of schema.sql, after core.city_metadata exists.
-\echo 'Adding core.address_info.city_metadata_id column (FK deferred to end of schema.sql)'
-ALTER TABLE core.address_info ADD COLUMN city_metadata_id UUID NULL;
+-- core.address_info.city_metadata_id column added here (NOT NULL as of PR4c).
+-- Single FK + composite-consistency FK added at the bottom of schema.sql, after core.city_metadata exists.
+-- PR4c: flipped from nullable to NOT NULL — every address writer is required to provide
+-- city_metadata_id; timezone derives from external.geonames_city.timezone via the FK chain.
+\echo 'Adding core.address_info.city_metadata_id column (NOT NULL; FK deferred to end of schema.sql)'
+ALTER TABLE core.address_info ADD COLUMN city_metadata_id UUID NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_address_info_city_metadata_id ON core.address_info(city_metadata_id);
--- NULL for now — no address rows exist in seed. Phase 3 of the rollout will flip this to NOT NULL
--- once the address-creation writer path is wired to city_metadata_id (see docs/plans/country_city_data_structure.md).
 
 \echo 'Creating table: audit.market_history'
 CREATE TABLE IF NOT EXISTS audit.market_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     market_id UUID NOT NULL,
     country_code VARCHAR(2) NOT NULL,
-    country_name VARCHAR(100) NULL,                     -- DEPRECATED (PR2)
     currency_metadata_id UUID NOT NULL,
-    timezone VARCHAR(50) NULL,                          -- DEPRECATED (PR2)
-    kitchen_open_time  TIME NOT NULL,
-    kitchen_close_time TIME NOT NULL,
     language VARCHAR(5) NOT NULL CHECK (language IN ('en', 'es', 'pt')),
     phone_dial_code VARCHAR(6) NULL,
     phone_local_digits SMALLINT NULL,
@@ -1284,9 +1268,18 @@ ALTER TABLE core.user_info ADD COLUMN locale VARCHAR(5) NOT NULL DEFAULT 'en' CH
 ALTER TABLE core.user_info ADD COLUMN city_metadata_id UUID NOT NULL DEFAULT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' REFERENCES core.city_metadata(city_metadata_id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS idx_user_info_city_metadata_id ON core.user_info(city_metadata_id);
 
-\echo 'Adding core.institution_info.market_id (required: every institution has a market — Global, single, or multi; default Global for backfill)'
-ALTER TABLE core.institution_info ADD COLUMN market_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES core.market_info(market_id) ON DELETE RESTRICT;
-CREATE INDEX IF NOT EXISTS idx_institution_info_market_id ON core.institution_info(market_id);
+-- institution_info.market_id REMOVED — replaced by core.institution_market junction table.
+-- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
+
+\echo 'Creating table: core.institution_market (multi-market assignment per institution)'
+CREATE TABLE IF NOT EXISTS core.institution_market (
+    institution_id UUID NOT NULL REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
+    market_id      UUID NOT NULL REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
+    is_primary     BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (institution_id, market_id)
+);
+CREATE INDEX IF NOT EXISTS idx_institution_market_market ON core.institution_market(market_id);
 
 \echo 'Creating table: core.user_market_assignment (v2: multi-market per user)'
 CREATE TABLE IF NOT EXISTS core.user_market_assignment (
@@ -1333,7 +1326,7 @@ CREATE TABLE IF NOT EXISTS audit.institution_history (
     institution_id UUID NOT NULL,
     name VARCHAR(50) NOT NULL,
     institution_type institution_type_enum NOT NULL,
-    market_id UUID,
+    -- market_id REMOVED — institution markets now in core.institution_market junction
     support_email_suppressed_until TIMESTAMPTZ NULL,
     last_support_email_date TIMESTAMPTZ NULL,
     is_archived BOOLEAN NOT NULL,
@@ -1364,7 +1357,8 @@ CREATE TABLE IF NOT EXISTS audit.user_history (
     mobile_number_verified_at TIMESTAMPTZ,
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     email_verified_at TIMESTAMPTZ,
-    employer_institution_id UUID NULL, -- For end-customers: links to their employer's institution
+    employer_entity_id UUID NULL, -- For end-customers: links to their employer's entity (institution_entity_info)
+    workplace_group_id UUID NULL, -- For coworker pickup coordination (B2C)
     support_email_suppressed_until TIMESTAMPTZ NULL,
     last_support_email_date TIMESTAMPTZ NULL,
     market_id UUID NOT NULL,
@@ -1443,7 +1437,7 @@ CREATE TABLE IF NOT EXISTS core.geolocation_info (
     address_id UUID NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
-    place_id VARCHAR(255) NULL,
+    place_id VARCHAR(500) NULL,  -- Mapbox mapbox_id can exceed 255 chars
     viewport JSONB NULL,
     formatted_address_google VARCHAR(500) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1463,7 +1457,7 @@ CREATE TABLE IF NOT EXISTS audit.geolocation_history (
     address_id UUID NOT NULL,
     latitude DECIMAL(10, 8) NOT NULL,
     longitude DECIMAL(11, 8) NOT NULL,
-    place_id VARCHAR(255) NULL,
+    place_id VARCHAR(500) NULL,  -- matches geolocation_info
     viewport JSONB NULL,
     formatted_address_google VARCHAR(500) NULL,
     is_archived BOOLEAN NOT NULL,
@@ -1488,6 +1482,8 @@ CREATE TABLE IF NOT EXISTS ops.institution_entity_info (
     payout_provider_account_id VARCHAR(255) NULL,
     payout_aggregator          VARCHAR(50)  NULL,
     payout_onboarding_status   VARCHAR(50)  NULL,
+    -- Email domain for domain-gated enrollment (employer entities) and future SSO (all entity types)
+    email_domain               VARCHAR(255) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1499,6 +1495,9 @@ CREATE TABLE IF NOT EXISTS ops.institution_entity_info (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_email_domain
+    ON ops.institution_entity_info(email_domain)
+    WHERE email_domain IS NOT NULL AND is_archived = FALSE;
 
 \echo 'Creating table: audit.institution_entity_history'
 CREATE TABLE IF NOT EXISTS audit.institution_entity_history (
@@ -1512,6 +1511,7 @@ CREATE TABLE IF NOT EXISTS audit.institution_entity_history (
     payout_provider_account_id VARCHAR(255) NULL,
     payout_aggregator          VARCHAR(50)  NULL,
     payout_onboarding_status   VARCHAR(50)  NULL,
+    email_domain               VARCHAR(255) NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
@@ -1523,6 +1523,17 @@ CREATE TABLE IF NOT EXISTS audit.institution_entity_history (
     FOREIGN KEY (institution_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+
+-- Deferred FKs: tables created before ops.institution_entity_info that reference it
+\echo 'Adding deferred FK: employer_benefits_program.institution_entity_id -> institution_entity_info'
+ALTER TABLE core.employer_benefits_program
+    ADD CONSTRAINT fk_employer_program_entity_id
+    FOREIGN KEY (institution_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE RESTRICT;
+
+\echo 'Adding deferred FK: user_info.employer_entity_id -> institution_entity_info'
+ALTER TABLE core.user_info
+    ADD CONSTRAINT fk_user_info_employer_entity_id
+    FOREIGN KEY (employer_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE SET NULL;
 
 \echo 'Creating table: ops.cuisine'
 CREATE TABLE IF NOT EXISTS ops.cuisine (
@@ -1590,8 +1601,8 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_info (
     member_perks TEXT[],
     member_perks_i18n JSONB,
     require_kiosk_code_verification BOOLEAN NOT NULL DEFAULT FALSE,
-    -- Kitchen hours copied from the market template (market_info.kitchen_open_time / kitchen_close_time)
-    -- at restaurant-create time. Owned by restaurant_info thereafter — no runtime fallback through market.
+    -- Kitchen hours copied from supplier_terms (or market_payout_aggregator defaults)
+    -- at restaurant-create time. Owned by restaurant_info thereafter — no runtime fallback.
     -- TIME is naive wall-clock, interpreted per-restaurant in address_info.timezone at runtime.
     kitchen_open_time  TIME NOT NULL DEFAULT '09:00',
     kitchen_close_time TIME NOT NULL DEFAULT '13:30',
@@ -1882,15 +1893,8 @@ CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_plate_selection_pickup_date_weekday CHECK (
-        EXTRACT(ISODOW FROM pickup_date) = CASE kitchen_day
-            WHEN 'monday' THEN 1
-            WHEN 'tuesday' THEN 2
-            WHEN 'wednesday' THEN 3
-            WHEN 'thursday' THEN 4
-            WHEN 'friday' THEN 5
-        END
-    ),
+    -- CHECK constraint on pickup_date DOW vs kitchen_day removed — business logic in Python
+    -- (VALID_KITCHEN_DAYS + kitchen_day_enum) is the real guard, and weekend service is planned.
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (product_id) REFERENCES ops.product_info(product_id) ON DELETE RESTRICT,
@@ -2951,8 +2955,39 @@ CREATE TABLE IF NOT EXISTS billing.market_payout_aggregator (
     is_active                BOOLEAN     NOT NULL DEFAULT TRUE,
     require_invoice          BOOLEAN     NOT NULL DEFAULT FALSE,
     max_unmatched_bill_days  INTEGER     NOT NULL DEFAULT 30,
+    -- Kitchen hours defaults (naive wall-clock; suppliers inherit at create time)
+    kitchen_open_time        TIME        NOT NULL DEFAULT '09:00',
+    kitchen_close_time       TIME        NOT NULL DEFAULT '13:30',
     notes                    TEXT        NULL,
-    FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT
+    -- Audit
+    is_archived              BOOLEAN     NOT NULL DEFAULT FALSE,
+    status                   status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_by              UUID        NOT NULL,
+    modified_date            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (market_id)  REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+
+\echo 'Creating table: audit.market_payout_aggregator_history'
+CREATE TABLE IF NOT EXISTS audit.market_payout_aggregator_history (
+    event_id                 UUID        PRIMARY KEY DEFAULT uuidv7(),
+    market_id                UUID        NOT NULL,
+    aggregator               VARCHAR(50) NOT NULL,
+    is_active                BOOLEAN     NOT NULL,
+    require_invoice          BOOLEAN     NOT NULL,
+    max_unmatched_bill_days  INTEGER     NOT NULL,
+    kitchen_open_time        TIME        NOT NULL,
+    kitchen_close_time       TIME        NOT NULL,
+    notes                    TEXT        NULL,
+    is_archived              BOOLEAN     NOT NULL,
+    status                   status_enum NOT NULL,
+    created_date             TIMESTAMPTZ NOT NULL,
+    modified_by              UUID        NOT NULL,
+    modified_date            TIMESTAMPTZ NOT NULL,
+    is_current               BOOLEAN     DEFAULT TRUE,
+    valid_until              TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (market_id)  REFERENCES billing.market_payout_aggregator(market_id) ON DELETE RESTRICT
 );
 
 \echo 'Creating table: billing.institution_settlement'
@@ -3166,6 +3201,7 @@ CREATE INDEX IF NOT EXISTS idx_supplier_w9_entity ON billing.supplier_w9(institu
 CREATE TABLE IF NOT EXISTS billing.employer_bill (
     employer_bill_id UUID PRIMARY KEY DEFAULT uuidv7(),
     institution_id UUID NOT NULL,
+    institution_entity_id UUID NOT NULL,  -- bills are per-entity (per-country/currency)
     billing_period_start DATE NOT NULL,
     billing_period_end DATE NOT NULL,
     billing_cycle VARCHAR(20) NOT NULL,
@@ -3186,9 +3222,11 @@ CREATE TABLE IF NOT EXISTS billing.employer_bill (
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
+    FOREIGN KEY (institution_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_employer_bill_institution ON billing.employer_bill(institution_id);
+CREATE INDEX IF NOT EXISTS idx_employer_bill_entity ON billing.employer_bill(institution_entity_id);
 CREATE INDEX IF NOT EXISTS idx_employer_bill_period ON billing.employer_bill(billing_period_start, billing_period_end);
 
 \echo 'Creating table: billing.employer_bill_line'
@@ -3217,6 +3255,7 @@ CREATE TABLE IF NOT EXISTS audit.employer_bill_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
     employer_bill_id UUID NOT NULL,
     institution_id UUID NOT NULL,
+    institution_entity_id UUID NOT NULL,
     billing_period_start DATE NOT NULL,
     billing_period_end DATE NOT NULL,
     billing_cycle VARCHAR(20) NOT NULL,
@@ -3249,11 +3288,18 @@ CREATE TABLE IF NOT EXISTS audit.employer_bill_history (
 \echo 'Creating table: billing.supplier_terms'
 CREATE TABLE IF NOT EXISTS billing.supplier_terms (
     supplier_terms_id       UUID        PRIMARY KEY DEFAULT uuidv7(),
-    institution_id          UUID        NOT NULL UNIQUE,
+    institution_id          UUID        NOT NULL,
+    -- Three-tier cascade: entity override → institution default → market default → hardcoded
+    -- institution_entity_id IS NULL = institution-level defaults
+    -- institution_entity_id IS NOT NULL = entity-level override
+    institution_entity_id   UUID        NULL,
     -- Pricing
     no_show_discount        INTEGER     NOT NULL DEFAULT 0 CHECK (no_show_discount >= 0 AND no_show_discount <= 100),
     -- Payment schedule
     payment_frequency       payment_frequency_enum NOT NULL DEFAULT 'daily'::payment_frequency_enum,
+    -- Kitchen hours (per-supplier overrides of market defaults; NULL = inherit)
+    kitchen_open_time       TIME        NULL,
+    kitchen_close_time      TIME        NULL,
     -- Invoice compliance (per-supplier overrides of market defaults)
     require_invoice         BOOLEAN     NULL,
     invoice_hold_days       INTEGER     NULL CHECK (invoice_hold_days IS NULL OR invoice_hold_days > 0),
@@ -3265,7 +3311,9 @@ CREATE TABLE IF NOT EXISTS billing.supplier_terms (
     modified_by             UUID        NOT NULL,
     modified_date           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
-    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+    FOREIGN KEY (institution_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    CONSTRAINT uq_supplier_terms_scope UNIQUE (institution_id, institution_entity_id)
 );
 
 \echo 'Creating table: audit.supplier_terms_history'
@@ -3273,8 +3321,11 @@ CREATE TABLE IF NOT EXISTS audit.supplier_terms_history (
     event_id                UUID        PRIMARY KEY DEFAULT uuidv7(),
     supplier_terms_id       UUID        NOT NULL,
     institution_id          UUID        NOT NULL,
+    institution_entity_id   UUID        NULL,
     no_show_discount        INTEGER     NOT NULL,
     payment_frequency       payment_frequency_enum NOT NULL,
+    kitchen_open_time       TIME        NULL,
+    kitchen_close_time      TIME        NULL,
     require_invoice         BOOLEAN     NULL,
     invoice_hold_days       INTEGER     NULL,
     is_archived             BOOLEAN     NOT NULL,

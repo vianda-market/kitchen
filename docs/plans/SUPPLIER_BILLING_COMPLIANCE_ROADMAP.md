@@ -352,8 +352,8 @@ The normalized `supplier_invoice` table is designed to absorb new countries with
 
 - `docs/billing/INSTITUTION_BILLING_EXECUTION_PLAN.md` — internal bill lifecycle
 - `docs/billing/RESTAURANT_BALANCE_SYSTEM.md` — balance accounting model
-- `docs/api/b2b_client/STRIPE_CONNECT_SUPPLIER_PAYOUT_B2B.md` — payout onboarding endpoints
-- `docs/api/b2b_client/SUPPLIER_INVOICE_REGISTRATION_B2B.md` — B2B frontend integration guide for invoice registration
+- `docs/api/b2b_client/API_CLIENT_SUPPLIER_PAYOUT.md` — payout onboarding endpoints
+- `docs/api/b2b_client/API_CLIENT_SUPPLIER_INVOICES.md` — B2B frontend integration guide for invoice registration
 - `docs/api/infrastructure/SUPPLIER_INVOICE_STORAGE_INFRASTRUCTURE.md` — GCS bucket schema + lifecycle policies
 - `docs/infrastructure/STRIPE_INTEGRATION_HANDOFF.md` — Stripe Connect setup
 - AFIP: https://www.afip.gob.ar/facturae/

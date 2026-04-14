@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from application import app
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
-from app.dto.models import UserDTO, EmployerDTO, AddressDTO
+from app.dto.models import UserDTO, AddressDTO
 from app.config import Status, RoleType, RoleName
 from app.tests.conftest import SAMPLE_CITY_ID
 
@@ -94,26 +94,22 @@ def client_supplier(supplier_user, mock_db):
 
 
 def test_assign_employer_success(client_customer, customer_user, mock_db):
-    """PUT /users/me/employer with valid employer_id and address_id returns 200."""
-    employer_id = uuid4()
+    """PUT /users/me/employer with valid employer_entity_id and address_id returns 200."""
+    employer_entity_id = uuid4()
     address_id = uuid4()
     user_id = customer_user["user_id"]
+    employer_institution_id = uuid4()
 
-    employer_dto = EmployerDTO(
-        employer_id=employer_id,
-        name="Test Employer",
-        address_id=address_id,
-        is_archived=False,
-        status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
-        modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
-    )
+    # Mock entity — route validates entity exists and address belongs to same institution
+    mock_entity = MagicMock()
+    mock_entity.institution_entity_id = employer_entity_id
+    mock_entity.institution_id = employer_institution_id
+
     address_dto = AddressDTO(
+        city_metadata_id=uuid4(),
         address_id=address_id,
-        institution_id=uuid4(),
+        institution_id=employer_institution_id,  # Must match entity's institution_id
         user_id=user_id,
-        employer_id=employer_id,
         address_type=["customer_employer"],
         street_type="st",
         street_name="Main St",
@@ -144,10 +140,10 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         mobile_number=None,
         mobile_number_verified=False,
         mobile_number_verified_at=None,
-        employer_id=employer_id,
+        employer_entity_id=employer_entity_id,
         employer_address_id=address_id,
         market_id=mid,
-        city_id=SAMPLE_CITY_ID,
+        city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),
@@ -155,51 +151,48 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         modified_date=datetime.now(timezone.utc),
     )
 
-    with patch("app.services.crud_service.employer_service") as mock_employer, \
+    with patch("app.services.crud_service.institution_entity_service") as mock_entity_svc, \
          patch("app.services.crud_service.address_service") as mock_address, \
          patch("app.routes.user.user_service") as mock_user:
-        mock_employer.get_by_id.return_value = employer_dto
+        mock_entity_svc.get_by_id.return_value = mock_entity
         mock_address.get_by_id.return_value = address_dto
         mock_user.update.return_value = updated_user
 
         response = client_customer.put(
             "/api/v1/users/me/employer",
-            json={"employer_id": str(employer_id), "address_id": str(address_id)},
+            json={"employer_entity_id": str(employer_entity_id), "address_id": str(address_id)},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["employer_id"] == str(employer_id)
+        assert data["employer_entity_id"] == str(employer_entity_id)
         assert data["employer_address_id"] == str(address_id)
         mock_user.update.assert_called_once()
         call_args = mock_user.update.call_args
         update_data = call_args[0][1]  # (user_id, update_data, db, ...)
-        assert update_data["employer_id"] == employer_id
+        assert update_data["employer_entity_id"] == employer_entity_id
         assert update_data["employer_address_id"] == address_id
 
 
 def test_assign_employer_address_not_belonging_to_employer(client_customer, customer_user, mock_db):
-    """PUT /users/me/employer with address not belonging to employer returns 400."""
-    employer_id = uuid4()
-    other_employer_id = uuid4()
+    """PUT /users/me/employer with address from different institution returns 400."""
+    employer_entity_id = uuid4()
     address_id = uuid4()
     user_id = customer_user["user_id"]
+    employer_institution_id = uuid4()
+    other_institution_id = uuid4()  # Address belongs to a different institution
 
-    employer_dto = EmployerDTO(
-        employer_id=employer_id,
-        name="Test Employer",
-        address_id=address_id,
-        is_archived=False,
-        status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
-        modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
-    )
+    # Mock entity
+    mock_entity = MagicMock()
+    mock_entity.institution_entity_id = employer_entity_id
+    mock_entity.institution_id = employer_institution_id
+
+    # Address with different institution_id → validation should fail
     address_dto = AddressDTO(
+        city_metadata_id=uuid4(),
         address_id=address_id,
-        institution_id=uuid4(),
+        institution_id=other_institution_id,  # Different from entity's institution
         user_id=user_id,
-        employer_id=other_employer_id,
         address_type=["customer_employer"],
         street_type="st",
         street_name="Main St",
@@ -217,15 +210,15 @@ def test_assign_employer_address_not_belonging_to_employer(client_customer, cust
         modified_date=datetime.now(timezone.utc),
     )
 
-    with patch("app.services.crud_service.employer_service") as mock_employer, \
+    with patch("app.services.crud_service.institution_entity_service") as mock_entity_svc, \
          patch("app.services.crud_service.address_service") as mock_address, \
          patch("app.routes.user.user_service") as mock_user:
-        mock_employer.get_by_id.return_value = employer_dto
+        mock_entity_svc.get_by_id.return_value = mock_entity
         mock_address.get_by_id.return_value = address_dto
 
         response = client_customer.put(
             "/api/v1/users/me/employer",
-            json={"employer_id": str(employer_id), "address_id": str(address_id)},
+            json={"employer_entity_id": str(employer_entity_id), "address_id": str(address_id)},
         )
 
         assert response.status_code == 400
@@ -235,12 +228,12 @@ def test_assign_employer_address_not_belonging_to_employer(client_customer, cust
 
 def test_assign_employer_supplier_forbidden(client_supplier, mock_db):
     """PUT /users/me/employer as Supplier returns 403."""
-    employer_id = uuid4()
+    employer_entity_id = uuid4()
     address_id = uuid4()
 
     response = client_supplier.put(
         "/api/v1/users/me/employer",
-        json={"employer_id": str(employer_id), "address_id": str(address_id)},
+        json={"employer_entity_id": str(employer_entity_id), "address_id": str(address_id)},
     )
 
     assert response.status_code == 403
@@ -326,7 +319,7 @@ def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer
         "first_name": "Test",
         "last_name": "User",
         "full_name": "Test User",
-        "employer_id": None,
+        "employer_entity_id": None,
         "market_id": market_id,
         "market_name": "Argentina",
         "is_archived": False,
@@ -360,9 +353,9 @@ def test_put_me_mobile_change_resets_verification_flags(client_customer, custome
         mobile_number="+14155552671",
         mobile_number_verified=True,
         mobile_number_verified_at=verified_at,
-        employer_id=None,
+        employer_entity_id=None,
         market_id=market_id,
-        city_id=SAMPLE_CITY_ID,
+        city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),
@@ -412,9 +405,9 @@ def test_put_me_new_email_triggers_verification_flow(client_customer, customer_u
         mobile_number_verified_at=None,
         email_verified=True,
         email_verified_at=datetime.now(timezone.utc),
-        employer_id=None,
+        employer_entity_id=None,
         market_id=market_id,
-        city_id=SAMPLE_CITY_ID,
+        city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),

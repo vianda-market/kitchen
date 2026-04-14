@@ -21,43 +21,102 @@ def get_cities_with_coverage(
     db: psycopg2.extensions.connection,
 ) -> List[str]:
     """
-    Return sorted list of city names (from city_info) that have at least one restaurant.
-    Intersection of: (a) supported cities in city_info, (b) cities with Active restaurant + plate_kitchen_days.
+    Return sorted list of city names (from core.city_metadata ∪ external.geonames_city)
+    that have at least one active restaurant with plate_kitchen_days and QR code.
+    Intersection of: (a) promoted cities in core.city_metadata (signup picker flag),
+    (b) cities with Active restaurant + plate_kitchen_days.
+
     Used by GET /leads/cities (public, no auth) and GET /restaurants/cities (auth).
     Single source for lead flow, signup picker, and explore dropdown.
+
+    NOTE: address_info.city is a PR2-deprecated free-text compat column; when it's
+    dropped (follow-up PR2a.5) this query will match via a JOIN through
+    address_info.city_metadata_id → geonames_city.ascii_name instead.
     """
     country = (country_code or "").strip().upper()
     if not country:
         return []
     query = """
-        SELECT c.name
-        FROM city_info c
-        WHERE c.country_code = %s
-          AND c.city_id != %s
-          AND c.is_archived = FALSE
+        SELECT COALESCE(cm.display_name_override, gc.name) AS name
+        FROM core.city_metadata cm
+        JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+        WHERE cm.country_iso = %s
+          AND cm.city_metadata_id != %s
+          AND cm.is_archived = FALSE
+          AND cm.show_in_signup_picker = TRUE
           AND EXISTS (
-            SELECT 1 FROM address_info a
-            INNER JOIN restaurant_info r ON r.address_id = a.address_id
-            WHERE UPPER(TRIM(a.city)) = UPPER(TRIM(c.name))
-              AND a.country_code = c.country_code
+            SELECT 1 FROM core.address_info a
+            INNER JOIN ops.restaurant_info r ON r.address_id = a.address_id
+            WHERE UPPER(TRIM(a.city)) = UPPER(TRIM(COALESCE(cm.display_name_override, gc.name)))
+              AND a.country_code = cm.country_iso
               AND a.is_archived = FALSE
               AND r.is_archived = FALSE
               AND r.status = 'active'
               AND EXISTS (
-                SELECT 1 FROM plate_info p
-                INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+                SELECT 1 FROM ops.plate_info p
+                INNER JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
                   AND pkd.is_archived = FALSE AND pkd.status = 'active'
                 WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
               )
               AND EXISTS (
-                SELECT 1 FROM qr_code qc
+                SELECT 1 FROM ops.qr_code qc
                 WHERE qc.restaurant_id = r.restaurant_id
                   AND qc.is_archived = FALSE AND qc.status = 'active'
               )
           )
-        ORDER BY LOWER(c.name)
+        ORDER BY LOWER(COALESCE(cm.display_name_override, gc.name))
     """
     rows = db_read(query, (country, str(GLOBAL_CITY_ID)), connection=db)
+    return [r["name"] for r in rows] if rows else []
+
+
+def get_supplier_cities_for_country(
+    country_code: str,
+    db: psycopg2.extensions.connection,
+) -> List[str]:
+    """
+    Return sorted list of city names appropriate for a supplier lead-capture dropdown.
+
+    Source is a union — so that a newly-added market without city_metadata coverage
+    still benefits from crowd-sourced data:
+      1. external.geonames_city (GeoNames, bulk-seeded) — cities in the country with pop >= 5000
+      2. core.city_metadata (curated served cities — ensures custom display names appear)
+      3. core.restaurant_lead.city_name (crowd-sourced from prior supplier lead submissions)
+
+    Deduped case-insensitively, sorted alphabetically by LOWER(name), capped at 1000.
+    """
+    country = (country_code or "").strip().upper()
+    if not country:
+        return []
+    query = """
+        WITH combined AS (
+            SELECT gc.name
+            FROM external.geonames_city gc
+            WHERE gc.country_iso = %(country)s
+            UNION
+            SELECT COALESCE(cm.display_name_override, gc2.name)
+            FROM core.city_metadata cm
+            JOIN external.geonames_city gc2 ON gc2.geonames_id = cm.geonames_id
+            WHERE cm.country_iso = %(country)s
+              AND cm.is_archived = FALSE
+              AND cm.city_metadata_id != %(global_city_id)s
+            UNION
+            SELECT DISTINCT rl.city_name
+            FROM core.restaurant_lead rl
+            WHERE rl.country_code = %(country)s
+              AND rl.is_archived = FALSE
+              AND rl.city_name IS NOT NULL AND rl.city_name <> ''
+        )
+        SELECT DISTINCT ON (LOWER(name)) name
+        FROM combined
+        ORDER BY LOWER(name)
+        LIMIT 1000
+    """
+    rows = db_read(
+        query,
+        {"country": country, "global_city_id": str(GLOBAL_CITY_ID)},
+        connection=db,
+    )
     return [r["name"] for r in rows] if rows else []
 
 

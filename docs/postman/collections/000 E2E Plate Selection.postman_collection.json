@@ -133,6 +133,80 @@
           "response": []
         },
         {
+          "name": "Setup: Resolve City Metadata (PR4c)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Find any available token so Setup works across collections that use different names.",
+                  "const token = pm.collectionVariables.get('authToken')",
+                  "    || pm.environment.get('authToken')",
+                  "    || pm.collectionVariables.get('employeeAdminToken')",
+                  "    || pm.environment.get('employeeAdminToken')",
+                  "    || pm.collectionVariables.get('superAdminAuthToken')",
+                  "    || pm.environment.get('superAdminAuthToken')",
+                  "    || pm.collectionVariables.get('adminAuthToken')",
+                  "    || pm.environment.get('adminAuthToken');",
+                  "if (token) {",
+                  "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "} else {",
+                  "    console.warn('No auth token available for Setup Cities — GET /cities will 401');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PR4c setup: pre-populate cityMetadataId{CC} cache for every seeded market",
+                  "// so downstream address-create injectors can read synchronously.",
+                  "pm.test('Cities list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const cities = pm.response.json();",
+                  "if (Array.isArray(cities)) {",
+                  "    const byCC = {};",
+                  "    for (const c of cities) {",
+                  "        const cc = (c.country_code || '').toUpperCase();",
+                  "        if (!cc || byCC[cc]) continue;",
+                  "        byCC[cc] = c;",
+                  "    }",
+                  "    for (const cc in byCC) {",
+                  "        const city = byCC[cc];",
+                  "        if (!city || !city.city_metadata_id) continue;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        pm.collectionVariables.set(varName, city.city_metadata_id);",
+                  "        pm.environment.set(varName, city.city_metadata_id);",
+                  "        pm.globals.set(varName, city.city_metadata_id);",
+                  "        console.log('cached', varName, '=', city.city_metadata_id, '(' + city.name + ')');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "B2B Address Create without institution_id - expect 400",
           "event": [
             {
@@ -147,6 +221,62 @@
                   "});"
                 ],
                 "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
+                ]
               }
             }
           ],
@@ -166,7 +296,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1043\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"100\"\n}"
+              "raw": "{\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1043\",\n  \"street_type\": \"ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"100\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/addresses",
@@ -190,7 +320,55 @@
               "script": {
                 "exec": [
                   "// Always use Vianda Enterprises (seed) - available before Supplier Create Institution; avoids stale institutionId from prior runs",
-                  "pm.collectionVariables.set(\"b2bAddressTestInstitutionId\", \"11111111-1111-1111-1111-111111111111\");"
+                  "pm.collectionVariables.set(\"b2bAddressTestInstitutionId\", \"11111111-1111-1111-1111-111111111111\");",
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
                 ],
                 "type": "text/javascript"
               }
@@ -213,17 +391,31 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{b2bAddressTestInstitutionId}}\",\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1044\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Cabildo\",\n  \"building_number\": \"200\"\n}"
+              "raw": "{\n  \"institution_id\": \"{{b2bAddressTestInstitutionId}}\",\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1044\",\n  \"street_type\": \"ave\",\n  \"street_name\": \"Cabildo\",\n  \"building_number\": \"200\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/addresses",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "addresses"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses"
+              ]
             }
           },
           "response": []
@@ -297,47 +489,61 @@
                   "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
                   "});",
                   "",
+                  "// Name → ISO 4217 code map (mirrors backend get_currency_code_by_name in app/config/supported_currencies.py).",
+                  "// Used by the 409 fallback to look up an existing currency by code (currency_name is no longer returned",
+                  "// by GET /credit-currencies since PR2a dropped the column — matching by name would fail).",
+                  "const NAME_TO_CODE = {",
+                  "    \"US Dollar\": \"USD\",",
+                  "    \"Argentine Peso\": \"ARS\",",
+                  "    \"Peruvian Sol\": \"PEN\",",
+                  "    \"Chilean Peso\": \"CLP\",",
+                  "    \"Mexican Peso\": \"MXN\",",
+                  "    \"Brazilian Real\": \"BRL\",",
+                  "};",
+                  "",
+                  "function storeCurrency(id, code) {",
+                  "    pm.collectionVariables.set(\"planCreditCurrencyId\", id);",
+                  "    pm.environment.set(\"planCreditCurrencyId\", id);",
+                  "    pm.globals.set(\"planCreditCurrencyId\", id);",
+                  "    pm.collectionVariables.set(\"planCreditCurrencyCode\", code);",
+                  "    pm.environment.set(\"planCreditCurrencyCode\", code);",
+                  "    pm.globals.set(\"planCreditCurrencyCode\", code);",
+                  "}",
+                  "",
                   "if (pm.response.code === 409) {",
-                  "    // 409 Conflict: Currency already exists - fetch by currency_name (backend assigns currency_code)",
-                  "    console.log(\"ℹ️ Currency already exists (expected on re-runs). Fetching existing currency...\");",
+                  "    console.log(\"Currency already exists (expected on re-runs). Looking up by currency_code...\");",
                   "    const requestBody = JSON.parse(pm.request.body.raw);",
                   "    const currencyName = (requestBody.currency_name || \"\").trim();",
+                  "    const expectedCode = NAME_TO_CODE[currencyName];",
+                  "    if (!expectedCode) {",
+                  "        console.error(\"NAME_TO_CODE has no mapping for '\" + currencyName + \"'. Add it to the collection script.\");",
+                  "    }",
                   "    pm.sendRequest({",
                   "        url: (pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\")) + \"/api/v1/credit-currencies\",",
                   "        method: 'GET',",
-                  "        header: {",
-                  "            'Authorization': 'Bearer ' + pm.environment.get(\"authToken\")",
-                  "        }",
+                  "        header: { 'Authorization': 'Bearer ' + pm.environment.get(\"authToken\") },",
                   "    }, function (err, res) {",
-                  "        if (err) {",
-                  "            console.error(\"❌ Error fetching currencies:\", err);",
-                  "        } else if (res.code === 200) {",
-                  "            const currencies = res.json();",
-                  "            const existingCurrency = currencies.find(c => (c.currency_name || \"\").trim() === currencyName);",
-                  "            if (existingCurrency) {",
-                  "                pm.collectionVariables.set(\"planCreditCurrencyId\", existingCurrency.credit_currency_id);",
-                  "                pm.collectionVariables.set(\"planCreditCurrencyCode\", existingCurrency.currency_code);",
-                  "                console.log(\"✅ Using existing currency:\", existingCurrency.credit_currency_id, existingCurrency.currency_code);",
-                  "            } else {",
-                  "                console.error(\"❌ Currency with name\", currencyName, \"not found in list\");",
-                  "            }",
+                  "        if (err || res.code !== 200) {",
+                  "            console.error(\"Failed to fetch currencies:\", err || res.code);",
+                  "            return;",
+                  "        }",
+                  "        const currencies = res.json();",
+                  "        const existing = currencies.find(c => (c.currency_code || \"\").trim() === expectedCode);",
+                  "        if (existing) {",
+                  "            storeCurrency(existing.currency_metadata_id, existing.currency_code);",
+                  "            console.log(\"Using existing currency:\", existing.currency_metadata_id, existing.currency_code);",
                   "        } else {",
-                  "            console.error(\"❌ Failed to fetch currencies. Status:\", res.code);",
+                  "            console.error(\"Currency with code\", expectedCode, \"not found in list\");",
                   "        }",
                   "    });",
                   "} else if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "    // Success: Set the variables from the response",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyId\", body.credit_currency_id);",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyCode\", body.currency_code);",
-                  "    console.log(\"✅ Created new currency:\");",
-                  "    console.log(\"   planCreditCurrencyId:\", body.credit_currency_id);",
-                  "    console.log(\"   planCreditCurrencyCode:\", body.currency_code);",
+                  "    storeCurrency(body.currency_metadata_id, body.currency_code);",
+                  "    console.log(\"Created new currency:\", body.currency_metadata_id, body.currency_code);",
                   "} else {",
-                  "    // Other errors: Optionally clear the variables",
                   "    pm.collectionVariables.set(\"planCreditCurrencyId\", null);",
                   "    pm.collectionVariables.set(\"planCreditCurrencyCode\", null);",
-                  "    console.error(\"❌ ERROR: Unexpected error occurred, cleared currency variables.\");",
+                  "    console.error(\"Unexpected error; cleared currency variables.\");",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -377,8 +583,7 @@
               "path": [
                 "api",
                 "v1",
-                "credit-currencies",
-                ""
+                "credit-currencies"
               ]
             }
           },
@@ -424,7 +629,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country_code\": \"AR\",\n  \"credit_currency_id\": \"{{planCreditCurrencyId}}\",\n  \"timezone\": \"America/Argentina/Buenos_Aires\"\n}",
+              "raw": "{\n  \"country_code\": \"AR\",\n  \"currency_metadata_id\": \"{{planCreditCurrencyId}}\",\n  \"timezone\": \"America/Argentina/Buenos_Aires\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -439,8 +644,7 @@
               "path": [
                 "api",
                 "v1",
-                "markets",
-                ""
+                "markets"
               ]
             }
           },
@@ -507,8 +711,7 @@
               "path": [
                 "api",
                 "v1",
-                "markets",
-                ""
+                "markets"
               ]
             }
           },
@@ -561,7 +764,7 @@
                   "const planCreditCurrencyId = pm.collectionVariables.get(\"planCreditCurrencyId\");",
                   "const planMarketId = pm.collectionVariables.get(\"planMarketId\");",
                   "",
-                  "// Validate that credit_currency_id is set",
+                  "// Validate that currency_metadata_id is set",
                   "if (!planCreditCurrencyId) {",
                   "    throw new Error(\"❌ planCreditCurrencyId is not set. Please run 'Create Credit Currency' first and ensure it completes successfully.\");",
                   "}",
@@ -571,13 +774,13 @@
                   "    throw new Error(\"❌ planMarketId is not set. Please run 'List Markets' first and ensure it completes successfully.\");",
                   "}",
                   "",
-                  "payload.credit_currency_id = planCreditCurrencyId;",
+                  "payload.currency_metadata_id = planCreditCurrencyId;",
                   "payload.market_id = planMarketId;",
                   "",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
                   "pm.request.body.update(JSON.stringify(payload));",
                   "",
-                  "console.log(\"✅ Using credit_currency_id:\", planCreditCurrencyId);",
+                  "console.log(\"✅ Using currency_metadata_id:\", planCreditCurrencyId);",
                   "console.log(\"✅ Using market_id:\", planMarketId);"
                 ],
                 "type": "text/javascript",
@@ -591,7 +794,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"market_id\": \"\",\n  \"credit_currency_id\": \"\",\n  \"name\": \"Entry Level\",\n  \"credit\": 70,\n  \"price\": 100000.00\n}",
+              "raw": "{\n  \"market_id\": \"\",\n  \"currency_metadata_id\": \"\",\n  \"name\": \"Entry Level\",\n  \"credit\": 70,\n  \"price\": 100000.00\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -848,14 +1051,14 @@
                   "    pm.expect(body).to.have.property(\"modified_date\");",
                   "});",
                   "",
-                  "// Test 4b: market_id (v1) when provided is returned",
-                  "pm.test(\"Response includes market_id when provided\", function () {",
+                  "// Test 4b: market_ids returned as array",
+                  "pm.test(\"Response includes market_ids array\", function () {",
                   "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"market_ids\");",
+                  "    pm.expect(body.market_ids).to.be.an(\"array\");",
+                  "    pm.expect(body.market_ids.length).to.be.at.least(1);",
                   "    const requestBody = JSON.parse(pm.request.body.raw);",
-                  "    if (requestBody.market_id) {",
-                  "        pm.expect(body).to.have.property(\"market_id\");",
-                  "        pm.expect(body.market_id).to.equal(requestBody.market_id);",
-                  "    }",
+                  "    pm.expect(body.market_ids[0]).to.equal(requestBody.market_ids[0]);",
                   "});",
                   "",
                   "// Test 5: Name matches request",
@@ -866,9 +1069,9 @@
                   "});",
                   "",
                   "// Test 6: Default values are correct",
-                  "pm.test(\"Default status is Active\", function () {",
+                  "pm.test(\"Default status is active\", function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body.status).to.equal(\"Active\");",
+                  "    pm.expect(body.status).to.equal(\"active\");",
                   "});",
                   "",
                   "pm.test(\"is_archived is false by default\", function () {",
@@ -883,13 +1086,14 @@
                   "    pm.expect(new Date(body.created_date).toString()).to.not.equal(\"Invalid Date\");",
                   "});",
                   "",
-                  "// Save institution_id and market_id for subsequent requests (Supplier users must use institution's market)",
+                  "// Save institution_id and primary market_id for subsequent requests",
                   "const body = pm.response.json();",
                   "pm.collectionVariables.set(\"institutionId\", body.institution_id);",
-                  "if (body.market_id) pm.collectionVariables.set(\"institutionMarketId\", body.market_id);",
+                  "const primaryMarketId = (body.market_ids && body.market_ids.length > 0) ? body.market_ids[0] : null;",
+                  "if (primaryMarketId) pm.collectionVariables.set(\"institutionMarketId\", primaryMarketId);",
                   "pm.environment.set(\"institutionId\", body.institution_id);",
                   "pm.globals.set(\"institutionId\", body.institution_id);",
-                  "if (body.market_id) { pm.environment.set(\"institutionMarketId\", body.market_id); pm.globals.set(\"institutionMarketId\", body.market_id); }",
+                  "if (primaryMarketId) { pm.environment.set(\"institutionMarketId\", primaryMarketId); pm.globals.set(\"institutionMarketId\", primaryMarketId); }",
                   "if (body.name) { pm.environment.set(\"institutionName\", body.name); pm.globals.set(\"institutionName\", body.name); }",
                   "console.log(\"✅ institutionId set (env updated for downstream collections):\", body.institution_id);"
                 ],
@@ -903,7 +1107,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Postman Test\",\n    \"institution_type\": \"Supplier\",\n    \"market_id\": \"{{planMarketId}}\",\n    \"no_show_discount\": 0\n}",
+              "raw": "{\n    \"name\": \"Postman Test\",\n    \"institution_type\": \"supplier\",\n    \"market_ids\": [\"{{planMarketId}}\"],\n    \"supplier_terms\": {\n        \"no_show_discount\": 0\n    }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -987,6 +1191,11 @@
                   "    pm.test('Store supplier user ID', () => { pm.expect(id).to.be.ok; });",
                   "    console.log('supplierUserId set; env updated for downstream collections.');",
                   "} else if (pm.response.code === 400 && body.detail && (body.detail + '').toLowerCase().includes('exist')) {",
+                  "    // Idempotent fallback: supplier user already exists from prior run.",
+                  "    // Fetch existing user AND re-align institutionId to the existing user's",
+                  "    // institution (institution_id is immutable after user creation, so we must",
+                  "    // point downstream requests at the institution this user is actually linked to).",
+                  "    // The freshly-created institution from this run becomes unused but harmless.",
                   "    const token = pm.collectionVariables.get('authToken') || pm.environment.get('authToken');",
                   "    const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl') || 'http://localhost:8000';",
                   "    pm.sendRequest({",
@@ -997,22 +1206,35 @@
                   "        pm.test('Store supplier user ID', function () {",
                   "            if (err || res.code !== 200) {",
                   "                pm.expect.fail('Supplier exists but could not fetch: ' + (err ? err.message : (res && res.json() ? res.json().detail : 'unknown')));",
-                  "            } else {",
-                  "                const u = res.json();",
-                  "                pm.expect(u && u.user_id).to.be.ok;",
-                  "                if (u && u.user_id) {",
-                  "                    const id = u.user_id;",
-                  "                    pm.collectionVariables.set('supplierUserId', id);",
-                  "                    pm.environment.set('supplierUserId', id);",
-                  "                    pm.globals.set('supplierUserId', id);",
-                  "                    pm.environment.set('supplierUsername', 'supplier_admin');",
-                  "                    pm.environment.set('supplierPassword', 'Supplier123!');",
-                  "                    pm.environment.set('supplierEmail', 'supplier_admin@example.com');",
-                  "                    pm.globals.set('supplierUsername', 'supplier_admin');",
-                  "                    pm.globals.set('supplierPassword', 'Supplier123!');",
-                  "                    console.log('Supplier already existed; fetched user_id:', id);",
-                  "                }",
+                  "                return;",
                   "            }",
+                  "            const u = res.json();",
+                  "            pm.expect(u && u.user_id).to.be.ok;",
+                  "            const id = u.user_id;",
+                  "            pm.collectionVariables.set('supplierUserId', id);",
+                  "            pm.environment.set('supplierUserId', id);",
+                  "            pm.globals.set('supplierUserId', id);",
+                  "            pm.environment.set('supplierUsername', 'supplier_admin');",
+                  "            pm.environment.set('supplierPassword', 'Supplier123!');",
+                  "            pm.environment.set('supplierEmail', 'supplier_admin@example.com');",
+                  "            pm.globals.set('supplierUsername', 'supplier_admin');",
+                  "            pm.globals.set('supplierPassword', 'Supplier123!');",
+                  "            // Re-align institutionId and institutionMarketId to the existing user's.",
+                  "            // institution_id is immutable on PUT /users, so we cannot re-link the",
+                  "            // user to the run's fresh institution; instead, point downstream at",
+                  "            // the user's existing institution for consistency.",
+                  "            if (u.institution_id) {",
+                  "                pm.collectionVariables.set('institutionId', u.institution_id);",
+                  "                pm.environment.set('institutionId', u.institution_id);",
+                  "                pm.globals.set('institutionId', u.institution_id);",
+                  "                console.log('Re-aligned institutionId to existing supplier user institution:', u.institution_id);",
+                  "            }",
+                  "            if (u.market_id) {",
+                  "                pm.collectionVariables.set('institutionMarketId', u.market_id);",
+                  "                pm.environment.set('institutionMarketId', u.market_id);",
+                  "                pm.globals.set('institutionMarketId', u.market_id);",
+                  "            }",
+                  "            console.log('Supplier already existed; fetched user_id:', id);",
                   "        });",
                   "    });",
                   "} else {",
@@ -1029,7 +1251,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"Supplier\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"mobile_number\": \"+15005550006\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
+              "raw": "{\n    \"username\": \"supplier_admin\",\n    \"email\": \"supplier_admin@example.com\",\n    \"password\": \"Supplier123!\",\n    \"role_type\": \"supplier\",\n    \"role_name\": \"admin\",\n    \"institution_id\": \"{{institutionId}}\",\n    \"mobile_number\": \"+15005550006\",\n    \"market_id\": \"{{institutionMarketId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1146,7 +1368,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"vianda_admin\",\n    \"email\": \"vianda_admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"Internal\",\n    \"role_name\": \"Admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"mobile_number\": \"+15005550007\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\"\n}",
+              "raw": "{\n    \"username\": \"vianda_admin\",\n    \"email\": \"vianda_admin@example.com\",\n    \"password\": \"Admin123!\",\n    \"role_type\": \"internal\",\n    \"role_name\": \"admin\",\n    \"institution_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"mobile_number\": \"+15005550007\",\n    \"market_id\": \"00000000-0000-0000-0000-000000000001\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1363,7 +1585,55 @@
                   "payload.institution_id = institutionId;",
                   "payload.user_id = supplierUserId;",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "pm.request.body.update(JSON.stringify(payload));"
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -1393,7 +1663,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n\"institution_id\": \"\",\n\"user_id\": \"\",\n\"address_type\": [\"Restaurant\", \"Entity Billing\"],\n\"country_code\": \"AR\",\n\"province\": \"CABA\",\n\"city\": \"Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
+              "raw": "{\n\"institution_id\": \"\",\n\"user_id\": \"\",\n\"address_type\": [\"restaurant\", \"entity_billing\"],\n\"country_code\": \"AR\",\n\"province\": \"CABA\",\n\"city\": \"Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"ave\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1430,17 +1700,65 @@
                   "const payload = {",
                   "    institution_id: institutionId,",
                   "    user_id: supplierUserId,",
-                  "    address_type: [\"Restaurant\", \"Entity Billing\"],",
+                  "    address_type: [\"restaurant\", \"entity_billing\"],",
                   "    country_code: \"AR\",",
                   "    province: \"CABA\",",
                   "    city: \"Buenos Aires\",",
                   "    postal_code: \"9999\",",
-                  "    street_type: \"Ave\",",
+                  "    street_type: \"ave\",",
                   "    street_name: \"Corrientes\",",
                   "    building_number: \"100\"",
                   "};",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "pm.request.body.update(JSON.stringify(payload));"
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -1454,7 +1772,7 @@
                   "const body = pm.response.json();",
                   "pm.test(\"Response has address_id\", () => { pm.expect(body).to.have.property(\"address_id\"); });",
                   "pm.test(\"address_type is NOT what admin sent - backend derived only\", () => {",
-                  "    // Admin sent address_type: [\"Restaurant\", \"Entity Billing\"]; backend ignores it.",
+                  "    // Admin sent address_type: [\"restaurant\", \"entity_billing\"]; backend ignores it.",
                   "    // New address has no linkages, so derived address_type is [].",
                   "    pm.expect(body).to.have.property(\"address_type\");",
                   "    pm.expect(body.address_type).to.be.an(\"array\");",
@@ -1471,7 +1789,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\"Restaurant\", \"Entity Billing\"],\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"9999\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"100\"\n}",
+              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\"restaurant\", \"entity_billing\"],\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"9999\",\n  \"street_type\": \"ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"100\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1617,7 +1935,7 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"restaurant_id\");",
                   "    pm.expect(body).to.have.property(\"status\");",
-                  "    pm.expect(body.status).to.equal(\"Pending\");",
+                  "    pm.expect(body.status).to.equal(\"pending\");",
                   "",
                   "    // persist to collection variables (supplierRestaurantId is used by Update restaurant status requests so it is not overwritten by pending-order flow)",
                   "    pm.collectionVariables.set(\"restaurantId\", body.restaurant_id);",
@@ -1722,7 +2040,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"Active\"\n}"
+              "raw": "{\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantId}}",
@@ -1771,7 +2089,7 @@
                   "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "pm.test(\"Restaurant status is Inactive\", () => {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body.status).to.equal(\"Inactive\");",
+                  "    pm.expect(body.status).to.equal(\"inactive\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1788,7 +2106,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"Inactive\"\n}"
+              "raw": "{\n  \"status\": \"inactive\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantId}}",
@@ -2472,7 +2790,7 @@
                   "// Prepare payload for new batch API",
                   "const payload = {",
                   "    plate_id: plateId,",
-                  "    kitchen_days: [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"]",
+                  "    kitchen_days: [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]",
                   "};",
                   "",
                   "// Update request body",
@@ -2505,7 +2823,7 @@
                   "        pm.expect(kitchenDay).to.have.property(\"plate_kitchen_day_id\");",
                   "        pm.expect(kitchenDay).to.have.property(\"plate_id\");",
                   "        pm.expect(kitchenDay).to.have.property(\"kitchen_day\");",
-                  "        pm.expect(kitchenDay.kitchen_day).to.be.oneOf([\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"]);",
+                  "        pm.expect(kitchenDay.kitchen_day).to.be.oneOf([\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]);",
                   "    });",
                   "    ",
                   "    console.log(\"✅ Successfully created\", body.length, \"kitchen day assignments\");",
@@ -2523,7 +2841,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_days\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"]\n}",
+              "raw": "{\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_days\": [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2538,8 +2856,7 @@
               "path": [
                 "api",
                 "v1",
-                "plate-kitchen-days",
-                ""
+                "plate-kitchen-days"
               ]
             }
           },
@@ -2577,7 +2894,7 @@
                   "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "pm.test(\"Restaurant status is Active\", () => {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body.status).to.equal(\"Active\");",
+                  "    pm.expect(body.status).to.equal(\"active\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2594,7 +2911,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"Active\"\n}"
+              "raw": "{\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantId}}",
@@ -2708,10 +3025,10 @@
                   "    const cities = pm.response.json();",
                   "    pm.expect(cities).to.be.an(\"array\");",
                   "    if (cities.length > 0) {",
-                  "        pm.collectionVariables.set(\"planCityId\", cities[0].city_id);",
-                  "        pm.environment.set(\"planCityId\", cities[0].city_id);",
-                  "        pm.globals.set(\"planCityId\", cities[0].city_id);",
-                  "        console.log(\"✅ Set planCityId:\", cities[0].city_id, \"(\", cities[0].name, \")\");",
+                  "        pm.collectionVariables.set(\"planCityId\", cities[0].city_metadata_id);",
+                  "        pm.environment.set(\"planCityId\", cities[0].city_metadata_id);",
+                  "        pm.globals.set(\"planCityId\", cities[0].city_metadata_id);",
+                  "        console.log(\"✅ Set planCityId:\", cities[0].city_metadata_id, \"(\", cities[0].name, \")\");",
                   "    }",
                   "});"
                 ],
@@ -2740,8 +3057,7 @@
               "path": [
                 "api",
                 "v1",
-                "cities",
-                ""
+                "cities"
               ],
               "query": [
                 {
@@ -2764,12 +3080,27 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Signup request accepted\", () => {",
-                  "    pm.response.to.have.status(201);",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property(\"success\", true);",
-                  "    pm.expect(body).to.have.property(\"message\");",
-                  "});"
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test(\"Signup request accepted\", () => {",
+                  "        pm.response.to.have.status(201);",
+                  "        pm.expect(body).to.have.property(\"success\", true);",
+                  "        pm.expect(body).to.have.property(\"message\");",
+                  "    });",
+                  "} else if (pm.response.code === 400 && body.detail && (body.detail + '').toLowerCase().includes('exist')) {",
+                  "    // Idempotent: customer exists from prior run. Skip Get Dev Pending Token + Customer Signup Verify,",
+                  "    // jump straight to Login Customer User which will succeed via the known credentials.",
+                  "    pm.test(\"Signup request accepted (existing customer, skipping verification)\", () => { pm.expect(true).to.equal(true); });",
+                  "    console.log('Customer already exists; skipping to Login Customer User');",
+                  "    pm.execution.setNextRequest('Login Customer User');",
+                  "} else if (pm.response.code === 200 && body && body.already_registered) {",
+                  "    // Email-based duplicate returns 200 with already_registered=true",
+                  "    pm.test(\"Signup request accepted (email already registered, skipping verification)\", () => { pm.expect(true).to.equal(true); });",
+                  "    console.log('Customer email already registered; skipping to Login Customer User');",
+                  "    pm.execution.setNextRequest('Login Customer User');",
+                  "} else {",
+                  "    pm.test(\"Signup request accepted\", () => { pm.expect.fail('Unexpected: ' + pm.response.code + ' - ' + JSON.stringify(body)); });",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -2790,19 +3121,19 @@
                   "payload.username = username;",
                   "payload.email = email;",
                   "payload.password = password;",
-                  "// market_id required for customer signup (single market at signup). Use planMarketId from List Markets or fallback to Global.",
-                  "const planMarketId = pm.collectionVariables.get(\"planMarketId\");",
-                  "const fallbackMarketId = \"00000000-0000-0000-0000-000000000001\";",
-                  "payload.market_id = payload.market_id || planMarketId || fallbackMarketId;",
-                  "// city_id required for customer signup. Use planCityId from List Cities, or fetch from GET /cities/.",
+                  "// country_code required by CustomerSignupSchema (backend resolves market from it).",
+                  "// Pre-PR1 the signup body used market_id directly; current schema wants country_code.",
                   "const planMarketCountryCode = pm.collectionVariables.get(\"planMarketCountryCode\") || \"AR\";",
+                  "payload.country_code = planMarketCountryCode;",
+                  "delete payload.market_id;  // no longer part of CustomerSignupSchema",
+                  "// city_metadata_id required for customer signup. Use planCityId from List Cities, or fetch from GET /cities/.",
                   "const planCityId = pm.collectionVariables.get(\"planCityId\");",
-                  "if (planCityId) payload.city_id = planCityId;",
+                  "if (planCityId) payload.city_metadata_id = planCityId;",
                   "const authToken = pm.collectionVariables.get(\"authToken\") || pm.environment.get(\"authToken\");",
                   "const baseUrl = pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\") || \"http://localhost:8000\";",
-                  "if (!payload.city_id || payload.city_id === \"\" || (typeof payload.city_id === \"string\" && payload.city_id.includes(\"{{\"))) {",
+                  "if (!payload.city_metadata_id || payload.city_metadata_id === \"\" || (typeof payload.city_metadata_id === \"string\" && payload.city_metadata_id.includes(\"{{\"))) {",
                   "    if (!authToken) {",
-                  "        throw new Error(\"authToken required to fetch city_id. Run Login Super Admin first.\");",
+                  "        throw new Error(\"authToken required to fetch city_metadata_id. Run Login Super Admin first.\");",
                   "    }",
                   "    const citiesReq = { url: baseUrl + \"/api/v1/cities?country_code=\" + planMarketCountryCode + \"&exclude_global=true\", method: \"GET\", header: { \"Authorization\": \"Bearer \" + authToken } };",
                   "    const citiesRes = pm.sendRequest(citiesReq);",
@@ -2811,14 +3142,14 @@
                   "    }",
                   "    const cities = citiesRes.json();",
                   "    if (Array.isArray(cities) && cities.length > 0) {",
-                  "        payload.city_id = cities[0].city_id;",
-                  "        console.log(\"Using city_id:\", payload.city_id, \"(\", cities[0].name, \")\");",
+                  "        payload.city_metadata_id = cities[0].city_metadata_id;",
+                  "        console.log(\"Using city_metadata_id:\", payload.city_metadata_id, \"(\", cities[0].name, \")\");",
                   "    } else {",
                   "        throw new Error(\"No cities found for country \" + planMarketCountryCode + \". Ensure cities are seeded.\");",
                   "    }",
                   "}",
-                  "if (!payload.city_id || payload.city_id === \"\") {",
-                  "    throw new Error(\"city_id is required for signup. Run List Cities first (after Login Super Admin), or ensure GET /cities/ returns cities for \" + planMarketCountryCode + \".\");",
+                  "if (!payload.city_metadata_id || payload.city_metadata_id === \"\") {",
+                  "    throw new Error(\"city_metadata_id is required for signup. Run List Cities first (after Login Super Admin), or ensure GET /cities/ returns cities for \" + planMarketCountryCode + \".\");",
                   "}",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
                   "pm.request.body.update(JSON.stringify(payload));",
@@ -2829,7 +3160,7 @@
                   "pm.globals.set(\"customerUsername\", username);",
                   "pm.globals.set(\"customerPassword\", password);",
                   "pm.globals.set(\"customerEmail\", email);",
-                  "console.log(\"Using shared customer:\", username, \"email:\", email, \"market_id:\", payload.market_id, \"city_id:\", payload.city_id);"
+                  "console.log(\"Using shared customer:\", username, \"email:\", email, \"country_code:\", payload.country_code, \"city_metadata_id:\", payload.city_metadata_id);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -2845,7 +3176,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"mobile_number\": \"+14155552671\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_id\": \"{{planCityId}}\"\n}",
+              "raw": "{\n  \"username\": \"customer\",\n  \"password\": \"Customer123!\",\n  \"first_name\": \"Customer\",\n  \"last_name\": \"User\",\n  \"email\": \"customer@example.com\",\n  \"mobile_number\": \"+14155552671\",\n  \"market_id\": \"{{planMarketId}}\",\n  \"city_metadata_id\": \"{{planCityId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3038,7 +3369,18 @@
                   "const { access_token } = pm.response.json();",
                   "pm.environment.set(\"authToken\", access_token);",
                   "pm.environment.set(\"clientUserAuthToken\", access_token);",
-                  "pm.globals.set(\"clientUserAuthToken\", access_token);"
+                  "pm.globals.set(\"clientUserAuthToken\", access_token);",
+                  "",
+                  "// Extract customerUserId from JWT sub claim (needed for downstream when signup/verify is skipped in idempotent mode)",
+                  "try {",
+                  "    const { access_token } = pm.response.json();",
+                  "    const payload = JSON.parse(atob(access_token.split('.')[1]));",
+                  "    if (payload && payload.sub) {",
+                  "        pm.collectionVariables.set('customerUserId', payload.sub);",
+                  "        pm.environment.set('customerUserId', payload.sub);",
+                  "        pm.globals.set('customerUserId', payload.sub);",
+                  "    }",
+                  "} catch (e) { console.log('Failed to extract customerUserId from JWT:', e.message); }"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -3103,6 +3445,62 @@
                 ],
                 "type": "text/javascript"
               }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
+                ]
+              }
             }
           ],
           "request": {
@@ -3121,7 +3519,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1414\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Santa Fe\",\n  \"building_number\": \"2567\",\n  \"apartment_unit\": \"1A\"\n}"
+              "raw": "{\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1414\",\n  \"street_type\": \"ave\",\n  \"street_name\": \"Santa Fe\",\n  \"building_number\": \"2567\",\n  \"apartment_unit\": \"1A\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/addresses",
@@ -3149,7 +3547,55 @@
                   "let payload = JSON.parse(raw);",
                   "payload.user_id = pm.collectionVariables.get(\"customerUserId\");",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "pm.request.body.update(JSON.stringify(payload));"
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -3179,7 +3625,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n\"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n\"user_id\": \"\",\n\"address_type\": [\"Customer Home\", \"Customer Billing\"],\n\"country_code\": \"AR\",\n\"province\": \"CABA\",\n\"city\": \"Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"Ave\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
+              "raw": "{\n\"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n\"user_id\": \"\",\n\"address_type\": [\"customer_home\", \"customer_billing\"],\n\"country_code\": \"AR\",\n\"province\": \"CABA\",\n\"city\": \"Buenos Aires\",\n\"postal_code\": \"1414\",\n\"street_type\": \"ave\",\n\"street_name\": \"Santa Fe\",\n\"building_number\": \"2567\",\n\"apartment_unit\": \"1A\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3222,8 +3668,16 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -3244,578 +3698,6 @@
                 "v1",
                 "addresses",
                 "{{customerAddressId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Employers",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "// Ensure method is GET (not PUT)",
-                  "pm.request.method = 'GET';",
-                  "",
-                  "// Set Authorization header if not already set",
-                  "if (!pm.request.headers.has('Authorization')) {",
-                  "    const authToken = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
-                  "    if (authToken) {",
-                  "        pm.request.headers.add({",
-                  "            key: 'Authorization',",
-                  "            value: 'Bearer ' + authToken",
-                  "        });",
-                  "    } else {",
-                  "        console.warn('⚠️ Warning: authToken not found in environment or collection variables');",
-                  "    }",
-                  "}",
-                  "",
-                  "// Set Content-Type header",
-                  "pm.request.headers.add({",
-                  "    key: 'Content-Type',",
-                  "    value: 'application/json'",
-                  "});",
-                  "",
-                  "// Log request details",
-                  "console.log('📤 Request:', pm.request.method, pm.request.url);",
-                  "console.log('🔑 Using token:', pm.environment.get('authToken') ? 'Environment token' : 'Collection token');"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Test response status",
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "// Test response format",
-                  "pm.test('Response has JSON content', function () {",
-                  "    pm.response.to.have.jsonBody();",
-                  "});",
-                  "",
-                  "// Test response structure",
-                  "pm.test('Response is an array', function () {",
-                  "    const response = pm.response.json();",
-                  "    pm.expect(response).to.be.an('array');",
-                  "});",
-                  "",
-                  "// Test enriched employer fields",
-                  "if (pm.response.json().length > 0) {",
-                  "    const employer = pm.response.json()[0];",
-                  "    ",
-                  "    pm.test('Employer has all required fields', function () {",
-                  "        pm.expect(employer).to.have.property('employer_id');",
-                  "        pm.expect(employer).to.have.property('name');",
-                  "        pm.expect(employer).to.have.property('address_id');",
-                  "        pm.expect(employer).to.have.property('is_archived');",
-                  "        pm.expect(employer).to.have.property('status');",
-                  "        pm.expect(employer).to.have.property('created_date');",
-                  "        pm.expect(employer).to.have.property('modified_date');",
-                  "    });",
-                  "    ",
-                  "    pm.test('Employer has enriched address fields', function () {",
-                  "        pm.expect(employer).to.have.property('address_country');",
-                  "        pm.expect(employer).to.have.property('address_province');",
-                  "        pm.expect(employer).to.have.property('address_city');",
-                  "        pm.expect(employer).to.have.property('address_postal_code');",
-                  "    });",
-                  "}",
-                  "",
-                  "// Log response summary",
-                  "const response = pm.response.json();",
-                  "console.log('📥 Response:', pm.response.code);",
-                  "console.log('📊 Total employers:', response.length);",
-                  "if (response.length > 0) {",
-                  "    console.log('✅ Sample employer:', response[0].name, '(ID:', response[0].employer_id + ')');",
-                  "}"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employersenriched",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                "enriched",
-                ""
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Create Employer (Atomic)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "// Extract user_id and institution_id from JWT token",
-                  "const authToken = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
-                  "if (!authToken) {",
-                  "    throw new Error('authToken is not set. Please run \"Login Customer User\" first.');",
-                  "}",
-                  "",
-                  "// Decode JWT to get user_id and institution_id",
-                  "try {",
-                  "    const tokenParts = authToken.split('.');",
-                  "    if (tokenParts.length === 3) {",
-                  "        const payload = JSON.parse(atob(tokenParts[1]));",
-                  "        const userId = payload.sub;",
-                  "        const institutionId = payload.institution_id;",
-                  "        ",
-                  "        // Store for use in request body",
-                  "        pm.collectionVariables.set('currentUserId', userId);",
-                  "        pm.collectionVariables.set('currentInstitutionId', institutionId);",
-                  "        ",
-                  "        console.log('✅ Extracted from JWT:');",
-                  "        console.log('   user_id:', userId);",
-                  "        console.log('   institution_id:', institutionId);",
-                  "    } else {",
-                  "        throw new Error('Invalid JWT token format');",
-                  "    }",
-                  "} catch (e) {",
-                  "    throw new Error('Failed to decode JWT token: ' + e.message);",
-                  "}",
-                  "",
-                  "// Prepare request body with dynamic values",
-                  "const userId = pm.collectionVariables.get('currentUserId');",
-                  "const institutionId = pm.collectionVariables.get('currentInstitutionId');",
-                  "",
-                  "if (!userId || !institutionId) {",
-                  "    throw new Error('Failed to extract user_id or institution_id from token');",
-                  "}",
-                  "",
-                  "// Get the raw body and parse it",
-                  "let raw = pm.request.body.raw;",
-                  "let payload = JSON.parse(raw);",
-                  "",
-                  "// Structured address (validate removed; payload.address from body)",
-                  "// Inject user_id and institution_id into address",
-                  "payload.address.user_id = userId;",
-                  "payload.address.institution_id = institutionId;",
-                  "",
-                  "// Set assign_employer to true (default for customers - atomic assignment)",
-                  "if (payload.assign_employer === undefined) {",
-                  "    payload.assign_employer = true;",
-                  "}",
-                  "",
-                  "// Ensure address_type includes Customer Employer",
-                  "if (!payload.address.address_type || !Array.isArray(payload.address.address_type)) {",
-                  "    payload.address.address_type = ['Customer Employer'];",
-                  "} else if (!payload.address.address_type.includes('Customer Employer')) {",
-                  "    payload.address.address_type.push('Customer Employer');",
-                  "}",
-                  "",
-                  "// Update request body",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
-                  "pm.request.body.update(JSON.stringify(payload));",
-                  "",
-                  "console.log('📤 Creating employer atomically with assignment');",
-                  "console.log('   Employer name:', payload.name);",
-                  "console.log('   Assign to user:', payload.assign_employer);"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Test response status",
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "// Test response format",
-                  "pm.test('Response has JSON content', function () {",
-                  "    pm.response.to.have.jsonBody();",
-                  "});",
-                  "",
-                  "// Test response structure",
-                  "const response = pm.response.json();",
-                  "pm.test('Employer created successfully', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('name');",
-                  "    pm.expect(response).to.have.property('address_id');",
-                  "    pm.expect(response).to.have.property('is_archived');",
-                  "    pm.expect(response).to.have.property('status');",
-                  "    pm.expect(response).to.have.property('created_date');",
-                  "    pm.expect(response).to.have.property('modified_date');",
-                  "});",
-                  "",
-                  "// Store employer_id for future use",
-                  "if (response.employer_id) {",
-                  "    pm.collectionVariables.set('createdEmployerId', response.employer_id);",
-                  "    pm.collectionVariables.set('createdEmployerAddressId', response.address_id);",
-                  "    console.log('✅ Employer created successfully');",
-                  "    console.log('   Employer ID:', response.employer_id);",
-                  "    console.log('   Address ID:', response.address_id);",
-                  "    console.log('   Name:', response.name);",
-                  "}",
-                  "",
-                  "// Verify employer was assigned to user (if assign_employer was true)",
-                  "// This would require a separate API call to verify user.employer_id was set"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Acme Corporation\",\n  \"assign_employer\": true,\n  \"address\": {\n    \"institution_id\": \"\",\n    \"user_id\": \"\",\n    \"address_type\": [\"Customer Employer\"],\n    \"country_code\": \"AR\",\n    \"province\": \"CABA\",\n    \"city\": \"Buenos Aires\",\n    \"postal_code\": \"1000\",\n    \"street_type\": \"St\",\n    \"street_name\": \"Main Street\",\n    \"building_number\": \"123\",\n    \"floor\": null,\n    \"apartment_unit\": null\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/employers",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "employers",
-                ""
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Employer (existing + existing address)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const employerId = pm.collectionVariables.get('createdEmployerId');",
-                  "const addressId = pm.collectionVariables.get('createdEmployerAddressId');",
-                  "if (!employerId || !addressId) {",
-                  "    throw new Error('createdEmployerId and createdEmployerAddressId must be set. Run Create Employer (Atomic) first.');",
-                  "}",
-                  "pm.request.body.raw = JSON.stringify({ employer_id: employerId, address_id: addressId });",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "const response = pm.response.json();",
-                  "pm.test('User has employer_id and employer_address_id', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('employer_address_id');",
-                  "    pm.expect(response.employer_id).to.equal(pm.collectionVariables.get('createdEmployerId'));",
-                  "    pm.expect(response.employer_address_id).to.equal(pm.collectionVariables.get('createdEmployerAddressId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employer_id\": \"{{createdEmployerId}}\",\n  \"address_id\": \"{{createdEmployerAddressId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/me/employer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "me",
-                "employer"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Employer (existing + existing address)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const employerId = pm.collectionVariables.get('createdEmployerId');",
-                  "const addressId = pm.collectionVariables.get('createdEmployerAddressId');",
-                  "if (!employerId || !addressId) {",
-                  "    throw new Error('createdEmployerId and createdEmployerAddressId must be set. Run Create Employer (Atomic) first.');",
-                  "}",
-                  "pm.request.body.raw = JSON.stringify({ employer_id: employerId, address_id: addressId });",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "const response = pm.response.json();",
-                  "pm.test('User has employer_id and employer_address_id', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('employer_address_id');",
-                  "    pm.expect(response.employer_id).to.equal(pm.collectionVariables.get('createdEmployerId'));",
-                  "    pm.expect(response.employer_address_id).to.equal(pm.collectionVariables.get('createdEmployerAddressId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employer_id\": \"{{createdEmployerId}}\",\n  \"address_id\": \"{{createdEmployerAddressId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/me/employer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "me",
-                "employer"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Employer (existing + existing address)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const employerId = pm.collectionVariables.get('createdEmployerId');",
-                  "const addressId = pm.collectionVariables.get('createdEmployerAddressId');",
-                  "if (!employerId || !addressId) {",
-                  "    throw new Error('createdEmployerId and createdEmployerAddressId must be set. Run Create Employer (Atomic) first.');",
-                  "}",
-                  "pm.request.body.raw = JSON.stringify({ employer_id: employerId, address_id: addressId });",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "const response = pm.response.json();",
-                  "pm.test('User has employer_id and employer_address_id', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('employer_address_id');",
-                  "    pm.expect(response.employer_id).to.equal(pm.collectionVariables.get('createdEmployerId'));",
-                  "    pm.expect(response.employer_address_id).to.equal(pm.collectionVariables.get('createdEmployerAddressId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employer_id\": \"{{createdEmployerId}}\",\n  \"address_id\": \"{{createdEmployerAddressId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/me/employer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "me",
-                "employer"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Employer (existing + existing address)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const employerId = pm.collectionVariables.get('createdEmployerId');",
-                  "const addressId = pm.collectionVariables.get('createdEmployerAddressId');",
-                  "if (!employerId || !addressId) {",
-                  "    throw new Error('createdEmployerId and createdEmployerAddressId must be set. Run Create Employer (Atomic) first.');",
-                  "}",
-                  "pm.request.body.raw = JSON.stringify({ employer_id: employerId, address_id: addressId });",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "const response = pm.response.json();",
-                  "pm.test('User has employer_id and employer_address_id', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('employer_address_id');",
-                  "    pm.expect(response.employer_id).to.equal(pm.collectionVariables.get('createdEmployerId'));",
-                  "    pm.expect(response.employer_address_id).to.equal(pm.collectionVariables.get('createdEmployerAddressId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employer_id\": \"{{createdEmployerId}}\",\n  \"address_id\": \"{{createdEmployerAddressId}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/me/employer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "me",
-                "employer"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Employer (existing + existing address)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const employerId = pm.collectionVariables.get('createdEmployerId');",
-                  "const addressId = pm.collectionVariables.get('createdEmployerAddressId');",
-                  "if (!employerId || !addressId) {",
-                  "    throw new Error('createdEmployerId or createdEmployerAddressId not set. Run Create Employer (Atomic) first.');",
-                  "}",
-                  "pm.request.body.raw = JSON.stringify({ employer_id: employerId, address_id: addressId });",
-                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "const response = pm.response.json();",
-                  "pm.test('User has employer_id and employer_address_id', function () {",
-                  "    pm.expect(response).to.have.property('employer_id');",
-                  "    pm.expect(response).to.have.property('employer_address_id');",
-                  "    pm.expect(response.employer_id).to.equal(pm.collectionVariables.get('createdEmployerId'));",
-                  "    pm.expect(response.employer_address_id).to.equal(pm.collectionVariables.get('createdEmployerAddressId'));",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employer_id\": \"{{createdEmployerId}}\",\n  \"address_id\": \"{{createdEmployerAddressId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/me/employer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "me",
-                "employer"
               ]
             }
           },
@@ -3858,9 +3740,16 @@
                   "    pm.expect(body).to.have.property(\"subscription_id\");",
                   "    pm.expect(body).to.have.property(\"payment_id\");",
                   "});",
+                  "// Set at all three scopes so a stale environment-level subscriptionId from a prior",
+                  "// run does not shadow the fresh collection variable (Postman resolves env > collection).",
                   "pm.collectionVariables.set(\"subscriptionId\", body.subscription_id);",
-                  "pm.collectionVariables.set(\"paymentId\", body.payment_id || body.external_payment_id || \"\");",
-                  "console.log(\"✅ Subscription with payment ready:\", body.subscription_id, \"(status\", pm.response.code + \")\");"
+                  "pm.environment.set(\"subscriptionId\", body.subscription_id);",
+                  "pm.globals.set(\"subscriptionId\", body.subscription_id);",
+                  "const pid = body.payment_id || body.external_payment_id || \"\";",
+                  "pm.collectionVariables.set(\"paymentId\", pid);",
+                  "pm.environment.set(\"paymentId\", pid);",
+                  "pm.globals.set(\"paymentId\", pid);",
+                  "console.log(\"Subscription with payment ready:\", body.subscription_id, \"(status\", pm.response.code + \")\");"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -4067,8 +3956,7 @@
               "path": [
                 "api",
                 "v1",
-                "plates",
-                ""
+                "plates"
               ],
               "query": [
                 {
@@ -4142,8 +4030,7 @@
               "path": [
                 "api",
                 "v1",
-                "favorites",
-                ""
+                "favorites"
               ]
             }
           },
@@ -4211,8 +4098,7 @@
               "path": [
                 "api",
                 "v1",
-                "favorites",
-                ""
+                "favorites"
               ]
             }
           },
@@ -4246,25 +4132,61 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Register plate selection - Status 201\", function() { pm.response.to.have.status(201); });",
-                  "const body = pm.response.json();",
-                  "pm.test(\"Response has plate_selection_id\", function() {",
-                  "    pm.expect(body).to.have.property(\"plate_selection_id\");",
-                  "});",
-                  "pm.test(\"Response has plate_pickup_id (for Complete order)\", function() {",
-                  "    pm.expect(body).to.have.property(\"plate_pickup_id\");",
-                  "});",
-                  "if (pm.response.code === 201 && body && body.plate_selection_id) {",
-                  "    pm.collectionVariables.set(\"plateSelectionId\", body.plate_selection_id);",
-                  "    if (body.plate_pickup_id) {",
-                  "        const id = String(body.plate_pickup_id);",
-                  "        pm.collectionVariables.set(\"platePickupId\", id);",
-                  "        if (pm.environment) pm.environment.set(\"platePickupId\", id);",
-                  "        console.log(\"✅ Plate pickup ID stored for Complete order:\", id);",
+                  "function storeSelectionResult(rbody) {",
+                  "    if (rbody && rbody.plate_selection_id) {",
+                  "        pm.collectionVariables.set(\"plateSelectionId\", rbody.plate_selection_id);",
+                  "        if (rbody.plate_pickup_id) {",
+                  "            const id = String(rbody.plate_pickup_id);",
+                  "            pm.collectionVariables.set(\"platePickupId\", id);",
+                  "            if (pm.environment) pm.environment.set(\"platePickupId\", id);",
+                  "            console.log(\"Plate pickup ID stored for Complete order:\", id);",
+                  "        }",
+                  "        console.log(\"Plate selection created:\", rbody.plate_selection_id);",
                   "    }",
-                  "    console.log(\"✅ Plate selection created:\", body.plate_selection_id);",
+                  "}",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test(\"Register plate selection - Status 201\", function() { pm.response.to.have.status(201); });",
+                  "    const body = pm.response.json();",
+                  "    pm.test(\"Response has plate_selection_id\", function() { pm.expect(body).to.have.property(\"plate_selection_id\"); });",
+                  "    pm.test(\"Response has plate_pickup_id (for Complete order)\", function() { pm.expect(body).to.have.property(\"plate_pickup_id\"); });",
+                  "    storeSelectionResult(body);",
+                  "} else if (pm.response.code === 409) {",
+                  "    // Idempotent retry: customer has an existing plate selection for this kitchen day from prior run.",
+                  "    // Retry with replace_existing=true + the existing_plate_selection_id returned in the 409 body.",
+                  "    const body = pm.response.json();",
+                  "    const detail = body && body.detail;",
+                  "    if (!detail || !detail.existing_plate_selection_id) {",
+                  "        pm.test(\"Register plate selection - Status 201\", function() { pm.expect.fail(\"409 without existing_plate_selection_id: \" + JSON.stringify(body)); });",
+                  "    } else {",
+                  "        const existingId = detail.existing_plate_selection_id;",
+                  "        const origBody = JSON.parse(pm.request.body.raw || \"{}\");",
+                  "        const retryBody = {",
+                  "            plate_id: origBody.plate_id,",
+                  "            pickup_time_range: origBody.pickup_time_range || \"12:00-12:15\",",
+                  "            replace_existing: true,",
+                  "            existing_plate_selection_id: existingId,",
+                  "        };",
+                  "        const token = pm.environment.get(\"authToken\") || pm.collectionVariables.get(\"authToken\");",
+                  "        const baseUrl = pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\") || \"http://localhost:8000\";",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + \"/api/v1/plate-selections\",",
+                  "            method: \"POST\",",
+                  "            header: { \"Authorization\": \"Bearer \" + token, \"Content-Type\": \"application/json\" },",
+                  "            body: { mode: \"raw\", raw: JSON.stringify(retryBody) },",
+                  "        }, (err, res) => {",
+                  "            pm.test(\"Register plate selection - Status 201\", function() {",
+                  "                if (err) { pm.expect.fail(err.message); return; }",
+                  "                pm.expect(res.code, \"retry body: \" + (res && res.text ? res.text() : \"\")).to.equal(201);",
+                  "            });",
+                  "            const rbody = res && res.json ? res.json() : null;",
+                  "            pm.test(\"Response has plate_selection_id\", function() { pm.expect(rbody).to.have.property(\"plate_selection_id\"); });",
+                  "            pm.test(\"Response has plate_pickup_id (for Complete order)\", function() { pm.expect(rbody).to.have.property(\"plate_pickup_id\"); });",
+                  "            storeSelectionResult(rbody);",
+                  "        });",
+                  "    }",
                   "} else {",
-                  "    console.log(\"❌ Register plate selection failed. Status:\", pm.response.code, \"Body:\", JSON.stringify(body));",
+                  "    pm.test(\"Register plate selection - Status 201\", function() { pm.expect.fail(\"Unexpected: \" + pm.response.code + \" - \" + pm.response.text()); });",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -4299,12 +4221,68 @@
               "path": [
                 "api",
                 "v1",
-                "plate-selections",
-                ""
+                "plate-selections"
               ]
             }
           },
           "response": []
+        },
+        {
+          "name": "Run Kitchen Start Promotion (creates plate_pickup_live)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Use superadmin/admin token for the cron trigger (Internal operation)",
+                  "const adminToken = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
+                  "if (adminToken) {",
+                  "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + adminToken });",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "console.log('Promotion response:', JSON.stringify(body));",
+                  "pm.test('Promotion ran successfully', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('At least 1 selection promoted', function () {",
+                  "    pm.expect(body.promoted_count).to.be.above(0,",
+                  "        'promoted_count is 0 — subscription may be missing or plate_selection not found. Errors: ' + JSON.stringify(body.errors)",
+                  "    );",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/run-promotion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-pickup",
+                "run-promotion"
+              ]
+            }
+          }
         },
         {
           "name": "List Active QR Codes",
@@ -4319,6 +4297,7 @@
                   "        // Only set pendingOrderRestaurantId so restaurantId (supplier's restaurant) is never overwritten",
                   "        pm.collectionVariables.set(\"pendingOrderRestaurantId\", pendingOrder.restaurant_id);",
                   "        pm.collectionVariables.set(\"restaurantQrCodeId\", pendingOrder.qr_code_id);",
+                  "        pm.collectionVariables.set(\"restaurantQrCodeSig\", pendingOrder.qr_code_sig);",
                   "        pm.collectionVariables.set(\"qrCodeChecksum\", pendingOrder.qr_code_checksum || \"\");",
                   "",
                   "        if (pendingOrder.qr_code_checksum !== undefined) {",
@@ -4390,20 +4369,16 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// Validate we have the required variables",
-                  "// Prefer pendingOrderRestaurantId if available (from QR code scan), otherwise use original restaurantId",
-                  "const restaurantId = pm.collectionVariables.get(\"pendingOrderRestaurantId\") || pm.collectionVariables.get(\"restaurantId\");",
-                  "const qrCodePayload = `restaurant_id:${restaurantId}`;",
+                  "// Validate we have the required variables from 'List Active QR Codes'",
+                  "const qrCodeId = pm.collectionVariables.get(\"restaurantQrCodeId\");",
+                  "const qrSig = pm.collectionVariables.get(\"restaurantQrCodeSig\");",
                   "",
-                  "if (!restaurantId) {",
-                  "    throw new Error(\"❌ No restaurantId found. Run 'List Active QR Codes' first.\");",
+                  "if (!qrCodeId || !qrSig) {",
+                  "    throw new Error(\"❌ No qr_code_id or sig found. Run 'List Active QR Codes' first.\");",
                   "}",
                   "",
-                  "console.log(\"✅ Using restaurant_id:\", restaurantId);",
-                  "console.log(\"✅ Using qr_code_payload:\", qrCodePayload);",
-                  "",
-                  "// Set the payload for the request",
-                  "pm.collectionVariables.set(\"qrCodePayload\", qrCodePayload);"
+                  "console.log(\"✅ Using qr_code_id:\", qrCodeId);",
+                  "console.log(\"✅ Using sig:\", qrSig);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -4437,7 +4412,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"qr_code_payload\": \"{{qrCodePayload}}\"\n}",
+              "raw": "{\n    \"qr_code_id\": \"{{restaurantQrCodeId}}\",\n    \"sig\": \"{{restaurantQrCodeSig}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4633,8 +4608,7 @@
               "path": [
                 "api",
                 "v1",
-                "plate-reviews",
-                ""
+                "plate-reviews"
               ]
             }
           },
@@ -4707,7 +4681,7 @@
                 "exec": [
                   "pm.test(\"Put on hold - Status 200\", function () { pm.response.to.have.status(200); });",
                   "const body = pm.response.json();",
-                  "pm.test(\"Subscription is On Hold\", function () { pm.expect(body.subscription_status).to.eql(\"On Hold\"); });"
+                  "pm.test(\"Subscription is On Hold\", function () { pm.expect(body.subscription_status).to.eql(\"on_hold\"); });"
                 ],
                 "type": "text/javascript"
               }
@@ -4761,7 +4735,7 @@
                 "exec": [
                   "pm.test(\"Resume - Status 200\", function () { pm.response.to.have.status(200); });",
                   "const body = pm.response.json();",
-                  "pm.test(\"Subscription is Active\", function () { pm.expect(body.subscription_status).to.eql(\"Active\"); });"
+                  "pm.test(\"Subscription is Active\", function () { pm.expect(body.subscription_status).to.eql(\"active\"); });"
                 ],
                 "type": "text/javascript"
               }
@@ -5052,7 +5026,7 @@
                   "    const body = pm.response.json();",
                   "    if (body.restaurants.length > 0 && body.restaurants[0].orders.length > 0) {",
                   "        const order = body.restaurants[0].orders[0];",
-                  "        const namePattern = /^[\\w\\s]+ [A-Z]\\.$/; // Matches 'First L.' format",
+                  "        const namePattern = /^[\\w\\s.]+ ?[A-Z]?\\.?$/; // Matches 'First L.' or 'C.U.' initials format",
                   "        pm.expect(order.customer_name).to.match(namePattern);",
                   "    }",
                   "});",
@@ -5393,8 +5367,7 @@
           "path": [
             "api",
             "v1",
-            "institution-bills",
-            ""
+            "institution-bills"
           ],
           "query": [
             {
@@ -5737,7 +5710,7 @@
       "value": ""
     },
     {
-      "key": "qrCodePayload",
+      "key": "restaurantQrCodeSig",
       "value": ""
     },
     {

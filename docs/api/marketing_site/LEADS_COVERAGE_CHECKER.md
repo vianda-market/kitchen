@@ -37,8 +37,21 @@ The default (no param) is intentionally restrictive — if the parameter is miss
 #### 2. City dropdown (after country selected)
 ```
 GET /api/v1/leads/cities?country_code={code}
+GET /api/v1/leads/cities?country_code={code}&audience=supplier
 ```
-Returns city names that have at least one active restaurant with plates and QR codes.
+
+**Default (no `audience` param):** Returns city names that have at least one active restaurant with plates and QR codes.
+
+**`audience=supplier`:** Returns a broader union of city names from three sources:
+- `external.geonames_city` (GeoNames raw data for the country)
+- `core.city_metadata` (Vianda-curated cities)
+- `core.restaurant_lead.city_name` (cities from supplier interest submissions)
+
+Sort: alphabetical, case-insensitive. Cap: 1000 rows.
+
+**Non-empty guarantee:** For any country returned by `GET /leads/markets?audience=supplier`, the supplier-audience cities response is guaranteed non-empty.
+
+**Caching:** The cities response includes `Cache-Control: public, max-age=3600`.
 
 **Response:** `{ cities: ["Buenos Aires", "Lima", ...] }`
 
@@ -246,7 +259,11 @@ Parse and forward UTM params from marketing campaigns. Firebase Analytics handle
 | `/leads/employee-count-ranges` | 60/min per IP |
 | `POST /leads/interest` | 5/min per IP |
 
-429 response: `{ "detail": "Rate limit exceeded" }`
+429 response shape (structured):
+```json
+{ "detail": "rate_limited", "retry_after_seconds": 42 }
+```
+The response also includes a `Retry-After` header (seconds until the limit resets).
 
 ---
 

@@ -28,7 +28,7 @@ These features have work items in multiple repos. Read the roadmap doc before st
 | B2C + Backend | `/Users/cdeachaval/learn/kitchen/docs/plans/b2c_client/MULTI_LANGUAGE_ROADMAP.md` | Spanish language toggle — UI strings and locale-aware API responses |
 | B2B + Backend | `/Users/cdeachaval/learn/kitchen/docs/plans/VIANDA_EMPLOYER_BENEFITS_PROGRAM.md` | Employer benefit institutions — onboarding, employee enrollment, benefit limits |
 | B2B + Backend | `/Users/cdeachaval/learn/kitchen/docs/plans/SUBSCRIPTION_MANAGEMENT_FUTURE.md` | Employee cancel/hold/resume on behalf of customer, cron reconciliation |
-| B2B + Backend | _(Archived)_ `docs/zArchive/roadmap/SUPPLIER_TERMS_ROADMAP.md` | Implemented — Supplier terms table, pipeline wiring, B2B API. See `docs/api/b2b_client/SUPPLIER_TERMS_B2B.md` for client guide |
+| B2B + Backend | _(Archived)_ `docs/zArchive/roadmap/SUPPLIER_TERMS_ROADMAP.md` | Implemented — Supplier terms table, pipeline wiring, B2B API. See `docs/api/b2b_client/API_CLIENT_SUPPLIER_TERMS.md` for client guide |
 
 ---
 

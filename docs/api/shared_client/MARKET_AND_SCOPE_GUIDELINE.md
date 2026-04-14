@@ -135,8 +135,8 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 - [API_PERMISSIONS_BY_ROLE.md](./API_PERMISSIONS_BY_ROLE.md)
 - [COUNTRY_CODE_API_CONTRACT.md](./COUNTRY_CODE_API_CONTRACT.md)
 - [ADDRESSES_API_CLIENT.md](./ADDRESSES_API_CLIENT.md)
-- B2C signup: [b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](../b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md), [b2c_client/MARKET_SELECTION_AT_SIGNUP.md](../b2c_client/MARKET_SELECTION_AT_SIGNUP.md)
-- B2B institution market: [b2b_client/INSTITUTION_MARKET_ID.md](../b2b_client/INSTITUTION_MARKET_ID.md)
+- B2C signup: [b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](../b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md), [b2c_client/MARKET_CITY_COUNTRY.md](../b2c_client/MARKET_CITY_COUNTRY.md)
+- B2B institution market: [b2b_client/API_CLIENT_INSTITUTIONS.md](../b2b_client/API_CLIENT_INSTITUTIONS.md)
 
 ---
 

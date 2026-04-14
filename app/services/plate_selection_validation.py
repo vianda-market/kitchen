@@ -46,7 +46,13 @@ def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
     """
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
-    
+
+    if getattr(restaurant, "is_archived", False) is True:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Restaurant '{restaurant.name}' is archived and cannot accept new orders.",
+        )
+
     # Only 'Active' restaurants can accept plate selections
     if restaurant.status != Status.ACTIVE:
         status_message = {
@@ -141,9 +147,24 @@ def validate_restaurant(
         - Holiday validation is only performed if target_date, country_code, and db are provided
         - National holidays take precedence (checked first)
     """
-    # 1. Status validation (always check)
+    # 1. Status + is_archived validation (always check)
     validate_restaurant_status(restaurant)
-    
+
+    # 1b. Entity archival check (requires db)
+    if db and restaurant.institution_entity_id:
+        from app.utils.db import db_read
+        entity_row = db_read(
+            "SELECT is_archived FROM institution_entity_info WHERE institution_entity_id = %s",
+            (str(restaurant.institution_entity_id),),
+            connection=db,
+            fetch_one=True,
+        )
+        if entity_row and entity_row["is_archived"]:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Restaurant '{restaurant.name}' belongs to an archived entity and cannot accept new orders.",
+            )
+
     # 2. Holiday validation (only if target_date provided)
     if target_date and country_code and db:
         # Check national holidays first (takes precedence)
@@ -353,11 +374,16 @@ def _find_next_available_kitchen_day_in_week(current_day: str, available_kitchen
         today = datetime.now().date()
 
     # Iterate over the next 7 calendar days
+    from app.config.settings import settings as _settings
     for days_ahead in range(8):  # 0 through 7 inclusive
         d = today + timedelta(days=days_ahead)
-        if d.weekday() >= 5:  # Saturday=5, Sunday=6 - skip weekends
-            continue
-        day_name = weekday_names[d.weekday()]
+        if d.weekday() >= 5:  # Saturday=5, Sunday=6
+            if not _settings.DEV_MODE:
+                continue  # Production: skip weekends
+            # DEV_MODE: map weekend to friday so Postman/dev testing works any day
+            day_name = "friday"
+        else:
+            day_name = weekday_names[d.weekday()]
         if day_name not in available_kitchen_days:
             continue
         if country_code and db:

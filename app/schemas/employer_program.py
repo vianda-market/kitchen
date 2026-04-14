@@ -14,6 +14,7 @@ from app.config import Status
 class ProgramCreateSchema(BaseModel):
     """Schema for creating an employer benefits program."""
     institution_id: UUID = Field(..., description="Employer institution ID (must be institution_type='Employer')")
+    institution_entity_id: Optional[UUID] = Field(None, description="Entity ID for entity-level override. NULL = institution-level defaults.")
     benefit_rate: int = Field(..., ge=0, le=100, description="Percentage of plan price employer covers (0-100)")
     benefit_cap: Optional[Decimal] = Field(None, ge=0, description="Max amount employer subsidizes per employee. NULL = no cap.")
     benefit_cap_period: str = Field("monthly", description="'per_renewal' or 'monthly'")
@@ -43,6 +44,7 @@ class ProgramResponseSchema(BaseModel):
     """Schema for employer benefits program response."""
     program_id: UUID
     institution_id: UUID
+    institution_entity_id: Optional[UUID] = None
     benefit_rate: int
     benefit_cap: Optional[Decimal] = None
     benefit_cap_period: str
@@ -75,7 +77,7 @@ class EmployeeEnrollSchema(BaseModel):
     first_name: str = Field(..., max_length=50)
     last_name: str = Field(..., max_length=50)
     mobile_number: Optional[str] = Field(None, max_length=16, description="E.164 format: +1234567890")
-    city_id: UUID = Field(..., description="City for the employee (cannot be Global)")
+    city_metadata_id: UUID = Field(..., description="City for the employee (cannot be Global). FK to core.city_metadata.")
 
 
 class EmployeeSubscribeSchema(BaseModel):
@@ -120,6 +122,7 @@ class EmployerBillResponseSchema(BaseModel):
     """Schema for employer bill response."""
     employer_bill_id: UUID
     institution_id: UUID
+    institution_entity_id: UUID
     billing_period_start: date
     billing_period_end: date
     billing_cycle: str
@@ -171,35 +174,8 @@ class GenerateBillRequestSchema(BaseModel):
     period_end: date = Field(..., description="Billing period end date")
 
 
-# =============================================================================
-# Domain Management
-# =============================================================================
-
-class DomainCreateSchema(BaseModel):
-    """Schema for adding an employer domain."""
-    domain: str = Field(..., max_length=255, description="Email domain (e.g., 'acme.com')")
-
-
-class DomainCreateResponseSchema(BaseModel):
-    """Response after creating a domain, including retroactive migration count."""
-    domain_id: UUID
-    institution_id: UUID
-    domain: str
-    is_active: bool
-    migrated_user_count: int = Field(0, description="Number of existing users migrated to this employer institution")
-    created_date: datetime
-
-
-class DomainResponseSchema(BaseModel):
-    """Schema for domain list response."""
-    domain_id: UUID
-    institution_id: UUID
-    domain: str
-    is_active: bool
-    created_date: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
+## Domain schemas REMOVED — email_domain is now a column on institution_entity_info,
+## managed via entity CRUD. See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
 # =============================================================================
 # Benefit Plan Breakdown (for B2C app)

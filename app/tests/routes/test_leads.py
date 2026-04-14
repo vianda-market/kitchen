@@ -155,7 +155,7 @@ class TestZipcodeMetricsEndpoint:
             if resp.status_code == 429:
                 body = resp.json()
                 msg = (body.get("detail") or body.get("error") or "").lower()
-                assert "rate limit" in msg or "too many" in msg
+                assert "rate_limited" in msg or "rate limit" in msg or "too many" in msg
                 return
         # If all 21 returned 200, rate limiting may be disabled in test (e.g. limiter bypass)
         pytest.skip("Rate limit not triggered in test env (limiter may be disabled)")

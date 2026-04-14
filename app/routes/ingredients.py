@@ -28,11 +28,11 @@ _SUPPORTED_LANGS = {"es", "en", "pt"}
 
 
 def _resolve_lang(lang: Optional[str], current_user: dict) -> str:
-    """Derive language: use explicit param first, then user locale (short code), then 'es'."""
+    """Derive language: use explicit param first, then user locale (short code), then 'en'."""
     if lang and lang in _SUPPORTED_LANGS:
         return lang
     locale = (current_user.get("locale") or "").split("-")[0].lower()
-    return locale if locale in _SUPPORTED_LANGS else "es"
+    return locale if locale in _SUPPORTED_LANGS else "en"
 
 
 def _resolve_market_id(current_user: dict) -> Optional[str]:

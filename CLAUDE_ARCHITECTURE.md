@@ -136,8 +136,9 @@ application.py               # FastAPI app, route registration, lifespan
    - **`crud_routes.py`** → Admin/System CRUD (no user context): Product, Plan, Restaurant, CreditCurrency, Institution, Plate, Geolocation, InstitutionEntity.
    - **`crud_routes_user.py`** → User CRUD (user_id from `current_user`): Subscription, PaymentMethod; includes subscription_payment (with-payment, confirm-payment) before generic CRUD.
 4. **Route factory** (`app/services/route_factory.py`) generates standard CRUD routes via `create_plan_routes()`, `create_product_routes()`, etc.
-5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, employer, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads.
+5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads. (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
 6. **Registration order:** Institution entities router registered before CRUD so `/enriched` matches before `/{entity_id}`. Manual/custom routes must be registered before auto-generated if they share paths (FastAPI matches first).
+7. **Composite-create pattern:** When an entity spans multiple tables by lifecycle, `POST` accepts optional embedded sub-resource blocks in a single transaction (`commit=False` chaining). Updates stay granular per sub-resource. Applied to: institutions (+ supplier_terms + institution_market), products (+ ingredient_ids), markets (+ billing_config). See `docs/api/internal/COMPOSITE_CREATE_PATTERN.md`.
 
 ---
 
@@ -200,6 +201,8 @@ Request
 - **Internal:** Global (all institutions).
 - **Supplier:** Scoped to `institution_id` from JWT.
 - **Employer:** Institution-scoped (like Supplier).
+- **Market filter:** Enriched endpoints accept optional `?market_id=` to narrow results within the institution. Validated against `core.institution_market` — can't filter to an unassigned market. Internal users bypass this validation.
+- **Institution market boundary:** `core.institution_market` junction controls which markets an institution can operate in. Entity creation validates the entity's address country is in an assigned market. User market assignments validate against `institution_market` (Supplier/Employer only; Internal bypasses).
 - **EntityScopingService** (`app/security/entity_scoping.py`) maps entity types to scope logic for both base and enriched endpoints. Use `EntityScopingService.get_scope_for_entity(entity_type, current_user)` in routes.
 - **InstitutionScope** and **UserScope** live in `app/security/scoping.py`; `institution_scope.py` re-exports for backward compatibility.
 
@@ -219,20 +222,23 @@ User-configurable early renewal threshold on `customer.subscription_info`.
 
 ## Employer Benefits Program
 
-Enterprise meal subscription benefits — employers subsidize employee meal plans with configurable rate + cap.
+Enterprise meal subscription benefits — employers subsidize employee meal plans with configurable rate + cap. Employers use the same `institution_info` + `institution_entity_info` model as suppliers (normalized in the multinational institutions initiative).
 
-- **Data model:** `core.employer_benefits_program` (one row per Employer institution: benefit_rate, benefit_cap, benefit_cap_period, price_discount, minimum_monthly_fee, billing_cycle, enrollment_mode, allow_early_renewal). `billing.employer_bill` (aggregated employer invoices). `billing.employer_bill_line` (per-renewal line items with snapshotted rates).
-- **Services:** `app/services/employer/program_service.py` (program CRUD), `app/services/employer/enrollment_service.py` (single + bulk employee enrollment, deactivation, subscription), `app/services/employer/billing_service.py` (bill generation, benefit calculator)
-- **Routes:** `app/routes/employer_program.py` — POST/GET/PUT `/employer/program`, POST/GET/DELETE `/employer/employees`, POST `/employer/employees/bulk`, POST `/employer/employees/{user_id}/subscribe`, POST/GET/DELETE `/employer/domains`, GET `/employer/billing`, POST `/employer/billing/generate`, POST `/employer/billing/run-cron`
-- **Schemas:** `app/schemas/employer_program.py`
-- **Key design:** Benefit employees are Customer Comensals assigned to the Employer's institution (not Vianda Customers). Created directly via `user_service.create()` bypassing `process_admin_user_creation()` which would force Vianda Customers assignment. Fully subsidized subscriptions activate immediately with no Stripe payment. Partial subsidy: employee self-subscribes via `POST /subscriptions/with-payment` — backend detects employer benefit and charges employee their share only.
-- **Domain-gated enrollment:** `core.employer_domain` table maps email domains to employer institutions. B2C signup (`_apply_customer_signup_rules` in `user_signup_service.py`) checks email domain before assigning institution. Retroactive migration on domain creation moves existing users to employer institution.
-- **Billing cron:** `app/services/cron/employer_billing.py` — checks all active programs, generates bills where due (daily/weekly/monthly). Month-end minimum fee reconciliation for sub-monthly cycles.
-- **B2B login restriction:** Customer Comensals blocked from B2B platform login when `x-client-type: b2b` header is sent. Returns structured 403 with app store URLs.
-- **Benefit employee invite:** Dedicated email template via `email_service.send_benefit_employee_invite_email()` with app download links.
-- **Benefit plans endpoint:** `GET /subscriptions/benefit-plans` in `route_factory.py` returns plans with employer/employee split breakdown for B2C app.
-- **Enums:** `benefit_cap_period_enum` (per_renewal, monthly), `enrollment_mode_enum` (managed, domain_gated), `billing_cycle_enum` (daily, weekly, monthly), `employer_bill_payment_status_enum` (pending, paid, failed, overdue)
-- **Roadmap:** `docs/plans/vianda_employer_benefits_program.md`
+- **Data model:** `core.employer_benefits_program` with three-tier cascade: `institution_entity_id IS NULL` = institution-level defaults; `institution_entity_id IS NOT NULL` = entity-level override. Unique constraint: `(institution_id, institution_entity_id)`. Currency-tied fields (`benefit_cap`, `minimum_monthly_fee`, `stripe_*`) exist only at entity level. `billing.employer_bill` (per-entity invoices, `institution_entity_id NOT NULL`). `billing.employer_bill_line` (per-renewal line items).
+- **Three-tier resolution:** `resolve_effective_program(institution_id, entity_id, db)` in `app/services/employer/program_service.py` — entity program → institution program → None. Used by billing, enrollment, and benefit-plans endpoint.
+- **No separate employer_info table.** Employer identity is `institution_info` (type=`employer`) + `institution_entity_info` per country. The `employer_info` and `employer_domain` tables were removed.
+- **email_domain:** Stored as `email_domain` column on `ops.institution_entity_info` (nullable). Used for domain-gated enrollment. Available to all entity types (suppliers for future SSO).
+- **Services:** `app/services/employer/program_service.py` (program CRUD with entity scoping), `app/services/employer/enrollment_service.py` (single + bulk employee enrollment, subscription), `app/services/employer/billing_service.py` (per-entity bill generation, benefit calculator)
+- **Routes:** `app/routes/employer_program.py` — POST/GET/PUT `/employer/program`, POST/GET/DELETE `/employer/employees`, POST `/employer/employees/bulk`, POST `/employer/employees/{user_id}/subscribe`, GET `/employer/billing`, POST `/employer/billing/generate`, POST `/employer/billing/run-cron`. Domain routes removed (domain managed via entity CRUD).
+- **Schemas:** `app/schemas/employer_program.py` — `ProgramCreateSchema` accepts optional `institution_entity_id`.
+- **Key design:** Benefit employees are Customer Comensals assigned to the Employer's institution. `user_info.employer_entity_id` links employees to their employer's entity (replaces former `employer_id`). `employer_address_id` kept for pickup office.
+- **Domain-gated enrollment:** `email_domain` on `institution_entity_info` replaces former `employer_domain` table. B2C signup (`_apply_customer_signup_rules` in `user_signup_service.py`) checks entity `email_domain` and sets both `institution_id` and `employer_entity_id`.
+- **Billing cron:** `app/services/cron/employer_billing.py` — iterates programs per entity, generates per-entity bills. Currency from `institution_entity_info.currency_metadata_id`. Month-end minimum fee reconciliation per entity.
+- **Benefit plans endpoint:** `GET /subscriptions/benefit-plans` in `route_factory.py` uses `resolve_effective_program()` with employee's `employer_entity_id`.
+- **B2B login restriction:** Customer Comensals blocked from B2B platform login when `x-client-type: b2b` header is sent.
+- **Enums:** `benefit_cap_period_enum`, `enrollment_mode_enum`, `billing_cycle_enum`, `employer_bill_payment_status_enum`
+- **Address types:** B2C customer addresses are user-selected: `customer_home` (Home), `customer_employer` (Work), `customer_other` (Other). No longer auto-derived from employer linkage.
+- **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`
 
 ---
 
@@ -256,12 +262,14 @@ Structured ingredient management replacing legacy free-text field on `product_in
 Tracks supplier tax invoices (AFIP Factura Electronica for Argentina) and W-9 collection (US) linked to institution bills.
 
 - **Data model:** `billing.supplier_invoice` (core, market-agnostic) + per-country extension tables: `billing.supplier_invoice_ar` (CAE, CUIT), `billing.supplier_invoice_pe` (serie, correlativo, CDR, RUC), `billing.supplier_invoice_us` (tax_year). Junction: `billing.bill_invoice_match`. Audit: `audit.supplier_invoice_history` (core only). US W-9: `billing.supplier_w9` (one per entity)
-- **Payout gate config:** `billing.market_payout_aggregator` (`require_invoice`, `max_unmatched_bill_days`) + per-supplier override on `billing.supplier_terms` (`require_invoice`, `invoice_hold_days`)
-- **Supplier terms:** `billing.supplier_terms` (1:1 with Supplier institution) — `no_show_discount`, `payment_frequency`, `require_invoice`, `invoice_hold_days`. Audit: `audit.supplier_terms_history`. Routes: `app/routes/supplier_terms.py` (GET/PUT). Resolution: `app/services/billing/supplier_terms_resolution.py`.
+- **Payout gate config:** `billing.market_payout_aggregator` (`require_invoice`, `max_unmatched_bill_days`, `kitchen_open_time`, `kitchen_close_time`) — market-level defaults for supplier terms. Auto-created during `POST /markets` (composite create). Managed via `GET/PUT /markets/{id}/billing-config`. Propagation preview: `GET /markets/{id}/billing-config/propagation-preview`.
+- **Supplier terms:** `billing.supplier_terms` with three-tier cascade: `institution_entity_id IS NULL` = institution-level defaults; `institution_entity_id IS NOT NULL` = entity-level override. Unique constraint: `(institution_id, institution_entity_id)`. Fields: `no_show_discount`, `payment_frequency`, `kitchen_open_time`, `kitchen_close_time`, `require_invoice`, `invoice_hold_days`. NULL = inherit from next tier. Audit: `audit.supplier_terms_history`. Routes: `app/routes/supplier_terms.py` (GET/PUT). Resolution: `app/services/billing/supplier_terms_resolution.py`.
   - `no_show_discount` → plate enriched queries + promotion service transaction creation
-  - `payment_frequency` → gates bill creation in `institution_billing.py:run_phase2_bills_and_payout()` via `_is_supplier_payout_due()` (settlements accumulate daily; bills created only when due)
-  - `require_invoice` + `invoice_hold_days` → invoice compliance gate in payout loop via `_check_invoice_compliance()` (blocks payout if entity has unmatched bills older than threshold)
-  - Effective value resolution (supplier override > market default) in `supplier_terms_resolution.py`, shared by API and billing pipeline
+  - `payment_frequency` → gates bill creation in `institution_billing.py:run_phase2_bills_and_payout()` via `_is_supplier_payout_due()`
+  - `kitchen_open_time` → gates pickup availability / QR code scanning via `kitchen_day_service.is_pickup_available()`
+  - `kitchen_close_time` → kitchen day cutoff (reservation lockdown, transaction finalization) via `kitchen_day_service._get_kitchen_close_time()`
+  - `require_invoice` + `invoice_hold_days` → invoice compliance gate in payout loop via `_check_invoice_compliance()`
+  - **Three-tier resolution chain:** `entity override → institution default → market_payout_aggregator → hardcoded defaults`. All public functions in `supplier_terms_resolution.py` accept optional `institution_entity_id` kwarg.
 - **Services:** `app/services/billing/supplier_invoice_service.py` (create, match, review, list), `app/services/billing/supplier_w9_service.py` (W-9 create/upsert, get by entity)
 - **Routes:** `app/routes/billing/supplier_invoice.py` — POST create (multipart), GET list, GET enriched, GET by ID, PATCH review, POST match. `app/routes/billing/supplier_w9.py` — POST submit W-9, GET by entity.
 - **GCS storage:** `invoices/{country_code}/{entity_id}/{invoice_id}/document` and `w9/{entity_id}/{w9_id}/document` in `GCS_SUPPLIER_BUCKET`. Country prefix enables per-country lifecycle policies (AR=10yr, PE=5yr, US=7yr).
@@ -280,7 +288,7 @@ Backend-computed onboarding checklist for Supplier/Employer institutions. Tracks
 - **Routes:** `app/routes/onboarding.py` — `GET /institutions/{id}/onboarding-status` (scoped), `GET /institutions/onboarding-summary` (Super Admin)
 - **Schemas:** `app/schemas/onboarding.py` — `OnboardingStatusResponseSchema`, `OnboardingSummaryResponseSchema`
 - **JWT claim:** `onboarding_status` added for Supplier/Employer tokens via `merge_onboarding_token_claims()` in `app/auth/utils.py`. Values: `not_started`, `in_progress`, `complete` (never `stalled`).
-- **Employer checklist:** Same endpoint, different items: `has_benefits_program`, `has_email_domain`, `has_enrolled_employee`, `has_active_subscription`. Dispatched by `institution_type`.
+- **Employer checklist:** Same endpoint, different items: `has_benefits_program`, `has_email_domain` (checks `email_domain` on entity), `has_enrolled_employee`, `has_active_subscription`. Dispatched by `institution_type`. Currently per-institution; future: per-market checklist.
 - **Customer checklist (user-level):** `GET /users/me/onboarding-status` — `has_verified_email`, `has_active_subscription`. JWT claim included for Customer role.
 - **Stalled status:** Internal-only. Derived when `days_since_last_activity >= 3` and checklist is partially complete.
 - **Stall detection cron:** `app/services/cron/supplier_stall_detection.py` — daily job sends escalating emails (2d getting started → 3d need help → 7d incomplete → 14d manual escalation). 3-day cooldown between emails per institution. Manual suppression via `support_email_suppressed_until` column.
@@ -430,3 +438,34 @@ Payment webhook -> subscription confirmed -> subscription_ads_hook.py [best-effo
 |------|-----|
 | `app/gateways/ads/`, `app/services/ads/pii_hasher.py`, `app/services/ads/models.py`, `app/services/ads/error_handler.py` | pytest (73 tests in `app/tests/gateways/ads/`) |
 | `app/services/ads/`, `app/routes/admin/ad_zones.py`, `app/routes/ad_tracking.py` | Postman collections (future) |
+
+---
+
+## Country / City / Currency Data Layer
+
+Two-tier geographic and currency data model replacing the retired `core.city_info` and `core.credit_currency_info` tables.
+
+- **External layer** (`external.*`): Read-only GeoNames + ISO 4217 data, bulk-seeded via `app/scripts/import_geonames.py`. Tables: `geonames_country`, `geonames_admin1`, `geonames_city`, `geonames_alternate_name`, `iso4217_currency`. CC-BY 4.0 licensed.
+- **Metadata layer** (`core.*_metadata`): Vianda-owned operational config. Tables: `country_metadata` (audience flags, pricing policy), `city_metadata` (display overrides, geonames_id FK), `currency_metadata` (currency_code FK). Audited via `audit.*_history` triggers.
+- **Timezone**: Lives on `address_info.timezone` (per-restaurant address), NOT on `market_info`. Derived from `external.geonames_city.timezone` at address write time. Market-level fallback for cron jobs: `TimezoneService._MARKET_PRIMARY_TIMEZONE`.
+- **XG pseudo-country**: ISO 3166-1 user-assigned code for Vianda's Global market. Synthetic rows in `external.geonames_country` (name="Global") and `geonames_city` (geonames_id=-1). `core.city_metadata` Global row at UUID `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`.
+- **Audience flags**: `country_metadata.is_customer_audience`, `is_supplier_audience`, `is_employer_audience` control `/leads/markets` and `/leads/cities` filtering.
+- **Country/currency names**: Always derived via JOIN to external tables, never stored redundantly.
+- **Institution-market link**: `core.institution_market` junction table assigns markets to institutions (replaces former `institution_info.market_id`). An institution can operate in multiple markets. Enriched institution responses include `market_ids` array.
+- **Key files**: `app/db/schema.sql`, `app/db/seed/reference_data.sql`, `app/scripts/import_geonames.py`, `app/services/timezone_service.py`, `app/routes/admin/external_data.py`, `app/routes/leads.py`
+- **Full reference**: `docs/api/internal/COUNTRY_CITY_DATA_STRUCTURE.md`
+
+---
+
+## Multinational Institutions
+
+Institutions can operate across multiple countries. One institution = one set of admin users, one login. Country-specific concerns (legal entities, currencies, tax IDs, billing) live on `institution_entity_info`.
+
+- **Institution-market junction:** `core.institution_market` replaces the former `institution_info.market_id` column. Admin-controlled multi-select. Entities can only be created in assigned markets.
+- **Entity as country boundary:** `ops.institution_entity_info` is the legal/fiscal boundary for **both** supplier and employer institutions. Each entity has: `tax_id`, `currency_metadata_id`, `address_id` (with `country_code`), `payout_provider_account_id`, `email_domain` (for enrollment/SSO).
+- **Three-tier cascade:** Both `supplier_terms` and `employer_benefits_program` support entity-level overrides via nullable `institution_entity_id`. Resolution: entity → institution → market/hardcoded defaults. Single-market institutions use institution-level defaults with no entity overrides.
+- **Employer normalization:** `employer_info` and `employer_domain` tables removed. Employer identity = `institution_info` (type=employer) + `institution_entity_info`. `user_info.employer_entity_id` replaces `employer_id`. `email_domain` column on entity replaces `employer_domain` table.
+- **Address types:** B2C customer addresses are user-selected (Home/Work/Other). `customer_employer` ("Work") is no longer auto-derived.
+- **JWT `market_id`:** B2C-only (plate/restaurant scoping). Orthogonal to institution structure. B2B users use primary market for language default.
+- **Validation:** Entity creation validates address country against `institution_market`. User market assignments validate against `institution_market` (Internal bypasses).
+- **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`

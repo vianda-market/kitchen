@@ -90,10 +90,18 @@ def _promote_for_location(
 
     kitchen_day = get_kitchen_day_for_date(today, timezone_str, market)
 
-    # kitchen_day enum: Mon-Fri only
-    if kitchen_day not in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"):
+    # kitchen_day enum values are lowercase (monday–friday)
+    valid_days = ("monday", "tuesday", "wednesday", "thursday", "friday")
+
+    # DEV_MODE: treat any day as a valid kitchen day so E2E tests work on weekends
+    from app.config.settings import Settings
+    _dev_mode = Settings().DEV_MODE
+    if not _dev_mode and kitchen_day not in valid_days:
         log_info(f"Location {location_id}: {kitchen_day} is not a kitchen day, skip")
         return 0
+    if _dev_mode and kitchen_day not in valid_days:
+        kitchen_day = "monday"  # Force a valid kitchen day for dev/test
+        log_info(f"Location {location_id}: DEV_MODE — overriding {now_local.strftime('%A').lower()} to {kitchen_day}")
 
     day_hours = config.business_hours.get(kitchen_day) if config.business_hours else None
     if not day_hours or "open" not in day_hours:
@@ -104,7 +112,10 @@ def _promote_for_location(
     if isinstance(open_time, str):
         from datetime import time as dt_time
         open_time = datetime.strptime(open_time, "%H:%M").time()
-    if now_local.time() < open_time:
+
+    # DEV_MODE: skip kitchen hours check so E2E tests can run at any time
+    from app.config.settings import Settings
+    if not Settings().DEV_MODE and now_local.time() < open_time:
         log_info(f"Location {location_id}: kitchen not yet open (open={open_time})")
         return 0
 
@@ -112,26 +123,37 @@ def _promote_for_location(
     # address.timezone matches location, no pickup yet
     conn = get_db_connection()
     try:
-        query = """
-            SELECT ps.plate_selection_id
-            FROM plate_selection_info ps
-            JOIN restaurant_info r ON ps.restaurant_id = r.restaurant_id
-            JOIN address_info a ON r.address_id = a.address_id
-            WHERE ps.kitchen_day = %s
-              AND ps.pickup_date = %s
-              AND ps.is_archived = FALSE
-              AND TRIM(COALESCE(a.timezone, '')) = %s
-              AND NOT EXISTS (
-                  SELECT 1 FROM plate_pickup_live ppl
-                  WHERE ppl.plate_selection_id = ps.plate_selection_id
-                    AND ppl.is_archived = FALSE
-              )
-        """
-        rows = db_read(
-            query,
-            (kitchen_day, today.isoformat(), timezone_str),
-            connection=conn,
-        )
+        if _dev_mode:
+            # DEV_MODE: skip kitchen_day and timezone filters — promote any selection for today
+            query = """
+                SELECT ps.plate_selection_id
+                FROM plate_selection_info ps
+                WHERE ps.pickup_date = %s
+                  AND ps.is_archived = FALSE
+                  AND NOT EXISTS (
+                      SELECT 1 FROM plate_pickup_live ppl
+                      WHERE ppl.plate_selection_id = ps.plate_selection_id
+                        AND ppl.is_archived = FALSE
+                  )
+            """
+            rows = db_read(query, (today.isoformat(),), connection=conn)
+        else:
+            query = """
+                SELECT ps.plate_selection_id
+                FROM plate_selection_info ps
+                JOIN restaurant_info r ON ps.restaurant_id = r.restaurant_id
+                JOIN address_info a ON r.address_id = a.address_id
+                WHERE ps.kitchen_day = %s
+                  AND ps.pickup_date = %s
+                  AND ps.is_archived = FALSE
+                  AND TRIM(COALESCE(a.timezone, '')) = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM plate_pickup_live ppl
+                      WHERE ppl.plate_selection_id = ps.plate_selection_id
+                        AND ppl.is_archived = FALSE
+                  )
+            """
+            rows = db_read(query, (kitchen_day, today.isoformat(), timezone_str), connection=conn)
 
         if not rows:
             log_info(f"Location {location_id}: no selections to promote")

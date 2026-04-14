@@ -37,16 +37,17 @@ def _create_restaurant_with_qr_code(cursor, modified_by: str) -> tuple:
     restaurant_id = str(uuid4())
     qr_code_id = str(uuid4())
 
-    # address_info: country_code GL (Global market from seed)
+    # address_info: country_code XG (Global market from seed).
+    # city_metadata_id references the Global synthetic city_metadata row from reference_data.sql.
     cursor.execute(
         """
         INSERT INTO address_info (
             address_id, institution_id, user_id, address_type, country_code,
             province, city, postal_code, street_type, street_name, building_number,
-            timezone, is_archived, status, modified_by
+            timezone, city_metadata_id, is_archived, status, modified_by
         ) VALUES (%s, %s, %s, ARRAY['restaurant']::address_type_enum[], 'XG',
             'Prov', 'City', '12345', 'st'::street_type_enum, 'Main', '1',
-            'UTC', FALSE, 'active'::status_enum, %s)
+            'UTC', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', FALSE, 'active'::status_enum, %s)
         """,
         (address_id, str(SEED_INSTITUTION_VIANDA_ID), modified_by, modified_by),
     )

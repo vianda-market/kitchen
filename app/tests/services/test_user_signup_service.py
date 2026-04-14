@@ -74,7 +74,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         mock_db_read.return_value = None  # No employer domain match
         # Arrange
         original_password = sample_user_data["password"]
@@ -99,7 +99,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         mock_db_read.return_value = None  # No employer domain match
         mock_create_user.return_value = sample_user_dto
 
@@ -112,7 +112,7 @@ class TestUserSignupService:
         assert call_args["modified_by"] == UserSignupService.BOT_USER_ID
         assert call_args["email"] == sample_user_data["email"].lower()
         assert call_args["market_id"] == SAMPLE_MARKET_ID  # Resolved from country_code
-        assert call_args["city_id"] == sample_user_data["city_id"]
+        assert call_args["city_metadata_id"] == sample_user_data["city_metadata_id"]
 
     def test_process_customer_signup_handles_missing_password(self, mock_db):
         """Test that customer signup handles missing password gracefully."""
@@ -153,7 +153,7 @@ class TestUserSignupService:
     ):
         """Test that admin user creation requires institution_id for non-Customer/Internal roles."""
         mock_market_service.get_by_id.return_value = {"is_archived": False}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         # Arrange - Supplier requires institution_id
         data_without_institution = {
             "email": "test@example.com",
@@ -318,9 +318,9 @@ class TestUserSignupService:
     @patch('app.services.user_signup_service.city_service')
     @patch('app.services.user_signup_service.market_service')
     def test_apply_customer_signup_rules_sets_defaults(self, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db):
-        """Test that customer signup rules set correct default values; market_id and city_id are preserved from input."""
+        """Test that customer signup rules set correct default values; market_id and city_metadata_id are preserved from input."""
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_db_read.return_value = None  # No employer domain match
         user_data = sample_user_data.copy()
@@ -422,7 +422,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = None
@@ -453,7 +453,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = MagicMock()  # user exists
         mock_get_by_email.return_value = None
@@ -475,7 +475,7 @@ class TestUserSignupService:
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="US")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
         mock_get_by_username.return_value = None
         mock_get_by_email.return_value = MagicMock()  # email already in user_info
@@ -517,29 +517,29 @@ class TestUserSignupService:
 
     @patch('app.services.user_signup_service.market_service')
     @patch('app.services.user_signup_service.city_service')
-    def test_request_customer_signup_raises_when_city_id_missing(
+    def test_request_customer_signup_raises_when_city_metadata_id_missing(
         self, mock_city_service, mock_market_service, sample_user_data, mock_db
     ):
-        """request_customer_signup returns 400 when city_id is missing."""
+        """request_customer_signup returns 400 when city_metadata_id is missing."""
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        sample_user_data.pop("city_id", None)
+        sample_user_data.pop("city_metadata_id", None)
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "city_id" in str(exc_info.value.detail).lower()
+        assert "city_metadata_id" in str(exc_info.value.detail).lower()
 
     @patch('app.services.user_signup_service.city_service')
     @patch('app.services.user_signup_service.market_service')
-    def test_request_customer_signup_raises_when_city_id_global(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
-        """request_customer_signup returns 400 when city_id is Global (B2C customers cannot get Global city)."""
+    def test_request_customer_signup_raises_when_city_metadata_id_global(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
+        """request_customer_signup returns 400 when city_metadata_id is Global (B2C customers cannot get Global city)."""
         from app.config.supported_cities import GLOBAL_CITY_ID
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="XG")
-        sample_user_data["city_id"] = GLOBAL_CITY_ID
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="XG")
+        sample_user_data["city_metadata_id"] = GLOBAL_CITY_ID
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -555,7 +555,7 @@ class TestUserSignupService:
     def test_verify_and_complete_signup_creates_user_and_returns_token(
         self, mock_create_user, mock_create_token, mock_market_service, mock_city_service, mock_set_assignments, sample_user_dto, mock_db
     ):
-        """verify_and_complete_signup loads pending (incl. market_id, city_id), creates user, sets market assignment, marks used, returns user and JWT."""
+        """verify_and_complete_signup loads pending (incl. market_id, city_metadata_id), creates user, sets market assignment, marks used, returns user and JWT."""
         from datetime import datetime, timezone, timedelta
         from app.tests.conftest import SAMPLE_MARKET_ID
         mock_market_service.get_by_id.return_value = {
@@ -563,7 +563,7 @@ class TestUserSignupService:
             "country_code": "AR",
             "language": "es",
         }
-        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_code="AR")
+        mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="AR")
         mock_create_user.return_value = sample_user_dto
         mock_create_token.return_value = "fake.jwt.token"
 
@@ -578,7 +578,7 @@ class TestUserSignupService:
             "last_name": "Doe",
             "mobile_number": "+14155552671",
             "market_id": SAMPLE_MARKET_ID,
-            "city_id": SAMPLE_CITY_ID,
+            "city_metadata_id": SAMPLE_CITY_ID,
             "used": False,
             "token_expiry": datetime.now(timezone.utc) + timedelta(hours=1),
         }
@@ -597,7 +597,7 @@ class TestUserSignupService:
         mock_create_user.assert_called_once()
         call_user_data = mock_create_user.call_args[0][0]
         assert call_user_data["market_id"] == SAMPLE_MARKET_ID
-        assert call_user_data["city_id"] == SAMPLE_CITY_ID
+        assert call_user_data["city_metadata_id"] == SAMPLE_CITY_ID
         assert call_user_data["locale"] == "es"
         assert call_user_data["mobile_number"] == "+14155552671"
         assert call_user_data["email_verified"] is True

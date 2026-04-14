@@ -87,11 +87,21 @@ def generate_employer_bill(
     period_end: date,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    *,
+    institution_entity_id: Optional[UUID] = None,
 ) -> Dict[str, Any]:
-    """Generate an employer bill for a billing period. Returns the bill DTO + lines."""
-    program = get_program_by_institution(institution_id, db)
+    """Generate an employer bill for a billing period. Returns the bill DTO + lines.
+
+    institution_entity_id is required — bills are always per-entity (NOT NULL on employer_bill).
+    Uses resolve_effective_program (entity → institution cascade) and derives currency
+    from the entity's currency_metadata.
+    """
+    if not institution_entity_id:
+        raise HTTPException(status_code=400, detail="institution_entity_id is required for employer bills")
+    from app.services.employer.program_service import resolve_effective_program
+    program = resolve_effective_program(institution_id, institution_entity_id, db)
     if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
+        raise HTTPException(status_code=400, detail="No active benefits program for this institution/entity")
 
     renewal_events = _get_renewal_events(institution_id, period_start, period_end, db)
 
@@ -136,17 +146,37 @@ def generate_employer_bill(
     minimum_fee_applied = discounted < min_fee and min_fee > 0
     billed_amount = max(discounted, min_fee)
 
-    from app.services.crud_service import institution_service
-    institution = institution_service.get_by_id(institution_id, db, scope=None)
+    # Currency resolution: entity → market fallback → USD
     currency_code = "USD"
-    if institution and hasattr(institution, "market_id") and institution.market_id:
-        from app.services.crud_service import market_service
-        market = market_service.get_by_id(institution.market_id, db)
-        if market:
-            currency_code = getattr(market, "currency_code", "USD") or "USD"
+    if institution_entity_id:
+        from app.utils.db import db_read as _db_read
+        entity_currency = _db_read(
+            "SELECT cm.currency_code FROM ops.institution_entity_info ie "
+            "JOIN core.currency_metadata cm ON ie.currency_metadata_id = cm.currency_metadata_id "
+            "WHERE ie.institution_entity_id = %s",
+            (str(institution_entity_id),),
+            connection=db,
+            fetch_one=True,
+        )
+        if entity_currency:
+            currency_code = entity_currency["currency_code"]
+    if currency_code == "USD":
+        # Fallback: primary market currency via institution_market junction
+        market_currency = db_read(
+            "SELECT cm.currency_code FROM core.institution_market im "
+            "JOIN core.market_info m ON im.market_id = m.market_id "
+            "JOIN core.currency_metadata cm ON m.currency_metadata_id = cm.currency_metadata_id "
+            "WHERE im.institution_id = %s ORDER BY im.is_primary DESC LIMIT 1",
+            (str(institution_id),),
+            connection=db,
+            fetch_one=True,
+        )
+        if market_currency:
+            currency_code = market_currency["currency_code"]
 
     bill_data = {
         "institution_id": str(institution_id),
+        "institution_entity_id": str(institution_entity_id) if institution_entity_id else None,
         "billing_period_start": str(period_start),
         "billing_period_end": str(period_end),
         "billing_cycle": program.billing_cycle,
@@ -187,10 +217,8 @@ def list_employer_bills(
     db: psycopg2.extensions.connection,
 ) -> list:
     """List employer bills for an institution."""
-    return employer_bill_service.get_all(
-        db,
-        scope=None,
-        additional_conditions=[("institution_id = %s::uuid", str(institution_id))],
+    return employer_bill_service.get_all_by_field(
+        "institution_id", institution_id, db, scope=None
     )
 
 
@@ -206,9 +234,14 @@ def get_employer_bill_detail(
     if str(bill.institution_id) != str(institution_id):
         return None
 
-    lines = employer_bill_line_service.get_all(
-        db,
-        scope=None,
-        additional_conditions=[("employer_bill_id = %s::uuid", str(bill_id))],
+    # employer_bill_line has no is_archived column — use raw query instead of
+    # CRUDService.get_all_by_field which hardcodes AND is_archived = FALSE.
+    from app.utils.db import db_read
+    from app.dto.models import EmployerBillLineDTO
+    rows = db_read(
+        "SELECT * FROM employer_bill_line WHERE employer_bill_id = %s ORDER BY renewal_date",
+        (str(bill_id),),
+        connection=db,
     )
-    return {"bill": bill, "lines": lines or []}
+    lines = [EmployerBillLineDTO(**r) for r in rows] if rows else []
+    return {"bill": bill, "lines": lines}

@@ -403,9 +403,10 @@ class CRUDService(Generic[T]):
                         conditions.append(f"a.{self.institution_column} = %s")
                         values.append(scope.institution_id)
                     query = f"""
-                        SELECT a.*, m.country_name, g.latitude, g.longitude
+                        SELECT a.*, gc.name AS country_name, g.latitude, g.longitude
                         FROM address_info a
                         LEFT JOIN market_info m ON a.country_code = m.country_code
+                        LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
                         LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
                         WHERE {' AND '.join(conditions)}
                     """
@@ -498,6 +499,7 @@ class CRUDService(Generic[T]):
                             SELECT COUNT(*)
                             FROM address_info a
                             LEFT JOIN market_info m ON a.country_code = m.country_code
+                            LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
                             LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
                             {where_clause}
                         """
@@ -505,9 +507,10 @@ class CRUDService(Generic[T]):
                         total_count = count_result["count"] if count_result else 0
 
                     query = f"""
-                        SELECT a.*, m.country_name, g.latitude, g.longitude
+                        SELECT a.*, gc.name AS country_name, g.latitude, g.longitude
                         FROM address_info a
                         LEFT JOIN market_info m ON a.country_code = m.country_code
+                        LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
                         LEFT JOIN geolocation_info g ON g.address_id = a.address_id AND g.is_archived = FALSE
                         {where_clause}
                         ORDER BY a.{self.id_column} DESC
@@ -641,9 +644,10 @@ class CRUDService(Generic[T]):
                     conditions.append(f"a.{self.institution_column} = %s")
                     params.append(str(scope.institution_id))
                 query = f"""
-                    SELECT a.*, COALESCE(m.country_name, '') as country_name
+                    SELECT a.*, gc.name AS country_name
                     FROM address_info a
                     LEFT JOIN market_info m ON a.country_code = m.country_code
+                    LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
                     WHERE {' AND '.join(conditions)}
                 """
                 result = db_read(query, tuple(params), connection=db, fetch_one=True)
@@ -689,9 +693,10 @@ class CRUDService(Generic[T]):
                     conditions.append(f"a.{self.institution_column} = %s")
                     params.append(str(scope.institution_id))
                 query = f"""
-                    SELECT a.*, COALESCE(m.country_name, '') as country_name
+                    SELECT a.*, gc.name AS country_name
                     FROM address_info a
                     LEFT JOIN market_info m ON a.country_code = m.country_code
+                    LEFT JOIN external.geonames_country gc ON gc.iso_alpha2 = m.country_code
                     WHERE {' AND '.join(conditions)}
                     ORDER BY a.{self.id_column} DESC
                 """
@@ -1577,7 +1582,7 @@ class CRUDService(Generic[T]):
 from app.dto.models import (
     UserDTO, InstitutionDTO, ProductDTO, PlateDTO, RestaurantDTO,
     InstitutionBillDTO, InstitutionSettlementDTO, ClientBillDTO, CreditCurrencyDTO,
-    AddressDTO, EmployerDTO, EmployerBenefitsProgramDTO, EmployerBillDTO, EmployerBillLineDTO, EmployerDomainDTO,
+    AddressDTO, EmployerBenefitsProgramDTO, EmployerBillDTO, EmployerBillLineDTO,
     CityDTO, GeolocationDTO,
     RestaurantTransactionDTO, ClientTransactionDTO,
     PlateSelectionDTO, PickupPreferencesDTO,
@@ -1592,6 +1597,7 @@ from app.dto.models import (
     BillInvoiceMatchDTO, SupplierW9DTO, SupplierTermsDTO,
     CuisineDTO, CuisineSuggestionDTO,
     ReferralConfigDTO, ReferralInfoDTO,
+    WorkplaceGroupDTO,
 )
 
 # Core entity services
@@ -1631,12 +1637,13 @@ supplier_w9_service = CRUDService(
 
 # Address and location services
 address_service = CRUDService("address_info", AddressDTO, "address_id", institution_column="institution_id")
-employer_service = CRUDService("employer_info", EmployerDTO, "employer_id")
+workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")
+# employer_service REMOVED — employer identity is institution_info + institution_entity_info
+# employer_domain_service REMOVED — email_domain is a column on institution_entity_info
 employer_benefits_program_service = CRUDService("employer_benefits_program", EmployerBenefitsProgramDTO, "program_id")
 employer_bill_service = CRUDService("employer_bill", EmployerBillDTO, "employer_bill_id")
 employer_bill_line_service = CRUDService("employer_bill_line", EmployerBillLineDTO, "line_id")
-employer_domain_service = CRUDService("employer_domain", EmployerDomainDTO, "domain_id")
-city_service = CRUDService("city_info", CityDTO, "city_id")
+city_service = CRUDService("city_metadata", CityDTO, "city_metadata_id")
 geolocation_service = CRUDService("geolocation_info", GeolocationDTO, "geolocation_id")
 
 # Cuisine services
@@ -2501,3 +2508,6 @@ ingredient_catalog_service = CRUDService("ingredient_catalog", IngredientCatalog
 # Referral services
 referral_config_service = CRUDService("referral_config", ReferralConfigDTO, "referral_config_id")
 referral_info_service = CRUDService("referral_info", ReferralInfoDTO, "referral_id")
+
+# Workplace group services
+workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")

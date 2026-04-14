@@ -33,7 +33,7 @@ from app.routes.plate_pickup import router as plate_pickup_router
 from app.routes.plate_review import router as plate_review_router
 from app.routes.notification_banner import router as notification_banner_router
 from app.routes.favorite import router as favorite_router
-from app.routes.employer import router as employer_router
+# from app.routes.employer import router as employer_router  # REMOVED — employer identity is institution + entity
 from app.routes.employer_program import router as employer_program_router
 from app.routes.address import router as address_router
 from app.routes.qr_code import router as qr_code_router
@@ -66,6 +66,7 @@ from app.routes.cities import router as cities_router
 from app.routes.provinces import router as provinces_router
 from app.routes.cuisines import router as cuisines_router
 from app.routes.admin.cuisines import router as admin_cuisines_router
+from app.routes.workplace_group import router as workplace_group_router, admin_router as workplace_group_admin_router
 
 # Onboarding status (supplier/employer onboarding checklist)
 from app.routes.onboarding import router as onboarding_router
@@ -181,15 +182,27 @@ OPENAPI_TAGS = [
     {"name": "Admin Archival", "description": "Archival statistics and operations"},
     {"name": "Admin Archival Config", "description": "Archival configuration"},
     {"name": "Admin Cuisines", "description": "Admin cuisine management and suggestion review"},
+    {"name": "Workplace Groups", "description": "B2C workplace group management for coworker pickup coordination"},
+    {"name": "Admin Workplace Groups", "description": "Admin workplace group management"},
 ]
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Kitchen API", lifespan=lifespan, openapi_tags=OPENAPI_TAGS, redirect_slashes=False)
 
-    # Rate limiting (slowapi) - must be set before routes that use @limiter.limit()
+    # Rate limiting (slowapi) - structured 429 with Retry-After header (PR5).
+    # Replaces the default slowapi handler which returns plain {"detail": "Rate limit exceeded"}.
+    from fastapi.responses import JSONResponse
+
+    async def _structured_rate_limit_handler(request, exc):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "rate_limited", "retry_after_seconds": 60},
+            headers={"Retry-After": "60"},
+        )
+
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _structured_rate_limit_handler)
 
     # CORS: explicit allowlist from env, or allow all for local dev
     from app.config.settings import settings
@@ -323,9 +336,7 @@ def create_app() -> FastAPI:
     v1_favorite_router.include_router(favorite_router)
     app.include_router(v1_favorite_router)
     
-    v1_employer_router = create_versioned_router("api", ["Employers"], APIVersion.V1)
-    v1_employer_router.include_router(employer_router)
-    app.include_router(v1_employer_router)
+    # v1_employer_router REMOVED — employer identity is institution + entity
 
     v1_employer_program_router = create_versioned_router("api", ["Employer Program"], APIVersion.V1)
     v1_employer_program_router.include_router(employer_program_router)
@@ -526,6 +537,22 @@ def create_app() -> FastAPI:
     v1_admin_cuisines_router = create_versioned_router("api", ["Admin Cuisines"], APIVersion.V1)
     v1_admin_cuisines_router.include_router(admin_cuisines_router)
     app.include_router(v1_admin_cuisines_router)
+
+    # Workplace group routes (B2C coworker pickup coordination)
+    v1_workplace_group_router = create_versioned_router("api", ["Workplace Groups"], APIVersion.V1)
+    v1_workplace_group_router.include_router(workplace_group_router)
+    app.include_router(v1_workplace_group_router)
+
+    # Admin workplace group routes (Internal only)
+    v1_workplace_group_admin_router = create_versioned_router("api", ["Admin Workplace Groups"], APIVersion.V1)
+    v1_workplace_group_admin_router.include_router(workplace_group_admin_router)
+    app.include_router(v1_workplace_group_admin_router)
+
+    # Admin external data routes (GeoNames picker for city/country promotion UI)
+    from app.routes.admin.external_data import router as admin_external_data_router
+    v1_admin_external_data_router = create_versioned_router("api", ["Admin: External Data"], APIVersion.V1)
+    v1_admin_external_data_router.include_router(admin_external_data_router)
+    app.include_router(v1_admin_external_data_router)
 
     # Ad click tracking (user-facing, captures gclid/fbclid from frontend)
     from app.routes.ad_tracking import router as ad_tracking_router

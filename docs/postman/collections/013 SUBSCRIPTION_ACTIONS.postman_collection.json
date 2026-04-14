@@ -57,14 +57,29 @@
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                { "key": "username", "value": "{{superAdminUsername}}", "type": "text" },
-                { "key": "password", "value": "{{superAdminPassword}}", "type": "text" }
+                {
+                  "key": "username",
+                  "value": "{{superAdminUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{superAdminPassword}}",
+                  "type": "text"
+                }
               ]
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "token"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token"
+              ]
             }
           },
           "response": []
@@ -122,14 +137,29 @@
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                { "key": "username", "value": "{{customerUsername}}", "type": "text" },
-                { "key": "password", "value": "{{customerPassword}}", "type": "text" }
+                {
+                  "key": "username",
+                  "value": "{{customerUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{customerPassword}}",
+                  "type": "text"
+                }
               ]
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "token"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token"
+              ]
             }
           },
           "response": []
@@ -149,21 +179,70 @@
                   "pm.test('Status 200', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
                   "pm.test('Response is array', function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(Array.isArray(body)).to.be.true;",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(Array.isArray(b)).to.be.true;",
                   "});",
                   "",
                   "const body = pm.response.json();",
-                  "const active = body.find(s => s.subscription_status !== 'Archived');",
+                  "// subscription_status enum is lowercase; archived subs have is_archived=true, so filter both.",
+                  "// Also restrict to subscriptions owned by our customer so we don't pick up someone else's from a prior run.",
+                  "const customerUserId = pm.collectionVariables.get('customerUserId') || pm.environment.get('customerUserId');",
+                  "const candidates = body.filter(s => !s.is_archived && s.subscription_status !== 'archived');",
+                  "const active = customerUserId",
+                  "    ? candidates.find(s => String(s.user_id) === String(customerUserId))",
+                  "    : candidates[0];",
+                  "",
+                  "function storeSubscriptionId(id) {",
+                  "    pm.collectionVariables.set('subscriptionId', id);",
+                  "    pm.environment.set('subscriptionId', id);",
+                  "    pm.globals.set('subscriptionId', id);",
+                  "    console.log('subscriptionId set:', id);",
+                  "}",
+                  "",
                   "if (active) {",
-                  "    pm.collectionVariables.set('subscriptionId', active.subscription_id);",
-                  "    pm.environment.set('subscriptionId', active.subscription_id);",
-                  "    pm.globals.set('subscriptionId', active.subscription_id);",
-                  "    console.log('Found subscription: ' + active.subscription_id);",
+                  "    storeSubscriptionId(active.subscription_id);",
                   "} else {",
-                  "    console.warn('No non-archived subscriptions found. Run collection 000 first.');",
+                  "    // No active subscription for our customer — create one via POST /subscriptions/with-payment.",
+                  "    // Collection 000's Cancel Subscription step archives the sub on every full run,",
+                  "    // so 013 must bootstrap its own active subscription to run standalone.",
+                  "    // IMPORTANT: the create must be done with the customer's token, not the admin's,",
+                  "    // because POST /subscriptions/with-payment rejects non-customer role types.",
+                  "    const customerToken = pm.collectionVariables.get('customerAuthToken') || pm.environment.get('customerAuthToken');",
+                  "    if (!customerToken) { pm.expect.fail('customerAuthToken not set. Run Login Customer first.'); }",
+                  "    const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "    console.log('No active subscription for customer; fetching plans to create one.');",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/v1/plans',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + customerToken },",
+                  "    }, (err, res) => {",
+                  "        if (err || res.code !== 200) { pm.expect.fail('Failed to list plans: ' + (err ? err.message : res.code)); return; }",
+                  "        const plans = res.json();",
+                  "        // Pick highest-priced plan so Stripe's 50-cent USD minimum (after currency conversion) is satisfied.",
+                  "        const firstPlan = Array.isArray(plans) && plans.length > 0",
+                  "            ? plans.slice().sort((a, b) => (b.price || 0) - (a.price || 0))[0]",
+                  "            : null;",
+                  "        if (!firstPlan) { pm.expect.fail('No plans available. Run 000 first.'); return; }",
+                  "        const planId = firstPlan.plan_id;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/subscriptions/with-payment',",
+                  "            method: 'POST',",
+                  "            header: { 'Authorization': 'Bearer ' + customerToken, 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({ plan_id: planId }) },",
+                  "        }, (err2, res2) => {",
+                  "            if (err2 || (res2.code !== 200 && res2.code !== 201)) {",
+                  "                pm.expect.fail('Failed to create subscription: ' + (err2 ? err2.message : res2.code + ' ' + res2.text()));",
+                  "                return;",
+                  "            }",
+                  "            const created = res2.json();",
+                  "            const subId = created.subscription_id || (created.subscription && created.subscription.subscription_id);",
+                  "            if (!subId) { pm.expect.fail('Subscription create did not return subscription_id: ' + JSON.stringify(created)); return; }",
+                  "            // Leave subscription in pending state — collection 013 has an explicit",
+                  "            // \"Confirm Payment (Mock Only)\" step that will activate it.",
+                  "            storeSubscriptionId(subId);",
+                  "        });",
+                  "    });",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -173,12 +252,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/enriched",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "enriched"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "enriched"
+              ]
             }
           },
           "response": []
@@ -228,12 +317,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}"
+              ]
             }
           },
           "response": []
@@ -276,12 +375,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/payment-details",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "payment-details"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "payment-details"
+              ]
             }
           },
           "response": []
@@ -319,12 +429,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/confirm-payment",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "confirm-payment"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "confirm-payment"
+              ]
             }
           },
           "response": []
@@ -359,7 +480,7 @@
                   "if (status === 200) {",
                   "    pm.test('Subscription put on hold', function () {",
                   "        const body = pm.response.json();",
-                  "        pm.expect(body.subscription_status).to.equal('On Hold');",
+                  "        pm.expect(body.subscription_status).to.equal('on_hold');",
                   "    });",
                   "} else if (status === 400) {",
                   "    pm.test('400 — already on hold or cancelled', function () {",
@@ -379,8 +500,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -388,8 +515,16 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/hold",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "hold"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "hold"
+              ]
             }
           },
           "response": []
@@ -407,7 +542,7 @@
                   "",
                   "pm.test('Subscription status is On Hold or Active', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body.subscription_status).to.be.oneOf(['On Hold', 'Active']);",
+                  "    pm.expect(body.subscription_status).to.be.oneOf(['on_hold', 'active']);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -417,12 +552,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/enriched/{{subscriptionId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "enriched", "{{subscriptionId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "enriched",
+                "{{subscriptionId}}"
+              ]
             }
           },
           "response": []
@@ -439,7 +585,7 @@
                   "if (status === 200) {",
                   "    pm.test('Subscription resumed', function () {",
                   "        const body = pm.response.json();",
-                  "        pm.expect(body.subscription_status).to.equal('Active');",
+                  "        pm.expect(body.subscription_status).to.equal('active');",
                   "    });",
                   "} else if (status === 400) {",
                   "    pm.test('400 — not on hold', function () {",
@@ -459,12 +605,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/resume",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "resume"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "resume"
+              ]
             }
           },
           "response": []
@@ -497,8 +654,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -506,8 +669,16 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/me/renewal-preferences",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "me", "renewal-preferences"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "me",
+                "renewal-preferences"
+              ]
             }
           },
           "response": []
@@ -541,12 +712,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{customerAuthToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerAuthToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/{{subscriptionId}}/cancel",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "{{subscriptionId}}", "cancel"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "cancel"
+              ]
             }
           },
           "response": []
@@ -579,12 +761,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions/enriched",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions", "enriched"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions",
+                "enriched"
+              ]
             }
           },
           "response": []
@@ -612,12 +804,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/subscriptions",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "subscriptions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subscriptions"
+              ]
             }
           },
           "response": []
@@ -638,14 +839,41 @@
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8000" },
-    { "key": "superAdminUsername", "value": "" },
-    { "key": "superAdminPassword", "value": "" },
-    { "key": "customerUsername", "value": "" },
-    { "key": "customerPassword", "value": "" },
-    { "key": "authToken", "value": "" },
-    { "key": "customerAuthToken", "value": "" },
-    { "key": "subscriptionId", "value": "" },
-    { "key": "planId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "superAdminUsername",
+      "value": ""
+    },
+    {
+      "key": "superAdminPassword",
+      "value": ""
+    },
+    {
+      "key": "customerUsername",
+      "value": ""
+    },
+    {
+      "key": "customerPassword",
+      "value": ""
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    },
+    {
+      "key": "customerAuthToken",
+      "value": ""
+    },
+    {
+      "key": "subscriptionId",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    }
   ]
 }

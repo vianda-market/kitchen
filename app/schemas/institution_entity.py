@@ -11,6 +11,7 @@ class InstitutionEntityCreateSchema(BaseModel):
     address_id: UUID
     tax_id: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255, description="Email domain for enrollment gating (employer) or SSO (all types)")
     is_archived: Optional[bool] = False
     # Status field removed - will be automatically set to 'Pending' by base model
 
@@ -20,6 +21,7 @@ class InstitutionEntityUpdateSchema(BaseModel):
     address_id: Optional[UUID] = None
     tax_id: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=100)
+    email_domain: Optional[str] = Field(None, max_length=255, description="Email domain for enrollment gating (employer) or SSO (all types)")
     is_archived: Optional[bool] = None
     status: Optional[Status] = None
 
@@ -31,6 +33,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     currency_metadata_id: UUID
     tax_id: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
+    email_domain: Optional[str] = None
     is_archived: bool
     status: Status
     created_date: datetime

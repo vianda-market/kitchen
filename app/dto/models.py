@@ -16,7 +16,7 @@ Benefits:
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, time
 from uuid import UUID
 from decimal import Decimal
 from app.config import Status, RoleType, RoleName, DiscretionaryReason, BillPayoutStatus, DietaryFlag
@@ -42,12 +42,13 @@ class UserDTO(BaseModel):
     mobile_number_verified_at: Optional[datetime] = None
     email_verified: bool = False
     email_verified_at: Optional[datetime] = None
-    employer_id: Optional[UUID] = None
+    employer_entity_id: Optional[UUID] = None
     employer_address_id: Optional[UUID] = None
+    workplace_group_id: Optional[UUID] = None
     support_email_suppressed_until: Optional[datetime] = None
     last_support_email_date: Optional[datetime] = None
     market_id: UUID
-    city_id: Optional[UUID] = None
+    city_metadata_id: Optional[UUID] = None
     locale: str = "en"
     referral_code: Optional[str] = None
     referred_by_code: Optional[str] = None
@@ -65,7 +66,7 @@ class InstitutionDTO(BaseModel):
     institution_id: UUID
     name: str
     institution_type: RoleType  # Internal, Customer, Supplier, or Employer
-    market_id: Optional[UUID] = None  # v1: NULL or Global = all markets; one UUID = local market
+    # market_id removed — institution markets now in core.institution_market junction
     support_email_suppressed_until: Optional[datetime] = None
     last_support_email_date: Optional[datetime] = None
     is_archived: bool = False
@@ -334,15 +335,12 @@ class CreditCurrencyDTO(BaseModel):
     Two-tier split: external.iso4217_currency holds raw ISO 4217 name/numeric/minor_unit;
     core.currency_metadata holds Vianda-owned pricing fields below. The DTO class name
     is kept as `CreditCurrencyDTO` to minimize churn across ~15 importers; the underlying
-    table and column are named currency_metadata / currency_metadata_id.
-
-    `currency_name` is a PR2-deprecated compat column on core.currency_metadata (populated
-    from external.iso4217_currency.name in seed). PR2 will migrate services to JOIN the
-    raw table and drop the column.
+    table and column are named currency_metadata / currency_metadata_id. Display name
+    resolves via JOIN external.iso4217_currency ic ON ic.code = cm.currency_code (no
+    longer a column on this table — dropped in PR2a).
     """
     currency_metadata_id: UUID
     currency_code: str
-    currency_name: Optional[str] = None
     credit_value_local_currency: Decimal
     currency_conversion_usd: Decimal
     is_archived: bool = False
@@ -362,10 +360,11 @@ class AddressDTO(BaseModel):
     address_id: UUID
     institution_id: UUID
     user_id: Optional[UUID] = None  # Required only for Customer Comensal home/other; nullable for Supplier, Internal, Employer
-    employer_id: Optional[UUID] = None  # Links address to employer (nullable)
+    workplace_group_id: Optional[UUID] = None
     address_type: List[str]
     is_default: bool = False
     floor: Optional[str] = None
+    city_metadata_id: UUID  # PR4c: required; source of truth for timezone via geonames_city JOIN
     country_name: str
     country_code: str
     province: str
@@ -402,25 +401,15 @@ class AddressSubpremiseDTO(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class EmployerDTO(BaseModel):
-    """Pure DTO for employer data"""
-    employer_id: UUID
-    name: str
-    address_id: UUID
-    is_archived: bool = False
-    status: Status
-    created_date: datetime
-    created_by: Optional[UUID] = None
-    modified_by: UUID
-    modified_date: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+## EmployerDTO REMOVED — employer identity is institution_info (type=employer) + institution_entity_info.
+## See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 
 
 class EmployerBenefitsProgramDTO(BaseModel):
     """Pure DTO for employer benefits program configuration"""
     program_id: UUID
     institution_id: UUID
+    institution_entity_id: Optional[UUID] = None  # NULL = institution-level defaults; set = entity-level override
     benefit_rate: int
     benefit_cap: Optional[Decimal] = None
     benefit_cap_period: str
@@ -449,6 +438,7 @@ class EmployerBillDTO(BaseModel):
     """Pure DTO for employer bill data"""
     employer_bill_id: UUID
     institution_id: UUID
+    institution_entity_id: UUID  # bills are per-entity (per-country/currency)
     billing_period_start: datetime
     billing_period_end: datetime
     billing_cycle: str
@@ -490,20 +480,7 @@ class EmployerBillLineDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class EmployerDomainDTO(BaseModel):
-    """Pure DTO for employer domain data"""
-    domain_id: UUID
-    institution_id: UUID
-    domain: str
-    is_active: bool = True
-    is_archived: bool = False
-    status: Status
-    created_date: datetime
-    created_by: Optional[UUID] = None
-    modified_by: UUID
-    modified_date: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+## EmployerDomainDTO REMOVED — replaced by email_domain column on institution_entity_info.
 
 
 class LeadInterestDTO(BaseModel):
@@ -526,6 +503,20 @@ class LeadInterestDTO(BaseModel):
     created_date: datetime
     modified_date: datetime
 
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkplaceGroupDTO(BaseModel):
+    workplace_group_id: UUID
+    name: str
+    email_domain: Optional[str] = None
+    require_domain_verification: bool = False
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -564,11 +555,25 @@ class RestaurantLeadDTO(BaseModel):
 
 
 class CityDTO(BaseModel):
-    """Pure DTO for city data (supported cities for user onboarding and address scoping)."""
-    city_id: UUID
-    name: str
-    country_code: str
-    province_code: Optional[str] = None
+    """Pure DTO for core.city_metadata (Vianda metadata layer on top of external.geonames_city).
+
+    Renamed from the old city_info-backed CityDTO. Field shape matches the new
+    city_metadata table; `name` is NOT on this DTO because it lives on external.geonames_city
+    (look up via `cm.geonames_id → gc.name` when you need the display string).
+
+    The class name is kept as `CityDTO` to avoid churning ~15 importers; callers
+    that need the display name should use a helper that JOINs external.geonames_city
+    or call place_name_resolver (PR2b).
+    """
+    city_metadata_id: UUID
+    geonames_id: int
+    country_iso: str
+    display_name_override: Optional[str] = None
+    display_name_i18n: Optional[dict] = None
+    show_in_signup_picker: bool = False
+    show_in_supplier_form: bool = False
+    show_in_customer_form: bool = False
+    is_served: bool = False
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -788,6 +793,7 @@ class InstitutionEntityDTO(BaseModel):
     payout_provider_account_id: Optional[str] = None
     payout_aggregator: Optional[str] = None
     payout_onboarding_status: Optional[str] = None
+    email_domain: Optional[str] = None  # For domain-gated enrollment (employer entities) and future SSO (all entity types)
     is_archived: bool = False
     status: Status
     created_date: datetime
@@ -802,14 +808,36 @@ class SupplierTermsDTO(BaseModel):
     """Pure DTO for supplier terms — negotiated per-supplier institution."""
     supplier_terms_id: UUID
     institution_id: UUID
+    institution_entity_id: Optional[UUID] = None  # NULL = institution-level; set = entity-level override
     no_show_discount: int = 0
     payment_frequency: PaymentFrequency = PaymentFrequency.DAILY
+    kitchen_open_time: Optional[time] = None
+    kitchen_close_time: Optional[time] = None
     require_invoice: Optional[bool] = None
     invoice_hold_days: Optional[int] = None
     is_archived: bool = False
     status: Status
     created_date: datetime
     created_by: Optional[UUID] = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarketPayoutAggregatorDTO(BaseModel):
+    """Pure DTO for market-level payout/billing configuration."""
+    market_id: UUID
+    aggregator: str
+    is_active: bool = True
+    require_invoice: bool = False
+    max_unmatched_bill_days: int = 30
+    kitchen_open_time: time = time(9, 0)
+    kitchen_close_time: time = time(13, 30)
+    notes: Optional[str] = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
     modified_by: UUID
     modified_date: datetime
 
@@ -1276,6 +1304,22 @@ class AdClickTrackingDTO(BaseModel):
     meta_upload_status: str = "pending"
     meta_uploaded_at: Optional[datetime] = None
     created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkplaceGroupDTO(BaseModel):
+    """DTO for workplace_group (B2C coworker pickup coordination)."""
+    workplace_group_id: UUID
+    name: str
+    email_domain: Optional[str] = None
+    require_domain_verification: bool = False
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: Optional[UUID] = None
+    modified_by: UUID
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)

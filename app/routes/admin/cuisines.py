@@ -106,16 +106,19 @@ def soft_delete_cuisine(
     current_user: dict = Depends(get_admin_user),
     db: connection = Depends(get_db),
 ):
-    """Soft-delete a cuisine (set is_archived=true, status=Inactive)."""
-    update_data = {
-        "is_archived": True,
-        "status": "inactive",
-        "modified_by": current_user["user_id"],
-    }
-    result = cuisine_crud_service.update(cuisine_id, update_data, db)
-    if not result:
+    """Soft-delete a cuisine (set is_archived=true). Use CRUDService.soft_delete because
+    CRUDService.update() re-fetches via get_by_id() which filters is_archived=FALSE and
+    would return None for a just-archived row → spurious 404."""
+    # Confirm it exists first so we return 404 cleanly (vs silent success on missing row)
+    existing = cuisine_crud_service.get_by_id(cuisine_id, db)
+    if not existing:
         raise HTTPException(status_code=404, detail="Cuisine not found")
-    return result
+    ok = cuisine_crud_service.soft_delete(cuisine_id, current_user["user_id"], db)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to archive cuisine")
+    # Return the pre-archive DTO with the archived flag flipped so the response matches schema.
+    existing.is_archived = True
+    return existing
 
 
 # ---- Suggestion Review ----
@@ -134,7 +137,7 @@ def approve_suggestion(
     If null, creates a new cuisine from the suggested name.
     Updates the originating restaurant's cuisine_id if present.
     """
-    reviewer_id = UUID(current_user["user_id"])
+    reviewer_id = UUID(str(current_user["user_id"]))
     result = cuisine_service.approve_suggestion(
         suggestion_id=suggestion_id,
         reviewer_id=reviewer_id,
@@ -155,7 +158,7 @@ def reject_suggestion(
     db: connection = Depends(get_db),
 ):
     """Reject a Pending cuisine suggestion with optional review notes."""
-    reviewer_id = UUID(current_user["user_id"])
+    reviewer_id = UUID(str(current_user["user_id"]))
     result = cuisine_service.reject_suggestion(
         suggestion_id=suggestion_id,
         reviewer_id=reviewer_id,

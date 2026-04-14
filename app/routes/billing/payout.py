@@ -40,11 +40,7 @@ def get_enriched_payouts(
     """
     def _get():
         scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_BILL, current_user)
-        return get_enriched_bill_payouts(
-            db, scope=scope,
-            page=pagination.page if pagination else None,
-            page_size=pagination.page_size if pagination else None,
-        )
+        return get_enriched_bill_payouts(db, scope=scope)
 
     result = handle_business_operation(_get, "enriched bill payouts retrieval")
     set_pagination_headers(response, result)

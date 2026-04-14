@@ -1,577 +1,879 @@
 {
-	"info": {
-		"_postman_id": "address-autocomplete-validation-2026",
-		"name": "002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION",
-		"description": "Tests for address suggest (autocomplete) and create via place_id (Mapbox mapbox_id). Uses Mapbox Search Box API for suggest and retrieve. Structured address creation is DEV_MODE only. Uses admin from 002 (env/globals) when available, else superadmin/SuperAdmin1!.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
-	},
-	"variable": [
-		{
-			"key": "baseUrl",
-			"value": "http://localhost:8000"
-		},
-		{
-			"key": "superAdminUsername",
-			"value": ""
-		},
-		{
-			"key": "superAdminPassword",
-			"value": ""
-		},
-		{
-			"key": "authToken",
-			"value": ""
-		},
-		{
-			"key": "testInstitutionId",
-			"value": "11111111-1111-1111-1111-111111111111"
-		},
-		{
-			"key": "testUserId",
-			"value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
-		},
-		{
-			"key": "institutionId",
-			"value": ""
-		},
-		{
-			"key": "supplierUserId",
-			"value": ""
-		},
-		{
-			"key": "sessionToken",
-			"value": ""
-		},
-		{
-			"key": "selectedPlaceId",
-			"value": ""
-		},
-		{
-			"key": "lastCreatedAddressId",
-			"value": ""
-		}
-	],
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"exec": [
-					"// Use admin from 002 (env or globals) when available",
-					"const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
-					"if (u) pm.collectionVariables.set('adminUsername', u);",
-					"const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
-					"if (p) pm.collectionVariables.set('adminPassword', p);",
-					"const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
-					"if (t) pm.collectionVariables.set('authToken', t);",
-					"// Use institutionId and supplierUserId from collection 000; fallback to seed when running standalone",
-					"const inst = pm.environment.get('institutionId') || pm.globals.get('institutionId') || pm.collectionVariables.get('testInstitutionId');",
-					"if (inst) pm.collectionVariables.set('institutionId', inst);",
-					"const uid = pm.environment.get('supplierUserId') || pm.globals.get('supplierUserId') || pm.collectionVariables.get('testUserId');",
-					"if (uid) pm.collectionVariables.set('supplierUserId', uid);"
-				],
-				"type": "text/javascript"
-			}
-		}
-	],
-	"item": [
-		{
-			"name": "Authentication",
-			"item": [
-				{
-					"name": "Login as Employee",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Response has access_token', function () {",
-									"    pm.expect(response).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.collectionVariables.set('authToken', response.access_token);",
-									"pm.environment.set('authToken', response.access_token);",
-									"pm.globals.set('authToken', response.access_token);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/x-www-form-urlencoded"
-							}
-						],
-						"body": {
-							"mode": "urlencoded",
-							"urlencoded": [
-								{
-									"key": "username",
-									"value": "{{superAdminUsername}}"
-								},
-								{
-									"key": "password",
-									"value": "{{superAdminPassword}}"
-								}
-							]
-						},
-						"url": "{{baseUrl}}/api/v1/auth/token"
-					}
-				},
-				{
-					"name": "Get current user (set testUserId, testInstitutionId)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-									"const r = pm.response.json();",
-									"if (r.user_id) { pm.collectionVariables.set('testUserId', r.user_id); }",
-									"if (r.institution_id) { pm.collectionVariables.set('testInstitutionId', r.institution_id); }"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [{"key": "Authorization", "value": "Bearer {{authToken}}"}],
-						"url": "{{baseUrl}}/api/v1/users/me"
-					}
-				}
-			]
-		},
-		{
-			"name": "Suggest (Autocomplete)",
-			"item": [
-				{
-					"name": "Suggest - partial address (no country)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Response has suggestions array', function () {",
-									"    pm.expect(response).to.have.property('suggestions');",
-									"    pm.expect(response.suggestions).to.be.an('array');",
-									"});",
-									"",
-									"if (response.suggestions.length > 0) {",
-									"    const s = response.suggestions[0];",
-									"    pm.test('Suggestion has place_id and display_text', function () {",
-									"        pm.expect(s).to.have.property('place_id');",
-									"        pm.expect(s).to.have.property('display_text');",
-									"        pm.expect(s.place_id).to.be.a('string').and.not.empty;",
-									"        pm.expect(s.display_text).to.be.a('string').and.not.empty;",
-									"    });",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{authToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Corrientes&limit=5",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [
-								{"key": "q", "value": "Av. Corrientes"},
-								{"key": "limit", "value": "5"}
-							]
-						}
-					}
-				},
-				{
-					"name": "Suggest - with country filter (AR)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Response has suggestions array', function () {",
-									"    pm.expect(response).to.have.property('suggestions');",
-									"});",
-									"",
-									"response.suggestions.forEach(function(s) {",
-									"    pm.test('Suggestion country_code is AR when filter applied', function () {",
-									"        pm.expect(s.country_code).to.equal('AR');",
-									"    });",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{authToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Santa+Fe&country=AR&limit=5",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [
-								{"key": "q", "value": "Santa Fe"},
-								{"key": "country", "value": "AR"},
-								{"key": "limit", "value": "5"}
-							]
-						}
-					}
-				},
-				{
-					"name": "Suggest - with session_token",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate a session token for this suggest session",
-									"const sessionToken = pm.variables.replaceIn('{{$guid}}');",
-									"pm.collectionVariables.set('sessionToken', sessionToken);"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Suggestions returned with session_token', function () {",
-									"    pm.expect(response).to.have.property('suggestions');",
-									"    pm.expect(response.suggestions).to.be.an('array');",
-									"});",
-									"",
-									"// Store first suggestion's place_id for the E2E create flow",
-									"if (response.suggestions.length > 0) {",
-									"    pm.collectionVariables.set('selectedPlaceId', response.suggestions[0].place_id);",
-									"    console.log('Selected place_id for create:', response.suggestions[0].place_id);",
-									"    console.log('Display text:', response.suggestions[0].display_text);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{authToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567&country=AR&limit=3&session_token={{sessionToken}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [
-								{"key": "q", "value": "Avenida Santa Fe 2567"},
-								{"key": "country", "value": "AR"},
-								{"key": "limit", "value": "3"},
-								{"key": "session_token", "value": "{{sessionToken}}"}
-							]
-						}
-					}
-				},
-				{
-					"name": "Suggest - empty query returns 200 with empty suggestions",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Suggestions is empty array', function () {",
-									"    pm.expect(response.suggestions).to.be.an('array');",
-									"    pm.expect(response.suggestions.length).to.equal(0);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{authToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [{"key": "q", "value": ""}]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Create Address (Structured - DEV_MODE only)",
-			"description": "Create with full address fields. Only works when DEV_MODE=true. In production, use the place_id flow (E2E section below). Uses institutionId and supplierUserId from collection 000 (env/globals); run 000 first or uses seed defaults.",
-			"item": [
-				{
-					"name": "Create - valid address (Buenos Aires)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
-									"const response = pm.response.json();",
-									"pm.test('Response has address_id', function () { pm.expect(response).to.have.property('address_id'); });",
-									"if (response.address_id) {",
-									"    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Authorization", "value": "Bearer {{authToken}}"},
-							{"key": "Content-Type", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1043\",\n  \"street_type\": \"Ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"1234\"\n}"
-						},
-						"url": "{{baseUrl}}/api/v1/addresses"
-					}
-				}
-			]
-		},
-		{
-			"name": "Auth required",
-			"item": [
-				{
-					"name": "Suggest without token returns 401",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 401', function () {",
-									"    pm.response.to.have.status(401);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=test",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [{"key": "q", "value": "test"}]
-						}
-					}
-				},
-				{
-					"name": "Create without token returns 401",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 401', function () {",
-									"    pm.response.to.have.status(401);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"street_name\": \"Test\",\n  \"street_type\": \"St\",\n  \"building_number\": \"1\",\n  \"city\": \"City\",\n  \"province\": \"State\",\n  \"postal_code\": \"12345\",\n  \"country_code\": \"AR\"\n}"
-						},
-						"url": "{{baseUrl}}/api/v1/addresses"
-					}
-				}
-			]
-		},
-		{
-			"name": "E2E: Suggest → Select → Create via place_id",
-			"description": "Production flow: 1) Suggest with session_token, 2) Select a suggestion (store place_id), 3) Create address using place_id + session_token. Requires live Mapbox API (MAPBOX_ACCESS_TOKEN set) or DEV_MODE=true for mock responses.",
-			"item": [
-				{
-					"name": "1. Suggest (generate session_token, get suggestions)",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate a session token for this E2E flow",
-									"const sessionToken = pm.variables.replaceIn('{{$guid}}');",
-									"pm.collectionVariables.set('sessionToken', sessionToken);",
-									"console.log('Generated session_token:', sessionToken);"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('At least one suggestion returned', function () {",
-									"    pm.expect(response.suggestions).to.be.an('array');",
-									"    pm.expect(response.suggestions.length).to.be.above(0);",
-									"});",
-									"",
-									"if (response.suggestions.length > 0) {",
-									"    const selected = response.suggestions[0];",
-									"    pm.collectionVariables.set('selectedPlaceId', selected.place_id);",
-									"    console.log('Selected:', selected.display_text);",
-									"    console.log('place_id:', selected.place_id);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [{"key": "Authorization", "value": "Bearer {{authToken}}"}],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567+Buenos+Aires&country=AR&limit=5&session_token={{sessionToken}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "addresses", "suggest"],
-							"query": [
-								{"key": "q", "value": "Avenida Santa Fe 2567 Buenos Aires"},
-								{"key": "country", "value": "AR"},
-								{"key": "limit", "value": "5"},
-								{"key": "session_token", "value": "{{sessionToken}}"}
-							]
-						}
-					}
-				},
-				{
-					"name": "2. Create Address via place_id",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"const inst = pm.collectionVariables.get('institutionId') || pm.environment.get('institutionId') || pm.globals.get('institutionId') || pm.collectionVariables.get('testInstitutionId');",
-									"const placeId = pm.collectionVariables.get('selectedPlaceId');",
-									"const sessionToken = pm.collectionVariables.get('sessionToken');",
-									"",
-									"if (!placeId) {",
-									"    console.warn('No place_id from suggest step — run step 1 first');",
-									"}",
-									"",
-									"const body = {",
-									"    institution_id: inst,",
-									"    place_id: placeId,",
-									"    session_token: sessionToken",
-									"};",
-									"pm.request.body.raw = JSON.stringify(body, null, 2);",
-									"console.log('Creating address with place_id:', placeId);"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
-									"",
-									"const response = pm.response.json();",
-									"pm.test('Response has address_id', function () {",
-									"    pm.expect(response).to.have.property('address_id');",
-									"});",
-									"",
-									"pm.test('Address has resolved fields from Mapbox', function () {",
-									"    pm.expect(response).to.have.property('street_name');",
-									"    pm.expect(response).to.have.property('city');",
-									"    pm.expect(response).to.have.property('province');",
-									"    pm.expect(response).to.have.property('country_code');",
-									"    pm.expect(response.country_code).to.equal('AR');",
-									"});",
-									"",
-									"if (response.address_id) {",
-									"    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
-									"    console.log('Created address:', response.address_id);",
-									"    console.log('Street:', response.street_name);",
-									"    console.log('City:', response.city);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Authorization", "value": "Bearer {{authToken}}"},
-							{"key": "Content-Type", "value": "application/json"}
-						],
-						"body": {"mode": "raw", "raw": "{}"},
-						"url": "{{baseUrl}}/api/v1/addresses"
-					}
-				}
-			]
-		}
-	]
+  "info": {
+    "_postman_id": "address-autocomplete-validation-2026",
+    "name": "002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION",
+    "description": "Tests for address suggest (autocomplete) and create via place_id (Mapbox mapbox_id). Uses Mapbox Search Box API for suggest and retrieve. Structured address creation is DEV_MODE only. Uses admin from 002 (env/globals) when available, else superadmin/SuperAdmin1!.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "superAdminUsername",
+      "value": ""
+    },
+    {
+      "key": "superAdminPassword",
+      "value": ""
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    },
+    {
+      "key": "testInstitutionId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "testUserId",
+      "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    },
+    {
+      "key": "institutionId",
+      "value": ""
+    },
+    {
+      "key": "supplierUserId",
+      "value": ""
+    },
+    {
+      "key": "sessionToken",
+      "value": ""
+    },
+    {
+      "key": "selectedPlaceId",
+      "value": ""
+    },
+    {
+      "key": "lastCreatedAddressId",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Use admin from 002 (env or globals) when available",
+          "const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+          "if (u) pm.collectionVariables.set('adminUsername', u);",
+          "const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+          "if (p) pm.collectionVariables.set('adminPassword', p);",
+          "const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+          "if (t) pm.collectionVariables.set('authToken', t);",
+          "// Use institutionId and supplierUserId from collection 000; fallback to seed when running standalone",
+          "const inst = pm.environment.get('institutionId') || pm.globals.get('institutionId') || pm.collectionVariables.get('testInstitutionId');",
+          "if (inst) pm.collectionVariables.set('institutionId', inst);",
+          "const uid = pm.environment.get('supplierUserId') || pm.globals.get('supplierUserId') || pm.collectionVariables.get('testUserId');",
+          "if (uid) pm.collectionVariables.set('supplierUserId', uid);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as Employee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has access_token', function () {",
+                  "    pm.expect(response).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('authToken', response.access_token);",
+                  "pm.environment.set('authToken', response.access_token);",
+                  "pm.globals.set('authToken', response.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{superAdminUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{superAdminPassword}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/auth/token"
+          }
+        },
+        {
+          "name": "Setup: Resolve City Metadata (PR4c)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Find any available token so Setup works across collections that use different names.",
+                  "const token = pm.collectionVariables.get('authToken')",
+                  "    || pm.environment.get('authToken')",
+                  "    || pm.collectionVariables.get('employeeAdminToken')",
+                  "    || pm.environment.get('employeeAdminToken')",
+                  "    || pm.collectionVariables.get('superAdminAuthToken')",
+                  "    || pm.environment.get('superAdminAuthToken')",
+                  "    || pm.collectionVariables.get('adminAuthToken')",
+                  "    || pm.environment.get('adminAuthToken');",
+                  "if (token) {",
+                  "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "} else {",
+                  "    console.warn('No auth token available for Setup Cities — GET /cities will 401');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PR4c setup: pre-populate cityMetadataId{CC} cache for every seeded market",
+                  "// so downstream address-create injectors can read synchronously.",
+                  "pm.test('Cities list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const cities = pm.response.json();",
+                  "if (Array.isArray(cities)) {",
+                  "    const byCC = {};",
+                  "    for (const c of cities) {",
+                  "        const cc = (c.country_code || '').toUpperCase();",
+                  "        if (!cc || byCC[cc]) continue;",
+                  "        byCC[cc] = c;",
+                  "    }",
+                  "    for (const cc in byCC) {",
+                  "        const city = byCC[cc];",
+                  "        if (!city || !city.city_metadata_id) continue;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        pm.collectionVariables.set(varName, city.city_metadata_id);",
+                  "        pm.environment.set(varName, city.city_metadata_id);",
+                  "        pm.globals.set(varName, city.city_metadata_id);",
+                  "        console.log('cached', varName, '=', city.city_metadata_id, '(' + city.name + ')');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user (set testUserId, testInstitutionId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "if (r.user_id) { pm.collectionVariables.set('testUserId', r.user_id); }",
+                  "if (r.institution_id) { pm.collectionVariables.set('testInstitutionId', r.institution_id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suggest (Autocomplete)",
+      "item": [
+        {
+          "name": "Suggest - partial address (no country)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has suggestions array', function () {",
+                  "    pm.expect(response).to.have.property('suggestions');",
+                  "    pm.expect(response.suggestions).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (response.suggestions.length > 0) {",
+                  "    const s = response.suggestions[0];",
+                  "    pm.test('Suggestion has place_id and display_text', function () {",
+                  "        pm.expect(s).to.have.property('place_id');",
+                  "        pm.expect(s).to.have.property('display_text');",
+                  "        pm.expect(s.place_id).to.be.a('string').and.not.empty;",
+                  "        pm.expect(s.display_text).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Av.+Corrientes&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Av. Corrientes"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Suggest - with country filter (AR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has suggestions array', function () {",
+                  "    pm.expect(response).to.have.property('suggestions');",
+                  "});",
+                  "",
+                  "response.suggestions.forEach(function(s) {",
+                  "    pm.test('Suggestion country_code is AR when filter applied', function () {",
+                  "        pm.expect(s.country_code).to.equal('AR');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Santa+Fe&country=AR&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Santa Fe"
+                },
+                {
+                  "key": "country",
+                  "value": "AR"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Suggest - with session_token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate a session token for this suggest session",
+                  "const sessionToken = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('sessionToken', sessionToken);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Suggestions returned with session_token', function () {",
+                  "    pm.expect(response).to.have.property('suggestions');",
+                  "    pm.expect(response.suggestions).to.be.an('array');",
+                  "});",
+                  "",
+                  "// Store first suggestion's place_id for the E2E create flow",
+                  "if (response.suggestions.length > 0) {",
+                  "    pm.collectionVariables.set('selectedPlaceId', response.suggestions[0].place_id);",
+                  "    console.log('Selected place_id for create:', response.suggestions[0].place_id);",
+                  "    console.log('Display text:', response.suggestions[0].display_text);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567&country=AR&limit=3&session_token={{sessionToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Avenida Santa Fe 2567"
+                },
+                {
+                  "key": "country",
+                  "value": "AR"
+                },
+                {
+                  "key": "limit",
+                  "value": "3"
+                },
+                {
+                  "key": "session_token",
+                  "value": "{{sessionToken}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Suggest - empty query returns 200 with empty suggestions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Suggestions is empty array', function () {",
+                  "    pm.expect(response.suggestions).to.be.an('array');",
+                  "    pm.expect(response.suggestions.length).to.equal(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Address (Structured - DEV_MODE only)",
+      "description": "Create with full address fields. Only works when DEV_MODE=true. In production, use the place_id flow (E2E section below). Uses institutionId and supplierUserId from collection 000 (env/globals); run 000 first or uses seed defaults.",
+      "item": [
+        {
+          "name": "Create - valid address (Buenos Aires)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has address_id', function () { pm.expect(response).to.have.property('address_id'); });",
+                  "if (response.address_id) {",
+                  "    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"C1043\",\n  \"street_type\": \"ave\",\n  \"street_name\": \"Corrientes\",\n  \"building_number\": \"1234\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/addresses"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth required",
+      "item": [
+        {
+          "name": "Suggest without token returns 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "test"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create without token returns 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "",
+                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
+                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+                  "// the injector early-returns and the legacy timezone_service path handles the request.",
+                  "(function injectCityMetadataId() {",
+                  "    try {",
+                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "        if (!raw || !raw.trim()) return;",
+                  "        let payload;",
+                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
+                  "        const target = (payload && payload.address) ? payload.address : payload;",
+                  "        if (!target || typeof target !== 'object') return;",
+                  "        if (target.city_metadata_id) return;",
+                  "        const cc = (target.country_code || '').toUpperCase();",
+                  "        if (!cc) return;",
+                  "        const varName = 'cityMetadataId' + cc;",
+                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+                  "        if (cmid) {",
+                  "            target.city_metadata_id = cmid;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "            return;",
+                  "        }",
+                  "        const token = pm.environment.get('authToken')",
+                  "            || pm.collectionVariables.get('authToken')",
+                  "            || pm.collectionVariables.get('superAdminAuthToken')",
+                  "            || pm.environment.get('superAdminAuthToken');",
+                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "        if (!token) return;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+                  "            method: 'GET',",
+                  "            header: { 'Authorization': 'Bearer ' + token }",
+                  "        }, (err, res) => {",
+                  "            if (err || !res || res.code !== 200) return;",
+                  "            let cities;",
+                  "            try { cities = res.json(); } catch (e) { return; }",
+                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
+                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+                  "            if (!first || !first.city_metadata_id) return;",
+                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
+                  "            pm.environment.set(varName, first.city_metadata_id);",
+                  "            target.city_metadata_id = first.city_metadata_id;",
+                  "            pm.request.body.update(JSON.stringify(payload));",
+                  "        });",
+                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street_name\": \"Test\",\n  \"street_type\": \"st\",\n  \"building_number\": \"1\",\n  \"city\": \"City\",\n  \"province\": \"State\",\n  \"postal_code\": \"12345\",\n  \"country_code\": \"AR\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/addresses"
+          }
+        }
+      ]
+    },
+    {
+      "name": "E2E: Suggest → Select → Create via place_id",
+      "description": "Production flow: 1) Suggest with session_token, 2) Select a suggestion (store place_id), 3) Create address using place_id + session_token. Requires live Mapbox API (MAPBOX_ACCESS_TOKEN set) or DEV_MODE=true for mock responses.",
+      "item": [
+        {
+          "name": "1. Suggest (generate session_token, get suggestions)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate a session token for this E2E flow",
+                  "const sessionToken = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('sessionToken', sessionToken);",
+                  "console.log('Generated session_token:', sessionToken);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('At least one suggestion returned', function () {",
+                  "    pm.expect(response.suggestions).to.be.an('array');",
+                  "    pm.expect(response.suggestions.length).to.be.above(0);",
+                  "});",
+                  "",
+                  "if (response.suggestions.length > 0) {",
+                  "    const selected = response.suggestions[0];",
+                  "    pm.collectionVariables.set('selectedPlaceId', selected.place_id);",
+                  "    console.log('Selected:', selected.display_text);",
+                  "    console.log('place_id:', selected.place_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/suggest?q=Avenida+Santa+Fe+2567+Buenos+Aires&country=AR&limit=5&session_token={{sessionToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addresses",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Avenida Santa Fe 2567 Buenos Aires"
+                },
+                {
+                  "key": "country",
+                  "value": "AR"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "session_token",
+                  "value": "{{sessionToken}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Create Address via place_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const inst = pm.collectionVariables.get('institutionId') || pm.environment.get('institutionId') || pm.globals.get('institutionId') || pm.collectionVariables.get('testInstitutionId');",
+                  "const placeId = pm.collectionVariables.get('selectedPlaceId');",
+                  "const sessionToken = pm.collectionVariables.get('sessionToken');",
+                  "",
+                  "if (!placeId) {",
+                  "    console.warn('No place_id from suggest step — run step 1 first');",
+                  "}",
+                  "",
+                  "const body = {",
+                  "    institution_id: inst,",
+                  "    place_id: placeId,",
+                  "    session_token: sessionToken",
+                  "};",
+                  "pm.request.body.raw = JSON.stringify(body, null, 2);",
+                  "console.log('Creating address with place_id:', placeId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has address_id', function () {",
+                  "    pm.expect(response).to.have.property('address_id');",
+                  "});",
+                  "",
+                  "pm.test('Address has resolved fields from Mapbox', function () {",
+                  "    pm.expect(response).to.have.property('street_name');",
+                  "    pm.expect(response).to.have.property('city');",
+                  "    pm.expect(response).to.have.property('province');",
+                  "    pm.expect(response).to.have.property('country_code');",
+                  "    pm.expect(response.country_code).to.equal('AR');",
+                  "});",
+                  "",
+                  "if (response.address_id) {",
+                  "    pm.collectionVariables.set('lastCreatedAddressId', response.address_id);",
+                  "    console.log('Created address:', response.address_id);",
+                  "    console.log('Street:', response.street_name);",
+                  "    console.log('City:', response.city);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/v1/addresses"
+          }
+        }
+      ]
+    }
+  ]
 }

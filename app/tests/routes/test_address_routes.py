@@ -58,6 +58,7 @@ def mock_db():
 
 def _minimal_address_body(include_institution_and_user=False, institution_id=None, user_id=None):
     body = {
+        "city_metadata_id": "11111111-1111-1111-1111-111111111111",
         "province": "CABA",
         "city": "Buenos Aires",
         "postal_code": "C1043AAZ",
@@ -155,10 +156,10 @@ class TestAddressCreateInstitutionSafeguard:
         uid = customer_user_with_institution["user_id"]
         iid = customer_user_with_institution["institution_id"]
         mock_dto = AddressDTO(
+            city_metadata_id=uuid4(),
             address_id=uuid4(),
             institution_id=iid,
             user_id=uid,
-            employer_id=None,
             address_type=[],
             is_default=False,
             floor=None,

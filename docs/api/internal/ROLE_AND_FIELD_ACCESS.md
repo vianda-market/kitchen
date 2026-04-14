@@ -79,4 +79,4 @@ Field rules apply only to **shared APIs** where multiple role types can call the
 
 - ROLE_BASED_ACCESS_CONTROL.md – scope matrix, /me pattern
 - api/client/API_PERMISSIONS_BY_ROLE.md – permission matrix by endpoint
-- api/client/ROLE_AND_FIELD_ACCESS_CLIENT.md – client integration (payload rules, 403 handling)
+- api/client/API_CLIENT_ROLE_FIELD_ACCESS.md – client integration (payload rules, 403 handling)

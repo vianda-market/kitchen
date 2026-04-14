@@ -42,17 +42,17 @@ class TestListCities:
     """GET /api/v1/cities returns supported cities from city_info."""
 
     def test_returns_200_and_list_with_city_fields(self, client_with_customer):
-        """Customer can list cities; each item has city_id, name, country_code, province_code."""
+        """Customer can list cities; each item has city_metadata_id, name, country_code.
+        province_code filter was removed in PR1 (two-tier city_metadata restructure)."""
         resp = client_with_customer.get("/api/v1/cities")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
         assert len(data) >= 1
         for item in data:
-            assert "city_id" in item
+            assert "city_metadata_id" in item
             assert "name" in item
             assert "country_code" in item
-            assert "province_code" in item
             assert isinstance(item["name"], str)
             assert isinstance(item["country_code"], str)
             assert len(item["country_code"]) == 2

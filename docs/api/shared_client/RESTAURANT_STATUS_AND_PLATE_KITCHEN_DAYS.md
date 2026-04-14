@@ -72,7 +72,7 @@ So Pending or Inactive restaurants, or restaurants with no **active** plate_kitc
 5. To disable a restaurant without touching plate_kitchen_days or QR codes, set **`{"status": "Inactive"}`**.
 6. If you archive, delete, or set to non-Active all plate_kitchen_days (or all QR codes) for a restaurant, the system will set that restaurant to Inactive automatically.
 
-See [QR_CODE_B2B.md](../b2b_client/QR_CODE_B2B.md) for QR code create flow and display options (print vs screen).
+See [API_CLIENT_QR_CODES.md](../b2b_client/API_CLIENT_QR_CODES.md) for QR code create flow and display options (print vs screen).
 
 ## For B2C clients
 

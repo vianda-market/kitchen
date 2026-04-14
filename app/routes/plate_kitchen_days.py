@@ -279,21 +279,34 @@ def update_plate_kitchen_day(
                     detail=f"Plate {existing.plate_id} is already assigned to {kitchen_day}"
                 )
 
-        # Build update data - plate_id is immutable, never include it
+        # Build update data - plate_id is immutable, never include it.
+        # Handle is_archived separately: CRUDService.update() re-fetches via get_by_id()
+        # which filters is_archived=FALSE → returns None for a just-archived row → false 500.
+        # Use soft_delete() for archival; .update() only for non-archive field changes.
+        wants_archive = payload.is_archived is True
         update_data = {}
         if payload.kitchen_day is not None:
             update_data["kitchen_day"] = payload.kitchen_day
         if payload.status is not None:
             update_data["status"] = payload.status
-        if payload.is_archived is not None:
-            update_data["is_archived"] = payload.is_archived
-        
         update_data["modified_by"] = current_user["user_id"]
-        
-        # CRUDService will automatically validate plate belongs to institution via JOIN-based scoping
-        updated = plate_kitchen_days_service.update(kitchen_day_id, update_data, connection, scope=scope)
-        if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update plate kitchen day")
+
+        if wants_archive:
+            # Apply non-archive updates first (if any), then soft_delete
+            if len(update_data) > 1:  # more than just modified_by
+                plate_kitchen_days_service.update(kitchen_day_id, update_data, connection, scope=scope, commit=False)
+            ok = plate_kitchen_days_service.soft_delete(kitchen_day_id, current_user["user_id"], connection, scope=scope)
+            if not ok:
+                raise HTTPException(status_code=500, detail="Failed to archive plate kitchen day")
+            # Return pre-archive DTO with flag flipped
+            existing.is_archived = True
+            updated = existing
+        else:
+            if payload.is_archived is not None:
+                update_data["is_archived"] = payload.is_archived  # False (un-archive)
+            updated = plate_kitchen_days_service.update(kitchen_day_id, update_data, connection, scope=scope)
+            if not updated:
+                raise HTTPException(status_code=500, detail="Failed to update plate kitchen day")
         
         log_info(f"Updated plate kitchen day: {kitchen_day_id}")
         return updated

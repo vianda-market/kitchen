@@ -5,7 +5,6 @@ API endpoints for managing markets (country-based subscription regions).
 Markets define the countries where the platform operates.
 """
 
-from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -16,8 +15,11 @@ from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     MarketResponseSchema,
     MarketCreateSchema,
-    MarketUpdateSchema
+    MarketUpdateSchema,
+    MarketPayoutAggregatorResponseSchema,
+    MarketBillingConfigUpdateSchema,
 )
+from app.services.error_handling import handle_business_operation
 from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
 from app.services.entity_service import get_enriched_markets, get_enriched_market_by_id
 from app.config import Status
@@ -202,9 +204,7 @@ async def create_market(
             status_code=400,
             detail="Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
         )
-    kitchen_close_time = None
-    if market_data.kitchen_close_time:
-        kitchen_close_time = datetime.strptime(market_data.kitchen_close_time, "%H:%M").time()
+    billing_config = market_data.billing_config.model_dump() if market_data.billing_config else None
     market = market_service.create(
         country_name=country_name,
         country_code=country_code,
@@ -212,8 +212,8 @@ async def create_market(
         timezone=market_data.timezone,
         modified_by=current_user["user_id"],
         status=market_data.status or Status.ACTIVE,
-        kitchen_close_time=kitchen_close_time,
         language=market_data.language,
+        billing_config=billing_config,
     )
     
     return market
@@ -262,9 +262,6 @@ async def update_market(
                 status_code=400,
                 detail="Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
             )
-    kitchen_close_time = None
-    if market_data.kitchen_close_time is not None:
-        kitchen_close_time = datetime.strptime(market_data.kitchen_close_time, "%H:%M").time()
     market = market_service.update(
         market_id=market_id,
         modified_by=current_user["user_id"],
@@ -272,7 +269,6 @@ async def update_market(
         country_code=country_code,
         currency_metadata_id=market_data.currency_metadata_id,
         timezone=market_data.timezone,
-        kitchen_close_time=kitchen_close_time,
         status=market_data.status,
         is_archived=market_data.is_archived,
         language=market_data.language,
@@ -326,5 +322,46 @@ async def archive_market(
     
     if not market:
         raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
-    
+
     return None
+
+
+@router.get("/{market_id}/billing-config", response_model=MarketPayoutAggregatorResponseSchema)
+def get_market_billing_config(
+    market_id: UUID,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Get billing configuration for a market. Internal only."""
+    config = market_service.get_billing_config(market_id, db)
+    if not config:
+        raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
+    return config
+
+
+@router.put("/{market_id}/billing-config", response_model=MarketPayoutAggregatorResponseSchema)
+def update_market_billing_config(
+    market_id: UUID,
+    data: MarketBillingConfigUpdateSchema,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Update billing configuration for a market. Internal only."""
+    updated = market_service.update_billing_config(
+        market_id, data.model_dump(exclude_unset=True), current_user["user_id"], db,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
+    return updated
+
+
+@router.get("/{market_id}/billing-config/propagation-preview")
+def preview_billing_propagation(
+    market_id: UUID,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
+    """Preview which suppliers inherit billing defaults from this market. Read-only. Internal only."""
+    def _preview():
+        return market_service.get_billing_propagation_preview(market_id, db)
+    return handle_business_operation(_preview, "billing propagation preview")

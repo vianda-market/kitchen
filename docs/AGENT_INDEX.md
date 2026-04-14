@@ -54,21 +54,21 @@ B2B-specific docs for kitchen-web (Restaurant + Employee backoffice).
 | [FRONTEND_AGENT_README](api/b2b_client/FRONTEND_AGENT_README.md) | Agent onboarding for B2B |
 | [LOCAL_NETWORK_DEV](api/b2b_client/LOCAL_NETWORK_DEV.md) | Local backend run scripts; API URL config |
 | [B2B_USER_INVITE_FLOW](api/b2b_client/B2B_USER_INVITE_FLOW.md) | User invite flow |
-| [CHANGE_PASSWORD_AND_ADMIN_RESET](api/b2b_client/CHANGE_PASSWORD_AND_ADMIN_RESET.md) | Password change, admin reset |
-| [ROLE_AND_FIELD_ACCESS_CLIENT](api/b2b_client/ROLE_AND_FIELD_ACCESS_CLIENT.md) | Role/field access for B2B |
-| [MARKETS_API_CLIENT](api/b2b_client/MARKETS_API_CLIENT.md) | Markets API for B2B |
-| [INSTITUTION_MARKET_ID](api/b2b_client/INSTITUTION_MARKET_ID.md) | Institution market_id |
+| [CHANGE_PASSWORD_AND_ADMIN_RESET](api/b2b_client/API_CLIENT_PASSWORD_MANAGEMENT.md) | Password change, admin reset |
+| [ROLE_AND_FIELD_ACCESS_CLIENT](api/b2b_client/API_CLIENT_ROLE_FIELD_ACCESS.md) | Role/field access for B2B |
+| [API_CLIENT_MARKETS](api/b2b_client/API_CLIENT_MARKETS.md) | Markets API for B2B |
+| [API_CLIENT_INSTITUTIONS](api/b2b_client/API_CLIENT_INSTITUTIONS.md) | Institution market_id |
 | [INSTITUTION_NO_SHOW_DISCOUNT](api/b2b_client/INSTITUTION_NO_SHOW_DISCOUNT.md) | Institution no-show discount |
 | [PLAN_API_MARKET_CURRENCY](api/b2b_client/PLAN_API_MARKET_CURRENCY.md) | Plan create/update: currency from market |
 | [PLAN_ROLLOVER_UI_HIDDEN](api/b2b_client/PLAN_ROLLOVER_UI_HIDDEN.md) | Plan rollover UI hidden |
 | [CREDIT_CURRENCY_EDIT_IMMUTABLE_CURRENCY](api/b2b_client/CREDIT_CURRENCY_EDIT_IMMUTABLE_CURRENCY.md) | Credit currency: immutable currency field |
 | [SUPPORTED_CURRENCIES_API](api/b2b_client/SUPPORTED_CURRENCIES_API.md) | Supported currencies list (dropdown) |
 | [RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY](api/b2b_client/RESTAURANT_AND_INSTITUTION_ENTITY_CREDIT_CURRENCY.md) | Entity create: currency derived from address -> market |
-| [EMPLOYER_ASSIGNMENT_WORKFLOW](api/b2b_client/EMPLOYER_ASSIGNMENT_WORKFLOW.md) | Backoffice employer management |
-| [EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B](api/b2b_client/EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B.md) | Employer address protection; Cities API |
+| [EMPLOYER_ASSIGNMENT_WORKFLOW](api/b2b_client/API_CLIENT_EMPLOYER_ASSIGNMENT.md) | Backoffice employer management |
+| [EMPLOYER_ADDRESS_PROTECTION_AND_CITIES_B2B](api/b2b_client/API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md) | Employer address protection; Cities API |
 | [DISCRETIONARY_REQUEST_FORM_GUIDE](api/b2b_client/DISCRETIONARY_REQUEST_FORM_GUIDE.md) | Discretionary credit requests |
-| [PRODUCT_API_B2B](api/b2b_client/PRODUCT_API_B2B.md) | Product CRUD, image upload (thumbnail + full-size) |
-| [QR_CODE_B2B](api/b2b_client/QR_CODE_B2B.md) | QR code create, display, restaurant activation |
+| [PRODUCT_API_B2B](api/b2b_client/API_CLIENT_PRODUCTS.md) | Product CRUD, image upload (thumbnail + full-size) |
+| [QR_CODE_B2B](api/b2b_client/API_CLIENT_QR_CODES.md) | QR code create, display, restaurant activation |
 | [SUPPLIER_DASHBOARD_METRICS_B2B](api/b2b_client/SUPPLIER_DASHBOARD_METRICS_B2B.md) | Supplier dashboard metrics |
 | [PAYMENT_METHOD_CHANGES_B2B](api/b2b_client/PAYMENT_METHOD_CHANGES_B2B.md) | Bank account and fintech removed; subscription payment |
 | [TIMEZONE_AUTO_DEDUCTION_UI_GUIDE](api/b2b_client/TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md) | Timezone deduction UI |
@@ -86,7 +86,7 @@ B2C-specific docs for kitchen-mobile (Customer app, React Native).
 | [FRONTEND_AGENT_README](api/b2c_client/FRONTEND_AGENT_README.md) | Agent onboarding for B2C |
 | [B2C_ENDPOINTS_OVERVIEW](api/b2c_client/B2C_ENDPOINTS_OVERVIEW.md) | Full B2C endpoint listing |
 | [CUSTOMER_SIGNUP_EMAIL_VERIFICATION](api/b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md) | Two-step signup flow with email verification |
-| [MARKET_SELECTION_AT_SIGNUP](api/b2c_client/MARKET_SELECTION_AT_SIGNUP.md) | Market selection at signup |
+| [MARKET_CITY_COUNTRY](api/b2c_client/MARKET_CITY_COUNTRY.md) | Market selection at signup |
 | [SUBSCRIPTION_PAYMENT_API](api/b2c_client/SUBSCRIPTION_PAYMENT_API.md) | Subscription with-payment + confirm-payment; Stripe |
 | [SUBSCRIPTION_ACTIONS_API](api/b2c_client/SUBSCRIPTION_ACTIONS_API.md) | Subscription actions |
 | [CUSTOMER_PAYMENT_METHODS_B2C](api/b2c_client/CUSTOMER_PAYMENT_METHODS_B2C.md) | Payment methods: list, add, delete, set default (mock) |

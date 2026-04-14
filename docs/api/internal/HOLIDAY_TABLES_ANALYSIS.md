@@ -87,7 +87,7 @@ CHECK (
 
 ## Client docs
 
-- B2B national holidays: [NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md](../b2b_client/NATIONAL_HOLIDAYS_MANAGEMENT_B2B.md) — sync summary includes **`updated`** vs **`inserted`** / **`skipped`**.
+- B2B national holidays: [API_CLIENT_NATIONAL_HOLIDAYS.md](../b2b_client/API_CLIENT_NATIONAL_HOLIDAYS.md) — sync summary includes **`updated`** vs **`inserted`** / **`skipped`**.
 - Restaurant holiday API plan (historical phases + alignment notes): [RESTAURANT_HOLIDAY_API_PLAN.md](../../zArchive/roadmap/RESTAURANT_HOLIDAY_API_PLAN.md).
 
 ---

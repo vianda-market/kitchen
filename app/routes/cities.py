@@ -2,7 +2,8 @@
 Supported Cities (B2C and back-office).
 
 Read-only list of cities for user onboarding and employer address scoping.
-Returns from city_info (seeded from supported_cities config).
+Returns from core.city_metadata (Vianda metadata layer) joined with external.geonames_city
+for the display name and timezone. Legacy city_info table retired in PR1.
 """
 
 from typing import List, Optional
@@ -12,9 +13,9 @@ import psycopg2.extensions
 
 from app.auth.dependencies import get_client_employee_or_supplier_user
 from app.dependencies.database import get_db
-from app.services.crud_service import city_service
 from app.schemas.consolidated_schemas import CityResponseSchema
 from app.config.supported_cities import GLOBAL_CITY_ID
+from app.utils.db import db_read
 
 router = APIRouter(prefix="/cities", tags=["Cities"])
 
@@ -22,7 +23,6 @@ router = APIRouter(prefix="/cities", tags=["Cities"])
 @router.get("", response_model=List[CityResponseSchema])
 async def list_cities(
     country_code: Optional[str] = Query(None, description="Filter by ISO 3166-1 alpha-2 country code (e.g. AR, PE)"),
-    province_code: Optional[str] = Query(None, description="Filter by province/state code (e.g. WA, FL). Use with country_code for cascading dropdown."),
     exclude_global: bool = Query(False, description="Exclude Global city (for Customer signup/profile picker)"),
     current_user: dict = Depends(get_client_employee_or_supplier_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -32,30 +32,47 @@ async def list_cities(
 
     **Authorization**: Customer, Internal, or Supplier.
 
-    **Returns**: JSON array of `{ city_id, name, country_code, province_code }` sorted by country_code, province_code, name.
+    **Returns**: JSON array of `{ city_metadata_id, name, country_code, is_archived, status }` sorted by
+    country_code then name (case-insensitive). Backed by core.city_metadata joined with external.geonames_city.
+    City display name uses `COALESCE(display_name_override, geonames_city.name)` — Vianda override wins, else
+    the canonical GeoNames name.
+
     Use for "City" dropdown in user profile and employer address filter.
-    Pass ?country_code=US&province_code=WA to get cities in Washington state.
+    Pass ?country_code=US to get cities in a specific country.
+
+    Note: province/state filtering was removed with the PR1 city_info retirement. Structural province data
+    now lives on external.geonames_admin1 and joins via geonames_city.admin1_code — if/when a province filter
+    is needed again, add it via that path (PR2 superadmin picker scope).
     """
+    params: List = []
+    conditions = ["cm.is_archived = FALSE"]
     if country_code:
-        cc = country_code.strip().upper()
-        cities = city_service.get_all_by_field("country_code", cc, db, scope=None)
-    else:
-        cities = city_service.get_all(db, include_archived=False)
-    if province_code:
-        pcode = province_code.strip()
-        cities = [c for c in cities if getattr(c, "province_code", None) == pcode]
-    # Sort by country_code, province_code (if present), then name (case-insensitive)
-    cities.sort(key=lambda c: (c.country_code, getattr(c, "province_code", "") or "", c.name.lower()))
+        conditions.append("cm.country_iso = %s")
+        params.append(country_code.strip().upper())
     if exclude_global:
-        cities = [c for c in cities if c.city_id != GLOBAL_CITY_ID]
+        conditions.append("cm.city_metadata_id != %s")
+        params.append(str(GLOBAL_CITY_ID))
+
+    query = f"""
+        SELECT
+            cm.city_metadata_id,
+            COALESCE(cm.display_name_override, gc.name) AS name,
+            cm.country_iso AS country_code,
+            cm.is_archived,
+            cm.status
+        FROM core.city_metadata cm
+        JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+        WHERE {' AND '.join(conditions)}
+        ORDER BY cm.country_iso, LOWER(COALESCE(cm.display_name_override, gc.name))
+    """
+    rows = db_read(query, tuple(params), connection=db)
     return [
         CityResponseSchema(
-            city_id=c.city_id,
-            name=c.name,
-            country_code=c.country_code,
-            province_code=c.province_code if hasattr(c, "province_code") else None,
-            is_archived=c.is_archived,
-            status=c.status,
+            city_metadata_id=r["city_metadata_id"],
+            name=r["name"],
+            country_code=r["country_code"],
+            is_archived=r["is_archived"],
+            status=r["status"],
         )
-        for c in cities
+        for r in (rows or [])
     ]

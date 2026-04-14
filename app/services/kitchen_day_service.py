@@ -2,19 +2,22 @@
 Kitchen Day Service - Centralized kitchen day logic.
 
 Provides a single source of truth for:
-- Effective current day (with 1:30 PM cutoff, configurable via market_info.kitchen_close_time)
+- Effective current day (with cutoff, configurable via supplier_terms / market_payout_aggregator)
 - Kitchen closed checks
+- Pickup availability (kitchen_open_time gating)
 - Date-to-kitchen-day mapping
 - Timezone-aware kitchen day resolution
 
-Resolution order for kitchen_close_time:
-1. market_info.kitchen_close_time (DB, B2B manageable)
-2. MarketConfiguration.kitchen_day_config[day].kitchen_close
-3. Hardcoded time(13, 30)
+Resolution order for kitchen_close_time / kitchen_open_time:
+1. supplier_terms (per-supplier override, if institution_id provided)
+2. market_payout_aggregator (market-level default via country_code)
+3. MarketConfiguration.kitchen_day_config[day].kitchen_close
+4. Hardcoded time(9, 0) / time(13, 30)
 """
 
 from datetime import datetime, date, time, timedelta
 from typing import Optional
+from uuid import UUID
 import pytz
 
 from app.config import KitchenDay
@@ -24,37 +27,79 @@ from app.config.settings import settings
 VALID_KITCHEN_DAYS = tuple(KitchenDay.values())
 WEEKDAY_NUM_TO_NAME = ("monday", "tuesday", "wednesday", "thursday", "friday")
 
+DEFAULT_KITCHEN_OPEN = time(9, 0)
+DEFAULT_KITCHEN_CLOSE = time(13, 30)
 
-def _get_kitchen_close_time(country_code: Optional[str], day_name: Optional[str] = None) -> time:
-    """
-    Resolve kitchen close time for a market.
-    Order: market_info.kitchen_close_time -> MarketConfiguration -> time(13, 30).
-    """
-    if country_code and str(country_code).strip():
-        # 1. Try DB via market_service
+
+def _parse_time(v) -> Optional[time]:
+    """Convert a time object or HH:MM string to a time. Returns None on failure."""
+    if v is None:
+        return None
+    if isinstance(v, time):
+        return v
+    if isinstance(v, str):
         try:
-            from app.services.market_service import market_service
-            market = market_service.get_by_country_code(country_code.upper())
-            if market and market.get("kitchen_close_time"):
-                kct = market["kitchen_close_time"]
-                if isinstance(kct, time):
-                    return kct
-                if isinstance(kct, str):
-                    return datetime.strptime(kct, "%H:%M").time()
+            return datetime.strptime(v.strip(), "%H:%M").time()
+        except ValueError:
+            return None
+    return None
+
+
+def _get_kitchen_time(
+    field: str,
+    country_code: Optional[str] = None,
+    institution_id: Optional[UUID] = None,
+    db=None,
+    day_name: Optional[str] = None,
+) -> time:
+    """
+    Resolve kitchen_open_time or kitchen_close_time.
+    Resolution: supplier_terms → market_payout_aggregator → MarketConfiguration → hardcoded.
+    """
+    default = DEFAULT_KITCHEN_OPEN if field == "kitchen_open_time" else DEFAULT_KITCHEN_CLOSE
+
+    # 1. Supplier-level override (requires institution_id + db)
+    if institution_id and db:
+        try:
+            from app.services.crud_service import supplier_terms_service
+            terms = supplier_terms_service.get_by_field("institution_id", institution_id, db)
+            if terms:
+                val = _parse_time(getattr(terms, field, None))
+                if val is not None:
+                    return val
         except Exception:
             pass
 
-        # 2. Fall back to MarketConfiguration
+    # 2. Market-level default via market_payout_aggregator
+    if country_code and str(country_code).strip():
+        try:
+            from app.utils.db import db_read as _db_read
+            if db:
+                row = _db_read(
+                    f"SELECT mpa.{field} FROM market_payout_aggregator mpa "
+                    "JOIN market_info m ON mpa.market_id = m.market_id "
+                    "WHERE m.country_code = %s AND mpa.is_archived = FALSE",
+                    (country_code.upper(),),
+                    connection=db,
+                    fetch_one=True,
+                )
+                if row:
+                    val = _parse_time(row.get(field))
+                    if val is not None:
+                        return val
+        except Exception:
+            pass
+
+    # 3. MarketConfiguration fallback (kitchen_close only)
+    if field == "kitchen_close_time" and country_code and str(country_code).strip():
         try:
             from app.config.market_config import MarketConfiguration
             config = MarketConfiguration.get_market_config(country_code.upper())
             if config and config.kitchen_day_config:
-                # Use provided day or Monday as default (all same in config)
                 day = day_name or "monday"
                 day_config = config.kitchen_day_config.get(day)
                 if day_config and day_config.get("kitchen_close"):
                     return day_config["kitchen_close"]
-                # Try any weekday
                 for d in WEEKDAY_NUM_TO_NAME:
                     dc = config.kitchen_day_config.get(d)
                     if dc and dc.get("kitchen_close"):
@@ -62,12 +107,33 @@ def _get_kitchen_close_time(country_code: Optional[str], day_name: Optional[str]
         except Exception:
             pass
 
-    return time(13, 30)
+    return default
+
+
+def _get_kitchen_close_time(
+    country_code: Optional[str],
+    day_name: Optional[str] = None,
+    institution_id: Optional[UUID] = None,
+    db=None,
+) -> time:
+    """Resolve kitchen close time. Backward-compatible wrapper."""
+    return _get_kitchen_time("kitchen_close_time", country_code, institution_id, db, day_name)
+
+
+def _get_kitchen_open_time(
+    country_code: Optional[str],
+    institution_id: Optional[UUID] = None,
+    db=None,
+) -> time:
+    """Resolve kitchen open time."""
+    return _get_kitchen_time("kitchen_open_time", country_code, institution_id, db)
 
 
 def get_effective_current_day(
     timezone_str: str = "America/Argentina/Buenos_Aires",
-    country_code: Optional[str] = None
+    country_code: Optional[str] = None,
+    institution_id: Optional[UUID] = None,
+    db=None,
 ) -> str:
     """
     Get the effective current kitchen day, considering cutoff time and dev overrides.
@@ -78,9 +144,11 @@ def get_effective_current_day(
     Args:
         timezone_str: IANA timezone for the market
         country_code: Optional country code for market-specific kitchen_close_time
+        institution_id: Optional institution UUID for supplier-specific override
+        db: Database connection (required when institution_id is provided)
 
     Returns:
-        Day name (e.g., "Monday", "Tuesday")
+        Day name (e.g., "monday", "tuesday")
     """
     if settings.DEV_OVERRIDE_DAY and settings.DEV_OVERRIDE_DAY.strip():
         override_day = settings.DEV_OVERRIDE_DAY.strip().lower()
@@ -94,23 +162,36 @@ def get_effective_current_day(
         tz = pytz.timezone("America/Argentina/Buenos_Aires")
 
     now = datetime.now(tz)
-    close_time = _get_kitchen_close_time(country_code, now.strftime("%A").lower())
+    close_time = _get_kitchen_close_time(country_code, now.strftime("%A").lower(), institution_id, db)
 
     if now.time() < close_time:
         current_day = (now - timedelta(days=1)).strftime("%A").lower()
     else:
         current_day = now.strftime("%A").lower()
 
+    # DEV_MODE: treat weekends as the nearest weekday so Postman E2E collections and
+    # dev testing work any day of the week. Production (DEV_MODE=False) is unaffected.
+    if settings.DEV_MODE and current_day not in VALID_KITCHEN_DAYS:
+        # Saturday → friday, Sunday → friday (most recent completed kitchen day)
+        current_day = "friday"
+
     return current_day
 
 
-def is_today_kitchen_closed(country_code: str, timezone_str: str) -> bool:
+def is_today_kitchen_closed(
+    country_code: str,
+    timezone_str: str,
+    institution_id: Optional[UUID] = None,
+    db=None,
+) -> bool:
     """
-    Return True if today is a weekday and the kitchen has already closed in the market.
+    Return True if today is a weekday and the kitchen has already closed.
 
     Args:
         country_code: ISO country code (e.g., AR, PE)
         timezone_str: IANA timezone for the market
+        institution_id: Optional institution UUID for supplier-specific override
+        db: Database connection (required when institution_id is provided)
 
     Returns:
         True if kitchen is closed (weekday and now >= kitchen_close), False otherwise
@@ -126,7 +207,7 @@ def is_today_kitchen_closed(country_code: str, timezone_str: str) -> bool:
     except Exception:
         return False
 
-    current_day = get_effective_current_day(timezone_str or "UTC", country_code)
+    current_day = get_effective_current_day(timezone_str or "UTC", country_code, institution_id, db)
     if current_day not in VALID_KITCHEN_DAYS:
         return False
 
@@ -134,7 +215,7 @@ def is_today_kitchen_closed(country_code: str, timezone_str: str) -> bool:
     if not day_config or not day_config.get("enabled", True):
         return False
 
-    close_time = _get_kitchen_close_time(country_code, current_day)
+    close_time = _get_kitchen_close_time(country_code, current_day, institution_id, db)
 
     try:
         tz = pytz.timezone(timezone_str or "UTC")
@@ -144,16 +225,50 @@ def is_today_kitchen_closed(country_code: str, timezone_str: str) -> bool:
     return now_local.time() >= close_time
 
 
+def is_pickup_available(
+    country_code: str,
+    timezone_str: str,
+    institution_id: Optional[UUID] = None,
+    db=None,
+) -> bool:
+    """
+    Return True if current local time >= effective kitchen_open_time for this supplier.
+    Gates QR code scanning and plate pickup availability.
+
+    Args:
+        country_code: ISO country code
+        timezone_str: IANA timezone
+        institution_id: Optional institution UUID for supplier-specific override
+        db: Database connection
+
+    Returns:
+        True if pickup is available (now >= kitchen_open_time), False otherwise
+    """
+    open_time = _get_kitchen_open_time(country_code, institution_id, db)
+    close_time = _get_kitchen_close_time(country_code, institution_id=institution_id, db=db)
+
+    try:
+        tz = pytz.timezone(timezone_str or "UTC")
+    except Exception:
+        tz = pytz.UTC
+    now_local = datetime.now(tz).time()
+
+    # Pickup is available between open and close
+    return open_time <= now_local <= close_time
+
+
 def date_to_kitchen_day(target_date: date) -> str:
     """
     Map a date to its kitchen day name. Handles DEV_OVERRIDE_DAY.
     No timezone - used for billing where date is already a closed day.
 
+    In DEV_MODE, weekends map to friday (same as get_effective_current_day).
+
     Args:
         target_date: The date to map
 
     Returns:
-        Day name (e.g., "Monday", "Tuesday")
+        Day name (e.g., "monday", "tuesday", "friday")
     """
     if settings.DEV_OVERRIDE_DAY and settings.DEV_OVERRIDE_DAY.strip():
         override_day = settings.DEV_OVERRIDE_DAY.strip().lower()
@@ -162,13 +277,21 @@ def date_to_kitchen_day(target_date: date) -> str:
             return override_day
 
     day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-    return day_names[target_date.weekday()]
+    result = day_names[target_date.weekday()]
+
+    # DEV_MODE: map weekends to friday for billing/settlement pipeline
+    if settings.DEV_MODE and result not in VALID_KITCHEN_DAYS:
+        result = "friday"
+
+    return result
 
 
 def get_kitchen_day_for_date(
     target_date: date,
     timezone_str: str,
-    country_code: Optional[str] = None
+    country_code: Optional[str] = None,
+    institution_id: Optional[UUID] = None,
+    db=None,
 ) -> str:
     """
     Get kitchen day for a given date. For today (in timezone), uses get_effective_current_day.
@@ -178,9 +301,11 @@ def get_kitchen_day_for_date(
         target_date: The date to resolve
         timezone_str: IANA timezone (for "today" comparison)
         country_code: Optional for market-specific kitchen_close
+        institution_id: Optional institution UUID for supplier-specific override
+        db: Database connection
 
     Returns:
-        Day name (e.g., "Monday", "Tuesday")
+        Day name (e.g., "monday", "tuesday")
     """
     try:
         tz = pytz.timezone(timezone_str or "UTC")
@@ -189,7 +314,7 @@ def get_kitchen_day_for_date(
     today_in_tz = datetime.now(tz).date()
 
     if target_date == today_in_tz:
-        return get_effective_current_day(timezone_str, country_code)
+        return get_effective_current_day(timezone_str, country_code, institution_id, db)
     return date_to_kitchen_day(target_date)
 
 
@@ -266,13 +391,18 @@ def is_plate_selection_editable(plate_selection_id, db) -> bool:
     Check if a plate selection is still within the editability window.
     Editable until 1 hour before kitchen day opens.
 
+    In DEV_MODE, always returns True so Postman E2E collections can replace
+    plate selections regardless of time-of-day.
+
     Args:
         plate_selection_id: UUID of the plate selection
         db: Database connection
 
     Returns:
-        True if editable (now < cutoff), False otherwise
+        True if editable (now < cutoff or DEV_MODE), False otherwise
     """
+    if settings.DEV_MODE:
+        return True
     editable_until = get_plate_selection_editable_until(plate_selection_id, db)
     if editable_until is None:
         return False

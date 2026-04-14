@@ -131,36 +131,39 @@ INSERT INTO external.geonames_city (
 
 -- 6 currency_metadata rows. UUIDs are preserved from the old credit_currency_info
 -- seed for continuity (so tests and dev_fixtures that hardcoded these UUIDs still work).
--- currency_name is a PR2-deprecated compat column; populated here to match legacy
--- credit_currency_info.currency_name values. credit_value_local_currency and
--- currency_conversion_usd are Vianda pricing policy.
-INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, currency_name, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('55555555-5555-5555-5555-555555555555', 'USD', 'US Dollar',      1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666601', 'ARS', 'Argentine Peso', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666602', 'PEN', 'Peruvian Sol',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666603', 'CLP', 'Chilean Peso',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666604', 'MXN', 'Mexican Peso',   1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666605', 'BRL', 'Brazilian Real', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+-- Display name resolves via JOIN external.iso4217_currency ic ON ic.code = cm.currency_code.
+-- credit_value_local_currency and currency_conversion_usd are Vianda pricing policy.
+INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('55555555-5555-5555-5555-555555555555', 'USD', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666601', 'ARS', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666602', 'PEN', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666603', 'CLP', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666604', 'MXN', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666605', 'BRL', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
--- Markets: country_name + timezone dropped. country_code FKs external.geonames_country.
--- currency_metadata_id (renamed from currency_metadata_id) FKs core.currency_metadata. Same UUIDs preserved.
--- kitchen_open_time + kitchen_close_time are naive wall-clock TIME templates inherited by restaurants at create time.
-INSERT INTO market_info (market_id, country_code, country_name, currency_metadata_id, timezone, kitchen_open_time, kitchen_close_time, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('00000000-0000-0000-0000-000000000001', 'XG', 'Global Marketplace', '55555555-5555-5555-5555-555555555555', 'UTC',                           '09:00'::TIME, '13:30'::TIME, 'en', NULL,   NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000002', 'AR', 'Argentina',          '66666666-6666-6666-6666-666666666601', 'America/Argentina/Buenos_Aires', '09:00'::TIME, '13:30'::TIME, 'es', '+54',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000003', 'PE', 'Peru',               '66666666-6666-6666-6666-666666666602', 'America/Lima',                  '09:00'::TIME, '13:30'::TIME, 'es', '+51',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000004', 'US', 'United States',      '55555555-5555-5555-5555-555555555555', 'America/New_York',              '09:00'::TIME, '13:30'::TIME, 'en', '+1',   10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000005', 'CL', 'Chile',              '66666666-6666-6666-6666-666666666603', 'America/Santiago',              '09:00'::TIME, '13:30'::TIME, 'es', '+56',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000006', 'MX', 'Mexico',             '66666666-6666-6666-6666-666666666604', 'America/Mexico_City',           '09:00'::TIME, '13:30'::TIME, 'es', '+52',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000007', 'BR', 'Brazil',             '66666666-6666-6666-6666-666666666605', 'America/Sao_Paulo',             '09:00'::TIME, '13:30'::TIME, 'pt', '+55',  11,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+-- Markets: country_name (PR2a) and timezone (PR2b) dropped. country_name derives via JOIN
+-- external.geonames_country; operational timezone is per-restaurant on address_info.timezone
+-- (populated at write time from external.geonames_city). Single-country fallback lookups
+-- live in app/services/timezone_service._MARKET_PRIMARY_TIMEZONE.
+-- currency_metadata_id FKs core.currency_metadata. Same UUIDs preserved.
+-- kitchen_open_time + kitchen_close_time now live on billing.market_payout_aggregator (market defaults)
+-- and billing.supplier_terms (per-supplier overrides). Restaurants inherit at create time.
+INSERT INTO market_info (market_id, country_code, currency_metadata_id, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('00000000-0000-0000-0000-000000000001', 'XG', '55555555-5555-5555-5555-555555555555', 'en', NULL,   NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000002', 'AR', '66666666-6666-6666-6666-666666666601', 'es', '+54',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000003', 'PE', '66666666-6666-6666-6666-666666666602', 'es', '+51',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000004', 'US', '55555555-5555-5555-5555-555555555555', 'en', '+1',   10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000005', 'CL', '66666666-6666-6666-6666-666666666603', 'es', '+56',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000006', 'MX', '66666666-6666-6666-6666-666666666604', 'es', '+52',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000007', 'BR', '66666666-6666-6666-6666-666666666605', 'pt', '+55',  11,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
-INSERT INTO institution_info (institution_id, name, institution_type, market_id, is_archived, status, created_date, created_by, modified_by, modified_date)
+-- market_id removed from institution_info — markets now assigned via core.institution_market junction.
+INSERT INTO institution_info (institution_id, name, institution_type, is_archived, status, created_date, created_by, modified_by, modified_date)
 VALUES (
   '11111111-1111-1111-1111-111111111111',           -- Vianda Enterprises (employees)
   'Vianda Enterprises',
   'internal'::institution_type_enum,
-  '00000000-0000-0000-0000-000000000001',           -- Global Marketplace
   False,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -172,7 +175,6 @@ VALUES (
   '22222222-2222-2222-2222-222222222222',           -- Vianda Customers (B2C)
   'Vianda Customers',
   'customer'::institution_type_enum,
-  '00000000-0000-0000-0000-000000000001',           -- Global Marketplace
   False,
   'active'::status_enum,
   CURRENT_TIMESTAMP,
@@ -180,6 +182,12 @@ VALUES (
   'dddddddd-dddd-dddd-dddd-dddddddddddd',
   CURRENT_TIMESTAMP
 );
+
+-- Assign markets to seed institutions via junction table
+INSERT INTO core.institution_market (institution_id, market_id, is_primary)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000001', TRUE),  -- Vianda Enterprises → Global
+  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000001', TRUE);   -- Vianda Customers → Global
 
 -- -----------------------------------------------------------------------------
 -- city_metadata seed — one row for the Global synthetic city, plus 22 historic
@@ -310,13 +318,14 @@ INSERT INTO user_info (
 INSERT INTO user_market_assignment (user_id, market_id, is_primary)
 SELECT user_id, market_id, true FROM user_info WHERE user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 
--- Market payout aggregators (require_invoice and max_unmatched_bill_days default to FALSE/30)
-INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, notes)
-SELECT market_id, 'stripe', TRUE, FALSE, 30, 'Stripe Connect supported'
+-- Market payout aggregators (require_invoice and max_unmatched_bill_days default to FALSE/30;
+-- kitchen_open_time/kitchen_close_time are market-level defaults for supplier terms)
+INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, kitchen_open_time, kitchen_close_time, notes, modified_by)
+SELECT market_id, 'stripe', TRUE, FALSE, 30, '09:00'::TIME, '13:30'::TIME, 'Stripe Connect supported', 'dddddddd-dddd-dddd-dddd-dddddddddddd'::UUID
 FROM core.market_info WHERE country_code IN ('AR', 'BR', 'CL', 'MX', 'US');
 
-INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, notes)
-SELECT market_id, 'none', FALSE, FALSE, 30, 'Stripe Connect not supported — alternative TBD (dLocal, Culqi, Niubiz)'
+INSERT INTO billing.market_payout_aggregator (market_id, aggregator, is_active, require_invoice, max_unmatched_bill_days, kitchen_open_time, kitchen_close_time, notes, modified_by)
+SELECT market_id, 'none', FALSE, FALSE, 30, '09:00'::TIME, '13:30'::TIME, 'Stripe Connect not supported — alternative TBD (dLocal, Culqi, Niubiz)', 'dddddddd-dddd-dddd-dddd-dddddddddddd'::UUID
 FROM core.market_info WHERE country_code = 'PE';
 
 -- No address_info, plan_info, subscription_info, national_holidays in seed; create via API.

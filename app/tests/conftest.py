@@ -58,7 +58,7 @@ def sample_user_data():
         "last_name": "Doe",
         "username": "johndoe",
         "country_code": "US",
-        "city_id": SAMPLE_CITY_ID,
+        "city_metadata_id": SAMPLE_CITY_ID,
     }
 
 
@@ -93,7 +93,7 @@ def sample_user_dto():
         email_verified=False,
         email_verified_at=None,
         market_id=uuid4(),
-        city_id=SAMPLE_CITY_ID,
+        city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
         created_date=datetime.now(timezone.utc),

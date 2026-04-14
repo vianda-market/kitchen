@@ -107,7 +107,7 @@ When the user is a **Supplier**:
 - **Cannot** edit supplier terms. PUT returns **403** with detail "Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit supplier terms."
 - Can read their own terms via GET.
 
-`no_show_discount` is **no longer on the institution payload**. It is now on `supplier_terms`. See [SUPPLIER_TERMS_B2B.md](./SUPPLIER_TERMS_B2B.md) for full API contract.
+`no_show_discount` is **no longer on the institution payload**. It is now on `supplier_terms`. See [API_CLIENT_SUPPLIER_TERMS.md](./API_CLIENT_SUPPLIER_TERMS.md) for full API contract.
 
 **Client recommendation**: Show a "Supplier Terms" tab on institution detail (Supplier type only). For Suppliers, show terms as read-only. After creating a Supplier institution, call `PUT /supplier-terms/{id}` to configure terms.
 

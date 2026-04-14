@@ -40,5 +40,5 @@ For authenticated flows that need `market_id` (e.g., plans, subscriptions), use 
 
 ## Related
 
-- [MARKET_SELECTION_AT_SIGNUP.md](./MARKET_SELECTION_AT_SIGNUP.md)
+- [MARKET_CITY_COUNTRY.md](./MARKET_CITY_COUNTRY.md)
 - [LEADS_API_SCOPE.md](../shared_client/LEADS_API_SCOPE.md)
