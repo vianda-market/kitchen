@@ -91,6 +91,7 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[2] / "app" / "db" / "seed" / 
 # IO helpers
 # ---------------------------------------------------------------------------
 
+
 def _log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
@@ -103,9 +104,8 @@ def fetch(url: str) -> bytes:
 
 
 def extract_zip_member(zip_bytes: bytes, member: str) -> bytes:
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        with zf.open(member) as f:
-            return f.read()
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf, zf.open(member) as f:
+        return f.read()
 
 
 def write_tsv(path: Path, lines) -> None:
@@ -122,6 +122,7 @@ def write_tsv(path: Path, lines) -> None:
 # ---------------------------------------------------------------------------
 # Processors — one per source
 # ---------------------------------------------------------------------------
+
 
 def process_country_info(raw: bytes) -> list[str]:
     """
@@ -252,10 +253,20 @@ def process_alternate_names(raw: bytes, id_set: set[str], locales: set[str]) -> 
             continue
         if not alt_id or not alt_name:
             continue
-        out.append("\t".join([
-            alt_id, gid, iso_lang, alt_name,
-            b(is_pref), b(is_short), b(is_colloq), b(is_hist),
-        ]))
+        out.append(
+            "\t".join(
+                [
+                    alt_id,
+                    gid,
+                    iso_lang,
+                    alt_name,
+                    b(is_pref),
+                    b(is_short),
+                    b(is_colloq),
+                    b(is_hist),
+                ]
+            )
+        )
         kept += 1
 
     _log(f"    alternate_names: scanned {scanned:,}, kept {kept:,}")
@@ -304,6 +315,7 @@ def process_iso4217(raw: bytes) -> list[str]:
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

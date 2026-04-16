@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install ruff
+        run: pip install ruff>=0.8.0
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run mypy (baseline-filtered)
+        run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
+
+  complexity:
+    name: Complexity Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install radon
+        run: pip install radon>=5.1.0
+
+      - name: Check complexity
+        run: bash scripts/check_complexity.sh
+
+  security:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install pip-audit
+        run: pip install pip-audit>=2.7.0
+
+      - name: Audit production dependencies
+        run: pip-audit -r requirements.txt
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run unit tests
+        run: >
+          pytest
+          -m "not integration and not database and not slow"
+          --tb=short
+          --cov=app
+          --cov-report=term-missing
+          --cov-fail-under=0
+          -q
+
+  acceptance:
+    name: Acceptance Tests (Newman)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kitchen
+          POSTGRES_PASSWORD: kitchen
+          POSTGRES_DB: kitchen
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: kitchen
+      DB_USER: kitchen
+      DB_PASSWORD: kitchen
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      DEV_MODE: "true"
+      PAYMENT_PROVIDER: mock
+      SUPPLIER_PAYOUT_PROVIDER: mock
+      EMAIL_PROVIDER: smtp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install newman
+        run: npm install -g newman
+
+      - name: Build database (schema + seed)
+        run: bash app/db/build_kitchen_db.sh
+
+      - name: Start server
+        run: |
+          uvicorn application:app --host 0.0.0.0 --port 8000 &
+          echo $! > /tmp/server.pid
+          # Wait for server to be ready
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/docs > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          curl -sf http://localhost:8000/docs > /dev/null || { echo "Server failed to start"; exit 1; }
+
+      - name: Run Postman collections
+        run: bash scripts/run_newman.sh
+
+      - name: Stop server
+        if: always()
+        run: |
+          [ -f /tmp/server.pid ] && kill "$(cat /tmp/server.pid)" 2>/dev/null || true

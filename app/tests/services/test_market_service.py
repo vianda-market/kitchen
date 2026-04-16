@@ -2,8 +2,9 @@
 Unit tests for market_service: is_global_market, reject_global_market_for_entity.
 """
 
-import pytest
 from uuid import uuid4
+
+import pytest
 from fastapi import HTTPException
 
 from app.services.market_service import (

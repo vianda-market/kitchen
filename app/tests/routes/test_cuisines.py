@@ -1,13 +1,13 @@
 """Tests for cuisine endpoints: GET /api/v1/cuisines and POST /api/v1/cuisines/suggestions"""
 
-import pytest
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
+from uuid import uuid4
 
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import (
     get_client_employee_or_supplier_user,
     get_employee_or_supplier_user,
@@ -140,7 +140,6 @@ class TestListCuisines:
         finally:
             pass
 
-
     @patch("app.routes.cuisines.cuisine_service")
     def test_language_param_localizes_cuisine_name(self, mock_cuisine_service, client_with_customer):
         """?language=es resolves cuisine_name from cuisine_name_i18n."""
@@ -194,7 +193,7 @@ class TestCreateSuggestion:
         """Valid suggestion body returns 201 with suggestion_id and Pending status."""
         suggestion_id = str(uuid4())
         user_id = str(uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         mock_cuisine_service.create_suggestion.return_value = {
             "suggestion_id": suggestion_id,
             "suggested_name": "Peruvian Fusion",

@@ -5,12 +5,10 @@ Maps numeric average_portion_size (1-3) to human-readable labels.
 Enforces minimum review threshold before returning averages.
 """
 
-from typing import Optional
-
 MIN_REVIEWS_FOR_AVERAGE = 5
 
 
-def bucket_portion_size(average: Optional[float], review_count: int) -> str:
+def bucket_portion_size(average: float | None, review_count: int) -> str:
     """
     Map average_portion_size (1-3) to display label.
 

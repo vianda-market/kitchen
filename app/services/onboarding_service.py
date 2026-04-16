@@ -3,15 +3,14 @@ Onboarding status service — computes supplier/employer onboarding checklist,
 completion percentage, next step, and aggregated admin summary.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
 
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning
-
+from app.utils.log import log_warning
 
 # =========================================================================
 # Supplier checklist
@@ -181,7 +180,7 @@ NEXT_STEP_LABELS = SUPPLIER_NEXT_STEP_LABELS
 STALL_THRESHOLD_DAYS = 7
 
 
-def _derive_status(checklist_bools: List[bool], days_since_last_activity: Optional[int]) -> str:
+def _derive_status(checklist_bools: list[bool], days_since_last_activity: int | None) -> str:
     if all(checklist_bools):
         return "complete"
     if not any(checklist_bools):
@@ -191,23 +190,23 @@ def _derive_status(checklist_bools: List[bool], days_since_last_activity: Option
     return "in_progress"
 
 
-def _find_next_step(checklist: Dict[str, bool], order: List[str], labels: Dict[str, str]) -> Optional[str]:
+def _find_next_step(checklist: dict[str, bool], order: list[str], labels: dict[str, str]) -> str | None:
     for key in order:
         if not checklist.get(key, False):
             return labels[key]
     return None
 
 
-def _compute_days_since(ref_date: Optional[datetime]) -> Optional[int]:
+def _compute_days_since(ref_date: datetime | None) -> int | None:
     if ref_date is None:
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if ref_date.tzinfo is None:
-        ref_date = ref_date.replace(tzinfo=timezone.utc)
+        ref_date = ref_date.replace(tzinfo=UTC)
     return (now - ref_date).days
 
 
-def _run_checklist(institution_id: UUID, institution_type: str, db) -> Optional[Dict[str, Any]]:
+def _run_checklist(institution_id: UUID, institution_type: str, db) -> dict[str, Any] | None:
     """Run the appropriate checklist query and return parsed result dict, or None."""
     config = _CHECKLIST_CONFIG.get(institution_type)
     if not config:
@@ -244,11 +243,12 @@ def _run_checklist(institution_id: UUID, institution_type: str, db) -> Optional[
 # Public API
 # =========================================================================
 
+
 def get_onboarding_status(
     institution_id: UUID,
     institution_type: str,
     db: psycopg2.extensions.connection,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Compute full onboarding status for a single institution (Supplier or Employer)."""
     result = _run_checklist(institution_id, institution_type, db)
     if not result:
@@ -292,7 +292,7 @@ def get_onboarding_status_claim(
 def get_customer_onboarding_status(
     user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Compute onboarding status for a Customer user (user-level, not institution-level)."""
     uid = str(user_id)
     row = db_read(_CUSTOMER_CHECKLIST_SQL, {"uid": uid}, connection=db, fetch_one=True)
@@ -389,18 +389,28 @@ _EMPLOYER_SUMMARY_ACTIVITY = """
     ) AS last_activity_date"""
 
 _SUMMARY_CONFIG = {
-    "supplier": (_SUPPLIER_SUMMARY_CHECKLIST, _SUPPLIER_SUMMARY_ACTIVITY, SUPPLIER_CHECKLIST_ORDER, SUPPLIER_NEXT_STEP_LABELS),
-    "employer": (_EMPLOYER_SUMMARY_CHECKLIST, _EMPLOYER_SUMMARY_ACTIVITY, EMPLOYER_CHECKLIST_ORDER, EMPLOYER_NEXT_STEP_LABELS),
+    "supplier": (
+        _SUPPLIER_SUMMARY_CHECKLIST,
+        _SUPPLIER_SUMMARY_ACTIVITY,
+        SUPPLIER_CHECKLIST_ORDER,
+        SUPPLIER_NEXT_STEP_LABELS,
+    ),
+    "employer": (
+        _EMPLOYER_SUMMARY_CHECKLIST,
+        _EMPLOYER_SUMMARY_ACTIVITY,
+        EMPLOYER_CHECKLIST_ORDER,
+        EMPLOYER_NEXT_STEP_LABELS,
+    ),
 }
 
 
 def get_onboarding_summary(
     db: psycopg2.extensions.connection,
     institution_type: str = "supplier",
-    market_id: Optional[UUID] = None,
-    onboarding_status_filter: Optional[str] = None,
-    stalled_days: Optional[int] = None,
-) -> Dict[str, Any]:
+    market_id: UUID | None = None,
+    onboarding_status_filter: str | None = None,
+    stalled_days: int | None = None,
+) -> dict[str, Any]:
     """Aggregated onboarding funnel for Internal admin view."""
     config = _SUMMARY_CONFIG.get(institution_type)
     if not config:
@@ -411,7 +421,7 @@ def get_onboarding_summary(
         checklist_columns=checklist_cols,
         last_activity_subquery=activity_sub,
     )
-    params: Dict[str, Any] = {"inst_type": institution_type}
+    params: dict[str, Any] = {"inst_type": institution_type}
 
     if market_id:
         query += " AND im.market_id = %(market_id)s"
@@ -438,17 +448,19 @@ def get_onboarding_summary(
         if inst_status == "stalled":
             effective_stalled_days = stalled_days or STALL_THRESHOLD_DAYS
             if days_since_last_activity is not None and days_since_last_activity >= effective_stalled_days:
-                stalled_institutions.append({
-                    "institution_id": row["institution_id"],
-                    "institution_name": row["institution_name"],
-                    "market_name": row.get("market_name"),
-                    "onboarding_status": inst_status,
-                    "completion_percentage": round(sum(checklist_bools) / len(order) * 100),
-                    "days_since_creation": days_since_creation,
-                    "days_since_last_activity": days_since_last_activity,
-                    "missing_steps": missing,
-                    "created_date": row["created_date"],
-                })
+                stalled_institutions.append(
+                    {
+                        "institution_id": row["institution_id"],
+                        "institution_name": row["institution_name"],
+                        "market_name": row.get("market_name"),
+                        "onboarding_status": inst_status,
+                        "completion_percentage": round(sum(checklist_bools) / len(order) * 100),
+                        "days_since_creation": days_since_creation,
+                        "days_since_last_activity": days_since_last_activity,
+                        "missing_steps": missing,
+                        "created_date": row["created_date"],
+                    }
+                )
 
     return {
         "total": sum(counts.values()),
@@ -473,7 +485,6 @@ _ONBOARDING_TABLES = {
     "qr_code": "SELECT r.institution_id FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE q.qr_code_id = %s",
     # Employer tables
     "employer_benefits_program": "SELECT institution_id FROM core.employer_benefits_program WHERE program_id = %s",
-    "institution_entity_info": "SELECT institution_id FROM ops.institution_entity_info WHERE institution_entity_id = %s",
 }
 
 

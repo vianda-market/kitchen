@@ -6,19 +6,21 @@ These two institutions must not be assigned to certain entities (e.g. products,
 institution entities, restaurants). Use get_restricted_institution_ids() and
 validate_institution_assignable() so all such checks share one rule and message.
 """
-from typing import Optional
+
 from uuid import UUID
+
 from fastapi import HTTPException
 
 from app.config.settings import get_vianda_customers_institution_id, get_vianda_enterprises_institution_id
 
-
 # Tables where institution_id must NOT be Vianda Customers or Vianda Enterprises
-RESTRICTED_INSTITUTION_TABLES = frozenset({
-    "product_info",
-    "institution_entity_info",
-    "restaurant_info",
-})
+RESTRICTED_INSTITUTION_TABLES = frozenset(
+    {
+        "product_info",
+        "institution_entity_info",
+        "restaurant_info",
+    }
+)
 
 
 # Human-readable context for error messages (table_name -> context)
@@ -34,7 +36,7 @@ def get_restricted_institution_ids() -> tuple:
     return (get_vianda_customers_institution_id(), get_vianda_enterprises_institution_id())
 
 
-def validate_institution_assignable(institution_id: Optional[UUID], context: str = "record") -> None:
+def validate_institution_assignable(institution_id: UUID | None, context: str = "record") -> None:
     """
     Raise HTTP 400 if institution_id is Vianda Customers or Vianda Enterprises.
 

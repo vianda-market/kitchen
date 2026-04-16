@@ -6,8 +6,6 @@ slowapi handles anonymous/IP-based limits separately (app/utils/rate_limit.py).
 """
 
 from dataclasses import dataclass
-from typing import Optional
-
 
 # ── Tier constants ───────────────────────────────────────────────────────────
 TIER_FREE = "free"
@@ -38,14 +36,15 @@ FREE_TIER_ENDPOINT_OVERRIDES: dict[str, int] = {
 @dataclass(frozen=True)
 class RateLimitRule:
     """Resolved rate-limit rule for a single request."""
+
     tier: str
     max_requests: int
     window_seconds: int
     exempt: bool
-    matched_prefix: Optional[str] = None
+    matched_prefix: str | None = None
 
 
-def classify_tier(role_type: str, onboarding_status: Optional[str]) -> str:
+def classify_tier(role_type: str, onboarding_status: str | None) -> str:
     """Derive rate-limit tier from JWT claims."""
     if role_type == "internal":
         return TIER_INTERNAL
@@ -60,7 +59,7 @@ def _strip_version_prefix(path: str) -> str:
     """Remove /api/v1 (or /api/v2) prefix for endpoint matching."""
     for prefix in ("/api/v1", "/api/v2"):
         if path.startswith(prefix):
-            return path[len(prefix):]
+            return path[len(prefix) :]
     return path
 
 
@@ -68,7 +67,10 @@ def resolve_rule(tier: str, path: str, method: str) -> RateLimitRule:
     """Return the applicable RateLimitRule for a given tier + request."""
     if tier == TIER_INTERNAL:
         return RateLimitRule(
-            tier=tier, max_requests=0, window_seconds=WINDOW_SECONDS, exempt=True,
+            tier=tier,
+            max_requests=0,
+            window_seconds=WINDOW_SECONDS,
+            exempt=True,
         )
 
     base_limit = TIER_GLOBAL_LIMITS[tier]
@@ -78,7 +80,7 @@ def resolve_rule(tier: str, path: str, method: str) -> RateLimitRule:
         normalized = _strip_version_prefix(path)
         matched_prefix = None
         matched_len = 0
-        for override_prefix, limit in FREE_TIER_ENDPOINT_OVERRIDES.items():
+        for override_prefix, _limit in FREE_TIER_ENDPOINT_OVERRIDES.items():
             if normalized.startswith(override_prefix) and len(override_prefix) > matched_len:
                 matched_prefix = override_prefix
                 matched_len = len(override_prefix)
@@ -92,5 +94,8 @@ def resolve_rule(tier: str, path: str, method: str) -> RateLimitRule:
             )
 
     return RateLimitRule(
-        tier=tier, max_requests=base_limit, window_seconds=WINDOW_SECONDS, exempt=False,
+        tier=tier,
+        max_requests=base_limit,
+        window_seconds=WINDOW_SECONDS,
+        exempt=False,
     )

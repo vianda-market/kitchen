@@ -6,7 +6,7 @@ All functions return data from existing tables (restaurant_info, plan_info, lead
 No external API calls. These are read-only projections for the marketing site.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import psycopg2.extensions
 import psycopg2.extras
@@ -22,7 +22,7 @@ def get_public_restaurants(
     *,
     featured_only: bool = False,
     limit: int = 12,
-) -> List[dict]:
+) -> list[dict]:
     """
     Return active restaurants for public display.
     Limited projection: id, name, cuisine, tagline, rating, cover image.
@@ -48,7 +48,7 @@ def get_public_restaurants(
 def get_public_plans(
     locale: str,
     db: psycopg2.extensions.connection,
-) -> List[dict]:
+) -> list[dict]:
     """
     Return active plans for public pricing display.
     Limited projection with currency from market's credit_currency.
@@ -110,21 +110,18 @@ _EMPLOYEE_RANGE_LABELS_I18N = {
 }
 
 
-def get_employee_count_ranges(locale: str = "en") -> List[dict]:
+def get_employee_count_ranges(locale: str = "en") -> list[dict]:
     """Return employee count ranges with localized labels."""
     if locale == "en" or locale not in _EMPLOYEE_RANGE_LABELS_I18N:
         return list(EMPLOYEE_COUNT_RANGES)
     word = _EMPLOYEE_RANGE_LABELS_I18N[locale]
-    return [
-        {"range_id": r["range_id"], "label": r["label"].replace("employees", word)}
-        for r in EMPLOYEE_COUNT_RANGES
-    ]
+    return [{"range_id": r["range_id"], "label": r["label"].replace("employees", word)} for r in EMPLOYEE_COUNT_RANGES]
 
 
 def get_leads_cuisines(
     locale: str,
     db: psycopg2.extensions.connection,
-) -> List[dict]:
+) -> list[dict]:
     """Return active cuisines for public lead interest form dropdowns."""
     rows = db_read(
         """
@@ -144,7 +141,7 @@ def create_lead_interest(
     data: dict,
     source: str,
     db: psycopg2.extensions.connection,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Insert a new lead interest record. Returns the created row or None.
     Validates interest_type, cuisine_id, and employee_count_range.
@@ -206,23 +203,23 @@ def create_lead_interest(
 def get_lead_interests(
     db: psycopg2.extensions.connection,
     *,
-    country_code: Optional[str] = None,
-    city_name: Optional[str] = None,
-    interest_type: Optional[str] = None,
-    interest_status: Optional[str] = None,
-    cuisine_id: Optional[str] = None,
-    employee_count_range: Optional[str] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
+    country_code: str | None = None,
+    city_name: str | None = None,
+    interest_type: str | None = None,
+    interest_status: str | None = None,
+    cuisine_id: str | None = None,
+    employee_count_range: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
     page: int = 1,
     page_size: int = 50,
-) -> Tuple[List[dict], int]:
+) -> tuple[list[dict], int]:
     """
     Paginated query of lead interest records with optional filters.
     Returns (rows, total_count). Internal use only.
     """
-    conditions: List[str] = ["NOT is_archived"]
-    params: List[Any] = []
+    conditions: list[str] = ["NOT is_archived"]
+    params: list[Any] = []
 
     if country_code:
         conditions.append("country_code = %s")
@@ -289,7 +286,7 @@ VALID_REFERRAL_SOURCES = {"ad", "referral", "search", "other"}
 def create_restaurant_lead(
     data: dict,
     db: psycopg2.extensions.connection,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Insert a new restaurant lead application and link cuisine selections.
     Returns the created row or None on validation failure.

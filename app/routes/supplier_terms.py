@@ -1,24 +1,24 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Optional
 from uuid import UUID
-from app.services.crud_service import supplier_terms_service
-from app.services.error_handling import handle_business_operation
-from app.services.billing.supplier_terms_resolution import (
-    resolve_effective_invoice_config, resolve_effective_kitchen_hours, get_terms_for_scope,
-)
+
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
-from app.security.field_policies import ensure_can_edit_supplier_terms
 from app.schemas.consolidated_schemas import (
-    SupplierTermsCreateSchema, SupplierTermsUpdateSchema, SupplierTermsResponseSchema,
+    SupplierTermsCreateSchema,
+    SupplierTermsResponseSchema,
 )
-import psycopg2.extensions
+from app.security.field_policies import ensure_can_edit_supplier_terms
+from app.services.billing.supplier_terms_resolution import (
+    get_terms_for_scope,
+    resolve_effective_invoice_config,
+    resolve_effective_kitchen_hours,
+)
+from app.services.crud_service import supplier_terms_service
+from app.services.error_handling import handle_business_operation
 
-router = APIRouter(
-    prefix="/supplier-terms",
-    tags=["Supplier Terms"],
-    dependencies=[Depends(oauth2_scheme)]
-)
+router = APIRouter(prefix="/supplier-terms", tags=["Supplier Terms"], dependencies=[Depends(oauth2_scheme)])
 
 
 def _resolve_supplier_institution(current_user: dict, institution_id: UUID) -> UUID:
@@ -37,17 +37,21 @@ def _resolve_supplier_institution(current_user: dict, institution_id: UUID) -> U
 def _enrich_with_effective_values(
     terms_row: dict,
     db: psycopg2.extensions.connection,
-    institution_entity_id: Optional[UUID] = None,
+    institution_entity_id: UUID | None = None,
 ) -> dict:
     """Add effective values (invoice config + kitchen hours) to a terms dict."""
     institution_id = terms_row["institution_id"]
     config = resolve_effective_invoice_config(
-        institution_id, db, institution_entity_id=institution_entity_id,
+        institution_id,
+        db,
+        institution_entity_id=institution_entity_id,
     )
     terms_row["effective_require_invoice"] = config["effective_require_invoice"]
     terms_row["effective_invoice_hold_days"] = config["effective_invoice_hold_days"]
     hours = resolve_effective_kitchen_hours(
-        institution_id, db, institution_entity_id=institution_entity_id,
+        institution_id,
+        db,
+        institution_entity_id=institution_entity_id,
     )
     terms_row["effective_kitchen_open_time"] = hours["effective_kitchen_open_time"]
     terms_row["effective_kitchen_close_time"] = hours["effective_kitchen_close_time"]
@@ -62,7 +66,9 @@ def _enrich_with_effective_values(
 @router.get("/{institution_id}", response_model=SupplierTermsResponseSchema)
 def get_supplier_terms(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level terms. Omit for institution-level."),
+    institution_entity_id: UUID | None = Query(
+        None, description="Entity ID for entity-level terms. Omit for institution-level."
+    ),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -79,7 +85,7 @@ def get_supplier_terms(
     return handle_business_operation(_get, "supplier terms retrieval")
 
 
-@router.get("", response_model=List[SupplierTermsResponseSchema])
+@router.get("", response_model=list[SupplierTermsResponseSchema])
 def list_supplier_terms(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -93,7 +99,9 @@ def list_supplier_terms(
         all_terms = supplier_terms_service.get_all(db)
         return [
             _enrich_with_effective_values(
-                t.model_dump(), db, institution_entity_id=t.institution_entity_id,
+                t.model_dump(),
+                db,
+                institution_entity_id=t.institution_entity_id,
             )
             for t in all_terms
         ]
@@ -105,7 +113,9 @@ def list_supplier_terms(
 def upsert_supplier_terms(
     institution_id: UUID,
     data: SupplierTermsCreateSchema,
-    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level override. Omit for institution-level."),
+    institution_entity_id: UUID | None = Query(
+        None, description="Entity ID for entity-level override. Omit for institution-level."
+    ),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):

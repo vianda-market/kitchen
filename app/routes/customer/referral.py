@@ -5,22 +5,21 @@ Customer Referral Routes
 User-facing endpoints for viewing referral code, listing referrals, and stats.
 Public endpoints for pre-auth referral code assignment (deep link lifecycle).
 """
+
 from decimal import Decimal
-from typing import List, Optional
-from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
+from app.config.enums import ReferralStatus
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     ReferralInfoResponseSchema,
     ReferralMyCodeResponseSchema,
     ReferralStatsResponseSchema,
 )
-from app.config.enums import ReferralStatus
 from app.utils.db import db_read
 from app.utils.log import log_info
 from app.utils.rate_limit import limiter
@@ -34,6 +33,7 @@ router = APIRouter(
 # =============================================================================
 # Public endpoints (no auth) — pre-auth referral code assignment
 # =============================================================================
+
 
 class AssignCodeRequest(BaseModel):
     referral_code: str = Field(..., max_length=20)
@@ -139,7 +139,7 @@ def get_my_referral_code(
     return {"referral_code": rows[0]["referral_code"]}
 
 
-@router.get("/my-referrals", response_model=List[ReferralInfoResponseSchema])
+@router.get("/my-referrals", response_model=list[ReferralInfoResponseSchema])
 def get_my_referrals(
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),

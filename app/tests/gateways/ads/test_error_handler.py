@@ -4,7 +4,6 @@ Unit tests for ads error handler (app/services/ads/error_handler.py).
 Verifies error categorization for both Google and Meta platforms,
 and retry logic.
 """
-import pytest
 
 from app.services.ads.error_handler import (
     AdsErrorCategory,

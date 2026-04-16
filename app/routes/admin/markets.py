@@ -5,26 +5,26 @@ API endpoints for managing markets (country-based subscription regions).
 Markets define the countries where the platform operates.
 """
 
-from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
-from app.dependencies.database import get_db
-from app.schemas.consolidated_schemas import (
-    MarketResponseSchema,
-    MarketCreateSchema,
-    MarketUpdateSchema,
-    MarketPayoutAggregatorResponseSchema,
-    MarketBillingConfigUpdateSchema,
-)
-from app.services.error_handling import handle_business_operation
-from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
-from app.services.entity_service import get_enriched_markets, get_enriched_market_by_id
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
+from app.dependencies.database import get_db
 from app.i18n.locale_names import localize_country_name, localize_currency_name
+from app.schemas.consolidated_schemas import (
+    MarketBillingConfigUpdateSchema,
+    MarketCreateSchema,
+    MarketPayoutAggregatorResponseSchema,
+    MarketResponseSchema,
+    MarketUpdateSchema,
+)
+from app.services.entity_service import get_enriched_market_by_id, get_enriched_markets
+from app.services.error_handling import handle_business_operation
+from app.services.market_service import is_global_market, market_service
 from app.utils.country import resolve_country_name
 from app.utils.error_messages import entity_not_found
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
@@ -32,10 +32,9 @@ from app.utils.pagination import PaginationParams, get_pagination_params, set_pa
 router = APIRouter(prefix="/markets", tags=["Markets"])
 
 
-@router.get("", response_model=List[MarketResponseSchema])
+@router.get("", response_model=list[MarketResponseSchema])
 async def list_markets(
-    status: Optional[Status] = Query(None, description="Filter by status"),
-    current_user: dict = Depends(get_current_user)
+    status: Status | None = Query(None, description="Filter by status"), current_user: dict = Depends(get_current_user)
 ):
     """
     List all markets. Non-archived only.
@@ -50,11 +49,8 @@ async def list_markets(
 
     **Returns**: List of markets
     """
-    markets = market_service.get_all(
-        include_archived=False,
-        status=status
-    )
-    
+    markets = market_service.get_all(include_archived=False, status=status)
+
     return markets
 
 
@@ -63,13 +59,14 @@ async def list_markets(
 # Must be registered before /{market_id} so /enriched is not parsed as market_id.
 # =============================================================================
 
-@router.get("/enriched", response_model=List[MarketResponseSchema])
+
+@router.get("/enriched", response_model=list[MarketResponseSchema])
 async def list_enriched_markets(
     response: Response,
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     List all markets with enriched data (currency details). Non-archived only.
@@ -101,7 +98,7 @@ async def list_enriched_markets(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched markets: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched markets: {str(e)}") from None
 
 
 @router.get("/enriched/{market_id}", response_model=MarketResponseSchema)
@@ -109,7 +106,7 @@ async def get_enriched_market(
     market_id: UUID,
     current_user: dict = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     Get a specific market by ID with enriched data (currency details). Non-archived only.
@@ -127,11 +124,7 @@ async def get_enriched_market(
     **Use Case**: Display market details with full currency information in admin UI
     """
     try:
-        enriched_market = get_enriched_market_by_id(
-            market_id,
-            db,
-            include_archived=False
-        )
+        enriched_market = get_enriched_market_by_id(market_id, db, include_archived=False)
 
         if not enriched_market:
             raise entity_not_found("Market", market_id, locale=locale)
@@ -145,53 +138,47 @@ async def get_enriched_market(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched market: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched market: {str(e)}") from None
 
 
 @router.get("/{market_id}", response_model=MarketResponseSchema)
-async def get_market(
-    market_id: UUID,
-    current_user: dict = Depends(get_current_user)
-):
+async def get_market(market_id: UUID, current_user: dict = Depends(get_current_user)):
     """
     Get a specific market by ID.
-    
+
     **Authorization**: Any authenticated user (Internal, Supplier, Customer, Employer).
-    
+
     **Path Parameters**:
     - `market_id`: UUID of the market
-    
+
     **Returns**: Market details
-    
+
     **Raises**:
     - 404: Market not found
     """
     market = market_service.get_by_id(market_id)
-    
+
     if not market:
         raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
-    
+
     return market
 
 
 @router.post("", response_model=MarketResponseSchema, status_code=201)
-async def create_market(
-    market_data: MarketCreateSchema,
-    current_user: dict = Depends(get_employee_user)
-):
+async def create_market(market_data: MarketCreateSchema, current_user: dict = Depends(get_employee_user)):
     """
     Create a new market.
-    
+
     **Authorization**: Internal only (system configuration)
-    
+
     **Request Body**: Market creation data (country_name is derived from country_code)
     - `country_code`: ISO 3166-1 alpha-2 code (e.g., "AR", "DE")
     - `currency_metadata_id`: FK to currency_metadata (UUID)
     - `timezone`: Timezone (e.g., "America/Argentina/Buenos_Aires")
     - `status`: Market status (default: Active)
-    
+
     **Returns**: Created market with enriched currency info (includes country_name and country_code)
-    
+
     **Raises**:
     - 400: Invalid country_code
     - 403: Insufficient permissions (e.g. Supplier)
@@ -215,33 +202,31 @@ async def create_market(
         language=market_data.language,
         billing_config=billing_config,
     )
-    
+
     return market
 
 
 @router.put("/{market_id}", response_model=MarketResponseSchema)
 async def update_market(
-    market_id: UUID,
-    market_data: MarketUpdateSchema,
-    current_user: dict = Depends(get_employee_user)
+    market_id: UUID, market_data: MarketUpdateSchema, current_user: dict = Depends(get_employee_user)
 ):
     """
     Update an existing market.
-    
+
     **Authorization**: Internal only. **Global Marketplace** (market_id = Global) is editable **only by Super Admin**.
-    
+
     **Path Parameters**:
     - `market_id`: UUID of the market to update
-    
+
     **Request Body**: Market update data (all fields optional). When country_code is provided, country_name is derived by the backend.
     - `country_code`: New ISO 3166-1 alpha-2 country code (if provided, country_name is resolved from it)
     - `currency_metadata_id`: New FK to currency_metadata
     - `timezone`: New timezone
     - `status`: New status
     - `is_archived`: Archive status
-    
+
     **Returns**: Updated market with enriched currency info
-    
+
     **Raises**:
     - 400: Invalid country_code
     - 403: Insufficient permissions (Supplier; or Internal Admin trying to edit Global Marketplace)
@@ -273,32 +258,29 @@ async def update_market(
         is_archived=market_data.is_archived,
         language=market_data.language,
     )
-    
+
     if not market:
         raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
-    
+
     return market
 
 
 @router.delete("/{market_id}", status_code=204)
-async def archive_market(
-    market_id: UUID,
-    current_user: dict = Depends(get_employee_user)
-):
+async def archive_market(market_id: UUID, current_user: dict = Depends(get_employee_user)):
     """
     Archive a market (soft delete).
-    
+
     **Authorization**: Internal only. **Global Marketplace** cannot be archived (or only Super Admin could; we disallow archiving it).
-    
+
     **Path Parameters**:
     - `market_id`: UUID of the market to archive
-    
+
     **Returns**: 204 No Content
-    
+
     **Raises**:
     - 403: Insufficient permissions (Supplier; or non–Super Admin trying to archive Global Marketplace)
     - 404: Market not found
-    
+
     **Note**: This is a soft delete. The market is marked as archived but
     not removed from the database.
     """
@@ -314,16 +296,13 @@ async def archive_market(
             detail="The Global Marketplace cannot be archived.",
         )
     market = market_service.update(
-        market_id=market_id,
-        modified_by=current_user["user_id"],
-        is_archived=True,
-        status=Status.INACTIVE
+        market_id=market_id, modified_by=current_user["user_id"], is_archived=True, status=Status.INACTIVE
     )
-    
+
     if not market:
         raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
 
-    return None
+    return
 
 
 @router.get("/{market_id}/billing-config", response_model=MarketPayoutAggregatorResponseSchema)
@@ -348,7 +327,10 @@ def update_market_billing_config(
 ):
     """Update billing configuration for a market. Internal only."""
     updated = market_service.update_billing_config(
-        market_id, data.model_dump(exclude_unset=True), current_user["user_id"], db,
+        market_id,
+        data.model_dump(exclude_unset=True),
+        current_user["user_id"],
+        db,
     )
     if not updated:
         raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
@@ -362,6 +344,8 @@ def preview_billing_propagation(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Preview which suppliers inherit billing defaults from this market. Read-only. Internal only."""
+
     def _preview():
         return market_service.get_billing_propagation_preview(market_id, db)
+
     return handle_business_operation(_preview, "billing propagation preview")

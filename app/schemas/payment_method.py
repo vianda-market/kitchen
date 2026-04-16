@@ -1,23 +1,26 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from app.config import Status
 from app.config.enums.payment_method_types import PaymentMethodProvider
+
 
 # --- For creating a new payment method (aggregator-only) ---
 class PaymentMethodCreateSchema(BaseModel):
     method_type: str = Field(..., max_length=50, description="Provider: Stripe, Mercado Pago, PayU")
-    method_type_id: Optional[UUID] = None
-    is_default: Optional[bool] = False
-    address_id: Optional[UUID] = Field(None, description="UUID of existing address to use")
-    address_data: Optional[Dict[str, Any]] = Field(None, description="Address data for new address creation")
+    method_type_id: UUID | None = None
+    is_default: bool | None = False
+    address_id: UUID | None = Field(None, description="UUID of existing address to use")
+    address_data: dict[str, Any] | None = Field(None, description="Address data for new address creation")
     # user_id will be set automatically from current_user
     # modified_by will be set automatically from current_user
     # status will be automatically set to 'Pending' by base model
     # is_archived will be automatically set to False by base model
     # created_date and modified_date will be automatically set by base model
-    
+
     @model_validator(mode="after")
     def validate_address_fields(self):
         """Ensure either address_id or address_data is provided, not both"""
@@ -31,22 +34,24 @@ class PaymentMethodCreateSchema(BaseModel):
             raise ValueError(f"method_type must be one of: {PaymentMethodProvider.values()}")
         return self
 
+
 # --- For updating an existing payment method ---
 class PaymentMethodUpdateSchema(BaseModel):
-    method_type: Optional[str] = Field(None, max_length=50)
-    method_type_id: Optional[UUID] = None
-    address_id: Optional[UUID] = None
-    is_archived: Optional[bool] = None
-    status: Optional[Status] = None
-    is_default: Optional[bool] = None
+    method_type: str | None = Field(None, max_length=50)
+    method_type_id: UUID | None = None
+    address_id: UUID | None = None
+    is_archived: bool | None = None
+    status: Status | None = None
+    is_default: bool | None = None
+
 
 # --- For returning payment method details in API responses ---
 class PaymentMethodResponseSchema(BaseModel):
     payment_method_id: UUID
     user_id: UUID
     method_type: str = Field(..., max_length=50)
-    method_type_id: Optional[UUID] = None
-    address_id: Optional[UUID] = None
+    method_type_id: UUID | None = None
+    address_id: UUID | None = None
     is_archived: bool
     status: Status
     is_default: bool
@@ -60,24 +65,25 @@ class PaymentMethodResponseSchema(BaseModel):
 # --- For returning enriched payment method details with user and provider info ---
 class PaymentMethodEnrichedResponseSchema(BaseModel):
     """Enriched payment method with user info and optional provider display (last4, brand)."""
+
     payment_method_id: UUID
     user_id: UUID
     full_name: str
     username: str
     email: str
-    mobile_number: Optional[str] = None
+    mobile_number: str | None = None
     method_type: str
-    method_type_id: Optional[UUID] = None
-    address_id: Optional[UUID] = None
+    method_type_id: UUID | None = None
+    address_id: UUID | None = None
     is_archived: bool
     status: Status
     is_default: bool
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
-    provider: Optional[str] = None
-    last4: Optional[str] = None
-    brand: Optional[str] = None
+    provider: str | None = None
+    last4: str | None = None
+    brand: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,6 +92,7 @@ class PaymentMethodEnrichedResponseSchema(BaseModel):
 class UserPaymentProviderResponseSchema(BaseModel):
     """Connected payment provider for a user (e.g. Stripe account).
     Intentionally omits provider_customer_id — internal system field, not for clients."""
+
     user_payment_provider_id: UUID
     provider: str
     created_date: datetime
@@ -99,15 +106,16 @@ class UserPaymentSummarySchema(BaseModel):
     """Read-only summary of a customer's payment method status.
     Used by Internal employees to review which customers have Stripe cards registered.
     Intentionally omits provider_customer_id (cus_xxx) — internal Stripe identifier."""
+
     user_id: UUID
     username: str
     email: str
     full_name: str
     status: str
     has_stripe_provider: bool
-    provider_connected_date: Optional[datetime] = None
+    provider_connected_date: datetime | None = None
     payment_method_count: int
-    default_last4: Optional[str] = None
-    default_brand: Optional[str] = None
+    default_last4: str | None = None
+    default_brand: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

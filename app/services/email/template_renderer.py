@@ -10,7 +10,6 @@ Plain text: .txt variant loaded alongside .html. Falls back to HTML-stripped ver
 
 import re
 from pathlib import Path
-from typing import Tuple
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -42,7 +41,7 @@ def _get_template(base_name: str, ext: str, locale: str):
     return _env.get_template(f"{base_name}.{ext}")
 
 
-def render_email(template_name: str, locale: str = "en", **context) -> Tuple[str, str]:
+def render_email(template_name: str, locale: str = "en", **context) -> tuple[str, str]:
     """
     Render an email template with locale support.
 

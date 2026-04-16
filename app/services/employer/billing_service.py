@@ -1,19 +1,18 @@
 """Employer Benefits Program billing service — bill generation and benefit calculation."""
-from typing import Dict, Any, List, Optional, Tuple
-from uuid import UUID
-from datetime import datetime, date, timezone
+
+from datetime import date
 from decimal import Decimal
+from typing import Any
+from uuid import UUID
 
 import psycopg2.extensions
 from fastapi import HTTPException
 
-from app.services.crud_service import (
-    employer_bill_service,
-    employer_bill_line_service,
-)
-from app.services.employer.program_service import get_program_by_institution
-from app.dto.models import EmployerBenefitsProgramDTO
 from app.config import Status
+from app.services.crud_service import (
+    employer_bill_line_service,
+    employer_bill_service,
+)
 from app.utils.db import db_read
 from app.utils.log import log_info
 
@@ -21,10 +20,10 @@ from app.utils.log import log_info
 def compute_employee_benefit(
     plan_price: float,
     benefit_rate: int,
-    benefit_cap: Optional[float],
+    benefit_cap: float | None,
     benefit_cap_period: str,
     already_used_this_month: float = 0.0,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Pure function: compute employer's contribution and employee's share for a renewal.
 
     Returns (employee_benefit, employee_share).
@@ -49,7 +48,7 @@ def _get_renewal_events(
     period_start: date,
     period_end: date,
     db: psycopg2.extensions.connection,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Find subscription renewal events within a period by querying audit.subscription_history.
 
     A renewal event is detected when balance increased (new record has higher balance than previous).
@@ -88,8 +87,8 @@ def generate_employer_bill(
     db: psycopg2.extensions.connection,
     modified_by: UUID,
     *,
-    institution_entity_id: Optional[UUID] = None,
-) -> Dict[str, Any]:
+    institution_entity_id: UUID | None = None,
+) -> dict[str, Any]:
     """Generate an employer bill for a billing period. Returns the bill DTO + lines.
 
     institution_entity_id is required — bills are always per-entity (NOT NULL on employer_bill).
@@ -99,13 +98,14 @@ def generate_employer_bill(
     if not institution_entity_id:
         raise HTTPException(status_code=400, detail="institution_entity_id is required for employer bills")
     from app.services.employer.program_service import resolve_effective_program
+
     program = resolve_effective_program(institution_id, institution_entity_id, db)
     if not program or not program.is_active:
         raise HTTPException(status_code=400, detail="No active benefits program for this institution/entity")
 
     renewal_events = _get_renewal_events(institution_id, period_start, period_end, db)
 
-    monthly_usage: Dict[str, float] = {}
+    monthly_usage: dict[str, float] = {}
     lines_data = []
     gross_total = Decimal("0")
 
@@ -126,17 +126,19 @@ def generate_employer_bill(
         monthly_usage[user_key] = already_used + employee_benefit
         gross_total += Decimal(str(employee_benefit))
 
-        lines_data.append({
-            "subscription_id": str(event["subscription_id"]),
-            "user_id": str(event["user_id"]),
-            "plan_id": str(event["plan_id"]),
-            "plan_price": plan_price,
-            "benefit_rate": program.benefit_rate,
-            "benefit_cap": float(program.benefit_cap) if program.benefit_cap is not None else None,
-            "benefit_cap_period": program.benefit_cap_period,
-            "employee_benefit": employee_benefit,
-            "renewal_date": event["renewal_date"],
-        })
+        lines_data.append(
+            {
+                "subscription_id": str(event["subscription_id"]),
+                "user_id": str(event["user_id"]),
+                "plan_id": str(event["plan_id"]),
+                "plan_price": plan_price,
+                "benefit_rate": program.benefit_rate,
+                "benefit_cap": float(program.benefit_cap) if program.benefit_cap is not None else None,
+                "benefit_cap_period": program.benefit_cap_period,
+                "employee_benefit": employee_benefit,
+                "renewal_date": event["renewal_date"],
+            }
+        )
 
     discount_rate = program.price_discount or 0
     discounted = gross_total * (Decimal("1") - Decimal(str(discount_rate)) / Decimal("100"))
@@ -150,6 +152,7 @@ def generate_employer_bill(
     currency_code = "USD"
     if institution_entity_id:
         from app.utils.db import db_read as _db_read
+
         entity_currency = _db_read(
             "SELECT cm.currency_code FROM ops.institution_entity_info ie "
             "JOIN core.currency_metadata cm ON ie.currency_metadata_id = cm.currency_metadata_id "
@@ -217,16 +220,14 @@ def list_employer_bills(
     db: psycopg2.extensions.connection,
 ) -> list:
     """List employer bills for an institution."""
-    return employer_bill_service.get_all_by_field(
-        "institution_id", institution_id, db, scope=None
-    )
+    return employer_bill_service.get_all_by_field("institution_id", institution_id, db, scope=None)
 
 
 def get_employer_bill_detail(
     bill_id: UUID,
     institution_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Get employer bill with line items."""
     bill = employer_bill_service.get_by_id(bill_id, db, scope=None)
     if not bill:
@@ -236,8 +237,9 @@ def get_employer_bill_detail(
 
     # employer_bill_line has no is_archived column — use raw query instead of
     # CRUDService.get_all_by_field which hardcodes AND is_archived = FALSE.
-    from app.utils.db import db_read
     from app.dto.models import EmployerBillLineDTO
+    from app.utils.db import db_read
+
     rows = db_read(
         "SELECT * FROM employer_bill_line WHERE employer_bill_id = %s ORDER BY renewal_date",
         (str(bill_id),),

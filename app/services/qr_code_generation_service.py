@@ -5,12 +5,12 @@ This service handles QR code image generation and storage management.
 Supports local development storage and GCS (Cloud Run).
 """
 
+import hashlib
 import os
 from datetime import datetime
 from io import BytesIO
 from uuid import UUID
 
-import hashlib
 import qrcode
 from fastapi import HTTPException
 
@@ -29,7 +29,7 @@ class QRCodeGenerationService:
         self._gcs_mode = bool(settings.GCS_INTERNAL_BUCKET)
         self.local_storage_path = os.getenv("QR_LOCAL_STORAGE_PATH", STATIC_QR_DIR)
         self.base_url = os.getenv("QR_BASE_URL", "http://localhost:8000/static/qr_codes")
-    
+
     def generate_qr_code_image(
         self,
         qr_code_id: UUID,
@@ -59,26 +59,20 @@ class QRCodeGenerationService:
             checksum = hashlib.sha256(image_bytes).hexdigest()
 
             if self._gcs_mode:
-                storage_path, url_path = self._generate_gcs_storage(
-                    qr_code_id, restaurant_id, image_bytes
-                )
+                storage_path, url_path = self._generate_gcs_storage(qr_code_id, restaurant_id, image_bytes)
             else:
                 now = datetime.now()
                 year_month = f"{now.year}/{now.month:02d}"
                 filename = f"{qr_code_id}.{self.image_format.lower()}"
-                storage_path, url_path = self._generate_local_storage(
-                    year_month, filename, image_bytes
-                )
+                storage_path, url_path = self._generate_local_storage(year_month, filename, image_bytes)
 
             return storage_path, url_path, checksum
 
         except Exception as e:
             log_error(f"Failed to generate QR code image for {qr_code_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate QR code image")
-    
-    def _generate_local_storage(
-        self, year_month: str, filename: str, image_bytes: bytes
-    ) -> tuple[str, str]:
+            raise HTTPException(status_code=500, detail="Failed to generate QR code image") from None
+
+    def _generate_local_storage(self, year_month: str, filename: str, image_bytes: bytes) -> tuple[str, str]:
         """Save QR code image to local storage."""
         file_path = os.path.join(self.local_storage_path, year_month, filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -88,16 +82,14 @@ class QRCodeGenerationService:
         log_info(f"QR code image saved locally: {file_path}")
         return file_path, url_path
 
-    def _generate_gcs_storage(
-        self, qr_code_id: UUID, restaurant_id: UUID, image_bytes: bytes
-    ) -> tuple[str, str]:
+    def _generate_gcs_storage(self, qr_code_id: UUID, restaurant_id: UUID, image_bytes: bytes) -> tuple[str, str]:
         """Upload QR code image to GCS internal bucket."""
         from app.utils.gcs import upload_qr_code
 
         blob_path = upload_qr_code(qr_code_id, restaurant_id, image_bytes)
         log_info(f"QR code image uploaded to GCS: {blob_path}")
         return blob_path, blob_path
-    
+
     def delete_qr_code_image(self, storage_path: str) -> bool:
         """
         Delete QR code image from storage.
@@ -131,4 +123,3 @@ class QRCodeGenerationService:
         except Exception as e:
             log_error(f"Failed to delete local QR code image {storage_path}: {e}")
             return False
-

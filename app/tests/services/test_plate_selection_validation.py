@@ -2,17 +2,18 @@
 Unit tests for plate selection validation (validate_pickup_time_range, 1-week-ahead order window, etc.).
 """
 
-import pytest
 from datetime import date
 from unittest.mock import Mock
+
+import pytest
 from fastapi import HTTPException
 from freezegun import freeze_time
 
-from app.services.plate_selection_validation import (
-    validate_pickup_time_range,
-    determine_target_kitchen_day,
-)
 from app.dto.models import PlateDTO
+from app.services.plate_selection_validation import (
+    determine_target_kitchen_day,
+    validate_pickup_time_range,
+)
 
 
 class TestValidatePickupTimeRange:

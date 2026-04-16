@@ -10,7 +10,7 @@ In PROD_MODE: Makes real API calls. Requires Places API enabled on the API key.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -38,16 +38,17 @@ class GooglePlacesGateway(BaseGateway):
     def __init__(self):
         super().__init__()
         from app.config.settings import get_google_api_key
+
         api_key = get_google_api_key()
         if api_key:
             self.dev_mode = False
-            logger.info(f"Google Places Gateway using live API (key configured)")
+            logger.info("Google Places Gateway using live API (key configured)")
 
     @property
     def service_name(self) -> str:
         return "Google Places API"
 
-    def _load_mock_responses(self) -> Dict[str, Any]:
+    def _load_mock_responses(self) -> dict[str, Any]:
         """Load mock responses from JSON file."""
         return self._load_mock_file("address_autocomplete_mocks.json")
 
@@ -73,8 +74,7 @@ class GooglePlacesGateway(BaseGateway):
             raise ExternalServiceError(f"Mock response not configured for operation '{operation}' with place_id")
         if operation not in self._mock_data:
             raise ExternalServiceError(
-                f"Mock response not configured for operation '{operation}'. "
-                f"Available: {list(self._mock_data.keys())}"
+                f"Mock response not configured for operation '{operation}'. Available: {list(self._mock_data.keys())}"
             )
         logger.info(f"🎭 Returning mock response for {self.service_name}.{operation}")
         return self._mock_data[operation]
@@ -85,6 +85,7 @@ class GooglePlacesGateway(BaseGateway):
         operation: 'places_autocomplete' | 'place_details'
         """
         from app.config.settings import get_google_api_key
+
         api_key = get_google_api_key()
         if not api_key:
             raise ExternalServiceError(
@@ -140,9 +141,9 @@ class GooglePlacesGateway(BaseGateway):
     def places_autocomplete(
         self,
         input_text: str,
-        included_region_codes: Optional[List[str]] = None,
-        location_restriction: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        included_region_codes: list[str] | None = None,
+        location_restriction: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Call Places API (New) Autocomplete.
         included_region_codes: optional list of ISO 3166-1 alpha-2 codes (e.g. ["ar", "us"]).
@@ -156,7 +157,7 @@ class GooglePlacesGateway(BaseGateway):
             kwargs["locationRestriction"] = location_restriction
         return self.call("places_autocomplete", **kwargs)
 
-    def place_details(self, place_id: str) -> Dict[str, Any]:
+    def place_details(self, place_id: str) -> dict[str, Any]:
         """
         Call Places API (New) Place Details for address components.
         Returns dict with id, formattedAddress, addressComponents, location, viewport.
@@ -165,7 +166,7 @@ class GooglePlacesGateway(BaseGateway):
 
 
 # Singleton
-_google_places_gateway: Optional[GooglePlacesGateway] = None
+_google_places_gateway: GooglePlacesGateway | None = None
 
 
 def get_google_places_gateway() -> GooglePlacesGateway:

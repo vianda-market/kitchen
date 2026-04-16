@@ -3,9 +3,8 @@ Unit tests for restaurant_visibility helpers: restaurant_has_active_plate_kitche
 restaurant_has_active_qr_code.
 """
 
-import pytest
-from uuid import uuid4
 from unittest.mock import patch
+from uuid import uuid4
 
 from app.services.restaurant_visibility import (
     restaurant_has_active_plate_kitchen_days,

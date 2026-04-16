@@ -5,10 +5,10 @@ Key: (country_code, province_code, city_name). Value: {south, west, north, east}
 Used to restrict suggestions to city area and reduce "outside service area" failures.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any
 
 # south < north, west < east (typically). Bounding box for each supported city.
-CITY_BOUNDS: Dict[tuple, Dict[str, float]] = {
+CITY_BOUNDS: dict[tuple, dict[str, float]] = {
     # Argentina
     ("AR", "CABA", "Buenos Aires"): {"south": -34.70, "west": -58.55, "north": -34.52, "east": -58.35},
     ("AR", "CO", "Cordoba"): {"south": -31.50, "west": -64.30, "north": -31.35, "east": -64.10},
@@ -42,9 +42,9 @@ CITY_BOUNDS: Dict[tuple, Dict[str, float]] = {
 
 def get_city_bounds(
     country_code: str,
-    province_code: Optional[str],
-    city_name: Optional[str] = None,
-) -> Optional[Dict[str, float]]:
+    province_code: str | None,
+    city_name: str | None = None,
+) -> dict[str, float] | None:
     """
     Return bounds {south, west, north, east} for a supported city.
     Tries (country_code, province_code, city_name) first, then first match for province.
@@ -63,20 +63,19 @@ def get_city_bounds(
     return None
 
 
-def get_city_bounds_by_name(country_code: str, city_name: str) -> Optional[Dict[str, float]]:
+def get_city_bounds_by_name(country_code: str, city_name: str) -> dict[str, float] | None:
     """Return bounds for a supported city by name."""
     from app.config.supported_cities import get_supported_cities_sorted_by_country_and_name
+
     cities = get_supported_cities_sorted_by_country_and_name(country_code=country_code)
     city_lower = (city_name or "").strip().lower()
     for c in cities:
         if (c.get("city_name") or "").strip().lower() == city_lower:
-            return get_city_bounds(
-                c["country_code"], c.get("province_code"), c.get("city_name")
-            )
+            return get_city_bounds(c["country_code"], c.get("province_code"), c.get("city_name"))
     return None
 
 
-def bounds_to_location_restriction(bounds: Dict[str, float]) -> Dict[str, Any]:
+def bounds_to_location_restriction(bounds: dict[str, float]) -> dict[str, Any]:
     """
     Convert {south, west, north, east} to Google Places API locationRestriction rectangle.
     """

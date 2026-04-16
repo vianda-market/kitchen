@@ -8,24 +8,24 @@ One review per pickup; reviews are immutable after creation.
 """
 
 from uuid import UUID
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Form, UploadFile, File
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.auth.dependencies import get_client_user, get_current_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     PlateReviewCreateSchema,
-    PlateReviewResponseSchema,
     PlateReviewEnrichedResponseSchema,
+    PlateReviewResponseSchema,
     PortionComplaintResponseSchema,
 )
 from app.services.plate_review_service import (
     create_review,
-    get_reviews_by_user,
-    get_review_by_pickup,
-    get_enriched_reviews_by_institution,
     file_portion_complaint,
+    get_enriched_reviews_by_institution,
+    get_review_by_pickup,
+    get_reviews_by_user,
 )
 from app.utils.log import log_error
 
@@ -37,10 +37,11 @@ router = APIRouter(
 
 # --- Supplier / Internal: enriched institution-scoped reviews ---
 
+
 @router.get("/by-institution/enriched", response_model=list[PlateReviewEnrichedResponseSchema])
 def get_institution_reviews_enriched(
-    plate_id: Optional[UUID] = Query(None, description="Filter by plate"),
-    restaurant_id: Optional[UUID] = Query(None, description="Filter by restaurant"),
+    plate_id: UUID | None = Query(None, description="Filter by plate"),
+    restaurant_id: UUID | None = Query(None, description="Filter by restaurant"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -60,13 +61,12 @@ def get_institution_reviews_enriched(
             raise HTTPException(status_code=403, detail="No institution assigned")
         institution_id = UUID(str(inst))
 
-    rows = get_enriched_reviews_by_institution(
-        institution_id, db, plate_id=plate_id, restaurant_id=restaurant_id
-    )
+    rows = get_enriched_reviews_by_institution(institution_id, db, plate_id=plate_id, restaurant_id=restaurant_id)
     return [PlateReviewEnrichedResponseSchema(**r) for r in rows]
 
 
 # --- Customer-only endpoints ---
+
 
 @router.post("", response_model=PlateReviewResponseSchema, status_code=201)
 def create_plate_review(
@@ -105,7 +105,7 @@ def create_plate_review(
         raise
     except Exception as e:
         log_error(f"Error creating plate review: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create plate review")
+        raise HTTPException(status_code=500, detail="Failed to create plate review") from None
 
 
 @router.get("/me", response_model=list[PlateReviewResponseSchema])
@@ -167,8 +167,8 @@ def get_my_review_by_pickup(
 @router.post("/{plate_review_id}/portion-complaint", response_model=PortionComplaintResponseSchema, status_code=201)
 def create_portion_complaint(
     plate_review_id: UUID,
-    complaint_text: Optional[str] = Form(None),
-    photo: Optional[UploadFile] = File(None),
+    complaint_text: str | None = Form(None),
+    photo: UploadFile | None = File(None),
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -186,8 +186,10 @@ def create_portion_complaint(
         photo_storage_path = None
         if photo and photo.filename:
             from app.config.settings import settings
+
             if settings.GCS_CUSTOMER_BUCKET:
                 from app.utils.gcs import upload_customer_bucket_blob
+
                 photo_bytes = photo.file.read()
                 blob_path = f"complaints/{plate_review_id}/photo"
                 upload_customer_bucket_blob(blob_path, photo_bytes, content_type=photo.content_type or "image/jpeg")
@@ -205,4 +207,4 @@ def create_portion_complaint(
         raise
     except Exception as e:
         log_error(f"Error filing portion complaint: {e}")
-        raise HTTPException(status_code=500, detail="Failed to file portion complaint")
+        raise HTTPException(status_code=500, detail="Failed to file portion complaint") from None

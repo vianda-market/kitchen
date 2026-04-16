@@ -1,66 +1,66 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body, Response, status
-from typing import Optional, List
 from uuid import UUID
+
+import psycopg2.extensions
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from pydantic import EmailStr
-from app.utils.log import log_info, log_warning, log_employer_assign_debug
-from app.dto.models import UserDTO
-from app.services.crud_service import user_service
-from app.services.entity_service import (
-    get_user_by_username,
-    get_user_by_email,
-    get_enriched_users,
-    get_enriched_user_by_id,
-    search_users,
-    get_assigned_market_ids,
-    get_assigned_market_ids_bulk,
-    set_user_market_assignments,
-)
-from app.services.user_signup_service import user_signup_service
-from app.services.email_change_service import email_change_service
-from app.services.error_handling import handle_business_operation, handle_get_by_id
+
 from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.auth.security import hash_password, verify_password
+from app.config.supported_cities import is_global_city
 from app.dependencies.database import get_db
-from app.utils.query_params import limit_query, institution_filter, market_filter
-from app.utils.error_messages import user_not_found
+from app.dto.models import UserDTO
 from app.schemas.consolidated_schemas import (
-    UserCreateSchema,
-    UserUpdateSchema,
-    UserResponseSchema,
-    UserEnrichedResponseSchema,
-    UserSearchResultSchema,
-    UserSearchResponseSchema,
-    EmailChangeVerifySchema,
-    ChangePasswordSchema,
     AdminResetPasswordSchema,
     AssignEmployerRequest,
     AssignWorkplaceRequest,
+    ChangePasswordSchema,
+    EmailChangeVerifySchema,
     MessagingPreferencesResponseSchema,
     MessagingPreferencesUpdateSchema,
+    UserCreateSchema,
+    UserEnrichedResponseSchema,
+    UserResponseSchema,
+    UserSearchResponseSchema,
+    UserSearchResultSchema,
+    UserUpdateSchema,
 )
-from app.auth.security import hash_password, verify_password
-from app.security.entity_scoping import EntityScopingService, ENTITY_USER
-from app.security.scoping import get_user_scope, UserScope, resolve_institution_filter
+from app.security.entity_scoping import ENTITY_USER, EntityScopingService
 from app.security.field_policies import (
-    ensure_user_role_type_allowed,
-    ensure_user_role_name_allowed,
     ensure_can_assign_role_name,
     ensure_can_edit_user,
+    ensure_employer_not_for_supplier_employee,
+    ensure_institution_type_matches_role_type,
     ensure_operator_cannot_create_users,
     ensure_supplier_can_create_edit_users,
     ensure_supplier_can_reset_user_password,
     ensure_supplier_user_institution_only,
-    ensure_employer_not_for_supplier_employee,
-    ensure_institution_type_matches_role_type,
+    ensure_user_role_name_allowed,
+    ensure_user_role_type_allowed,
 )
-from app.services.crud_service import institution_service, city_service
+from app.security.scoping import get_user_scope, resolve_institution_filter
+from app.services.crud_service import city_service, institution_service, user_service
+from app.services.email_change_service import email_change_service
+from app.services.entity_service import (
+    get_assigned_market_ids,
+    get_assigned_market_ids_bulk,
+    get_enriched_user_by_id,
+    get_enriched_users,
+    get_user_by_email,
+    get_user_by_username,
+    search_users,
+    set_user_market_assignments,
+)
+from app.services.error_handling import handle_business_operation, handle_get_by_id
+from app.services.market_service import is_global_market, market_service
 from app.services.messaging_preferences_service import (
     get_messaging_preferences,
     update_messaging_preferences,
 )
-from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
-from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
+from app.services.user_signup_service import user_signup_service
+from app.utils.error_messages import user_not_found
+from app.utils.log import log_employer_assign_debug, log_info
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
-import psycopg2.extensions
+from app.utils.query_params import institution_filter, limit_query, market_filter
 
 
 def _validate_user_update_city_metadata_id(
@@ -89,6 +89,93 @@ def _validate_user_update_city_metadata_id(
         )
 
 
+_IMMUTABLE_FIELDS = {"role_type", "institution_id", "username"}
+_IMMUTABLE_MESSAGES = {
+    "role_type": "role_type is immutable and cannot be changed after user creation",
+    "institution_id": "institution_id is immutable and cannot be changed after user creation",
+    "username": "username is immutable and cannot be changed after user creation.",
+}
+
+
+def _reject_immutable_fields(update_data: dict) -> None:
+    """Raise 400 if any immutable field is explicitly set, then strip unsafe fields."""
+    for field in _IMMUTABLE_FIELDS:
+        if field in update_data:
+            raise HTTPException(status_code=400, detail=_IMMUTABLE_MESSAGES[field])
+    for key in ("role_type", "institution_id", "username", "password", "hashed_password"):
+        update_data.pop(key, None)
+
+
+def _extract_role_type_str(existing_user) -> str | None:
+    """Extract role_type as a plain string from a user DTO."""
+    rt = getattr(existing_user, "role_type", None)
+    if rt and hasattr(rt, "value"):
+        return rt.value
+    return rt
+
+
+def _apply_employer_rules(update_data: dict, existing_role_type: str | None) -> None:
+    """Validate and clean employer-related fields."""
+    if "employer_entity_id" in update_data:
+        ensure_employer_not_for_supplier_employee(
+            existing_role_type, update_data["employer_entity_id"], context="update"
+        )
+    if existing_role_type in ("supplier", "internal", "employer"):
+        update_data.pop("employer_entity_id", None)
+    if "employer_entity_id" in update_data and update_data["employer_entity_id"] is None:
+        update_data["employer_address_id"] = None
+
+
+def _apply_market_and_city_rules(
+    update_data: dict,
+    existing_user,
+    existing_role_type: str | None,
+    current_user: dict,
+    user_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Validate and apply market_id, market_ids, and city_metadata_id rules."""
+    if existing_role_type in ("customer", "supplier"):
+        update_data.pop("market_id", None)
+        update_data.pop("market_ids", None)
+    _validate_user_update_market_id(update_data, current_user)
+    if "market_ids" in update_data:
+        set_user_market_assignments(user_id, update_data["market_ids"], db)
+        update_data.pop("market_ids")
+    if "city_metadata_id" in update_data and update_data["city_metadata_id"] is not None:
+        _validate_city_metadata_update(update_data, existing_user, existing_role_type, db)
+    elif _is_comensal(existing_user, existing_role_type) and "city_metadata_id" in update_data:
+        raise HTTPException(status_code=400, detail="City is required and cannot be removed")
+
+
+def _is_comensal(existing_user, existing_role_type: str | None) -> bool:
+    """Check if user is a Customer Comensal."""
+    if existing_role_type != "customer":
+        return False
+    rn = getattr(existing_user, "role_name", None)
+    rn_str = (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
+    return rn_str == "comensal"
+
+
+def _validate_city_metadata_update(
+    update_data: dict,
+    existing_user,
+    existing_role_type: str | None,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Validate city_metadata_id when it's being set (not None)."""
+    if _is_comensal(existing_user, existing_role_type):
+        cid = (
+            update_data["city_metadata_id"]
+            if isinstance(update_data["city_metadata_id"], UUID)
+            else UUID(str(update_data["city_metadata_id"]))
+        )
+        if is_global_city(cid):
+            raise HTTPException(status_code=400, detail="Customers must have a specific city")
+    effective_market_id = update_data.get("market_id") or existing_user.market_id
+    _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
+
+
 def _validate_user_update_market_id(update_data: dict, current_user: dict) -> None:
     """Validate market exists and not archived. Only Admin (Internal Admin, Super Admin, Supplier Admin) can set market_id to Global; Managers and Operators cannot."""
     if "market_id" not in update_data:
@@ -98,9 +185,10 @@ def _validate_user_update_market_id(update_data: dict, current_user: dict) -> No
         return
     try:
         from uuid import UUID
+
         market_id = UUID(str(market_id)) if not isinstance(market_id, UUID) else market_id
     except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid market_id")
+        raise HTTPException(status_code=400, detail="Invalid market_id") from None
     market = market_service.get_by_id(market_id)
     if not market:
         raise HTTPException(status_code=400, detail=f"Market not found: {market_id}")
@@ -132,7 +220,7 @@ def _apply_email_change_request(
     existing_user: UserDTO,
     update_data: dict,
     db: psycopg2.extensions.connection,
-) -> Optional[str]:
+) -> str | None:
     """
     If payload requests a different email, start verification flow (do not write email to user_info yet).
     Returns email_change_message for UserResponseSchema, or None.
@@ -152,17 +240,14 @@ def _apply_email_change_request(
     update_data.pop("email", None)
     update_data["email_verified"] = False
     update_data["email_verified_at"] = None
-    return (
-        f"A verification code has been sent to {new_norm}. "
-        "Your email will be updated after verification."
-    )
+    return f"A verification code has been sent to {new_norm}. Your email will be updated after verification."
 
 
 def _user_dto_to_response(
     user: UserDTO,
     db: psycopg2.extensions.connection,
     *,
-    email_change_message: Optional[str] = None,
+    email_change_message: str | None = None,
 ) -> UserResponseSchema:
     """Build UserResponseSchema from UserDTO with v2 market_ids."""
     market_ids = get_assigned_market_ids(user.user_id, db, fallback_primary=user.market_id)
@@ -174,31 +259,22 @@ def _user_dto_to_response(
     )
 
 
-def _user_dtos_to_responses(users: list, db: psycopg2.extensions.connection) -> List[UserResponseSchema]:
+def _user_dtos_to_responses(users: list, db: psycopg2.extensions.connection) -> list[UserResponseSchema]:
     """Build list of UserResponseSchema from UserDTOs with v2 market_ids (bulk)."""
     if not users:
         return []
     user_ids = [u.user_id for u in users]
     primary_by_user = {u.user_id: u.market_id for u in users}
     bulk = get_assigned_market_ids_bulk(user_ids, db, primary_by_user=primary_by_user)
-    return [
-        UserResponseSchema(**u.model_dump(), market_ids=bulk.get(u.user_id, [u.market_id]))
-        for u in users
-    ]
+    return [UserResponseSchema(**u.model_dump(), market_ids=bulk.get(u.user_id, [u.market_id])) for u in users]
 
 
-router = APIRouter(
-    prefix="/users",
-    tags=["Users"],
-    dependencies=[Depends(oauth2_scheme)]
-)
+router = APIRouter(prefix="/users", tags=["Users"], dependencies=[Depends(oauth2_scheme)])
+
 
 # 1. List all users
-@router.get("", response_model=List[UserResponseSchema])
-def list_users(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
-):
+@router.get("", response_model=list[UserResponseSchema])
+def list_users(current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)):
     """List all users. Non-archived only."""
     # Use institution scope for Internal users/Suppliers, user scope for Customers
     if current_user.get("role_type") == "customer":
@@ -208,29 +284,24 @@ def list_users(
             return _user_dtos_to_responses([user] if user else [], db)
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
+
         def _get_users():
             return _user_dtos_to_responses(user_service.get_all(db, scope=scope, include_archived=False), db)
 
-    return handle_business_operation(
-        _get_users,
-        "user list retrieval"
-    )
+    return handle_business_operation(_get_users, "user list retrieval")
 
 
 # 2. Lookup a single user by username or email
 @router.get("/lookup", response_model=UserResponseSchema)
 def get_user_by_lookup(
-    username: Optional[str] = Query(None, description="Username"),
-    email: Optional[EmailStr] = Query(None, description="Email"),
+    username: str | None = Query(None, description="Username"),
+    email: EmailStr | None = Query(None, description="Email"),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     # Ensure at least one unique identifier is provided
     if username is None and email is None:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one of username or email must be provided."
-        )
+        raise HTTPException(status_code=400, detail="At least one of username or email must be provided.")
     """Lookup user by username or email"""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
@@ -258,9 +329,9 @@ def search_users_route(
     search_by: str = Query(..., description="Field to search: name, username, or email"),
     limit: int = limit_query(20, 1, 100),
     offset: int = Query(0, ge=0, description="Number of items to skip for pagination"),
-    role_type: Optional[str] = Query(None, description="Filter by role_type (e.g. Customer)"),
-    institution_id: Optional[UUID] = institution_filter(),
-    market_id: Optional[UUID] = market_filter(),
+    role_type: str | None = Query(None, description="Filter by role_type (e.g. Customer)"),
+    institution_id: UUID | None = institution_filter(),
+    market_id: UUID | None = market_filter(),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -318,35 +389,32 @@ def search_users_route(
 # GET /users/me - Get current user's profile
 @router.get("/me", response_model=UserEnrichedResponseSchema)
 def get_current_user_profile(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Get current user's own profile with enriched data. Non-archived only."""
     user_id = current_user["user_id"]
     scope = None  # No scope needed for self-access
-    
+
     def _get_enriched_user():
         enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=False)
         if not enriched_user:
             raise user_not_found()
         return enriched_user
 
-    return handle_business_operation(
-        _get_enriched_user,
-        "current user profile retrieval"
-    )
+    return handle_business_operation(_get_enriched_user, "current user profile retrieval")
+
 
 # PUT /users/me - Update current user's profile
 @router.put("/me", response_model=UserResponseSchema)
 def update_current_user_profile(
     user_update: UserUpdateSchema,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update current user's own profile"""
     user_id = current_user["user_id"]
     scope = None  # No scope needed for self-access
-    
+
     existing_user = user_service.get_by_id(user_id, db, scope=scope)
     if not existing_user:
         raise user_not_found()
@@ -374,7 +442,11 @@ def update_current_user_profile(
     if rt_str == "customer" and rn_str == "comensal" and "city_metadata_id" in update_data:
         if update_data["city_metadata_id"] is None:
             raise HTTPException(status_code=400, detail="City is required and cannot be removed")
-        cid = update_data["city_metadata_id"] if isinstance(update_data["city_metadata_id"], UUID) else UUID(str(update_data["city_metadata_id"]))
+        cid = (
+            update_data["city_metadata_id"]
+            if isinstance(update_data["city_metadata_id"], UUID)
+            else UUID(str(update_data["city_metadata_id"]))
+        )
         if is_global_city(cid):
             raise HTTPException(status_code=400, detail="Customers must have a specific city")
     # Validate city_metadata_id matches user's market country (use effective market: update or existing)
@@ -395,11 +467,7 @@ def update_current_user_profile(
             raise user_not_found()
         return _user_dto_to_response(updated, db, email_change_message=email_change_message)
 
-    return handle_business_operation(
-        _update_user,
-        "current user profile update",
-        "User updated successfully"
-    )
+    return handle_business_operation(_update_user, "current user profile update", "User updated successfully")
 
 
 # GET /users/me/messaging-preferences - Get current user's messaging preferences
@@ -448,8 +516,9 @@ def register_fcm_token(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Register or update FCM device token for push notifications. Called on login and token refresh."""
-    from app.services.fcm_token_service import register_fcm_token as _register
     from uuid import UUID as _UUID
+
+    from app.services.fcm_token_service import register_fcm_token as _register
 
     token = (body.get("token") or "").strip()
     platform = (body.get("platform") or "").strip().lower()
@@ -474,8 +543,9 @@ def delete_my_fcm_tokens(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Remove all FCM tokens for the current user. Called on logout."""
-    from app.services.fcm_token_service import delete_user_fcm_tokens
     from uuid import UUID as _UUID
+
+    from app.services.fcm_token_service import delete_user_fcm_tokens
 
     user_id = current_user["user_id"]
     if isinstance(user_id, str):
@@ -535,18 +605,19 @@ def verify_my_email_change(
 # PUT /users/me/terminate - Terminate current user's account
 @router.put("/me/terminate", response_model=dict)
 def terminate_my_account(
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Terminate current user's account (archive/soft delete)
-    
+
     This is a destructive operation that archives the user's account.
     Users cannot delete themselves - only archive/terminate.
     Separate endpoint from regular profile updates for safety.
     Idempotent: if already archived, returns 200 with "Account already terminated".
     """
+
     def _terminate_account():
         from app.utils.db import db_read
+
         # Check if already archived (idempotent: avoid 500 when Postman runs Terminate twice)
         row = db_read(
             "SELECT user_id, is_archived FROM user_info WHERE user_id = %s",
@@ -563,23 +634,21 @@ def terminate_my_account(
             current_user["user_id"],
             current_user["user_id"],  # Self-termination
             db,
-            scope=None
+            scope=None,
         )
         if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to terminate account"
-            )
+            raise HTTPException(status_code=500, detail="Failed to terminate account")
         return {"detail": "Account terminated successfully"}
-    
+
     return handle_business_operation(_terminate_account, "account termination")
+
 
 # PUT /users/me/employer - Assign existing employer and address to current user (Customers only)
 @router.put("/me/employer", response_model=UserResponseSchema)
 def assign_my_employer(
     body: AssignEmployerRequest = Body(..., description="Employer ID and address ID (office user works at)"),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Assign an existing employer entity and address to current user. Both employer_entity_id and address_id required; address must belong to employer. Only Customer users can have an employer; Supplier and Internal get 403."""
     log_employer_assign_debug(
@@ -592,7 +661,7 @@ def assign_my_employer(
             status_code=403,
             detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign an employer.",
         )
-    from app.services.crud_service import institution_entity_service, address_service
+    from app.services.crud_service import address_service, institution_entity_service
     from app.utils.error_messages import entity_not_found
 
     def _assign_employer():
@@ -628,36 +697,37 @@ def assign_my_employer(
         update_data = {
             "employer_entity_id": employer_entity_id,
             "employer_address_id": address_id,
-            "modified_by": current_user["user_id"]
+            "modified_by": current_user["user_id"],
         }
-        
-        updated = user_service.update(
-            current_user["user_id"],
-            update_data,
-            db,
-            scope=None
-        )
+
+        updated = user_service.update(current_user["user_id"], update_data, db, scope=None)
 
         # Store floor/unit in address_subpremise when provided (per-user at employer address)
         if updated and (body.floor is not None or body.apartment_unit is not None):
             from app.services.address_service import _upsert_address_subpremise
+
             _upsert_address_subpremise(
                 address_id,
-                UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"],
-                UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"],
+                UUID(str(current_user["user_id"]))
+                if isinstance(current_user["user_id"], str)
+                else current_user["user_id"],
+                UUID(str(current_user["user_id"]))
+                if isinstance(current_user["user_id"], str)
+                else current_user["user_id"],
                 db,
                 floor=body.floor,
                 apartment_unit=body.apartment_unit,
                 is_default=False,
                 commit=True,
             )
-        
+
         if not updated:
             log_employer_assign_debug(
                 f"employer entity assignment FAILED: user_service.update returned None for user_id={current_user['user_id']}"
             )
             # Diagnostic: check if user exists (including archived) to surface actionable errors
             from app.utils.db import db_read
+
             try:
                 row = db_read(
                     "SELECT user_id, is_archived FROM user_info WHERE user_id = %s",
@@ -667,20 +737,16 @@ def assign_my_employer(
                 )
                 if not row:
                     raise HTTPException(
-                        status_code=500,
-                        detail="Failed to assign employer: user not found in database."
+                        status_code=500, detail="Failed to assign employer: user not found in database."
                     )
                 if row.get("is_archived"):
                     raise HTTPException(
                         status_code=400,
-                        detail="User account has been terminated. Run 000 Client Setup to create a fresh customer, then complete Employer Assignment Workflow from the start."
+                        detail="User account has been terminated. Run 000 Client Setup to create a fresh customer, then complete Employer Assignment Workflow from the start.",
                     )
             except HTTPException:
                 raise
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to assign employer"
-            )
+            raise HTTPException(status_code=500, detail="Failed to assign employer")
         log_employer_assign_debug(
             f"employer assignment SUCCESS: user_id={current_user['user_id']} "
             f"employer_entity_id={employer_entity_id} employer_address_id={address_id}"
@@ -704,7 +770,7 @@ def assign_my_workplace(
             status_code=403,
             detail="Workplace group is not applicable to Supplier, Internal, or Employer users. Only Customer users can assign a workplace group.",
         )
-    from app.services.crud_service import workplace_group_service, address_service
+    from app.services.crud_service import address_service, workplace_group_service
 
     def _assign_workplace():
         group_id = body.workplace_group_id
@@ -761,37 +827,36 @@ def assign_my_workplace(
 # Must be registered before /{user_id} so /enriched is not parsed as user_id.
 # =============================================================================
 
+
 # GET /users/enriched - List all users with enriched data
-@router.get("/enriched", response_model=List[UserEnrichedResponseSchema])
+@router.get("/enriched", response_model=list[UserEnrichedResponseSchema])
 def list_enriched_users(
     response: Response,
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """List all users with enriched data (role_name, role_type, institution_name). Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
     def _get_enriched_users():
         return get_enriched_users(
-            db, scope=scope, include_archived=False,
+            db,
+            scope=scope,
+            include_archived=False,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )
 
-    result = handle_business_operation(
-        _get_enriched_users,
-        "enriched user list retrieval"
-    )
+    result = handle_business_operation(_get_enriched_users, "enriched user list retrieval")
     set_pagination_headers(response, result)
     return result
+
 
 # GET /users/enriched/{user_id} - Get a single user with enriched data
 @router.get("/enriched/{user_id}", response_model=UserEnrichedResponseSchema)
 def get_enriched_user_by_id_route(
-    user_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    user_id: UUID, current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
     Get a single user by ID with enriched data (role_name, role_type, institution_name).
@@ -822,10 +887,7 @@ def get_enriched_user_by_id_route(
         if scope and not scope.is_global:
             user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
             if not user_with_scope:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Forbidden: You do not have access to this user"
-                )
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this user")
 
     def _get_enriched_user():
         enriched_user = get_enriched_user_by_id(user_id, db, scope=scope, include_archived=False)
@@ -833,17 +895,13 @@ def get_enriched_user_by_id_route(
             raise user_not_found()
         return enriched_user
 
-    return handle_business_operation(
-        _get_enriched_user,
-        "enriched user retrieval"
-    )
+    return handle_business_operation(_get_enriched_user, "enriched user retrieval")
+
 
 # 3. Get a single user by primary key (user_id)
 @router.get("/{user_id}", response_model=UserResponseSchema)
 def get_user_by_id(
-    user_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    user_id: UUID, current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
     Get a user by ID. For reading your own profile, use GET /users/me instead.
@@ -871,39 +929,28 @@ def get_user_by_id(
         user_exists = user_service.get_by_id(user_id, db, scope=None)
         if not user_exists:
             raise user_not_found()
-        
+
         # Now check if user has access with scope
         if scope and not scope.is_global:
             user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
             if not user_with_scope:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Forbidden: You do not have access to this user"
-                )
-    
-    user = handle_get_by_id(
-        user_service.get_by_id,
-        user_id,
-        db,
-        "user",
-        extra_kwargs={"scope": scope}
-    )
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this user")
+
+    user = handle_get_by_id(user_service.get_by_id, user_id, db, "user", extra_kwargs={"scope": scope})
     return _user_dto_to_response(user, db)
+
 
 # POST /users - Create a new user
 @router.post("", response_model=UserResponseSchema, status_code=201)
 def create(
     user: UserCreateSchema,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create a new user - Restricted to Internal users and Suppliers (Admin/Manager only)"""
     # Customers cannot create users
     if current_user.get("role_type") == "customer":
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: customers cannot create users"
-        )
+        raise HTTPException(status_code=403, detail="Forbidden: customers cannot create users")
 
     ensure_operator_cannot_create_users(current_user)
     ensure_supplier_can_create_edit_users(current_user)
@@ -935,25 +982,20 @@ def create(
         user_data.get("role_type"),
         user_data.get("role_name"),
     )
-    ensure_employer_not_for_supplier_employee(user_data.get("role_type"), user_data.get("employer_entity_id"), context="create")
+    ensure_employer_not_for_supplier_employee(
+        user_data.get("role_type"), user_data.get("employer_entity_id"), context="create"
+    )
     if rt_str in ("supplier", "internal", "employer"):
         user_data["employer_entity_id"] = None
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_USER, current_user)
 
     def _create_user_with_validation():
-        created = user_signup_service.process_admin_user_creation(
-            user_data,
-            current_user,
-            db,
-            scope=scope
-        )
+        created = user_signup_service.process_admin_user_creation(user_data, current_user, db, scope=scope)
         return _user_dto_to_response(created, db)
 
     return handle_business_operation(
-        _create_user_with_validation,
-        "user creation with validation",
-        "User created successfully"
+        _create_user_with_validation, "user creation with validation", "User created successfully"
     )
 
 
@@ -963,7 +1005,7 @@ def update(
     user_id: UUID,
     user_update: UserUpdateSchema,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     Update a user. For updating your own profile, use PUT /users/me instead.
@@ -991,16 +1033,13 @@ def update(
         user_exists = user_service.get_by_id(user_id, db, scope=None)
         if not user_exists:
             raise user_not_found()
-        
+
         # Now check if user has access with scope
         if scope and not scope.is_global:
             user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
             if not user_with_scope:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Forbidden: You do not have access to this user"
-                )
-    
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this user")
+
     existing_user = user_service.get_by_id(user_id, db, scope=scope)
     if not existing_user:
         raise user_not_found()
@@ -1014,27 +1053,9 @@ def update(
     )
 
     update_data = user_update.model_dump(exclude_unset=True)
-    if "role_type" in update_data:
-        raise HTTPException(status_code=400, detail="role_type is immutable and cannot be changed after user creation")
-    if "institution_id" in update_data:
-        raise HTTPException(status_code=400, detail="institution_id is immutable and cannot be changed after user creation")
-    if "username" in update_data:
-        raise HTTPException(status_code=400, detail="username is immutable and cannot be changed after user creation.")
-    update_data.pop("role_type", None)
-    update_data.pop("institution_id", None)
-    update_data.pop("username", None)
-    update_data.pop("password", None)
-    update_data.pop("hashed_password", None)
-    existing_role_type = getattr(existing_user, "role_type", None)
-    if existing_role_type and hasattr(existing_role_type, "value"):
-        existing_role_type = existing_role_type.value
-    if "employer_entity_id" in update_data:
-        ensure_employer_not_for_supplier_employee(existing_role_type, update_data["employer_entity_id"], context="update")
-    if existing_role_type in ("supplier", "internal", "employer"):
-        update_data.pop("employer_entity_id", None)
-    # When clearing employer, also clear employer_address_id
-    if "employer_entity_id" in update_data and update_data["employer_entity_id"] is None:
-        update_data["employer_address_id"] = None
+    _reject_immutable_fields(update_data)
+    existing_role_type = _extract_role_type_str(existing_user)
+    _apply_employer_rules(update_data, existing_role_type)
     if "role_name" in update_data:
         ensure_user_role_name_allowed(existing_role_type, update_data["role_name"], current_user, "update")
         ensure_can_assign_role_name(
@@ -1044,30 +1065,7 @@ def update(
             update_data["role_name"],
         )
 
-    # Target user is Customer (Comensal or Customer Employer) or Supplier: market is non-editable; only paid upgrade flow can add markets
-    if existing_role_type in ("customer", "supplier"):
-        update_data.pop("market_id", None)
-        update_data.pop("market_ids", None)
-    _validate_user_update_market_id(update_data, current_user)
-    # v2: persist market_ids to user_market_assignment (and set primary); then remove from update_data
-    if "market_ids" in update_data:
-        set_user_market_assignments(user_id, update_data["market_ids"], db)
-        update_data.pop("market_ids")
-    # Customer Comensal: cannot remove city or set to Global (B2B updating Customer)
-    existing_role_name = getattr(existing_user, "role_name", None)
-    rn_str = (existing_role_name.value if hasattr(existing_role_name, "value") else str(existing_role_name)) if existing_role_name else ""
-    if existing_role_type == "customer" and rn_str == "comensal" and "city_metadata_id" in update_data:
-        if update_data["city_metadata_id"] is None:
-            raise HTTPException(status_code=400, detail="City is required and cannot be removed")
-        cid = update_data["city_metadata_id"] if isinstance(update_data["city_metadata_id"], UUID) else UUID(str(update_data["city_metadata_id"]))
-        if is_global_city(cid):
-            raise HTTPException(status_code=400, detail="Customers must have a specific city")
-        effective_market_id = update_data.get("market_id") or existing_user.market_id
-        _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
-    elif "city_metadata_id" in update_data and update_data["city_metadata_id"] is not None:
-        # Non-Comensal or non-Customer: validate city matches market when provided
-        effective_market_id = update_data.get("market_id") or existing_user.market_id
-        _validate_user_update_city_metadata_id(update_data["city_metadata_id"], effective_market_id, db)
+    _apply_market_and_city_rules(update_data, existing_user, existing_role_type, current_user, user_id, db)
 
     _apply_mobile_number_verification_reset(update_data, existing_user)
     email_change_message = _apply_email_change_request(user_id, existing_user, update_data, db)
@@ -1079,11 +1077,7 @@ def update(
             raise user_not_found()
         return _user_dto_to_response(updated, db, email_change_message=email_change_message)
 
-    return handle_business_operation(
-        _update_user,
-        "user update",
-        "User updated successfully"
-    )
+    return handle_business_operation(_update_user, "user update", "User updated successfully")
 
 
 # POST /users/{user_id}/resend-invite - Resend B2B invite email (set-password link)
@@ -1205,14 +1199,12 @@ def reset_user_password(
 # DELETE /users/{user_id} - Delete a user
 @router.delete("/{user_id}", response_model=dict)
 def delete_user(
-    user_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    user_id: UUID, current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """Delete a user"""
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
-    
+
     ensure_supplier_can_create_edit_users(current_user)
     # Apply user scoping for Customers and Internal Operators (self-only access)
     if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
@@ -1226,15 +1218,12 @@ def delete_user(
         user_exists = user_service.get_by_id(user_id, db, scope=None)
         if not user_exists:
             raise user_not_found()
-        
+
         # Now check if user has access with scope
         if scope and not scope.is_global:
             user_with_scope = user_service.get_by_id(user_id, db, scope=scope)
             if not user_with_scope:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Forbidden: You do not have access to this user"
-                )
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this user")
 
     existing_user = user_service.get_by_id(user_id, db, scope=scope)
     if not existing_user:
@@ -1254,5 +1243,5 @@ def delete_user(
             raise user_not_found()
         log_info(f"Deleted user with ID: {user_id}")
         return {"detail": "User deleted successfully"}
-    
+
     return handle_business_operation(_delete_user, "user deletion")

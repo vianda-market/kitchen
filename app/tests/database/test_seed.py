@@ -5,138 +5,119 @@ Tests that seed data is correctly loaded into the database.
 Replaces: app/db/tests/02_initial_seed.sql
 """
 
-import pytest
-from app.tests.database.conftest import (
-    db_transaction, count_rows, count_non_archived_rows, record_exists
-)
+from app.tests.database.conftest import count_non_archived_rows, record_exists
 from app.tests.database.test_data.expected_seed_data import (
-    SEED_SUPERADMIN_USER_ID,
     SEED_INSTITUTION_VIANDA_ID,
-    get_expected_user_count,
-    get_expected_institution_count,
-    get_expected_currency_count,
-    get_expected_market_count,
+    SEED_SUPERADMIN_USER_ID,
     get_expected_cuisine_count,
+    get_expected_currency_count,
+    get_expected_institution_count,
+    get_expected_market_count,
+    get_expected_user_count,
 )
 
 
 class TestSeedDataCounts:
     """Test that seed data has correct row counts."""
-    
+
     def test_user_info_seed_count(self, db_transaction):
         """Test that user_info has the expected number of seeded rows (excludes archived test data)."""
-        count = count_non_archived_rows(db_transaction, 'user_info')
+        count = count_non_archived_rows(db_transaction, "user_info")
         expected = get_expected_user_count()
-        assert count == expected, (
-            f"Expected {expected} users in user_info, found {count}"
-        )
-    
+        assert count == expected, f"Expected {expected} users in user_info, found {count}"
+
     def test_institution_info_seed_count(self, db_transaction):
         """Test that institution_info has the expected number of seeded rows (excludes archived test data)."""
-        count = count_non_archived_rows(db_transaction, 'institution_info')
+        count = count_non_archived_rows(db_transaction, "institution_info")
         expected = get_expected_institution_count()
-        assert count >= expected, (
-            f"Expected at least {expected} institutions in institution_info, found {count}"
-        )
-    
+        assert count >= expected, f"Expected at least {expected} institutions in institution_info, found {count}"
+
     def test_currency_metadata_seed_count(self, db_transaction):
         """Test that seed has the expected number of currency_metadata rows (6: USD, ARS, PEN, CLP, MXN, BRL; excludes archived).
         Renamed from currency_metadata — two-tier split: external.iso4217_currency (raw) + core.currency_metadata (policy)."""
-        count = count_non_archived_rows(db_transaction, 'currency_metadata')
+        count = count_non_archived_rows(db_transaction, "currency_metadata")
         expected = get_expected_currency_count()
-        assert count == expected, (
-            f"Expected {expected} currency_metadata row(s) in seed, found {count}"
-        )
+        assert count == expected, f"Expected {expected} currency_metadata row(s) in seed, found {count}"
 
     def test_market_info_seed_count(self, db_transaction):
         """Test that seed has the expected number of markets (excludes archived test data)."""
-        count = count_non_archived_rows(db_transaction, 'market_info')
+        count = count_non_archived_rows(db_transaction, "market_info")
         expected = get_expected_market_count()
-        assert count == expected, (
-            f"Expected {expected} market(s) in seed, found {count}"
-        )
+        assert count == expected, f"Expected {expected} market(s) in seed, found {count}"
 
     def test_cuisine_seed_count(self, db_transaction):
         """Test that seed has the expected number of cuisines (22 non-archived)."""
-        count = count_non_archived_rows(db_transaction, 'cuisine')
+        count = count_non_archived_rows(db_transaction, "cuisine")
         expected = get_expected_cuisine_count()
-        assert count == expected, (
-            f"Expected {expected} cuisine(s) in seed, found {count}"
-        )
+        assert count == expected, f"Expected {expected} cuisine(s) in seed, found {count}"
 
 
 class TestSeedDataRecords:
     """Test that specific seed records exist."""
-    
+
     def test_superadmin_user_seeded(self, db_transaction):
         """Test that Super Admin user is seeded."""
-        assert record_exists(
-            db_transaction,
-            'user_info',
-            'user_id',
-            str(SEED_SUPERADMIN_USER_ID)
-        ), f"Super Admin user with ID {SEED_SUPERADMIN_USER_ID} should be seeded"
-    
+        assert record_exists(db_transaction, "user_info", "user_id", str(SEED_SUPERADMIN_USER_ID)), (
+            f"Super Admin user with ID {SEED_SUPERADMIN_USER_ID} should be seeded"
+        )
+
     def test_vianda_enterprises_seeded(self, db_transaction):
         """Test that Vianda Enterprises institution is seeded."""
-        assert record_exists(
-            db_transaction,
-            'institution_info',
-            'institution_id',
-            str(SEED_INSTITUTION_VIANDA_ID)
-        ), f"Vianda Enterprises institution with ID {SEED_INSTITUTION_VIANDA_ID} should be seeded"
-    
+        assert record_exists(db_transaction, "institution_info", "institution_id", str(SEED_INSTITUTION_VIANDA_ID)), (
+            f"Vianda Enterprises institution with ID {SEED_INSTITUTION_VIANDA_ID} should be seeded"
+        )
+
     def test_usd_currency_seeded(self, db_transaction):
         """Test that USD (minimal bootstrap currency) is seeded in core.currency_metadata.
         Preserved UUID for continuity with the retired currency_metadata seed."""
-        usd_currency_metadata_id = '55555555-5555-5555-5555-555555555555'
-        assert record_exists(
-            db_transaction,
-            'currency_metadata',
-            'currency_metadata_id',
-            usd_currency_metadata_id
-        ), "US Dollar (USD) bootstrap currency_metadata row should be seeded"
+        usd_currency_metadata_id = "55555555-5555-5555-5555-555555555555"
+        assert record_exists(db_transaction, "currency_metadata", "currency_metadata_id", usd_currency_metadata_id), (
+            "US Dollar (USD) bootstrap currency_metadata row should be seeded"
+        )
         with db_transaction.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT ic.name, cm.currency_code
                 FROM core.currency_metadata cm
                 JOIN external.iso4217_currency ic ON cm.currency_code = ic.code
                 WHERE cm.currency_metadata_id = %s
-            """, (usd_currency_metadata_id,))
+            """,
+                (usd_currency_metadata_id,),
+            )
             result = cur.fetchone()
             assert result is not None, "USD currency_metadata should exist"
             currency_name, currency_code = result
-            assert currency_name == 'US Dollar', f"Expected 'US Dollar', got '{currency_name}'"
-            assert currency_code == 'USD', f"Expected 'USD', got '{currency_code}'"
+            assert currency_name == "US Dollar", f"Expected 'US Dollar', got '{currency_name}'"
+            assert currency_code == "USD", f"Expected 'USD', got '{currency_code}'"
 
     def test_argentina_market_has_ars_currency(self, db_transaction):
         """Test that Argentina market resolves to ARS via the currency_metadata join (not USD)."""
-        argentina_market_id = '00000000-0000-0000-0000-000000000002'
+        argentina_market_id = "00000000-0000-0000-0000-000000000002"
         with db_transaction.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT cm.currency_code
                 FROM market_info m
                 JOIN core.currency_metadata cm ON m.currency_metadata_id = cm.currency_metadata_id
                 WHERE m.market_id = %s
-            """, (argentina_market_id,))
+            """,
+                (argentina_market_id,),
+            )
             result = cur.fetchone()
             assert result is not None, "Argentina market should exist with currency metadata"
             currency_code = result[0]
-            assert currency_code == 'ARS', f"Argentina market should have ARS, got '{currency_code}'"
+            assert currency_code == "ARS", f"Argentina market should have ARS, got '{currency_code}'"
 
     def test_global_market_seeded(self, db_transaction):
         """Test that Global Marketplace (minimal bootstrap market) is seeded."""
-        global_market_id = '00000000-0000-0000-0000-000000000001'
-        assert record_exists(
-            db_transaction,
-            'market_info',
-            'market_id',
-            global_market_id
-        ), "Global Marketplace should be seeded"
+        global_market_id = "00000000-0000-0000-0000-000000000001"
+        assert record_exists(db_transaction, "market_info", "market_id", global_market_id), (
+            "Global Marketplace should be seeded"
+        )
 
     def test_argentina_market_language_is_spanish(self, db_transaction):
         """B2C signup derives locale from market_info.language; AR must stay es."""
-        argentina_market_id = '00000000-0000-0000-0000-000000000002'
+        argentina_market_id = "00000000-0000-0000-0000-000000000002"
         with db_transaction.cursor() as cur:
             cur.execute(
                 "SELECT language FROM market_info WHERE market_id = %s",
@@ -158,38 +139,41 @@ class TestSeedDataRecords:
                 """
             )
             assert cur.fetchone() is not None
-    
+
     def test_superadmin_user_properties(self, db_transaction):
         """Test that Super Admin user has correct properties."""
         with db_transaction.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT username, role_type, role_name, email
                 FROM user_info
                 WHERE user_id = %s
-            """, (str(SEED_SUPERADMIN_USER_ID),))
+            """,
+                (str(SEED_SUPERADMIN_USER_ID),),
+            )
             result = cur.fetchone()
-            
+
             assert result is not None, "Super Admin user should exist"
             username, role_type, role_name, email = result
-            
-            assert username == 'superadmin', f"Super Admin username should be 'superadmin', got '{username}'"
-            assert role_type == 'internal', f"Super Admin role_type should be 'internal', got '{role_type}'"
-            assert role_name == 'super_admin', f"Super Admin role_name should be 'super_admin', got '{role_name}'"
-            assert email == 'viandallc@gmail.com', f"Super Admin email should be 'viandallc@gmail.com', got '{email}'"
-    
+
+            assert username == "superadmin", f"Super Admin username should be 'superadmin', got '{username}'"
+            assert role_type == "internal", f"Super Admin role_type should be 'internal', got '{role_type}'"
+            assert role_name == "super_admin", f"Super Admin role_name should be 'super_admin', got '{role_name}'"
+            assert email == "viandallc@gmail.com", f"Super Admin email should be 'viandallc@gmail.com', got '{email}'"
+
     def test_vianda_enterprises_name(self, db_transaction):
         """Test that Vianda Enterprises has correct name."""
         with db_transaction.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT name
                 FROM institution_info
                 WHERE institution_id = %s
-            """, (str(SEED_INSTITUTION_VIANDA_ID),))
+            """,
+                (str(SEED_INSTITUTION_VIANDA_ID),),
+            )
             result = cur.fetchone()
-            
+
             assert result is not None, "Vianda Enterprises should exist"
             name = result[0]
-            assert name == 'Vianda Enterprises', (
-                f"Vianda Enterprises name should be 'Vianda Enterprises', got '{name}'"
-            )
-
+            assert name == "Vianda Enterprises", f"Vianda Enterprises name should be 'Vianda Enterprises', got '{name}'"

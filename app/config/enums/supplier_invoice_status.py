@@ -10,6 +10,7 @@ from enum import Enum
 
 class SupplierInvoiceStatus(str, Enum):
     """Status of a supplier invoice through the review process."""
+
     PENDING_REVIEW = "pending_review"
     APPROVED = "approved"
     REJECTED = "rejected"

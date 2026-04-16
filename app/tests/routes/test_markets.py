@@ -2,12 +2,13 @@
 Tests for market create/update: country_code only, country_name derived by backend.
 """
 
-import pytest
-from uuid import uuid4
-from fastapi.testclient import TestClient
 from unittest.mock import patch
+from uuid import uuid4
 
+import pytest
 from application import app
+from fastapi.testclient import TestClient
+
 from app.auth.dependencies import get_employee_user, oauth2_scheme
 
 
@@ -43,9 +44,7 @@ class TestCreateMarketCountryCodeOnly:
     """POST /api/v1/markets accepts country_code only; country_name is derived."""
 
     @patch("app.routes.admin.markets.market_service")
-    def test_create_market_with_country_code_only_derives_country_name(
-        self, mock_market_service, client_with_employee
-    ):
+    def test_create_market_with_country_code_only_derives_country_name(self, mock_market_service, client_with_employee):
         """Request body has only country_code; backend resolves country_name and passes both to service."""
         mock_market_service.create.return_value = {
             "market_id": str(uuid4()),
@@ -91,7 +90,9 @@ class TestCreateMarketCountryCodeOnly:
         mock_market_service.create.assert_not_called()
 
     @patch("app.routes.admin.markets.market_service")
-    def test_create_market_lowercase_country_code_normalized_to_uppercase(self, mock_market_service, client_with_employee):
+    def test_create_market_lowercase_country_code_normalized_to_uppercase(
+        self, mock_market_service, client_with_employee
+    ):
         """Request with lowercase country_code (e.g. ar) is normalized to uppercase; service receives AR."""
         mock_market_service.create.return_value = {
             "market_id": str(uuid4()),
@@ -134,7 +135,7 @@ class TestCreateMarketCountryCodeOnly:
                 "currency_code": "ARS",
                 "currency_name": "Argentine Peso",
                 "timezone": payload["timezone"],
-                    "is_archived": False,
+                "is_archived": False,
                 "status": "active",
                 "created_date": "2026-02-10T12:00:00Z",
                 "modified_date": "2026-02-10T12:00:00Z",

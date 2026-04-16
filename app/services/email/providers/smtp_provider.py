@@ -1,10 +1,9 @@
 """SMTP email provider — wraps current Gmail SMTP logic."""
 
 import smtplib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
 
 from app.services.email.providers.base import EmailProvider
 from app.utils.log import log_email_tracking
@@ -37,11 +36,11 @@ class SmtpEmailProvider(EmailProvider):
         to_email: str,
         subject: str,
         body_text: str,
-        body_html: Optional[str] = None,
-        cc: Optional[List[str]] = None,
-        bcc: Optional[List[str]] = None,
-        reply_to: Optional[str] = None,
-        category: Optional[str] = None,
+        body_html: str | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        reply_to: str | None = None,
+        category: str | None = None,
     ) -> bool:
         if not self.is_configured():
             log_email_tracking("Cannot send email: SMTP credentials not configured", level="error")
@@ -54,7 +53,7 @@ class SmtpEmailProvider(EmailProvider):
             msg["From"] = f"{self.from_name} <{self.from_email}>"
             msg["To"] = to_email
             msg["Subject"] = subject
-            msg["Date"] = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+            msg["Date"] = datetime.now(UTC).strftime("%a, %d %b %Y %H:%M:%S +0000")
 
             if cc:
                 msg["Cc"] = ", ".join(cc)
@@ -83,7 +82,9 @@ class SmtpEmailProvider(EmailProvider):
             return True
 
         except smtplib.SMTPAuthenticationError as e:
-            log_email_tracking(f"SMTP authentication failed: {e}. Check SMTP_USERNAME and SMTP_PASSWORD.", level="error")
+            log_email_tracking(
+                f"SMTP authentication failed: {e}. Check SMTP_USERNAME and SMTP_PASSWORD.", level="error"
+            )
             return False
         except smtplib.SMTPException as e:
             log_email_tracking(f"SMTP error sending email to {to_email}: {e}", level="error")

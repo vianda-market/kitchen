@@ -1,4 +1,5 @@
 import time
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -6,6 +7,7 @@ from starlette.types import ASGIApp
 # Simple in-memory cache to store permission decisions.
 # In production, consider using Redis or similar.
 permission_cache = {}
+
 
 class PermissionCacheMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, cache_ttl: int = 300):  # TTL in seconds (default 5 minutes)
@@ -17,12 +19,13 @@ class PermissionCacheMiddleware(BaseHTTPMiddleware):
         # we can use user_id as key for permission cache.
         token = request.headers.get("Authorization")
         if token:
-            # Extract user_id from token. In a real app, you might have already stored user data 
+            # Extract user_id from token. In a real app, you might have already stored user data
             # in the request state using your authentication middleware.
             # Here, we simulate extraction from an Authorization header "Bearer <token>".
             parts = token.split()
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 from app.auth.security import verify_token
+
                 user_data = verify_token(parts[1])
                 if user_data:
                     user_id = user_data.get("sub")

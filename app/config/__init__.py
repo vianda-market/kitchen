@@ -10,16 +10,16 @@ This module provides a unified import point for both enum definitions and runtim
 # Re-export all enums from the enums subfolder for backward compatibility
 from app.config.enums import (
     AddressType,
-    Status,
-    RoleType,
-    RoleName,
-    TransactionType,
-    KitchenDay,
-    PickupType,
     AuditOperation,
-    DiscretionaryReason,
     BillPayoutStatus,
     DietaryFlag,
+    DiscretionaryReason,
+    KitchenDay,
+    PickupType,
+    RoleName,
+    RoleType,
+    Status,
+    TransactionType,
 )
 
 __all__ = [
@@ -35,4 +35,3 @@ __all__ = [
     "BillPayoutStatus",
     "DietaryFlag",
 ]
-

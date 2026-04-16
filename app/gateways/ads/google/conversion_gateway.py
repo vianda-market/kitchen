@@ -8,6 +8,7 @@ Uploads Enhanced Conversions via the ConversionUploadService. Handles:
 - Partial failure handling
 - order_id-based idempotency (Google deduplicates by order_id per conversion action)
 """
+
 import logging
 
 from app.gateways.ads.base import AdsConversionGateway
@@ -61,9 +62,7 @@ class GoogleAdsConversionGateway(AdsConversionGateway):
         click_conversion.currency_code = event.currency_code
 
         # Timestamp (Google expects "yyyy-mm-dd hh:mm:ss+/-hh:mm" format)
-        click_conversion.conversion_date_time = event.event_time.strftime(
-            "%Y-%m-%d %H:%M:%S%z"
-        )
+        click_conversion.conversion_date_time = event.event_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
         # Click identifier: gclid > wbraid > gbraid
         if event.gclid:
@@ -151,9 +150,7 @@ class GoogleAdsConversionGateway(AdsConversionGateway):
                 error_category=category.value,
             )
 
-    def upload_conversions_batch(
-        self, events: list[ConversionEvent]
-    ) -> list[ConversionResult]:
+    def upload_conversions_batch(self, events: list[ConversionEvent]) -> list[ConversionResult]:
         """Upload a batch of conversions. Max 2,000 per request (Google limit)."""
         if not events:
             return []

@@ -5,13 +5,13 @@ Provides get and update for messaging preference booleans.
 On first GET, creates default row (all True) if missing.
 """
 
+from datetime import UTC, datetime
 from uuid import UUID
-from typing import Optional
-from datetime import datetime, timezone
+
 import psycopg2.extensions
 
 from app.dto.models import MessagingPreferencesDTO
-from app.utils.db import db_read, db_insert, db_update
+from app.utils.db import db_insert, db_read, db_update
 
 
 def get_messaging_preferences(
@@ -43,7 +43,7 @@ def get_messaging_preferences(
     )
     if not row:
         # Create default row
-        now = datetime.now(timezone.utc)
+        datetime.now(UTC)
         db_insert(
             "user_messaging_preferences",
             {
@@ -111,7 +111,7 @@ def update_messaging_preferences(
         to_update["coworkers_can_see_my_orders"] = False
         to_update["notify_coworker_pickup_alert"] = False
 
-    to_update["modified_date"] = datetime.now(timezone.utc)
+    to_update["modified_date"] = datetime.now(UTC)
 
     db_update(
         "user_messaging_preferences",

@@ -6,9 +6,8 @@ Verifies SHA256 hashing normalization per Google/Meta requirements:
 - Strip whitespace before hashing
 - Consistent output for equivalent inputs
 """
-import hashlib
 
-import pytest
+import hashlib
 
 from app.services.ads.pii_hasher import build_hashed_user_data, normalize_and_hash
 

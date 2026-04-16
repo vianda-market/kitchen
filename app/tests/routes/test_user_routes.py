@@ -2,17 +2,18 @@
 Tests for user routes: PUT /users/me/employer (assign employer with address).
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from unittest.mock import patch, MagicMock
+
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.config import RoleName, RoleType, Status
 from app.dependencies.database import get_db
-from app.dto.models import UserDTO, AddressDTO
-from app.config import Status, RoleType, RoleName
+from app.dto.models import AddressDTO, UserDTO
 from app.tests.conftest import SAMPLE_CITY_ID
 
 
@@ -48,6 +49,7 @@ def mock_db():
 @pytest.fixture
 def client_customer(customer_user, mock_db):
     """Test client with Customer user."""
+
     def _override_oauth2():
         return "test-token"
 
@@ -72,6 +74,7 @@ def client_customer(customer_user, mock_db):
 @pytest.fixture
 def client_supplier(supplier_user, mock_db):
     """Test client with Supplier user."""
+
     def _override_oauth2():
         return "test-token"
 
@@ -122,9 +125,9 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         timezone="America/Argentina/Buenos_Aires",
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
     mid = uuid4()
     updated_user = UserDTO(
@@ -146,14 +149,16 @@ def test_assign_employer_success(client_customer, customer_user, mock_db):
         city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
 
-    with patch("app.services.crud_service.institution_entity_service") as mock_entity_svc, \
-         patch("app.services.crud_service.address_service") as mock_address, \
-         patch("app.routes.user.user_service") as mock_user:
+    with (
+        patch("app.services.crud_service.institution_entity_service") as mock_entity_svc,
+        patch("app.services.crud_service.address_service") as mock_address,
+        patch("app.routes.user.user_service") as mock_user,
+    ):
         mock_entity_svc.get_by_id.return_value = mock_entity
         mock_address.get_by_id.return_value = address_dto
         mock_user.update.return_value = updated_user
@@ -205,14 +210,16 @@ def test_assign_employer_address_not_belonging_to_employer(client_customer, cust
         timezone="America/Argentina/Buenos_Aires",
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
 
-    with patch("app.services.crud_service.institution_entity_service") as mock_entity_svc, \
-         patch("app.services.crud_service.address_service") as mock_address, \
-         patch("app.routes.user.user_service") as mock_user:
+    with (
+        patch("app.services.crud_service.institution_entity_service") as mock_entity_svc,
+        patch("app.services.crud_service.address_service") as mock_address,
+        patch("app.routes.user.user_service") as mock_user,
+    ):
         mock_entity_svc.get_by_id.return_value = mock_entity
         mock_address.get_by_id.return_value = address_dto
 
@@ -244,6 +251,7 @@ def test_assign_employer_supplier_forbidden(client_supplier, mock_db):
 # Deprecation tests: self-read/self-update via deprecated /{user_id} endpoints
 # ---------------------------------------------------------------------------
 
+
 def test_deprecated_get_user_self_read_returns_410_gone(client_customer, customer_user, mock_db):
     """GET /users/{user_id} for Customer self-read returns 410 Gone with migration hint."""
     user_id = customer_user["user_id"]
@@ -260,9 +268,9 @@ def test_deprecated_get_user_self_read_returns_410_gone(client_customer, custome
         market_id=uuid4(),
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
     with patch("app.routes.user.user_service") as mock_user:
         mock_user.get_by_id.return_value = user_dto
@@ -287,9 +295,9 @@ def test_deprecated_put_user_self_update_returns_410_gone(client_customer, custo
         market_id=uuid4(),
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
     with patch("app.routes.user.user_service") as mock_user:
         mock_user.get_by_id.return_value = user_dto
@@ -307,7 +315,7 @@ def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer
     user_id = customer_user["user_id"]
     inst_id = customer_user["institution_id"]
     market_id = uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     enriched = {
         "user_id": user_id,
         "institution_id": inst_id,
@@ -339,7 +347,7 @@ def test_put_me_mobile_change_resets_verification_flags(client_customer, custome
     user_id = customer_user["user_id"]
     market_id = uuid4()
     inst_id = customer_user["institution_id"]
-    verified_at = datetime.now(timezone.utc)
+    verified_at = datetime.now(UTC)
     existing = UserDTO(
         user_id=user_id,
         institution_id=inst_id,
@@ -358,9 +366,9 @@ def test_put_me_mobile_change_resets_verification_flags(client_customer, custome
         city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
     updated = existing.model_copy(
         update={
@@ -369,8 +377,9 @@ def test_put_me_mobile_change_resets_verification_flags(client_customer, custome
             "mobile_number_verified_at": None,
         }
     )
-    with patch("app.routes.user.user_service") as mock_user, patch(
-        "app.routes.user.get_assigned_market_ids", return_value=[market_id]
+    with (
+        patch("app.routes.user.user_service") as mock_user,
+        patch("app.routes.user.get_assigned_market_ids", return_value=[market_id]),
     ):
         mock_user.get_by_id.return_value = existing
         mock_user.update.return_value = updated
@@ -404,15 +413,15 @@ def test_put_me_new_email_triggers_verification_flow(client_customer, customer_u
         mobile_number_verified=False,
         mobile_number_verified_at=None,
         email_verified=True,
-        email_verified_at=datetime.now(timezone.utc),
+        email_verified_at=datetime.now(UTC),
         employer_entity_id=None,
         market_id=market_id,
         city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=user_id,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
     updated = existing.model_copy(
         update={
@@ -420,10 +429,10 @@ def test_put_me_new_email_triggers_verification_flow(client_customer, customer_u
             "email_verified_at": None,
         }
     )
-    with patch("app.routes.user.user_service") as mock_user, patch(
-        "app.routes.user.email_change_service.request_email_change"
-    ) as mock_req, patch(
-        "app.routes.user.get_assigned_market_ids", return_value=[market_id]
+    with (
+        patch("app.routes.user.user_service") as mock_user,
+        patch("app.routes.user.email_change_service.request_email_change") as mock_req,
+        patch("app.routes.user.get_assigned_market_ids", return_value=[market_id]),
     ):
         mock_user.get_by_id.return_value = existing
         mock_user.update.return_value = updated
@@ -446,9 +455,7 @@ def test_put_me_new_email_triggers_verification_flow(client_customer, customer_u
 
 def test_post_me_verify_email_change_success(client_customer, customer_user, mock_db):
     """POST /users/me/verify-email-change returns success message."""
-    with patch(
-        "app.routes.user.email_change_service.verify_email_change"
-    ) as mock_verify:
+    with patch("app.routes.user.email_change_service.verify_email_change") as mock_verify:
         response = client_customer.post(
             "/api/v1/users/me/verify-email-change",
             json={"code": "123456"},

@@ -6,6 +6,7 @@ implementation based on platform + settings (mock vs live).
 Follows the same pattern as app/gateways/address_provider.py and
 app/services/payment_provider/__init__.py.
 """
+
 from app.config.settings import settings
 from app.gateways.ads.base import AdsCampaignGateway, AdsConversionGateway
 from app.gateways.ads.mock_gateway import MockCampaignGateway, MockConversionGateway
@@ -29,6 +30,7 @@ def get_conversion_gateway(platform: AdsPlatform) -> AdsConversionGateway:
             return MockConversionGateway("google")
         # Lazy import: google-ads SDK only loaded when provider=live
         from app.gateways.ads.google.conversion_gateway import GoogleAdsConversionGateway
+
         return GoogleAdsConversionGateway()
 
     if platform == AdsPlatform.META:
@@ -37,6 +39,7 @@ def get_conversion_gateway(platform: AdsPlatform) -> AdsConversionGateway:
             return MockConversionGateway("meta")
         # Lazy import: facebook-business SDK only loaded when provider=live
         from app.gateways.ads.meta.conversion_gateway import MetaConversionGateway
+
         return MetaConversionGateway()
 
     raise ValueError(f"Unknown ads platform: {platform}")
@@ -53,6 +56,7 @@ def get_campaign_gateway(platform: AdsPlatform) -> AdsCampaignGateway:
         if settings.DEV_MODE or provider == "mock":
             return MockCampaignGateway("google")
         from app.gateways.ads.google.campaign_gateway import GoogleAdsCampaignGateway
+
         return GoogleAdsCampaignGateway()
 
     if platform == AdsPlatform.META:
@@ -60,6 +64,7 @@ def get_campaign_gateway(platform: AdsPlatform) -> AdsCampaignGateway:
         if settings.DEV_MODE or provider == "mock":
             return MockCampaignGateway("meta")
         from app.gateways.ads.meta.campaign_gateway import MetaCampaignGateway
+
         return MetaCampaignGateway()
 
     raise ValueError(f"Unknown ads platform: {platform}")

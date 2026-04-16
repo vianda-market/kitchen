@@ -5,24 +5,23 @@ Supplier W-9 business logic — create/update, retrieve, document URL resolution
 US suppliers must submit a W-9 before payouts. One W-9 per institution entity
 (UNIQUE constraint on institution_entity_id).
 """
-from typing import Optional
+
 from uuid import UUID
-from datetime import datetime
 
 import psycopg2.extensions
 from fastapi import HTTPException
 
-from app.services.crud_service import supplier_w9_service
 from app.dto.models import SupplierW9DTO
+from app.services.crud_service import supplier_w9_service
 from app.utils.db import db_read
-from app.utils.gcs import upload_supplier_w9_document, get_supplier_w9_document_signed_url
-from app.utils.log import log_info, log_error
+from app.utils.gcs import get_supplier_w9_document_signed_url, upload_supplier_w9_document
+from app.utils.log import log_error
 
 
 def create_or_update_w9(
     data: dict,
-    file_data: Optional[bytes],
-    file_content_type: Optional[str],
+    file_data: bytes | None,
+    file_content_type: str | None,
     current_user: dict,
     db: psycopg2.extensions.connection,
 ) -> SupplierW9DTO:
@@ -45,48 +44,43 @@ def create_or_update_w9(
 
         if file_data and file_content_type:
             try:
-                blob_path = upload_supplier_w9_document(
-                    str(existing.w9_id), entity_id, file_data, file_content_type
-                )
+                blob_path = upload_supplier_w9_document(str(existing.w9_id), entity_id, file_data, file_content_type)
                 update_data["document_storage_path"] = blob_path
             except Exception as e:
                 log_error(f"Failed to upload W-9 document: {e}")
-                raise HTTPException(status_code=500, detail="Failed to upload W-9 document")
+                raise HTTPException(status_code=500, detail="Failed to upload W-9 document") from None
 
         updated = supplier_w9_service.update(str(existing.w9_id), update_data, db)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update W-9")
         return updated
-    else:
-        # Create new W-9
-        w9 = supplier_w9_service.create(data, db, commit=False)
-        if not w9:
-            raise HTTPException(status_code=500, detail="Failed to create W-9")
+    # Create new W-9
+    w9 = supplier_w9_service.create(data, db, commit=False)
+    if not w9:
+        raise HTTPException(status_code=500, detail="Failed to create W-9")
 
-        if file_data and file_content_type:
-            try:
-                blob_path = upload_supplier_w9_document(
-                    str(w9.w9_id), entity_id, file_data, file_content_type
-                )
-                supplier_w9_service.update(
-                    str(w9.w9_id),
-                    {"document_storage_path": blob_path, "modified_by": user_id},
-                    db,
-                    commit=False,
-                )
-            except Exception as e:
-                log_error(f"Failed to upload W-9 document: {e}")
-                db.rollback()
-                raise HTTPException(status_code=500, detail="Failed to upload W-9 document")
+    if file_data and file_content_type:
+        try:
+            blob_path = upload_supplier_w9_document(str(w9.w9_id), entity_id, file_data, file_content_type)
+            supplier_w9_service.update(
+                str(w9.w9_id),
+                {"document_storage_path": blob_path, "modified_by": user_id},
+                db,
+                commit=False,
+            )
+        except Exception as e:
+            log_error(f"Failed to upload W-9 document: {e}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to upload W-9 document") from None
 
-        db.commit()
-        return supplier_w9_service.get_by_id(str(w9.w9_id), db)
+    db.commit()
+    return supplier_w9_service.get_by_id(str(w9.w9_id), db)
 
 
 def get_w9_by_entity(
     institution_entity_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Optional[SupplierW9DTO]:
+) -> SupplierW9DTO | None:
     """Fetch the W-9 record for an entity. Returns None if not collected."""
     return _get_w9_by_entity_id(str(institution_entity_id), db)
 
@@ -94,7 +88,7 @@ def get_w9_by_entity(
 def _get_w9_by_entity_id(
     entity_id: str,
     db: psycopg2.extensions.connection,
-) -> Optional[SupplierW9DTO]:
+) -> SupplierW9DTO | None:
     """Internal helper to fetch W-9 by entity_id."""
     result = db_read(
         """SELECT * FROM billing.supplier_w9

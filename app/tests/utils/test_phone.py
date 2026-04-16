@@ -54,6 +54,7 @@ def test_get_mobile_region_invalid_returns_none():
 # format_mobile_for_display
 # ---------------------------------------------------------------------------
 
+
 def test_format_display_none_and_empty_returns_none():
     assert format_mobile_for_display(None) is None
     assert format_mobile_for_display("") is None

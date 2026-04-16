@@ -11,7 +11,6 @@ position overlays using standard layout units regardless of @2x retina.
 import math
 import re
 import unicodedata
-from typing import Tuple
 
 
 def lat_lng_to_pixel(
@@ -22,14 +21,14 @@ def lat_lng_to_pixel(
     zoom: int,
     width: int,
     height: int,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """
     Convert lat/lng to CSS pixel position on a static map image.
 
     Uses Web Mercator projection matching Mapbox Static Images API.
     Returns (pixel_x, pixel_y) where (0, 0) is the top-left corner.
     """
-    scale = 256 * (2 ** zoom)
+    scale = 256 * (2**zoom)
 
     pixel_x = width / 2 + (lng - center_lng) * scale / 360
 

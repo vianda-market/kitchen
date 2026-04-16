@@ -15,9 +15,9 @@ Resolution order for kitchen_close_time / kitchen_open_time:
 4. Hardcoded time(9, 0) / time(13, 30)
 """
 
-from datetime import datetime, date, time, timedelta
-from typing import Optional
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
+
 import pytz
 
 from app.config import KitchenDay
@@ -31,7 +31,7 @@ DEFAULT_KITCHEN_OPEN = time(9, 0)
 DEFAULT_KITCHEN_CLOSE = time(13, 30)
 
 
-def _parse_time(v) -> Optional[time]:
+def _parse_time(v) -> time | None:
     """Convert a time object or HH:MM string to a time. Returns None on failure."""
     if v is None:
         return None
@@ -47,10 +47,10 @@ def _parse_time(v) -> Optional[time]:
 
 def _get_kitchen_time(
     field: str,
-    country_code: Optional[str] = None,
-    institution_id: Optional[UUID] = None,
+    country_code: str | None = None,
+    institution_id: UUID | None = None,
     db=None,
-    day_name: Optional[str] = None,
+    day_name: str | None = None,
 ) -> time:
     """
     Resolve kitchen_open_time or kitchen_close_time.
@@ -62,6 +62,7 @@ def _get_kitchen_time(
     if institution_id and db:
         try:
             from app.services.crud_service import supplier_terms_service
+
             terms = supplier_terms_service.get_by_field("institution_id", institution_id, db)
             if terms:
                 val = _parse_time(getattr(terms, field, None))
@@ -74,6 +75,7 @@ def _get_kitchen_time(
     if country_code and str(country_code).strip():
         try:
             from app.utils.db import db_read as _db_read
+
             if db:
                 row = _db_read(
                     f"SELECT mpa.{field} FROM market_payout_aggregator mpa "
@@ -94,6 +96,7 @@ def _get_kitchen_time(
     if field == "kitchen_close_time" and country_code and str(country_code).strip():
         try:
             from app.config.market_config import MarketConfiguration
+
             config = MarketConfiguration.get_market_config(country_code.upper())
             if config and config.kitchen_day_config:
                 day = day_name or "monday"
@@ -111,9 +114,9 @@ def _get_kitchen_time(
 
 
 def _get_kitchen_close_time(
-    country_code: Optional[str],
-    day_name: Optional[str] = None,
-    institution_id: Optional[UUID] = None,
+    country_code: str | None,
+    day_name: str | None = None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> time:
     """Resolve kitchen close time. Backward-compatible wrapper."""
@@ -121,8 +124,8 @@ def _get_kitchen_close_time(
 
 
 def _get_kitchen_open_time(
-    country_code: Optional[str],
-    institution_id: Optional[UUID] = None,
+    country_code: str | None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> time:
     """Resolve kitchen open time."""
@@ -131,8 +134,8 @@ def _get_kitchen_open_time(
 
 def get_effective_current_day(
     timezone_str: str = "America/Argentina/Buenos_Aires",
-    country_code: Optional[str] = None,
-    institution_id: Optional[UUID] = None,
+    country_code: str | None = None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> str:
     """
@@ -181,7 +184,7 @@ def get_effective_current_day(
 def is_today_kitchen_closed(
     country_code: str,
     timezone_str: str,
-    institution_id: Optional[UUID] = None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> bool:
     """
@@ -201,6 +204,7 @@ def is_today_kitchen_closed(
 
     try:
         from app.config.market_config import MarketConfiguration
+
         config = MarketConfiguration.get_market_config((country_code or "").upper())
         if not config or not config.kitchen_day_config:
             return False
@@ -228,7 +232,7 @@ def is_today_kitchen_closed(
 def is_pickup_available(
     country_code: str,
     timezone_str: str,
-    institution_id: Optional[UUID] = None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> bool:
     """
@@ -289,8 +293,8 @@ def date_to_kitchen_day(target_date: date) -> str:
 def get_kitchen_day_for_date(
     target_date: date,
     timezone_str: str,
-    country_code: Optional[str] = None,
-    institution_id: Optional[UUID] = None,
+    country_code: str | None = None,
+    institution_id: UUID | None = None,
     db=None,
 ) -> str:
     """
@@ -321,7 +325,7 @@ def get_kitchen_day_for_date(
 def get_plate_selection_editable_until(
     plate_selection_id,
     db,
-) -> Optional[datetime]:
+) -> datetime | None:
     """
     Get the datetime until which a plate selection is editable.
     Editable until 1 hour before kitchen day opens (business_hours.open = 11:30, so cutoff = 10:30 AM local).
@@ -360,6 +364,7 @@ def get_plate_selection_editable_until(
 
     try:
         from app.config.market_config import MarketConfiguration
+
         config = MarketConfiguration.get_market_config(country_code)
         if config and config.business_hours and kitchen_day:
             day_hours = config.business_hours.get(kitchen_day)

@@ -5,8 +5,8 @@ Admin Referral Configuration Routes
 Routes for internal administrators to manage referral program configuration per market
 and trigger the referral cron job.
 """
+
 from uuid import UUID
-from typing import List
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_employee_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
-    ReferralConfigUpdateSchema,
-    ReferralConfigResponseSchema,
     ReferralConfigEnrichedResponseSchema,
+    ReferralConfigResponseSchema,
+    ReferralConfigUpdateSchema,
 )
 from app.services.crud_service import referral_config_service
 from app.utils.db import db_read
@@ -28,7 +28,7 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=List[ReferralConfigResponseSchema])
+@router.get("", response_model=list[ReferralConfigResponseSchema])
 def list_referral_configs(
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -38,7 +38,7 @@ def list_referral_configs(
     return configs
 
 
-@router.get("/enriched", response_model=List[ReferralConfigEnrichedResponseSchema])
+@router.get("/enriched", response_model=list[ReferralConfigEnrichedResponseSchema])
 def list_referral_configs_enriched(
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -113,5 +113,6 @@ def run_referral_cron_endpoint(
 ):
     """Run the referral cron job. Internal only."""
     from app.services.cron.referral_cron import run_referral_cron
+
     result = run_referral_cron()
     return result

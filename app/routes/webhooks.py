@@ -5,11 +5,13 @@ No authentication — verification is via Stripe-Signature header.
 After successful verification, always return 200 for accepted events (even on internal failure)
 so Stripe does not retry for days.
 """
+
+from datetime import UTC
 from uuid import UUID
 
 import psycopg2.extensions
 import stripe
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.config.settings import settings
 from app.dependencies.database import get_db
@@ -22,7 +24,7 @@ from app.services.subscription_action_service import (
     create_and_process_bill_for_subscription_payment,
 )
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_error, log_info, log_warning
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
@@ -79,38 +81,33 @@ def _handle_payment_intent_succeeded(
 
     cursor = db.cursor()
     try:
-        activate_subscription_after_payment(
-            subscription_id, modified_by=modified_by, db=db, commit=False
-        )
+        activate_subscription_after_payment(subscription_id, modified_by=modified_by, db=db, commit=False)
         cursor.execute(
             "UPDATE subscription_payment SET status = %s WHERE subscription_payment_id = %s::uuid",
             ("succeeded", str(sp_id)),
         )
-        create_and_process_bill_for_subscription_payment(
-            subscription_id, UUID(str(sp_id)), modified_by, db
-        )
+        create_and_process_bill_for_subscription_payment(subscription_id, UUID(str(sp_id)), modified_by, db)
         db.commit()
         log_info(f"Stripe webhook: activated subscription {subscription_id}")
         # Best-effort referral reward processing (non-blocking)
         try:
             from app.services.referral_service import process_referral_reward
+
             process_referral_reward(UUID(str(user_id)), db)
         except Exception as ref_err:
             log_warning(f"Referral reward processing failed for user {user_id}: {ref_err}")
         # Best-effort ads conversion tracking (non-blocking)
         try:
             import asyncio
+
             from app.services.ads.subscription_ads_hook import notify_ads_subscription_activated
-            asyncio.get_event_loop().create_task(
-                notify_ads_subscription_activated(subscription_id, db)
-            )
+
+            asyncio.get_event_loop().create_task(notify_ads_subscription_activated(subscription_id, db))
         except Exception as ads_err:
             log_warning(f"Ads conversion tracking failed for subscription {subscription_id}: {ads_err}")
     except Exception as e:
         db.rollback()
-        log_warning(
-            f"Stripe webhook payment_intent.succeeded processing failed (returning 200): {e}"
-        )
+        log_warning(f"Stripe webhook payment_intent.succeeded processing failed (returning 200): {e}")
     finally:
         cursor.close()
 
@@ -135,10 +132,10 @@ async def stripe_webhook(
         event = stripe.Webhook.construct_event(payload, signature, secret)
     except ValueError as e:
         log_warning(f"Stripe webhook invalid payload: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload")
+        raise HTTPException(status_code=400, detail="Invalid payload") from None
     except stripe.SignatureVerificationError as e:
         log_warning(f"Stripe webhook signature verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid signature") from None
 
     event_type = event.type
     try:
@@ -160,13 +157,15 @@ async def stripe_webhook(
 # STRIPE CONNECT WEBHOOK (separate secret; separate endpoint)
 # =============================================================================
 
+
 def _handle_account_updated(
     event: stripe.Event,
     db: psycopg2.extensions.connection,
 ) -> None:
     """Sync payout_onboarding_status on entity when Stripe confirms onboarding is complete."""
-    from app.services.entity_service import get_institution_entity_by_payout_account_id
     from app.services.crud_service import institution_entity_service
+    from app.services.entity_service import get_institution_entity_by_payout_account_id
+
     account = event.data.object
     connect_id = account.id if hasattr(account, "id") else None
     if not connect_id:
@@ -234,9 +233,7 @@ def _handle_transfer_reversed(
     if reversals and hasattr(reversals, "data") and reversals.data:
         first = reversals.data[0]
         reversal_reason = getattr(first, "reason", None) or "unknown"
-    log_warning(
-        f"Connect transfer.reversed: transfer={transfer_id} reason={reversal_reason}"
-    )
+    log_warning(f"Connect transfer.reversed: transfer={transfer_id} reason={reversal_reason}")
     try:
         with db.cursor() as cur:
             cur.execute(
@@ -276,8 +273,9 @@ def _handle_connect_payout_paid(
     payout_id = payout.id if hasattr(payout, "id") else None
     if not payout_id:
         return
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime
+
+    now = datetime.now(UTC)
     try:
         with db.cursor() as cur:
             # Match payout row via provider_transfer_id (the Transfer ID written at creation)
@@ -367,10 +365,10 @@ async def stripe_connect_webhook(
         event = stripe.Webhook.construct_event(payload, signature, secret)
     except ValueError as e:
         log_warning(f"Connect webhook invalid payload: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload")
+        raise HTTPException(status_code=400, detail="Invalid payload") from None
     except stripe.SignatureVerificationError as e:
         log_warning(f"Connect webhook signature verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid signature") from None
 
     event_type = event.type
     try:

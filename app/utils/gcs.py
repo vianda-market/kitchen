@@ -2,6 +2,7 @@
 
 Uses ADC on Cloud Run; local creds (GOOGLE_APPLICATION_CREDENTIALS) for local dev.
 """
+
 import base64
 import datetime
 import hashlib
@@ -87,9 +88,7 @@ def delete_file(bucket_name: str, blob_name: str) -> None:
 # ── Convenience helpers per actor type ──
 
 
-def upload_qr_code(
-    qr_code_id: str | UUID, restaurant_id: str | UUID, file_data: bytes
-) -> str:
+def upload_qr_code(qr_code_id: str | UUID, restaurant_id: str | UUID, file_data: bytes) -> str:
     """Upload QR code to internal bucket. Returns blob path."""
     from app.config.settings import settings
 
@@ -160,9 +159,7 @@ def upload_product_image(
         raise
 
 
-def get_product_image_signed_url(
-    product_id: str | UUID, institution_id: str | UUID
-) -> str:
+def get_product_image_signed_url(product_id: str | UUID, institution_id: str | UUID) -> str:
     """Generate signed URL for product full image."""
     from app.config.settings import settings
 
@@ -174,9 +171,7 @@ def get_product_image_signed_url(
     )
 
 
-def get_product_thumbnail_signed_url(
-    product_id: str | UUID, institution_id: str | UUID
-) -> str:
+def get_product_thumbnail_signed_url(product_id: str | UUID, institution_id: str | UUID) -> str:
     """Generate signed URL for product thumbnail."""
     from app.config.settings import settings
 
@@ -223,16 +218,12 @@ def delete_qr_code_blob(blob_name: str) -> None:
 # ── Stubs for future phases ──
 
 
-def upload_profile_picture(
-    user_id: str | UUID, file_data: bytes, content_type: str
-) -> str:
+def upload_profile_picture(user_id: str | UUID, file_data: bytes, content_type: str) -> str:
     """Upload profile picture to customer bucket. (Future phase.)"""
     from app.config.settings import settings
 
     blob_name = f"profile/{user_id}/picture"
-    return upload_file(
-        settings.GCS_CUSTOMER_BUCKET, blob_name, file_data, content_type
-    )
+    return upload_file(settings.GCS_CUSTOMER_BUCKET, blob_name, file_data, content_type)
 
 
 def get_profile_picture_signed_url(user_id: str | UUID) -> str:
@@ -247,16 +238,12 @@ def get_profile_picture_signed_url(user_id: str | UUID) -> str:
     )
 
 
-def upload_employer_logo(
-    employer_id: str | UUID, file_data: bytes, content_type: str
-) -> str:
+def upload_employer_logo(employer_id: str | UUID, file_data: bytes, content_type: str) -> str:
     """Upload employer logo to employer bucket. (Future phase.)"""
     from app.config.settings import settings
 
     blob_name = f"logos/{employer_id}/logo"
-    return upload_file(
-        settings.GCS_EMPLOYER_BUCKET, blob_name, file_data, content_type
-    )
+    return upload_file(settings.GCS_EMPLOYER_BUCKET, blob_name, file_data, content_type)
 
 
 def get_employer_logo_signed_url(employer_id: str | UUID) -> str:

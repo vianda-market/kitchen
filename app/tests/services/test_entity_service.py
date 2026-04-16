@@ -5,25 +5,29 @@ Tests the business logic for entity-specific operations including
 user lookups, product filtering, and business rule enforcement.
 """
 
-import pytest
+from datetime import UTC, datetime
+from decimal import Decimal
 from unittest.mock import Mock, patch
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
 from fastapi import HTTPException
 
+from app.config import RoleName, RoleType, Status
+from app.dto.models import InstitutionBillDTO, PlateDTO, ProductDTO, UserDTO
 from app.services.entity_service import (
-    get_user_by_username, get_user_by_email, get_products_by_institution,
-    get_plates_by_restaurant, get_bills_by_status,
-    get_enriched_discretionary_requests,
+    get_bills_by_status,
     get_enriched_discretionary_request_by_id,
-    search_users,
-    search_restaurants,
-    get_enriched_plates,
+    get_enriched_discretionary_requests,
     get_enriched_plate_by_id,
+    get_enriched_plates,
+    get_plates_by_restaurant,
+    get_products_by_institution,
+    get_user_by_email,
+    get_user_by_username,
+    search_restaurants,
+    search_users,
 )
-from app.dto.models import UserDTO, ProductDTO, PlateDTO, InstitutionBillDTO
-from app.config import Status, RoleType, RoleName
-from decimal import Decimal
 
 
 class TestEntityService:
@@ -46,17 +50,17 @@ class TestEntityService:
             "market_id": uuid4(),
             "is_archived": False,
             "status": Status.ACTIVE,
-            "created_date": datetime.now(timezone.utc),
+            "created_date": datetime.now(UTC),
             "modified_by": uuid4(),
-            "modified_date": datetime.now(timezone.utc)
+            "modified_date": datetime.now(UTC),
         }
-        
-        with patch('app.services.entity_service.user_service') as mock_user_service:
+
+        with patch("app.services.entity_service.user_service") as mock_user_service:
             mock_user_service.get_by_field.return_value = UserDTO(**mock_user_data)
-            
+
             # Act
             result = get_user_by_username(username, mock_db)
-            
+
             # Assert
             assert result is not None
             assert result.username == username
@@ -67,13 +71,13 @@ class TestEntityService:
         """Test that get_user_by_username returns None when user not found."""
         # Arrange
         username = "nonexistent"
-        
-        with patch('app.services.entity_service.user_service') as mock_user_service:
+
+        with patch("app.services.entity_service.user_service") as mock_user_service:
             mock_user_service.get_by_field.return_value = None
-            
+
             # Act
             result = get_user_by_username(username, mock_db)
-            
+
             # Assert
             assert result is None
             mock_user_service.get_by_field.assert_called_once_with("username", username, mock_db, scope=None)
@@ -82,14 +86,14 @@ class TestEntityService:
         """Test that get_user_by_username handles database errors gracefully."""
         # Arrange
         username = "testuser"
-        
-        with patch('app.services.entity_service.user_service') as mock_user_service:
+
+        with patch("app.services.entity_service.user_service") as mock_user_service:
             mock_user_service.get_by_field.side_effect = Exception("Database error")
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 get_user_by_username(username, mock_db)
-            
+
             assert exc_info.value.status_code == 500
             assert "Failed to get user by username" in str(exc_info.value.detail)
 
@@ -109,11 +113,11 @@ class TestEntityService:
             "market_id": uuid4(),
             "is_archived": False,
             "status": Status.ACTIVE,
-            "created_date": datetime.now(timezone.utc),
+            "created_date": datetime.now(UTC),
             "modified_by": uuid4(),
-            "modified_date": datetime.now(timezone.utc)
+            "modified_date": datetime.now(UTC),
         }
-        with patch('app.services.entity_service.user_service') as mock_user_service:
+        with patch("app.services.entity_service.user_service") as mock_user_service:
             mock_user_service.get_by_field.return_value = UserDTO(**mock_user_data)
             # Act: pass mixed-case username
             result = get_user_by_username("TestUser", mock_db)
@@ -137,11 +141,11 @@ class TestEntityService:
             "market_id": uuid4(),
             "is_archived": False,
             "status": Status.ACTIVE,
-            "created_date": datetime.now(timezone.utc),
+            "created_date": datetime.now(UTC),
             "modified_by": uuid4(),
-            "modified_date": datetime.now(timezone.utc)
+            "modified_date": datetime.now(UTC),
         }
-        with patch('app.services.entity_service.user_service') as mock_user_service:
+        with patch("app.services.entity_service.user_service") as mock_user_service:
             mock_user_service.get_by_field.return_value = UserDTO(**mock_user_data)
             result = get_user_by_email("User@Example.com", mock_db)
             assert result is not None
@@ -153,7 +157,7 @@ class TestEntityService:
         # Arrange
         institution_id = uuid4()
         other_institution_id = uuid4()
-        
+
         # Create mock ProductDTOs
         mock_products = [
             ProductDTO(
@@ -168,8 +172,8 @@ class TestEntityService:
                 image_thumbnail_url="http://localhost:8000/static/placeholders/product_default.png",
                 image_thumbnail_storage_path="static/placeholders/product_default.png",
                 image_checksum="7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c",
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             ProductDTO(
                 product_id=uuid4(),
@@ -183,8 +187,8 @@ class TestEntityService:
                 image_thumbnail_url="http://localhost:8000/static/placeholders/product_default.png",
                 image_thumbnail_storage_path="static/placeholders/product_default.png",
                 image_checksum="7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c",
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             ProductDTO(
                 product_id=uuid4(),
@@ -198,17 +202,17 @@ class TestEntityService:
                 image_thumbnail_url="http://localhost:8000/static/placeholders/product_default.png",
                 image_thumbnail_storage_path="static/placeholders/product_default.png",
                 image_checksum="7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c",
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
-            )
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
+            ),
         ]
-        
-        with patch('app.services.entity_service.product_service') as mock_product_service:
+
+        with patch("app.services.entity_service.product_service") as mock_product_service:
             mock_product_service.get_all.return_value = mock_products
-            
+
             # Act
             result = get_products_by_institution(institution_id, mock_db)
-            
+
             # Assert
             assert len(result) == 2
             assert all(product.institution_id == institution_id for product in result)
@@ -219,13 +223,13 @@ class TestEntityService:
         """Test that get_products_by_institution handles no products found."""
         # Arrange
         institution_id = uuid4()
-        
-        with patch('app.services.entity_service.product_service') as mock_product_service:
+
+        with patch("app.services.entity_service.product_service") as mock_product_service:
             mock_product_service.get_all.return_value = []
-            
+
             # Act
             result = get_products_by_institution(institution_id, mock_db)
-            
+
             # Assert
             assert result == []
 
@@ -234,7 +238,7 @@ class TestEntityService:
         # Arrange
         restaurant_id = uuid4()
         other_restaurant_id = uuid4()
-        
+
         # Create mock PlateDTOs
         mock_plates = [
             PlateDTO(
@@ -248,8 +252,8 @@ class TestEntityService:
                 status="active",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             PlateDTO(
                 plate_id=uuid4(),
@@ -262,8 +266,8 @@ class TestEntityService:
                 status="active",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             PlateDTO(
                 plate_id=uuid4(),
@@ -276,17 +280,17 @@ class TestEntityService:
                 status="active",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
-            )
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
+            ),
         ]
-        
-        with patch('app.services.entity_service.plate_service') as mock_plate_service:
+
+        with patch("app.services.entity_service.plate_service") as mock_plate_service:
             mock_plate_service.get_all.return_value = mock_plates
-            
+
             # Act
             result = get_plates_by_restaurant(restaurant_id, mock_db)
-            
+
             # Assert
             assert len(result) == 2
             assert all(plate.restaurant_id == restaurant_id for plate in result)
@@ -297,13 +301,13 @@ class TestEntityService:
         """Test that get_plates_by_restaurant handles no plates found."""
         # Arrange
         restaurant_id = uuid4()
-        
-        with patch('app.services.entity_service.plate_service') as mock_plate_service:
+
+        with patch("app.services.entity_service.plate_service") as mock_plate_service:
             mock_plate_service.get_all.return_value = []
-            
+
             # Act
             result = get_plates_by_restaurant(restaurant_id, mock_db)
-            
+
             # Assert
             assert result == []
 
@@ -312,7 +316,7 @@ class TestEntityService:
         # Arrange
         institution_id = uuid4()
         status = "pending"
-        
+
         # Create mock InstitutionBillDTOs
         mock_bills = [
             InstitutionBillDTO(
@@ -321,13 +325,13 @@ class TestEntityService:
                 institution_entity_id=institution_id,
                 currency_metadata_id=uuid4(),
                 status=status,
-                period_start=datetime.now(timezone.utc),
-                period_end=datetime.now(timezone.utc),
+                period_start=datetime.now(UTC),
+                period_end=datetime.now(UTC),
                 resolution="Monthly",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             InstitutionBillDTO(
                 institution_bill_id=uuid4(),
@@ -335,13 +339,13 @@ class TestEntityService:
                 institution_entity_id=institution_id,
                 currency_metadata_id=uuid4(),
                 status=Status.PROCESSED,  # Different status
-                period_start=datetime.now(timezone.utc),
-                period_end=datetime.now(timezone.utc),
+                period_start=datetime.now(UTC),
+                period_end=datetime.now(UTC),
                 resolution="Monthly",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
             ),
             InstitutionBillDTO(
                 institution_bill_id=uuid4(),
@@ -349,22 +353,22 @@ class TestEntityService:
                 institution_entity_id=institution_id,
                 currency_metadata_id=uuid4(),
                 status=status,
-                period_start=datetime.now(timezone.utc),
-                period_end=datetime.now(timezone.utc),
+                period_start=datetime.now(UTC),
+                period_end=datetime.now(UTC),
                 resolution="Monthly",
                 modified_by=uuid4(),
                 is_archived=False,
-                created_date=datetime.now(timezone.utc),
-                modified_date=datetime.now(timezone.utc)
-            )
+                created_date=datetime.now(UTC),
+                modified_date=datetime.now(UTC),
+            ),
         ]
-        
-        with patch('app.services.entity_service.institution_bill_service') as mock_bill_service:
+
+        with patch("app.services.entity_service.institution_bill_service") as mock_bill_service:
             mock_bill_service.get_all.return_value = mock_bills
-            
+
             # Act
             result = get_bills_by_status(institution_id, status, mock_db)
-            
+
             # Assert
             assert len(result) == 2
             assert all(bill.institution_entity_id == institution_id for bill in result)
@@ -375,13 +379,13 @@ class TestEntityService:
         # Arrange
         institution_id = uuid4()
         status = "pending"
-        
-        with patch('app.services.entity_service.institution_bill_service') as mock_bill_service:
+
+        with patch("app.services.entity_service.institution_bill_service") as mock_bill_service:
             mock_bill_service.get_all.return_value = []
-            
+
             # Act
             result = get_bills_by_status(institution_id, status, mock_db)
-            
+
             # Assert
             assert result == []
 
@@ -389,14 +393,14 @@ class TestEntityService:
         """Test that get_products_by_institution handles service errors gracefully."""
         # Arrange
         institution_id = uuid4()
-        
-        with patch('app.services.entity_service.product_service') as mock_product_service:
+
+        with patch("app.services.entity_service.product_service") as mock_product_service:
             mock_product_service.get_all.side_effect = Exception("Service error")
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 get_products_by_institution(institution_id, mock_db)
-            
+
             assert exc_info.value.status_code == 500
             assert "Failed to get products for institution" in str(exc_info.value.detail)
 
@@ -404,14 +408,14 @@ class TestEntityService:
         """Test that get_plates_by_restaurant handles service errors gracefully."""
         # Arrange
         restaurant_id = uuid4()
-        
-        with patch('app.services.entity_service.plate_service') as mock_plate_service:
+
+        with patch("app.services.entity_service.plate_service") as mock_plate_service:
             mock_plate_service.get_all.side_effect = Exception("Service error")
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 get_plates_by_restaurant(restaurant_id, mock_db)
-            
+
             assert exc_info.value.status_code == 500
             assert "Failed to get plates for restaurant" in str(exc_info.value.detail)
 
@@ -420,14 +424,14 @@ class TestEntityService:
         # Arrange
         institution_id = uuid4()
         status = "pending"
-        
-        with patch('app.services.entity_service.institution_bill_service') as mock_bill_service:
+
+        with patch("app.services.entity_service.institution_bill_service") as mock_bill_service:
             mock_bill_service.get_all.side_effect = Exception("Service error")
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 get_bills_by_status(institution_id, status, mock_db)
-            
+
             assert exc_info.value.status_code == 500
             assert "Failed to get bills for institution" in str(exc_info.value.detail)
 
@@ -482,7 +486,7 @@ class TestEntityService:
 class TestEnrichedDiscretionary:
     """Tests for enriched discretionary requests (created_by / created_by_name)."""
 
-    @patch('app.services.enriched_service.db_read')
+    @patch("app.services.enriched_service.db_read")
     def test_get_enriched_discretionary_requests_includes_created_by_fields(self, mock_db_read, mock_db):
         """Enriched list response includes created_by and created_by_name."""
         did = uuid4()
@@ -491,7 +495,7 @@ class TestEnrichedDiscretionary:
         ccid = uuid4()
         mid = uuid4()
         creator_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_db_read.return_value = [
             {
                 "discretionary_id": str(did),
@@ -526,12 +530,12 @@ class TestEnrichedDiscretionary:
         assert result[0].created_by == creator_id
         assert result[0].created_by_name == "Admin User"
 
-    @patch('app.services.enriched_service.db_read')
+    @patch("app.services.enriched_service.db_read")
     def test_get_enriched_discretionary_request_by_id_includes_created_by_fields(self, mock_db_read, mock_db):
         """Enriched by-id response includes created_by and created_by_name."""
         did = uuid4()
         creator_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_db_read.return_value = {
             "discretionary_id": str(did),
             "user_id": str(uuid4()),
@@ -570,9 +574,7 @@ class TestEnrichedPlatesPortionSize:
 
     @patch("app.services.entity_service._plate_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_portion_size_insufficient_reviews_when_review_count_below_5(
-        self, mock_plate_enriched, mock_db
-    ):
+    def test_portion_size_insufficient_reviews_when_review_count_below_5(self, mock_plate_enriched, mock_db):
         """When review_count < 5, portion_size is insufficient_reviews and averages are null."""
         from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
 
@@ -610,8 +612,8 @@ class TestEnrichedPlatesPortionSize:
             delivery_time_minutes=15,
             is_archived=False,
             status="active",
-            created_date=datetime.now(timezone.utc),
-            modified_date=datetime.now(timezone.utc),
+            created_date=datetime.now(UTC),
+            modified_date=datetime.now(UTC),
         )
         mock_plate_enriched.get_enriched.return_value = [plate]
 
@@ -625,9 +627,7 @@ class TestEnrichedPlatesPortionSize:
 
     @patch("app.services.entity_service._plate_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_portion_size_bucketed_when_review_count_ge_5(
-        self, mock_plate_enriched, mock_db
-    ):
+    def test_portion_size_bucketed_when_review_count_ge_5(self, mock_plate_enriched, mock_db):
         """When review_count >= 5, portion_size is bucketed from average_portion_size."""
         from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
 
@@ -665,8 +665,8 @@ class TestEnrichedPlatesPortionSize:
             delivery_time_minutes=15,
             is_archived=False,
             status="active",
-            created_date=datetime.now(timezone.utc),
-            modified_date=datetime.now(timezone.utc),
+            created_date=datetime.now(UTC),
+            modified_date=datetime.now(UTC),
         )
         mock_plate_enriched.get_enriched.return_value = [plate]
 
@@ -680,9 +680,7 @@ class TestEnrichedPlatesPortionSize:
 
     @patch("app.services.entity_service._plate_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_get_enriched_plate_by_id_portion_size(
-        self, mock_plate_enriched, mock_db
-    ):
+    def test_get_enriched_plate_by_id_portion_size(self, mock_plate_enriched, mock_db):
         """get_enriched_plate_by_id applies portion_size logic."""
         from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
 
@@ -721,8 +719,8 @@ class TestEnrichedPlatesPortionSize:
             delivery_time_minutes=15,
             is_archived=False,
             status="active",
-            created_date=datetime.now(timezone.utc),
-            modified_date=datetime.now(timezone.utc),
+            created_date=datetime.now(UTC),
+            modified_date=datetime.now(UTC),
         )
         mock_plate_enriched.get_enriched_by_id.return_value = plate
 

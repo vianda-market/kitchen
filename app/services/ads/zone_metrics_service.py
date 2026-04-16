@@ -12,15 +12,16 @@ Called by a cron endpoint (Cloud Scheduler daily) or on-demand from admin.
 Uses PostgreSQL's earth_distance functions for radius matching. Falls back
 to application-level haversine if the extension is not available.
 """
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import psycopg2.extensions
 
 from app.services.ads.notify_me_sync import count_notify_me_leads_for_zone
 from app.utils.db import db_read
-from app.utils.log import log_info, log_error
+from app.utils.log import log_error, log_info
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def refresh_zone_metrics(
     restaurant_count = _count_restaurants_in_radius(lat, lon, radius, db)
     subscriber_count = _count_subscribers_in_radius(lat, lon, radius, db)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(

@@ -1,8 +1,7 @@
 """X-Content-Language from Accept-Language (header-only middleware)."""
 
-from fastapi.testclient import TestClient
-
 from application import app
+from fastapi.testclient import TestClient
 
 
 def test_root_response_includes_x_content_language():

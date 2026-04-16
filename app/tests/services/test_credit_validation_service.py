@@ -5,18 +5,19 @@ Tests the business logic for credit validation including sufficient credits,
 insufficient credits, and edge cases like exact credit matches.
 """
 
-import pytest
-from unittest.mock import Mock, patch
-from uuid import UUID, uuid4
 from decimal import Decimal
+from unittest.mock import patch
+from uuid import uuid4
+
+import pytest
 from fastapi import HTTPException
 
-from app.services.credit_validation_service import (
-    validate_sufficient_credits,
-    handle_insufficient_credits,
-    get_user_balance
-)
 from app.dto.models import SubscriptionDTO
+from app.services.credit_validation_service import (
+    get_user_balance,
+    handle_insufficient_credits,
+    validate_sufficient_credits,
+)
 
 
 class TestCreditValidationService:
@@ -28,7 +29,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 10.0
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -40,15 +41,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is True
             assert result.current_balance == 10.0
@@ -64,7 +65,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 5.0  # Exactly enough
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -76,15 +77,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is True
             assert result.current_balance == 5.0
@@ -100,7 +101,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 3.0  # Insufficient
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -112,15 +113,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is False
             assert result.current_balance == 3.0
@@ -136,7 +137,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 0.0  # Zero balance
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -148,15 +149,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is False
             assert result.current_balance == 0.0
@@ -171,14 +172,14 @@ class TestCreditValidationService:
         # Arrange
         user_id = uuid4()
         required_credits = 5.0
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = None
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             assert exc_info.value.status_code == 404
             assert "User subscription not found" in str(exc_info.value.detail)
             assert "Please go to Plan and subscribe before reserving a plate" in str(exc_info.value.detail)
@@ -188,14 +189,14 @@ class TestCreditValidationService:
         # Arrange
         user_id = uuid4()
         required_credits = 5.0
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.side_effect = Exception("Database connection error")
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             assert exc_info.value.status_code == 500
             assert "Error validating user credits" in str(exc_info.value.detail)
 
@@ -205,10 +206,10 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 0.0
-        
+
         # Act
         result = handle_insufficient_credits(user_id, required_credits, current_balance)
-        
+
         # Assert
         assert result.error_type == "insufficient_credits"
         assert "no credits remaining" in result.message
@@ -224,10 +225,10 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 2.0
-        
+
         # Act
         result = handle_insufficient_credits(user_id, required_credits, current_balance)
-        
+
         # Assert
         assert result.error_type == "insufficient_credits"
         assert "You have 2.0 credits, but this plate costs 5.0 credits" in result.message
@@ -242,7 +243,7 @@ class TestCreditValidationService:
         # Arrange
         user_id = uuid4()
         current_balance = 10.0
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -254,15 +255,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
 
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = get_user_balance(user_id, mock_db)
-            
+
             # Assert
             assert result == 10.0
 
@@ -270,13 +271,13 @@ class TestCreditValidationService:
         """Test that get_user_balance returns None when subscription is not found."""
         # Arrange
         user_id = uuid4()
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = None
-            
+
             # Act
             result = get_user_balance(user_id, mock_db)
-            
+
             # Assert
             assert result is None
 
@@ -284,13 +285,13 @@ class TestCreditValidationService:
         """Test that get_user_balance handles exceptions gracefully."""
         # Arrange
         user_id = uuid4()
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.side_effect = Exception("Database error")
-            
+
             # Act
             result = get_user_balance(user_id, mock_db)
-            
+
             # Assert
             assert result is None
 
@@ -300,7 +301,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 2.5
         current_balance = 2.5  # Exactly enough with decimals
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -312,15 +313,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is True
             assert result.remaining_balance_after_purchase == 0.0
@@ -332,7 +333,7 @@ class TestCreditValidationService:
         user_id = uuid4()
         required_credits = 5.0
         current_balance = 4.99  # Very small shortfall
-        
+
         mock_subscription = SubscriptionDTO(
             subscription_id=uuid4(),
             user_id=user_id,
@@ -344,15 +345,15 @@ class TestCreditValidationService:
             status="active",
             created_date="2023-01-01T00:00:00",
             modified_by=uuid4(),
-            modified_date="2023-01-01T00:00:00"
+            modified_date="2023-01-01T00:00:00",
         )
-        
-        with patch('app.services.crud_service.subscription_service.get_by_user') as mock_get_by_user:
+
+        with patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user:
             mock_get_by_user.return_value = mock_subscription
-            
+
             # Act
             result = validate_sufficient_credits(user_id, required_credits, mock_db)
-            
+
             # Assert
             assert result.has_sufficient_credits is False
             assert abs(result.shortfall - 0.01) < 0.001  # Allow for floating point precision

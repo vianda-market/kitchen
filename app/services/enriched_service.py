@@ -14,29 +14,31 @@ Benefits:
 - Easy to extend with new enriched endpoints
 """
 
-from typing import TypeVar, Generic, Optional, List, Any, Tuple, Dict, Callable, Union
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, Union
 from uuid import UUID
-from datetime import datetime
+
 import psycopg2.extensions
 from fastapi import HTTPException
 from pydantic import BaseModel
-from app.utils.db import db_read
-from app.utils.log import log_info, log_error
+
 from app.security.institution_scope import InstitutionScope
+from app.utils.db import db_read
+from app.utils.log import log_error
 from app.utils.pagination import PaginatedList
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class EnrichedService(Generic[T]):
     """
     Generic enriched service that provides common enriched query operations
     for any enriched endpoint type, eliminating code duplication.
-    
+
     Similar to CRUDService but specialized for enriched queries with JOINs,
     computed fields, and complex filtering.
     """
-    
+
     def __init__(
         self,
         base_table: str,
@@ -44,13 +46,13 @@ class EnrichedService(Generic[T]):
         id_column: str,
         schema_class: type[T],
         *,
-        institution_column: Optional[str] = None,
-        institution_table_alias: Optional[str] = None,
-        default_order_by: Optional[str] = None
+        institution_column: str | None = None,
+        institution_table_alias: str | None = None,
+        default_order_by: str | None = None,
     ):
         """
         Initialize the enriched service for a specific entity.
-        
+
         Args:
             base_table: Name of the main database table (e.g., "institution_entity_info")
             table_alias: Alias for the main table in queries (e.g., "ie")
@@ -72,36 +74,36 @@ class EnrichedService(Generic[T]):
         self.institution_column = institution_column
         self.institution_table_alias = institution_table_alias or table_alias
         self.default_order_by = default_order_by if default_order_by is not None else f"{table_alias}.{id_column} DESC"
-    
+
     def _build_where_clause(
         self,
         include_archived: bool = False,
-        scope: Optional[InstitutionScope] = None,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None
-    ) -> Tuple[str, List[Any]]:
+        scope: InstitutionScope | None = None,
+        additional_conditions: list[tuple[str, Any]] | None = None,
+    ) -> tuple[str, list[Any]]:
         """
         Build WHERE clause and parameters for enriched queries.
-        
+
         Args:
             include_archived: Whether to include archived records
             scope: Optional institution scope for filtering
             additional_conditions: List of (condition, param) tuples for custom conditions
-            
+
         Returns:
             Tuple of (where_clause, params)
         """
         conditions = []
-        params: List[Any] = []
-        
+        params: list[Any] = []
+
         # Filter by archived status
         if not include_archived:
             conditions.append(f"{self.table_alias}.is_archived = FALSE")
-        
+
         # Apply institution scoping (for Suppliers - filter by institution)
         if scope and not scope.is_global and scope.institution_id and self.institution_column:
             conditions.append(f"{self.institution_table_alias}.{self.institution_column} = %s::uuid")
             params.append(str(scope.institution_id))
-        
+
         # Add custom conditions
         if additional_conditions:
             for condition, param in additional_conditions:
@@ -109,17 +111,17 @@ class EnrichedService(Generic[T]):
                 if param is not None:
                     # psycopg2 can't adapt uuid.UUID; convert to str for query params
                     params.append(str(param) if isinstance(param, UUID) else param)
-        
+
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         return where_clause, params
-    
+
     def _convert_uuids_to_strings(self, row_dict: dict) -> dict:
         """
         Convert UUID objects to strings in a row dictionary for Pydantic validation.
-        
+
         Args:
             row_dict: Dictionary from database query
-            
+
         Returns:
             Dictionary with UUIDs converted to strings
         """
@@ -130,58 +132,46 @@ class EnrichedService(Generic[T]):
             else:
                 converted[key] = value
         return converted
-    
+
     def _execute_query(
-        self,
-        query: str,
-        params: Optional[List[Any]],
-        db: psycopg2.extensions.connection,
-        fetch_one: bool = False
-    ) -> Optional[List[dict]]:
+        self, query: str, params: list[Any] | None, db: psycopg2.extensions.connection, fetch_one: bool = False
+    ) -> list[dict] | None:
         """
         Execute enriched query with standard error handling.
-        
+
         Args:
             query: SQL query string
             params: Query parameters
             db: Database connection
             fetch_one: Whether to fetch single result
-            
+
         Returns:
             List of dictionaries or None if fetch_one and no result
         """
         try:
-            results = db_read(
-                query,
-                tuple(params) if params else None,
-                connection=db,
-                fetch_one=fetch_one
-            )
-            
+            results = db_read(query, tuple(params) if params else None, connection=db, fetch_one=fetch_one)
+
             if fetch_one:
                 return [results] if results else None
             return results if results else []
         except Exception as e:
             log_error(f"Error executing enriched query: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to execute enriched query: {str(e)}"
-            )
-    
+            raise HTTPException(status_code=500, detail=f"Failed to execute enriched query: {str(e)}") from None
+
     def get_enriched(
         self,
         db: psycopg2.extensions.connection,
         *,
-        select_fields: List[str],
-        joins: List[Tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
-        scope: Optional[InstitutionScope] = None,
+        select_fields: list[str],
+        joins: list[tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
+        scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
-        order_by: Optional[str] = None,
-        row_transform: Optional[Callable[[dict], dict]] = None,
-        page: Optional[int] = None,
-        page_size: Optional[int] = None,
-    ) -> Union[List[T], "PaginatedList[T]"]:
+        additional_conditions: list[tuple[str, Any]] | None = None,
+        order_by: str | None = None,
+        row_transform: Callable[[dict], dict] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> Union[list[T], "PaginatedList[T]"]:
         """
         Get all enriched records with JOINs and filtering.
 
@@ -208,9 +198,7 @@ class EnrichedService(Generic[T]):
         try:
             # Build WHERE clause
             where_clause, params = self._build_where_clause(
-                include_archived=include_archived,
-                scope=scope,
-                additional_conditions=additional_conditions
+                include_archived=include_archived, scope=scope, additional_conditions=additional_conditions
             )
 
             # Build JOIN clauses
@@ -227,7 +215,7 @@ class EnrichedService(Generic[T]):
                 count_query = f"""
                     SELECT COUNT(*)
                     FROM {self.base_table} {self.table_alias}
-                    {' '.join(join_clauses)}
+                    {" ".join(join_clauses)}
                     {where_clause}
                 """
                 count_result = self._execute_query(count_query, list(params), db, fetch_one=True)
@@ -242,9 +230,9 @@ class EnrichedService(Generic[T]):
 
             query = f"""
                 SELECT
-                    {', '.join(select_fields)}
+                    {", ".join(select_fields)}
                 FROM {self.base_table} {self.table_alias}
-                {' '.join(join_clauses)}
+                {" ".join(join_clauses)}
                 {where_clause}
                 ORDER BY {order_by_clause}
                 {pagination_clause}
@@ -275,28 +263,26 @@ class EnrichedService(Generic[T]):
             raise
         except Exception as e:
             import traceback
+
             error_trace = traceback.format_exc()
             log_error(f"Error getting enriched {self.base_table}: {e}\nTraceback: {error_trace}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to get enriched {self.base_table}: {str(e)}"
-            )
-    
+            raise HTTPException(status_code=500, detail=f"Failed to get enriched {self.base_table}: {str(e)}") from None
+
     def get_enriched_by_id(
         self,
         record_id: UUID,
         db: psycopg2.extensions.connection,
         *,
-        select_fields: List[str],
-        joins: List[Tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
-        scope: Optional[InstitutionScope] = None,
+        select_fields: list[str],
+        joins: list[tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
+        scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
-        row_transform: Optional[Callable[[dict], dict]] = None,
-    ) -> Optional[T]:
+        additional_conditions: list[tuple[str, Any]] | None = None,
+        row_transform: Callable[[dict], dict] | None = None,
+    ) -> T | None:
         """
         Get a single enriched record by ID with JOINs and filtering.
-        
+
         Args:
             record_id: Record ID to fetch
             db: Database connection
@@ -305,7 +291,7 @@ class EnrichedService(Generic[T]):
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records
             additional_conditions: List of (condition, param) tuples for custom WHERE conditions
-            
+
         Returns:
             Enriched schema object or None if not found
         """
@@ -315,68 +301,64 @@ class EnrichedService(Generic[T]):
             conditions = [id_condition]
             if additional_conditions:
                 conditions.extend(additional_conditions)
-            
+
             # Build WHERE clause
             where_clause, params = self._build_where_clause(
-                include_archived=include_archived,
-                scope=scope,
-                additional_conditions=conditions
+                include_archived=include_archived, scope=scope, additional_conditions=conditions
             )
-            
+
             # Build JOIN clauses
             join_clauses = []
             for join_type, table, alias, condition in joins:
                 join_clauses.append(f"{join_type} JOIN {table} {alias} ON {condition}")
-            
+
             # Build complete query
             query = f"""
-                SELECT 
-                    {', '.join(select_fields)}
+                SELECT
+                    {", ".join(select_fields)}
                 FROM {self.base_table} {self.table_alias}
-                {' '.join(join_clauses)}
+                {" ".join(join_clauses)}
                 {where_clause}
             """
-            
+
             # Execute query
             results = self._execute_query(query, params, db, fetch_one=True)
-            
+
             if not results:
                 return None
-            
+
             # Convert UUIDs and validate schema
             row_dict = dict(results[0])
             row_dict = self._convert_uuids_to_strings(row_dict)
             if row_transform:
                 row_dict = row_transform(row_dict)
             return self.schema_class(**row_dict)
-            
+
         except HTTPException:
             raise
         except Exception as e:
             import traceback
+
             error_trace = traceback.format_exc()
             log_error(f"Error getting enriched {self.base_table} by ID {record_id}: {e}\nTraceback: {error_trace}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to get enriched {self.base_table}: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to get enriched {self.base_table}: {str(e)}") from None
 
     def get_distinct_enriched(
         self,
         db: psycopg2.extensions.connection,
         *,
-        select_fields: List[str],
-        aggregate_fields: List[Dict[str, str]],
-        joins: List[Tuple[str, str, str, str]],
-        group_by_fields: Optional[List[str]] = None,
-        scope: Optional[InstitutionScope] = None,
+        select_fields: list[str],
+        aggregate_fields: list[dict[str, str]],
+        joins: list[tuple[str, str, str, str]],
+        group_by_fields: list[str] | None = None,
+        scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: Optional[List[Tuple[str, Any]]] = None,
-        order_by: Optional[str] = None,
-        row_transform: Optional[Callable[[dict], dict]] = None,
-        page: Optional[int] = None,
-        page_size: Optional[int] = None,
-    ) -> Union[List[T], "PaginatedList[T]"]:
+        additional_conditions: list[tuple[str, Any]] | None = None,
+        order_by: str | None = None,
+        row_transform: Callable[[dict], dict] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> Union[list[T], "PaginatedList[T]"]:
         """
         Get enriched records grouped by the base table's primary key, with
         joined rows aggregated into JSON arrays via json_agg(json_build_object(...)).
@@ -428,9 +410,7 @@ class EnrichedService(Generic[T]):
             # Build json_agg expressions
             agg_expressions = []
             for agg in aggregate_fields:
-                kv_pairs = ", ".join(
-                    f"'{k}', {v}" for k, v in agg["fields"].items()
-                )
+                kv_pairs = ", ".join(f"'{k}', {v}" for k, v in agg["fields"].items())
                 inner = f"json_build_object({kv_pairs})"
                 # Optional ORDER BY inside json_agg
                 order = f" ORDER BY {agg['order_by']}" if agg.get("order_by") else ""
@@ -447,7 +427,8 @@ class EnrichedService(Generic[T]):
                 # Strip "AS alias" from select_fields for GROUP BY
                 # e.g. "ic.name as currency_name" → "ic.name"
                 import re
-                gb_fields = [re.split(r'\s+[aA][sS]\s+', f)[0].strip() for f in select_fields]
+
+                gb_fields = [re.split(r"\s+[aA][sS]\s+", f)[0].strip() for f in select_fields]
             order_by_clause = order_by or self.default_order_by
 
             # COUNT for pagination (count distinct base rows)
@@ -456,7 +437,7 @@ class EnrichedService(Generic[T]):
                 count_query = f"""
                     SELECT COUNT(DISTINCT {self.table_alias}.{self.id_column})
                     FROM {self.base_table} {self.table_alias}
-                    {' '.join(join_clauses)}
+                    {" ".join(join_clauses)}
                     {where_clause}
                 """
                 count_result = self._execute_query(count_query, list(params), db, fetch_one=True)
@@ -470,11 +451,11 @@ class EnrichedService(Generic[T]):
 
             query = f"""
                 SELECT
-                    {', '.join(all_select)}
+                    {", ".join(all_select)}
                 FROM {self.base_table} {self.table_alias}
-                {' '.join(join_clauses)}
+                {" ".join(join_clauses)}
                 {where_clause}
-                GROUP BY {', '.join(gb_fields)}
+                GROUP BY {", ".join(gb_fields)}
                 ORDER BY {order_by_clause}
                 {pagination_clause}
             """
@@ -507,10 +488,9 @@ class EnrichedService(Generic[T]):
             raise
         except Exception as e:
             import traceback
+
             error_trace = traceback.format_exc()
             log_error(f"Error getting distinct enriched {self.base_table}: {e}\nTraceback: {error_trace}")
             raise HTTPException(
-                status_code=500,
-                detail=f"Failed to get distinct enriched {self.base_table}: {str(e)}"
-            )
-
+                status_code=500, detail=f"Failed to get distinct enriched {self.base_table}: {str(e)}"
+            ) from None

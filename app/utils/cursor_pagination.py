@@ -12,7 +12,6 @@ construct them; the backend is free to change the encoding at any time.
 
 import base64
 import json
-from typing import Any, List, Optional, Tuple
 
 # Defaults and bounds for the `limit` query param (plate count per page).
 DEFAULT_LIMIT = 20
@@ -43,7 +42,7 @@ def decode_cursor(cursor: str) -> int:
         raise ValueError(f"Invalid cursor: {exc}") from exc
 
 
-def clamp_limit(limit: Optional[int]) -> int:
+def clamp_limit(limit: int | None) -> int:
     """Return *limit* clamped to [MIN_LIMIT, MAX_LIMIT], defaulting when None."""
     if limit is None:
         return DEFAULT_LIMIT
@@ -51,10 +50,10 @@ def clamp_limit(limit: Optional[int]) -> int:
 
 
 def slice_restaurants_by_cursor(
-    restaurants: List[dict],
-    cursor: Optional[str],
-    limit: Optional[int],
-) -> Tuple[List[dict], Optional[str], bool]:
+    restaurants: list[dict],
+    cursor: str | None,
+    limit: int | None,
+) -> tuple[list[dict], str | None, bool]:
     """Slice a **sorted** restaurant list using cursor-based pagination.
 
     Parameters
@@ -88,7 +87,7 @@ def slice_restaurants_by_cursor(
 
     effective_limit = clamp_limit(limit)
 
-    page: List[dict] = []
+    page: list[dict] = []
     plate_count = 0
     idx = start
 

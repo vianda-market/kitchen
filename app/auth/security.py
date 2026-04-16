@@ -1,9 +1,12 @@
-from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
+from datetime import UTC, datetime, timedelta
+
 import jwt
+from passlib.context import CryptContext
+
 from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. exist
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def hash_password(plain_password: str) -> str:
     """
@@ -11,11 +14,13 @@ def hash_password(plain_password: str) -> str:
     """
     return pwd_context.hash(plain_password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verify the plain password against the hashed password.
     """
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     """
@@ -25,10 +30,11 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
         - "institution_id": the institution identifier
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
 
 def verify_token(token: str):
     """

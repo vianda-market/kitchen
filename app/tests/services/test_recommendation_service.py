@@ -4,14 +4,13 @@ Unit tests for recommendation service.
 MVP: plate favorited, restaurant favorited, both, neither, no user_id.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from app.services.recommendation_service import (
-    apply_recommendation,
     _compute_plate_score,
     _compute_restaurant_score,
+    apply_recommendation,
 )
 
 

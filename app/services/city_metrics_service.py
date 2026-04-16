@@ -9,17 +9,18 @@ We use city first (instead of zipcode) so coverage grows faster at city level;
 zipcode refinement can be added later.
 """
 
-from typing import Optional, List, Any
+from typing import Any
+
 import psycopg2.extensions
 
-from app.utils.db import db_read
 from app.config.supported_cities import GLOBAL_CITY_ID
+from app.utils.db import db_read
 
 
 def get_cities_with_coverage(
     country_code: str,
     db: psycopg2.extensions.connection,
-) -> List[str]:
+) -> list[str]:
     """
     Return sorted list of city names (from core.city_metadata ∪ external.geonames_city)
     that have at least one active restaurant with plate_kitchen_days and QR code.
@@ -73,7 +74,7 @@ def get_cities_with_coverage(
 def get_supplier_cities_for_country(
     country_code: str,
     db: psycopg2.extensions.connection,
-) -> List[str]:
+) -> list[str]:
     """
     Return sorted list of city names appropriate for a supplier lead-capture dropdown.
 
@@ -122,7 +123,7 @@ def get_supplier_cities_for_country(
 
 def get_city_metrics(
     city: str,
-    country_code: Optional[str],
+    country_code: str | None,
     db: psycopg2.extensions.connection,
 ) -> dict[str, Any]:
     """
@@ -159,7 +160,7 @@ def get_city_metrics(
         ORDER BY city
     """
     rows = db_read(query_cities, (country,), connection=db)
-    cities: List[str] = [r["city"] for r in rows] if rows else []
+    cities: list[str] = [r["city"] for r in rows] if rows else []
 
     # 2) Match: case-insensitive exact match; if none, keep requested and count 0
     matched_city: str = requested

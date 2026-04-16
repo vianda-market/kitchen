@@ -5,14 +5,12 @@ Referral code generation utility.
 Generates static, human-readable referral codes in the format NAME-XXXX
 (e.g., MARIA-V7X2). Caller handles uniqueness retry on DB constraint violation.
 """
+
 import secrets
 import string
 
 # Exclude ambiguous characters: 0/O, 1/I/L
-_SAFE_CHARS = "".join(
-    c for c in string.ascii_uppercase + string.digits
-    if c not in "0OIL1"
-)
+_SAFE_CHARS = "".join(c for c in string.ascii_uppercase + string.digits if c not in "0OIL1")
 
 
 def generate_referral_code(first_name: str | None) -> str:

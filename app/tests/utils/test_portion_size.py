@@ -2,9 +2,7 @@
 Unit tests for portion_size utility (bucket_portion_size, minimum review threshold).
 """
 
-import pytest
-
-from app.utils.portion_size import bucket_portion_size, MIN_REVIEWS_FOR_AVERAGE
+from app.utils.portion_size import MIN_REVIEWS_FOR_AVERAGE, bucket_portion_size
 
 
 class TestBucketPortionSize:

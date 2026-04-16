@@ -1,12 +1,11 @@
 """Email provider factory — returns the configured provider singleton."""
 
 import os
-from typing import Optional
 
 from app.services.email.providers.base import EmailProvider
 from app.utils.log import log_email_tracking
 
-_provider: Optional[EmailProvider] = None
+_provider: EmailProvider | None = None
 
 
 def get_email_provider() -> EmailProvider:
@@ -16,6 +15,7 @@ def get_email_provider() -> EmailProvider:
         return _provider
 
     from app.config.settings import get_settings
+
     settings = get_settings()
 
     provider_name = settings.EMAIL_PROVIDER.lower()

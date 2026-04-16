@@ -3,22 +3,24 @@
 Supports three-tier cascade: entity override → institution default.
 See docs/plans/MULTINATIONAL_INSTITUTIONS.md
 """
-from typing import Optional, Dict, Any
-from uuid import UUID
-import psycopg2.extensions
-from fastapi import HTTPException, status
 
+from typing import Any
+from uuid import UUID
+
+import psycopg2.extensions
+from fastapi import HTTPException
+
+from app.dto.models import EmployerBenefitsProgramDTO
 from app.services.crud_service import (
     employer_benefits_program_service,
     institution_service,
 )
-from app.dto.models import EmployerBenefitsProgramDTO
 from app.utils.db import db_read
 from app.utils.log import log_info
 
 
 def create_program(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
 ) -> EmployerBenefitsProgramDTO:
@@ -55,24 +57,26 @@ def create_program(
     program = employer_benefits_program_service.create(data, db, scope=None)
     if not program:
         raise HTTPException(status_code=500, detail="Failed to create benefits program")
-    log_info(f"Created employer benefits program {program.program_id} for institution {institution_id}"
-             f" (entity={entity_id or 'institution-level'})")
+    log_info(
+        f"Created employer benefits program {program.program_id} for institution {institution_id}"
+        f" (entity={entity_id or 'institution-level'})"
+    )
     return program
 
 
 def get_program_by_institution(
     institution_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Optional[EmployerBenefitsProgramDTO]:
+) -> EmployerBenefitsProgramDTO | None:
     """Get the institution-level default program (entity IS NULL), or None."""
     return _get_program_row(institution_id, None, db)
 
 
 def get_program_by_scope(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID],
+    institution_entity_id: UUID | None,
     db: psycopg2.extensions.connection,
-) -> Optional[EmployerBenefitsProgramDTO]:
+) -> EmployerBenefitsProgramDTO | None:
     """Get program by exact (institution, entity) scope.
 
     entity_id=None fetches the institution-level default (IS NULL).
@@ -82,9 +86,9 @@ def get_program_by_scope(
 
 def resolve_effective_program(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID],
+    institution_entity_id: UUID | None,
     db: psycopg2.extensions.connection,
-) -> Optional[EmployerBenefitsProgramDTO]:
+) -> EmployerBenefitsProgramDTO | None:
     """Resolve the effective program for an entity via two-tier cascade.
 
     1. Entity-level program (institution_id + entity_id) — if exists, return it
@@ -105,14 +109,12 @@ def get_all_programs_for_institution(
     db: psycopg2.extensions.connection,
 ) -> list:
     """Get all program rows for an institution (institution-level + all entity overrides)."""
-    return employer_benefits_program_service.get_all_by_field(
-        "institution_id", institution_id, db, scope=None
-    )
+    return employer_benefits_program_service.get_all_by_field("institution_id", institution_id, db, scope=None)
 
 
 def update_program(
     program_id: UUID,
-    updates: Dict[str, Any],
+    updates: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
 ) -> EmployerBenefitsProgramDTO:
@@ -129,11 +131,12 @@ def update_program(
 # Internal
 # ---------------------------------------------------------------------------
 
+
 def _get_program_row(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID],
+    institution_entity_id: UUID | None,
     db: psycopg2.extensions.connection,
-) -> Optional[EmployerBenefitsProgramDTO]:
+) -> EmployerBenefitsProgramDTO | None:
     """Fetch a specific program row by (institution, entity) scope.
 
     entity_id=None fetches the institution-level default (IS NULL).

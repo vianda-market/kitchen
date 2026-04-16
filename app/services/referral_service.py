@@ -5,21 +5,20 @@ Referral domain service.
 Core business logic for the referral system: code validation, referral creation,
 reward calculation, credit issuance, and lifecycle management (held rewards, expiration).
 """
+
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Optional, Dict, Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config.enums import ReferralStatus, Status
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_info
 
 
-def validate_referral_code(code: str, db: psycopg2.extensions.connection) -> Optional[dict]:
+def validate_referral_code(code: str, db: psycopg2.extensions.connection) -> dict | None:
     """Look up a user by referral_code. Returns user row dict or None."""
     if not code or not code.strip():
         return None
@@ -87,19 +86,21 @@ def process_referral_reward(
     # Load referral config for this market
     config = _get_referral_config(market_id, db)
     if not config or not config["is_enabled"]:
-        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(timezone.utc))
+        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(UTC))
         log_info(f"Referral {referral_id} expired: program not enabled for market {market_id}")
         return
 
     # Get referee's plan price
     plan_price = _get_referee_plan_price(referee_user_id, db)
     if plan_price is None or plan_price < config["min_plan_price_to_qualify"]:
-        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(timezone.utc))
-        log_info(f"Referral {referral_id} expired: plan price {plan_price} below minimum {config['min_plan_price_to_qualify']}")
+        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(UTC))
+        log_info(
+            f"Referral {referral_id} expired: plan price {plan_price} below minimum {config['min_plan_price_to_qualify']}"
+        )
         return
 
     # Mark as qualified
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     bonus_rate = config["referrer_bonus_rate"]
     bonus_credits = _compute_bonus_credits(plan_price, bonus_rate, config.get("referrer_bonus_cap"), market_id, db)
 
@@ -117,8 +118,13 @@ def process_referral_reward(
     if referrer_subscription:
         # Issue credits immediately
         _issue_reward(
-            referral_id, referrer_user_id, referrer_subscription["subscription_id"],
-            bonus_credits, plan_price, bonus_rate, db,
+            referral_id,
+            referrer_user_id,
+            referrer_subscription["subscription_id"],
+            bonus_credits,
+            plan_price,
+            bonus_rate,
+            db,
         )
         log_info(f"Referral {referral_id} rewarded: {bonus_credits} credits to referrer {referrer_user_id}")
     else:
@@ -135,9 +141,13 @@ def process_referral_reward(
                 WHERE referral_id = %s::uuid
                 """,
                 (
-                    ReferralStatus.QUALIFIED.value, now,
-                    float(bonus_credits), float(plan_price), bonus_rate,
-                    held_until, str(referral_id),
+                    ReferralStatus.QUALIFIED.value,
+                    now,
+                    float(bonus_credits),
+                    float(plan_price),
+                    bonus_rate,
+                    held_until,
+                    str(referral_id),
                 ),
             )
             db.commit()
@@ -148,7 +158,7 @@ def process_referral_reward(
 
 def retry_held_rewards(db: psycopg2.extensions.connection) -> int:
     """Retry held rewards. Called by cron. Returns count of referrals processed."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = db_read(
         """
         SELECT referral_id, referrer_user_id, bonus_credits_awarded, bonus_plan_price,
@@ -170,7 +180,7 @@ def retry_held_rewards(db: psycopg2.extensions.connection) -> int:
 
         # Ensure timezone-aware comparison
         if held_until and held_until.tzinfo is None:
-            held_until = held_until.replace(tzinfo=timezone.utc)
+            held_until = held_until.replace(tzinfo=UTC)
 
         if held_until and held_until < now:
             # Expired — referrer never activated
@@ -186,8 +196,13 @@ def retry_held_rewards(db: psycopg2.extensions.connection) -> int:
             plan_price = Decimal(str(row["bonus_plan_price"])) if row["bonus_plan_price"] else Decimal("0")
             bonus_rate = row["bonus_rate_applied"] or 0
             _issue_reward(
-                referral_id, referrer_user_id, referrer_subscription["subscription_id"],
-                bonus_credits, plan_price, bonus_rate, db,
+                referral_id,
+                referrer_user_id,
+                referrer_subscription["subscription_id"],
+                bonus_credits,
+                plan_price,
+                bonus_rate,
+                db,
             )
             log_info(f"Held referral {referral_id} now rewarded: {bonus_credits} credits to {referrer_user_id}")
             processed += 1
@@ -211,12 +226,12 @@ def expire_stale_pending_referrals(db: psycopg2.extensions.connection) -> int:
     if not rows:
         return 0
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expired_count = 0
     for row in rows:
         created = row["created_date"]
         if created and created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         expiry_days = row["pending_expiry_days"] or 90
         if created and (now - created).days >= expiry_days:
             referral_id = UUID(str(row["referral_id"]))
@@ -230,7 +245,8 @@ def expire_stale_pending_referrals(db: psycopg2.extensions.connection) -> int:
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _get_referral_config(market_id: UUID, db: psycopg2.extensions.connection) -> Optional[dict]:
+
+def _get_referral_config(market_id: UUID, db: psycopg2.extensions.connection) -> dict | None:
     """Load active referral config for a market."""
     rows = db_read(
         "SELECT * FROM referral_config WHERE market_id = %s AND is_archived = FALSE",
@@ -240,7 +256,7 @@ def _get_referral_config(market_id: UUID, db: psycopg2.extensions.connection) ->
     return rows[0] if rows else None
 
 
-def _get_referee_plan_price(referee_user_id: UUID, db: psycopg2.extensions.connection) -> Optional[Decimal]:
+def _get_referee_plan_price(referee_user_id: UUID, db: psycopg2.extensions.connection) -> Decimal | None:
     """Get the plan price for the referee's subscription."""
     rows = db_read(
         """
@@ -262,7 +278,7 @@ def _get_referee_plan_price(referee_user_id: UUID, db: psycopg2.extensions.conne
 def _compute_bonus_credits(
     plan_price: Decimal,
     bonus_rate: int,
-    bonus_cap: Optional[Decimal],
+    bonus_cap: Decimal | None,
     market_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> Decimal:
@@ -292,7 +308,7 @@ def _compute_bonus_credits(
     return Decimal(str(math.floor(raw_bonus)))
 
 
-def _get_active_subscription(user_id: UUID, db: psycopg2.extensions.connection) -> Optional[dict]:
+def _get_active_subscription(user_id: UUID, db: psycopg2.extensions.connection) -> dict | None:
     """Return the active subscription for a user, or None."""
     rows = db_read(
         """
@@ -337,7 +353,7 @@ def _issue_reward(
     from app.services.crud_service import client_transaction_service, update_balance
 
     if bonus_credits <= 0:
-        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(timezone.utc))
+        _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(UTC))
         return
 
     # System user for modified_by
@@ -358,7 +374,7 @@ def _issue_reward(
     update_balance(UUID(str(subscription_id)), float(bonus_credits), db, commit=False)
 
     # Mark referral as rewarded
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(
@@ -372,9 +388,14 @@ def _issue_reward(
             WHERE referral_id = %s::uuid
             """,
             (
-                ReferralStatus.REWARDED.value, now, now,
-                float(bonus_credits), float(plan_price), bonus_rate,
-                str(transaction.transaction_id), str(referral_id),
+                ReferralStatus.REWARDED.value,
+                now,
+                now,
+                float(bonus_credits),
+                float(plan_price),
+                bonus_rate,
+                str(transaction.transaction_id),
+                str(referral_id),
             ),
         )
         db.commit()
@@ -387,7 +408,7 @@ def _update_referral_status(
     new_status: ReferralStatus,
     db: psycopg2.extensions.connection,
     *,
-    expired_date: Optional[datetime] = None,
+    expired_date: datetime | None = None,
 ) -> None:
     """Update referral_info status with optional expired_date."""
     cursor = db.cursor()

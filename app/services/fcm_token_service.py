@@ -6,6 +6,7 @@ A single token can only belong to one user at a time (device changed hands = rea
 """
 
 from uuid import UUID
+
 import psycopg2.extensions
 
 from app.utils.db import db_read, db_write

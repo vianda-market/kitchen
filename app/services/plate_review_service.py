@@ -7,13 +7,13 @@ Only customers who have completed a pickup (was_collected=true) can submit revie
 """
 
 from uuid import UUID
-from typing import Optional, List
+
 import psycopg2.extensions
+from fastapi import HTTPException
 
 from app.dto.models import PlateReviewDTO
-from app.utils.db import db_read, db_insert
-from app.utils.log import log_info, log_error
-from fastapi import HTTPException
+from app.utils.db import db_insert, db_read
+from app.utils.log import log_info
 
 
 def create_review(
@@ -23,8 +23,8 @@ def create_review(
     portion_size_rating: int,
     db: psycopg2.extensions.connection,
     *,
-    would_order_again: Optional[bool] = None,
-    comment: Optional[str] = None,
+    would_order_again: bool | None = None,
+    comment: str | None = None,
 ) -> PlateReviewDTO:
     """
     Create a plate review. One review per pickup; immutable after creation.
@@ -122,11 +122,12 @@ def get_reviews_by_user(
     db: psycopg2.extensions.connection,
     *,
     include_archived: bool = False,
-) -> List[PlateReviewDTO]:
+) -> list[PlateReviewDTO]:
     """List all reviews by the given user."""
     archived_clause = "" if include_archived else "AND is_archived = FALSE"
-    rows = db_read(
-        f"""
+    rows = (
+        db_read(
+            f"""
         SELECT plate_review_id, user_id, plate_id, plate_pickup_id,
                stars_rating, portion_size_rating, would_order_again, comment,
                is_archived, created_date, modified_date
@@ -134,10 +135,12 @@ def get_reviews_by_user(
         WHERE user_id = %s {archived_clause}
         ORDER BY plate_review_id DESC
         """,
-        (str(user_id),),
-        connection=db,
-        fetch_one=False,
-    ) or []
+            (str(user_id),),
+            connection=db,
+            fetch_one=False,
+        )
+        or []
+    )
     return [PlateReviewDTO(**r) for r in rows]
 
 
@@ -145,7 +148,7 @@ def get_review_by_pickup(
     user_id: UUID,
     plate_pickup_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Optional[PlateReviewDTO]:
+) -> PlateReviewDTO | None:
     """Get the review for a specific pickup, if it exists and belongs to the user."""
     row = db_read(
         """
@@ -163,12 +166,12 @@ def get_review_by_pickup(
 
 
 def get_enriched_reviews_by_institution(
-    institution_id: Optional[UUID],
+    institution_id: UUID | None,
     db: psycopg2.extensions.connection,
     *,
-    plate_id: Optional[UUID] = None,
-    restaurant_id: Optional[UUID] = None,
-) -> List[dict]:
+    plate_id: UUID | None = None,
+    restaurant_id: UUID | None = None,
+) -> list[dict]:
     """
     Return enriched plate reviews scoped to an institution (supplier).
     No customer PII (user_id, plate_pickup_id excluded).
@@ -199,8 +202,9 @@ def get_enriched_reviews_by_institution(
 
     where_clause = " AND ".join(conditions)
 
-    rows = db_read(
-        f"""
+    rows = (
+        db_read(
+            f"""
         SELECT pr.plate_review_id, pr.plate_id, prod.name AS plate_name,
                r.name AS restaurant_name,
                pr.stars_rating, pr.portion_size_rating,
@@ -213,15 +217,17 @@ def get_enriched_reviews_by_institution(
         WHERE {where_clause}
         ORDER BY pr.created_date DESC
         """,
-        tuple(params),
-        connection=db,
-        fetch_one=False,
-    ) or []
+            tuple(params),
+            connection=db,
+            fetch_one=False,
+        )
+        or []
+    )
     return rows
 
 
 def get_plate_review_aggregates(
-    plate_ids: List[UUID],
+    plate_ids: list[UUID],
     db: psycopg2.extensions.connection,
 ) -> dict:
     """
@@ -231,8 +237,9 @@ def get_plate_review_aggregates(
     if not plate_ids:
         return {}
     ids_placeholder = ",".join("%s" for _ in plate_ids)
-    rows = db_read(
-        f"""
+    rows = (
+        db_read(
+            f"""
         SELECT plate_id,
                ROUND(AVG(stars_rating)::numeric, 1) as average_stars,
                ROUND(AVG(portion_size_rating)::numeric, 1) as average_portion_size,
@@ -241,10 +248,12 @@ def get_plate_review_aggregates(
         WHERE plate_id IN ({ids_placeholder}) AND is_archived = FALSE
         GROUP BY plate_id
         """,
-        tuple(str(pid) for pid in plate_ids),
-        connection=db,
-        fetch_one=False,
-    ) or []
+            tuple(str(pid) for pid in plate_ids),
+            connection=db,
+            fetch_one=False,
+        )
+        or []
+    )
     return {
         str(r["plate_id"]): {
             "average_stars": float(r["average_stars"]) if r["average_stars"] is not None else None,
@@ -258,8 +267,8 @@ def get_plate_review_aggregates(
 def file_portion_complaint(
     plate_review_id: UUID,
     user_id: UUID,
-    complaint_text: Optional[str],
-    photo_storage_path: Optional[str],
+    complaint_text: str | None,
+    photo_storage_path: str | None,
     db: psycopg2.extensions.connection,
 ) -> dict:
     """
@@ -294,7 +303,10 @@ def file_portion_complaint(
     if str(review["user_id"]) != str(user_id):
         raise HTTPException(status_code=403, detail="Review does not belong to you")
     if review["portion_size_rating"] != 1:
-        raise HTTPException(status_code=400, detail="Portion complaints can only be filed for reviews with portion size rating of 1 (small)")
+        raise HTTPException(
+            status_code=400,
+            detail="Portion complaints can only be filed for reviews with portion size rating of 1 (small)",
+        )
 
     # Check no existing complaint for this review
     existing = db_read(

@@ -2,15 +2,15 @@
 Unit tests for MapboxSearchGateway (suggest + retrieve).
 """
 
-import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 from app.gateways.mapbox_search_gateway import MapboxSearchGateway, get_mapbox_search_gateway
 
 
 class TestMapboxSearchGatewaySuggest:
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_returns_mock_suggestions(self, mock_settings):
+    def test_dev_mode_returns_mock_suggestions(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxSearchGateway()
         result = gw.suggest(query="Av. Santa Fe")
@@ -18,8 +18,9 @@ class TestMapboxSearchGatewaySuggest:
         assert len(result["suggestions"]) > 0
         assert "mapbox_id" in result["suggestions"][0]
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_retrieve_returns_feature(self, mock_settings):
+    def test_dev_mode_retrieve_returns_feature(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxSearchGateway()
         result = gw.retrieve(mapbox_id="dXJuOm1ieHBsYzo0NTk2Mjg")
@@ -27,8 +28,9 @@ class TestMapboxSearchGatewaySuggest:
         assert "geometry" in result
         assert "properties" in result
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_retrieve_fallback_to_first(self, mock_settings):
+    def test_dev_mode_retrieve_fallback_to_first(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxSearchGateway()
         result = gw.retrieve(mapbox_id="nonexistent-id")
@@ -47,7 +49,7 @@ class TestMapboxSearchGatewaySuggest:
         mock_get.return_value = mock_response
 
         gw = MapboxSearchGateway()
-        result = gw.suggest(query="test", country="AR", session_token="tok-123")
+        gw.suggest(query="test", country="AR", session_token="tok-123")
 
         mock_get.assert_called_once()
         call_args = mock_get.call_args
@@ -58,10 +60,12 @@ class TestMapboxSearchGatewaySuggest:
 
 
 class TestMapboxSearchGatewaySingleton:
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_singleton_returns_same_instance(self, mock_settings):
+    def test_singleton_returns_same_instance(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         import app.gateways.mapbox_search_gateway as mod
+
         mod._mapbox_search_gateway = None
         gw1 = get_mapbox_search_gateway()
         gw2 = get_mapbox_search_gateway()

@@ -6,6 +6,7 @@ Maps platform-specific error codes to shared categories so the worker
 and conversion service can make retry/alert decisions without knowing
 platform internals.
 """
+
 import logging
 from enum import Enum
 
@@ -13,12 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class AdsErrorCategory(Enum):
-    RATE_LIMITED = "rate_limited"        # Retry with exponential backoff
+    RATE_LIMITED = "rate_limited"  # Retry with exponential backoff
     PARTIAL_FAILURE = "partial_failure"  # Some events succeeded, retry failed ones
-    AUTH_EXPIRED = "auth_expired"        # Alert ops, do not retry
-    INVALID_DATA = "invalid_data"       # Bad PII, missing click ID. Log and skip.
-    TRANSIENT = "transient"             # Network/timeout. Retry immediately.
-    PERMANENT = "permanent"             # Unrecoverable. Log and dead-letter.
+    AUTH_EXPIRED = "auth_expired"  # Alert ops, do not retry
+    INVALID_DATA = "invalid_data"  # Bad PII, missing click ID. Log and skip.
+    TRANSIENT = "transient"  # Network/timeout. Retry immediately.
+    PERMANENT = "permanent"  # Unrecoverable. Log and dead-letter.
 
 
 def categorize_google_error(error) -> AdsErrorCategory:
@@ -61,7 +62,7 @@ def categorize_meta_error(error_code: int, error_message: str = "") -> AdsErrorC
     """
     if error_code == 17:  # User request limit reached
         return AdsErrorCategory.RATE_LIMITED
-    if error_code == 4:   # Application request limit reached
+    if error_code == 4:  # Application request limit reached
         return AdsErrorCategory.RATE_LIMITED
     if error_code == 32:  # Temporarily unavailable
         return AdsErrorCategory.TRANSIENT
@@ -71,9 +72,9 @@ def categorize_meta_error(error_code: int, error_message: str = "") -> AdsErrorC
         return AdsErrorCategory.INVALID_DATA
     if error_code == 200:  # Permission error
         return AdsErrorCategory.AUTH_EXPIRED
-    if error_code == 1:    # Unknown error
+    if error_code == 1:  # Unknown error
         return AdsErrorCategory.TRANSIENT
-    if error_code == 2:    # Temporary service error
+    if error_code == 2:  # Temporary service error
         return AdsErrorCategory.TRANSIENT
 
     logger.warning(

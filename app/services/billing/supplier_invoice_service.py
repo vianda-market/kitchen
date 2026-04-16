@@ -5,28 +5,29 @@ Supplier invoice business logic — create, match to bills, review.
 Core invoice data lives in billing.supplier_invoice. Country-specific fields
 are in extension tables: supplier_invoice_ar, _pe, _us (1:1 by supplier_invoice_id).
 """
-from typing import Optional, List
-from uuid import UUID
+
 from datetime import datetime
-from decimal import Decimal
+from uuid import UUID
 
 import psycopg2.extensions
 from fastapi import HTTPException
 
-from app.services.crud_service import (
-    supplier_invoice_service, bill_invoice_match_service,
-    supplier_invoice_ar_service, supplier_invoice_pe_service, supplier_invoice_us_service,
-)
-from app.dto.models import SupplierInvoiceDTO, BillInvoiceMatchDTO
 from app.config.enums import SupplierInvoiceStatus
+from app.dto.models import BillInvoiceMatchDTO, SupplierInvoiceDTO
 from app.security.institution_scope import InstitutionScope
+from app.services.crud_service import (
+    bill_invoice_match_service,
+    supplier_invoice_ar_service,
+    supplier_invoice_pe_service,
+    supplier_invoice_service,
+    supplier_invoice_us_service,
+)
 from app.utils.db import db_read
 from app.utils.gcs import (
-    upload_supplier_invoice_document,
     get_supplier_invoice_document_signed_url,
+    upload_supplier_invoice_document,
 )
-from app.utils.log import log_info, log_error
-
+from app.utils.log import log_error
 
 # =============================================================================
 # Country extension table helpers
@@ -63,7 +64,7 @@ def fetch_country_details(
     country_code: str,
     supplier_invoice_id: str,
     db: psycopg2.extensions.connection,
-) -> Optional[dict]:
+) -> dict | None:
     """Fetch country extension record as a dict. Returns None if not found."""
     service = _COUNTRY_SERVICES.get(country_code)
     if not service:
@@ -84,9 +85,7 @@ def enrich_with_country_details(
     country_code = invoice_dict.get("country_code", "")
     detail_key = _COUNTRY_DETAIL_KEY.get(country_code)
     if detail_key:
-        details = fetch_country_details(
-            country_code, str(invoice_dict["supplier_invoice_id"]), db
-        )
+        details = fetch_country_details(country_code, str(invoice_dict["supplier_invoice_id"]), db)
         invoice_dict[detail_key] = details
     return invoice_dict
 
@@ -95,11 +94,12 @@ def enrich_with_country_details(
 # Core business logic
 # =============================================================================
 
+
 def create_supplier_invoice(
     data: dict,
-    country_details: Optional[dict],
-    file_data: Optional[bytes],
-    file_content_type: Optional[str],
+    country_details: dict | None,
+    file_data: bytes | None,
+    file_content_type: str | None,
     current_user: dict,
     db: psycopg2.extensions.connection,
 ) -> SupplierInvoiceDTO:
@@ -152,7 +152,7 @@ def create_supplier_invoice(
         except Exception as e:
             log_error(f"Failed to upload invoice document: {e}")
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to upload invoice document")
+            raise HTTPException(status_code=500, detail="Failed to upload invoice document") from None
 
     db.commit()
     return supplier_invoice_service.get_by_id(str(invoice.supplier_invoice_id), db)
@@ -160,10 +160,10 @@ def create_supplier_invoice(
 
 def match_invoice_to_bills(
     supplier_invoice_id: UUID,
-    bill_matches: List[dict],
+    bill_matches: list[dict],
     current_user: dict,
     db: psycopg2.extensions.connection,
-) -> List[BillInvoiceMatchDTO]:
+) -> list[BillInvoiceMatchDTO]:
     """
     Create bill_invoice_match records linking an invoice to one or more bills.
     Validates that each bill belongs to the same entity as the invoice.
@@ -213,7 +213,7 @@ def match_invoice_to_bills(
 def review_supplier_invoice(
     invoice_id: UUID,
     review_status: str,
-    rejection_reason: Optional[str],
+    rejection_reason: str | None,
     reviewer_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> SupplierInvoiceDTO:
@@ -246,10 +246,10 @@ def review_supplier_invoice(
 def get_supplier_invoices(
     db: psycopg2.extensions.connection,
     *,
-    scope: Optional[InstitutionScope] = None,
-    entity_id: Optional[UUID] = None,
-    status_filter: Optional[str] = None,
-) -> List[SupplierInvoiceDTO]:
+    scope: InstitutionScope | None = None,
+    entity_id: UUID | None = None,
+    status_filter: str | None = None,
+) -> list[SupplierInvoiceDTO]:
     """Get supplier invoices with optional filtering. Scoped to institution."""
     invoices = supplier_invoice_service.get_all(db, scope=scope)
 

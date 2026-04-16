@@ -3,10 +3,8 @@ Default (lat, lng) per supported city for Explore when user has no default addre
 Used as focus for map center and radius distance when no user default.
 """
 
-from typing import Optional, Dict, Any
-
 # Key: (country_code, province_code, city_name) for cities with same province. Falls back to (country_code, province_code).
-CITY_DEFAULT_LOCATION: Dict[tuple, Dict[str, float]] = {
+CITY_DEFAULT_LOCATION: dict[tuple, dict[str, float]] = {
     # Argentina
     ("AR", "CABA", "Buenos Aires"): {"lat": -34.6037, "lng": -58.3816},
     ("AR", "CO", "Cordoba"): {"lat": -31.4201, "lng": -64.1888},
@@ -40,9 +38,9 @@ CITY_DEFAULT_LOCATION: Dict[tuple, Dict[str, float]] = {
 
 def get_city_default_location(
     country_code: str,
-    province_code: Optional[str],
-    city_name: Optional[str] = None,
-) -> Optional[Dict[str, float]]:
+    province_code: str | None,
+    city_name: str | None = None,
+) -> dict[str, float] | None:
     """
     Return default lat/lng for a supported city.
     Tries (country_code, province_code, city_name) first, then (country_code, province_code).
@@ -62,16 +60,15 @@ def get_city_default_location(
     return None
 
 
-def get_city_default_location_by_name(country_code: str, city_name: str) -> Optional[Dict[str, float]]:
+def get_city_default_location_by_name(country_code: str, city_name: str) -> dict[str, float] | None:
     """
     Return default lat/lng for a supported city by name. Looks up province from supported_cities.
     """
     from app.config.supported_cities import get_supported_cities_sorted_by_country_and_name
+
     cities = get_supported_cities_sorted_by_country_and_name(country_code=country_code)
     city_lower = (city_name or "").strip().lower()
     for c in cities:
         if (c.get("city_name") or "").strip().lower() == city_lower:
-            return get_city_default_location(
-                c["country_code"], c.get("province_code"), c.get("city_name")
-            )
+            return get_city_default_location(c["country_code"], c.get("province_code"), c.get("city_name"))
     return None

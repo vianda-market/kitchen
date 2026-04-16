@@ -14,7 +14,7 @@ In PROD_MODE: Makes real API calls. Requires Mapbox access token.
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import requests
 
@@ -35,6 +35,7 @@ class MapboxGeocodingGateway(BaseGateway):
     def __init__(self):
         super().__init__()
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if token:
             self.dev_mode = False
@@ -44,7 +45,7 @@ class MapboxGeocodingGateway(BaseGateway):
     def service_name(self) -> str:
         return "Mapbox Geocoding API"
 
-    def _load_mock_responses(self) -> Dict[str, Any]:
+    def _load_mock_responses(self) -> dict[str, Any]:
         return self._load_mock_file("mapbox_geocoding_mocks.json")
 
     def _make_request(self, operation: str, **kwargs) -> Any:
@@ -53,6 +54,7 @@ class MapboxGeocodingGateway(BaseGateway):
         operation: 'geocode' | 'reverse_geocode'
         """
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if not token:
             raise ExternalServiceError(
@@ -120,7 +122,7 @@ class MapboxGeocodingGateway(BaseGateway):
     # Public methods — signatures match GoogleMapsGateway for provider compat
     # -------------------------------------------------------------------------
 
-    def geocode(self, address: str, country: Optional[str] = None, language: str = "es") -> Tuple[float, float]:
+    def geocode(self, address: str, country: str | None = None, language: str = "es") -> tuple[float, float]:
         """
         Convert address string to coordinates.
         Returns (latitude, longitude) — note: GeoJSON is [lng, lat], we swap.
@@ -145,7 +147,7 @@ class MapboxGeocodingGateway(BaseGateway):
             raise ExternalServiceError(f"No reverse geocoding results for ({latitude}, {longitude})")
         return features[0].get("properties", {}).get("full_address", "")
 
-    def geocode_full(self, address: str, country: Optional[str] = None, language: str = "es") -> Dict[str, Any]:
+    def geocode_full(self, address: str, country: str | None = None, language: str = "es") -> dict[str, Any]:
         """
         Full geocoding result with coordinates, mapbox_id, formatted address, and context.
         Used by geolocation_service for richer data.
@@ -165,7 +167,7 @@ class MapboxGeocodingGateway(BaseGateway):
             "context": props.get("context", {}),
         }
 
-    def get_address_components(self, address: str, country: Optional[str] = None) -> Dict[str, str]:
+    def get_address_components(self, address: str, country: str | None = None) -> dict[str, str]:
         """
         Extract structured address components from geocoding result.
         Returns flat dict compatible with Google's component-type keying.
@@ -204,7 +206,7 @@ class MapboxGeocodingGateway(BaseGateway):
 
 
 # Singleton
-_mapbox_geocoding_gateway: Optional[MapboxGeocodingGateway] = None
+_mapbox_geocoding_gateway: MapboxGeocodingGateway | None = None
 
 
 def get_mapbox_geocoding_gateway() -> MapboxGeocodingGateway:

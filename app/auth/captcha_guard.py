@@ -7,7 +7,7 @@ Conditional reCAPTCHA dependency factories for auth endpoints.
 Both exempt B2C mobile clients and are disabled when RECAPTCHA_SECRET_KEY is empty.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import HTTPException, Request
 

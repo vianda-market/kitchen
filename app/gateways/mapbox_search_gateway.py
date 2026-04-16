@@ -14,7 +14,7 @@ after 180 seconds of inactivity.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 
@@ -35,6 +35,7 @@ class MapboxSearchGateway(BaseGateway):
     def __init__(self):
         super().__init__()
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if token:
             self.dev_mode = False
@@ -44,7 +45,7 @@ class MapboxSearchGateway(BaseGateway):
     def service_name(self) -> str:
         return "Mapbox Search Box API"
 
-    def _load_mock_responses(self) -> Dict[str, Any]:
+    def _load_mock_responses(self) -> dict[str, Any]:
         return self._load_mock_file("mapbox_search_mocks.json")
 
     def _get_mock_response(self, operation: str, **kwargs) -> Any:
@@ -65,8 +66,7 @@ class MapboxSearchGateway(BaseGateway):
             raise ExternalServiceError(f"Mock response not configured for operation '{operation}' with mapbox_id")
         if operation not in self._mock_data:
             raise ExternalServiceError(
-                f"Mock response not configured for operation '{operation}'. "
-                f"Available: {list(self._mock_data.keys())}"
+                f"Mock response not configured for operation '{operation}'. Available: {list(self._mock_data.keys())}"
             )
         logger.info(f"Returning mock response for {self.service_name}.{operation}")
         return self._mock_data[operation]
@@ -77,6 +77,7 @@ class MapboxSearchGateway(BaseGateway):
         operation: 'suggest' | 'retrieve'
         """
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if not token:
             raise ExternalServiceError(
@@ -139,11 +140,11 @@ class MapboxSearchGateway(BaseGateway):
     def suggest(
         self,
         query: str,
-        country: Optional[str] = None,
+        country: str | None = None,
         language: str = "es",
-        session_token: Optional[str] = None,
+        session_token: str | None = None,
         limit: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call Mapbox Search Box Suggest.
         Returns raw API response with 'suggestions' list.
@@ -157,7 +158,7 @@ class MapboxSearchGateway(BaseGateway):
             limit=limit,
         )
 
-    def retrieve(self, mapbox_id: str, session_token: Optional[str] = None) -> Dict[str, Any]:
+    def retrieve(self, mapbox_id: str, session_token: str | None = None) -> dict[str, Any]:
         """
         Call Mapbox Search Box Retrieve for full address + coordinates.
         Returns the first Feature from the GeoJSON FeatureCollection.
@@ -173,7 +174,7 @@ class MapboxSearchGateway(BaseGateway):
 
 
 # Singleton
-_mapbox_search_gateway: Optional[MapboxSearchGateway] = None
+_mapbox_search_gateway: MapboxSearchGateway | None = None
 
 
 def get_mapbox_search_gateway() -> MapboxSearchGateway:

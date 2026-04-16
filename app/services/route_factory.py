@@ -7,7 +7,7 @@ for any entity, eliminating the need for repetitive route files and reducing cod
 
 The factory creates:
 - GET /{entity_id} - Get single entity
-- GET / - Get all entities  
+- GET / - Get all entities
 - POST / - Create entity
 - PUT /{entity_id} - Update entity
 - DELETE /{entity_id} - Delete entity
@@ -19,71 +19,80 @@ Benefits:
 - Automatic error handling and logging
 """
 
-from typing import Type, TypeVar, Generic, Any, Dict, List, Optional, Callable
-from fastapi import APIRouter, HTTPException, status, Query, Depends, UploadFile, File, Form, Response
-from pydantic import BaseModel
+from collections.abc import Callable
+from datetime import UTC
+from typing import Any, Generic, TypeVar
 from uuid import UUID
-import psycopg2.extensions
 
-from app.auth.dependencies import get_current_user, get_employee_user, get_client_user, get_client_or_employee_user, get_resolved_locale, oauth2_scheme
-from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from pydantic import BaseModel
+
+from app.auth.dependencies import (
+    get_client_or_employee_user,
+    get_current_user,
+    get_employee_user,
+    get_resolved_locale,
+    oauth2_scheme,
+)
 from app.config.settings import settings
 from app.dependencies.database import get_db
-from app.services.error_handling import handle_get_by_id, handle_get_all, handle_create, handle_update, handle_delete
-from app.security.institution_scope import get_institution_scope
 from app.security.entity_scoping import (
-    EntityScopingService,
-    ENTITY_PRODUCT,
-    ENTITY_PLATE,
     ENTITY_INSTITUTION_ENTITY,
+    ENTITY_PLATE,
+    ENTITY_PRODUCT,
+    EntityScopingService,
 )
+from app.security.institution_scope import get_institution_scope
+from app.services.error_handling import handle_create, handle_delete, handle_get_all, handle_get_by_id, handle_update
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
-T = TypeVar('T', bound=BaseModel)  # DTO type
-U = TypeVar('U', bound=BaseModel)  # Create schema type
-V = TypeVar('V', bound=BaseModel)  # Update schema type
-W = TypeVar('W', bound=BaseModel)  # Response schema type
+T = TypeVar("T", bound=BaseModel)  # DTO type
+U = TypeVar("U", bound=BaseModel)  # Create schema type
+V = TypeVar("V", bound=BaseModel)  # Update schema type
+W = TypeVar("W", bound=BaseModel)  # Response schema type
 
 
 class CRUDService(Generic[T]):
     """Generic CRUD service interface"""
-    
-    def get_by_id(self, entity_id: UUID, db: psycopg2.extensions.connection) -> Optional[T]:
+
+    def get_by_id(self, entity_id: UUID, db: psycopg2.extensions.connection) -> T | None:
         raise NotImplementedError
-    
-    def get_by_id_non_archived(self, entity_id: UUID, db: psycopg2.extensions.connection) -> Optional[T]:
+
+    def get_by_id_non_archived(self, entity_id: UUID, db: psycopg2.extensions.connection) -> T | None:
         raise NotImplementedError
-    
-    def get_all(self, db: psycopg2.extensions.connection) -> List[T]:
+
+    def get_all(self, db: psycopg2.extensions.connection) -> list[T]:
         raise NotImplementedError
-    
-    def get_all_non_archived(self, db: psycopg2.extensions.connection) -> List[T]:
+
+    def get_all_non_archived(self, db: psycopg2.extensions.connection) -> list[T]:
         raise NotImplementedError
-    
-    def create(self, data: Dict[str, Any], db: psycopg2.extensions.connection) -> Optional[T]:
+
+    def create(self, data: dict[str, Any], db: psycopg2.extensions.connection) -> T | None:
         raise NotImplementedError
-    
-    def update(self, entity_id: UUID, data: Dict[str, Any], db: psycopg2.extensions.connection) -> Optional[T]:
+
+    def update(self, entity_id: UUID, data: dict[str, Any], db: psycopg2.extensions.connection) -> T | None:
         raise NotImplementedError
-    
+
     def soft_delete(self, entity_id: UUID, db: psycopg2.extensions.connection) -> bool:
         raise NotImplementedError
 
 
 class RouteConfig:
     """Configuration for route generation"""
-    
+
     def __init__(
         self,
         prefix: str,
-        tags: List[str],
+        tags: list[str],
         entity_name: str,
         entity_name_plural: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         institution_scoped: bool = False,
-        entity_type: Optional[str] = None,
-        immutable_update_fields: Optional[List[str]] = None,
+        entity_type: str | None = None,
+        immutable_update_fields: list[str] | None = None,
         paginatable: bool = False,
-        pre_archive_validator: Optional[Callable] = None,
+        pre_archive_validator: Callable | None = None,
     ):
         self.prefix = prefix
         self.tags = tags
@@ -100,19 +109,19 @@ class RouteConfig:
 def create_crud_routes(
     config: RouteConfig,
     service: CRUDService[T],
-    create_schema: Type[U],
-    update_schema: Type[V],
-    response_schema: Type[W],
-    additional_routes: Optional[List] = None,
+    create_schema: type[U],
+    update_schema: type[V],
+    response_schema: type[W],
+    additional_routes: list | None = None,
     requires_user_context: bool = False,
     allows_modification: bool = True,
-    before_create: Optional[Callable[[dict, psycopg2.extensions.connection], dict]] = None,
-    before_update: Optional[Callable[[dict, psycopg2.extensions.connection, UUID], dict]] = None,
-    custom_routes_first: Optional[Callable[[APIRouter], None]] = None,
+    before_create: Callable[[dict, psycopg2.extensions.connection], dict] | None = None,
+    before_update: Callable[[dict, psycopg2.extensions.connection, UUID], dict] | None = None,
+    custom_routes_first: Callable[[APIRouter], None] | None = None,
 ) -> APIRouter:
     """
     Create a complete set of CRUD routes for an entity.
-    
+
     Args:
         config: Route configuration (prefix, tags, entity names)
         service: CRUD service instance
@@ -122,21 +131,17 @@ def create_crud_routes(
         additional_routes: Optional list of additional custom routes
         custom_routes_first: Optional callback to add custom routes before generic ones.
             Custom routes take precedence when path+method overlap (FastAPI first-match wins).
-        
+
     Returns:
         APIRouter with all CRUD endpoints
     """
-    
-    router = APIRouter(
-        prefix=config.prefix,
-        tags=config.tags,
-        dependencies=[Depends(oauth2_scheme)]
-    )
-    
+
+    router = APIRouter(prefix=config.prefix, tags=config.tags, dependencies=[Depends(oauth2_scheme)])
+
     # Register custom routes FIRST — they take precedence when path+method match
     if custom_routes_first:
         custom_routes_first(router)
-    
+
     from app.security.field_policies import ensure_supplier_admin_or_manager
 
     # GET /{entity_id}
@@ -144,7 +149,7 @@ def create_crud_routes(
     def get_entity(
         entity_id: UUID,
         current_user: dict = Depends(get_current_user),
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get a single entity by ID (non-archived only)"""
         ensure_supplier_admin_or_manager(current_user)
@@ -160,17 +165,18 @@ def create_crud_routes(
             entity_id,
             db,
             config.entity_name,
-            extra_kwargs={"scope": scope} if config.institution_scoped else None
+            extra_kwargs={"scope": scope} if config.institution_scoped else None,
         )
-    
+
     # GET (collection root - no trailing slash per REST convention)
     if config.paginatable:
-        @router.get("", response_model=List[response_schema])
+
+        @router.get("", response_model=list[response_schema])
         def get_all_entities(
             response: Response,
-            pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+            pagination: PaginationParams | None = Depends(get_pagination_params),
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get all entities (non-archived only). Supports optional pagination via page/page_size query params."""
             ensure_supplier_admin_or_manager(current_user)
@@ -195,10 +201,10 @@ def create_crud_routes(
             set_pagination_headers(response, result)
             return result
     else:
-        @router.get("", response_model=List[response_schema])
+
+        @router.get("", response_model=list[response_schema])
         def get_all_entities(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """Get all entities (non-archived only)"""
             ensure_supplier_admin_or_manager(current_user)
@@ -214,20 +220,20 @@ def create_crud_routes(
                 return service.get_all(connection, scope=scope, include_archived=False)
 
             return handle_get_all(service_callable, db, config.entity_name_plural)
-    
+
     # POST (collection root - no trailing slash per REST convention)
     @router.post("", response_model=response_schema, status_code=status.HTTP_201_CREATED)
     def create_entity(
         create_data: create_schema,
         current_user: dict = Depends(get_current_user),
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Create a new entity"""
         ensure_supplier_admin_or_manager(current_user)
         data = create_data.model_dump()
         # Set modified_by from the current user's id
         data["modified_by"] = current_user["user_id"]
-        
+
         # Set user_id if this entity requires user context
         if requires_user_context:
             data["user_id"] = current_user["user_id"]
@@ -247,15 +253,16 @@ def create_crud_routes(
             return service.create(payload, connection, scope=scope)
 
         return handle_create(create_callable, data, db, config.entity_name)
-    
+
     # PUT /{entity_id} - Only include if entity allows modification
     if allows_modification:
+
         @router.put("/{entity_id}", response_model=response_schema)
         def update_entity(
             entity_id: UUID,
             update_data: update_schema,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Update an existing entity"""
             ensure_supplier_admin_or_manager(current_user)
@@ -287,21 +294,17 @@ def create_crud_routes(
                             )
                         data.pop(field, None)
 
-            def update_callable(
-                target_id: UUID,
-                payload: dict,
-                connection: psycopg2.extensions.connection
-            ):
+            def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
                 return service.update(target_id, payload, connection, scope=scope)
 
             return handle_update(update_callable, entity_id, data, db, config.entity_name)
-        
+
         @router.patch("/{entity_id}", response_model=response_schema)
         def partial_update_entity(
             entity_id: UUID,
             update_data: update_schema,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Partially update an existing entity"""
             data = update_data.model_dump(exclude_unset=True)
@@ -332,21 +335,17 @@ def create_crud_routes(
                             )
                         data.pop(field, None)
 
-            def partial_update_callable(
-                target_id: UUID,
-                payload: dict,
-                connection: psycopg2.extensions.connection
-            ):
+            def partial_update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
                 return service.update(target_id, payload, connection, scope=scope)
 
             return handle_update(partial_update_callable, entity_id, data, db, config.entity_name)
-    
+
     # DELETE /{entity_id}
     @router.delete("/{entity_id}", response_model=dict)
     def delete_entity(
         entity_id: UUID,
         current_user: dict = Depends(get_current_user),
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Delete an entity (soft delete)"""
         ensure_supplier_admin_or_manager(current_user)
@@ -366,14 +365,14 @@ def create_crud_routes(
 
         handle_delete(delete_callable, entity_id, db, config.entity_name)
         return {"detail": f"{config.entity_name.title()} deleted successfully"}
-    
+
     # Add any additional custom routes
     if additional_routes:
-        for route in additional_routes:
+        for _route in additional_routes:
             # Additional routes would be added here
             # This allows for custom endpoints beyond standard CRUD
             pass
-    
+
     return router
 
 
@@ -386,18 +385,21 @@ def create_crud_routes(
 
 def create_product_routes() -> APIRouter:
     """Create routes for Product entity"""
-    from app.services.crud_service import product_service
+
     from app.schemas.consolidated_schemas import (
-        ProductCreateSchema, ProductUpdateSchema, ProductResponseSchema, ProductEnrichedResponseSchema,
-        ProductIngredientResponseSchema, ProductIngredientsSetSchema,
+        ProductCreateSchema,
+        ProductEnrichedResponseSchema,
+        ProductIngredientResponseSchema,
+        ProductIngredientsSetSchema,
+        ProductResponseSchema,
+        ProductUpdateSchema,
     )
+    from app.security.field_policies import ensure_supplier_admin_or_manager
+    from app.services.crud_service import product_service
+    from app.services.entity_service import get_enriched_product_by_id, get_enriched_products
     from app.services.product_image_service import ProductImageService
-    from app.services.entity_service import get_enriched_products, get_enriched_product_by_id
-    from app.services.error_handling import handle_create
     from app.utils.error_messages import entity_not_found
     from app.utils.log import log_error
-    from app.security.field_policies import ensure_supplier_admin_or_manager
-    from typing import List, Optional
 
     config = RouteConfig(
         prefix="/products",
@@ -412,10 +414,9 @@ def create_product_routes() -> APIRouter:
 
     def _product_custom_routes(router: APIRouter) -> None:
         # Static path segments must be registered before /{product_id} or "enriched" is parsed as a UUID.
-        @router.get("/enriched", response_model=List[ProductEnrichedResponseSchema])
+        @router.get("/enriched", response_model=list[ProductEnrichedResponseSchema])
         def list_enriched_products(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """List all products with enriched data (institution_name). Non-archived only."""
             try:
@@ -425,13 +426,13 @@ def create_product_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched products: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched products")
+                raise HTTPException(status_code=500, detail="Failed to retrieve enriched products") from None
 
         @router.get("/enriched/{product_id}", response_model=ProductEnrichedResponseSchema)
         def get_enriched_product_by_id_route(
             product_id: UUID,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get a single product by ID with enriched data (institution_name). Non-archived only."""
             try:
@@ -444,9 +445,9 @@ def create_product_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched product {product_id}: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched product")
+                raise HTTPException(status_code=500, detail="Failed to retrieve enriched product") from None
 
-        @router.get("/{product_id}/ingredients", response_model=List[ProductIngredientResponseSchema])
+        @router.get("/{product_id}/ingredients", response_model=list[ProductIngredientResponseSchema])
         def get_product_ingredients_route(
             product_id: UUID,
             current_user: dict = Depends(get_current_user),
@@ -454,10 +455,17 @@ def create_product_routes() -> APIRouter:
         ):
             """Get ordered ingredient list for a product."""
             from app.services.ingredient_service import get_product_ingredients
-            market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+
+            market_id = (
+                str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+            )
             return get_product_ingredients(product_id, market_id, db)
 
-        @router.post("/{product_id}/ingredients", response_model=List[ProductIngredientResponseSchema], status_code=status.HTTP_200_OK)
+        @router.post(
+            "/{product_id}/ingredients",
+            response_model=list[ProductIngredientResponseSchema],
+            status_code=status.HTTP_200_OK,
+        )
         def set_product_ingredients_route(
             product_id: UUID,
             body: ProductIngredientsSetSchema,
@@ -466,11 +474,14 @@ def create_product_routes() -> APIRouter:
         ):
             """Full-replace ingredient list for a product. Accepts {ingredient_ids: [UUID, ...]}."""
             from app.services.ingredient_service import set_product_ingredients
+
             scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
             product = product_service.get_by_id(product_id, db, scope=scope)
             if not product or product.is_archived:
                 raise entity_not_found("Product", product_id)
-            market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+            market_id = (
+                str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+            )
             return set_product_ingredients(product_id, body.ingredient_ids, current_user["user_id"], market_id, db)
 
         @router.get("/{product_id}", response_model=ProductResponseSchema)
@@ -494,11 +505,12 @@ def create_product_routes() -> APIRouter:
         def create_product_with_image_validation(
             create_data: ProductCreateSchema,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Create a new product with image validation.
             Supports composite creation: embed ingredient_ids for atomic product + ingredients."""
             from app.services.ingredient_service import set_product_ingredients
+
             data = create_data.model_dump()
             ingredient_ids = data.pop("ingredient_ids", None)
             data["modified_by"] = current_user["user_id"]
@@ -521,21 +533,30 @@ def create_product_routes() -> APIRouter:
                     raise HTTPException(status_code=500, detail="Failed to create product")
 
                 if has_ingredients:
-                    market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+                    market_id = (
+                        str(current_user["subscription_market_id"])
+                        if current_user.get("subscription_market_id")
+                        else None
+                    )
                     set_product_ingredients(
-                        product.product_id, ingredient_ids, current_user["user_id"],
-                        market_id, db, commit=False,
+                        product.product_id,
+                        ingredient_ids,
+                        current_user["user_id"],
+                        market_id,
+                        db,
+                        commit=False,
                     )
                     db.commit()
 
                 from app.utils.gcs import resolve_product_image_urls
+
                 return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
             except HTTPException:
                 raise
             except Exception as e:
                 db.rollback()
                 log_error(f"Error creating product: {e}")
-                raise HTTPException(status_code=500, detail="Error creating product")
+                raise HTTPException(status_code=500, detail="Error creating product") from None
 
         @router.put("/{product_id}", response_model=ProductResponseSchema)
         def update_product_with_ingredients(
@@ -546,6 +567,7 @@ def create_product_routes() -> APIRouter:
         ):
             """Update a product. If ingredient_ids is provided, full-replaces ingredient set atomically."""
             from app.services.ingredient_service import set_product_ingredients
+
             ensure_supplier_admin_or_manager(current_user)
             data = update_data.model_dump(exclude_unset=True)
             ingredient_ids = data.pop("ingredient_ids", None)
@@ -559,11 +581,19 @@ def create_product_routes() -> APIRouter:
                     raise HTTPException(status_code=500, detail="Failed to update product")
 
                 if has_ingredients:
-                    market_id = str(current_user["subscription_market_id"]) if current_user.get("subscription_market_id") else None
+                    market_id = (
+                        str(current_user["subscription_market_id"])
+                        if current_user.get("subscription_market_id")
+                        else None
+                    )
                     if len(ingredient_ids) > 0:
                         set_product_ingredients(
-                            product_id, ingredient_ids, current_user["user_id"],
-                            market_id, db, commit=False,
+                            product_id,
+                            ingredient_ids,
+                            current_user["user_id"],
+                            market_id,
+                            db,
+                            commit=False,
                         )
                     else:
                         # Empty list = remove all ingredients
@@ -575,13 +605,14 @@ def create_product_routes() -> APIRouter:
                     db.commit()
 
                 from app.utils.gcs import resolve_product_image_urls
+
                 return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
             except HTTPException:
                 raise
             except Exception as e:
                 db.rollback()
                 log_error(f"Error updating product {product_id}: {e}")
-                raise HTTPException(status_code=500, detail="Error updating product")
+                raise HTTPException(status_code=500, detail="Error updating product") from None
 
         @router.post("/{product_id}/image", response_model=ProductResponseSchema)
         async def upload_product_image(
@@ -625,9 +656,8 @@ def create_product_routes() -> APIRouter:
             if not updated_product:
                 product_image_service.delete_image(storage_path, thumb_storage_path)
                 raise HTTPException(status_code=500, detail="Failed to update product image")
-            if (
-                product.image_storage_path != storage_path
-                and not product_image_service.is_placeholder(product.image_storage_path)
+            if product.image_storage_path != storage_path and not product_image_service.is_placeholder(
+                product.image_storage_path
             ):
                 old_thumb = getattr(product, "image_thumbnail_storage_path", None)
                 product_image_service.delete_image(product.image_storage_path, old_thumb)
@@ -678,27 +708,32 @@ def create_product_routes() -> APIRouter:
         create_schema=ProductCreateSchema,
         update_schema=ProductUpdateSchema,
         response_schema=ProductResponseSchema,
-        custom_routes_first=_product_custom_routes
+        custom_routes_first=_product_custom_routes,
     )
     return router
 
 
 def create_plan_routes() -> APIRouter:
     """Create routes for Plan entity with Internal-only access for modifications, Client/Internal access for viewing"""
+
+    from app.schemas.consolidated_schemas import (
+        PlanCreateSchema,
+        PlanEnrichedResponseSchema,
+        PlanResponseSchema,
+        PlanUpdateSchema,
+    )
     from app.services.crud_service import plan_service
-    from app.services.market_service import reject_global_market_for_entity, GLOBAL_MARKET_ID
-    from app.schemas.consolidated_schemas import PlanCreateSchema, PlanUpdateSchema, PlanResponseSchema, PlanEnrichedResponseSchema
-    from app.services.entity_service import get_enriched_plans, get_enriched_plan_by_id
+    from app.services.entity_service import get_enriched_plan_by_id, get_enriched_plans
+    from app.services.market_service import GLOBAL_MARKET_ID, reject_global_market_for_entity
+    from app.utils.error_messages import entity_not_found
+    from app.utils.filter_builder import build_filter_conditions
+    from app.utils.log import log_error
     from app.utils.query_params import (
+        currency_code_filter,
         market_filter,
         status_filter,
-        currency_code_filter,
     )
-    from app.utils.filter_builder import build_filter_conditions
-    from app.utils.error_messages import entity_not_found
-    from app.utils.log import log_error
-    from typing import List, Optional
-    
+
     config = RouteConfig(
         prefix="/plans",
         tags=["Plans"],
@@ -706,48 +741,43 @@ def create_plan_routes() -> APIRouter:
         entity_name_plural="plans",
         paginatable=True,
     )
-    
+
     # Create router without generic routes to avoid route conflicts
-    router = APIRouter(
-        prefix=config.prefix,
-        tags=config.tags,
-        dependencies=[Depends(oauth2_scheme)]
-    )
-    
+    router = APIRouter(prefix=config.prefix, tags=config.tags, dependencies=[Depends(oauth2_scheme)])
+
     # Define GET endpoints first with proper access control (Clients and Internal only, not Suppliers)
-    @router.get("", response_model=List[PlanResponseSchema])
+    @router.get("", response_model=list[PlanResponseSchema])
     def get_all_plans(
         current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get all plans - Available to Clients and Internal only. Excludes plans for Global Marketplace. Non-archived only."""
         scope = None  # Plans are not institution-scoped
+
         def service_callable(connection: psycopg2.extensions.connection):
             plans = plan_service.get_all(connection, scope=scope, include_archived=False)
             return [p for p in plans if p.market_id != GLOBAL_MARKET_ID]
+
         return handle_get_all(service_callable, db, "plans")
 
     # Enriched routes MUST be before /{plan_id} so /enriched is not parsed as plan_id
-    @router.get("/enriched", response_model=List[PlanEnrichedResponseSchema])
+    @router.get("/enriched", response_model=list[PlanEnrichedResponseSchema])
     def list_enriched_plans(
-        market_id: Optional[UUID] = market_filter(),
-        status: Optional[str] = status_filter(),
-        currency_code: Optional[str] = currency_code_filter(),
+        market_id: UUID | None = market_filter(),
+        status: str | None = status_filter(),
+        currency_code: str | None = currency_code_filter(),
         current_user: dict = Depends(get_client_or_employee_user),
         locale: str = Depends(get_resolved_locale),
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code. Excludes plans for Global Marketplace. Non-archived only."""
         try:
             from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_list_field
+
             filters = {"market_id": market_id, "status": status, "currency_code": currency_code}
             additional_conditions = list(build_filter_conditions("plans", filters) or [])
             additional_conditions.append(("pl.market_id != %s::uuid", str(GLOBAL_MARKET_ID)))
-            enriched_plans = get_enriched_plans(
-                db,
-                include_archived=False,
-                additional_conditions=additional_conditions
-            )
+            enriched_plans = get_enriched_plans(db, include_archived=False, additional_conditions=additional_conditions)
             if locale != "en":
                 for p in enriched_plans:
                     resolve_i18n_field(p, "name", locale)
@@ -759,23 +789,20 @@ def create_plan_routes() -> APIRouter:
             raise
         except Exception as e:
             log_error(f"Error getting enriched plans: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plans")
+            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plans") from None
 
     @router.get("/enriched/{plan_id}", response_model=PlanEnrichedResponseSchema)
     def get_enriched_plan_by_id_route(
         plan_id: UUID,
         current_user: dict = Depends(get_client_or_employee_user),
         locale: str = Depends(get_resolved_locale),
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get a single plan by ID with enriched data (currency_name and currency_code) - Available to Clients and Internal only. Non-archived only."""
         try:
             from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_list_field
-            enriched_plan = get_enriched_plan_by_id(
-                plan_id,
-                db,
-                include_archived=False
-            )
+
+            enriched_plan = get_enriched_plan_by_id(plan_id, db, include_archived=False)
             if not enriched_plan:
                 raise entity_not_found("Plan", plan_id, locale=locale)
             if locale != "en":
@@ -788,13 +815,13 @@ def create_plan_routes() -> APIRouter:
             raise
         except Exception as e:
             log_error(f"Error getting enriched plan {plan_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan")
+            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan") from None
 
     @router.get("/{plan_id}", response_model=PlanResponseSchema)
     def get_plan(
         plan_id: UUID,
         current_user: dict = Depends(get_client_or_employee_user),  # Clients and Internal can view
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get a single plan by ID - Available to Clients and Internal only. Non-archived only."""
         scope = None  # Plans are not institution-scoped
@@ -803,15 +830,15 @@ def create_plan_routes() -> APIRouter:
             plan_id,
             db,
             "plan",
-            extra_kwargs={"scope": scope} if config.institution_scoped else None
+            extra_kwargs={"scope": scope} if config.institution_scoped else None,
         )
-    
+
     # Override POST/PUT/DELETE endpoints to be Internal-only
     @router.post("", response_model=PlanResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_plan(
         create_data: PlanCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Create a new plan - Internal-only"""
         data = create_data.model_dump()
@@ -821,16 +848,18 @@ def create_plan_routes() -> APIRouter:
         data["rollover_cap"] = None
         data["modified_by"] = current_user["user_id"]
         scope = None  # Plans are not institution-scoped
+
         def create_callable(payload: dict, connection: psycopg2.extensions.connection):
             return plan_service.create(payload, connection, scope=scope)
+
         return handle_create(create_callable, data, db, "plan")
-    
+
     @router.put("/{plan_id}", response_model=PlanResponseSchema)
     def update_plan(
         plan_id: UUID,
         update_data: PlanUpdateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Update an existing plan - Internal-only"""
         data = update_data.model_dump(exclude_unset=True)
@@ -841,20 +870,24 @@ def create_plan_routes() -> APIRouter:
         if "modified_by" not in data:
             data["modified_by"] = current_user["user_id"]
         scope = None  # Plans are not institution-scoped
+
         def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
             return plan_service.update(target_id, payload, connection, scope=scope)
+
         return handle_update(update_callable, plan_id, data, db, "plan")
-    
+
     @router.delete("/{plan_id}", response_model=dict)
     def delete_plan(
         plan_id: UUID,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Delete a plan (soft delete) - Internal-only"""
         scope = None  # Plans are not institution-scoped
+
         def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
             return plan_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
+
         handle_delete(delete_callable, plan_id, db, "plan")
         return {"detail": "Plan deleted successfully"}
 
@@ -864,15 +897,21 @@ def create_plan_routes() -> APIRouter:
 def create_restaurant_routes() -> APIRouter:
     """Create custom routes for Restaurant entity with automatic balance creation"""
     from app.routes.restaurant import router as restaurant_router
+
     return restaurant_router
 
 
 def create_credit_currency_routes() -> APIRouter:
     """Create routes for CreditCurrency entity with Internal-only access"""
+
+    from app.schemas.consolidated_schemas import (
+        CreditCurrencyCreateSchema,
+        CreditCurrencyEnrichedResponseSchema,
+        CreditCurrencyResponseSchema,
+        CreditCurrencyUpdateSchema,
+    )
     from app.services.crud_service import credit_currency_service
-    from app.schemas.consolidated_schemas import CreditCurrencyCreateSchema, CreditCurrencyUpdateSchema, CreditCurrencyResponseSchema, CreditCurrencyEnrichedResponseSchema
-    from typing import List
-    
+
     config = RouteConfig(
         prefix="/credit-currencies",
         tags=["Credit Currencies"],
@@ -880,34 +919,33 @@ def create_credit_currency_routes() -> APIRouter:
         entity_name_plural="credit currencies",
         paginatable=True,
     )
-    
+
     # Create router without generic routes to avoid route conflicts
-    router = APIRouter(
-        prefix=config.prefix,
-        tags=config.tags,
-        dependencies=[Depends(oauth2_scheme)]
-    )
-    
+    router = APIRouter(prefix=config.prefix, tags=config.tags, dependencies=[Depends(oauth2_scheme)])
+
     # Define all endpoints with Internal-only access (Suppliers use credit_currency data via plates, but can't access API directly)
-    @router.get("", response_model=List[CreditCurrencyResponseSchema])
+    @router.get("", response_model=list[CreditCurrencyResponseSchema])
     def get_all_credit_currencies(
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get all credit currencies - Internal-only. Non-archived only."""
         scope = None  # Credit currencies are not institution-scoped
+
         def service_callable(connection: psycopg2.extensions.connection):
             return credit_currency_service.get_all(connection, scope=scope, include_archived=False)
+
         return handle_get_all(service_callable, db, "credit currencies")
-    
+
     # Enriched routes MUST be before /{currency_id} so /enriched is not parsed as currency_id
-    @router.get("/enriched", response_model=List[CreditCurrencyEnrichedResponseSchema])
+    @router.get("/enriched", response_model=list[CreditCurrencyEnrichedResponseSchema])
     def get_all_credit_currencies_enriched(
         current_user: dict = Depends(get_employee_user),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get all credit currencies with enriched data (market name, country code). Internal-only. Non-archived only."""
         from app.services.entity_service import get_enriched_credit_currencies
+
         return get_enriched_credit_currencies(db, include_archived=False)
 
     @router.get("/enriched/{currency_id}", response_model=CreditCurrencyEnrichedResponseSchema)
@@ -918,6 +956,7 @@ def create_credit_currency_routes() -> APIRouter:
     ):
         """Get a single credit currency by ID with enriched data. Internal-only. Non-archived only."""
         from app.services.entity_service import get_enriched_credit_currency_by_id
+
         result = get_enriched_credit_currency_by_id(currency_id, db, include_archived=False)
         if not result:
             raise HTTPException(status_code=404, detail="Credit currency not found")
@@ -927,7 +966,7 @@ def create_credit_currency_routes() -> APIRouter:
     def get_credit_currency(
         currency_id: UUID,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get a single credit currency by ID - Internal-only. Non-archived only."""
         scope = None  # Credit currencies are not institution-scoped
@@ -936,14 +975,14 @@ def create_credit_currency_routes() -> APIRouter:
             currency_id,
             db,
             "credit currency",
-            extra_kwargs={"scope": scope} if config.institution_scoped else None
+            extra_kwargs={"scope": scope} if config.institution_scoped else None,
         )
-    
+
     @router.post("", response_model=CreditCurrencyResponseSchema, status_code=status.HTTP_201_CREATED)
     def create_credit_currency(
         create_data: CreditCurrencyCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Create a new credit currency - Internal-only. Backend assigns currency_code from supported list and fetches currency_conversion_usd from open.er-api.com."""
         from app.config.supported_currencies import get_currency_code_by_name
@@ -969,47 +1008,53 @@ def create_credit_currency_routes() -> APIRouter:
         data["currency_conversion_usd"] = rate
         data["modified_by"] = current_user["user_id"]
         scope = None  # Credit currencies are not institution-scoped
+
         def create_callable(payload: dict, connection: psycopg2.extensions.connection):
             return credit_currency_service.create(payload, connection, scope=scope)
+
         return handle_create(create_callable, data, db, "credit currency")
-    
+
     @router.put("/{currency_id}", response_model=CreditCurrencyResponseSchema)
     def update_credit_currency(
         currency_id: UUID,
         update_data: CreditCurrencyUpdateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Update an existing credit currency - Internal-only"""
         data = update_data.model_dump(exclude_unset=True)
         if "modified_by" not in data:
             data["modified_by"] = current_user["user_id"]
         scope = None  # Credit currencies are not institution-scoped
+
         def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
             return credit_currency_service.update(target_id, payload, connection, scope=scope)
+
         return handle_update(update_callable, currency_id, data, db, "credit currency")
-    
+
     @router.delete("/{currency_id}", response_model=dict)
     def delete_credit_currency(
         currency_id: UUID,
         current_user: dict = Depends(get_employee_user),  # Internal-only
-        db: psycopg2.extensions.connection = Depends(get_db)
+        db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Delete a credit currency (soft delete) - Internal-only"""
         scope = None  # Credit currencies are not institution-scoped
+
         def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
             return credit_currency_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
+
         handle_delete(delete_callable, currency_id, db, "credit currency")
         return {"detail": "Credit currency deleted successfully"}
-    
+
     return router
 
 
 def create_qr_code_routes() -> APIRouter:
     """Create routes for QRCode entity"""
+    from app.schemas.consolidated_schemas import QRCodeCreateSchema, QRCodeResponseSchema, QRCodeUpdateSchema
     from app.services.crud_service import qr_code_service
-    from app.schemas.consolidated_schemas import QRCodeCreateSchema, QRCodeUpdateSchema, QRCodeResponseSchema
-    
+
     config = RouteConfig(
         prefix="/qr-codes",
         tags=["QR Codes"],
@@ -1017,26 +1062,32 @@ def create_qr_code_routes() -> APIRouter:
         entity_name_plural="QR codes",
         paginatable=True,
     )
-    
+
     return create_crud_routes(
         config=config,
         service=qr_code_service,
         create_schema=QRCodeCreateSchema,
         update_schema=QRCodeUpdateSchema,
-        response_schema=QRCodeResponseSchema
+        response_schema=QRCodeResponseSchema,
     )
 
 
 def create_subscription_routes() -> APIRouter:
     """Create routes for Subscription entity with enriched endpoints"""
-    from app.services.crud_service import subscription_service
-    from app.schemas.subscription import SubscriptionCreateSchema, SubscriptionUpdateSchema, SubscriptionResponseSchema, SubscriptionHoldRequestSchema, RenewalPreferencesSchema
+
     from app.schemas.consolidated_schemas import SubscriptionEnrichedResponseSchema
-    from app.services.entity_service import get_enriched_subscriptions, get_enriched_subscription_by_id
+    from app.schemas.subscription import (
+        RenewalPreferencesSchema,
+        SubscriptionCreateSchema,
+        SubscriptionHoldRequestSchema,
+        SubscriptionResponseSchema,
+        SubscriptionUpdateSchema,
+    )
+    from app.services.crud_service import subscription_service
+    from app.services.entity_service import get_enriched_subscription_by_id, get_enriched_subscriptions
     from app.services.error_handling import handle_business_operation
     from app.services.subscription_action_service import put_subscription_on_hold, resume_subscription
-    from typing import List
-    
+
     config = RouteConfig(
         prefix="/subscriptions",
         tags=["Subscriptions"],
@@ -1044,13 +1095,12 @@ def create_subscription_routes() -> APIRouter:
         entity_name_plural="subscriptions",
         paginatable=True,
     )
-    
+
     def _subscription_custom_routes(router: APIRouter) -> None:
         # Enriched routes MUST be before /{subscription_id} so /enriched is not parsed as subscription_id
-        @router.get("/enriched", response_model=List[SubscriptionEnrichedResponseSchema])
+        @router.get("/enriched", response_model=list[SubscriptionEnrichedResponseSchema])
         def list_enriched_subscriptions(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """List subscriptions with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
@@ -1060,18 +1110,21 @@ def create_subscription_routes() -> APIRouter:
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
+
                 def _get_enriched_subscriptions():
                     return get_enriched_subscriptions(db, scope=None, include_archived=False, user_id=user_id)
             else:
+
                 def _get_enriched_subscriptions():
                     return get_enriched_subscriptions(db, scope=None, include_archived=False)
+
             return handle_business_operation(_get_enriched_subscriptions, "enriched subscription list retrieval")
 
         @router.get("/enriched/{subscription_id}", response_model=SubscriptionEnrichedResponseSchema)
         def get_enriched_subscription_by_id_route(
             subscription_id: UUID,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get subscription by ID with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
@@ -1081,6 +1134,7 @@ def create_subscription_routes() -> APIRouter:
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
+
                 def _get_enriched_subscription():
                     sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
                     if not sub:
@@ -1089,11 +1143,13 @@ def create_subscription_routes() -> APIRouter:
                         raise HTTPException(status_code=404, detail="Subscription not found")
                     return sub
             else:
+
                 def _get_enriched_subscription():
                     sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
                     if not sub:
                         raise HTTPException(status_code=404, detail="Subscription not found")
                     return sub
+
             return handle_business_operation(_get_enriched_subscription, "enriched subscription retrieval")
 
         @router.patch("/me/renewal-preferences", response_model=SubscriptionResponseSchema)
@@ -1116,9 +1172,7 @@ def create_subscription_routes() -> APIRouter:
                 "early_renewal_threshold": body.early_renewal_threshold,
                 "modified_by": user_id,
             }
-            updated = subscription_service.update(
-                subscription.subscription_id, update_data, db, scope=None
-            )
+            updated = subscription_service.update(subscription.subscription_id, update_data, db, scope=None)
             if not updated:
                 raise HTTPException(status_code=500, detail="Failed to update renewal preferences")
             return updated
@@ -1131,9 +1185,10 @@ def create_subscription_routes() -> APIRouter:
             """Get available plans with employer benefit breakdown for benefit employees.
             Returns plans in the user's market with employer/employee split.
             Non-benefit users get 404."""
-            from app.services.crud_service import institution_service, plan_service as _plan_service
-            from app.services.employer.program_service import resolve_effective_program
+            from app.services.crud_service import institution_service
+            from app.services.crud_service import plan_service as _plan_service
             from app.services.employer.billing_service import compute_employee_benefit
+            from app.services.employer.program_service import resolve_effective_program
             from app.utils.db import db_read
 
             user_id = current_user.get("user_id")
@@ -1154,8 +1209,10 @@ def create_subscription_routes() -> APIRouter:
 
             # Get user's market and employer_entity_id
             user_row = db_read(
-                "SELECT market_id, employer_entity_id FROM user_info WHERE user_id = %s::uuid", (str(user_id),),
-                connection=db, fetch_one=True,
+                "SELECT market_id, employer_entity_id FROM user_info WHERE user_id = %s::uuid",
+                (str(user_id),),
+                connection=db,
+                fetch_one=True,
             )
             if not user_row or not user_row.get("market_id"):
                 raise HTTPException(status_code=400, detail="User has no market assigned")
@@ -1167,19 +1224,25 @@ def create_subscription_routes() -> APIRouter:
 
             # Get plans in market
             plans = _plan_service.get_all_by_field(
-                "market_id", user_row["market_id"], db, scope=None,
+                "market_id",
+                user_row["market_id"],
+                db,
+                scope=None,
             )
 
             # Compute monthly cap usage
             already_used = 0.0
             benefit_cap = float(program.benefit_cap) if program.benefit_cap is not None else None
             if benefit_cap is not None and program.benefit_cap_period == "monthly":
-                from datetime import datetime, timezone
-                now = datetime.now(timezone.utc)
+                from datetime import datetime
+
+                now = datetime.now(UTC)
                 month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 usage = db_read(
                     "SELECT COALESCE(SUM(ebl.employee_benefit), 0) as total FROM employer_bill_line ebl JOIN employer_bill eb ON ebl.employer_bill_id = eb.employer_bill_id WHERE ebl.user_id = %s::uuid AND ebl.renewal_date >= %s",
-                    (str(user_id), month_start), connection=db, fetch_one=True,
+                    (str(user_id), month_start),
+                    connection=db,
+                    fetch_one=True,
                 )
                 already_used = float(usage["total"]) if usage else 0.0
 
@@ -1189,26 +1252,31 @@ def create_subscription_routes() -> APIRouter:
             for plan in plans:
                 plan_price = float(getattr(plan, "price", 0))
                 emp_benefit, emp_share = compute_employee_benefit(
-                    plan_price, program.benefit_rate, benefit_cap, program.benefit_cap_period, already_used,
+                    plan_price,
+                    program.benefit_rate,
+                    benefit_cap,
+                    program.benefit_cap_period,
+                    already_used,
                 )
-                result.append({
-                    "plan_id": plan.plan_id,
-                    "plan_name": getattr(plan, "name", ""),
-                    "plan_price": plan_price,
-                    "plan_credit": int(getattr(plan, "credit", 0)),
-                    "employer_covers": emp_benefit,
-                    "employee_pays": emp_share,
-                    "benefit_rate": program.benefit_rate,
-                    "benefit_cap": program.benefit_cap,
-                    "benefit_cap_period": program.benefit_cap_period,
-                    "remaining_monthly_cap": round(remaining_cap, 2) if remaining_cap is not None else None,
-                })
+                result.append(
+                    {
+                        "plan_id": plan.plan_id,
+                        "plan_name": getattr(plan, "name", ""),
+                        "plan_price": plan_price,
+                        "plan_credit": int(getattr(plan, "credit", 0)),
+                        "employer_covers": emp_benefit,
+                        "employee_pays": emp_share,
+                        "benefit_rate": program.benefit_rate,
+                        "benefit_cap": program.benefit_cap,
+                        "benefit_cap_period": program.benefit_cap_period,
+                        "remaining_monthly_cap": round(remaining_cap, 2) if remaining_cap is not None else None,
+                    }
+                )
             return result
 
-        @router.get("", response_model=List[SubscriptionResponseSchema])
+        @router.get("", response_model=list[SubscriptionResponseSchema])
         def list_subscriptions_override(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """List subscriptions. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
@@ -1218,18 +1286,21 @@ def create_subscription_routes() -> APIRouter:
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
+
                 def _get_subscriptions():
                     return subscription_service.get_all_by_field("user_id", user_id, db, scope=None)
             else:
+
                 def _get_subscriptions():
                     return subscription_service.get_all(db, scope=None, include_archived=False)
+
             return handle_business_operation(_get_subscriptions, "subscription list retrieval")
 
         @router.get("/{subscription_id}", response_model=SubscriptionResponseSchema)
         def get_subscription_override(
             subscription_id: UUID,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get a single subscription by ID. Internal: global. Customers: own only. Suppliers: 403."""
             role_type = current_user.get("role_type")
@@ -1239,6 +1310,7 @@ def create_subscription_routes() -> APIRouter:
                 user_id = current_user.get("user_id")
                 if not user_id:
                     raise HTTPException(status_code=401, detail="User ID not found in token")
+
                 def _get_subscription():
                     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
                     if not subscription:
@@ -1247,11 +1319,13 @@ def create_subscription_routes() -> APIRouter:
                         raise HTTPException(status_code=404, detail="Subscription not found")
                     return subscription
             else:
+
                 def _get_subscription():
                     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
                     if not subscription:
                         raise HTTPException(status_code=404, detail="Subscription not found")
                     return subscription
+
             return handle_business_operation(_get_subscription, "subscription retrieval")
 
         @router.post("/{subscription_id}/hold", response_model=SubscriptionResponseSchema)
@@ -1263,7 +1337,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """Put a subscription on hold. Only the owning customer. Hold duration max 3 months."""
             if current_user.get("role_type") != "customer":
-                raise HTTPException(status_code=403, detail="Forbidden: Only customers can put their subscription on hold.")
+                raise HTTPException(
+                    status_code=403, detail="Forbidden: Only customers can put their subscription on hold."
+                )
             user_id = current_user.get("user_id")
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -1277,7 +1353,9 @@ def create_subscription_routes() -> APIRouter:
         ):
             """Resume a subscription from hold. Only the owning customer."""
             if current_user.get("role_type") != "customer":
-                raise HTTPException(status_code=403, detail="Forbidden: Only customers can resume their own subscription.")
+                raise HTTPException(
+                    status_code=403, detail="Forbidden: Only customers can resume their own subscription."
+                )
             user_id = current_user.get("user_id")
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found in token")
@@ -1290,7 +1368,7 @@ def create_subscription_routes() -> APIRouter:
         update_schema=SubscriptionUpdateSchema,
         response_schema=SubscriptionResponseSchema,
         requires_user_context=True,
-        custom_routes_first=_subscription_custom_routes
+        custom_routes_first=_subscription_custom_routes,
     )
     return router
 
@@ -1298,14 +1376,25 @@ def create_subscription_routes() -> APIRouter:
 def create_institution_routes() -> APIRouter:
     """Create routes for Institution entity with POST/PUT/DELETE restricted to Internal Admin and Super Admin only.
     GET endpoints scoped: Suppliers, Customers, and Internal Management see only their institution."""
-    from app.services.crud_service import institution_service, supplier_terms_service
-    from app.schemas.consolidated_schemas import InstitutionCreateSchema, InstitutionUpdateSchema, InstitutionResponseSchema
     from app.auth.dependencies import get_admin_user
-    from app.services.error_handling import handle_create, handle_get_all, handle_get_by_id, handle_update, handle_delete
-    from app.utils.log import log_info, log_error
-    from app.services.entity_service import (
-        attach_institution_market_ids, attach_institution_market_ids_bulk,
+    from app.schemas.consolidated_schemas import (
+        InstitutionCreateSchema,
+        InstitutionResponseSchema,
+        InstitutionUpdateSchema,
     )
+    from app.services.crud_service import institution_service, supplier_terms_service
+    from app.services.entity_service import (
+        attach_institution_market_ids,
+        attach_institution_market_ids_bulk,
+    )
+    from app.services.error_handling import (
+        handle_delete,
+        handle_get_all,
+        handle_get_by_id,
+        handle_update,
+    )
+    from app.utils.log import log_error, log_info
+
     config = RouteConfig(
         prefix="/institutions",
         tags=["Institutions"],
@@ -1314,36 +1403,38 @@ def create_institution_routes() -> APIRouter:
         institution_scoped=True,  # Suppliers/Customers/Internal Management: own institution only
         paginatable=True,
     )
-    
+
     def _institution_scope(current_user: dict):
         role_type = current_user.get("role_type")
         role_name = current_user.get("role_name")
         if role_type == "internal" and role_name in ("admin", "super_admin"):
             return None  # Global access
         return get_institution_scope(current_user)
-    
+
     def _institution_custom_routes(router: APIRouter) -> None:
         """Custom institution routes — registered first so they take precedence over generic CRUD."""
-        @router.get("", response_model=List[InstitutionResponseSchema])
+
+        @router.get("", response_model=list[InstitutionResponseSchema])
         def get_all_institutions(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """List institutions. Suppliers, Customers, Internal Management: own institution only. Admin/Super Admin: all. Non-archived only."""
             scope = _institution_scope(current_user)
+
             def service_callable(connection: psycopg2.extensions.connection):
                 return institution_service.get_all(connection, scope=scope, include_archived=False)
+
             institutions = handle_get_all(service_callable, db, "institutions")
             if not institutions:
                 return institutions
             enriched = attach_institution_market_ids_bulk(institutions, db)
             return [InstitutionResponseSchema(**d) for d in enriched]
-        
+
         @router.get("/{entity_id}", response_model=InstitutionResponseSchema)
         def get_institution(
             entity_id: UUID,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get institution by ID. Suppliers, Customers, Internal Management: own institution only. Admin/Super Admin: any. Non-archived only."""
             scope = _institution_scope(current_user)
@@ -1352,18 +1443,18 @@ def create_institution_routes() -> APIRouter:
                 entity_id,
                 db,
                 "institution",
-                extra_kwargs={"scope": scope} if scope else None
+                extra_kwargs={"scope": scope} if scope else None,
             )
             if institution is None:
                 return institution
             return InstitutionResponseSchema(**attach_institution_market_ids(institution, db))
-        
+
         @router.put("/{entity_id}", response_model=InstitutionResponseSchema)
         def update_institution(
             entity_id: UUID,
             update_data: InstitutionUpdateSchema,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Update institution. Admin/Super Admin only."""
             scope = _institution_scope(current_user)
@@ -1371,7 +1462,10 @@ def create_institution_routes() -> APIRouter:
             if "modified_by" not in data:
                 data["modified_by"] = current_user["user_id"]
 
-            if current_user.get("role_type") != "internal" or current_user.get("role_name") not in ("admin", "super_admin"):
+            if current_user.get("role_type") != "internal" or current_user.get("role_name") not in (
+                "admin",
+                "super_admin",
+            ):
                 raise HTTPException(status_code=403, detail="Only Admin or Super Admin can edit institutions.")
 
             existing = institution_service.get_by_id(entity_id, db, scope=scope)
@@ -1380,7 +1474,9 @@ def create_institution_routes() -> APIRouter:
             # Effective type after update: new value if provided, else existing
             new_type = data.get("institution_type")
             effective_type_str = (
-                (new_type.value if hasattr(new_type, "value") else str(new_type)) if new_type is not None else inst_type_str
+                (new_type.value if hasattr(new_type, "value") else str(new_type))
+                if new_type is not None
+                else inst_type_str
             )
             if effective_type_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
                 raise HTTPException(
@@ -1408,6 +1504,7 @@ def create_institution_routes() -> APIRouter:
                     connection.commit()
                     return result
             else:
+
                 def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
                     return institution_service.update(target_id, payload, connection, scope=scope)
 
@@ -1415,16 +1512,17 @@ def create_institution_routes() -> APIRouter:
             if updated is None:
                 return updated
             return InstitutionResponseSchema(**attach_institution_market_ids(updated, db))
-        
+
         @router.delete("/{entity_id}", response_model=dict)
         def delete_institution(
             entity_id: UUID,
             current_user: dict = Depends(get_admin_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Delete institution (soft delete) - Internal Admin and Super Admin only.
             System institutions (Vianda Enterprises, Vianda Customers) cannot be archived."""
             from app.config.restricted_institutions import get_restricted_institution_ids
+
             uid = entity_id if isinstance(entity_id, UUID) else UUID(str(entity_id))
             if uid in get_restricted_institution_ids():
                 raise HTTPException(
@@ -1432,16 +1530,18 @@ def create_institution_routes() -> APIRouter:
                     detail="System institutions (Vianda Enterprises, Vianda Customers) cannot be archived.",
                 )
             scope = _institution_scope(current_user)
+
             def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
                 return institution_service.soft_delete(target_id, current_user["user_id"], connection, scope=scope)
+
             handle_delete(delete_callable, entity_id, db, "institution")
             return {"detail": "Institution deleted successfully"}
-        
+
         @router.post("", response_model=InstitutionResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_institution(
             create_data: InstitutionCreateSchema,
             current_user: dict = Depends(get_admin_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Create a new institution - Internal Admin and Super Admin only.
             Supports composite creation: embed supplier_terms for atomic institution + terms creation."""
@@ -1466,7 +1566,8 @@ def create_institution_routes() -> APIRouter:
                 v is None or v == field.default
                 for v, field in zip(
                     supplier_terms_data.values(),
-                    create_data.supplier_terms.__class__.model_fields.values()
+                    create_data.supplier_terms.__class__.model_fields.values(),
+                    strict=False,
                 )
             ):
                 supplier_terms_data = None
@@ -1509,29 +1610,35 @@ def create_institution_routes() -> APIRouter:
             except Exception as e:
                 db.rollback()
                 log_error(f"Error creating institution: {e}")
-                raise HTTPException(status_code=500, detail="Error creating institution")
-    
+                raise HTTPException(status_code=500, detail="Error creating institution") from None
+
     router = create_crud_routes(
         config=config,
         service=institution_service,
         create_schema=InstitutionCreateSchema,
         update_schema=InstitutionUpdateSchema,
         response_schema=InstitutionResponseSchema,
-        custom_routes_first=_institution_custom_routes
+        custom_routes_first=_institution_custom_routes,
     )
     return router
 
 
 def create_payment_method_routes() -> APIRouter:
     """Create routes for PaymentMethod entity with enriched endpoints"""
-    from app.services.crud_service import payment_method_service
-    from app.schemas.payment_method import PaymentMethodCreateSchema, PaymentMethodUpdateSchema, PaymentMethodResponseSchema, PaymentMethodEnrichedResponseSchema
-    from app.services.entity_service import get_enriched_payment_methods as fetch_enriched_payment_methods, get_enriched_payment_method_by_id
-    from app.services.error_handling import handle_business_operation
+
     from app.auth.dependencies import get_employee_or_customer_user
+    from app.schemas.payment_method import (
+        PaymentMethodCreateSchema,
+        PaymentMethodEnrichedResponseSchema,
+        PaymentMethodResponseSchema,
+        PaymentMethodUpdateSchema,
+    )
     from app.security.scoping import EmployeeCustomerAccessControl
-    from typing import List
-    
+    from app.services.crud_service import payment_method_service
+    from app.services.entity_service import get_enriched_payment_method_by_id
+    from app.services.entity_service import get_enriched_payment_methods as fetch_enriched_payment_methods
+    from app.services.error_handling import handle_business_operation
+
     config = RouteConfig(
         prefix="/payment-methods",
         tags=["Payment Methods"],
@@ -1539,25 +1646,27 @@ def create_payment_method_routes() -> APIRouter:
         entity_name_plural="payment methods",
         paginatable=True,
     )
-    
+
     def _payment_method_custom_routes(router: APIRouter) -> None:
         from app.services.payment_method_service import create_payment_method_with_address
-        from app.utils.log import log_info
         from app.utils.db import db_read
-        
+        from app.utils.log import log_info
+
         @router.post("", response_model=PaymentMethodResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_payment_method(
             create_data: PaymentMethodCreateSchema,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Create payment method - sets is_default=True if user's first."""
+
             def _create_payment_method():
                 data = create_data.model_dump()
                 address_id = data.pop("address_id", None)
                 address_data = data.pop("address_data", None)
                 if address_data:
                     from app.security.field_policies import ensure_supplier_can_create_edit_addresses
+
                     ensure_supplier_can_create_edit_addresses(current_user)
                 query = "SELECT COUNT(*) as count FROM payment_method WHERE user_id = %s::uuid AND is_archived = FALSE"
                 result = db_read(query, (str(current_user["user_id"]),), connection=db, fetch_one=True)
@@ -1566,37 +1675,45 @@ def create_payment_method_routes() -> APIRouter:
                     data["is_default"] = True
                     log_info(f"Setting is_default=True for first payment method for user {current_user['user_id']}")
                 else:
-                    log_info(f"User {current_user['user_id']} already has {existing_count} payment method(s), is_default={data.get('is_default', False)}")
+                    log_info(
+                        f"User {current_user['user_id']} already has {existing_count} payment method(s), is_default={data.get('is_default', False)}"
+                    )
                 return create_payment_method_with_address(
                     payment_method_data=data,
                     address_id=address_id,
                     address_data=address_data,
                     current_user=current_user,
                     db=db,
-                    scope=None
+                    scope=None,
                 )
-            return handle_business_operation(_create_payment_method, "payment method creation", "Payment method created successfully")
 
-        @router.get("/enriched", response_model=List[PaymentMethodEnrichedResponseSchema])
+            return handle_business_operation(
+                _create_payment_method, "payment method creation", "Payment method created successfully"
+            )
+
+        @router.get("/enriched", response_model=list[PaymentMethodEnrichedResponseSchema])
         def list_enriched_payment_methods(
             current_user: dict = Depends(get_employee_or_customer_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """List payment methods with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             user_id, error = EmployeeCustomerAccessControl.enforce_access(current_user)
             if error:
                 raise HTTPException(**error)
+
             def _get():
                 return fetch_enriched_payment_methods(db, scope=None, include_archived=False, user_id=user_id)
+
             return handle_business_operation(_get, "enriched payment method list retrieval")
 
         @router.get("/enriched/{payment_method_id}", response_model=PaymentMethodEnrichedResponseSchema)
         def get_enriched_payment_method_by_id_route(
             payment_method_id: UUID,
             current_user: dict = Depends(get_employee_or_customer_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get payment method by ID with enriched data. Non-archived only."""
+
             def _get():
                 pm = get_enriched_payment_method_by_id(payment_method_id, db, scope=None, include_archived=False)
                 if not pm:
@@ -1605,6 +1722,7 @@ def create_payment_method_routes() -> APIRouter:
                 if error:
                     raise HTTPException(**error)
                 return pm
+
             return handle_business_operation(_get, "enriched payment method retrieval")
 
     router = create_crud_routes(
@@ -1614,21 +1732,26 @@ def create_payment_method_routes() -> APIRouter:
         update_schema=PaymentMethodUpdateSchema,
         response_schema=PaymentMethodResponseSchema,
         requires_user_context=True,
-        custom_routes_first=_payment_method_custom_routes
+        custom_routes_first=_payment_method_custom_routes,
     )
     return router
 
 
 def create_plate_routes() -> APIRouter:
     """Create routes for Plate entity"""
+
+    from app.schemas.consolidated_schemas import (
+        PlateCreateSchema,
+        PlateEnrichedResponseSchema,
+        PlateResponseSchema,
+        PlateUpdateSchema,
+    )
     from app.services.crud_service import plate_service
-    from app.schemas.consolidated_schemas import PlateCreateSchema, PlateUpdateSchema, PlateResponseSchema, PlateEnrichedResponseSchema
-    from app.services.entity_service import get_enriched_plates, get_enriched_plate_by_id
-    from app.services.error_handling import handle_get_by_id, handle_get_all
+    from app.services.entity_service import get_enriched_plate_by_id, get_enriched_plates
+    from app.services.error_handling import handle_get_all, handle_get_by_id
     from app.utils.error_messages import entity_not_found
     from app.utils.log import log_error
-    from typing import List, Optional
-    
+
     config = RouteConfig(
         prefix="/plates",
         tags=["Plates"],
@@ -1638,32 +1761,34 @@ def create_plate_routes() -> APIRouter:
         entity_type=ENTITY_PLATE,
         paginatable=True,
     )
-    
+
     def _plate_custom_routes(router: APIRouter) -> None:
-        @router.get("", response_model=List[PlateResponseSchema])
+        @router.get("", response_model=list[PlateResponseSchema])
         def get_all_plates(
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
             """Get all plates - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "customer":
                 scope = None
             else:
                 scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+
             def service_callable(connection: psycopg2.extensions.connection):
                 return plate_service.get_all(connection, scope=scope, include_archived=False)
+
             return handle_get_all(service_callable, db, "plates")
 
         # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
-        @router.get("/enriched", response_model=List[PlateEnrichedResponseSchema])
+        @router.get("/enriched", response_model=list[PlateEnrichedResponseSchema])
         def list_enriched_plates(
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """List plates with enriched data - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 from app.i18n.locale_names import resolve_cuisine_name
+
                 if current_user.get("role_type") == "customer":
                     scope = None
                 else:
@@ -1671,6 +1796,7 @@ def create_plate_routes() -> APIRouter:
                 plates = get_enriched_plates(db, scope=scope, include_archived=False)
                 if locale != "en":
                     from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_field_aliased
+
                     for p in plates:
                         resolve_cuisine_name(p, locale)
                         resolve_i18n_field_aliased(p, "product_name", "product_name_i18n", locale)
@@ -1681,15 +1807,18 @@ def create_plate_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched plates: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plates")
+                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plates") from None
 
         @router.get("/enriched/{plate_id}", response_model=PlateEnrichedResponseSchema)
         def get_enriched_plate_by_id_route(
             plate_id: UUID,
-            kitchen_day: Optional[str] = Query(None, description="When provided with user having employer, includes has_coworker_offer, has_coworker_request"),
+            kitchen_day: str | None = Query(
+                None,
+                description="When provided with user having employer, includes has_coworker_offer, has_coworker_request",
+            ),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get plate by ID with enriched data. Non-archived only."""
             try:
@@ -1702,20 +1831,40 @@ def create_plate_routes() -> APIRouter:
                 user_id = None
                 if kitchen_day and current_user.get("user_id"):
                     from app.utils.db import db_read
+
                     uid_raw = current_user["user_id"]
                     try:
                         user_id = uid_raw if isinstance(uid_raw, UUID) else UUID(uid_raw)
                     except (ValueError, TypeError):
                         user_id = None
-                    user_row = db_read("SELECT employer_entity_id, employer_address_id FROM user_info WHERE user_id = %s", (str(uid_raw),), connection=db, fetch_one=True)
+                    user_row = db_read(
+                        "SELECT employer_entity_id, employer_address_id FROM user_info WHERE user_id = %s",
+                        (str(uid_raw),),
+                        connection=db,
+                        fetch_one=True,
+                    )
                     if user_row and user_row.get("employer_entity_id"):
                         employer_entity_id = user_row["employer_entity_id"]
                         employer_address_id = user_row.get("employer_address_id")
-                enriched_plate = get_enriched_plate_by_id(plate_id, db, scope=scope, include_archived=False, kitchen_day=kitchen_day, employer_entity_id=employer_entity_id, employer_address_id=employer_address_id, user_id=user_id)
+                enriched_plate = get_enriched_plate_by_id(
+                    plate_id,
+                    db,
+                    scope=scope,
+                    include_archived=False,
+                    kitchen_day=kitchen_day,
+                    employer_entity_id=employer_entity_id,
+                    employer_address_id=employer_address_id,
+                    user_id=user_id,
+                )
                 if not enriched_plate:
                     raise entity_not_found("Plate", plate_id, locale=locale)
                 if locale != "en":
-                    from app.i18n.locale_names import resolve_cuisine_name, resolve_i18n_field, resolve_i18n_field_aliased
+                    from app.i18n.locale_names import (
+                        resolve_cuisine_name,
+                        resolve_i18n_field,
+                        resolve_i18n_field_aliased,
+                    )
+
                     resolve_cuisine_name(enriched_plate, locale)
                     resolve_i18n_field_aliased(enriched_plate, "product_name", "product_name_i18n", locale)
                     resolve_i18n_field(enriched_plate, "ingredients", locale)
@@ -1725,13 +1874,13 @@ def create_plate_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched plate {plate_id}: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plate")
+                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plate") from None
 
         @router.get("/{plate_id}", response_model=PlateResponseSchema)
         def get_plate(
             plate_id: UUID,
             current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db)
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get plate by ID - Customers: any. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "customer":
@@ -1739,11 +1888,7 @@ def create_plate_routes() -> APIRouter:
             else:
                 scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
             return handle_get_by_id(
-                plate_service.get_by_id,
-                plate_id,
-                db,
-                "plate",
-                extra_kwargs={"scope": scope} if scope else None
+                plate_service.get_by_id, plate_id, db, "plate", extra_kwargs={"scope": scope} if scope else None
             )
 
     router = create_crud_routes(
@@ -1752,16 +1897,16 @@ def create_plate_routes() -> APIRouter:
         create_schema=PlateCreateSchema,
         update_schema=PlateUpdateSchema,
         response_schema=PlateResponseSchema,
-        custom_routes_first=_plate_custom_routes
+        custom_routes_first=_plate_custom_routes,
     )
     return router
 
 
 def create_geolocation_routes() -> APIRouter:
     """Create routes for Geolocation entity"""
+    from app.schemas.geolocation import GeolocationCreateSchema, GeolocationResponseSchema, GeolocationUpdateSchema
     from app.services.crud_service import geolocation_service
-    from app.schemas.geolocation import GeolocationCreateSchema, GeolocationUpdateSchema, GeolocationResponseSchema
-    
+
     config = RouteConfig(
         prefix="/geolocations",
         tags=["Geolocations"],
@@ -1769,13 +1914,13 @@ def create_geolocation_routes() -> APIRouter:
         entity_name_plural="geolocations",
         paginatable=True,
     )
-    
+
     return create_crud_routes(
         config=config,
         service=geolocation_service,
         create_schema=GeolocationCreateSchema,
         update_schema=GeolocationUpdateSchema,
-        response_schema=GeolocationResponseSchema
+        response_schema=GeolocationResponseSchema,
     )
 
 
@@ -1784,14 +1929,19 @@ def create_institution_entity_routes() -> APIRouter:
     currency_metadata_id is derived from address.country_code -> market (Option A); client does not send it.
     Note: Enriched endpoints (/enriched, /enriched/{entity_id}) are in app/routes/institution_entity.py,
     registered before this router so /enriched matches before /{entity_id}."""
-    from app.services.crud_service import institution_entity_service
-    from app.schemas.consolidated_schemas import InstitutionEntityCreateSchema, InstitutionEntityUpdateSchema, InstitutionEntityResponseSchema
     from app.auth.dependencies import require_supplier_admin_or_employee_admin
+    from app.schemas.consolidated_schemas import (
+        InstitutionEntityCreateSchema,
+        InstitutionEntityResponseSchema,
+        InstitutionEntityUpdateSchema,
+    )
+    from app.services.crud_service import institution_entity_service
     from app.services.entity_service import derive_currency_metadata_id_for_address
 
     def _before_create(data: dict, connection: psycopg2.extensions.connection) -> dict:
-        from app.utils.db import db_read as _db_read
         from app.config.tax_id_config import validate_tax_id_for_country
+        from app.utils.db import db_read as _db_read
+
         data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
         # Validate that the entity's address country maps to a market assigned to the institution
         market_check = _db_read(
@@ -1814,8 +1964,9 @@ def create_institution_entity_routes() -> APIRouter:
         return data
 
     def _before_update(data: dict, connection: psycopg2.extensions.connection, entity_id: UUID) -> dict:
-        from app.utils.db import db_read as _db_read
         from app.config.tax_id_config import validate_tax_id_for_country
+        from app.utils.db import db_read as _db_read
+
         if "address_id" in data:
             data["currency_metadata_id"] = derive_currency_metadata_id_for_address(data["address_id"], connection)
         # Validate tax_id format if being updated
@@ -1868,9 +2019,9 @@ def create_institution_entity_routes() -> APIRouter:
 
 def create_plate_selection_routes() -> APIRouter:
     """Create routes for PlateSelection entity (user-dependent)"""
-    from app.services.crud_service import plate_selection_service
     from app.schemas.consolidated_schemas import PlateSelectionCreateSchema, PlateSelectionResponseSchema
-    
+    from app.services.crud_service import plate_selection_service
+
     config = RouteConfig(
         prefix="/plate-selections",
         tags=["Plate Selections"],
@@ -1878,14 +2029,14 @@ def create_plate_selection_routes() -> APIRouter:
         entity_name_plural="plate selections",
         paginatable=True,
     )
-    
+
     return create_crud_routes(
         config=config,
         service=plate_selection_service,
         create_schema=PlateSelectionCreateSchema,
         update_schema=PlateSelectionCreateSchema,  # Using same schema for update
         response_schema=PlateSelectionResponseSchema,
-        requires_user_context=True  # ← KEY: This entity requires user_id
+        requires_user_context=True,  # ← KEY: This entity requires user_id
     )
 
 
@@ -1893,4 +2044,3 @@ def create_plate_selection_routes() -> APIRouter:
 # IMMUTABLE ENTITY ROUTE FACTORY FUNCTIONS
 # =============================================================================
 # institution_payment_attempt and client_payment_attempt routes removed (payment attempts deprecated)
-

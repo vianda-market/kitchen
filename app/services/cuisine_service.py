@@ -4,11 +4,10 @@ Cuisine Service — Business logic for cuisine management and suggestion workflo
 Provides search, CRUD helpers, and the supplier suggestion -> admin review pipeline.
 """
 
-import re
 import logging
-from typing import List, Optional
+import re
+from datetime import UTC, datetime
 from uuid import UUID
-from datetime import datetime, timezone
 
 import psycopg2.extensions
 from psycopg2.extras import RealDictCursor
@@ -20,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 def search_cuisines(
     db: psycopg2.extensions.connection,
-    search: Optional[str] = None,
+    search: str | None = None,
     include_archived: bool = False,
-) -> List[dict]:
+) -> list[dict]:
     """Search active cuisines by name or slug. Returns dicts for schema mapping."""
     base = "SELECT * FROM cuisine"
     conditions = []
@@ -48,7 +47,7 @@ def search_cuisines(
 def create_suggestion(
     suggested_name: str,
     suggested_by: UUID,
-    restaurant_id: Optional[UUID],
+    restaurant_id: UUID | None,
     modified_by: UUID,
     db: psycopg2.extensions.connection,
 ) -> dict:
@@ -79,8 +78,8 @@ def create_suggestion(
 def approve_suggestion(
     suggestion_id: UUID,
     reviewer_id: UUID,
-    resolved_cuisine_id: Optional[UUID],
-    review_notes: Optional[str],
+    resolved_cuisine_id: UUID | None,
+    review_notes: str | None,
     db: psycopg2.extensions.connection,
 ) -> dict:
     """
@@ -134,7 +133,7 @@ def approve_suggestion(
             final_cuisine_id = str(new_row["cuisine_id"])
 
         # Update suggestion
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cursor.execute(
             """
             UPDATE cuisine_suggestion
@@ -175,11 +174,11 @@ def approve_suggestion(
 def reject_suggestion(
     suggestion_id: UUID,
     reviewer_id: UUID,
-    review_notes: Optional[str],
+    review_notes: str | None,
     db: psycopg2.extensions.connection,
 ) -> dict:
     """Reject a Pending suggestion."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with db.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(
             """
@@ -207,7 +206,7 @@ def reject_suggestion(
     return dict(updated) if updated else None
 
 
-def get_pending_suggestions(db: psycopg2.extensions.connection) -> List[dict]:
+def get_pending_suggestions(db: psycopg2.extensions.connection) -> list[dict]:
     """List all Pending cuisine suggestions."""
     rows = db_read(
         "SELECT * FROM cuisine_suggestion WHERE suggestion_status = 'pending' AND NOT is_archived ORDER BY created_date",

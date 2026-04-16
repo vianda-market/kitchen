@@ -5,10 +5,8 @@ Validates country-province-city combinations against supported_cities config.
 Rejects invalid combinations (e.g., Florida + Seattle; Seattle is in Washington).
 """
 
-from typing import Optional
-
-from app.config.supported_provinces import SUPPORTED_PROVINCES
 from app.config.supported_cities import SUPPORTED_CITIES
+from app.config.supported_provinces import SUPPORTED_PROVINCES
 
 
 def _build_province_lookup() -> dict:
@@ -25,7 +23,7 @@ def _build_province_lookup() -> dict:
     return lookup
 
 
-_PROVINCE_LOOKUP: Optional[dict] = None
+_PROVINCE_LOOKUP: dict | None = None
 
 
 def _get_province_lookup() -> dict:
@@ -35,7 +33,7 @@ def _get_province_lookup() -> dict:
     return _PROVINCE_LOOKUP
 
 
-def _resolve_province_code(country_code: str, province: str) -> Optional[str]:
+def _resolve_province_code(country_code: str, province: str) -> str | None:
     """Resolve province input (name or code) to canonical province_code, or None."""
     if not province or not country_code:
         return None
@@ -67,7 +65,7 @@ def _build_city_set() -> set:
     return out
 
 
-_CITY_SET: Optional[set] = None
+_CITY_SET: set | None = None
 
 
 def _get_city_set() -> set:
@@ -86,7 +84,7 @@ def _get_city_province_map() -> dict:
     return out
 
 
-_CITY_PROVINCE_MAP: Optional[dict] = None
+_CITY_PROVINCE_MAP: dict | None = None
 
 
 def _get_city_province_map_cached() -> dict:
@@ -104,7 +102,7 @@ def _get_province_name_map() -> dict:
     return out
 
 
-_PROVINCE_NAME_MAP: Optional[dict] = None
+_PROVINCE_NAME_MAP: dict | None = None
 
 
 def _get_province_name_map_cached() -> dict:
@@ -139,7 +137,7 @@ def get_validation_error_detail(
     country_code: str,
     province: str,
     city: str,
-) -> Optional[str]:
+) -> str | None:
     """
     Return user-facing error message when validation fails, or None if valid.
 

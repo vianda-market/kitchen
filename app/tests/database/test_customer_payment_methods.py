@@ -5,12 +5,14 @@ Database tests for customer payment methods (Stripe integration Phase 2).
 - Tests payment_method + external_payment_method flow (insert, list, archive, set default).
 """
 
+from uuid import UUID, uuid4
+
 import pytest
-from uuid import uuid4, UUID
-from app.tests.database.conftest import db_transaction, get_table_columns
+
+from app.tests.database.conftest import get_table_columns
 from app.tests.database.test_data.expected_seed_data import (
-    SEED_SUPERADMIN_USER_ID,
     SEED_INSTITUTION_CUSTOMERS_ID,
+    SEED_SUPERADMIN_USER_ID,
 )
 
 SEED_MARKET_ID = "00000000-0000-0000-0000-000000000001"

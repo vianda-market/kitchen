@@ -7,7 +7,8 @@ Matching: exact match of requested zip to a postal_code with restaurants;
 if none, fallback to first available postal_code in the country (or zero count).
 """
 
-from typing import Any, Optional, List
+from typing import Any
+
 import psycopg2.extensions
 
 from app.utils.db import db_read
@@ -15,7 +16,7 @@ from app.utils.db import db_read
 
 def get_zipcode_metrics(
     zip_code: str,
-    country_code: Optional[str],
+    country_code: str | None,
     db: psycopg2.extensions.connection,
 ) -> dict[str, Any]:
     """
@@ -52,7 +53,7 @@ def get_zipcode_metrics(
         ORDER BY a.postal_code
     """
     rows = db_read(query_postal_codes, (country,), connection=db)
-    postal_codes: List[str] = [r["postal_code"] for r in rows] if rows else []
+    postal_codes: list[str] = [r["postal_code"] for r in rows] if rows else []
 
     # 2) Match: exact first, else fallback to first in list (or requested with count 0)
     matched_zipcode: str = requested

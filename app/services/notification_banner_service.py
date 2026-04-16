@@ -5,16 +5,16 @@ Creates, queries, and manages in-app notification banners for B2C clients.
 Banners complement push notifications — push for background, banners for foreground.
 """
 
-from uuid import UUID
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from fastapi import HTTPException
+from typing import Any
+from uuid import UUID
+
 import psycopg2.extensions
 import psycopg2.extras
+from fastapi import HTTPException
 
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning, log_error
-
+from app.utils.log import log_error, log_info, log_warning
 
 REQUIRED_PAYLOAD_FIELDS = {
     "survey_available": {"plate_name", "pickup_date", "plate_selection_id", "plate_pickup_id"},
@@ -30,11 +30,11 @@ def create_notification(
     payload: dict,
     action_type: str,
     action_label: str,
-    client_types: List[str],
+    client_types: list[str],
     expires_at: datetime,
     dedup_key: str,
     db: psycopg2.extensions.connection,
-) -> Optional[str]:
+) -> str | None:
     """
     Create a notification banner. Deduplicates by (user_id, dedup_key).
 
@@ -91,9 +91,9 @@ def create_notification(
 
 def get_active_notifications(
     user_id: UUID,
-    client_type: Optional[str],
+    client_type: str | None,
     db: psycopg2.extensions.connection,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Get active, unexpired notifications for a user, filtered by client type.
     Survey notifications respect a 2-hour grace period after creation.
@@ -128,18 +128,20 @@ def get_active_notifications(
 
     notifications = []
     for row in rows:
-        notifications.append({
-            "notification_id": row["notification_id"],
-            "notification_type": row["notification_type"],
-            "priority": row["priority"],
-            "created_at": row["created_date"],
-            "expires_at": row["expires_at"],
-            "payload": row["payload"],
-            "action": {
-                "action_type": row["action_type"],
-                "action_label": row["action_label"],
-            },
-        })
+        notifications.append(
+            {
+                "notification_id": row["notification_id"],
+                "notification_type": row["notification_type"],
+                "priority": row["priority"],
+                "created_at": row["created_date"],
+                "expires_at": row["expires_at"],
+                "payload": row["payload"],
+                "action": {
+                    "action_type": row["action_type"],
+                    "action_label": row["action_label"],
+                },
+            }
+        )
 
     return notifications
 
@@ -190,7 +192,7 @@ def acknowledge_notification(
     except Exception as e:
         db.rollback()
         log_error(f"Failed to acknowledge notification {notification_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to acknowledge notification")
+        raise HTTPException(status_code=500, detail="Failed to acknowledge notification") from None
 
 
 def expire_stale_notifications(

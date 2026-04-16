@@ -5,23 +5,23 @@ Appends raw API payloads to currency_rate_raw for audit trail, validates rates
 (outlier detection, zero check), and updates currency_metadata.currency_conversion_usd.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Tuple, Optional
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
 
-from app.utils.db import db_read, db_insert, db_update
+from app.utils.db import db_insert, db_read, db_update
 from app.utils.db_pool import get_db_connection_context
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_error, log_info, log_warning
 
 RATE_API_URL = "https://open.er-api.com/v6/latest/USD"
 OUTLIER_THRESHOLD = 0.5  # Flag if rate changes more than 50% vs previous
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 
-def fetch_usd_rate_for_currency(currency_code: str) -> Tuple[Optional[float], Optional[dict]]:
+def fetch_usd_rate_for_currency(currency_code: str) -> tuple[float | None, dict | None]:
     """
     Fetch USD exchange rate for a single currency from open.er-api.com.
 
@@ -44,15 +44,15 @@ def fetch_usd_rate_for_currency(currency_code: str) -> Tuple[Optional[float], Op
         raise HTTPException(
             status_code=503,
             detail="Exchange rate service temporarily unavailable. Please try again.",
-        )
+        ) from None
     except httpx.HTTPError:
         raise HTTPException(
             status_code=503,
             detail="Could not fetch exchange rate. Please try again.",
-        )
+        ) from None
 
 
-def _get_target_currencies(connection) -> List[str]:
+def _get_target_currencies(connection) -> list[str]:
     """Get non-USD currency codes from currency_metadata (non-archived)."""
     query = """
         SELECT currency_code
@@ -76,7 +76,7 @@ def _get_previous_rate(currency_code: str, connection) -> float | None:
     return float(row["rate"]) if row else None
 
 
-def run_currency_refresh() -> Dict[str, Any]:
+def run_currency_refresh() -> dict[str, Any]:
     """
     Fetch latest USD exchange rates and update currency_metadata.
 
@@ -84,7 +84,7 @@ def run_currency_refresh() -> Dict[str, Any]:
     currencies from currency_metadata. Appends raw payload to currency_rate_raw
     for audit trail. Validates each rate (zero check, outlier detection).
     """
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "ok",
         "updated": [],
         "skipped": [],
@@ -119,13 +119,11 @@ def run_currency_refresh() -> Dict[str, Any]:
         # api_date from API timestamp or fallback to today
         if "time_last_update_unix" in data:
             try:
-                api_date = datetime.fromtimestamp(
-                    data["time_last_update_unix"], tz=timezone.utc
-                ).date()
+                api_date = datetime.fromtimestamp(data["time_last_update_unix"], tz=UTC).date()
             except (TypeError, ValueError, OSError):
-                api_date = datetime.now(timezone.utc).date()
+                api_date = datetime.now(UTC).date()
         else:
-            api_date = datetime.now(timezone.utc).date()
+            api_date = datetime.now(UTC).date()
 
         for currency_code in target_currencies:
             rate = all_rates.get(currency_code)
@@ -154,9 +152,7 @@ def run_currency_refresh() -> Dict[str, Any]:
                     change_pct = abs(rate_val - prev) / prev
                     if change_pct > OUTLIER_THRESHOLD:
                         is_valid = False
-                        notes = (
-                            f"Outlier: {prev:.4f} → {rate_val:.4f} ({change_pct:.1%} change)"
-                        )
+                        notes = f"Outlier: {prev:.4f} → {rate_val:.4f} ({change_pct:.1%} change)"
                         result["skipped"].append(currency_code)
 
             # Always insert raw record
@@ -174,7 +170,7 @@ def run_currency_refresh() -> Dict[str, Any]:
 
             # Only update currency_metadata if rate is valid
             if is_valid:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 db_update(
                     "currency_metadata",
                     {

@@ -3,6 +3,7 @@
 Layer 1 (Client → Backend): verify_checksum before upload.
 Layer 2 (Backend → GCS): pass MD5 to GCS for server-side verification.
 """
+
 import hashlib
 
 from fastapi import HTTPException
@@ -32,9 +33,7 @@ def verify_checksum(
     elif algorithm == "md5":
         actual = compute_md5(data)
     else:
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported checksum algorithm: {algorithm}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported checksum algorithm: {algorithm}")
 
     if actual.lower() != expected_checksum.strip().lower():
         raise HTTPException(

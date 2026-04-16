@@ -1,16 +1,17 @@
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
+
 import psycopg2.extensions
-from app.dto.models import ClientBillDTO, SubscriptionDTO, CreditCurrencyDTO
+
+from app.config import Status
 from app.services.crud_service import (
     client_bill_service,
-    subscription_service,
     credit_currency_service,
+    subscription_service,
     update_balance,
 )
-from app.utils.log import log_info, log_warning
-from app.config import Status
+from app.utils.log import log_info
 
 
 def process_client_bill_internal(
@@ -42,9 +43,9 @@ def process_client_bill_internal(
     credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value_local_currency))
     renewal_date = subscription.renewal_date
     if renewal_date.tzinfo is None:
-        renewal_date = renewal_date.replace(tzinfo=timezone.utc)
+        renewal_date = renewal_date.replace(tzinfo=UTC)
     else:
-        renewal_date = renewal_date.astimezone(timezone.utc)
+        renewal_date = renewal_date.astimezone(UTC)
     new_renewal_date = renewal_date + timedelta(days=30)
 
     update_balance(bill.subscription_id, float(credits_to_add), db, commit=commit)
@@ -83,18 +84,16 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     new_balance = float(subscription.balance) + credits_to_add
 
     # Calculate new renewal_date: today (UTC) + 30 days, rounded up to next day at 00:00 UTC
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     next_utc_midnight = (now_utc + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     new_renewal_date = next_utc_midnight + timedelta(days=29)  # total 30 days from now, rounded up
 
-    subscription_service.update(
-        bill.subscription_id,
-        {"balance": new_balance, "renewal_date": new_renewal_date},
-        db
-    )
+    subscription_service.update(bill.subscription_id, {"balance": new_balance, "renewal_date": new_renewal_date}, db)
 
     # Note: Subscription status activation (Pending -> Active) is handled automatically
     # by the database trigger subscription_status_activation_trigger() when balance
     # transitions from <= 0 to > 0 for Pending subscriptions.
 
-    log_info(f"Added {credits_to_add} credits to subscription {bill.subscription_id}. New balance: {new_balance}. Renewal date set to {new_renewal_date}")
+    log_info(
+        f"Added {credits_to_add} credits to subscription {bill.subscription_id}. New balance: {new_balance}. Renewal date set to {new_renewal_date}"
+    )

@@ -5,11 +5,11 @@ Ad Zone management routes (Internal Admin only).
 CRUD for geographic ad zones + flywheel state transitions.
 Zones are the targeting unit for the geographic flywheel engine.
 """
-from typing import List, Optional
+
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_employee_user
 from app.dependencies.database import get_db
@@ -62,10 +62,10 @@ async def create_ad_zone(
     return zone
 
 
-@router.get("", response_model=List[AdZoneResponseSchema])
+@router.get("", response_model=list[AdZoneResponseSchema])
 async def list_ad_zones(
-    country_code: Optional[str] = Query(None, min_length=2, max_length=2),
-    flywheel_state: Optional[str] = Query(None),
+    country_code: str | None = Query(None, min_length=2, max_length=2),
+    flywheel_state: str | None = Query(None),
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
 ):
@@ -163,8 +163,11 @@ async def check_ad_zone_overlaps(
     if not zone:
         raise HTTPException(status_code=404, detail="Ad zone not found")
     overlaps = check_zone_overlap(
-        float(zone["latitude"]), float(zone["longitude"]),
-        float(zone["radius_km"]), db, exclude_zone_id=zone_id,
+        float(zone["latitude"]),
+        float(zone["longitude"]),
+        float(zone["radius_km"]),
+        db,
+        exclude_zone_id=zone_id,
     )
     return {"zone_id": str(zone_id), "overlaps": overlaps}
 
@@ -205,6 +208,7 @@ async def sync_all_zone_metrics(
     for each non-paused zone.
     """
     from app.services.ads.zone_metrics_service import refresh_all_zone_metrics
+
     return refresh_all_zone_metrics(db)
 
 
@@ -220,6 +224,7 @@ async def sync_zone_metrics(
     **Authorization**: Internal employees only.
     """
     from app.services.ads.zone_metrics_service import refresh_zone_metrics
+
     result = refresh_zone_metrics(zone_id, db)
     if not result:
         raise HTTPException(status_code=404, detail="Ad zone not found")
@@ -246,6 +251,7 @@ async def get_zone_audience(
         raise HTTPException(status_code=404, detail="Ad zone not found")
 
     from app.services.ads.notify_me_sync import export_hashed_audience_for_zone
+
     audience = export_hashed_audience_for_zone(zone["country_code"], zone["city_name"], db)
 
     return {

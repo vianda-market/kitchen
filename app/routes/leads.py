@@ -6,14 +6,17 @@ City-first so coverage grows faster; zipcode refinement can be added later.
 """
 
 import time
-from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, Response
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
+from app.auth.recaptcha import verify_recaptcha
 from app.config import Status
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.locale_names import (
+    localize_country_name,
+)
 from app.schemas.consolidated_schemas import (
     CityMetricsResponseSchema,
     EmailRegisteredResponseSchema,
@@ -34,34 +37,32 @@ from app.services.city_metrics_service import (
     get_cities_with_coverage,
     get_city_metrics,
 )
-from app.services.zipcode_metrics_service import get_zipcode_metrics
+from app.services.entity_service import get_user_by_email
 from app.services.leads_public_service import (
-    get_public_restaurants,
-    get_public_plans,
     create_lead_interest,
     create_restaurant_lead,
-    get_leads_cuisines,
     get_employee_count_ranges,
+    get_leads_cuisines,
+    get_public_plans,
+    get_public_restaurants,
 )
-from app.services.entity_service import get_user_by_email
-from app.services.market_service import market_service, is_global_market, get_markets_with_coverage
-from app.i18n.locale_names import localize_country_name, resolve_i18n_field, resolve_i18n_list_field, resolve_i18n_field_dict
+from app.services.market_service import get_markets_with_coverage, is_global_market, market_service
+from app.services.zipcode_metrics_service import get_zipcode_metrics
 from app.utils.country import normalize_country_code
 from app.utils.db import db_read
 from app.utils.locale import resolve_locale_from_header
 from app.utils.rate_limit import limiter
-from app.auth.recaptcha import verify_recaptcha
 
 router = APIRouter(prefix="/leads", tags=["Leads"], dependencies=[Depends(verify_recaptcha)])
 
 # -----------------------------------------------------------------------------
 # Public markets (no auth): rate limit and cache — country_code + country_name only
 # -----------------------------------------------------------------------------
-_markets_cache: dict[str, tuple[List[dict], float]] = {}  # key -> (data, expiry)
+_markets_cache: dict[str, tuple[list[dict], float]] = {}  # key -> (data, expiry)
 CACHE_TTL_SECONDS = 600  # 10 minutes
 
 
-def _get_cached_markets(audience: str, db) -> List[MarketPublicMinimalSchema]:
+def _get_cached_markets(audience: str, db) -> list[MarketPublicMinimalSchema]:
     """Return cached markets for the given audience. Two cache entries: 'customer' and 'supplier'."""
     global _markets_cache
     now = time.time()
@@ -99,7 +100,7 @@ def _get_cached_markets(audience: str, db) -> List[MarketPublicMinimalSchema]:
     return [MarketPublicMinimalSchema(**m) for m in slim]
 
 
-@router.get("/markets", response_model=List[MarketPublicMinimalSchema])
+@router.get("/markets", response_model=list[MarketPublicMinimalSchema])
 @limiter.limit("60/minute")
 async def list_leads_markets(
     request: Request,
@@ -129,10 +130,7 @@ async def list_leads_markets(
     markets = _get_cached_markets(effective_audience, db)
     if locale == "en":
         return markets
-    return [
-        m.model_copy(update={"country_name": localize_country_name(m.country_code, locale)})
-        for m in markets
-    ]
+    return [m.model_copy(update={"country_name": localize_country_name(m.country_code, locale)}) for m in markets]
 
 
 @router.get("/featured-restaurant", response_model=LeadsFeaturedRestaurantSchema)
@@ -184,11 +182,11 @@ async def get_featured_restaurant(
 
 
 # Cities cache — keyed by (country, audience), 600s TTL (same pattern as _markets_cache)
-_cities_cache: dict[str, tuple[List[str], float]] = {}
+_cities_cache: dict[str, tuple[list[str], float]] = {}
 CITIES_CACHE_TTL_SECONDS = 600  # 10 minutes
 
 
-def _get_cached_cities(country: str, audience: str, db) -> List[str]:
+def _get_cached_cities(country: str, audience: str, db) -> list[str]:
     """Return cached city list for the (country, audience) pair."""
     global _cities_cache
     now = time.time()
@@ -199,6 +197,7 @@ def _get_cached_cities(country: str, audience: str, db) -> List[str]:
 
     if audience == "supplier":
         from app.services.city_metrics_service import get_supplier_cities_for_country
+
         cities = get_supplier_cities_for_country(country, db)
     else:
         cities = get_cities_with_coverage(country, db)
@@ -213,7 +212,7 @@ def _get_cached_cities(country: str, audience: str, db) -> List[str]:
 async def get_leads_cities(
     request: Request,
     response: Response,
-    country_code: Optional[str] = "US",
+    country_code: str | None = "US",
     audience: str = Query(
         None,
         description=(
@@ -244,7 +243,7 @@ async def get_leads_cities(
 async def get_city_metrics_endpoint(
     request: Request,
     city: str,
-    country_code: Optional[str] = "US",
+    country_code: str | None = "US",
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -270,7 +269,7 @@ async def get_city_metrics_endpoint(
 @limiter.limit("10/minute")
 async def get_email_registered(
     request: Request,
-    email: Optional[str] = None,
+    email: str | None = None,
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -290,7 +289,7 @@ async def get_email_registered(
 async def get_zipcode_metrics_endpoint(
     request: Request,
     zip: str,
-    country_code: Optional[str] = "US",
+    country_code: str | None = "US",
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -303,7 +302,7 @@ async def get_zipcode_metrics_endpoint(
     return ZipcodeMetricsResponseSchema(**data)
 
 
-@router.get("/restaurants", response_model=List[LeadsRestaurantSchema])
+@router.get("/restaurants", response_model=list[LeadsRestaurantSchema])
 @limiter.limit("60/minute")
 async def list_leads_restaurants(
     request: Request,
@@ -328,7 +327,7 @@ async def list_leads_restaurants(
     return [LeadsRestaurantSchema(**r) for r in rows]
 
 
-@router.get("/plans", response_model=List[LeadsPlanSchema])
+@router.get("/plans", response_model=list[LeadsPlanSchema])
 @limiter.limit("60/minute")
 async def list_leads_plans(
     request: Request,
@@ -351,7 +350,7 @@ async def list_leads_plans(
     return [LeadsPlanSchema(**r) for r in rows]
 
 
-@router.get("/cuisines", response_model=List[LeadsCuisineSchema])
+@router.get("/cuisines", response_model=list[LeadsCuisineSchema])
 @limiter.limit("60/minute")
 async def list_leads_cuisines(
     request: Request,
@@ -373,7 +372,7 @@ async def list_leads_cuisines(
     return [LeadsCuisineSchema(**r) for r in rows]
 
 
-@router.get("/employee-count-ranges", response_model=List[EmployeeCountRangeSchema])
+@router.get("/employee-count-ranges", response_model=list[EmployeeCountRangeSchema])
 @limiter.limit("60/minute")
 async def list_employee_count_ranges(
     request: Request,

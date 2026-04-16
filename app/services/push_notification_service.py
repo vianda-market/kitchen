@@ -8,13 +8,13 @@ When not configured (dev), logs the notification instead of sending.
 from __future__ import annotations
 
 from uuid import UUID
+
 import psycopg2.extensions
 
 from app.config.settings import settings
-from app.services.fcm_token_service import get_user_fcm_tokens, delete_fcm_token_by_value
+from app.services.fcm_token_service import delete_fcm_token_by_value, get_user_fcm_tokens
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning, log_error
-
+from app.utils.log import log_error, log_info, log_warning
 
 _firebase_initialized = False
 
@@ -29,6 +29,7 @@ def _ensure_firebase():
     try:
         import firebase_admin
         from firebase_admin import credentials
+
         cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
         firebase_admin.initialize_app(cred)
         _firebase_initialized = True

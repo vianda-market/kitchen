@@ -24,14 +24,14 @@ Benefits:
 from fastapi import APIRouter
 
 from app.services.route_factory import (
-    create_product_routes,
-    create_plan_routes,
-    create_restaurant_routes,
     create_credit_currency_routes,
-    create_institution_routes,
-    create_plate_routes,
     create_geolocation_routes,
     create_institution_entity_routes,
+    create_institution_routes,
+    create_plan_routes,
+    create_plate_routes,
+    create_product_routes,
+    create_restaurant_routes,
 )
 
 # Create consolidated router

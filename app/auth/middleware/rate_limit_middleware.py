@@ -7,7 +7,6 @@ Anonymous requests pass through — slowapi handles those separately.
 
 import time
 from collections import deque
-from typing import Optional
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -16,20 +15,18 @@ from starlette.responses import Response
 
 from app.auth.security import verify_token
 from app.config.rate_limit_config import (
-    TIER_GLOBAL_LIMITS,
+    RateLimitRule,
     classify_tier,
     resolve_rule,
-    RateLimitRule,
 )
 from app.config.settings import settings
 from app.i18n.messages import get_message
-
 
 # ── Module-level storage: bucket_key → deque of monotonic timestamps ────────
 _buckets: dict[str, deque[float]] = {}
 
 
-def _extract_bearer_token(request: Request) -> Optional[str]:
+def _extract_bearer_token(request: Request) -> str | None:
     """Extract raw JWT from Authorization header. Returns None if absent."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer ") and len(auth) > 7:
@@ -37,13 +34,16 @@ def _extract_bearer_token(request: Request) -> Optional[str]:
     return None
 
 
-def _decode_claims(token: str) -> Optional[dict]:
+def _decode_claims(token: str) -> dict | None:
     """Decode JWT via verify_token. Returns payload dict or None."""
     return verify_token(token)
 
 
 def _check_rate_limit(
-    key: str, max_requests: int, window_seconds: int, now: float,
+    key: str,
+    max_requests: int,
+    window_seconds: int,
+    now: float,
 ) -> tuple[bool, int]:
     """
     Sliding-window check. Returns (allowed, remaining).
@@ -71,16 +71,15 @@ def _evict_stale_buckets(now: float) -> None:
     if len(_buckets) <= settings.RATE_LIMIT_MAX_TRACKED_USERS:
         return
     eviction_age = settings.RATE_LIMIT_EVICTION_AGE_SECONDS
-    stale_keys = [
-        k for k, dq in _buckets.items()
-        if not dq or (now - dq[-1]) > eviction_age
-    ]
+    stale_keys = [k for k, dq in _buckets.items() if not dq or (now - dq[-1]) > eviction_age]
     for k in stale_keys:
         del _buckets[k]
 
 
 def _set_rate_limit_headers(
-    response: Response, rule: RateLimitRule, remaining: int,
+    response: Response,
+    rule: RateLimitRule,
+    remaining: int,
 ) -> None:
     """Attach standard rate-limit headers."""
     response.headers["X-RateLimit-Limit"] = str(rule.max_requests)
@@ -132,7 +131,10 @@ class UserRateLimitMiddleware(BaseHTTPMiddleware):
 
         # Check global bucket
         global_allowed, global_remaining = _check_rate_limit(
-            user_id, global_rule.max_requests, global_rule.window_seconds, now,
+            user_id,
+            global_rule.max_requests,
+            global_rule.window_seconds,
+            now,
         )
 
         # Check endpoint bucket if override applies
@@ -140,7 +142,10 @@ class UserRateLimitMiddleware(BaseHTTPMiddleware):
         if has_endpoint_override:
             ep_key = f"{user_id}:endpoint:{endpoint_rule.matched_prefix}"
             endpoint_allowed, endpoint_remaining = _check_rate_limit(
-                ep_key, endpoint_rule.max_requests, endpoint_rule.window_seconds, now,
+                ep_key,
+                endpoint_rule.max_requests,
+                endpoint_rule.window_seconds,
+                now,
             )
 
         _evict_stale_buckets(now)

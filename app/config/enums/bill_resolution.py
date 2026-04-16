@@ -12,6 +12,7 @@ from enum import Enum
 
 class BillResolution(str, Enum):
     """Valid resolution values for institution bills."""
+
     PENDING = "pending"
     PAID = "paid"
     REJECTED = "rejected"

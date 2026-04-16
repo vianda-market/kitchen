@@ -20,6 +20,16 @@ responses>=0.23.0  # HTTP mocking
 factory-boy>=3.2.0  # Test data factories
 
 # Development tools
-black>=23.0.0  # Code formatting
-flake8>=6.0.0  # Linting
+ruff>=0.8.0  # Linting + formatting (replaces black, flake8, isort)
+pip-audit>=2.7.0  # Dependency vulnerability scanning
 mypy>=1.0.0  # Type checking
+mypy-baseline>=0.7.0  # Gradual mypy adoption (baseline of existing errors)
+radon>=5.1.0  # Cyclomatic complexity and maintainability index
+wily>=1.25.0  # Complexity trend tracking over git history
+mutmut>=3.5.0  # Mutation testing for critical business logic
+
+# Type stubs for mypy
+types-requests>=2.31.0
+types-PyYAML>=6.0.0
+types-pytz>=2024.1
+types-python-dateutil>=2.9.0

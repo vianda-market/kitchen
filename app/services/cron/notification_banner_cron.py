@@ -7,15 +7,16 @@ Phase 2: Generates reservation_reminder notifications for upcoming pickups
 
 Intended to run every 15 minutes via Cloud Scheduler.
 """
-from typing import Dict, Any
-from datetime import datetime
 
-from app.utils.db import get_db_connection, close_db_connection, db_read
-from app.utils.log import log_info, log_error, log_warning
+from datetime import datetime
+from typing import Any
+
 from app.services.notification_banner_service import (
     create_notification,
     expire_stale_notifications,
 )
+from app.utils.db import close_db_connection, db_read, get_db_connection
+from app.utils.log import log_error, log_info, log_warning
 
 
 def _generate_reservation_reminders(connection) -> int:
@@ -63,6 +64,7 @@ def _generate_reservation_reminders(connection) -> int:
             # Compute expires_at: end of pickup window on pickup_date in market timezone
             end_time_str = pickup_window.split("-")[1] if "-" in pickup_window else "14:30"
             from zoneinfo import ZoneInfo
+
             end_time = datetime.strptime(end_time_str, "%H:%M").time()
             local_expires = datetime.combine(pickup_date, end_time, tzinfo=ZoneInfo(timezone_str))
 
@@ -86,17 +88,14 @@ def _generate_reservation_reminders(connection) -> int:
             if result:
                 created_count += 1
         except Exception as e:
-            log_warning(
-                f"Failed to create reservation reminder for selection "
-                f"{row['plate_selection_id']}: {e}"
-            )
+            log_warning(f"Failed to create reservation reminder for selection {row['plate_selection_id']}: {e}")
 
     return created_count
 
 
-def run_notification_banner_cron() -> Dict[str, Any]:
+def run_notification_banner_cron() -> dict[str, Any]:
     """Generate reservation reminders and expire stale notifications."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "cron_job": "notification_banners",
         "success": True,
         "reminders_created": 0,
@@ -111,10 +110,7 @@ def run_notification_banner_cron() -> Dict[str, Any]:
         expired = expire_stale_notifications(connection)
         result["notifications_expired"] = expired
 
-        log_info(
-            f"Notification banner cron completed: "
-            f"{reminders} reminders created, {expired} notifications expired"
-        )
+        log_info(f"Notification banner cron completed: {reminders} reminders created, {expired} notifications expired")
     except Exception as e:
         result["success"] = False
         result["errors"].append(str(e))

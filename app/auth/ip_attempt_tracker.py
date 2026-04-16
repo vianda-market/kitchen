@@ -48,10 +48,7 @@ class IPAttemptTracker:
         self._buckets.pop(key, None)
 
     def _evict_stale_buckets(self, now: float) -> None:
-        stale_keys = [
-            k for k, dq in self._buckets.items()
-            if not dq or (now - dq[-1]) > self._eviction_age_seconds
-        ]
+        stale_keys = [k for k, dq in self._buckets.items() if not dq or (now - dq[-1]) > self._eviction_age_seconds]
         for k in stale_keys:
             del self._buckets[k]
 

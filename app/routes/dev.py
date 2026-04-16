@@ -3,10 +3,11 @@
 Dev-only endpoints for integration testing. All routes guarded by DEV_MODE.
 Never enable DEV_MODE in production.
 """
+
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.config.settings import settings
@@ -28,8 +29,10 @@ def _require_dev_mode() -> None:
 def _get_connect_gateway():
     if (settings.SUPPLIER_PAYOUT_PROVIDER or "mock").lower() == "stripe":
         from app.services.payment_provider.stripe import connect_gateway
+
         return connect_gateway
     from app.services.payment_provider.stripe import connect_mock
+
     return connect_mock
 
 

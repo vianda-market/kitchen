@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any, Dict
+from typing import Any
 
 
 def _ensure_db_password() -> None:
@@ -32,7 +32,7 @@ def _check_network(url: str, timeout: float = 3.0) -> bool:
         return False
 
 
-def _log_currency(result: Dict[str, Any]) -> None:
+def _log_currency(result: dict[str, Any]) -> None:
     prefix = "[post-rebuild-sync] currency:"
     if result.get("status") == "ok":
         updated = result.get("updated", [])
@@ -47,7 +47,7 @@ def _log_currency(result: Dict[str, Any]) -> None:
         print(f"{prefix} status=error reason={reason}", file=sys.stderr)
 
 
-def _log_holidays(result: Dict[str, Any]) -> None:
+def _log_holidays(result: dict[str, Any]) -> None:
     prefix = "[post-rebuild-sync] holidays:"
     if result.get("status") == "error":
         reason = result.get("reason", "unknown")

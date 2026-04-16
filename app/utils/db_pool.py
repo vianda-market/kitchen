@@ -5,15 +5,17 @@ Provides efficient connection pooling for database operations,
 reducing connection overhead and improving performance.
 """
 
-import psycopg2.pool
+import os
+from collections.abc import Generator
+from contextlib import contextmanager
+from typing import Any, Optional
+from urllib.parse import quote_plus
+
 import psycopg2.extensions
 import psycopg2.extras
-import os
-import time
-from contextlib import contextmanager
-from typing import Optional
-from urllib.parse import quote_plus
-from app.utils.log import log_info, log_warning, log_error
+import psycopg2.pool
+
+from app.utils.log import log_error, log_info, log_warning
 
 
 def resolve_db_sslmode() -> str:
@@ -71,86 +73,90 @@ def build_psycopg2_dsn() -> str:
     return f"postgresql://{netloc}/{d_enc}{suffix}"
 
 
-def _register_enum_types(conn: psycopg2.extensions.connection):
+def _register_enum_types(conn: psycopg2.extensions.connection) -> bool:
     """
     Register all PostgreSQL enum types with psycopg2 for proper type handling.
     This ensures enum types and arrays are handled correctly without SQL casting.
-    
+
     Args:
         conn: Database connection
-        
+
     Returns:
         True if all enum types registered successfully, False otherwise
     """
     enum_types = [
-        'address_type_enum',      # Already implemented
-        'status_enum',            # CRITICAL - used by all tables
-        'role_type_enum',         # CRITICAL - permission system
-        'role_name_enum',         # CRITICAL - permission system
-        'institution_type_enum',  # Internal / Customer / Supplier / Employer - must match user role_type (Customer can be in Customer or Employer institution)
-        'transaction_type_enum',  # CRITICAL - transaction system
-        'kitchen_day_enum',       # New
-        'pickup_type_enum',       # New
-        'street_type_enum',       # Address street type (St, Ave, Blvd, etc.)
-        'audit_operation_enum',   # New
-        'discretionary_reason_enum',  # New - discretionary request reasons
-        'discretionary_status_enum',  # Discretionary lifecycle: Pending, Cancelled, Approved, Rejected
-        'bill_resolution_enum',   # Institution bill resolution: Pending, Paid, Rejected
+        "address_type_enum",  # Already implemented
+        "status_enum",  # CRITICAL - used by all tables
+        "role_type_enum",  # CRITICAL - permission system
+        "role_name_enum",  # CRITICAL - permission system
+        "institution_type_enum",  # Internal / Customer / Supplier / Employer - must match user role_type (Customer can be in Customer or Employer institution)
+        "transaction_type_enum",  # CRITICAL - transaction system
+        "kitchen_day_enum",  # New
+        "pickup_type_enum",  # New
+        "street_type_enum",  # Address street type (St, Ave, Blvd, etc.)
+        "audit_operation_enum",  # New
+        "discretionary_reason_enum",  # New - discretionary request reasons
+        "discretionary_status_enum",  # Discretionary lifecycle: Pending, Cancelled, Approved, Rejected
+        "bill_resolution_enum",  # Institution bill resolution: Pending, Paid, Rejected
     ]
-    
+
     registered_count = 0
     for enum_name in enum_types:
         try:
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT oid, typarray 
-                    FROM pg_type 
+                cursor.execute(
+                    """
+                    SELECT oid, typarray
+                    FROM pg_type
                     WHERE typname = %s
-                """, (enum_name,))
+                """,
+                    (enum_name,),
+                )
                 result = cursor.fetchone()
-                
+
                 if result:
                     enum_oid, array_oid = result
                     # Register the enum type
                     ENUM_TYPE = psycopg2.extensions.new_type(
-                        (enum_oid,), f'{enum_name.upper()}', lambda value, cursor: value
+                        (enum_oid,), f"{enum_name.upper()}", lambda value, cursor: value
                     )
                     psycopg2.extensions.register_type(ENUM_TYPE, conn)
-                    
+
                     # Register the array type (if exists)
                     if array_oid:
                         ENUM_ARRAY_TYPE = psycopg2.extensions.new_array_type(
-                            (array_oid,), f'{enum_name.upper()}_ARRAY', ENUM_TYPE
+                            (array_oid,), f"{enum_name.upper()}_ARRAY", ENUM_TYPE
                         )
                         psycopg2.extensions.register_type(ENUM_ARRAY_TYPE, conn)
-                    
+
                     registered_count += 1
                     log_info(f"✅ Registered {enum_name} and {enum_name}[] types with psycopg2")
                 else:
                     log_warning(f"⚠️ {enum_name} not found in database - enum type registration skipped")
         except Exception as e:
             log_warning(f"⚠️ Failed to register {enum_name}: {e}")
-    
+
     if registered_count == len(enum_types):
         log_info(f"✅ Successfully registered {registered_count}/{len(enum_types)} enum types")
     else:
         log_warning(f"⚠️ Only registered {registered_count}/{len(enum_types)} enum types")
-    
+
     return registered_count == len(enum_types)
+
 
 class DatabasePool:
     """Manages a pool of database connections for efficient reuse"""
-    
+
     _instance = None
     _pool = None
-    
-    def __new__(cls):
+
+    def __new__(cls) -> "DatabasePool":
         if cls._instance is None:
-            cls._instance = super(DatabasePool, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
-    
-    def __init__(self):
-        if not hasattr(self, '_initialized'):
+
+    def __init__(self) -> None:
+        if not hasattr(self, "_initialized"):
             self._initialized = True
             self._pool = None
             self._minconn = int(os.getenv("DB_POOL_MIN_CONNECTIONS", 5))
@@ -170,8 +176,8 @@ class DatabasePool:
             log_info(f"   DB_HOST: {os.getenv('DB_HOST')}")
             log_info(f"   DB_PORT: {os.getenv('DB_PORT')}")
             log_info(f"   sslmode: {self._pool_config['sslmode']} (via connection URI)")
-    
-    def get_pool(self):
+
+    def get_pool(self) -> psycopg2.pool.SimpleConnectionPool:
         """Get or create the connection pool"""
         if self._pool is None:
             try:
@@ -180,9 +186,7 @@ class DatabasePool:
                     self._maxconn,
                     self._dsn,
                 )
-                log_info(
-                    f"🔌 Database pool initialized: {self._minconn}-{self._maxconn} connections"
-                )
+                log_info(f"🔌 Database pool initialized: {self._minconn}-{self._maxconn} connections")
                 log_info(
                     f"📍 Pool config: {self._pool_config['host']}:{self._pool_config['port']}/{self._pool_config['database']}"
                 )
@@ -190,71 +194,70 @@ class DatabasePool:
                 log_error(f"❌ Failed to create database pool: {e}")
                 raise
         return self._pool
-    
-    def get_connection(self):
+
+    def get_connection(self) -> psycopg2.extensions.connection:
         """Get a connection from the pool and register enum types"""
         pool = self.get_pool()
         try:
             conn = pool.getconn()
             if conn is None:
                 raise Exception("No connections available in pool")
-            
+
             # Register enum types for proper array handling
             _register_enum_types(conn)
 
             # Set search_path for this connection (belt-and-suspenders;
             # ALTER DATABASE in build_kitchen_db.sh also sets this DB-wide)
             with conn.cursor() as _cur:
-                _cur.execute(
-                    "SET search_path = core, ops, customer, billing, audit, public"
-                )
+                _cur.execute("SET search_path = core, ops, customer, billing, audit, public")
 
             return conn
         except Exception as e:
             log_error(f"❌ Failed to get connection from pool: {e}")
             raise
-    
-    def return_connection(self, conn):
+
+    def return_connection(self, conn: psycopg2.extensions.connection) -> None:
         """Return a connection to the pool"""
         if conn and self._pool:
             try:
                 self._pool.putconn(conn)
             except Exception as e:
                 log_warning(f"⚠️ Error returning connection to pool: {e}")
-    
+
     @contextmanager
-    def get_connection_context(self):
+    def get_connection_context(self) -> Generator[psycopg2.extensions.connection, None, None]:
         """Context manager for automatic connection management"""
         conn = None
         try:
             conn = self.get_connection()
             yield conn
-        except Exception as e:
+        except Exception:
             if conn:
                 conn.rollback()
             raise
         finally:
             if conn:
                 self.return_connection(conn)
-    
-    def get_pool_stats(self):
+
+    def get_pool_stats(self) -> Optional[dict[str, Any]]:
         """Get current pool statistics"""
         if self._pool is None:
             return None
-        
+
         try:
             return {
-                'min_connections': self._pool_config['minconn'],
-                'max_connections': self._pool_config['maxconn'],
-                'pool_initialized': self._pool is not None
+                "min_connections": self._pool_config["minconn"],
+                "max_connections": self._pool_config["maxconn"],
+                "pool_initialized": self._pool is not None,
             }
         except Exception as e:
             log_warning(f"⚠️ Error getting pool stats: {e}")
             return None
-    
-    def close_pool(self):
+
+    def close_pool(self) -> None:
         """Close the connection pool"""
         from app.utils.db import clear_enum_registration_cache
+
         clear_enum_registration_cache()
         if self._pool:
             try:
@@ -264,23 +267,28 @@ class DatabasePool:
             except Exception as e:
                 log_warning(f"⚠️ Error closing pool: {e}")
 
+
 # Global pool instance
 db_pool = DatabasePool()
 
-def get_db_pool():
+
+def get_db_pool() -> DatabasePool:
     """Get the global database pool instance"""
     return db_pool
 
-def get_db_connection():
+
+def get_db_connection() -> psycopg2.extensions.connection:
     """Get a connection from the pool (for backward compatibility during transition)"""
     return db_pool.get_connection()
 
-def close_db_connection(conn):
+
+def close_db_connection(conn: psycopg2.extensions.connection) -> None:
     """Return a connection to the pool (for backward compatibility during transition)"""
     db_pool.return_connection(conn)
 
+
 @contextmanager
-def get_db_connection_context():
+def get_db_connection_context() -> Generator[psycopg2.extensions.connection, None, None]:
     """Context manager for database connections"""
     with db_pool.get_connection_context() as conn:
-        yield conn 
+        yield conn

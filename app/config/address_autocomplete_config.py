@@ -5,8 +5,6 @@ Tuning for UX (too low = noisy suggestions; too high = poor UX) and cost
 (fewer chars = more API calls).
 """
 
-from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +17,7 @@ class AddressAutocompleteConfig(BaseSettings):
     ADDRESS_AUTOCOMPLETE_MIN_CHARS: int = 3
 
 
-_address_autocomplete_config: Optional[AddressAutocompleteConfig] = None
+_address_autocomplete_config: AddressAutocompleteConfig | None = None
 
 
 def get_address_autocomplete_config() -> AddressAutocompleteConfig:

@@ -16,8 +16,8 @@ Suppression:
   - Manual override via support_email_suppressed_until on institution_info
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from app.services.email_service import email_service
@@ -26,8 +26,8 @@ from app.services.onboarding_service import (
     SUPPLIER_CHECKLIST_ORDER,
     get_onboarding_status,
 )
-from app.utils.db import db_read, db_update, get_db_connection, close_db_connection
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.db import close_db_connection, db_read, db_update, get_db_connection
+from app.utils.log import log_error, log_info, log_warning
 
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
@@ -35,7 +35,7 @@ SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 EMAIL_COOLDOWN_DAYS = 3
 
 
-def _get_supplier_admin_email(institution_id: UUID, connection) -> Optional[str]:
+def _get_supplier_admin_email(institution_id: UUID, connection) -> str | None:
     """Find the Supplier Admin's email for an institution."""
     row = db_read(
         """
@@ -53,7 +53,7 @@ def _get_supplier_admin_email(institution_id: UUID, connection) -> Optional[str]
     return row["email"] if row else None
 
 
-def _is_suppressed(institution: Dict, now: datetime) -> bool:
+def _is_suppressed(institution: dict, now: datetime) -> bool:
     """Check if the institution is within a suppression window."""
     suppressed_until = institution.get("support_email_suppressed_until")
     if suppressed_until and suppressed_until > now:
@@ -62,7 +62,7 @@ def _is_suppressed(institution: Dict, now: datetime) -> bool:
     last_email = institution.get("last_support_email_date")
     if last_email:
         if last_email.tzinfo is None:
-            last_email = last_email.replace(tzinfo=timezone.utc)
+            last_email = last_email.replace(tzinfo=UTC)
         if (now - last_email).days < EMAIL_COOLDOWN_DAYS:
             return True
 
@@ -86,13 +86,13 @@ def _record_email_sent(institution_id: UUID, now: datetime, connection) -> None:
     )
 
 
-def run_supplier_stall_detection() -> Dict[str, Any]:
+def run_supplier_stall_detection() -> dict[str, Any]:
     """
     Detect stalled suppliers and send escalating onboarding emails.
     Returns a result dict with metrics for logging/monitoring.
     """
-    now_utc = datetime.now(timezone.utc)
-    result: Dict[str, Any] = {
+    now_utc = datetime.now(UTC)
+    result: dict[str, Any] = {
         "cron_job": "supplier_stall_detection",
         "run_at_utc": now_utc.isoformat(),
         "institutions_checked": 0,
@@ -161,11 +161,7 @@ def run_supplier_stall_detection() -> Dict[str, Any]:
                     continue
 
                 # Determine which email to send based on stall rules
-                missing_steps = [
-                    NEXT_STEP_LABELS[k]
-                    for k in SUPPLIER_CHECKLIST_ORDER
-                    if not checklist.get(k, False)
-                ]
+                missing_steps = [NEXT_STEP_LABELS[k] for k in SUPPLIER_CHECKLIST_ORDER if not checklist.get(k, False)]
 
                 email_type = None
                 if onboarding_status == "not_started" and days_since_creation >= 2:
@@ -202,17 +198,22 @@ def run_supplier_stall_detection() -> Dict[str, Any]:
                 sent = False
                 if email_type == "getting_started":
                     sent = email_service.send_onboarding_getting_started_email(
-                        to_email=admin_email, institution_name=inst_name,
+                        to_email=admin_email,
+                        institution_name=inst_name,
                     )
                 elif email_type == "need_help":
                     sent = email_service.send_onboarding_need_help_email(
-                        to_email=admin_email, institution_name=inst_name,
-                        completion_percentage=completion_pct, missing_steps=missing_steps,
+                        to_email=admin_email,
+                        institution_name=inst_name,
+                        completion_percentage=completion_pct,
+                        missing_steps=missing_steps,
                     )
                 elif email_type == "incomplete":
                     sent = email_service.send_onboarding_incomplete_email(
-                        to_email=admin_email, institution_name=inst_name,
-                        completion_percentage=completion_pct, missing_steps=missing_steps,
+                        to_email=admin_email,
+                        institution_name=inst_name,
+                        completion_percentage=completion_pct,
+                        missing_steps=missing_steps,
                     )
 
                 if sent:

@@ -6,16 +6,14 @@ Street block order differs by market:
 - Argentina, Peru: street_type, street_name, building_number (e.g. "Av Santa Fe 100")
 """
 
-from typing import Optional
-
 from app.config.market_config import MarketConfiguration
 
 
 def format_street_display(
     country_code: str,
-    street_type: Optional[str],
-    street_name: Optional[str],
-    building_number: Optional[str],
+    street_type: str | None,
+    street_name: str | None,
+    building_number: str | None,
 ) -> str:
     """
     Format street components for display according to market conventions.
@@ -49,11 +47,11 @@ def format_street_display(
 
 def format_address_display(
     country_code: str,
-    street_type: Optional[str],
-    street_name: Optional[str],
-    building_number: Optional[str],
-    city: Optional[str] = None,
-    postal_code: Optional[str] = None,
+    street_type: str | None,
+    street_name: str | None,
+    building_number: str | None,
+    city: str | None = None,
+    postal_code: str | None = None,
 ) -> str:
     """
     Format full address for display: market-aware street + city + postal_code.

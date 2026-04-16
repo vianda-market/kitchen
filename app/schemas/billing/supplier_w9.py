@@ -1,9 +1,9 @@
 # app/schemas/billing/supplier_w9.py
-from typing import Optional
-from uuid import UUID
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict, field_validator
 import re
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.config.enums import TaxClassification
 
@@ -11,7 +11,7 @@ from app.config.enums import TaxClassification
 class SupplierW9CreateSchema(BaseModel):
     institution_entity_id: UUID
     legal_name: str
-    business_name: Optional[str] = None
+    business_name: str | None = None
     tax_classification: TaxClassification
     ein_last_four: str
     address_line: str
@@ -25,15 +25,15 @@ class SupplierW9CreateSchema(BaseModel):
 
 
 class SupplierW9UpdateSchema(BaseModel):
-    legal_name: Optional[str] = None
-    business_name: Optional[str] = None
-    tax_classification: Optional[TaxClassification] = None
-    ein_last_four: Optional[str] = None
-    address_line: Optional[str] = None
+    legal_name: str | None = None
+    business_name: str | None = None
+    tax_classification: TaxClassification | None = None
+    ein_last_four: str | None = None
+    address_line: str | None = None
 
     @field_validator("ein_last_four")
     @classmethod
-    def validate_ein_last_four(cls, v: Optional[str]) -> Optional[str]:
+    def validate_ein_last_four(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{4}", v):
             raise ValueError("ein_last_four must be exactly 4 digits")
         return v
@@ -43,14 +43,14 @@ class SupplierW9ResponseSchema(BaseModel):
     w9_id: UUID
     institution_entity_id: UUID
     legal_name: str
-    business_name: Optional[str] = None
+    business_name: str | None = None
     tax_classification: str
     ein_last_four: str
     address_line: str
-    document_url: Optional[str] = None
+    document_url: str | None = None
     is_archived: bool
     collected_at: datetime
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
     modified_date: datetime
     modified_by: UUID
 

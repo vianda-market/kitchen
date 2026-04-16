@@ -1,7 +1,5 @@
 """SendGrid email provider — production email transport."""
 
-from typing import List, Optional
-
 from app.services.email.providers.base import EmailProvider
 from app.utils.log import log_email_tracking
 
@@ -14,7 +12,7 @@ class SendGridEmailProvider(EmailProvider):
         api_key: str,
         from_email: str,
         from_name: str,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
     ):
         self.api_key = api_key
         self.from_email = from_email
@@ -29,11 +27,11 @@ class SendGridEmailProvider(EmailProvider):
         to_email: str,
         subject: str,
         body_text: str,
-        body_html: Optional[str] = None,
-        cc: Optional[List[str]] = None,
-        bcc: Optional[List[str]] = None,
-        reply_to: Optional[str] = None,
-        category: Optional[str] = None,
+        body_html: str | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        reply_to: str | None = None,
+        category: str | None = None,
     ) -> bool:
         if not self.is_configured():
             log_email_tracking("Cannot send email: SendGrid API key or from_email not configured", level="error")

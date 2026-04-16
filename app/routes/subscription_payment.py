@@ -3,37 +3,42 @@
 Atomic subscription + payment: POST /subscriptions/with-payment and (mock) POST /subscriptions/{id}/confirm-payment.
 When user has Pending in same market, edit in place (update plan, cancel previous payment intent, new payment).
 """
+
+from datetime import UTC
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user
-from app.dependencies.database import get_db
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
 from app.config.settings import settings
+from app.dependencies.database import get_db
+from app.schemas.subscription import (
+    SubscriptionResponseSchema,
+    SubscriptionWithPaymentRequestSchema,
+    SubscriptionWithPaymentResponseSchema,
+)
 from app.services.crud_service import (
-    subscription_service,
-    plan_service,
     get_subscription_by_user_and_market,
+    plan_service,
+    subscription_service,
 )
 from app.services.market_service import market_service
 from app.services.payment_provider import (
-    create_payment_for_subscription,
     cancel_payment_intent,
+    create_payment_for_subscription,
     get_client_secret_for_pending_payment,
 )
 from app.services.subscription_action_service import (
     activate_subscription_after_payment,
     create_and_process_bill_for_subscription_payment,
+)
+from app.services.subscription_action_service import (
     cancel_subscription as cancel_subscription_action,
 )
 from app.utils.db import db_insert, db_read, db_update
-from app.schemas.subscription import (
-    SubscriptionWithPaymentRequestSchema,
-    SubscriptionWithPaymentResponseSchema,
-    SubscriptionResponseSchema,
-)
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
@@ -57,12 +62,14 @@ def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.conne
     """Check if user is a benefit employee and compute employer/employee split.
     Returns dict with split info, or None if user is not a benefit employee."""
     from app.services.crud_service import institution_service
-    from app.services.employer.program_service import get_program_by_institution
     from app.services.employer.billing_service import compute_employee_benefit
+    from app.services.employer.program_service import get_program_by_institution
 
     user = db_read(
         "SELECT institution_id FROM user_info WHERE user_id = %s::uuid AND is_archived = FALSE",
-        (str(user_id),), connection=db, fetch_one=True,
+        (str(user_id),),
+        connection=db,
+        fetch_one=True,
     )
     if not user:
         return None
@@ -86,8 +93,9 @@ def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.conne
     # Compute monthly cap usage for this user
     already_used = 0.0
     if benefit_cap is not None and program.benefit_cap_period == "monthly":
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        from datetime import datetime
+
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         usage_rows = db_read(
             """
@@ -98,7 +106,8 @@ def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.conne
               AND ebl.renewal_date >= %s
             """,
             (str(user_id), month_start),
-            connection=db, fetch_one=True,
+            connection=db,
+            fetch_one=True,
         )
         already_used = float(usage_rows["total_used"]) if usage_rows else 0.0
 
@@ -124,6 +133,7 @@ def _create_fully_subsidized_subscription(
 ):
     """Create a subscription that activates immediately with no payment (100% employer subsidy)."""
     from app.utils.log import log_info
+
     plan_credit = int(getattr(plan, "credit", 0))
     program = benefit_info["program"]
     early_threshold = None if not program.allow_early_renewal else 10
@@ -132,7 +142,14 @@ def _create_fully_subsidized_subscription(
     existing = get_subscription_by_user_and_market(user_id, market_id, db)
     if existing:
         if existing.subscription_status == SubscriptionStatus.ACTIVE.value:
-            raise HTTPException(status_code=409, detail={"code": "already_active", "subscription_id": str(existing.subscription_id), "message": "You already have an active subscription in this market."})
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "already_active",
+                    "subscription_id": str(existing.subscription_id),
+                    "message": "You already have an active subscription in this market.",
+                },
+            )
 
     create_data = {
         "plan_id": plan.plan_id,
@@ -193,9 +210,8 @@ def create_subscription_with_payment(
         if employer_benefit_info["employee_share_cents"] == 0:
             # Fully subsidized — activate immediately, no payment
             return _create_fully_subsidized_subscription(user_id, plan, market_id, employer_benefit_info, db)
-        else:
-            # Partial subsidy — charge employee their share only
-            amount_cents = employer_benefit_info["employee_share_cents"]
+        # Partial subsidy — charge employee their share only
+        amount_cents = employer_benefit_info["employee_share_cents"]
 
     existing = get_subscription_by_user_and_market(user_id, market_id, db)
     if existing:
@@ -389,7 +405,7 @@ def get_payment_details_for_pending_subscription(
         raise HTTPException(
             status_code=501,
             detail="Payment details not available for this provider. " + str(e),
-        )
+        ) from None
 
     return {
         "subscription_id": subscription_id,
@@ -465,17 +481,17 @@ def confirm_subscription_payment(
         )
     finally:
         cursor.close()
-    create_and_process_bill_for_subscription_payment(
-        subscription_id, UUID(str(_sp_id)), user_id, db
-    )
+    create_and_process_bill_for_subscription_payment(subscription_id, UUID(str(_sp_id)), user_id, db)
     db.commit()
 
     # Best-effort referral reward processing (non-blocking)
     try:
         from app.services.referral_service import process_referral_reward
+
         process_referral_reward(user_id, db)
     except Exception as e:
         from app.utils.log import log_warning
+
         log_warning(f"Referral reward processing failed for user {user_id}: {e}")
 
     updated = subscription_service.get_by_id(subscription_id, db, scope=None)

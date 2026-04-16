@@ -5,19 +5,16 @@ Tests the business logic for geocoding, timezone mapping,
 and location-based calculations.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
-from app.services.geolocation_service import (
-    call_geocode_api, get_timezone_from_location
-)
+from app.services.geolocation_service import call_geocode_api, get_timezone_from_location
 
 
 class TestGeolocationService:
     """Test suite for Geolocation Service business logic."""
 
-    @patch('app.services.geolocation_service.geolocation_service.geocode_address')
-    @patch('app.services.geolocation_service.log_warning')
+    @patch("app.services.geolocation_service.geolocation_service.geocode_address")
+    @patch("app.services.geolocation_service.log_warning")
     def test_call_geocode_api_returns_json_on_success(self, mock_log_warning, mock_geocode):
         """Test that call_geocode_api returns JSON data on successful API call."""
         mock_geocode.return_value = {
@@ -31,8 +28,8 @@ class TestGeolocationService:
         assert result == {"lat": -34.6037, "lng": -58.3816, "formatted_address": "Buenos Aires, Argentina"}
         mock_geocode.assert_called_once_with("Buenos Aires, Argentina")
 
-    @patch('app.services.geolocation_service.geolocation_service.geocode_address')
-    @patch('app.services.geolocation_service.log_warning')
+    @patch("app.services.geolocation_service.geolocation_service.geocode_address")
+    @patch("app.services.geolocation_service.log_warning")
     def test_call_geocode_api_handles_non_200_status(self, mock_log_warning, mock_geocode):
         """Test that call_geocode_api handles geocoding failure (returns None)."""
         mock_geocode.return_value = None
@@ -42,8 +39,8 @@ class TestGeolocationService:
         assert result == {}
         mock_geocode.assert_called_once_with("Invalid Address")
 
-    @patch('app.services.geolocation_service.geolocation_service.geocode_address')
-    @patch('app.services.geolocation_service.log_warning')
+    @patch("app.services.geolocation_service.geolocation_service.geocode_address")
+    @patch("app.services.geolocation_service.log_warning")
     def test_call_geocode_api_handles_request_exception(self, mock_log_warning, mock_geocode):
         """Test that call_geocode_api handles request exceptions."""
         mock_geocode.side_effect = Exception("Connection error")
@@ -53,8 +50,8 @@ class TestGeolocationService:
         assert result == {}
         mock_geocode.assert_called_once_with("Test Address")
 
-    @patch('app.services.geolocation_service.geolocation_service.geocode_address')
-    @patch('app.services.geolocation_service.log_warning')
+    @patch("app.services.geolocation_service.geolocation_service.geocode_address")
+    @patch("app.services.geolocation_service.log_warning")
     def test_call_geocode_api_handles_general_exception(self, mock_log_warning, mock_geocode):
         """Test that call_geocode_api handles general exceptions."""
         mock_geocode.side_effect = Exception("Unexpected error")

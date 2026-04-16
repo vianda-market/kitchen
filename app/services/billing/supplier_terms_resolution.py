@@ -6,7 +6,7 @@ See docs/plans/MULTINATIONAL_INSTITUTIONS.md for design rationale.
 
 from datetime import time
 from uuid import UUID
-from typing import Optional
+
 import psycopg2.extensions
 
 from app.utils.db import db_read
@@ -19,11 +19,12 @@ DEFAULT_KITCHEN_CLOSE = time(13, 30)
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_terms_row(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID],
+    institution_entity_id: UUID | None,
     db: psycopg2.extensions.connection,
-) -> Optional[dict]:
+) -> dict | None:
     """Fetch a specific supplier_terms row.
 
     If institution_entity_id is provided, fetches the entity-level override.
@@ -46,7 +47,7 @@ def _get_terms_row(
     )
 
 
-def _resolve_field(field: str, entity_terms: Optional[dict], institution_terms: Optional[dict]):
+def _resolve_field(field: str, entity_terms: dict | None, institution_terms: dict | None):
     """Return the first non-None value from entity → institution tiers."""
     if entity_terms and entity_terms.get(field) is not None:
         return entity_terms[field]
@@ -55,7 +56,7 @@ def _resolve_field(field: str, entity_terms: Optional[dict], institution_terms: 
     return None
 
 
-def _get_market_payout_config(institution_id: UUID, db: psycopg2.extensions.connection) -> Optional[dict]:
+def _get_market_payout_config(institution_id: UUID, db: psycopg2.extensions.connection) -> dict | None:
     """Fetch market_payout_aggregator row for the institution's primary market.
 
     Looks up market via institution_market junction (is_primary=TRUE first, then any).
@@ -78,11 +79,12 @@ def _get_market_payout_config(institution_id: UUID, db: psycopg2.extensions.conn
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def get_terms_for_scope(
     institution_id: UUID,
-    institution_entity_id: Optional[UUID],
+    institution_entity_id: UUID | None,
     db: psycopg2.extensions.connection,
-) -> Optional[dict]:
+) -> dict | None:
     """Get supplier terms row for a specific (institution, entity) scope.
 
     entity_id=None fetches the institution-level default (IS NULL).
@@ -95,7 +97,7 @@ def resolve_effective_invoice_config(
     institution_id: UUID,
     db: psycopg2.extensions.connection,
     *,
-    institution_entity_id: Optional[UUID] = None,
+    institution_entity_id: UUID | None = None,
 ) -> dict:
     """Return resolved invoice compliance config.
 
@@ -127,7 +129,7 @@ def resolve_effective_kitchen_hours(
     institution_id: UUID,
     db: psycopg2.extensions.connection,
     *,
-    institution_entity_id: Optional[UUID] = None,
+    institution_entity_id: UUID | None = None,
 ) -> dict:
     """Return resolved kitchen hours.
 
@@ -171,7 +173,7 @@ def get_supplier_payment_frequency(
     institution_id: UUID,
     db: psycopg2.extensions.connection,
     *,
-    institution_entity_id: Optional[UUID] = None,
+    institution_entity_id: UUID | None = None,
 ) -> str:
     """Return the payment frequency for a supplier. Default: 'daily'.
 

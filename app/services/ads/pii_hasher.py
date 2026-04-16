@@ -9,6 +9,7 @@ provides the shared implementation.
 SECURITY: Raw PII must never be logged, stored in Redis, or persisted
 beyond the initial event capture. Hash before enqueuing to ARQ.
 """
+
 import hashlib
 
 

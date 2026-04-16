@@ -4,6 +4,7 @@ Unit tests for zone haversine distance calculation.
 Verifies the haversine function used for zone overlap detection
 produces correct distances for known city pairs.
 """
+
 import pytest
 
 from app.services.ads.zone_service import _haversine_km

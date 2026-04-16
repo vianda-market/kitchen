@@ -4,14 +4,14 @@ Employer benefits billing cron job.
 Checks all active employer programs and generates bills for those where billing is due today.
 Handles daily, weekly, and monthly billing cycles.
 """
-from datetime import date, timedelta, datetime, timezone
-from typing import Dict, Any, Optional
-from uuid import UUID
-from decimal import Decimal
 
-from app.utils.db import db_read, get_db_connection, close_db_connection
-from app.utils.log import log_info, log_warning, log_error
-from app.services.employer.billing_service import generate_employer_bill, list_employer_bills
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
+from uuid import UUID
+
+from app.services.employer.billing_service import generate_employer_bill
+from app.utils.db import close_db_connection, db_read, get_db_connection
+from app.utils.log import log_error, log_info
 
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
@@ -55,7 +55,7 @@ def _compute_billing_period(program, today: date) -> tuple:
     return (today - timedelta(days=30), today)
 
 
-def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
+def run_employer_billing(bill_date: date | None = None) -> dict[str, Any]:
     """Generate employer bills for all programs where billing is due today.
 
     Args:
@@ -64,8 +64,8 @@ def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
     Returns:
         Summary dict with counts and errors.
     """
-    today = bill_date or datetime.now(timezone.utc).date()
-    result: Dict[str, Any] = {
+    today = bill_date or datetime.now(UTC).date()
+    result: dict[str, Any] = {
         "cron_job": "employer_billing",
         "run_date": today.isoformat(),
         "bills_generated": 0,
@@ -90,13 +90,13 @@ def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
             log_info("Employer billing cron: no active programs found.")
             return result
 
-        from app.dto.models import EmployerBenefitsProgramDTO
-
         for row in rows:
             result["programs_checked"] += 1
+
             # Build a lightweight object for billing check
             class ProgramProxy:
                 pass
+
             p = ProgramProxy()
             p.billing_cycle = row["billing_cycle"]
             p.billing_day = row.get("billing_day")
@@ -111,12 +111,18 @@ def run_employer_billing(bill_date: Optional[date] = None) -> Dict[str, Any]:
             period_start, period_end = _compute_billing_period(p, today)
 
             try:
-                bill_result = generate_employer_bill(
-                    institution_id, period_start, period_end, connection, modified_by=SYSTEM_USER_ID,
+                generate_employer_bill(
+                    institution_id,
+                    period_start,
+                    period_end,
+                    connection,
+                    modified_by=SYSTEM_USER_ID,
                     institution_entity_id=entity_id,
                 )
                 result["bills_generated"] += 1
-                log_info(f"Generated employer bill for institution {institution_id} entity {entity_id}: period {period_start}-{period_end}")
+                log_info(
+                    f"Generated employer bill for institution {institution_id} entity {entity_id}: period {period_start}-{period_end}"
+                )
             except Exception as e:
                 log_error(f"Employer billing failed for institution {institution_id} entity {entity_id}: {e}")
                 result["errors"].append(f"{institution_id}/{entity_id}: {e}")
@@ -138,7 +144,7 @@ def _is_last_day_of_month(d: date) -> bool:
     return next_day.month != d.month
 
 
-def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str, Any]):
+def _reconcile_minimum_fees(programs, today: date, connection, result: dict[str, Any]):
     """For daily/weekly billing: check if month's total < minimum_monthly_fee. If so, generate adjustment."""
     month_start = today.replace(day=1)
     for row in programs:
@@ -171,8 +177,9 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
         if total < min_fee_float:
             adjustment = min_fee_float - total
             try:
-                from app.services.crud_service import employer_bill_service
                 from app.config import Status
+                from app.services.crud_service import employer_bill_service
+
                 # Resolve currency from entity's currency_metadata
                 currency_row = db_read(
                     """
@@ -204,7 +211,9 @@ def _reconcile_minimum_fees(programs, today: date, connection, result: Dict[str,
                     "modified_by": str(SYSTEM_USER_ID),
                 }
                 employer_bill_service.create(adjustment_bill, connection, scope=None)
-                log_info(f"Minimum fee adjustment bill created for institution {institution_id} entity {entity_id}: ${adjustment:.2f} {currency_code}")
+                log_info(
+                    f"Minimum fee adjustment bill created for institution {institution_id} entity {entity_id}: ${adjustment:.2f} {currency_code}"
+                )
             except Exception as e:
                 log_error(f"Minimum fee reconciliation failed for institution {institution_id} entity {entity_id}: {e}")
                 result["errors"].append(f"min_fee {institution_id}/{entity_id}: {e}")

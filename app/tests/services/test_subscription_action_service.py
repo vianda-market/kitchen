@@ -3,22 +3,24 @@ Unit tests for Subscription Action Service.
 
 Tests cancel, put on hold, resume, and reconcile_hold_subscriptions.
 """
-import pytest
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
-from datetime import datetime, timezone, timedelta
-from decimal import Decimal
+
+import pytest
 from fastapi import HTTPException
 
+from app.config import Status
+from app.config.enums.subscription_status import SubscriptionStatus
+from app.dto.models import SubscriptionDTO
 from app.services.subscription_action_service import (
     cancel_subscription,
     put_subscription_on_hold,
-    resume_subscription,
     reconcile_hold_subscriptions,
+    resume_subscription,
 )
-from app.dto.models import SubscriptionDTO
-from app.config import Status
-from app.config.enums.subscription_status import SubscriptionStatus
 
 
 def _make_subscription(
@@ -34,15 +36,15 @@ def _make_subscription(
         plan_id=uuid4(),
         market_id=uuid4(),
         balance=Decimal("0"),
-        renewal_date=datetime.now(timezone.utc) + timedelta(days=30),
+        renewal_date=datetime.now(UTC) + timedelta(days=30),
         is_archived=False,
         status=Status.ACTIVE,
         subscription_status=subscription_status,
         hold_start_date=hold_start_date,
         hold_end_date=hold_end_date,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -107,7 +109,7 @@ class TestPutSubscriptionOnHold:
         sub_id = uuid4()
         user_id = uuid4()
         subscription = _make_subscription(subscription_id=sub_id, user_id=user_id)
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(days=30)
         updated = _make_subscription(
             subscription_id=sub_id,
@@ -131,7 +133,7 @@ class TestPutSubscriptionOnHold:
         sub_id = uuid4()
         user_id = uuid4()
         subscription = _make_subscription(subscription_id=sub_id, user_id=user_id)
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(days=91)
         with patch("app.services.subscription_action_service.subscription_service") as svc:
             svc.get_by_id.return_value = subscription
@@ -145,7 +147,7 @@ class TestPutSubscriptionOnHold:
         sub_id = uuid4()
         user_id = uuid4()
         subscription = _make_subscription(subscription_id=sub_id, user_id=user_id)
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start - timedelta(days=1)
         with patch("app.services.subscription_action_service.subscription_service") as svc:
             svc.get_by_id.return_value = subscription
@@ -162,7 +164,7 @@ class TestPutSubscriptionOnHold:
             user_id=user_id,
             subscription_status=SubscriptionStatus.ON_HOLD.value,
         )
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(days=30)
         with patch("app.services.subscription_action_service.subscription_service") as svc:
             svc.get_by_id.return_value = subscription
@@ -176,7 +178,7 @@ class TestPutSubscriptionOnHold:
         owner_id = uuid4()
         other_id = uuid4()
         subscription = _make_subscription(subscription_id=sub_id, user_id=owner_id)
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(days=30)
         with patch("app.services.subscription_action_service.subscription_service") as svc:
             svc.get_by_id.return_value = subscription
@@ -190,7 +192,7 @@ class TestResumeSubscription:
     def test_resume_success(self, mock_db):
         sub_id = uuid4()
         user_id = uuid4()
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(days=30)
         subscription = _make_subscription(
             subscription_id=sub_id,

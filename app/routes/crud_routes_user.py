@@ -22,11 +22,8 @@ Benefits:
 
 from fastapi import APIRouter
 
-from app.services.route_factory import (
-    create_subscription_routes,
-    create_payment_method_routes
-)
 from app.routes.subscription_payment import router as subscription_payment_router
+from app.services.route_factory import create_payment_method_routes, create_subscription_routes
 
 # Create consolidated router for user-dependent routes
 crud_router_user = APIRouter()

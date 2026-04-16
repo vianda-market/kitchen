@@ -6,55 +6,52 @@ This service handles the complex business logic for creating plate selections,
 breaking down the large route function into smaller, testable components.
 """
 
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
-from datetime import datetime, timezone
-from decimal import Decimal
+
 import psycopg2.extensions
 from fastapi import HTTPException
 
-from app.dto.models import (
-    PlateDTO, RestaurantDTO, QRCodeDTO, CreditCurrencyDTO,
-    PlateSelectionDTO, ClientTransactionDTO, SubscriptionDTO
-)
-from app.services.crud_service import (
-    plate_service, restaurant_service, credit_currency_service,
-    plate_selection_service, plate_pickup_live_service,
-    qr_code_service, subscription_service,
-)
-from app.utils.log import log_info, log_warning, log_error
-from app.utils.db import db_read
-from app.services.date_service import get_effective_current_day
-from app.services.market_detection import MarketDetectionService
 from app.config import Status
-from app.services.credit_validation_service import (
-    validate_sufficient_credits,
-    handle_insufficient_credits
+from app.dto.models import (
+    PlateSelectionDTO,
 )
 from app.services.billing import (
     apply_subscription_renewal,
 )
+from app.services.credit_validation_service import handle_insufficient_credits, validate_sufficient_credits
+from app.services.crud_service import (
+    credit_currency_service,
+    plate_pickup_live_service,
+    plate_selection_service,
+    plate_service,
+    qr_code_service,
+    restaurant_service,
+    subscription_service,
+)
+from app.services.date_service import get_effective_current_day
 from app.services.restaurant_explorer_service import resolve_weekday_to_next_occurrence
+from app.utils.db import db_read
+from app.utils.log import log_error, log_info, log_warning
+
 from .plate_selection_validation import (
-    validate_plate_selection_data,
-    validate_restaurant_status,
-    validate_restaurant,
-    validate_pickup_time_range,
     determine_target_kitchen_day,
+    validate_pickup_time_range,
+    validate_restaurant,
+    validate_restaurant_status,
 )
 
 
 def create_plate_selection_with_transactions(
-    payload: Dict[str, Any],
-    current_user: Dict[str, Any],
-    db: psycopg2.extensions.connection
+    payload: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
 ) -> PlateSelectionDTO:
     """
     Create a plate selection with all related transactions.
-    
+
     This function orchestrates the entire plate selection creation process,
     delegating to smaller, focused functions for each step.
-    
+
     Raises:
         HTTPException: For validation errors, missing resources, or system failures
     """
@@ -63,13 +60,19 @@ def create_plate_selection_with_transactions(
         context = _fetch_plate_selection_context(payload, db)
         if not context:
             raise HTTPException(status_code=400, detail="Invalid plate selection data or missing required resources")
-            
+
         # Step 2: Determine target kitchen day
-        timezone_str = getattr(context["address"], "timezone", None) or (
-            __import__("app.config.market_config", fromlist=["MarketConfiguration"])
-            .MarketConfiguration.get_market_timezone(context["address"].country_code)
-            if context["address"].country_code else None
-        ) or "America/Argentina/Buenos_Aires"
+        timezone_str = (
+            getattr(context["address"], "timezone", None)
+            or (
+                __import__(
+                    "app.config.market_config", fromlist=["MarketConfiguration"]
+                ).MarketConfiguration.get_market_timezone(context["address"].country_code)
+                if context["address"].country_code
+                else None
+            )
+            or "America/Argentina/Buenos_Aires"
+        )
         country_code = context["address"].country_code
         context["target_day"] = determine_target_kitchen_day(
             payload.get("target_kitchen_day"),
@@ -78,14 +81,12 @@ def create_plate_selection_with_transactions(
             context["kitchen_days"],
             country_code,
             db,
-            timezone_str=timezone_str
+            timezone_str=timezone_str,
         )
-        
+
         # Step 2.5: Calculate target date and validate restaurant (status + holidays)
         try:
-            target_date = resolve_weekday_to_next_occurrence(
-                context["target_day"], timezone_str
-            ).strftime('%Y-%m-%d')
+            target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str).strftime("%Y-%m-%d")
             context["target_date"] = target_date
 
             # Get country code for holiday validation (already stored in address)
@@ -94,10 +95,7 @@ def create_plate_selection_with_transactions(
             # Validate restaurant (status + holidays for target date)
             if country_code:
                 validate_restaurant(
-                    restaurant=context["restaurant"],
-                    target_date=target_date,
-                    country_code=country_code,
-                    db=db
+                    restaurant=context["restaurant"], target_date=target_date, country_code=country_code, db=db
                 )
             else:
                 # If country code not available, just validate status
@@ -114,9 +112,7 @@ def create_plate_selection_with_transactions(
                 target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str)
             pickup_time_range = payload.get("pickup_time_range")
             if pickup_time_range:
-                validate_pickup_time_range(
-                    country_code, context["target_day"], target_date, pickup_time_range
-                )
+                validate_pickup_time_range(country_code, context["target_day"], target_date, pickup_time_range)
 
         # Step 2.7: Reject if user already has a plate selection for this kitchen_day (or handle replace flow)
         _existing = db_read(
@@ -146,7 +142,7 @@ def create_plate_selection_with_transactions(
                         "kitchen_day": context["target_day"],
                         "existing_plate_selection_id": existing_id,
                         "message": f"You already have a plate reserved for {context['target_day']}. "
-                                   "Continue to cancel your meal and reserve this plate?",
+                        "Continue to cancel your meal and reserve this plate?",
                     },
                 )
 
@@ -159,10 +155,10 @@ def create_plate_selection_with_transactions(
                 renewal_date = subscription.renewal_date
                 if renewal_date is not None:
                     if renewal_date.tzinfo is None:
-                        renewal_date = renewal_date.replace(tzinfo=timezone.utc)
+                        renewal_date = renewal_date.replace(tzinfo=UTC)
                     else:
-                        renewal_date = renewal_date.astimezone(timezone.utc)
-                    now_utc = datetime.now(timezone.utc)
+                        renewal_date = renewal_date.astimezone(UTC)
+                    now_utc = datetime.now(UTC)
                     if balance < threshold and renewal_date > now_utc:
                         user_id = current_user.get("user_id")
                         if isinstance(user_id, str):
@@ -174,30 +170,26 @@ def create_plate_selection_with_transactions(
                                 modified_by=user_id,
                                 commit=True,
                             )
-                            log_info(f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {threshold}, renewal_date in future)")
+                            log_info(
+                                f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {threshold}, renewal_date in future)"
+                            )
                         except (HTTPException, ValueError) as e:
                             log_warning(f"Could not apply early renewal: {e}")
-        
+
         # Step 3: NEW - Validate sufficient credits BEFORE creating any records
-        credit_validation = validate_sufficient_credits(
-            current_user["user_id"],
-            context["plate"].credit,
-            db
-        )
-        
+        credit_validation = validate_sufficient_credits(current_user["user_id"], context["plate"].credit, db)
+
         if not credit_validation.has_sufficient_credits:
             # Return user-friendly insufficient credits response
             insufficient_credits_response = handle_insufficient_credits(
-                current_user["user_id"],
-                context["plate"].credit,
-                credit_validation.current_balance
+                current_user["user_id"], context["plate"].credit, credit_validation.current_balance
             )
             # Raise HTTPException with user-friendly response
             raise HTTPException(
                 status_code=402,  # Payment Required
-                detail=insufficient_credits_response.model_dump()
+                detail=insufficient_credits_response.model_dump(),
             )
-        
+
         # Step 4: Create the plate selection (only if credits are sufficient)
         # Client transaction, subscription balance, plate_pickup_live, and restaurant_transaction
         # are all created at kitchen_start by the promotion cron.
@@ -205,13 +197,15 @@ def create_plate_selection_with_transactions(
         if not selection:
             db.rollback()
             raise HTTPException(status_code=500, detail="Failed to create plate selection record")
-        
+
         # Commit
         db.commit()
-        log_info(f"Successfully created plate selection {selection.plate_selection_id} (plate_pickup created at kitchen_start)")
-        
+        log_info(
+            f"Successfully created plate selection {selection.plate_selection_id} (plate_pickup created at kitchen_start)"
+        )
+
         return selection, None
-        
+
     except HTTPException:
         # HTTPException already handled rollback, just re-raise
         raise
@@ -219,65 +213,65 @@ def create_plate_selection_with_transactions(
         # Rollback on any unexpected error
         db.rollback()
         log_error(f"Error creating plate selection: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create plate selection")
+        raise HTTPException(status_code=500, detail="Failed to create plate selection") from None
 
 
-def _fetch_plate_selection_context(
-    payload: Dict[str, Any], 
-    db: psycopg2.extensions.connection
-) -> Dict[str, Any]:
+def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensions.connection) -> dict[str, Any]:
     """
     Fetch all required data for plate selection in one place.
-    
+
     Returns a context dictionary with all required entities.
-    
+
     Raises:
         HTTPException: For invalid data or missing resources
     """
     try:
         plate_id = UUID(str(payload["plate_id"]))
     except (ValueError, KeyError):
-        raise HTTPException(status_code=400, detail=f"Invalid plate_id format: {payload.get('plate_id')}")
-    
+        raise HTTPException(status_code=400, detail=f"Invalid plate_id format: {payload.get('plate_id')}") from None
+
     # Fetch plate
     plate = plate_service.get_by_id(plate_id, db)
     if not plate:
         raise HTTPException(status_code=404, detail=f"Plate not found for plate_id {plate_id}")
-    
+
     # Fetch restaurant
     restaurant = restaurant_service.get_by_id(plate.restaurant_id, db)
     if not restaurant:
         raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {plate.restaurant_id}")
-    
+
     # Validate restaurant status - must be 'Active' to accept plate selections
     validate_restaurant_status(restaurant)
-    
+
     # Fetch restaurant address to get country information
     from app.services.crud_service import address_service
+
     address = address_service.get_by_id(restaurant.address_id, db)
     if not address:
         raise HTTPException(status_code=404, detail=f"Address not found for address_id {restaurant.address_id}")
-    
+
     # Fetch QR code
     qr_code = qr_code_service.get_by_restaurant(plate.restaurant_id, db)
     if not qr_code:
         raise HTTPException(status_code=404, detail=f"No QR code found for restaurant {plate.restaurant_id}")
-    
+
     # Fetch credit currency (from institution_entity, not restaurant)
     from app.services.entity_service import get_currency_metadata_id_for_restaurant
+
     currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
     credit_currency = credit_currency_service.get_by_id(currency_metadata_id, db)
     if not credit_currency:
         raise HTTPException(status_code=404, detail=f"Credit currency not found for restaurant {plate.restaurant_id}")
-    
+
     # Fetch kitchen days for the plate
     # Note: We pass scope=None to get all kitchen days (not filtered by institution)
     # This is correct for plate selection, as customers should see all available days for a plate
     # The filtering by plate_id happens below
     from app.services.crud_service import plate_kitchen_days_service
+
     kitchen_days = plate_kitchen_days_service.get_all(db, scope=None, include_archived=False)
     plate_kitchen_days = [kd.kitchen_day for kd in kitchen_days if kd.plate_id == plate_id]
-    
+
     return {
         "plate": plate,
         "restaurant": restaurant,
@@ -285,25 +279,23 @@ def _fetch_plate_selection_context(
         "qr_code": qr_code,
         "credit_currency": credit_currency,
         "kitchen_days": plate_kitchen_days,
-        "payload": payload
+        "payload": payload,
     }
 
 
 def _create_plate_selection_record(
-    context: Dict[str, Any],
-    current_user: Dict[str, Any],
-    db: psycopg2.extensions.connection
+    context: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
 ) -> PlateSelectionDTO:
     """
     Create the main plate selection record.
-    
+
     Raises:
         HTTPException: If plate selection creation fails
     """
     plate = context["plate"]
     qr_code = context["qr_code"]
     target_day = context["target_day"]
-    
+
     payload_data = context.get("payload", {})
     pickup_intent = payload_data.get("pickup_intent", "self")
     flexible_on_time = payload_data.get("flexible_on_time") if pickup_intent == "request" else None
@@ -325,30 +317,39 @@ def _create_plate_selection_record(
         "pickup_intent": pickup_intent,
         "flexible_on_time": flexible_on_time,
         "status": Status.PENDING,
-        "modified_by": current_user["user_id"]
+        "modified_by": current_user["user_id"],
     }
-    
+
     selection = plate_selection_service.create(data, db, commit=False)
     if selection:
         log_info(f"Created plate selection: {selection.plate_selection_id} (commit deferred)")
         return selection
-    else:
-        raise HTTPException(status_code=500, detail=f"Failed to create plate selection with data: {data}")
+    raise HTTPException(status_code=500, detail=f"Failed to create plate selection with data: {data}")
 
 
 # Fields that may NOT be modified via PATCH. To change plate, user must cancel and create new.
-_PATCH_FORBIDDEN_FIELDS = frozenset({
-    "plate_id", "target_kitchen_day", "kitchen_day", "pickup_date", "user_id", "restaurant_id",
-    "product_id", "qr_code_id", "credit", "plate_selection_id", "created_date",
-    "modified_date", "is_archived", "status",
-})
+_PATCH_FORBIDDEN_FIELDS = frozenset(
+    {
+        "plate_id",
+        "target_kitchen_day",
+        "kitchen_day",
+        "pickup_date",
+        "user_id",
+        "restaurant_id",
+        "product_id",
+        "qr_code_id",
+        "credit",
+        "plate_selection_id",
+        "created_date",
+        "modified_date",
+        "is_archived",
+        "status",
+    }
+)
 
 
 def update_plate_selection(
-    plate_selection_id: UUID,
-    payload: Dict[str, Any],
-    current_user: Dict[str, Any],
-    db: psycopg2.extensions.connection
+    plate_selection_id: UUID, payload: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
 ) -> PlateSelectionDTO:
     """
     Update a plate selection. Only pickup_time_range, pickup_intent, flexible_on_time,
@@ -364,8 +365,8 @@ def update_plate_selection(
         raise HTTPException(
             status_code=400,
             detail=f"Cannot modify {', '.join(sorted(forbidden_in_payload))}. "
-                   "Only pickup_time_range, pickup_intent, and flexible_on_time are editable. "
-                   "To change the plate, cancel this selection and create a new one.",
+            "Only pickup_time_range, pickup_intent, and flexible_on_time are editable. "
+            "To change the plate, cancel this selection and create a new one.",
         )
 
     selection = plate_selection_service.get_by_id_non_archived(plate_selection_id, db)
@@ -378,7 +379,7 @@ def update_plate_selection(
     if not is_plate_selection_editable(plate_selection_id, db):
         raise HTTPException(
             status_code=400,
-            detail="Plate selection is no longer editable. Edits are allowed until 1 hour before kitchen day opens."
+            detail="Plate selection is no longer editable. Edits are allowed until 1 hour before kitchen day opens.",
         )
 
     updates = {}
@@ -408,7 +409,7 @@ def update_plate_selection(
 
 def cancel_plate_selection(
     plate_selection_id: UUID,
-    current_user: Dict[str, Any],
+    current_user: dict[str, Any],
     db: psycopg2.extensions.connection,
     commit: bool = True,
 ) -> PlateSelectionDTO:
@@ -430,7 +431,7 @@ def cancel_plate_selection(
     if not is_plate_selection_editable(plate_selection_id, db):
         raise HTTPException(
             status_code=400,
-            detail="Plate selection is no longer editable. Cancellation is allowed until 1 hour before kitchen day opens."
+            detail="Plate selection is no longer editable. Cancellation is allowed until 1 hour before kitchen day opens.",
         )
 
     plate = plate_service.get_by_id(selection.plate_id, db)
@@ -445,6 +446,7 @@ def cancel_plate_selection(
         plate_selection_service.soft_delete(plate_selection_id, current_user["user_id"], db)
 
         from app.utils.db import db_read
+
         pickup_rows = db_read(
             "SELECT plate_pickup_id FROM plate_pickup_live WHERE plate_selection_id = %s AND is_archived = FALSE",
             (str(plate_selection_id),),
@@ -465,15 +467,12 @@ def cancel_plate_selection(
     except Exception as e:
         db.rollback()
         log_error(f"Error cancelling plate selection: {e}")
-        raise HTTPException(status_code=500, detail="Failed to cancel plate selection")
+        raise HTTPException(status_code=500, detail="Failed to cancel plate selection") from None
 
 
 def delete_plate_selection(
-    plate_selection_id: UUID,
-    current_user: Dict[str, Any],
-    db: psycopg2.extensions.connection
-) -> Dict[str, str]:
+    plate_selection_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection
+) -> dict[str, str]:
     """Delete (cancel) a plate selection. Same as cancel - soft-deletes selection and archives."""
     cancel_plate_selection(plate_selection_id, current_user, db)
     return {"detail": "Plate selection deleted successfully"}
-

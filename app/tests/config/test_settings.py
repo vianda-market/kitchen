@@ -2,7 +2,6 @@
 Unit tests for get_google_api_key environment-based resolution.
 """
 
-import pytest
 from unittest.mock import patch
 
 from app.config.settings import get_google_api_key, settings

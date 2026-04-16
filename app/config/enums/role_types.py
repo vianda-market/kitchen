@@ -4,11 +4,13 @@ Role Type Enumeration
 Defines the valid role types in the system.
 Role types are fixed at compile time and determine user access categories.
 """
+
 from enum import Enum
 
 
 class RoleType(str, Enum):
     """Valid role types - fixed at compile time. Also used for institution_type. Employer = benefit-program institution and role_type."""
+
     INTERNAL = "internal"
     SUPPLIER = "supplier"
     CUSTOMER = "customer"
@@ -23,4 +25,3 @@ class RoleType(str, Enum):
     def is_valid(cls, value: str) -> bool:
         """Check if a value is a valid role type"""
         return value in cls.values()
-

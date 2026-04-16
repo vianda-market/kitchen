@@ -4,8 +4,6 @@ Ingredients Routes
 GET  /ingredients/search       — multilingual autocomplete (OFF-backed)
 POST /ingredients/custom       — create a custom ingredient when OFF returns no match
 """
-from typing import List, Optional
-from uuid import UUID
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, Query
@@ -27,7 +25,7 @@ _LANG_PATTERN = "^(es|en|pt)$"
 _SUPPORTED_LANGS = {"es", "en", "pt"}
 
 
-def _resolve_lang(lang: Optional[str], current_user: dict) -> str:
+def _resolve_lang(lang: str | None, current_user: dict) -> str:
     """Derive language: use explicit param first, then user locale (short code), then 'en'."""
     if lang and lang in _SUPPORTED_LANGS:
         return lang
@@ -35,16 +33,16 @@ def _resolve_lang(lang: Optional[str], current_user: dict) -> str:
     return locale if locale in _SUPPORTED_LANGS else "en"
 
 
-def _resolve_market_id(current_user: dict) -> Optional[str]:
+def _resolve_market_id(current_user: dict) -> str | None:
     """Extract market_id string for dialect alias lookup. None when not available."""
     mid = current_user.get("subscription_market_id")
     return str(mid) if mid else None
 
 
-@router.get("/search", response_model=List[IngredientSearchResultSchema])
+@router.get("/search", response_model=list[IngredientSearchResultSchema])
 def search_ingredients_route(
     query: str = Query(..., min_length=2, max_length=100),
-    lang: Optional[str] = Query(None, pattern=_LANG_PATTERN),
+    lang: str | None = Query(None, pattern=_LANG_PATTERN),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):

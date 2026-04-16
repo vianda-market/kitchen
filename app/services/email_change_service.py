@@ -4,22 +4,21 @@ Mirrors credential_recovery / password_recovery_service patterns.
 """
 
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import psycopg2
 import psycopg2.errors
-import psycopg2.extras
 import psycopg2.extensions
+import psycopg2.extras
 from fastapi import HTTPException, status
 
 from app.config import Status
+from app.services.crud_service import user_service
 from app.services.email_service import email_service
 from app.services.entity_service import get_user_by_email
-from app.services.crud_service import user_service
 from app.utils.locale import get_user_locale
-from app.utils.log import log_info, log_error, log_warning
+from app.utils.log import log_error, log_info, log_warning
 
 
 class EmailChangeService:
@@ -83,8 +82,8 @@ class EmailChangeService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="This email is already pending verification for another account",
                 )
-        expiry_time = datetime.now(timezone.utc) + timedelta(hours=self.token_expiry_hours)
-        last_error: Optional[Exception] = None
+        expiry_time = datetime.now(UTC) + timedelta(hours=self.token_expiry_hours)
+        last_error: Exception | None = None
 
         for _attempt in range(self._code_insert_max_attempts):
             verification_code = self.generate_verification_code()
@@ -217,9 +216,9 @@ class EmailChangeService:
             )
 
         token_expiry = row["token_expiry"]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if token_expiry and token_expiry.tzinfo is None:
-            token_expiry = token_expiry.replace(tzinfo=timezone.utc)
+            token_expiry = token_expiry.replace(tzinfo=UTC)
         if (token_expiry or now) <= now:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -303,9 +302,7 @@ class EmailChangeService:
                 locale=get_user_locale(user_id, db),
             )
             if not sent:
-                log_warning(
-                    f"verify_email_change: confirmation email failed for old address user_id={user_id_str}"
-                )
+                log_warning(f"verify_email_change: confirmation email failed for old address user_id={user_id_str}")
 
         log_info(f"Email change verified for user_id={user_id_str}")
 

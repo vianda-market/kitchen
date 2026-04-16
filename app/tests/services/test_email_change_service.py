@@ -1,13 +1,13 @@
 """Unit tests for email_change_service."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
-from app.config import Status, RoleType, RoleName
+from app.config import RoleName, RoleType, Status
 from app.dto.models import UserDTO
 from app.services.email_change_service import email_change_service
 
@@ -29,16 +29,16 @@ def sample_user():
         mobile_number_verified=False,
         mobile_number_verified_at=None,
         email_verified=True,
-        email_verified_at=datetime.now(timezone.utc),
+        email_verified_at=datetime.now(UTC),
         employer_entity_id=None,
         employer_address_id=None,
         market_id=uuid4(),
         city_metadata_id=uuid4(),
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uid,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -50,26 +50,25 @@ class TestEmailChangeService:
             return_value=sample_user,
         ):
             with pytest.raises(HTTPException) as exc:
-                email_change_service.request_email_change(
-                    sample_user.user_id, "old@example.com", mock_db
-                )
+                email_change_service.request_email_change(sample_user.user_id, "old@example.com", mock_db)
             assert exc.value.status_code == 400
 
     def test_request_email_change_duplicate_user_email_raises_409(self, sample_user):
         mock_db = MagicMock()
         other = MagicMock()
         other.user_id = uuid4()
-        with patch(
-            "app.services.email_change_service.user_service.get_by_id",
-            return_value=sample_user,
-        ), patch(
-            "app.services.email_change_service.get_user_by_email",
-            return_value=other,
+        with (
+            patch(
+                "app.services.email_change_service.user_service.get_by_id",
+                return_value=sample_user,
+            ),
+            patch(
+                "app.services.email_change_service.get_user_by_email",
+                return_value=other,
+            ),
         ):
             with pytest.raises(HTTPException) as exc:
-                email_change_service.request_email_change(
-                    sample_user.user_id, "taken@example.com", mock_db
-                )
+                email_change_service.request_email_change(sample_user.user_id, "taken@example.com", mock_db)
             assert exc.value.status_code == 409
 
     @patch("app.services.email_change_service.email_service.send_email_change_verification_email")
@@ -87,9 +86,7 @@ class TestEmailChangeService:
         mock_cursor.__exit__ = MagicMock(return_value=False)
         mock_db.cursor.return_value = mock_cursor
 
-        email_change_service.request_email_change(
-            sample_user.user_id, "new@example.com", mock_db
-        )
+        email_change_service.request_email_change(sample_user.user_id, "new@example.com", mock_db)
 
         mock_send.assert_called_once()
         assert mock_cursor.execute.call_count >= 2

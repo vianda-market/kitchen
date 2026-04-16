@@ -5,15 +5,15 @@ Builds additional_conditions for EnrichedService.get_enriched() and CRUDService
 from query params, using the central filter registry.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.config.filter_registry import FILTER_REGISTRY
 
 
 def build_filter_conditions(
     entity_key: str,
-    filters: Dict[str, Any],
-) -> Optional[List[Tuple[str, Any]]]:
+    filters: dict[str, Any],
+) -> list[tuple[str, Any]] | None:
     """
     Build additional_conditions for EnrichedService from filters dict.
 
@@ -25,7 +25,7 @@ def build_filter_conditions(
         List of (condition, param) tuples for additional_conditions, or None if empty
     """
     registry = FILTER_REGISTRY.get(entity_key, {})
-    conditions: List[Tuple[str, Any]] = []
+    conditions: list[tuple[str, Any]] = []
 
     for param_name, value in filters.items():
         if value is None:

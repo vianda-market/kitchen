@@ -7,7 +7,6 @@ Used by Internal employees to review which customers have payment methods regist
 Access: Internal role only (get_employee_user). Suppliers, Customers, and Employers
 receive 403.
 """
-from typing import List
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends
@@ -60,11 +59,11 @@ ORDER BY u.created_date DESC
 """
 
 
-@router.get("", response_model=List[UserPaymentSummarySchema])
+@router.get("", response_model=list[UserPaymentSummarySchema])
 def list_user_payment_summary(
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-) -> List[UserPaymentSummarySchema]:
+) -> list[UserPaymentSummarySchema]:
     """
     List all non-archived customers with their Stripe payment method status.
 

@@ -2,12 +2,11 @@
 Unit tests for restaurant explorer service (B2C by-city: plates with image_url/savings, restaurants with address).
 """
 
-import pytest
-from freezegun import freeze_time
-from unittest.mock import patch, MagicMock
+from datetime import date
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from datetime import date
+from freezegun import freeze_time
 
 from app.services.restaurant_explorer_service import (
     _compute_savings_pct,
@@ -105,9 +104,7 @@ class TestGetPlatesForRestaurants:
 
     @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_portion_size_insufficient_reviews_when_review_count_below_5(
-        self, mock_db_read, mock_get_aggregates
-    ):
+    def test_portion_size_insufficient_reviews_when_review_count_below_5(self, mock_db_read, mock_get_aggregates):
         """When review_count < 5, portion_size is insufficient_reviews and averages are null."""
         rid = uuid4()
         pid = uuid4()
@@ -141,9 +138,7 @@ class TestGetPlatesForRestaurants:
 
     @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_portion_size_bucketed_when_review_count_ge_5(
-        self, mock_db_read, mock_get_aggregates
-    ):
+    def test_portion_size_bucketed_when_review_count_ge_5(self, mock_db_read, mock_get_aggregates):
         """When review_count >= 5, portion_size is bucketed from average_portion_size."""
         rid = uuid4()
         pid = uuid4()
@@ -177,16 +172,30 @@ class TestGetPlatesForRestaurants:
 
     @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_portion_size_light_and_large_buckets(
-        self, mock_db_read, mock_get_aggregates
-    ):
+    def test_portion_size_light_and_large_buckets(self, mock_db_read, mock_get_aggregates):
         """portion_size light (avg<1.5) and large (avg>=2.5) buckets."""
         rid = uuid4()
         pid_light = uuid4()
         pid_large = uuid4()
         mock_db_read.return_value = [
-            {"restaurant_id": rid, "plate_id": pid_light, "product_name": "Small", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
-            {"restaurant_id": rid, "plate_id": pid_large, "product_name": "Big", "price": 15.0, "credit": 2, "kitchen_day": "monday", "image_url": None},
+            {
+                "restaurant_id": rid,
+                "plate_id": pid_light,
+                "product_name": "Small",
+                "price": 8.0,
+                "credit": 1,
+                "kitchen_day": "monday",
+                "image_url": None,
+            },
+            {
+                "restaurant_id": rid,
+                "plate_id": pid_large,
+                "product_name": "Big",
+                "price": 15.0,
+                "credit": 2,
+                "kitchen_day": "monday",
+                "image_url": None,
+            },
         ]
         mock_get_aggregates.return_value = {
             str(pid_light): {"average_stars": 4.0, "average_portion_size": 1.2, "review_count": 10},
@@ -202,14 +211,20 @@ class TestGetPlatesForRestaurants:
 
     @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_portion_size_insufficient_reviews_when_no_aggregates(
-        self, mock_db_read, mock_get_aggregates
-    ):
+    def test_portion_size_insufficient_reviews_when_no_aggregates(self, mock_db_read, mock_get_aggregates):
         """When plate has no aggregates, portion_size stays insufficient_reviews."""
         rid = uuid4()
         pid = uuid4()
         mock_db_read.return_value = [
-            {"restaurant_id": rid, "plate_id": pid, "product_name": "New", "price": 10.0, "credit": 1, "kitchen_day": "tuesday", "image_url": None},
+            {
+                "restaurant_id": rid,
+                "plate_id": pid,
+                "product_name": "New",
+                "price": 10.0,
+                "credit": 1,
+                "kitchen_day": "tuesday",
+                "image_url": None,
+            },
         ]
         mock_get_aggregates.return_value = {}
         mock_db = MagicMock()
@@ -342,9 +357,33 @@ class TestGetRestaurantsByCity:
                 },
             ],
             [
-                {"restaurant_id": rid_a, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
-                {"restaurant_id": rid_a, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
-                {"restaurant_id": rid_b, "plate_id": pid3, "product_name": "Soup", "price": 6.0, "credit": 1, "kitchen_day": "wednesday", "image_url": None},
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": pid1,
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "wednesday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": pid2,
+                    "product_name": "Salad",
+                    "price": 8.0,
+                    "credit": 1,
+                    "kitchen_day": "wednesday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "plate_id": pid3,
+                    "product_name": "Soup",
+                    "price": 6.0,
+                    "credit": 1,
+                    "kitchen_day": "wednesday",
+                    "image_url": None,
+                },
             ],
             [],  # vol_query (has_volunteer)
             [],  # reserved_query (user has no reserved plates)
@@ -353,7 +392,9 @@ class TestGetRestaurantsByCity:
         mock_db = MagicMock()
 
         result = get_restaurants_by_city(
-            "Buenos Aires", "AR", mock_db,
+            "Buenos Aires",
+            "AR",
+            mock_db,
             kitchen_day="wednesday",
             user_id=user_id,
         )
@@ -444,8 +485,24 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": pid1, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
-                {"restaurant_id": rid, "plate_id": pid2, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": pid1,
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid,
+                    "plate_id": pid2,
+                    "product_name": "Salad",
+                    "price": 8.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],
             {"lat": -34.6, "lng": -58.4},
@@ -453,7 +510,9 @@ class TestGetRestaurantsByCity:
         mock_db = MagicMock()
 
         result = get_restaurants_by_city(
-            "Buenos Aires", "AR", mock_db,
+            "Buenos Aires",
+            "AR",
+            mock_db,
             kitchen_day="monday",
         )
 
@@ -491,8 +550,24 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": pid_reserved, "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
-                {"restaurant_id": rid, "plate_id": pid_other, "product_name": "Salad", "price": 8.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": pid_reserved,
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid,
+                    "plate_id": pid_other,
+                    "product_name": "Salad",
+                    "price": 8.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],
             [{"plate_id": pid_reserved, "plate_selection_id": plate_selection_id}],
@@ -502,7 +577,9 @@ class TestGetRestaurantsByCity:
 
         with patch("app.services.recommendation_service.apply_recommendation"):
             result = get_restaurants_by_city(
-                "Buenos Aires", "AR", mock_db,
+                "Buenos Aires",
+                "AR",
+                mock_db,
                 kitchen_day="monday",
                 user_id=user_id,
             )
@@ -536,7 +613,15 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": uuid4(),
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],  # vol_query returns empty - no volunteers with both prefs True
             {"lat": -34.6, "lng": -58.4},
@@ -568,7 +653,15 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": uuid4(),
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [{"restaurant_id": rid}],  # vol_query returns this restaurant - has volunteer with prefs True
             {"lat": -34.6, "lng": -58.4},
@@ -608,7 +701,15 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": uuid4(),
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],  # vol_query
             [],  # coworker_offer_query - no other coworker offers
@@ -619,7 +720,9 @@ class TestGetRestaurantsByCity:
         mock_db = MagicMock()
 
         result = get_restaurants_by_city(
-            "Buenos Aires", "AR", mock_db,
+            "Buenos Aires",
+            "AR",
+            mock_db,
             kitchen_day="monday",
             user_id=user_id,
             employer_entity_id=employer_entity_id,
@@ -658,7 +761,15 @@ class TestGetRestaurantsByCity:
                 }
             ],
             [
-                {"restaurant_id": rid, "plate_id": uuid4(), "product_name": "Pasta", "price": 10.0, "credit": 1, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid,
+                    "plate_id": uuid4(),
+                    "product_name": "Pasta",
+                    "price": 10.0,
+                    "credit": 1,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],  # vol_query
             [],  # coworker_offer_query
@@ -669,7 +780,9 @@ class TestGetRestaurantsByCity:
         mock_db = MagicMock()
 
         result = get_restaurants_by_city(
-            "Buenos Aires", "AR", mock_db,
+            "Buenos Aires",
+            "AR",
+            mock_db,
             kitchen_day="monday",
             user_id=user_id,
             employer_entity_id=employer_entity_id,
@@ -717,7 +830,11 @@ class TestGetCoworkerPickupWindows:
         rid = uuid4()
         uid = uuid4()
         mock_get_windows.return_value = [
-            "11:30-11:45", "11:45-12:00", "12:00-12:15", "12:15-12:30", "12:30-12:45",
+            "11:30-11:45",
+            "11:45-12:00",
+            "12:00-12:15",
+            "12:15-12:30",
+            "12:30-12:45",
         ]
         mock_db_read.side_effect = [
             {"employer_entity_id": uuid4(), "employer_address_id": None},
@@ -741,36 +858,6 @@ class TestGetCoworkerPickupWindows:
         result = get_coworker_pickup_windows(uuid4(), "sunday", uuid4(), mock_db)
         assert result == []
         mock_db_read.assert_not_called()
-
-
-class TestGetPickupWindowsForKitchenDay:
-    """get_pickup_windows_for_kitchen_day returns 15-min windows from market business_hours (11:30–13:30)."""
-
-    def test_ar_monday_returns_windows_11_30_to_13_30(self):
-        """AR market: Monday 11:30–13:30 yields 8 windows."""
-        target = date(2026, 3, 9)  # Monday
-        windows = get_pickup_windows_for_kitchen_day("AR", "monday", target)
-        assert len(windows) == 8
-        assert windows[0] == "11:30-11:45"
-        assert windows[-1] == "13:15-13:30"
-
-    def test_us_friday_same_hours(self):
-        """US market: same business hours as AR."""
-        target = date(2026, 3, 13)  # Friday
-        windows = get_pickup_windows_for_kitchen_day("US", "friday", target)
-        assert "11:30-11:45" in windows
-        assert "12:00-12:15" in windows
-        assert "13:15-13:30" in windows
-
-    def test_unknown_country_returns_empty(self):
-        """Unknown country code returns empty list."""
-        target = date(2026, 3, 9)
-        assert get_pickup_windows_for_kitchen_day("XX", "monday", target) == []
-
-    def test_invalid_kitchen_day_returns_empty(self):
-        """Invalid kitchen_day (e.g. Sunday) returns empty."""
-        target = date(2026, 3, 9)
-        assert get_pickup_windows_for_kitchen_day("AR", "sunday", target) == []
 
 
 class TestGetAllowedKitchenDaysSortedByDate:

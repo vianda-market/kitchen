@@ -3,13 +3,13 @@ Unit tests for address autocomplete mapping (Mapbox GeoJSON -> backend schema).
 """
 
 import pytest
+
 from app.services.address_autocomplete_mapping import (
-    map_place_details_to_address,
+    _route_to_street_type_and_name,
     extract_place_details_geolocation,
     get_city_candidates_from_place_details,
-    _route_to_street_type_and_name,
+    map_place_details_to_address,
 )
-
 
 # Shared fixture: Mapbox GeoJSON Feature
 MAPBOX_FEATURE_SANTA_FE = {

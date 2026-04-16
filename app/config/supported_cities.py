@@ -7,7 +7,6 @@ helper — the authoritative city list lives in `core.city_metadata` joined to
 `external.geonames_city`. Users pick cities from that query, not from this tuple.
 """
 
-from typing import List, Optional
 from uuid import UUID
 
 # Global city for B2B users (Internal, Supplier). No city filter in queries.
@@ -21,7 +20,7 @@ GLOBAL_CITY_COUNTRY_CODE = "XG"
 GLOBAL_CITY_NAME = "Global"
 
 
-def is_global_city(city_metadata_id: Optional[UUID]) -> bool:
+def is_global_city(city_metadata_id: UUID | None) -> bool:
     """Return True if city_metadata_id is the Global city sentinel (B2B users, no city filter)."""
     return city_metadata_id is not None and city_metadata_id == GLOBAL_CITY_ID
 
@@ -61,18 +60,15 @@ SUPPORTED_CITIES = (
 
 
 def get_supported_cities_sorted_by_country_and_name(
-    country_code: Optional[str] = None,
-    province_code: Optional[str] = None,
-) -> List[dict]:
+    country_code: str | None = None,
+    province_code: str | None = None,
+) -> list[dict]:
     """
     Return list of { "country_code": str, "province_code": str, "city_name": str }
     for supported cities, optionally filtered by country_code and/or province_code.
     Sorted by country_code, province_code, city_name (case-insensitive).
     """
-    out = [
-        {"country_code": cc, "province_code": pcode, "city_name": name}
-        for cc, pcode, name in SUPPORTED_CITIES
-    ]
+    out = [{"country_code": cc, "province_code": pcode, "city_name": name} for cc, pcode, name in SUPPORTED_CITIES]
     if country_code:
         ccu = (country_code or "").strip().upper()
         out = [x for x in out if x["country_code"] == ccu]

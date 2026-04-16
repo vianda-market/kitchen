@@ -3,8 +3,8 @@
 Live Stripe implementation. Creates real PaymentIntents and handles webhook activation.
 Used when PAYMENT_PROVIDER=stripe. Requires STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.
 """
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+
+from datetime import UTC, datetime
 from uuid import UUID
 
 import psycopg2.extensions
@@ -19,8 +19,7 @@ def _ensure_stripe_configured() -> None:
     key = (settings.STRIPE_SECRET_KEY or "").strip()
     if not key:
         raise ValueError(
-            "STRIPE_SECRET_KEY is required when PAYMENT_PROVIDER=stripe. "
-            "Add it to .env (use sk_test_... for sandbox)."
+            "STRIPE_SECRET_KEY is required when PAYMENT_PROVIDER=stripe. Add it to .env (use sk_test_... for sandbox)."
         )
     stripe.api_key = key
 
@@ -29,7 +28,7 @@ def create_payment_for_subscription(
     subscription_id: UUID,
     amount_cents: int,
     currency: str,
-    metadata: Optional[dict] = None,
+    metadata: dict | None = None,
 ) -> PaymentIntentResult:
     """Create a real Stripe PaymentIntent for the subscription. Uses idempotency key for retries."""
     _ensure_stripe_configured()
@@ -73,7 +72,7 @@ def create_customer_checkout_setup_session(
     success_url: str,
     cancel_url: str,
     db: psycopg2.extensions.connection,
-) -> Tuple[str, datetime]:
+) -> tuple[str, datetime]:
     """
     Lock user row for email, ensure Stripe Customer exists in user_payment_provider, create Checkout Session mode=setup.
     Commits after provider insert so the record survives Session.create failures (return 502 to client).
@@ -106,7 +105,7 @@ def create_customer_checkout_setup_session(
             (str(user_id),),
         )
         provider_row = cursor.fetchone()
-        stripe_cus: Optional[str] = provider_row[0] if provider_row else None
+        stripe_cus: str | None = provider_row[0] if provider_row else None
 
         if not stripe_cus:
             customer = stripe.Customer.create(
@@ -141,13 +140,13 @@ def create_customer_checkout_setup_session(
         raise RuntimeError("Stripe Checkout Session returned no URL.")
     exp = session.expires_at
     if exp is None:
-        expires_at = datetime.now(timezone.utc)
+        expires_at = datetime.now(UTC)
     else:
-        expires_at = datetime.fromtimestamp(int(exp), tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(int(exp), tz=UTC)
     return session.url, expires_at
 
 
-def detach_customer_payment_method_external(external_id: Optional[str]) -> None:
+def detach_customer_payment_method_external(external_id: str | None) -> None:
     """Detach PM in Stripe; resource_missing = already detached (no-op). Re-raises other Stripe errors."""
     _ensure_stripe_configured()
     if not external_id or str(external_id).startswith("pm_mock_"):

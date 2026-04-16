@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 
 class EmailProvider(ABC):
@@ -11,11 +10,11 @@ class EmailProvider(ABC):
         to_email: str,
         subject: str,
         body_text: str,
-        body_html: Optional[str] = None,
-        cc: Optional[List[str]] = None,
-        bcc: Optional[List[str]] = None,
-        reply_to: Optional[str] = None,
-        category: Optional[str] = None,
+        body_html: str | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        reply_to: str | None = None,
+        category: str | None = None,
     ) -> bool:
         """Send an email. Returns True on success."""
         ...

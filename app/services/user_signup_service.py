@@ -8,31 +8,32 @@ verification email; verify step creates the user in user_info.
 """
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
-from typing import Dict, Any, Optional, Tuple
-from fastapi import HTTPException, status
+
 import psycopg2.extensions
 import psycopg2.extras
+from fastapi import HTTPException, status
 
+from app.auth.security import create_access_token
+from app.auth.utils import build_token_data, merge_onboarding_token_claims, merge_subscription_token_claims
+from app.config import RoleName, RoleType, Status
+from app.config.settings import get_vianda_customers_institution_id, get_vianda_enterprises_institution_id
+from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
 from app.dto.models import UserDTO
+from app.security.institution_scope import InstitutionScope
+from app.services.crud_service import city_service
+from app.services.email_service import email_service
 from app.services.entity_service import (
     create_user_with_validation,
     get_user_by_email,
     get_user_by_username,
     set_user_market_assignments,
 )
-from app.services.email_service import email_service
-from app.auth.security import create_access_token
-from app.auth.utils import build_token_data, merge_subscription_token_claims, merge_onboarding_token_claims
-from app.utils.log import log_info, log_warning, log_error, log_email_tracking
-from app.security.institution_scope import InstitutionScope
-from app.config import RoleType, RoleName, Status
-from app.config.settings import get_vianda_customers_institution_id, get_vianda_enterprises_institution_id
-from app.services.market_service import market_service, GLOBAL_MARKET_ID, is_global_market
-from app.services.crud_service import city_service
-from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
+from app.services.market_service import GLOBAL_MARKET_ID, is_global_market, market_service
 from app.utils.country import normalize_country_code
+from app.utils.log import log_email_tracking, log_error, log_info, log_warning
 
 
 class UserSignupService:
@@ -42,6 +43,7 @@ class UserSignupService:
     def get_institutions_not_for_restaurant(cls) -> tuple:
         """Institution IDs that must not be assigned to a restaurant (Vianda Customers + Vianda Enterprises)."""
         return (get_vianda_customers_institution_id(), get_vianda_enterprises_institution_id())
+
     # Role constants - using enum values instead of UUIDs
     CUSTOMER_ROLE_TYPE = RoleType.CUSTOMER
     CUSTOMER_ROLE_NAME = RoleName.COMENSAL
@@ -56,7 +58,7 @@ class UserSignupService:
         pass
 
     @staticmethod
-    def _is_customer_comensal(user_data: Dict[str, Any]) -> bool:
+    def _is_customer_comensal(user_data: dict[str, Any]) -> bool:
         """True if role_type is Customer and role_name is Comensal (enum or string)."""
         rt = user_data.get("role_type")
         rn = user_data.get("role_name")
@@ -65,14 +67,14 @@ class UserSignupService:
         return rt_str == "customer" and rn_str == "comensal"
 
     @staticmethod
-    def _is_internal(user_data: Dict[str, Any]) -> bool:
+    def _is_internal(user_data: dict[str, Any]) -> bool:
         """True if role_type is Internal (enum or string)."""
         rt = user_data.get("role_type")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
         return rt_str == "internal"
 
     @staticmethod
-    def _check_employer_domain(email: Optional[str], db: Optional[psycopg2.extensions.connection]) -> Optional[Dict[str, UUID]]:
+    def _check_employer_domain(email: str | None, db: psycopg2.extensions.connection | None) -> dict[str, UUID] | None:
         """Check if the email's domain matches an active employer entity. Returns dict with institution_id and institution_entity_id, or None."""
         if not email or not db or "@" not in email:
             return None
@@ -80,6 +82,7 @@ class UserSignupService:
         if not domain:
             return None
         from app.utils.db import db_read
+
         row = db_read(
             """
             SELECT ie.institution_id, ie.institution_entity_id
@@ -100,72 +103,68 @@ class UserSignupService:
             "institution_entity_id": UUID(str(row["institution_entity_id"])),
         }
 
-    def process_customer_signup(
-        self, 
-        user_data: Dict[str, Any], 
-        db: psycopg2.extensions.connection
-    ) -> UserDTO:
+    def process_customer_signup(self, user_data: dict[str, Any], db: psycopg2.extensions.connection) -> UserDTO:
         """
         Process customer self-registration with business rules.
-        
+
         Args:
             user_data: User data dictionary from signup form
             db: Database connection
-            
+
         Returns:
             Created user DTO
-            
+
         Raises:
             HTTPException: For validation or creation failures
         """
         # Validate signup data
         self._validate_signup_data(user_data)
-        
+
         # Resolve country_code to market_id (B2C signup uses country_code)
         self._resolve_country_code_to_market_id(user_data, db)
-        
+
         # Process password security
         self._process_password_security(user_data)
-        
+
         # Apply business rules for customer signup (market_id must be in user_data at this point)
         self._apply_customer_signup_rules(user_data, db)
-        
+
         # Create user with validation
         new_user = create_user_with_validation(user_data, db)
-        
+
         log_info(f"Customer self-signed up: {new_user.user_id}")
         return new_user
-    
+
     def process_admin_user_creation(
-        self, 
-        user_data: Dict[str, Any], 
-        current_user: Dict[str, Any], 
+        self,
+        user_data: dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
         *,
-        scope: Optional[InstitutionScope] = None
+        scope: InstitutionScope | None = None,
     ) -> UserDTO:
         """
         Process admin user creation with business rules.
-        
+
         Args:
             user_data: User data dictionary
             current_user: Current admin user information
             db: Database connection
-            
+
         Returns:
             Created user DTO
-            
+
         Raises:
             HTTPException: For validation or creation failures
         """
         # Validate user data
         self._validate_user_data(user_data)
-        
+
         # Process password security
         self._process_password_security(user_data)
         # Track invite flow: no password provided -> send invite email after create
         use_invite_flow = "hashed_password" not in user_data
-        
+
         # Apply admin creation rules
         self._apply_admin_creation_rules(user_data, current_user)
 
@@ -199,8 +198,24 @@ class UserSignupService:
         # Supplier and Employer: user's market must be within institution's market(s)
         self._ensure_user_market_within_institution(user_data, db)
         # Internal or Supplier: default city_metadata_id to Global when not provided
-        rt_str = (user_data.get("role_type").value if hasattr(user_data.get("role_type"), "value") else str(user_data.get("role_type") or "")) if user_data.get("role_type") else ""
-        rn_str = (user_data.get("role_name").value if hasattr(user_data.get("role_name"), "value") else str(user_data.get("role_name") or "")) if user_data.get("role_name") else ""
+        rt_str = (
+            (
+                user_data.get("role_type").value
+                if hasattr(user_data.get("role_type"), "value")
+                else str(user_data.get("role_type") or "")
+            )
+            if user_data.get("role_type")
+            else ""
+        )
+        rn_str = (
+            (
+                user_data.get("role_name").value
+                if hasattr(user_data.get("role_name"), "value")
+                else str(user_data.get("role_name") or "")
+            )
+            if user_data.get("role_name")
+            else ""
+        )
         if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_metadata_id"):
             user_data["city_metadata_id"] = GLOBAL_CITY_ID
             log_info(f"Defaulted city_metadata_id to Global for {rt_str}/{rn_str}")
@@ -211,7 +226,11 @@ class UserSignupService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="city_metadata_id is required for Customer (Comensal). Use GET /api/v1/cities/?country_code=... (not the Global city).",
                 )
-            cid = user_data["city_metadata_id"] if isinstance(user_data["city_metadata_id"], UUID) else UUID(str(user_data["city_metadata_id"]))
+            cid = (
+                user_data["city_metadata_id"]
+                if isinstance(user_data["city_metadata_id"], UUID)
+                else UUID(str(user_data["city_metadata_id"]))
+            )
             if is_global_city(cid):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -221,108 +240,104 @@ class UserSignupService:
         new_user = create_user_with_validation(user_data, db, scope=scope)
         if market_ids_list:
             from app.services.entity_service import set_user_market_assignments
+
             set_user_market_assignments(new_user.user_id, market_ids_list, db)
         log_info(f"Admin created user: {new_user.user_id}")
         if use_invite_flow:
             self._send_b2b_invite_email(new_user.user_id, new_user.email, new_user.first_name, db)
         return new_user
-    
-    def _validate_signup_data(self, user_data: Dict[str, Any]) -> None:
+
+    def _validate_signup_data(self, user_data: dict[str, Any]) -> None:
         """
         Validate customer signup data.
-        
+
         Args:
             user_data: User data dictionary
-            
+
         Raises:
             HTTPException: For validation failures
         """
         required_fields = ["email", "password"]
         missing_fields = [field for field in required_fields if not user_data.get(field)]
-        
+
         if missing_fields:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing required fields: {', '.join(missing_fields)}"
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
-        
+
         # Validate email format (basic validation)
         email = user_data.get("email", "").strip().lower()
         if "@" not in email or "." not in email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email format")
+
         # Validate password strength (basic validation)
         password = user_data.get("password", "")
         if len(password) < 8:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters long"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters long"
             )
-    
-    def _validate_user_data(self, user_data: Dict[str, Any]) -> None:
+
+    def _validate_user_data(self, user_data: dict[str, Any]) -> None:
         """
         Validate general user data for admin creation.
-        
+
         Args:
             user_data: User data dictionary
-            
+
         Raises:
             HTTPException: For validation failures
         """
         required_fields = ["email"]
         missing_fields = [field for field in required_fields if not user_data.get(field)]
-        
+
         if missing_fields:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing required fields: {', '.join(missing_fields)}"
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
-        
+
         # Validate email format
         email = user_data.get("email", "").strip().lower()
         if "@" not in email or "." not in email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email format")
+
         # Validate required fields for admin creation (institution_id optional for Customer+Comensal)
         if not user_data.get("role_type") or not user_data.get("role_name"):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role type and role name are required for user creation"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Role type and role name are required for user creation"
             )
 
         # Customer+Comensal and Internal get institution_id assigned by the backend
-        if not self._is_customer_comensal(user_data) and not self._is_internal(user_data) and not user_data.get("institution_id"):
+        if (
+            not self._is_customer_comensal(user_data)
+            and not self._is_internal(user_data)
+            and not user_data.get("institution_id")
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institution ID is required for user creation (except Customer+Comensal and Internal)"
+                detail="Institution ID is required for user creation (except Customer+Comensal and Internal)",
             )
 
-    def _process_password_security(self, user_data: Dict[str, Any]) -> None:
+    def _process_password_security(self, user_data: dict[str, Any]) -> None:
         """
         Process password security (hashing and cleanup).
         When password is provided and non-empty, hash it. When omitted or None (B2B invite flow), skip.
-        
+
         Args:
             user_data: User data dictionary (modified in place)
         """
         pwd = user_data.get("password")
         if pwd and isinstance(pwd, str) and pwd.strip():
             from app.auth.security import hash_password
+
             hashed_pwd = hash_password(pwd)
             user_data["hashed_password"] = hashed_pwd
             del user_data["password"]  # Remove the plain password
-            
-            log_info(f"🔐 Password hashed successfully:")
+
+            log_info("🔐 Password hashed successfully:")
             log_info(f"   Hash length: {len(hashed_pwd)}")
             log_info(f"   Hash starts with: {hashed_pwd[:20]}...")
-    
-    def _resolve_country_code_to_market_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
+
+    def _resolve_country_code_to_market_id(self, user_data: dict[str, Any], db: psycopg2.extensions.connection) -> None:
         """
         Resolve country_code to market_id for B2C signup. Requires active, non-archived, non-Global market.
         Raises HTTPException 400 if missing, invalid, archived, or Global.
@@ -358,17 +373,23 @@ class UserSignupService:
             )
         user_data["market_id"] = market_id
 
-    def _validate_and_resolve_city_metadata_id(self, user_data: Dict[str, Any], db: psycopg2.extensions.connection) -> None:
+    def _validate_and_resolve_city_metadata_id(
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection
+    ) -> None:
         """
         Require and validate city for B2C signup. Accepts city_metadata_id or city_name.
         If city_name provided, resolve to city_metadata_id by matching name (case-insensitive) in market's country.
         city_metadata_id must not be Global; city must exist, not archived, and match market's country.
         """
+        from app.utils.db import db_read
+
         city_metadata_id_raw = user_data.get("city_metadata_id")
         city_name_raw = (user_data.get("city_name") or "").strip()
 
         if city_metadata_id_raw is not None:
-            city_metadata_id = city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
+            city_metadata_id = (
+                city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
+            )
         elif city_name_raw:
             market_id = user_data.get("market_id")
             if not market_id:
@@ -442,7 +463,9 @@ class UserSignupService:
                     )
         user_data["city_metadata_id"] = city_metadata_id
 
-    def _apply_customer_signup_rules(self, user_data: Dict[str, Any], db: Optional[psycopg2.extensions.connection] = None) -> None:
+    def _apply_customer_signup_rules(
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection | None = None
+    ) -> None:
         """
         Apply business rules for customer self-registration.
         market_id must already be set (from pending row at verify, or from client at request). No default.
@@ -456,7 +479,9 @@ class UserSignupService:
         if employer_match:
             user_data["institution_id"] = str(employer_match["institution_id"])
             user_data["employer_entity_id"] = str(employer_match["institution_entity_id"])
-            log_info(f"Domain-gated signup: assigned employer institution {employer_match['institution_id']} entity {employer_match['institution_entity_id']} for email {user_data.get('email')}")
+            log_info(
+                f"Domain-gated signup: assigned employer institution {employer_match['institution_id']} entity {employer_match['institution_entity_id']} for email {user_data.get('email')}"
+            )
         else:
             user_data["institution_id"] = get_vianda_customers_institution_id()
         user_data["role_type"] = self.CUSTOMER_ROLE_TYPE
@@ -480,7 +505,9 @@ class UserSignupService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="market_id is required for customer signup.",
             )
-        market_id = user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
+        market_id = (
+            user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
+        )
         if db:
             market = market_service.get_by_id(market_id)
             if not market or market.get("is_archived"):
@@ -500,7 +527,9 @@ class UserSignupService:
                 detail="city_metadata_id is required for customer signup.",
             )
         city_metadata_id_raw = user_data["city_metadata_id"]
-        city_metadata_id = city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
+        city_metadata_id = (
+            city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
+        )
         if is_global_city(city_metadata_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -515,49 +544,52 @@ class UserSignupService:
                 )
         user_data["city_metadata_id"] = city_metadata_id
 
-        log_info(f"Applied customer signup rules: institution={get_vianda_customers_institution_id()}, market_id={market_id}, city_metadata_id={city_metadata_id}, role_type={self.CUSTOMER_ROLE_TYPE.value}, role_name={self.CUSTOMER_ROLE_NAME.value}")
-    
-    def _apply_admin_creation_rules(self, user_data: Dict[str, Any], current_user: Dict[str, Any]) -> None:
+        log_info(
+            f"Applied customer signup rules: institution={get_vianda_customers_institution_id()}, market_id={market_id}, city_metadata_id={city_metadata_id}, role_type={self.CUSTOMER_ROLE_TYPE.value}, role_name={self.CUSTOMER_ROLE_NAME.value}"
+        )
+
+    def _apply_admin_creation_rules(self, user_data: dict[str, Any], current_user: dict[str, Any]) -> None:
         """
         Apply business rules for admin user creation.
-        
+
         Args:
             user_data: User data dictionary (modified in place)
             current_user: Current admin user information
         """
         # Set modified_by to current admin user
         user_data["modified_by"] = current_user["user_id"]
-        
+
         # Ensure email is lowercase
         if "email" in user_data:
             user_data["email"] = user_data["email"].strip().lower()
         # Ensure username is lowercase
         if "username" in user_data:
             user_data["username"] = user_data.get("username", "").strip().lower()
-        
+
         # Set default values
         user_data.setdefault("is_archived", False)
         if "hashed_password" not in user_data:
             user_data["status"] = Status.INACTIVE  # Invite flow: Inactive until password set
         else:
             user_data.setdefault("status", Status.ACTIVE)
-        
+
         # If no password/hash provided, generate random hash (B2B invite flow: user sets password via email link)
         if "hashed_password" not in user_data:
             import secrets
             import string
-            temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+
+            temp_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
             user_data["password"] = temp_password
             self._process_password_security(user_data)
             log_info("Generated placeholder hash for B2B invite flow (user will set password via email link)")
-        
+
         log_info(f"Applied admin creation rules: modified_by={current_user['user_id']}")
 
     def _send_b2b_invite_email(
         self,
         user_id: UUID,
         email: str,
-        first_name: Optional[str],
+        first_name: str | None,
         db: psycopg2.extensions.connection,
     ) -> None:
         """
@@ -566,7 +598,7 @@ class UserSignupService:
         """
         invite_expiry_hours = 24
         reset_code = str(secrets.randbelow(1_000_000)).zfill(6)
-        expiry_time = datetime.now(timezone.utc) + timedelta(hours=invite_expiry_hours)
+        expiry_time = datetime.now(UTC) + timedelta(hours=invite_expiry_hours)
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
                 """
@@ -587,6 +619,7 @@ class UserSignupService:
             db.commit()
         log_email_tracking(f"B2B invite email: sending to {email} (user_id={user_id})")
         from app.utils.locale import get_user_locale
+
         sent = email_service.send_b2b_invite_email(
             to_email=email,
             reset_code=reset_code,
@@ -603,7 +636,7 @@ class UserSignupService:
         self,
         user_id: UUID,
         email: str,
-        first_name: Optional[str],
+        first_name: str | None,
         db: psycopg2.extensions.connection,
     ) -> None:
         """
@@ -613,104 +646,122 @@ class UserSignupService:
         """
         self._send_b2b_invite_email(user_id, email, first_name, db)
 
+    @staticmethod
+    def _enum_to_str(val) -> str:
+        """Extract string from an enum or plain string value."""
+        if not val:
+            return ""
+        return val.value if hasattr(val, "value") else str(val)
+
+    def _default_market_for_internal_admin(self, user_data: dict[str, Any], rt_str: str, rn_str: str) -> None:
+        """Default market_id to Global for Internal Admin/Super Admin."""
+        if rt_str == "internal" and rn_str in ("admin", "super_admin") and not user_data.get("market_id"):
+            user_data["market_id"] = GLOBAL_MARKET_ID
+            log_info(f"Defaulted market_id to Global for {rt_str}/{rn_str}")
+
+    def _default_market_from_institution(
+        self,
+        user_data: dict[str, Any],
+        rt_str: str,
+        rn_str: str,
+        db: psycopg2.extensions.connection,
+    ) -> None:
+        """Default market_id from institution's primary market for Supplier Admin and Employer."""
+        is_supplier_admin = rt_str == "supplier" and rn_str == "admin"
+        if not (is_supplier_admin or rt_str == "employer"):
+            return
+        if user_data.get("market_id"):
+            return
+        inst_id = user_data.get("institution_id")
+        if not inst_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="institution_id is required for Supplier and Employer",
+            )
+        inst_id = inst_id if isinstance(inst_id, UUID) else UUID(str(inst_id))
+        with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute(
+                "SELECT market_id FROM core.institution_market WHERE institution_id = %s ORDER BY is_primary DESC LIMIT 1",
+                (str(inst_id),),
+            )
+            row = cursor.fetchone()
+        if not row or not row.get("market_id"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="institution_id is required for Supplier and Employer; institution must have assigned markets",
+            )
+        user_data["market_id"] = row["market_id"] if isinstance(row["market_id"], UUID) else UUID(str(row["market_id"]))
+        log_info(f"Defaulted market_id to institution's primary market for {rt_str}/{rn_str}")
+
+    @staticmethod
+    def _validate_manager_operator_market(market_id: UUID | None, creator_is_super_admin: bool) -> None:
+        """Validate market_id for Manager/Operator: required, Global only for Super Admin."""
+        from app.services.market_service import is_global_market
+
+        if not market_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="market_id is required for Manager and Operator",
+            )
+        if is_global_market(market_id) and not creator_is_super_admin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only super_admin can assign Global market to manager or operator",
+            )
+
+    @staticmethod
+    def _ensure_market_id_as_uuid(user_data: dict[str, Any]) -> UUID | None:
+        """Normalize market_id to UUID in user_data and return it."""
+        market_id = user_data.get("market_id")
+        if market_id is not None and not isinstance(market_id, UUID):
+            market_id = UUID(str(market_id))
+            user_data["market_id"] = market_id
+        return market_id
+
+    @staticmethod
+    def _validate_market_exists(market_id: UUID) -> None:
+        """Validate market exists and is not archived."""
+        market = market_service.get_by_id(market_id)
+        if not market:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Market not found: {market_id}")
+        if market.get("is_archived"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Market is archived: {market_id}")
+
     def _resolve_market_id_for_admin_creation(
         self,
-        user_data: Dict[str, Any],
-        current_user: Dict[str, Any],
+        user_data: dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
     ) -> None:
         """
         Resolve and validate market_id for admin-created users. Default Global for Admin/Super Admin/Supplier Admin.
         Require market_id for Manager/Operator; only Super Admin can assign Global to them.
         """
-        from app.services.market_service import is_global_market
-        role_type = user_data.get("role_type")
-        role_name = user_data.get("role_name")
-        rt_str = (role_type.value if hasattr(role_type, "value") else str(role_type)) if role_type else ""
-        rn_str = (role_name.value if hasattr(role_name, "value") else str(role_name)) if role_name else ""
-        creator_rn = (current_user.get("role_name") or "").value if hasattr(current_user.get("role_name"), "value") else str(current_user.get("role_name") or "")
-        creator_is_super_admin = creator_rn == "super_admin"
+        rt_str = self._enum_to_str(user_data.get("role_type"))
+        rn_str = self._enum_to_str(user_data.get("role_name"))
+        creator_is_super_admin = self._enum_to_str(current_user.get("role_name")) == "super_admin"
 
-        # Admin, Super Admin (Internal) -> default to Global if not provided. Supplier Admin and Employer -> default to institution's market
-        if rt_str == "internal" and rn_str in ("admin", "super_admin"):
-            if not user_data.get("market_id"):
-                user_data["market_id"] = GLOBAL_MARKET_ID
-                log_info(f"Defaulted market_id to Global for {rt_str}/{rn_str}")
-        elif (rt_str == "supplier" and rn_str == "admin") or rt_str == "employer":
-            if not user_data.get("market_id"):
-                inst_id = user_data.get("institution_id")
-                if inst_id:
-                    inst_id = inst_id if isinstance(inst_id, UUID) else UUID(str(inst_id))
-                    with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                        cursor.execute(
-                            "SELECT market_id FROM core.institution_market WHERE institution_id = %s ORDER BY is_primary DESC LIMIT 1",
-                            (str(inst_id),),
-                        )
-                        row = cursor.fetchone()
-                    if row and row.get("market_id"):
-                        user_data["market_id"] = row["market_id"] if isinstance(row["market_id"], UUID) else UUID(str(row["market_id"]))
-                        log_info(f"Defaulted market_id to institution's primary market for {rt_str}/{rn_str}")
-                    else:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="institution_id is required for Supplier and Employer; institution must have assigned markets",
-                        )
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="institution_id is required for Supplier and Employer",
-                    )
+        self._default_market_for_internal_admin(user_data, rt_str, rn_str)
+        self._default_market_from_institution(user_data, rt_str, rn_str, db)
 
-        market_id_raw = user_data.get("market_id")
-        if market_id_raw is not None and not isinstance(market_id_raw, UUID):
-            market_id_raw = UUID(str(market_id_raw))
-        market_id = market_id_raw
+        market_id = self._ensure_market_id_as_uuid(user_data)
 
-        # Manager / Operator (Internal): market_id required; cannot be Global unless creator is Super Admin
         if rt_str == "internal" and rn_str in ("manager", "operator"):
-            if not market_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="market_id is required for Manager and Operator",
-                )
-            if is_global_market(market_id) and not creator_is_super_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Only super_admin can assign Global market to manager or operator",
-                )
+            self._validate_manager_operator_market(market_id, creator_is_super_admin)
 
-        # Customer: default already set in _apply_customer_signup_rules; admin-created Customer gets default US if not provided
         if rt_str == "customer" and not market_id:
             user_data["market_id"] = self.DEFAULT_CUSTOMER_MARKET_ID
-            log_info(f"Defaulted market_id to US for Customer")
+            log_info("Defaulted market_id to US for Customer")
 
-        market_id = user_data.get("market_id")
-        if market_id is not None and not isinstance(market_id, UUID):
-            market_id = UUID(str(market_id))
-            user_data["market_id"] = market_id
-
+        market_id = self._ensure_market_id_as_uuid(user_data)
         if not market_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required",
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="market_id is required")
 
-        # Validate market exists and is not archived
-        market = market_service.get_by_id(market_id)
-        if not market:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Market not found: {market_id}",
-            )
-        if market.get("is_archived"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Market is archived: {market_id}",
-            )
+        self._validate_market_exists(market_id)
 
     def _ensure_user_market_within_institution(
         self,
-        user_data: Dict[str, Any],
+        user_data: dict[str, Any],
         db: psycopg2.extensions.connection,
     ) -> None:
         """
@@ -720,7 +771,7 @@ class UserSignupService:
         rt = user_data.get("role_type")
         rn = user_data.get("role_name")
         rt_str = (rt.value if hasattr(rt, "value") else str(rt)) if rt else ""
-        rn_str = (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
+        (rn.value if hasattr(rn, "value") else str(rn)) if rn else ""
         is_supplier = rt_str == "supplier"
         is_employer = rt_str == "employer"
         if not is_supplier and not is_employer:
@@ -755,14 +806,10 @@ class UserSignupService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Supplier and Employer users must be assigned a market from their institution's assigned markets. "
-                       f"User market_id {market_id} is not in institution's markets.",
+                f"User market_id {market_id} is not in institution's markets.",
             )
 
-    def _apply_scope_constraints(
-        self,
-        user_data: Dict[str, Any],
-        scope: Optional[InstitutionScope]
-    ) -> None:
+    def _apply_scope_constraints(self, user_data: dict[str, Any], scope: InstitutionScope | None) -> None:
         """
         Apply institution scoping constraints for admin-created users.
 
@@ -774,49 +821,41 @@ class UserSignupService:
             return
 
         if not scope.institution_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: missing institution scope"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: missing institution scope")
 
         target_institution = user_data.get("institution_id")
         if target_institution:
             scope.enforce(target_institution)
         else:
             user_data["institution_id"] = UUID(scope.institution_id)
-    
+
     def validate_user_permissions(
-        self, 
-        current_user: Dict[str, Any], 
-        target_institution_id: Optional[UUID] = None
+        self, current_user: dict[str, Any], target_institution_id: UUID | None = None
     ) -> None:
         """
         Validate user permissions for user creation.
-        
+
         Args:
             current_user: Current user information
             target_institution_id: Target institution ID (if creating for specific institution)
-            
+
         Raises:
             HTTPException: For permission failures
         """
         # Basic permission check - user must be authenticated
         if not current_user or not current_user.get("user_id"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
         # Additional permission checks can be added here based on role/institution
         # For now, we'll allow any authenticated user to create users
         # This can be enhanced with role-based access control
-        
+
         log_info(f"User permissions validated for user creation: {current_user['user_id']}")
-    
-    def get_signup_constants(self) -> Dict[str, UUID]:
+
+    def get_signup_constants(self) -> dict[str, UUID]:
         """
         Get signup constants for external use.
-        
+
         Returns:
             Dictionary of signup constants
         """
@@ -824,14 +863,14 @@ class UserSignupService:
             "customer_institution": get_vianda_customers_institution_id(),
             "customer_role_type": self.CUSTOMER_ROLE_TYPE.value,
             "customer_role_name": self.CUSTOMER_ROLE_NAME.value,
-            "bot_user_id": self.BOT_USER_ID
+            "bot_user_id": self.BOT_USER_ID,
         }
 
     def request_customer_signup(
         self,
-        user_data: Dict[str, Any],
+        user_data: dict[str, Any],
         db: psycopg2.extensions.connection,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Handle signup request: validate, store pending signup, send verification email.
         If email is already registered, return same success message (no email sent) to avoid enumeration.
@@ -862,6 +901,7 @@ class UserSignupService:
         if not signup_referral_code and device_id:
             # Check for pre-auth referral code assignment from deep link
             from app.utils.db import db_read as _db_read
+
             assignment_rows = _db_read(
                 """
                 SELECT referral_code FROM referral_code_assignment
@@ -878,6 +918,7 @@ class UserSignupService:
 
         if signup_referral_code:
             from app.services.referral_service import validate_referral_code
+
             referrer = validate_referral_code(signup_referral_code, db)
             if not referrer:
                 raise HTTPException(
@@ -886,7 +927,7 @@ class UserSignupService:
                 )
 
         verification_code = str(secrets.randbelow(1_000_000)).zfill(6)
-        expiry = datetime.now(timezone.utc) + timedelta(hours=self.SIGNUP_VERIFICATION_CODE_EXPIRY_HOURS)
+        expiry = datetime.now(UTC) + timedelta(hours=self.SIGNUP_VERIFICATION_CODE_EXPIRY_HOURS)
 
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
@@ -946,7 +987,7 @@ class UserSignupService:
         self,
         code: str,
         db: psycopg2.extensions.connection,
-    ) -> Tuple[UserDTO, str]:
+    ) -> tuple[UserDTO, str]:
         """
         Load pending signup by verification code; if valid and not expired, create user and mark code used.
         Accepts 6-digit code (or legacy token for compat). Returns (user_dto, access_token).
@@ -980,9 +1021,9 @@ class UserSignupService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Verification code has already been used",
             )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if row["token_expiry"] and row["token_expiry"].tzinfo is None:
-            row["token_expiry"] = row["token_expiry"].replace(tzinfo=timezone.utc)
+            row["token_expiry"] = row["token_expiry"].replace(tzinfo=UTC)
         if (row["token_expiry"] or now) <= now:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1000,17 +1041,20 @@ class UserSignupService:
             "market_id": row["market_id"],
             "city_metadata_id": row["city_metadata_id"],
             "email_verified": True,
-            "email_verified_at": datetime.now(timezone.utc),
+            "email_verified_at": datetime.now(UTC),
             "referred_by_code": signup_referral_code,
         }
         self._apply_customer_signup_rules(user_data, db)
         new_user = create_user_with_validation(user_data, db)
         # Populate user_market_assignment so GET /restaurants/by-city and other market-scoped APIs see the customer's market
-        market_id_uuid = user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
+        market_id_uuid = (
+            user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
+        )
         set_user_market_assignments(new_user.user_id, [market_id_uuid], db)
 
         # Generate and assign referral code for the new user
         from app.utils.referral_code import generate_referral_code as gen_code
+
         max_retries = 5
         for attempt in range(max_retries):
             code = gen_code(new_user.first_name)
@@ -1024,11 +1068,14 @@ class UserSignupService:
             except psycopg2.errors.UniqueViolation:
                 db.rollback()
                 if attempt == max_retries - 1:
-                    log_warning(f"Failed to generate unique referral code for user {new_user.user_id} after {max_retries} attempts")
+                    log_warning(
+                        f"Failed to generate unique referral code for user {new_user.user_id} after {max_retries} attempts"
+                    )
 
         # Create referral record if user was referred
         if signup_referral_code:
-            from app.services.referral_service import validate_referral_code, create_referral_on_signup
+            from app.services.referral_service import create_referral_on_signup, validate_referral_code
+
             referrer = validate_referral_code(signup_referral_code, db)
             if referrer:
                 create_referral_on_signup(

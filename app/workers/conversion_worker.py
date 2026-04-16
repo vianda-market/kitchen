@@ -5,6 +5,7 @@ ARQ task: upload a conversion event to the target ad platform.
 Single task handles both Google and Meta. The platform is determined by
 the job payload. Gateway resolution is deferred to the factory (Chunk 2).
 """
+
 import logging
 from datetime import timedelta
 
@@ -41,6 +42,7 @@ async def upload_conversion(ctx: dict, platform: str, event_data: dict) -> None:
     # For now, import inline so the worker module loads even without gateways.
     try:
         from app.gateways.ads.factory import get_conversion_gateway
+
         gateway = get_conversion_gateway(ads_platform)
         result = gateway.upload_conversion(event)
 
@@ -78,4 +80,4 @@ async def upload_conversion(ctx: dict, platform: str, event_data: dict) -> None:
             extra={"platform": platform, "entity_id": event.entity_id},
         )
         job_try = ctx.get("job_try", 1)
-        raise Retry(defer=timedelta(minutes=job_try * 15))
+        raise Retry(defer=timedelta(minutes=job_try * 15)) from None

@@ -2,13 +2,11 @@
 Unit tests for supported currencies config (list, sort, name→code lookup).
 """
 
-import pytest
-
 from app.config.supported_currencies import (
-    get_supported_currencies_sorted_by_name,
-    get_currency_code_by_name,
-    SUPPORTED_CURRENCY_CODES,
     SUPPORTED_CURRENCIES,
+    SUPPORTED_CURRENCY_CODES,
+    get_currency_code_by_name,
+    get_supported_currencies_sorted_by_name,
 )
 
 
@@ -80,4 +78,4 @@ class TestSupportedCurrencyCodes:
     def test_matches_currencies_list(self):
         """Set is derived from SUPPORTED_CURRENCIES (same codes)."""
         expected = frozenset(code for _, code in SUPPORTED_CURRENCIES)
-        assert SUPPORTED_CURRENCY_CODES == expected
+        assert expected == SUPPORTED_CURRENCY_CODES

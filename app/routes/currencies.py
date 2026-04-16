@@ -5,8 +5,6 @@ Read-only list of currencies valid for creating a credit currency (e.g. Currency
 Same source as validation for POST /api/v1/credit-currencies/ (backend assigns currency_code from name).
 """
 
-from typing import List
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -18,11 +16,12 @@ router = APIRouter(prefix="/currencies", tags=["Currencies"])
 
 class SupportedCurrencySchema(BaseModel):
     """One supported currency for dropdowns (e.g. Create Credit Currency)."""
+
     currency_name: str = Field(..., description="Display name (e.g. US Dollar)")
     currency_code: str = Field(..., description="ISO 4217 code (e.g. USD)")
 
 
-@router.get("", response_model=List[SupportedCurrencySchema])
+@router.get("", response_model=list[SupportedCurrencySchema])
 async def list_supported_currencies(
     current_user: dict = Depends(get_employee_user),
 ):

@@ -14,7 +14,7 @@ strip non-digit characters before sending the API payload.
 """
 
 import re
-from typing import Optional
+
 from fastapi import HTTPException
 
 TAX_ID_CONFIG = {
@@ -39,7 +39,7 @@ TAX_ID_CONFIG = {
 }
 
 
-def get_tax_id_config(country_code: str) -> Optional[dict]:
+def get_tax_id_config(country_code: str) -> dict | None:
     """Return tax ID config for a country, or None if no rules defined."""
     return TAX_ID_CONFIG.get(country_code.upper())
 

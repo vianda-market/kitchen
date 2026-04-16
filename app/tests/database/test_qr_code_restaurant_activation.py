@@ -7,13 +7,13 @@ the restaurant_auto_deactivate_on_qr_code trigger sets the restaurant to Inactiv
 Requires trigger.sql to be applied (run build_kitchen_db.sh to rebuild).
 """
 
-import pytest
 from uuid import uuid4
 
-from app.tests.database.conftest import db_transaction
+import pytest
+
 from app.tests.database.test_data.expected_seed_data import (
-    SEED_SUPERADMIN_USER_ID,
     SEED_INSTITUTION_VIANDA_ID,
+    SEED_SUPERADMIN_USER_ID,
 )
 
 

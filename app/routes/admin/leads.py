@@ -5,11 +5,10 @@ Read-only for Phase 1. Future: mark as contacted, bulk export, aggregate charts.
 """
 
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_employee_user
 from app.dependencies.database import get_db
@@ -19,16 +18,16 @@ from app.services.leads_public_service import get_lead_interests
 router = APIRouter(prefix="/admin/leads", tags=["Admin Leads"])
 
 
-@router.get("/interest", response_model=List[LeadInterestResponseSchema])
+@router.get("/interest", response_model=list[LeadInterestResponseSchema])
 async def list_lead_interests(
-    country_code: Optional[str] = Query(None, description="Filter by country code (e.g. US)"),
-    city_name: Optional[str] = Query(None, description="Filter by city name"),
-    interest_type: Optional[str] = Query(None, description="Filter: customer, employer, supplier"),
-    status: Optional[str] = Query(None, description="Filter: active, notified, unsubscribed"),
-    cuisine_id: Optional[UUID] = Query(None, description="Filter by cuisine UUID"),
-    employee_count_range: Optional[str] = Query(None, description="Filter by company size range (e.g. 51-100)"),
-    created_after: Optional[datetime] = Query(None, description="Filter: created on or after this date (ISO 8601)"),
-    created_before: Optional[datetime] = Query(None, description="Filter: created on or before this date (ISO 8601)"),
+    country_code: str | None = Query(None, description="Filter by country code (e.g. US)"),
+    city_name: str | None = Query(None, description="Filter by city name"),
+    interest_type: str | None = Query(None, description="Filter: customer, employer, supplier"),
+    status: str | None = Query(None, description="Filter: active, notified, unsubscribed"),
+    cuisine_id: UUID | None = Query(None, description="Filter by cuisine UUID"),
+    employee_count_range: str | None = Query(None, description="Filter by company size range (e.g. 51-100)"),
+    created_after: datetime | None = Query(None, description="Filter: created on or after this date (ISO 8601)"),
+    created_before: datetime | None = Query(None, description="Filter: created on or before this date (ISO 8601)"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Results per page"),
     current_user: dict = Depends(get_employee_user),
@@ -53,8 +52,9 @@ async def list_lead_interests(
         page_size=page_size,
     )
     # Total count as response header for pagination
-    from fastapi.responses import JSONResponse
     from fastapi.encoders import jsonable_encoder
+    from fastapi.responses import JSONResponse
+
     response = JSONResponse(
         content=jsonable_encoder([LeadInterestResponseSchema(**r) for r in rows]),
     )

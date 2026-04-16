@@ -6,23 +6,21 @@ Returns from core.city_metadata (Vianda metadata layer) joined with external.geo
 for the display name and timezone. Legacy city_info table retired in PR1.
 """
 
-from typing import List, Optional
-
-from fastapi import APIRouter, Depends, Query
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_client_employee_or_supplier_user
+from app.config.supported_cities import GLOBAL_CITY_ID
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import CityResponseSchema
-from app.config.supported_cities import GLOBAL_CITY_ID
 from app.utils.db import db_read
 
 router = APIRouter(prefix="/cities", tags=["Cities"])
 
 
-@router.get("", response_model=List[CityResponseSchema])
+@router.get("", response_model=list[CityResponseSchema])
 async def list_cities(
-    country_code: Optional[str] = Query(None, description="Filter by ISO 3166-1 alpha-2 country code (e.g. AR, PE)"),
+    country_code: str | None = Query(None, description="Filter by ISO 3166-1 alpha-2 country code (e.g. AR, PE)"),
     exclude_global: bool = Query(False, description="Exclude Global city (for Customer signup/profile picker)"),
     current_user: dict = Depends(get_client_employee_or_supplier_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -44,7 +42,7 @@ async def list_cities(
     now lives on external.geonames_admin1 and joins via geonames_city.admin1_code — if/when a province filter
     is needed again, add it via that path (PR2 superadmin picker scope).
     """
-    params: List = []
+    params: list = []
     conditions = ["cm.is_archived = FALSE"]
     if country_code:
         conditions.append("cm.country_iso = %s")
@@ -62,7 +60,7 @@ async def list_cities(
             cm.status
         FROM core.city_metadata cm
         JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
-        WHERE {' AND '.join(conditions)}
+        WHERE {" AND ".join(conditions)}
         ORDER BY cm.country_iso, LOWER(COALESCE(cm.display_name_override, gc.name))
     """
     rows = db_read(query, tuple(params), connection=db)

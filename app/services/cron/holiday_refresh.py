@@ -4,8 +4,8 @@ National public holiday sync from Nager.Date (api v3).
 UPSERT for nager_date rows (refresh names); skip when an active manual row owns the date.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -15,43 +15,36 @@ from app.config.market_config import MarketConfiguration
 from app.services.cron.currency_refresh import SYSTEM_USER_ID
 from app.utils.db import db_read
 from app.utils.db_pool import get_db_connection_context
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_error, log_info, log_warning
 
 NAGER_PUBLIC_HOLIDAYS_URL = "https://date.nager.at/api/v3/PublicHolidays"
 VALID_YEAR_MIN = 2024
 
 
 def _valid_year_max_utc() -> int:
-    return datetime.now(timezone.utc).year + 2
+    return datetime.now(UTC).year + 2
 
 
-def _market_country_codes() -> List[str]:
-    codes: Set[str] = {
-        cfg.country_code for cfg in MarketConfiguration.MARKETS.values()
-    }
+def _market_country_codes() -> list[str]:
+    codes: set[str] = {cfg.country_code for cfg in MarketConfiguration.MARKETS.values()}
     return sorted(codes)
 
 
 def _resolve_years(
-    years: Optional[List[int]],
-) -> Tuple[Optional[List[int]], Optional[str]]:
+    years: list[int] | None,
+) -> tuple[list[int] | None, str | None]:
     """Returns (resolved_years, error_reason). error_reason set if explicit years invalid."""
     y_max = _valid_year_max_utc()
 
     if years is not None and len(years) > 0:
         for y in years:
             if y < VALID_YEAR_MIN or y > y_max:
-                return None, (
-                    f"Year {y} is out of bounds; allowed "
-                    f"[{VALID_YEAR_MIN}, {y_max}] inclusive (UTC)."
-                )
+                return None, (f"Year {y} is out of bounds; allowed [{VALID_YEAR_MIN}, {y_max}] inclusive (UTC).")
         return sorted(set(years)), None
 
-    now_y = datetime.now(timezone.utc).year
+    now_y = datetime.now(UTC).year
     raw = [now_y, now_y + 1]
-    resolved = sorted(
-        {max(VALID_YEAR_MIN, min(y, y_max)) for y in raw}
-    )
+    resolved = sorted({max(VALID_YEAR_MIN, min(y, y_max)) for y in raw})
     return resolved, None
 
 
@@ -132,7 +125,7 @@ def _upsert_nager_holiday(
         cursor.close()
 
 
-def run_holiday_refresh(years: Optional[List[int]] = None) -> Dict[str, Any]:
+def run_holiday_refresh(years: list[int] | None = None) -> dict[str, Any]:
     """
     Fetch public holidays from Nager.Date for all market country codes.
 
@@ -145,7 +138,7 @@ def run_holiday_refresh(years: Optional[List[int]] = None) -> Dict[str, Any]:
         errors list (e.g. HTTP failures per country).
     """
     countries = _market_country_codes()
-    empty_counts: Dict[str, int] = {c: 0 for c in countries}
+    empty_counts: dict[str, int] = dict.fromkeys(countries, 0)
 
     resolved, err = _resolve_years(years)
     if err:
@@ -161,12 +154,12 @@ def run_holiday_refresh(years: Optional[List[int]] = None) -> Dict[str, Any]:
         }
 
     assert resolved is not None
-    inserted: Dict[str, int] = {c: 0 for c in countries}
-    updated: Dict[str, int] = {c: 0 for c in countries}
-    skipped: Dict[str, int] = {c: 0 for c in countries}
-    errors: List[str] = []
+    inserted: dict[str, int] = dict.fromkeys(countries, 0)
+    updated: dict[str, int] = dict.fromkeys(countries, 0)
+    skipped: dict[str, int] = dict.fromkeys(countries, 0)
+    errors: list[str] = []
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "ok",
         "years": resolved,
         "inserted": inserted,
@@ -204,9 +197,7 @@ def run_holiday_refresh(years: Optional[List[int]] = None) -> Dict[str, Any]:
                         raw_date = holiday.get("date")
                         if not raw_date:
                             continue
-                        holiday_name = (
-                            holiday.get("localName") or holiday.get("name") or ""
-                        )[:100]
+                        holiday_name = (holiday.get("localName") or holiday.get("name") or "")[:100]
                         holiday_name = holiday_name.strip()
                         if not holiday_name:
                             log_warning(

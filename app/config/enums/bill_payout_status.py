@@ -10,6 +10,7 @@ from enum import Enum
 
 class BillPayoutStatus(str, Enum):
     """Status of a single payout attempt on a bill."""
+
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"

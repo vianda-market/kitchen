@@ -13,8 +13,9 @@ IMPORTANT: This module must never raise exceptions that bubble up to callers.
 All errors are logged and swallowed. Ads tracking is never worth breaking
 the payment flow.
 """
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import psycopg2.extensions
@@ -106,7 +107,7 @@ def _build_subscription_event(
         user_phone=sub_data.get("mobile_number"),
         conversion_value=float(sub_data.get("plan_price", 0)),
         currency_code=sub_data.get("currency_code", "USD"),
-        event_time=datetime.now(timezone.utc),
+        event_time=datetime.now(UTC),
         # Click identifiers (from frontend capture, may be None)
         gclid=(click_data or {}).get("gclid"),
         wbraid=(click_data or {}).get("wbraid"),

@@ -5,7 +5,7 @@ Unit tests for country code resolution and normalization (alpha-2 to country nam
 import pytest
 from fastapi import HTTPException
 
-from app.utils.country import resolve_country_name, normalize_country_code
+from app.utils.country import normalize_country_code, resolve_country_name
 
 
 class TestResolveCountryName:

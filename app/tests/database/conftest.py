@@ -15,16 +15,17 @@ import os
 # Same database name as Cloud SQL (kitchen); environment is isolated by instance / GCP project.
 os.environ.setdefault("DB_NAME", "kitchen")
 os.environ.setdefault("DB_USER", "cdeachaval")
-import pytest
+from collections.abc import Generator
+
 import psycopg2
-from app.utils.db_pool import build_psycopg2_dsn
+import psycopg2.extensions
+import pytest
+
 from app.tests.database.test_data.expected_seed_data import (
     SEED_SUPERADMIN_USER_ID,
     SEED_SYSTEM_BOT_USER_ID,
 )
-import psycopg2.extensions
-from typing import Generator
-from contextlib import contextmanager
+from app.utils.db_pool import build_psycopg2_dsn
 
 
 def _cleanup_allowed_for_session() -> bool:
@@ -52,35 +53,50 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
 
     with conn.cursor() as cur:
         # 1. Archive client_bill_info for non-seed users
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE client_bill_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
-        """, (seed_user_ids,))
+        """,
+            (seed_user_ids,),
+        )
         # 2. Archive subscription_info for non-seed users
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE subscription_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
-        """, (seed_user_ids,))
+        """,
+            (seed_user_ids,),
+        )
         # 3. Archive plan_info by test plan names
         cur.execute("""
             UPDATE plan_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE name IN ('Test Plan', 'Cron Plan', 'Plan With Cap', 'Entry Level', 'Plan', 'Zero Credit Plan')
         """)
         # 4. Archive address_info for non-seed users (future-proofing)
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE address_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id IS NOT NULL AND user_id NOT IN %s
-        """, (seed_user_ids,))
+        """,
+            (seed_user_ids,),
+        )
         # 5. Archive payment_method for non-seed users
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE payment_method SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
-        """, (seed_user_ids,))
+        """,
+            (seed_user_ids,),
+        )
         # 6. Archive all users except seed (superadmin, system bot)
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE user_info SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE user_id NOT IN %s
-        """, (seed_user_ids,))
+        """,
+            (seed_user_ids,),
+        )
         # 7. Archive test institutions (per plan: name LIKE 'Test %')
         cur.execute("""
             UPDATE institution_info SET is_archived = TRUE, status = 'inactive'::status_enum
@@ -89,17 +105,20 @@ def _run_cleanup_test_data(conn: psycopg2.extensions.connection) -> None:
         # 8. Archive non-seed currency_metadata rows (seed has USD, ARS, PEN, CLP, MXN, BRL).
         # Renamed from currency_metadata cleanup — the old table has been retired.
         seed_currency_metadata_ids = (
-            '55555555-5555-5555-5555-555555555555',  # USD
-            '66666666-6666-6666-6666-666666666601',  # ARS
-            '66666666-6666-6666-6666-666666666602',  # PEN
-            '66666666-6666-6666-6666-666666666603',  # CLP
-            '66666666-6666-6666-6666-666666666604',  # MXN
-            '66666666-6666-6666-6666-666666666605',  # BRL
+            "55555555-5555-5555-5555-555555555555",  # USD
+            "66666666-6666-6666-6666-666666666601",  # ARS
+            "66666666-6666-6666-6666-666666666602",  # PEN
+            "66666666-6666-6666-6666-666666666603",  # CLP
+            "66666666-6666-6666-6666-666666666604",  # MXN
+            "66666666-6666-6666-6666-666666666605",  # BRL
         )
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE core.currency_metadata SET is_archived = TRUE, status = 'inactive'::status_enum
             WHERE currency_metadata_id NOT IN %s
-        """, (seed_currency_metadata_ids,))
+        """,
+            (seed_currency_metadata_ids,),
+        )
     conn.commit()
 
 
@@ -126,10 +145,10 @@ def cleanup_test_data(db_connection: psycopg2.extensions.connection) -> Generato
 def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
     """
     Real database connection for integration tests.
-    
+
     This fixture creates a session-scoped database connection that is reused
     across all tests in the session. The connection is closed after all tests complete.
-    
+
     Uses environment variables for connection parameters:
     - DB_HOST (default: localhost)
     - DB_NAME (default: kitchen)
@@ -140,7 +159,7 @@ def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
     """
     # libpq URI with sslmode= in query (reliable for Cloud SQL); see build_psycopg2_dsn().
     conn = psycopg2.connect(build_psycopg2_dsn())
-    
+
     # Enable autocommit for DDL operations, but we'll use transactions in tests
     conn.autocommit = False
 
@@ -157,10 +176,10 @@ def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
 def db_transaction(db_connection: psycopg2.extensions.connection):
     """
     Database transaction that rolls back after test.
-    
+
     This fixture ensures test isolation by rolling back any changes made
     during the test. Each test gets a fresh transaction state.
-    
+
     Usage:
         def test_something(db_transaction):
             with db_transaction.cursor() as cur:
@@ -170,14 +189,14 @@ def db_transaction(db_connection: psycopg2.extensions.connection):
     """
     # Start fresh - rollback any pending changes
     db_connection.rollback()
-    
+
     yield db_connection
-    
+
     # Rollback after test to ensure isolation
     db_connection.rollback()
 
 
-APP_SCHEMAS = ('core', 'ops', 'customer', 'billing', 'audit')
+APP_SCHEMAS = ("core", "ops", "customer", "billing", "audit")
 
 
 def get_tables(conn: psycopg2.extensions.connection, schema: str = None) -> set:
@@ -193,21 +212,27 @@ def get_tables(conn: psycopg2.extensions.connection, schema: str = None) -> set:
     """
     with conn.cursor() as cur:
         if schema:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = %s
                   AND table_type = 'BASE TABLE'
                 ORDER BY table_name
-            """, (schema,))
+            """,
+                (schema,),
+            )
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = ANY(%s)
                   AND table_type = 'BASE TABLE'
                 ORDER BY table_name
-            """, (list(APP_SCHEMAS),))
+            """,
+                (list(APP_SCHEMAS),),
+            )
         return {row[0] for row in cur.fetchall()}
 
 
@@ -225,21 +250,27 @@ def get_table_columns(conn: psycopg2.extensions.connection, table_name: str, sch
     """
     with conn.cursor() as cur:
         if schema:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_schema = %s
                   AND table_name = %s
                 ORDER BY column_name
-            """, (schema, table_name))
+            """,
+                (schema, table_name),
+            )
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_schema = ANY(%s)
                   AND table_name = %s
                 ORDER BY column_name
-            """, (list(APP_SCHEMAS), table_name))
+            """,
+                (list(APP_SCHEMAS), table_name),
+            )
         return {row[0] for row in cur.fetchall()}
 
 
@@ -258,30 +289,42 @@ def get_indexes(conn: psycopg2.extensions.connection, table_name: str = None, sc
     with conn.cursor() as cur:
         if schema:
             if table_name:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT indexname FROM pg_indexes
                     WHERE schemaname = %s AND tablename = %s
                     ORDER BY indexname
-                """, (schema, table_name))
+                """,
+                    (schema, table_name),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT indexname FROM pg_indexes
                     WHERE schemaname = %s
                     ORDER BY indexname
-                """, (schema,))
+                """,
+                    (schema,),
+                )
         else:
             if table_name:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT indexname FROM pg_indexes
                     WHERE schemaname = ANY(%s) AND tablename = %s
                     ORDER BY indexname
-                """, (list(APP_SCHEMAS), table_name))
+                """,
+                    (list(APP_SCHEMAS), table_name),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT indexname FROM pg_indexes
                     WHERE schemaname = ANY(%s)
                     ORDER BY indexname
-                """, (list(APP_SCHEMAS),))
+                """,
+                    (list(APP_SCHEMAS),),
+                )
         return [row[0] for row in cur.fetchall()]
 
 
@@ -305,9 +348,7 @@ def count_rows(conn: psycopg2.extensions.connection, table_name: str, schema: st
         return cur.fetchone()[0]
 
 
-def count_non_archived_rows(
-    conn: psycopg2.extensions.connection, table_name: str, schema: str = None
-) -> int:
+def count_non_archived_rows(conn: psycopg2.extensions.connection, table_name: str, schema: str = None) -> int:
     """
     Count rows in a table where is_archived = FALSE.
 
@@ -321,16 +362,15 @@ def count_non_archived_rows(
     """
     with conn.cursor() as cur:
         if schema:
-            cur.execute(
-                f'SELECT COUNT(*) FROM "{schema}"."{table_name}" WHERE is_archived = FALSE'
-            )
+            cur.execute(f'SELECT COUNT(*) FROM "{schema}"."{table_name}" WHERE is_archived = FALSE')
         else:
             cur.execute(f'SELECT COUNT(*) FROM "{table_name}" WHERE is_archived = FALSE')
         return cur.fetchone()[0]
 
 
-def record_exists(conn: psycopg2.extensions.connection, table_name: str,
-                  column_name: str, value, schema: str = None) -> bool:
+def record_exists(
+    conn: psycopg2.extensions.connection, table_name: str, column_name: str, value, schema: str = None
+) -> bool:
     """
     Check if a record exists in a table. Bare name resolves via search_path.
 
@@ -346,19 +386,23 @@ def record_exists(conn: psycopg2.extensions.connection, table_name: str,
     """
     with conn.cursor() as cur:
         if schema:
-            cur.execute(f'''
+            cur.execute(
+                f'''
                 SELECT EXISTS(
                     SELECT 1 FROM "{schema}"."{table_name}"
                     WHERE "{column_name}" = %s
                 )
-            ''', (value,))
+            ''',
+                (value,),
+            )
         else:
-            cur.execute(f'''
+            cur.execute(
+                f'''
                 SELECT EXISTS(
                     SELECT 1 FROM "{table_name}"
                     WHERE "{column_name}" = %s
                 )
-            ''', (value,))
+            ''',
+                (value,),
+            )
         return cur.fetchone()[0]
-
-

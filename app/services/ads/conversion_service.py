@@ -6,17 +6,14 @@ and fans out to all enabled ad platforms via ARQ deferred jobs.
 This is the single entry point from business logic (subscription confirmation,
 lead submission, employer onboarding) into the ads platform.
 """
+
 import logging
 from datetime import timedelta
 
 from app.config.settings import settings
 from app.services.ads.models import (
-    AdsPlatform,
-    CampaignStrategy,
     ConversionEvent,
-    ConversionEventType,
 )
-from app.services.ads.pii_hasher import build_hashed_user_data
 
 logger = logging.getLogger(__name__)
 

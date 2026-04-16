@@ -2,7 +2,7 @@
 JWT payload helpers — single place for access-token claims so login, B2C verify, and password reset stay in sync.
 """
 
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -10,7 +10,7 @@ import psycopg2.extensions
 from app.dto.models import UserDTO
 
 
-def build_token_data(user: UserDTO) -> Dict[str, Any]:
+def build_token_data(user: UserDTO) -> dict[str, Any]:
     """Core JWT claims for Kitchen user tokens (sub, roles, institution, locale)."""
     role_type = user.role_type.value if hasattr(user.role_type, "value") else str(user.role_type)
     role_name = user.role_name.value if hasattr(user.role_name, "value") else str(user.role_name)
@@ -25,7 +25,7 @@ def build_token_data(user: UserDTO) -> Dict[str, Any]:
 
 
 def merge_subscription_token_claims(
-    token_data: Dict[str, Any],
+    token_data: dict[str, Any],
     user_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> None:
@@ -47,7 +47,7 @@ def merge_subscription_token_claims(
 
 
 def merge_onboarding_token_claims(
-    token_data: Dict[str, Any],
+    token_data: dict[str, Any],
     db: psycopg2.extensions.connection,
 ) -> None:
     """
@@ -62,10 +62,12 @@ def merge_onboarding_token_claims(
     try:
         if role_type in ("supplier", "employer"):
             from app.services.onboarding_service import get_onboarding_status_claim
+
             institution_id = UUID(token_data["institution_id"])
             token_data["onboarding_status"] = get_onboarding_status_claim(institution_id, db)
         elif role_type == "customer":
             from app.services.onboarding_service import get_customer_onboarding_claim
+
             user_id = UUID(token_data["sub"])
             token_data["onboarding_status"] = get_customer_onboarding_claim(user_id, db)
     except Exception:

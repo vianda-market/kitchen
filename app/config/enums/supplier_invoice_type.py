@@ -10,6 +10,7 @@ from enum import Enum
 
 class SupplierInvoiceType(str, Enum):
     """Type of supplier invoice by country compliance format."""
+
     FACTURA_ELECTRONICA = "factura_electronica"
     CPE = "cpe"
     IRS_1099_NEC = "1099_nec"

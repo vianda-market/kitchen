@@ -5,6 +5,7 @@ Abstract base classes for ad platform gateways.
 Each platform (Google, Meta) implements these ABCs. The factory
 (factory.py) resolves the correct implementation based on settings.
 """
+
 from abc import ABC, abstractmethod
 
 from app.services.ads.models import ConversionEvent, ConversionResult
@@ -24,9 +25,7 @@ class AdsConversionGateway(ABC):
         ...
 
     @abstractmethod
-    def upload_conversions_batch(
-        self, events: list[ConversionEvent]
-    ) -> list[ConversionResult]:
+    def upload_conversions_batch(self, events: list[ConversionEvent]) -> list[ConversionResult]:
         """
         Upload a batch of conversion events. Handles partial failures internally.
 

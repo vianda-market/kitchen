@@ -1,17 +1,17 @@
 """POST /api/v1/auth/reset-password returns access_token after success."""
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 from uuid import uuid4
 
 import jwt
 import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
+from app.config import RoleName, RoleType, Status
 from app.config.settings import settings
 from app.dto.models import UserDTO
-from app.config import RoleType, RoleName, Status
-from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -28,9 +28,9 @@ def reset_user_dto():
         locale="es",
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uid,
-        modified_date=datetime.now(timezone.utc),
+        modified_date=datetime.now(UTC),
     )
 
 

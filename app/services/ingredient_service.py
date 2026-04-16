@@ -11,18 +11,18 @@ Search order:
   4. Return image_url directly (full URL stored by Wikidata enrichment cron)
   5. Apply dialect alias per market_id if present in ingredient_alias
 """
+
 import logging
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
 
 from app.config.settings import settings  # OFF_ENABLED, OFF_LOCAL_MIN_VERIFIED_RESULTS
 from app.services.open_food_facts_service import (
-    search_off_suggestions,
     resolve_off_taxonomy,
+    search_off_suggestions,
 )
-from app.utils.db import db_read, db_insert
+from app.utils.db import db_read
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +34,13 @@ _SCHEMA = "ops"
 # Search
 # ---------------------------------------------------------------------------
 
+
 def search_ingredients(
     query: str,
     lang: str,
-    market_id: Optional[str],
+    market_id: str | None,
     db,
-) -> List[dict]:
+) -> list[dict]:
     """
     Search ingredient_catalog. Falls back to OFF when verified results < threshold.
 
@@ -70,7 +71,7 @@ def search_ingredients(
     return [_format_result(r) for r in local_rows]
 
 
-def _query_local(query: str, market_id: Optional[str], db) -> List[dict]:
+def _query_local(query: str, market_id: str | None, db) -> list[dict]:
     """
     Query ingredient_catalog with optional alias join, ordered by verified/enriched.
     Applies dialect alias override when market_id is provided.
@@ -119,7 +120,7 @@ def _format_result(row: dict) -> dict:
     }
 
 
-def _upsert_off_entries(resolved: List[dict], db) -> None:
+def _upsert_off_entries(resolved: list[dict], db) -> None:
     """
     Insert resolved OFF entries into ingredient_catalog.
     Uses ON CONFLICT (name) DO NOTHING — never overwrites existing entries.
@@ -140,15 +141,18 @@ def _upsert_off_entries(resolved: List[dict], db) -> None:
     try:
         cursor = db.cursor()
         for entry in resolved:
-            cursor.execute(sql, (
-                entry["name"],
-                entry["name_display"],
-                entry.get("name_es"),
-                entry.get("name_en"),
-                entry.get("name_pt"),
-                entry.get("off_taxonomy_id"),
-                system_user_id,
-            ))
+            cursor.execute(
+                sql,
+                (
+                    entry["name"],
+                    entry["name_display"],
+                    entry.get("name_es"),
+                    entry.get("name_en"),
+                    entry.get("name_pt"),
+                    entry.get("off_taxonomy_id"),
+                    system_user_id,
+                ),
+            )
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -158,6 +162,7 @@ def _upsert_off_entries(resolved: List[dict], db) -> None:
 # ---------------------------------------------------------------------------
 # Custom ingredient creation
 # ---------------------------------------------------------------------------
+
 
 def create_custom_ingredient(name: str, lang: str, user_id: UUID, db) -> dict:
     """
@@ -192,37 +197,52 @@ def create_custom_ingredient(name: str, lang: str, user_id: UUID, db) -> dict:
     """
     try:
         cursor = db.cursor()
-        cursor.execute(insert_sql, (
-            normalized, name, name_es, name_en, name_pt, str(user_id),
-        ))
+        cursor.execute(
+            insert_sql,
+            (
+                normalized,
+                name,
+                name_es,
+                name_en,
+                name_pt,
+                str(user_id),
+            ),
+        )
         row = cursor.fetchone()
         db.commit()
         if row is None:
             raise HTTPException(status_code=500, detail="Failed to create ingredient")
         # Build dict from RETURNING columns
         columns = [
-            "ingredient_id", "name_display", "name_en", "off_taxonomy_id",
-            "image_url", "source", "is_verified", "image_enriched",
+            "ingredient_id",
+            "name_display",
+            "name_en",
+            "off_taxonomy_id",
+            "image_url",
+            "source",
+            "is_verified",
+            "image_enriched",
         ]
-        result_row = dict(zip(columns, row))
+        result_row = dict(zip(columns, row, strict=False))
         return _format_result({**result_row, "display_label": result_row["name_display"]})
     except HTTPException:
         raise
     except Exception as exc:
         db.rollback()
         logger.error("Custom ingredient creation failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to create ingredient")
+        raise HTTPException(status_code=500, detail="Failed to create ingredient") from None
 
 
 # ---------------------------------------------------------------------------
 # Product ingredient CRUD
 # ---------------------------------------------------------------------------
 
+
 def get_product_ingredients(
     product_id: UUID,
-    market_id: Optional[str],
+    market_id: str | None,
     db,
-) -> List[dict]:
+) -> list[dict]:
     """
     Return ordered list of ingredients for a product, with dialect alias applied.
     """
@@ -249,13 +269,13 @@ def get_product_ingredients(
 
 def set_product_ingredients(
     product_id: UUID,
-    ingredient_ids: List[UUID],
+    ingredient_ids: list[UUID],
     user_id: UUID,
-    market_id: Optional[str],
+    market_id: str | None,
     db,
     *,
     commit: bool = True,
-) -> List[dict]:
+) -> list[dict]:
     """
     Full-replace: delete existing product ingredients, then insert provided list.
     Verifies each ingredient_id exists (404 on first missing).
@@ -293,9 +313,15 @@ def set_product_ingredients(
             VALUES (%s, %s, %s, %s)
         """
         for idx, iid in enumerate(ingredient_ids):
-            cursor.execute(insert_sql, (
-                str(product_id), str(iid), idx, str(user_id),
-            ))
+            cursor.execute(
+                insert_sql,
+                (
+                    str(product_id),
+                    str(iid),
+                    idx,
+                    str(user_id),
+                ),
+            )
 
         if commit:
             db.commit()
@@ -304,7 +330,7 @@ def set_product_ingredients(
     except Exception as exc:
         db.rollback()
         logger.error("set_product_ingredients failed for product %s: %s", product_id, exc)
-        raise HTTPException(status_code=500, detail="Failed to update product ingredients")
+        raise HTTPException(status_code=500, detail="Failed to update product ingredients") from None
 
     return get_product_ingredients(product_id, market_id, db)
 

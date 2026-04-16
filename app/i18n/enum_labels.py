@@ -1,9 +1,7 @@
 """Enum display labels by locale; canonical values match app.config.enums."""
 
-from typing import Dict
-
 # Enum display labels by locale — codes are canonical (DB); labels are display-only
-ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
+ENUM_LABELS: dict[str, dict[str, dict[str, str]]] = {
     "en": {
         "bill_resolution": {
             "pending": "Pending",
@@ -426,15 +424,31 @@ ENUM_LABELS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
 }
 
-LABELED_ENUM_TYPES = frozenset({
-    "street_type", "address_type", "bill_resolution", "bill_payout_status",
-    "status", "kitchen_day", "subscription_status", "discretionary_status",
-    "pickup_type", "role_type", "institution_type", "role_name", "transaction_type",
-    "employer_bill_payment_status", "supplier_invoice_status",
-    "supplier_invoice_type", "cuisine_suggestion_status",
-    "payment_method_provider", "audit_operation", "discretionary_reason",
-    "referral_status",
-})
+LABELED_ENUM_TYPES = frozenset(
+    {
+        "street_type",
+        "address_type",
+        "bill_resolution",
+        "bill_payout_status",
+        "status",
+        "kitchen_day",
+        "subscription_status",
+        "discretionary_status",
+        "pickup_type",
+        "role_type",
+        "institution_type",
+        "role_name",
+        "transaction_type",
+        "employer_bill_payment_status",
+        "supplier_invoice_status",
+        "supplier_invoice_type",
+        "cuisine_suggestion_status",
+        "payment_method_provider",
+        "audit_operation",
+        "discretionary_reason",
+        "referral_status",
+    }
+)
 
 
 def get_label(enum_type: str, code: str, locale: str = "en") -> str:
@@ -446,6 +460,6 @@ def get_label(enum_type: str, code: str, locale: str = "en") -> str:
     )
 
 
-def labels_for_values(enum_type: str, values: list[str], locale: str) -> Dict[str, str]:
+def labels_for_values(enum_type: str, values: list[str], locale: str) -> dict[str, str]:
     """Build code -> label map for a list of canonical values."""
     return {v: get_label(enum_type, v, locale) for v in values}

@@ -8,6 +8,12 @@ __pycache__/
 
 # Virtual environment folders
 venv/
+
+# Wily complexity cache
+.wily/
+
+# Mutmut mutation testing cache
+.mutmut-cache/
 kenv/
 
 # Environment variables

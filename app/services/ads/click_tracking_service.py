@@ -7,8 +7,9 @@ frontend on landing and passed to the backend when the user subscribes.
 These are stored in ad_click_tracking and used by the conversion upload
 pipeline to attribute conversions to ad clicks.
 """
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import psycopg2.extensions
@@ -50,7 +51,7 @@ def create_click_tracking(
         if existing:
             return existing
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(
@@ -72,10 +73,18 @@ def create_click_tracking(
             (
                 str(user_id),
                 str(subscription_id) if subscription_id else None,
-                data.get("gclid"), data.get("wbraid"), data.get("gbraid"),
-                data.get("fbclid"), data.get("fbc"), data.get("fbp"),
-                data.get("event_id"), data.get("landing_url"), data.get("source_platform"),
-                now, now, now,
+                data.get("gclid"),
+                data.get("wbraid"),
+                data.get("gbraid"),
+                data.get("fbclid"),
+                data.get("fbc"),
+                data.get("fbp"),
+                data.get("event_id"),
+                data.get("landing_url"),
+                data.get("source_platform"),
+                now,
+                now,
+                now,
             ),
         )
         row = cursor.fetchone()

@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.schemas.consolidated_schemas import QRCodePrintContextSchema
 
@@ -58,9 +58,7 @@ def _sample_print_ctx() -> QRCodePrintContextSchema:
 
 @patch("app.services.qr_code_print_service.load_qr_png_base64", return_value="Zm9v")
 @patch("app.routes.qr_code.get_qr_code_print_context_by_id")
-def test_print_by_qr_code_id_returns_html(
-    mock_get_ctx, _mock_load, client_with_auth
-):
+def test_print_by_qr_code_id_returns_html(mock_get_ctx, _mock_load, client_with_auth):
     ctx = _sample_print_ctx()
     mock_get_ctx.return_value = ctx
     r = client_with_auth.get(f"/api/v1/qr-codes/{ctx.qr_code_id}/print")
@@ -72,9 +70,7 @@ def test_print_by_qr_code_id_returns_html(
 
 @patch("app.services.qr_code_print_service.load_qr_png_base64", return_value="Zm9v")
 @patch("app.routes.qr_code.get_qr_code_print_context_by_id")
-def test_print_autoprint_true_includes_onload_print(
-    mock_get_ctx, _mock_load, client_with_auth
-):
+def test_print_autoprint_true_includes_onload_print(mock_get_ctx, _mock_load, client_with_auth):
     ctx = _sample_print_ctx()
     mock_get_ctx.return_value = ctx
     r = client_with_auth.get(
@@ -88,9 +84,7 @@ def test_print_autoprint_true_includes_onload_print(
 
 @patch("app.services.qr_code_print_service.load_qr_png_base64", return_value="Zm9v")
 @patch("app.routes.qr_code.get_qr_code_print_context_by_id")
-def test_print_autoprint_one_does_not_autoprint(
-    mock_get_ctx, _mock_load, client_with_auth
-):
+def test_print_autoprint_one_does_not_autoprint(mock_get_ctx, _mock_load, client_with_auth):
     ctx = _sample_print_ctx()
     mock_get_ctx.return_value = ctx
     r = client_with_auth.get(
@@ -103,9 +97,7 @@ def test_print_autoprint_one_does_not_autoprint(
 
 @patch("app.services.qr_code_print_service.load_qr_png_base64", return_value="Zm9v")
 @patch("app.routes.qr_code.get_qr_code_print_context_by_id")
-def test_print_autoprint_yes_does_not_autoprint(
-    mock_get_ctx, _mock_load, client_with_auth
-):
+def test_print_autoprint_yes_does_not_autoprint(mock_get_ctx, _mock_load, client_with_auth):
     ctx = _sample_print_ctx()
     mock_get_ctx.return_value = ctx
     r = client_with_auth.get(
@@ -133,9 +125,7 @@ def test_print_by_restaurant_id_returns_html(
     ctx = _sample_print_ctx()
     rid = ctx.restaurant_id
     mock_restaurant_svc.get_by_id.return_value = MagicMock(restaurant_id=rid)
-    mock_qr_svc.get_by_field.return_value = MagicMock(
-        qr_code_id=ctx.qr_code_id, is_archived=False
-    )
+    mock_qr_svc.get_by_field.return_value = MagicMock(qr_code_id=ctx.qr_code_id, is_archived=False)
     mock_get_ctx.return_value = ctx
     r = client_with_auth.get(f"/api/v1/qr-codes/restaurant/{rid}/print")
     assert r.status_code == 200

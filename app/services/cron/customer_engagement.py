@@ -15,27 +15,27 @@ Rules (benefit employees — institution_id = employer institution):
 Suppression: 3-day cooldown per user via support_email_suppressed_until / last_support_email_date.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
-from app.services.email_service import email_service
-from app.utils.db import db_read, db_update, get_db_connection, close_db_connection
-from app.utils.log import log_info, log_warning, log_error
 from app.config.settings import get_settings
+from app.services.email_service import email_service
+from app.utils.db import close_db_connection, db_read, db_update, get_db_connection
+from app.utils.log import log_error, log_info
 
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 EMAIL_COOLDOWN_DAYS = 3
 
 
-def _is_user_suppressed(user: Dict, now: datetime) -> bool:
+def _is_user_suppressed(user: dict, now: datetime) -> bool:
     suppressed_until = user.get("support_email_suppressed_until")
     if suppressed_until and suppressed_until > now:
         return True
     last_email = user.get("last_support_email_date")
     if last_email:
         if last_email.tzinfo is None:
-            last_email = last_email.replace(tzinfo=timezone.utc)
+            last_email = last_email.replace(tzinfo=UTC)
         if (now - last_email).days < EMAIL_COOLDOWN_DAYS:
             return True
     return False
@@ -57,7 +57,7 @@ def _record_user_email_sent(user_id: UUID, now: datetime, connection) -> None:
     )
 
 
-def _get_employer_name(institution_id: UUID, connection) -> Optional[str]:
+def _get_employer_name(institution_id: UUID, connection) -> str | None:
     """Get the institution name for a benefit employee's employer."""
     row = db_read(
         "SELECT name FROM core.institution_info WHERE institution_id = %s",
@@ -68,23 +68,23 @@ def _get_employer_name(institution_id: UUID, connection) -> Optional[str]:
     return row["name"] if row else None
 
 
-def _days_since(ref_date: Optional[datetime], now: datetime) -> int:
+def _days_since(ref_date: datetime | None, now: datetime) -> int:
     if ref_date is None:
         return 0
     if ref_date.tzinfo is None:
-        ref_date = ref_date.replace(tzinfo=timezone.utc)
+        ref_date = ref_date.replace(tzinfo=UTC)
     return (now - ref_date).days
 
 
-def run_customer_engagement() -> Dict[str, Any]:
+def run_customer_engagement() -> dict[str, Any]:
     """
     Find customers without active subscriptions and send engagement emails.
     """
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     settings = get_settings()
     vianda_customers_id = settings.VIANDA_CUSTOMERS_INSTITUTION_ID
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "cron_job": "customer_engagement",
         "run_at_utc": now_utc.isoformat(),
         "users_checked": 0,
@@ -143,22 +143,30 @@ def run_customer_engagement() -> Dict[str, Any]:
                     employer_name = _get_employer_name(institution_id, connection) or "your employer"
                     if days_since_signup >= 5:
                         sent = email_service.send_benefit_reminder_email(
-                            to_email=email, user_first_name=first_name,
-                            employer_name=employer_name, locale=locale,
+                            to_email=email,
+                            user_first_name=first_name,
+                            employer_name=employer_name,
+                            locale=locale,
                         )
                     elif days_since_signup >= 1:
                         sent = email_service.send_benefit_waiting_email(
-                            to_email=email, user_first_name=first_name,
-                            employer_name=employer_name, locale=locale,
+                            to_email=email,
+                            user_first_name=first_name,
+                            employer_name=employer_name,
+                            locale=locale,
                         )
                 else:
                     if days_since_signup >= 7:
                         sent = email_service.send_customer_missing_out_email(
-                            to_email=email, user_first_name=first_name, locale=locale,
+                            to_email=email,
+                            user_first_name=first_name,
+                            locale=locale,
                         )
                     elif days_since_signup >= 2:
                         sent = email_service.send_customer_subscribe_email(
-                            to_email=email, user_first_name=first_name, locale=locale,
+                            to_email=email,
+                            user_first_name=first_name,
+                            locale=locale,
                         )
 
                 if sent:

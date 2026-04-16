@@ -1,23 +1,24 @@
 """Employer Benefits Program enrollment service — single + bulk employee creation."""
+
 import csv
 import io
 import re
 import secrets
-from typing import Dict, Any, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
 
 import psycopg2.extensions
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
-from app.services.crud_service import user_service, subscription_service
-from app.services.employer.program_service import get_program_by_institution, resolve_effective_program
-from app.services.subscription_action_service import cancel_subscription
 from app.auth.security import hash_password
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
+from app.services.crud_service import subscription_service, user_service
+from app.services.employer.program_service import resolve_effective_program
+from app.services.subscription_action_service import cancel_subscription
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_error, log_info, log_warning
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -35,7 +36,7 @@ def _email_exists(email: str, db: psycopg2.extensions.connection) -> bool:
 
 def _create_benefit_employee(
     institution_id: UUID,
-    employee_data: Dict[str, Any],
+    employee_data: dict[str, Any],
     program,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
@@ -68,13 +69,17 @@ def _create_benefit_employee(
     return created
 
 
-def _send_invite(user_id: UUID, email: str, first_name: Optional[str], institution_id: UUID, db: psycopg2.extensions.connection):
+def _send_invite(
+    user_id: UUID, email: str, first_name: str | None, institution_id: UUID, db: psycopg2.extensions.connection
+):
     """Send benefit employee invite email with app download links."""
     import secrets as _secrets
-    from app.config import Status
-    from app.services.email_service import email_service
-    from app.services.crud_service import institution_service
+
     import psycopg2.extras
+
+    from app.config import Status
+    from app.services.crud_service import institution_service
+    from app.services.email_service import email_service
 
     try:
         institution = institution_service.get_by_id(institution_id, db, scope=None)
@@ -82,7 +87,7 @@ def _send_invite(user_id: UUID, email: str, first_name: Optional[str], instituti
 
         invite_expiry_hours = 24
         reset_code = str(_secrets.randbelow(1_000_000)).zfill(6)
-        expiry_time = datetime.now(timezone.utc) + timedelta(hours=invite_expiry_hours)
+        expiry_time = datetime.now(UTC) + timedelta(hours=invite_expiry_hours)
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
                 "UPDATE credential_recovery SET is_used = TRUE, is_archived = TRUE WHERE user_id = %s AND is_used = FALSE AND is_archived = FALSE",
@@ -95,6 +100,7 @@ def _send_invite(user_id: UUID, email: str, first_name: Optional[str], instituti
             db.commit()
 
         from app.utils.locale import get_user_locale
+
         email_service.send_benefit_employee_invite_email(
             to_email=email,
             reset_code=reset_code,
@@ -110,7 +116,7 @@ def _send_invite(user_id: UUID, email: str, first_name: Optional[str], instituti
 
 def enroll_single_employee(
     institution_id: UUID,
-    employee_data: Dict[str, Any],
+    employee_data: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
 ):
@@ -140,16 +146,16 @@ def enroll_bulk_employees(
     locale: str,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Enroll employees from CSV. Never fails the batch on one bad row."""
     program = resolve_effective_program(institution_id, None, db)
     if not program or not program.is_active:
         raise HTTPException(status_code=400, detail="No active benefits program for this institution")
 
     reader = csv.DictReader(io.StringIO(csv_content))
-    created: List[str] = []
-    skipped: List[Dict[str, str]] = []
-    errors: List[Dict[str, Any]] = []
+    created: list[str] = []
+    skipped: list[dict[str, str]] = []
+    errors: list[dict[str, Any]] = []
     row_num = 0
 
     for row in reader:
@@ -188,7 +194,9 @@ def enroll_bulk_employees(
             log_error(f"Bulk enroll row {row_num} ({email}): {e}")
             errors.append({"row": row_num, "email": email, "reason": str(e)})
 
-    log_info(f"Bulk enrollment for institution {institution_id}: created={len(created)}, skipped={len(skipped)}, errors={len(errors)}")
+    log_info(
+        f"Bulk enrollment for institution {institution_id}: created={len(created)}, skipped={len(skipped)}, errors={len(errors)}"
+    )
     return {
         "created_count": len(created),
         "skipped_count": len(skipped),
@@ -236,7 +244,7 @@ def deactivate_employee(
 def list_benefit_employees(
     institution_id: UUID,
     db: psycopg2.extensions.connection,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List benefit employees in an employer institution with subscription status."""
     rows = db_read(
         """
@@ -352,6 +360,7 @@ def migrate_existing_users_for_domain(
     """Migrate existing Customer Comensals with matching email domain from Vianda Customers to the employer institution.
     Returns count of migrated users."""
     from app.config.settings import get_vianda_customers_institution_id
+
     vianda_customers_id = get_vianda_customers_institution_id()
 
     rows = db_read(

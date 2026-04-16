@@ -3,9 +3,9 @@
 from uuid import uuid4
 
 import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_current_user, oauth2_scheme
 
 

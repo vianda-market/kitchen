@@ -6,8 +6,9 @@ Frontend submits click identifiers (gclid, fbclid, fbc, fbp) captured
 on landing. These are stored and used for conversion attribution when
 the user subscribes.
 """
-from fastapi import APIRouter, Depends, HTTPException
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db

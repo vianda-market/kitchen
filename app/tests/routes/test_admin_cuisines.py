@@ -1,13 +1,13 @@
 """Tests for admin cuisine endpoints: CRUD + suggestion review"""
 
-import pytest
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
+from uuid import UUID, uuid4
 
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_admin_user, oauth2_scheme
 
 
@@ -41,9 +41,10 @@ def client_with_admin(mock_admin_user):
 
 # ---- Helpers ----
 
+
 def _cuisine_dict(**overrides):
     """Build a cuisine dict with sensible defaults."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     base = {
         "cuisine_id": str(uuid4()),
         "cuisine_name": "Italian",
@@ -64,7 +65,7 @@ def _cuisine_dict(**overrides):
 
 def _suggestion_dict(**overrides):
     """Build a suggestion dict with sensible defaults."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     base = {
         "suggestion_id": str(uuid4()),
         "suggested_name": "Peruvian Fusion",
@@ -83,19 +84,16 @@ def _suggestion_dict(**overrides):
 
 # ---- Cuisine CRUD Tests ----
 
+
 class TestAdminCuisineCRUD:
     """Admin CRUD on /api/v1/admin/cuisines."""
 
     @patch("app.routes.admin.cuisines.cuisine_service")
     @patch("app.routes.admin.cuisines.cuisine_crud_service")
-    def test_create_cuisine_returns_201(
-        self, mock_crud, mock_service, client_with_admin
-    ):
+    def test_create_cuisine_returns_201(self, mock_crud, mock_service, client_with_admin):
         """POST /admin/cuisines with valid body returns 201."""
         mock_service._generate_slug.return_value = "thai"
-        mock_crud.create.return_value = _cuisine_dict(
-            cuisine_name="Thai", slug="thai"
-        )
+        mock_crud.create.return_value = _cuisine_dict(cuisine_name="Thai", slug="thai")
         payload = {"cuisine_name": "Thai"}
         resp = client_with_admin.post("/api/v1/admin/cuisines", json=payload)
         assert resp.status_code == 201
@@ -137,13 +135,9 @@ class TestAdminCuisineCRUD:
     def test_update_cuisine_returns_200(self, mock_crud, client_with_admin):
         """PUT /admin/cuisines/{id} returns 200 with updated data."""
         cuisine_id = str(uuid4())
-        mock_crud.update.return_value = _cuisine_dict(
-            cuisine_id=cuisine_id, cuisine_name="Updated Italian"
-        )
+        mock_crud.update.return_value = _cuisine_dict(cuisine_id=cuisine_id, cuisine_name="Updated Italian")
         payload = {"cuisine_name": "Updated Italian"}
-        resp = client_with_admin.put(
-            f"/api/v1/admin/cuisines/{cuisine_id}", json=payload
-        )
+        resp = client_with_admin.put(f"/api/v1/admin/cuisines/{cuisine_id}", json=payload)
         assert resp.status_code == 200
         assert resp.json()["cuisine_name"] == "Updated Italian"
 
@@ -155,8 +149,9 @@ class TestAdminCuisineCRUD:
         and returns None for the just-archived row."""
         cuisine_id = str(uuid4())
         # get_by_id returns the CuisineDTO-shaped dict (route wraps it in the response model)
-        from app.dto.models import CuisineDTO
         from app.config import Status
+        from app.dto.models import CuisineDTO
+
         mock_crud.get_by_id.return_value = CuisineDTO(
             cuisine_id=UUID(cuisine_id),
             cuisine_name="Italian",
@@ -168,9 +163,9 @@ class TestAdminCuisineCRUD:
             display_order=None,
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.now(timezone.utc),
+            created_date=datetime.now(UTC),
             modified_by=UUID(str(uuid4())),
-            modified_date=datetime.now(timezone.utc),
+            modified_date=datetime.now(UTC),
         )
         mock_crud.soft_delete.return_value = True
         resp = client_with_admin.delete(f"/api/v1/admin/cuisines/{cuisine_id}")
@@ -181,13 +176,12 @@ class TestAdminCuisineCRUD:
 
 # ---- Suggestion Review Tests ----
 
+
 class TestAdminSuggestionReview:
     """Admin review of cuisine suggestions."""
 
     @patch("app.routes.admin.cuisines.cuisine_service")
-    def test_list_pending_suggestions_returns_200(
-        self, mock_service, client_with_admin
-    ):
+    def test_list_pending_suggestions_returns_200(self, mock_service, client_with_admin):
         """GET /admin/cuisines/suggestions returns 200 with pending list."""
         mock_service.get_pending_suggestions.return_value = [
             _suggestion_dict(),
@@ -204,7 +198,7 @@ class TestAdminSuggestionReview:
         """PUT /admin/cuisines/suggestions/{id}/approve returns 200."""
         suggestion_id = str(uuid4())
         resolved_cuisine_id = str(uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         mock_service.approve_suggestion.return_value = _suggestion_dict(
             suggestion_id=suggestion_id,
             suggestion_status="approved",
@@ -238,7 +232,7 @@ class TestAdminSuggestionReview:
     def test_reject_suggestion_returns_200(self, mock_service, client_with_admin):
         """PUT /admin/cuisines/suggestions/{id}/reject returns 200."""
         suggestion_id = str(uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         mock_service.reject_suggestion.return_value = _suggestion_dict(
             suggestion_id=suggestion_id,
             suggestion_status="rejected",

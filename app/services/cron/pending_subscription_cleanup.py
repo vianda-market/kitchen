@@ -7,15 +7,15 @@ subscription_payment rows as cancelled so we do not leave orphan intents.
 Safe to run repeatedly (idempotent).
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
-from app.utils.db import db_read, db_update, get_db_connection, close_db_connection
-from app.utils.log import log_info, log_warning, log_error
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
 from app.services.payment_provider import cancel_payment_intent
+from app.utils.db import close_db_connection, db_read, db_update, get_db_connection
+from app.utils.log import log_error, log_info, log_warning
 
 # System user for automated operations
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
@@ -24,14 +24,14 @@ SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 PENDING_MAX_AGE_HOURS = 24
 
 
-def run_pending_subscription_cleanup() -> Dict[str, Any]:
+def run_pending_subscription_cleanup() -> dict[str, Any]:
     """
     Cancel Pending subscriptions older than 24 hours (never paid).
     For each: cancel Stripe PaymentIntents for pending payment rows,
     mark those rows cancelled, set subscription to Cancelled.
     Idempotent; safe to run daily or every few hours.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=PENDING_MAX_AGE_HOURS)
+    cutoff = datetime.now(UTC) - timedelta(hours=PENDING_MAX_AGE_HOURS)
     result = {
         "cron_job": "pending_subscription_cleanup",
         "cutoff_iso": cutoff.isoformat(),

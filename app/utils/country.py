@@ -8,7 +8,6 @@ Country code utilities — single source of truth for ISO 3166-1 conversions.
 """
 
 import logging
-from typing import Dict, Optional
 
 import pycountry
 from fastapi import HTTPException
@@ -19,22 +18,62 @@ logger = logging.getLogger(__name__)
 # Static lookup dicts — used by address gateways for fast conversion
 # ---------------------------------------------------------------------------
 
-_COUNTRY_ALPHA2_TO_ALPHA3: Dict[str, str] = {
-    "AR": "ARG", "US": "USA", "BR": "BRA", "MX": "MEX", "CA": "CAN",
-    "CL": "CHL", "CO": "COL", "PE": "PER", "UY": "URY", "PY": "PRY",
-    "EC": "ECU", "BO": "BOL", "VE": "VEN", "GB": "GBR", "ES": "ESP",
-    "FR": "FRA", "DE": "DEU", "IT": "ITA", "JP": "JPN", "AU": "AUS",
+_COUNTRY_ALPHA2_TO_ALPHA3: dict[str, str] = {
+    "AR": "ARG",
+    "US": "USA",
+    "BR": "BRA",
+    "MX": "MEX",
+    "CA": "CAN",
+    "CL": "CHL",
+    "CO": "COL",
+    "PE": "PER",
+    "UY": "URY",
+    "PY": "PRY",
+    "EC": "ECU",
+    "BO": "BOL",
+    "VE": "VEN",
+    "GB": "GBR",
+    "ES": "ESP",
+    "FR": "FRA",
+    "DE": "DEU",
+    "IT": "ITA",
+    "JP": "JPN",
+    "AU": "AUS",
 }
 
-_COUNTRY_NAME_TO_ALPHA2: Dict[str, str] = {
-    "argentina": "AR", "united states": "US", "usa": "US", "united states of america": "US",
-    "brazil": "BR", "brasil": "BR", "mexico": "MX", "méxico": "MX", "canada": "CA",
-    "chile": "CL", "colombia": "CO", "peru": "PE", "perú": "PE",
-    "uruguay": "UY", "paraguay": "PY", "ecuador": "EC", "bolivia": "BO",
-    "venezuela": "VE", "venezuela (bolivarian republic of)": "VE",
-    "united kingdom": "GB", "uk": "GB", "great britain": "GB", "england": "GB",
-    "spain": "ES", "españa": "ES", "france": "FR", "germany": "DE", "deutschland": "DE",
-    "italy": "IT", "italia": "IT", "japan": "JP", "australia": "AU",
+_COUNTRY_NAME_TO_ALPHA2: dict[str, str] = {
+    "argentina": "AR",
+    "united states": "US",
+    "usa": "US",
+    "united states of america": "US",
+    "brazil": "BR",
+    "brasil": "BR",
+    "mexico": "MX",
+    "méxico": "MX",
+    "canada": "CA",
+    "chile": "CL",
+    "colombia": "CO",
+    "peru": "PE",
+    "perú": "PE",
+    "uruguay": "UY",
+    "paraguay": "PY",
+    "ecuador": "EC",
+    "bolivia": "BO",
+    "venezuela": "VE",
+    "venezuela (bolivarian republic of)": "VE",
+    "united kingdom": "GB",
+    "uk": "GB",
+    "great britain": "GB",
+    "england": "GB",
+    "spain": "ES",
+    "españa": "ES",
+    "france": "FR",
+    "germany": "DE",
+    "deutschland": "DE",
+    "italy": "IT",
+    "italia": "IT",
+    "japan": "JP",
+    "australia": "AU",
 }
 
 
@@ -53,7 +92,7 @@ def country_alpha3_to_alpha2(alpha3: str) -> str:
     return (alpha3 or "")[:2].upper()
 
 
-def country_name_to_alpha2(name: str) -> Optional[str]:
+def country_name_to_alpha2(name: str) -> str | None:
     """Resolve country name (e.g. 'Argentina') to ISO 3166-1 alpha-2. Returns None if not found."""
     if not name or not name.strip():
         return None
@@ -66,7 +105,7 @@ def country_name_to_alpha2(name: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-def normalize_country_code(value: Optional[str], default: Optional[str] = None) -> str:
+def normalize_country_code(value: str | None, default: str | None = None) -> str:
     """
     Normalize country_code for storage: strip, uppercase; accept alpha-2 or alpha-3, return alpha-2.
     When alpha-3 is supplied, convert to alpha-2 and log. Use at API boundary so services receive alpha-2.

@@ -10,6 +10,7 @@ from enum import Enum
 
 class TaxClassification(str, Enum):
     """IRS W-9 tax classification categories."""
+
     INDIVIDUAL = "individual"
     C_CORP = "c_corp"
     S_CORP = "s_corp"

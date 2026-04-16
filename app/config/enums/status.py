@@ -7,22 +7,23 @@ Status is a system enum list (static, compile-time constants), not operational d
 Context map: status values vary by use case. Use get_by_context() for API/schemas
 so the frontend and validation only see the relevant subset (e.g. user = Active/Inactive only).
 """
+
 from enum import Enum
-from typing import Dict, List
 
 # Context-scoped status values for API and frontend. DB keeps single status_enum.
 # discretionary has its own DiscretionaryStatus enum; status_discretionary from enum_service.
-STATUS_CONTEXTS: Dict[str, List["Status"]] = {
+STATUS_CONTEXTS: dict[str, list["Status"]] = {
     "general": [],  # Active, Pending, Inactive
-    "user": [],     # Active, Inactive
+    "user": [],  # Active, Inactive
     "restaurant": [],  # Active, Pending, Inactive
     "plate_pickup": [],  # Pending, Arrived, Completed, Cancelled
-    "bill": [],     # Pending, Processed, Cancelled
+    "bill": [],  # Pending, Processed, Cancelled
 }
 
 
 class Status(str, Enum):
     """Valid status values - fixed at compile time"""
+
     # General statuses (user, institution, product, etc.)
     ACTIVE = "active"
     INACTIVE = "inactive"
@@ -57,14 +58,14 @@ class Status(str, Enum):
         _ensure_contexts_filled()
         members = STATUS_CONTEXTS.get(context, [])
         return [s.value for s in members]
-    
+
     @classmethod
     def get_by_category(cls, category: str) -> list[str]:
         """Get status values by category (for backward compatibility)"""
         category_map = {
-            'general': [cls.ACTIVE, cls.PENDING, cls.INACTIVE],
-            'order': [cls.PENDING, cls.ARRIVED, cls.COMPLETED, cls.CANCELLED],
-            'transaction': [cls.PROCESSED],
+            "general": [cls.ACTIVE, cls.PENDING, cls.INACTIVE],
+            "order": [cls.PENDING, cls.ARRIVED, cls.COMPLETED, cls.CANCELLED],
+            "transaction": [cls.PROCESSED],
         }
         return [s.value for s in category_map.get(category, [])]
 
@@ -76,9 +77,14 @@ def _ensure_contexts_filled() -> None:
     STATUS_CONTEXTS["general"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
     STATUS_CONTEXTS["user"] = [Status.ACTIVE, Status.INACTIVE]
     STATUS_CONTEXTS["restaurant"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
-    STATUS_CONTEXTS["plate_pickup"] = [Status.PENDING, Status.ARRIVED, Status.HANDED_OUT, Status.COMPLETED, Status.CANCELLED]
+    STATUS_CONTEXTS["plate_pickup"] = [
+        Status.PENDING,
+        Status.ARRIVED,
+        Status.HANDED_OUT,
+        Status.COMPLETED,
+        Status.CANCELLED,
+    ]
     STATUS_CONTEXTS["bill"] = [Status.PENDING, Status.PROCESSED, Status.CANCELLED]
 
 
 _ensure_contexts_filled()
-

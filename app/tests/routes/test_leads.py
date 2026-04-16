@@ -2,11 +2,12 @@
 Tests for leads routes: GET /api/v1/leads/markets, zipcode-metrics (no auth, rate-limited).
 """
 
-import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import patch
 
+import pytest
 from application import app
+from fastapi.testclient import TestClient
+
 from app.routes import leads
 
 
@@ -31,8 +32,20 @@ class TestLeadsMarketsEndpoint:
     def test_200_returns_public_market_fields_only(self, mock_coverage, client):
         """Response has public market fields (country_code, country_name, language, phone, locale); no market_id."""
         mock_coverage.return_value = [
-            {"country_code": "AR", "country_name": "Argentina", "language": "es", "phone_dial_code": "+54", "phone_local_digits": 10},
-            {"country_code": "US", "country_name": "United States", "language": "en", "phone_dial_code": "+1", "phone_local_digits": 10},
+            {
+                "country_code": "AR",
+                "country_name": "Argentina",
+                "language": "es",
+                "phone_dial_code": "+54",
+                "phone_local_digits": 10,
+            },
+            {
+                "country_code": "US",
+                "country_name": "United States",
+                "language": "en",
+                "phone_dial_code": "+1",
+                "phone_local_digits": 10,
+            },
         ]
         resp = client.get("/api/v1/leads/markets")
         assert resp.status_code == 200
@@ -51,8 +64,18 @@ class TestLeadsMarketsEndpoint:
     def test_excludes_global_marketplace_supplier_audience(self, mock_market_service, client):
         """Global Marketplace is excluded from supplier audience list."""
         mock_market_service.get_all.return_value = [
-            {"market_id": "00000000-0000-0000-0000-000000000001", "country_code": "XG", "country_name": "Global", "language": "en"},
-            {"market_id": "11111111-1111-1111-1111-111111111111", "country_code": "AR", "country_name": "Argentina", "language": "es"},
+            {
+                "market_id": "00000000-0000-0000-0000-000000000001",
+                "country_code": "XG",
+                "country_name": "Global",
+                "language": "en",
+            },
+            {
+                "market_id": "11111111-1111-1111-1111-111111111111",
+                "country_code": "AR",
+                "country_name": "Argentina",
+                "language": "es",
+            },
         ]
 
         def is_global(m_id):
@@ -78,7 +101,13 @@ class TestLeadsMarketsEndpoint:
     def test_unknown_audience_defaults_to_coverage_filtered(self, mock_coverage, client):
         """Unknown audience value falls back to coverage-filtered (restrictive default)."""
         mock_coverage.return_value = [
-            {"country_code": "AR", "country_name": "Argentina", "language": "es", "phone_dial_code": "+54", "phone_local_digits": 10},
+            {
+                "country_code": "AR",
+                "country_name": "Argentina",
+                "language": "es",
+                "phone_dial_code": "+54",
+                "phone_local_digits": 10,
+            },
         ]
         resp = client.get("/api/v1/leads/markets", params={"audience": "garbage"})
         assert resp.status_code == 200
@@ -150,7 +179,7 @@ class TestZipcodeMetricsEndpoint:
         }
         # Exhaust rate limit: 21 requests; 21st should return 429.
         # Rate limit is per-IP; TestClient may share connection so limit applies.
-        for i in range(21):
+        for _i in range(21):
             resp = client.get("/api/v1/leads/zipcode-metrics", params={"zip": "12345"})
             if resp.status_code == 429:
                 body = resp.json()

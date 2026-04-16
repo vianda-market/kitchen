@@ -9,9 +9,10 @@ Uses Application Default Credentials (ADC):
 Shared by all ad platform gateways (Google Ads, Meta Ads) and any future
 service needing runtime secrets from GCP.
 """
+
+import logging
 import os
 import time
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ def _get_client():
     global _client
     if _client is None:
         from google.cloud import secretmanager
+
         _client = secretmanager.SecretManagerServiceClient()
     return _client
 
@@ -47,9 +49,7 @@ def get_secret(secret_id: str, version: str = "latest", project_id: str | None =
     if project_id is None:
         project_id = os.getenv("GCP_PROJECT_ID", "").strip()
     if not project_id:
-        raise ValueError(
-            "GCP project ID required. Set GCP_PROJECT_ID env var or pass project_id."
-        )
+        raise ValueError("GCP project ID required. Set GCP_PROJECT_ID env var or pass project_id.")
 
     cache_key = f"{project_id}/{secret_id}/{version}"
     if cache_key in _cache:

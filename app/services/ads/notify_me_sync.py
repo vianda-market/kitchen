@@ -10,8 +10,8 @@ Current limitation: lead_interest has city_name + zipcode but no lat/lon.
 Matching is by city_name + country_code. Once leads are geocoded (future),
 this can use radius-based matching like restaurant/subscriber counts.
 """
+
 import logging
-from uuid import UUID
 
 import psycopg2.extensions
 

@@ -5,18 +5,15 @@ Stripe Connect outbound: account creation, onboarding links, account sessions, t
 Only active when SUPPLIER_PAYOUT_PROVIDER=stripe. Uses the same STRIPE_SECRET_KEY as inbound.
 All functions raise HTTPException on Stripe API errors so routes get clean 4xx/5xx responses.
 """
-from datetime import datetime, timezone
-from typing import Optional
+
 from uuid import UUID
 
 import psycopg2.extensions
 import stripe
-
 from fastapi import HTTPException
 
 from app.config.settings import settings
-from app.config.enums import BillPayoutStatus
-from app.utils.log import log_info, log_error
+from app.utils.log import log_error, log_info
 
 
 def _handle_stripe_error(e: Exception) -> HTTPException:
@@ -25,7 +22,9 @@ def _handle_stripe_error(e: Exception) -> HTTPException:
         log_error(f"Stripe authentication error: {e}")
         return HTTPException(status_code=500, detail="Payment provider authentication failed")
     if isinstance(e, stripe.error.InvalidRequestError):
-        return HTTPException(status_code=400, detail=f"Invalid request: {getattr(e, 'user_message', None) or 'check parameters'}")
+        return HTTPException(
+            status_code=400, detail=f"Invalid request: {getattr(e, 'user_message', None) or 'check parameters'}"
+        )
     if isinstance(e, stripe.error.PermissionError):
         return HTTPException(status_code=400, detail="Payment provider account not ready for this operation")
     if isinstance(e, stripe.error.APIConnectionError):
@@ -49,7 +48,7 @@ def _ensure_connect_configured() -> None:
     stripe.api_key = key
 
 
-def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = None) -> str:
+def create_connected_account(entity_id: UUID, name: str, email: str | None = None) -> str:
     """
     Create a Stripe Express connected account for a supplier entity.
     Returns payout_provider_account_id (acct_…). Callers must check
@@ -67,7 +66,7 @@ def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = 
     try:
         account = stripe.Account.create(**params)
     except Exception as e:
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
     log_info(f"Created Stripe Connect account {account.id} for entity {entity_id}")
     return account.id
 
@@ -91,7 +90,7 @@ def create_account_link(
             type="account_onboarding",
         )
     except Exception as e:
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
     log_info(f"Created onboarding link for {payout_provider_account_id}")
     return {"url": link.url, "expires_at": link.expires_at}
 
@@ -105,7 +104,7 @@ def get_account_status(payout_provider_account_id: str) -> dict:
     try:
         account = stripe.Account.retrieve(payout_provider_account_id)
     except Exception as e:
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
     return {
         "charges_enabled": account.charges_enabled,
         "payouts_enabled": account.payouts_enabled,
@@ -125,7 +124,7 @@ def create_account_session(payout_provider_account_id: str) -> str:
             components={"account_onboarding": {"enabled": True}},
         )
     except Exception as e:
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
     log_info(f"Created AccountSession for {payout_provider_account_id}")
     return session.client_secret
 
@@ -156,7 +155,7 @@ def create_transfer(
             idempotency_key=idempotency_key,
         )
     except Exception as e:
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
     log_info(f"Created Stripe Transfer {transfer.id} → {payout_provider_account_id} for bill {institution_bill_id}")
     return transfer.id
 
@@ -182,7 +181,6 @@ def execute_supplier_payout(
     6. Return payout row dict
     """
     from app.services.crud_service import institution_bill_service, institution_entity_service
-    from app.utils.db import db_read
 
     # 1. Load bill
     bill = institution_bill_service.get_by_id(str(institution_bill_id), db)
@@ -285,7 +283,7 @@ def execute_supplier_payout(
         raise
     except Exception as e:
         log_error(f"Payout execution failed for bill {institution_bill_id}: {e}")
-        raise _handle_stripe_error(e)
+        raise _handle_stripe_error(e) from e
 
     # 6. Return payout row
     with db.cursor() as cur:
@@ -300,4 +298,4 @@ def execute_supplier_payout(
         )
         row = cur.fetchone()
         cols = [desc[0] for desc in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))

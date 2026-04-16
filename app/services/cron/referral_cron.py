@@ -5,11 +5,12 @@ Referral cron job.
 Retries held rewards for referrers who now have active subscriptions,
 and expires stale pending referrals past their market's expiry window.
 """
-from typing import Dict, Any
 
-from app.utils.db import get_db_connection, close_db_connection
-from app.utils.log import log_info, log_error
-from app.services.referral_service import retry_held_rewards, expire_stale_pending_referrals
+from typing import Any
+
+from app.services.referral_service import expire_stale_pending_referrals, retry_held_rewards
+from app.utils.db import close_db_connection, get_db_connection
+from app.utils.log import log_error, log_info
 
 
 def _cleanup_expired_assignments(connection) -> int:
@@ -26,9 +27,9 @@ def _cleanup_expired_assignments(connection) -> int:
         cursor.close()
 
 
-def run_referral_cron() -> Dict[str, Any]:
+def run_referral_cron() -> dict[str, Any]:
     """Retry held rewards, expire stale pending referrals, clean up expired code assignments."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "cron_job": "referral_rewards",
         "success": True,
         "held_retried": 0,
@@ -47,7 +48,9 @@ def run_referral_cron() -> Dict[str, Any]:
         cleaned = _cleanup_expired_assignments(connection)
         result["assignments_cleaned"] = cleaned
 
-        log_info(f"Referral cron completed: {held_count} held retried, {expired_count} pending expired, {cleaned} assignments cleaned")
+        log_info(
+            f"Referral cron completed: {held_count} held retried, {expired_count} pending expired, {cleaned} assignments cleaned"
+        )
     except Exception as e:
         result["success"] = False
         result["errors"].append(str(e))

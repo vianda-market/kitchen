@@ -2,13 +2,12 @@
 Unit tests for map projection utilities (Web Mercator, pixel conversion, grid cells).
 """
 
-import pytest
 from app.utils.map_projection import (
-    lat_lng_to_pixel,
-    is_within_frame,
-    grid_cell,
-    slugify_city,
     distance_from_center,
+    grid_cell,
+    is_within_frame,
+    lat_lng_to_pixel,
+    slugify_city,
 )
 
 

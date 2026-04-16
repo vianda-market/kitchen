@@ -11,13 +11,12 @@ Zones are the geographic unit for the flywheel engine. Each zone has:
 Zones are created by operators (cold start) or proposed by the Gemini advisor (data-driven).
 Operators can override any automated threshold or state transition at any time.
 """
-import logging
-from datetime import datetime, timezone
-from math import asin, cos, radians, sin, sqrt
-from typing import Optional
-from uuid import UUID
 
 import json
+import logging
+from datetime import UTC, datetime
+from math import asin, cos, radians, sin, sqrt
+from uuid import UUID
 
 import psycopg2.extensions
 
@@ -28,8 +27,12 @@ from app.utils.log import log_info
 logger = logging.getLogger(__name__)
 
 VALID_FLYWHEEL_STATES = {
-    "monitoring", "supply_acquisition", "demand_activation",
-    "growth", "mature", "paused",
+    "monitoring",
+    "supply_acquisition",
+    "demand_activation",
+    "growth",
+    "mature",
+    "paused",
 }
 
 
@@ -66,13 +69,15 @@ def check_zone_overlap(
         distance = _haversine_km(latitude, longitude, float(row["latitude"]), float(row["longitude"]))
         combined_radii = radius_km + float(row["radius_km"])
         if distance < combined_radii:
-            overlaps.append({
-                "zone_id": row["id"],
-                "zone_name": row["name"],
-                "distance_km": round(distance, 2),
-                "combined_radii_km": round(combined_radii, 2),
-                "overlap_km": round(combined_radii - distance, 2),
-            })
+            overlaps.append(
+                {
+                    "zone_id": row["id"],
+                    "zone_name": row["name"],
+                    "distance_km": round(distance, 2),
+                    "combined_radii_km": round(combined_radii, 2),
+                    "overlap_km": round(combined_radii - distance, 2),
+                }
+            )
     return overlaps
 
 
@@ -99,13 +104,12 @@ def create_zone(
     flywheel_state = data.get("flywheel_state", "monitoring")
     if flywheel_state not in VALID_FLYWHEEL_STATES:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail=f"Invalid flywheel_state: {flywheel_state}")
 
-    budget_allocation = data.get("budget_allocation") or {
-        "b2c_subscriber": 0, "b2b_employer": 0, "b2b_restaurant": 100
-    }
+    budget_allocation = data.get("budget_allocation") or {"b2c_subscriber": 0, "b2b_employer": 0, "b2b_restaurant": 100}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(
@@ -127,14 +131,22 @@ def create_zone(
             ) RETURNING id
             """,
             (
-                data["name"], data["country_code"], data["city_name"],
+                data["name"],
+                data["country_code"],
+                data["city_name"],
                 data.get("neighborhood"),
-                data["latitude"], data["longitude"], radius_km,
-                flywheel_state, now, str(created_by_user_id) if created_by_user_id else None,
+                data["latitude"],
+                data["longitude"],
+                radius_km,
+                flywheel_state,
+                now,
+                str(created_by_user_id) if created_by_user_id else None,
                 json.dumps(budget_allocation),
                 data.get("daily_budget_cents"),
-                "operator", str(created_by_user_id) if created_by_user_id else None,
-                now, now,
+                "operator",
+                str(created_by_user_id) if created_by_user_id else None,
+                now,
+                now,
             ),
         )
         row = cursor.fetchone()
@@ -202,6 +214,7 @@ def update_zone(
 
     if "budget_allocation" in data and data["budget_allocation"] is not None:
         import json
+
         sets.append("budget_allocation = %s::jsonb")
         params.append(json.dumps(data["budget_allocation"]))
 
@@ -209,7 +222,7 @@ def update_zone(
         return get_zone_by_id(zone_id, db)
 
     sets.append("modified_date = %s")
-    params.append(datetime.now(timezone.utc))
+    params.append(datetime.now(UTC))
     params.append(str(zone_id))
 
     cursor = db.cursor()
@@ -247,13 +260,14 @@ def transition_zone_state(
     """
     if new_state not in VALID_FLYWHEEL_STATES:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail=f"Invalid flywheel_state: {new_state}")
 
     zone = get_zone_by_id(zone_id, db)
     if not zone:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(
@@ -266,9 +280,11 @@ def transition_zone_state(
             WHERE id = %s::uuid
             """,
             (
-                new_state, now,
+                new_state,
+                now,
                 str(changed_by_user_id) if changed_by_user_id else None,
-                now, str(zone_id),
+                now,
+                str(zone_id),
             ),
         )
         db.commit()

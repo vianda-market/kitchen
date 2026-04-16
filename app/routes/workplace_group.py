@@ -1,36 +1,40 @@
 """Workplace group routes for B2C coworker pickup coordination."""
-from fastapi import APIRouter, HTTPException, Depends, Query, Response, status
-from typing import Optional, List
+
 from uuid import UUID
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
 from app.dependencies.database import get_db
-from app.utils.db import db_read
-from app.utils.log import log_info
-from app.services.crud_service import workplace_group_service
-from app.services.address_service import address_business_service
-from app.services.error_handling import handle_business_operation, handle_get_by_id
 from app.schemas.consolidated_schemas import (
-    WorkplaceGroupCreateSchema,
-    WorkplaceGroupUpdateSchema,
-    WorkplaceGroupResponseSchema,
-    WorkplaceGroupSearchResultSchema,
-    WorkplaceGroupEnrichedResponseSchema,
     AddressCreateSchema,
     AddressResponseSchema,
+    WorkplaceGroupCreateSchema,
+    WorkplaceGroupEnrichedResponseSchema,
+    WorkplaceGroupResponseSchema,
+    WorkplaceGroupSearchResultSchema,
+    WorkplaceGroupUpdateSchema,
 )
+from app.services.address_service import address_business_service
+from app.services.crud_service import workplace_group_service
+from app.services.error_handling import handle_business_operation
+from app.utils.db import db_read
+from app.utils.log import log_info
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/workplace-groups", tags=["Workplace Groups"], dependencies=[Depends(oauth2_scheme)])
-admin_router = APIRouter(prefix="/admin/workplace-groups", tags=["Admin Workplace Groups"], dependencies=[Depends(oauth2_scheme)])
+admin_router = APIRouter(
+    prefix="/admin/workplace-groups", tags=["Admin Workplace Groups"], dependencies=[Depends(oauth2_scheme)]
+)
 
 
 # =============================================================================
 # B2C ROUTES (any authenticated user)
 # =============================================================================
 
-@router.get("/search", response_model=List[WorkplaceGroupSearchResultSchema])
+
+@router.get("/search", response_model=list[WorkplaceGroupSearchResultSchema])
 def search_workplace_groups(
     q: str = Query(..., min_length=1, description="Search query (fuzzy name match)"),
     limit: int = Query(10, ge=1, le=50, description="Max results"),
@@ -63,6 +67,7 @@ def create_workplace_group(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create a new workplace group."""
+
     def _create():
         data = body.model_dump()
         data["created_by"] = current_user["user_id"]
@@ -89,7 +94,7 @@ def get_workplace_group(
     return WorkplaceGroupResponseSchema(**group.model_dump())
 
 
-@router.get("/{group_id}/addresses", response_model=List[AddressResponseSchema])
+@router.get("/{group_id}/addresses", response_model=list[AddressResponseSchema])
 def list_group_addresses(
     group_id: UUID,
     current_user: dict = Depends(get_current_user),
@@ -134,9 +139,7 @@ def add_group_address(
     def _create_address():
         data = body.model_dump(exclude_unset=True)
         data["workplace_group_id"] = str(group_id)
-        new_addr = address_business_service.create_address_with_geocoding(
-            data, current_user, db, commit=True
-        )
+        new_addr = address_business_service.create_address_with_geocoding(data, current_user, db, commit=True)
         return new_addr
 
     return handle_business_operation(_create_address, "workplace group address creation")
@@ -146,12 +149,13 @@ def add_group_address(
 # ADMIN ROUTES (Internal employees only)
 # =============================================================================
 
-@admin_router.get("", response_model=List[WorkplaceGroupResponseSchema])
+
+@admin_router.get("", response_model=list[WorkplaceGroupResponseSchema])
 def admin_list_workplace_groups(
     response: Response,
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
 ):
     """List all workplace groups (paginated). Internal only."""
     result = workplace_group_service.get_all(db, scope=None, pagination=pagination)
@@ -163,12 +167,12 @@ def admin_list_workplace_groups(
     return [WorkplaceGroupResponseSchema(**g.model_dump()) for g in groups]
 
 
-@admin_router.get("/enriched", response_model=List[WorkplaceGroupEnrichedResponseSchema])
+@admin_router.get("/enriched", response_model=list[WorkplaceGroupEnrichedResponseSchema])
 def admin_list_workplace_groups_enriched(
     response: Response,
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
 ):
     """List workplace groups with member count. Internal only."""
     rows = db_read(
@@ -227,13 +231,14 @@ def admin_archive_workplace_group(
     log_info(f"Archived workplace group: {group_id}")
 
 
-@admin_router.post("/bulk", response_model=List[WorkplaceGroupResponseSchema], status_code=status.HTTP_201_CREATED)
+@admin_router.post("/bulk", response_model=list[WorkplaceGroupResponseSchema], status_code=status.HTTP_201_CREATED)
 def admin_bulk_create_workplace_groups(
-    bodies: List[WorkplaceGroupCreateSchema],
+    bodies: list[WorkplaceGroupCreateSchema],
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Bulk create workplace groups. Internal only."""
+
     def _bulk_create():
         created_groups = []
         for body in bodies:

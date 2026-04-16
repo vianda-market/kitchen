@@ -5,17 +5,18 @@ This file contains common fixtures, mocks, and test utilities
 that are shared across all test modules.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock
-from uuid import UUID, uuid4
-from datetime import datetime, timezone, date
+from datetime import UTC, date, datetime
 from decimal import Decimal
-import psycopg2.extensions
+from unittest.mock import Mock
+from uuid import UUID, uuid4
 
+import psycopg2.extensions
+import pytest
 
 # =============================================================================
 # Database Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -65,18 +66,15 @@ def sample_user_data():
 @pytest.fixture
 def sample_current_user():
     """Sample current user for testing."""
-    return {
-        "user_id": str(uuid4()),
-        "username": "admin",
-        "email": "admin@example.com"
-    }
+    return {"user_id": str(uuid4()), "username": "admin", "email": "admin@example.com"}
 
 
 @pytest.fixture
 def sample_user_dto():
     """Sample UserDTO for testing."""
+    from app.config import RoleName, RoleType, Status
     from app.dto.models import UserDTO
-    from app.config import Status, RoleType, RoleName
+
     return UserDTO(
         user_id=uuid4(),
         institution_id=uuid4(),
@@ -96,9 +94,9 @@ def sample_user_dto():
         city_metadata_id=SAMPLE_CITY_ID,
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -106,18 +104,14 @@ def sample_user_dto():
 # Permission & Role-Based Access Control Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_employee_user():
     """Internal user (role_type='Internal', role_name='Admin') for testing.
-    
+
     Internal users have global access and can manage system configuration.
     """
-    return {
-        "user_id": uuid4(),
-        "role_type": "internal",
-        "role_name": "admin",
-        "institution_id": uuid4()
-    }
+    return {"user_id": uuid4(), "role_type": "internal", "role_name": "admin", "institution_id": uuid4()}
 
 
 @pytest.fixture
@@ -127,12 +121,7 @@ def sample_super_admin_user():
     Super Admins have global access (via Internal role_type) plus special
     approval permissions (via role_name='super_admin').
     """
-    return {
-        "user_id": uuid4(),
-        "role_type": "internal",
-        "role_name": "super_admin",
-        "institution_id": uuid4()
-    }
+    return {"user_id": uuid4(), "role_type": "internal", "role_name": "super_admin", "institution_id": uuid4()}
 
 
 @pytest.fixture
@@ -142,12 +131,7 @@ def sample_supplier_user():
     Suppliers are scoped to their institution_id and cannot access
     system configuration APIs.
     """
-    return {
-        "user_id": uuid4(),
-        "role_type": "supplier",
-        "role_name": "admin",
-        "institution_id": uuid4()
-    }
+    return {"user_id": uuid4(), "role_type": "supplier", "role_name": "admin", "institution_id": uuid4()}
 
 
 @pytest.fixture
@@ -157,22 +141,19 @@ def sample_customer_user():
     Customers access iOS/Android apps only and have limited backoffice access
     (e.g., viewing plans).
     """
-    return {
-        "user_id": uuid4(),
-        "role_type": "customer",
-        "role_name": "comensal",
-        "institution_id": uuid4()
-    }
+    return {"user_id": uuid4(), "role_type": "customer", "role_name": "comensal", "institution_id": uuid4()}
 
 
 # =============================================================================
 # Plate Pickup Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_pickup_record():
     """Sample PlatePickupLiveDTO for testing."""
     from app.dto.models import PlatePickupLiveDTO
+
     return PlatePickupLiveDTO(
         plate_pickup_id=uuid4(),
         plate_selection_id=uuid4(),
@@ -183,9 +164,9 @@ def sample_pickup_record():
         qr_code_payload="QR123456",
         is_archived=False,
         status="pending",
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -193,6 +174,7 @@ def sample_pickup_record():
 def sample_qr_code():
     """Sample QRCodeDTO for testing."""
     from app.dto.models import QRCodeDTO
+
     return QRCodeDTO(
         qr_code_id=uuid4(),
         restaurant_id=uuid4(),
@@ -202,9 +184,9 @@ def sample_qr_code():
         qr_code_checksum="19f3c0f4f064b2fb601b53f1f4a6a3a053217a81d8427a7201da7dda4dd5c6d2",
         is_archived=False,
         status="active",
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -212,22 +194,24 @@ def sample_qr_code():
 def sample_restaurant():
     """Sample RestaurantDTO for testing."""
     from app.dto.models import RestaurantDTO
+
     return RestaurantDTO(
         restaurant_id=uuid4(),
         name="Test Restaurant",
         institution_id=uuid4(),
         is_archived=False,
         status="active",
-        created_date=datetime.now(timezone.utc),
-        modified_date=datetime.now(timezone.utc)
+        created_date=datetime.now(UTC),
+        modified_date=datetime.now(UTC),
     )
 
 
 @pytest.fixture
 def sample_plate_selection():
     """Sample PlateSelectionDTO for testing."""
-    from app.dto.models import PlateSelectionDTO
     from app.config import Status
+    from app.dto.models import PlateSelectionDTO
+
     return PlateSelectionDTO(
         plate_selection_id=uuid4(),
         user_id=uuid4(),
@@ -242,17 +226,18 @@ def sample_plate_selection():
         pickup_intent="self",
         is_archived=False,
         status=Status.PENDING,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
 @pytest.fixture
 def sample_plate():
     """Sample PlateDTO for testing."""
-    from app.dto.models import PlateDTO
     from app.config import Status
+    from app.dto.models import PlateDTO
+
     return PlateDTO(
         plate_id=uuid4(),
         product_id=uuid4(),
@@ -263,9 +248,9 @@ def sample_plate():
         delivery_time_minutes=15,
         is_archived=False,
         status=Status.ACTIVE,
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -273,6 +258,7 @@ def sample_plate():
 def sample_restaurant_transaction():
     """Sample RestaurantTransactionDTO for testing."""
     from app.dto.models import RestaurantTransactionDTO
+
     return RestaurantTransactionDTO(
         transaction_id=uuid4(),
         restaurant_id=uuid4(),
@@ -280,7 +266,7 @@ def sample_restaurant_transaction():
         discretionary_id=None,
         currency_metadata_id=uuid4(),
         was_collected=False,
-        ordered_timestamp=datetime.now(timezone.utc),
+        ordered_timestamp=datetime.now(UTC),
         collected_timestamp=None,
         arrival_time=None,
         completion_time=None,
@@ -292,9 +278,9 @@ def sample_restaurant_transaction():
         final_amount=Decimal("5.0"),
         is_archived=False,
         status="pending",
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -302,20 +288,18 @@ def sample_restaurant_transaction():
 # Business Logic Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_bill_data():
     """Sample client bill data for testing."""
-    return {
-        "currency_metadata_id": str(uuid4()),
-        "amount": 25.50,
-        "status": "pending"
-    }
+    return {"currency_metadata_id": str(uuid4()), "amount": 25.50, "status": "pending"}
 
 
 @pytest.fixture
 def sample_credit_currency_dto():
     """Sample CreditCurrencyDTO for testing."""
     from app.dto.models import CreditCurrencyDTO
+
     return CreditCurrencyDTO(
         currency_metadata_id=uuid4(),
         currency_code="USD",
@@ -323,9 +307,9 @@ def sample_credit_currency_dto():
         currency_conversion_usd=Decimal("1.0"),
         is_archived=False,
         status="active",
-        created_date=datetime.now(timezone.utc),
+        created_date=datetime.now(UTC),
         modified_by=uuid4(),
-        modified_date=datetime.now(timezone.utc)
+        modified_date=datetime.now(UTC),
     )
 
 
@@ -338,13 +322,14 @@ def sample_address_data():
         "city": "New York",
         "province": "NY",
         "country": "US",
-        "address_type": "restaurant"
+        "address_type": "restaurant",
     }
 
 
 # =============================================================================
 # Mock Utilities
 # =============================================================================
+
 
 @pytest.fixture
 def mock_logger():
@@ -359,25 +344,19 @@ def mock_logger():
 @pytest.fixture
 def mock_geocoding_api():
     """Mock geocoding API response."""
-    return {
-        "latitude": 40.7128,
-        "longitude": -74.0060,
-        "status": "success"
-    }
+    return {"latitude": 40.7128, "longitude": -74.0060, "status": "success"}
 
 
 @pytest.fixture
 def mock_failed_geocoding_api():
     """Mock failed geocoding API response."""
-    return {
-        "status": "error",
-        "message": "Address not found"
-    }
+    return {"status": "error", "message": "Address not found"}
 
 
 # =============================================================================
 # Service Mock Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_user_service():
@@ -426,17 +405,9 @@ def mock_restaurant_service():
 # =============================================================================
 
 
-
-
-
-
 def create_mock_dto(dto_class, **kwargs):
     """Create a mock DTO with default values."""
-    defaults = {
-        "is_archived": False,
-        "created_date": datetime.now(timezone.utc),
-        "modified_date": datetime.now(timezone.utc)
-    }
+    defaults = {"is_archived": False, "created_date": datetime.now(UTC), "modified_date": datetime.now(UTC)}
     defaults.update(kwargs)
     return dto_class(**defaults)
 
@@ -444,10 +415,10 @@ def create_mock_dto(dto_class, **kwargs):
 def assert_http_exception(exc_info, expected_status_code, expected_detail_contains=None):
     """Assert HTTPException properties."""
     from fastapi import HTTPException
-    
+
     assert isinstance(exc_info.value, HTTPException)
     assert exc_info.value.status_code == expected_status_code
-    
+
     if expected_detail_contains:
         assert expected_detail_contains in str(exc_info.value.detail)
 
@@ -464,18 +435,13 @@ def mock_service_method(service, method_name, return_value=None, side_effect=Non
 # Pytest Configuration
 # =============================================================================
 
+
 def pytest_configure(config):
     """Configure pytest settings."""
     # Add custom markers
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
 
 
 def pytest_collection_modifyitems(config, items):

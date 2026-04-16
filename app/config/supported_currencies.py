@@ -6,12 +6,10 @@ resolving currency_code from currency_name on credit currency create.
 Used by GET /api/v1/currencies/ and by POST /api/v1/credit-currencies/ validation.
 """
 
-from typing import List, Optional
-
 # (currency_name, currency_code) - ISO 4217. Names must be unique for name→code lookup.
 # Americas-focused plus common; sorted by code for maintainability; API returns sorted by name.
 # currency_name max 50 chars (currency_metadata.currency_name).
-SUPPORTED_CURRENCIES: List[tuple] = [
+SUPPORTED_CURRENCIES: list[tuple] = [
     ("Argentine Peso", "ARS"),
     ("Bahamian Dollar", "BSD"),
     ("Barbadian Dollar", "BBD"),
@@ -47,10 +45,10 @@ SUPPORTED_CURRENCIES: List[tuple] = [
 SUPPORTED_CURRENCY_CODES = frozenset(code for _, code in SUPPORTED_CURRENCIES)
 
 # Name → code lookup (unique names).
-_NAME_TO_CODE = {name: code for name, code in SUPPORTED_CURRENCIES}
+_NAME_TO_CODE = dict(SUPPORTED_CURRENCIES)
 
 
-def get_supported_currencies_sorted_by_name() -> List[dict]:
+def get_supported_currencies_sorted_by_name() -> list[dict]:
     """
     Return list of { "currency_name": str, "currency_code": str } for supported currencies,
     sorted by currency_name (case-insensitive).
@@ -60,7 +58,7 @@ def get_supported_currencies_sorted_by_name() -> List[dict]:
     return out
 
 
-def get_currency_code_by_name(currency_name: Optional[str]) -> Optional[str]:
+def get_currency_code_by_name(currency_name: str | None) -> str | None:
     """
     Return the ISO 4217 currency code for the given currency name, or None if not supported.
     Uses exact match on the supported list.

@@ -4,11 +4,13 @@ Street Type Enumeration
 Defines the valid street type abbreviations used in the address_info table.
 Street types represent common address line type abbreviations.
 """
+
 from enum import Enum
 
 
 class StreetType(str, Enum):
     """Valid street type abbreviations"""
+
     STREET = "st"
     AVENUE = "ave"
     BOULEVARD = "blvd"

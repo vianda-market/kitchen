@@ -1,52 +1,49 @@
-from fastapi import APIRouter, HTTPException, Depends, Body, Response
-from typing import Optional, List
 from uuid import UUID
-from app.services.entity_service import (
-    get_enriched_institution_entities, get_enriched_institution_entity_by_id
-)
-from app.services.crud_service import institution_service, institution_entity_service
-from app.services.market_service import is_global_market
-from app.services.error_handling import handle_business_operation
+
+import psycopg2.extensions
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
+
 from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.config.settings import settings
 from app.dependencies.database import get_db
-from app.utils.query_params import institution_filter
-from app.utils.error_messages import institution_entity_not_found
 from app.schemas.consolidated_schemas import (
-    InstitutionEntityEnrichedResponseSchema,
     InstitutionBillPayoutResponseSchema,
+    InstitutionEntityEnrichedResponseSchema,
     MarketPayoutAggregatorResponseSchema,
 )
-from app.security.entity_scoping import EntityScopingService, ENTITY_INSTITUTION_ENTITY
+from app.security.entity_scoping import ENTITY_INSTITUTION_ENTITY, EntityScopingService
 from app.security.scoping import resolve_institution_filter
+from app.services.crud_service import institution_entity_service
+from app.services.entity_service import get_enriched_institution_entities, get_enriched_institution_entity_by_id
+from app.services.error_handling import handle_business_operation
+from app.services.market_service import is_global_market
+from app.utils.error_messages import institution_entity_not_found
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
-from app.config.settings import settings
-import psycopg2.extensions
+from app.utils.query_params import institution_filter
 
-router = APIRouter(
-    prefix="/institution-entities",
-    tags=["Institution Entities"],
-    dependencies=[Depends(oauth2_scheme)]
-)
+router = APIRouter(prefix="/institution-entities", tags=["Institution Entities"], dependencies=[Depends(oauth2_scheme)])
 
 # =============================================================================
 # ENRICHED INSTITUTION ENTITY ENDPOINTS (with institution_name, address details)
 # =============================================================================
 
+
 # GET /institution-entities/enriched/ - List all institution entities with enriched data
-@router.get("/enriched", response_model=List[InstitutionEntityEnrichedResponseSchema])
+@router.get("/enriched", response_model=list[InstitutionEntityEnrichedResponseSchema])
 def list_enriched_institution_entities(
     response: Response,
-    institution_id: Optional[UUID] = institution_filter(),
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    institution_id: UUID | None = institution_filter(),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """List all institution entities with enriched data (institution_name, address_country, address_province, address_city). Optional institution_id filters by institution (B2B Internal dropdown scoping). When institution has a local market_id (v1), only entities in that market are returned. Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
-    institution_market_id: Optional[UUID] = None
+    institution_market_id: UUID | None = None
     if effective_institution_id is not None:
         from app.services.entity_service import get_institution_market_ids
+
         inst_markets = get_institution_market_ids(effective_institution_id, db)
         if inst_markets and len(inst_markets) == 1 and not is_global_market(inst_markets[0]):
             institution_market_id = inst_markets[0]
@@ -62,19 +59,17 @@ def list_enriched_institution_entities(
             page_size=pagination.page_size if pagination else None,
         )
 
-    result = handle_business_operation(
-        _get_enriched_entities,
-        "enriched institution entity list retrieval"
-    )
+    result = handle_business_operation(_get_enriched_entities, "enriched institution entity list retrieval")
     set_pagination_headers(response, result)
     return result
+
 
 # GET /institution-entities/enriched/{entity_id} - Get a single institution entity with enriched data
 @router.get("/enriched/{entity_id}", response_model=InstitutionEntityEnrichedResponseSchema)
 def get_enriched_institution_entity_by_id_route(
     entity_id: UUID,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single institution entity by ID with enriched data (institution_name, address_country, address_province, address_city). Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
@@ -85,22 +80,22 @@ def get_enriched_institution_entity_by_id_route(
             raise institution_entity_not_found(entity_id)
         return enriched_entity
 
-    return handle_business_operation(
-        _get_enriched_entity,
-        "enriched institution entity retrieval"
-    )
+    return handle_business_operation(_get_enriched_entity, "enriched institution entity retrieval")
 
 
 # =============================================================================
 # STRIPE CONNECT ONBOARDING ENDPOINTS
 # =============================================================================
 
+
 def _get_connect_gateway():
     """Return the appropriate Connect gateway (live or mock) based on SUPPLIER_PAYOUT_PROVIDER."""
     if (settings.SUPPLIER_PAYOUT_PROVIDER or "mock").lower() == "stripe":
         from app.services.payment_provider.stripe import connect_gateway
+
         return connect_gateway
     from app.services.payment_provider.stripe import connect_mock
+
     return connect_mock
 
 
@@ -134,6 +129,7 @@ def get_payout_aggregator(
     market_id = row[0]
 
     from psycopg2.extras import RealDictCursor
+
     with db.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """SELECT market_id, aggregator, is_active, require_invoice,
@@ -333,7 +329,7 @@ def execute_stripe_connect_payout(
     return InstitutionBillPayoutResponseSchema(**payout_row)
 
 
-@router.get("/{entity_id}/stripe-connect/payouts", response_model=List[InstitutionBillPayoutResponseSchema])
+@router.get("/{entity_id}/stripe-connect/payouts", response_model=list[InstitutionBillPayoutResponseSchema])
 def list_entity_payouts(
     entity_id: UUID,
     current_user: dict = Depends(get_current_user),
@@ -364,4 +360,4 @@ def list_entity_payouts(
         )
         rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
-    return [InstitutionBillPayoutResponseSchema(**dict(zip(cols, row))) for row in rows]
+    return [InstitutionBillPayoutResponseSchema(**dict(zip(cols, row, strict=False))) for row in rows]

@@ -7,11 +7,11 @@ All clients (web, iOS, Android, React Native) call the same backend endpoints.
 """
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.gateways.address_provider import get_search_gateway
-from app.utils.country import country_name_to_alpha2, country_alpha3_to_alpha2
-from app.utils.log import log_info, log_error
+from app.utils.country import country_alpha3_to_alpha2, country_name_to_alpha2
+from app.utils.log import log_error, log_info
 
 
 class AddressAutocompleteService:
@@ -23,12 +23,12 @@ class AddressAutocompleteService:
     def suggest(
         self,
         q: str,
-        country: Optional[str] = None,
-        province: Optional[str] = None,
-        city: Optional[str] = None,
+        country: str | None = None,
+        province: str | None = None,
+        city: str | None = None,
         limit: int = 5,
-        session_token: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        session_token: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Return address suggestions for partial input.
         country: optional ISO 3166-1 alpha-2 (e.g. AR) or country name (e.g. Argentina) to bias/restrict results.
@@ -47,7 +47,7 @@ class AddressAutocompleteService:
             input_text = loc_prefix + input_text
 
         # Resolve country to alpha-2
-        alpha2: Optional[str] = None
+        alpha2: str | None = None
         if country:
             raw = country.strip()
             if len(raw) == 2 and raw.isalpha():
@@ -73,19 +73,20 @@ class AddressAutocompleteService:
             return []
 
         # Determine country_code for output (when single-country filter applied)
-        country_code: Optional[str] = None
+        country_code: str | None = None
         if alpha2 and len(alpha2) == 2 and alpha2.isalpha():
             country_code = alpha2.upper()
         elif not alpha2:
             # Load supported countries as fallback filter info
             from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
+
             if SUPPORTED_COUNTRY_CODES and len(SUPPORTED_COUNTRY_CODES) == 1:
                 cc = list(SUPPORTED_COUNTRY_CODES)[0]
                 if len(cc) == 2 and cc.isalpha():
                     country_code = cc.upper()
 
         # Parse response — handle both Mapbox and Google formats
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         suggestions_list = raw_response.get("suggestions") or []
         for i, item in enumerate(suggestions_list):
             if i >= limit:
@@ -97,7 +98,7 @@ class AddressAutocompleteService:
         log_info(f"Address suggest returned {len(out)} suggestions for q={input_text!r}")
         return out
 
-    def _parse_suggestion(self, item: Dict[str, Any], country_code: Optional[str]) -> Optional[Dict[str, Any]]:
+    def _parse_suggestion(self, item: dict[str, Any], country_code: str | None) -> dict[str, Any] | None:
         """Parse a single suggestion from either Mapbox or Google format."""
         # Mapbox format: { mapbox_id, name, full_address, context }
         if "mapbox_id" in item:
@@ -105,7 +106,7 @@ class AddressAutocompleteService:
             if not mapbox_id:
                 return None
             display_text = item.get("full_address") or item.get("name") or ""
-            sug: Dict[str, Any] = {"place_id": mapbox_id, "display_text": display_text}
+            sug: dict[str, Any] = {"place_id": mapbox_id, "display_text": display_text}
             # Extract country_code from context if available
             ctx_cc = (item.get("context", {}).get("country", {}).get("country_code") or "").upper()
             if ctx_cc and len(ctx_cc) == 2:

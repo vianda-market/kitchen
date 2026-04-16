@@ -3,10 +3,10 @@
 Canonical models for the ads platform. Platform-specific gateways translate
 these to wire format (Google protobuf, Meta CAPI JSON).
 """
-from dataclasses import dataclass, field, asdict
+
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class AdsPlatform(Enum):
@@ -28,6 +28,7 @@ class ConversionEventType(Enum):
 
     Only ApprovedPartner is custom (no standard equivalent for post-human-vetting).
     """
+
     # Standard events (used across strategies)
     SUBSCRIBE = "Subscribe"
     PURCHASE = "Purchase"
@@ -45,6 +46,7 @@ class ConversionEvent:
     Canonical conversion event. One model for all platforms.
     Each gateway adapter translates this to platform wire format.
     """
+
     platform: AdsPlatform
     event_type: ConversionEventType
     strategy: CampaignStrategy
@@ -52,23 +54,23 @@ class ConversionEvent:
     entity_id: str
     # PII (raw here; hashed at dispatch time, never persisted raw in Redis/DB)
     user_email: str
-    user_phone: Optional[str]
+    user_phone: str | None
     # Value
     conversion_value: float
     currency_code: str  # ISO 4217
     event_time: datetime  # Timezone-aware
     # Click identifiers (platform-specific, at most one set populated)
-    gclid: Optional[str] = None
-    wbraid: Optional[str] = None
-    gbraid: Optional[str] = None
-    fbclid: Optional[str] = None
-    fbc: Optional[str] = None  # Meta _fbc cookie
-    fbp: Optional[str] = None  # Meta _fbp cookie
+    gclid: str | None = None
+    wbraid: str | None = None
+    gbraid: str | None = None
+    fbclid: str | None = None
+    fbc: str | None = None  # Meta _fbc cookie
+    fbp: str | None = None  # Meta _fbp cookie
     # LTV signals
-    predicted_ltv: Optional[float] = None
-    subscription_months: Optional[int] = None
+    predicted_ltv: float | None = None
+    subscription_months: int | None = None
     # Event dedup (client-generated, shared across Pixel/SDK/CAPI)
-    event_id: Optional[str] = None
+    event_id: str | None = None
     # Strategy-specific custom_data (sent as params alongside standard event name)
     custom_data: dict = field(default_factory=dict)
 
@@ -95,9 +97,10 @@ class ConversionEvent:
 @dataclass
 class ConversionResult:
     """Result from a gateway upload attempt."""
+
     success: bool
     platform: AdsPlatform
     entity_id: str
-    error_message: Optional[str] = None
-    error_category: Optional[str] = None  # From AdsErrorCategory
-    platform_response: Optional[dict] = None
+    error_message: str | None = None
+    error_category: str | None = None  # From AdsErrorCategory
+    platform_response: dict | None = None

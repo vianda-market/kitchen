@@ -4,9 +4,8 @@ Unit tests for Coworker Service.
 Tests eligibility logic and ineligibility_reason for the "Offer to pick up" flow.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
-from uuid import uuid4, UUID
+from unittest.mock import patch
+from uuid import uuid4
 
 from app.services.coworker_service import get_coworkers_with_eligibility
 
@@ -14,7 +13,14 @@ from app.services.coworker_service import get_coworkers_with_eligibility
 class TestCoworkerServiceIneligibilityReason:
     """Tests for ineligibility_reason in get_coworkers_with_eligibility."""
 
-    def _make_ps_row(self, kitchen_day="monday", restaurant_id=None, pickup_time_range="12:00-12:15", employer_entity_id=None, employer_address_id=None):
+    def _make_ps_row(
+        self,
+        kitchen_day="monday",
+        restaurant_id=None,
+        pickup_time_range="12:00-12:15",
+        employer_entity_id=None,
+        employer_address_id=None,
+    ):
         return {
             "kitchen_day": kitchen_day,
             "restaurant_id": str(restaurant_id or uuid4()),
@@ -83,7 +89,6 @@ class TestCoworkerServiceIneligibilityReason:
         ps_row = self._make_ps_row(restaurant_id=restaurant_a)
         owner_check = self._make_owner_check(current_user_id)
         coworkers = [self._make_coworker(user_id=coworker_id)]
-        existing = {"restaurant_id": restaurant_b, "pickup_time_range": "12:00-12:15"}  # same time, different restaurant
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:
@@ -114,7 +119,10 @@ class TestCoworkerServiceIneligibilityReason:
         ps_row = self._make_ps_row(restaurant_id=restaurant_id, pickup_time_range="12:00-12:15")
         owner_check = self._make_owner_check(current_user_id)
         coworkers = [self._make_coworker(user_id=coworker_id)]
-        existing = {"restaurant_id": restaurant_id, "pickup_time_range": "12:15-12:30"}  # same restaurant, different time
+        existing = {
+            "restaurant_id": restaurant_id,
+            "pickup_time_range": "12:15-12:30",
+        }  # same restaurant, different time
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:

@@ -1,18 +1,17 @@
 """Tests for rate_limit_config: tier classification and rule resolution."""
 
-import pytest
 from app.config.rate_limit_config import (
-    TIER_FREE,
-    TIER_ONBOARDED,
     TIER_B2B,
+    TIER_FREE,
     TIER_INTERNAL,
+    TIER_ONBOARDED,
     WINDOW_SECONDS,
     classify_tier,
     resolve_rule,
 )
 
-
 # ── classify_tier ────────────────────────────────────────────────────────────
+
 
 class TestClassifyTier:
     def test_internal(self):
@@ -41,6 +40,7 @@ class TestClassifyTier:
 
 
 # ── resolve_rule ─────────────────────────────────────────────────────────────
+
 
 class TestResolveRule:
     def test_internal_exempt(self):

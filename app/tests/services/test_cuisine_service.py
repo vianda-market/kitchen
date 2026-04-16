@@ -1,7 +1,6 @@
 """Unit tests for cuisine_service business logic"""
 
-import pytest
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 from app.services import cuisine_service
 
@@ -76,9 +75,9 @@ class TestGenerateSlug:
     def test_generate_slug_multiple_collisions(self, mock_db_read):
         """Multiple collisions increment suffix until free slug found."""
         mock_db_read.side_effect = [
-            {"slug": "thai"},      # thai exists
-            {"slug": "thai-2"},    # thai-2 exists
-            None,                  # thai-3 is free
+            {"slug": "thai"},  # thai exists
+            {"slug": "thai-2"},  # thai-2 exists
+            None,  # thai-3 is free
         ]
         slug = cuisine_service._generate_slug("Thai", db=None)
         assert slug == "thai-3"

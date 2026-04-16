@@ -6,8 +6,6 @@ Used by GET /api/v1/provinces/ and for location validation.
 Derived from supported_cities config.
 """
 
-from typing import List
-
 # (country_code, province_code, province_name) - ISO 3166-1 alpha-2 for country.
 # province_code: short code (e.g. WA, FL). province_name: full name for display.
 # Sorted by country_code then province_name for maintainability.
@@ -42,7 +40,7 @@ SUPPORTED_PROVINCES = (
 )
 
 
-def get_supported_provinces_by_country(country_code: str) -> List[dict]:
+def get_supported_provinces_by_country(country_code: str) -> list[dict]:
     """
     Return list of { "province_code": str, "province_name": str, "country_code": str }
     for the given country, sorted by province_name.
@@ -57,7 +55,7 @@ def get_supported_provinces_by_country(country_code: str) -> List[dict]:
     return out
 
 
-def get_all_supported_provinces() -> List[dict]:
+def get_all_supported_provinces() -> list[dict]:
     """
     Return list of { "province_code": str, "province_name": str, "country_code": str }
     for all supported provinces, sorted by country_code then province_name.

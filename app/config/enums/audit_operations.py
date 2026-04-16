@@ -4,11 +4,13 @@ Audit Operation Enumeration
 Defines the valid audit operations tracked in history tables.
 Audit operations are fixed at compile time and represent CRUD operations.
 """
+
 from enum import Enum
 
 
 class AuditOperation(str, Enum):
     """Valid audit operations - fixed at compile time"""
+
     CREATE = "create"
     UPDATE = "update"
     ARCHIVE = "archive"
@@ -23,4 +25,3 @@ class AuditOperation(str, Enum):
     def is_valid(cls, value: str) -> bool:
         """Check if a value is a valid audit operation"""
         return value in cls.values()
-

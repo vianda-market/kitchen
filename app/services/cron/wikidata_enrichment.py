@@ -11,9 +11,10 @@ per API request, so one HTTP call serves the whole batch.
 Kill switch: WIKIDATA_ENRICHMENT_ENABLED=false (default) — cron is a no-op until activated.
 No API key required. No quota limits (respect Wikidata User-Agent policy).
 """
+
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -21,7 +22,7 @@ import httpx
 from app.config.settings import settings
 from app.utils.db import db_read
 from app.utils.db_pool import get_db_connection_context
-from app.utils.log import log_info, log_warning, log_error
+from app.utils.log import log_error, log_info
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,14 @@ P18_IMAGE = "P18"
 _HTTP_TIMEOUT = 10.0
 
 
-def run_wikidata_enrichment() -> Dict[str, Any]:
+def run_wikidata_enrichment() -> dict[str, Any]:
     """
     Entry point for Cloud Run Job / Cloud Scheduler.
 
     Returns summary dict:
         {status, image_enriched, image_skipped, errors}
     """
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "ok",
         "image_enriched": 0,
         "image_skipped": 0,
@@ -62,7 +63,7 @@ def run_wikidata_enrichment() -> Dict[str, Any]:
         log_info("Wikidata enrichment: processing %d rows", len(rows))
 
         # Build wikidata_id → row mapping for batch lookup
-        id_to_rows: Dict[str, dict] = {}
+        id_to_rows: dict[str, dict] = {}
         for row in rows:
             wid = row["off_wikidata_id"]
             if wid:
@@ -97,7 +98,9 @@ def run_wikidata_enrichment() -> Dict[str, Any]:
 
     log_info(
         "Wikidata enrichment complete: image_enriched=%d image_skipped=%d errors=%d",
-        result["image_enriched"], result["image_skipped"], result["errors"],
+        result["image_enriched"],
+        result["image_skipped"],
+        result["errors"],
     )
     return result
 
@@ -106,7 +109,8 @@ def run_wikidata_enrichment() -> Dict[str, Any]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _fetch_pending(db, limit: int) -> List[dict]:
+
+def _fetch_pending(db, limit: int) -> list[dict]:
     """Select rows pending image enrichment that have a Wikidata ID."""
     sql = """
         SELECT ingredient_id, off_wikidata_id
@@ -121,7 +125,7 @@ def _fetch_pending(db, limit: int) -> List[dict]:
     return rows if rows else []
 
 
-def _batch_fetch_p18(wikidata_ids: List[str]) -> Optional[Dict[str, str]]:
+def _batch_fetch_p18(wikidata_ids: list[str]) -> dict[str, str] | None:
     """
     Fetch P18 (image) claims for a batch of Wikidata entity IDs.
 
@@ -147,7 +151,7 @@ def _batch_fetch_p18(wikidata_ids: List[str]) -> Optional[Dict[str, str]]:
             data = response.json()
 
         entities = data.get("entities", {})
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
 
         for wid, entity in entities.items():
             claims = entity.get("claims", {})
@@ -181,7 +185,7 @@ def _mark_enriched(db, ingredient_id, image_url: str) -> None:
     """
     try:
         cursor = db.cursor()
-        cursor.execute(sql, (image_url, datetime.now(timezone.utc), str(ingredient_id)))
+        cursor.execute(sql, (image_url, datetime.now(UTC), str(ingredient_id)))
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -199,7 +203,7 @@ def _mark_skipped(db, ingredient_id) -> None:
     """
     try:
         cursor = db.cursor()
-        cursor.execute(sql, (datetime.now(timezone.utc), str(ingredient_id)))
+        cursor.execute(sql, (datetime.now(UTC), str(ingredient_id)))
         db.commit()
     except Exception as exc:
         db.rollback()

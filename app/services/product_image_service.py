@@ -5,12 +5,11 @@ Handles product image uploads, resizing, checksum calculation, storage, and clea
 Supports local storage (dev) and GCS (Cloud Run).
 """
 
-import os
-from datetime import datetime, timezone
-from io import BytesIO
-from typing import Optional
-from uuid import UUID
 import hashlib
+import os
+from datetime import UTC, datetime
+from io import BytesIO
+from uuid import UUID
 
 from fastapi import HTTPException
 from PIL import Image
@@ -45,7 +44,7 @@ class ProductImageService:
         *,
         image_bytes: bytes,
         content_type: str,
-        expected_checksum: Optional[str] = None,
+        expected_checksum: str | None = None,
     ) -> tuple[str, str, str, str, str]:
         """
         Persist an uploaded image (full-size + thumbnail) and return storage metadata.
@@ -85,17 +84,15 @@ class ProductImageService:
                 raise HTTPException(
                     status_code=400,
                     detail="Provided checksum must contain only hexadecimal characters",
-                )
+                ) from None
             if original_checksum != normalized_expected:
-                raise HTTPException(
-                    status_code=400, detail="Image checksum mismatch. Please re-upload the file."
-                )
+                raise HTTPException(status_code=400, detail="Image checksum mismatch. Please re-upload the file.")
 
         # Process image AFTER checksum computation
         try:
             image = Image.open(BytesIO(image_bytes))
         except Exception:
-            raise HTTPException(status_code=400, detail="Unable to read image file")
+            raise HTTPException(status_code=400, detail="Unable to read image file") from None
 
         image = image.convert("RGB")
         image_full = image.copy()
@@ -103,9 +100,7 @@ class ProductImageService:
             image_full.thumbnail((self.max_dimension, self.max_dimension), Image.LANCZOS)
         image_thumb = image.copy()
         if max(image_thumb.size) > self.thumbnail_dimension:
-            image_thumb.thumbnail(
-                (self.thumbnail_dimension, self.thumbnail_dimension), Image.LANCZOS
-            )
+            image_thumb.thumbnail((self.thumbnail_dimension, self.thumbnail_dimension), Image.LANCZOS)
 
         buffer_full = BytesIO()
         image_full.save(buffer_full, format=self.output_format, optimize=True)
@@ -124,7 +119,7 @@ class ProductImageService:
             return blob_full, blob_full, blob_thumb, blob_thumb, original_checksum
 
         # Local mode
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         year_month = f"{now.year}/{now.month:02d}"
         ext = self.output_format.lower()
         filename = f"{product_id}.{ext}"
@@ -137,13 +132,9 @@ class ProductImageService:
         absolute_path_thumb = os.path.join(storage_dir, thumb_filename)
         with open(absolute_path_thumb, "wb") as f:
             f.write(thumb_bytes)
-        storage_path = os.path.join(self.local_storage_path, year_month, filename).replace(
-            "\\", "/"
-        )
+        storage_path = os.path.join(self.local_storage_path, year_month, filename).replace("\\", "/")
         url_path = f"{self.base_url}/{year_month}/{filename}"
-        thumbnail_storage_path = os.path.join(
-            self.local_storage_path, year_month, thumb_filename
-        ).replace("\\", "/")
+        thumbnail_storage_path = os.path.join(self.local_storage_path, year_month, thumb_filename).replace("\\", "/")
         thumbnail_url_path = f"{self.base_url}/{year_month}/{thumb_filename}"
         log_info(f"Product image saved: {storage_path}, thumbnail: {thumbnail_storage_path}")
         return storage_path, url_path, thumbnail_storage_path, thumbnail_url_path, original_checksum
@@ -151,7 +142,7 @@ class ProductImageService:
     def delete_image(
         self,
         storage_path: str,
-        thumbnail_storage_path: Optional[str] = None,
+        thumbnail_storage_path: str | None = None,
     ) -> None:
         """Remove an image (and optionally its thumbnail) from storage (ignoring placeholder)."""
         if not storage_path or self.is_placeholder(storage_path):
@@ -250,13 +241,13 @@ class ProductImageService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Cannot create product without valid placeholder: {exc}",
-            )
+            ) from None
 
     def validate_product_image_at_creation(
         self,
-        image_storage_path: Optional[str] = None,
-        image_url: Optional[str] = None,
-        image_checksum: Optional[str] = None,
+        image_storage_path: str | None = None,
+        image_url: str | None = None,
+        image_checksum: str | None = None,
     ) -> dict:
         """
         Validate and ensure product has valid image at creation time.
@@ -270,9 +261,7 @@ class ProductImageService:
             return self.placeholder_metadata()
         if not settings.GCS_INTERNAL_BUCKET:
             abs_custom_path = (
-                os.path.abspath(image_storage_path)
-                if not os.path.isabs(image_storage_path)
-                else image_storage_path
+                os.path.abspath(image_storage_path) if not os.path.isabs(image_storage_path) else image_storage_path
             )
             if not os.path.exists(abs_custom_path):
                 raise HTTPException(
@@ -287,4 +276,3 @@ class ProductImageService:
             "thumbnail_url": image_url or meta["thumbnail_url"],
             "checksum": image_checksum or meta["checksum"],
         }
-

@@ -5,18 +5,16 @@ API endpoints for retrieving system enum values.
 Provides centralized access to all valid enum values for frontend dropdowns.
 """
 
-from typing import Dict, List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import get_current_user, get_employee_or_supplier_user
-from app.config.enums import Status, DiscretionaryReason
+from app.config.enums import DiscretionaryReason, Status
 from app.config.settings import settings
 from app.i18n.enum_labels import LABELED_ENUM_TYPES, labels_for_values
 from app.schemas.consolidated_schemas import EnumsResponseSchema
 from app.services.enum_service import enum_service
-from app.utils.log import log_info, log_error
+from app.utils.log import log_error, log_info
 
 router = APIRouter(prefix="/enums", tags=["Enums"])
 
@@ -31,9 +29,9 @@ _LABEL_SOURCE = {
 }
 
 
-def _enums_with_labels(flat: Dict[str, List[str]], language: str) -> Dict[str, dict]:
+def _enums_with_labels(flat: dict[str, list[str]], language: str) -> dict[str, dict]:
     """Map enum name -> {values, labels}; labeled enums use i18n maps, others use identity labels."""
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     for k, v in flat.items():
         if not isinstance(v, list):
             continue
@@ -57,17 +55,17 @@ async def get_all_enums(
 ):
     """
     Get all system enum values.
-    
+
     **Authorization**: All authenticated users (Internal, Supplier, Customer, Employer)
-    
+
     Returns all valid enum values used throughout the system, primarily
     for populating frontend dropdown menus and form validation.
-    
+
     **Returns**: Dictionary mapping enum type names to their valid values
-    
+
     **Caching**: This endpoint returns static configuration data.
     Frontend should cache for 1 hour to minimize API calls.
-    
+
     **Example Response** (each key is `{ "values": [...], "labels": { code: display } }`):
     ```json
     {
@@ -99,13 +97,11 @@ async def get_all_enums(
         return body
     except Exception as e:
         log_error(f"Error fetching enums: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enum values")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enum values") from None
 
 
 @router.get("/institution-types/assignable")
-async def get_assignable_institution_types(
-    current_user: dict = Depends(get_current_user)
-):
+async def get_assignable_institution_types(current_user: dict = Depends(get_current_user)):
     """
     Get institution types the current user can create/assign in institution create/edit forms.
 
@@ -122,72 +118,61 @@ async def get_assignable_institution_types(
         result = enum_service.get_assignable_institution_types(current_user)
         return JSONResponse(
             content={"institution_type": result},
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "X-Content-Type-Options": "nosniff"
-            }
+            headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"},
         )
     except Exception as e:
         log_error(f"Error fetching assignable institution types: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve assignable institution types")
+        raise HTTPException(status_code=500, detail="Failed to retrieve assignable institution types") from None
 
 
 @router.get("/roles/assignable")
-async def get_assignable_roles(
-    current_user: dict = Depends(get_employee_or_supplier_user)
-):
+async def get_assignable_roles(current_user: dict = Depends(get_employee_or_supplier_user)):
     """
     Get assignable role_type and role_name values for user create/edit forms.
-    
+
     **Authorization**: Internal and Supplier only (403 for Customer).
-    
+
     Returns role_type and role_name_by_role_type filtered by what the current
     user can assign. Suppliers see only Supplier role_type and Admin/Manager/Operator
     role_names. Internal users see the full set.
-    
+
     **Response** (Supplier):
     {"role_type": ["supplier"], "role_name_by_role_type": {"supplier": ["admin", "manager", "operator"]}}
-    
+
     **Response** (Internal): Full set per valid role combinations.
     """
     try:
         role_type_from_token = current_user.get("role_type")
-        log_info(f"Assignable roles: user_id={current_user.get('user_id')} role_type={role_type_from_token!r} (type={type(role_type_from_token).__name__})")
+        log_info(
+            f"Assignable roles: user_id={current_user.get('user_id')} role_type={role_type_from_token!r} (type={type(role_type_from_token).__name__})"
+        )
         result = enum_service.get_assignable_roles(current_user)
         return JSONResponse(
-            content=result,
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "X-Content-Type-Options": "nosniff"
-            }
+            content=result, headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"}
         )
     except Exception as e:
         log_error(f"Error fetching assignable roles: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve assignable roles")
+        raise HTTPException(status_code=500, detail="Failed to retrieve assignable roles") from None
 
 
-@router.get("/{enum_name}", response_model=List[str])
-async def get_enum_by_name(
-    enum_name: str,
-    context: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
+@router.get("/{enum_name}", response_model=list[str])
+async def get_enum_by_name(enum_name: str, context: str | None = None, current_user: dict = Depends(get_current_user)):
     """
     Get values for a specific enum type.
-    
+
     **Authorization**: All authenticated users (Internal, Supplier, Customer, Employer)
-    
+
     **Path Parameters**:
     - `enum_name`: Name of the enum (e.g., 'status', 'role_type', 'subscription_status')
-    
+
     **Query Parameters**:
     - `context`: Optional. For `enum_name=status`, restricts to a subset: `user` (Active/Inactive),
       `discretionary`, `plate_pickup`, `bill`. Use `context=user` for user edit forms.
-    
+
     **Returns**: List of valid values for the requested enum
-    
+
     **Caching**: Frontend should cache individual enum responses for 1 hour.
-    
+
     **Example**: GET /api/v1/enums/status
     ```json
     ["active", "pending", "inactive"]
@@ -196,29 +181,31 @@ async def get_enum_by_name(
     ```json
     ["active", "inactive"]
     ```
-    
+
     **Error Responses**:
     - 404: Unknown enum type requested
     - 401: Not authenticated
     - 500: Server error
     """
-    log_info(f"User {current_user.get('user_id')} fetching enum: {enum_name}" + (f" context={context}" if context else ""))
-    
+    log_info(
+        f"User {current_user.get('user_id')} fetching enum: {enum_name}" + (f" context={context}" if context else "")
+    )
+
     try:
         enum_values = enum_service.get_enum_by_name(enum_name, current_user=current_user, context=context)
-        
+
         return JSONResponse(
             content=enum_values,
             headers={
                 "Cache-Control": "public, max-age=3600",  # 1 hour cache
-                "X-Content-Type-Options": "nosniff"
-            }
+                "X-Content-Type-Options": "nosniff",
+            },
         )
     except ValueError as e:
         err_msg = str(e)
         if "cannot read role enums" in err_msg:
-            raise HTTPException(status_code=403, detail=err_msg)
-        raise HTTPException(status_code=404, detail=err_msg)
+            raise HTTPException(status_code=403, detail=err_msg) from None
+        raise HTTPException(status_code=404, detail=err_msg) from None
     except Exception as e:
         log_error(f"Error fetching enum {enum_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enum values")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enum values") from None

@@ -1,56 +1,56 @@
 # app/routes/billing/supplier_invoice.py
-from typing import List, Optional
-from uuid import UUID
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Response
+import json
 from datetime import date
 from decimal import Decimal
-import json
+from uuid import UUID
 
-from app.services.crud_service import supplier_invoice_service
-from app.services.billing.supplier_invoice_service import (
-    create_supplier_invoice,
-    match_invoice_to_bills,
-    review_supplier_invoice,
-    get_supplier_invoices,
-    resolve_document_url,
-    enrich_with_country_details,
-)
-from app.services.entity_service import get_enriched_supplier_invoices
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+
+from app.auth.dependencies import get_current_user, get_employee_user
+from app.config.enums import SupplierInvoiceType
+from app.config.settings import settings
+from app.dependencies.database import get_db
 from app.schemas.billing.supplier_invoice import (
+    ARInvoiceDetailsSchema,
+    BillInvoiceMatchCreateSchema,
+    BillInvoiceMatchResponseSchema,
+    PEInvoiceDetailsSchema,
     SupplierInvoiceCreateSchema,
     SupplierInvoiceResponseSchema,
     SupplierInvoiceReviewSchema,
-    ARInvoiceDetailsSchema,
-    PEInvoiceDetailsSchema,
     USInvoiceDetailsSchema,
-    BillInvoiceMatchCreateSchema,
-    BillInvoiceMatchResponseSchema,
 )
 from app.schemas.consolidated_schemas import SupplierInvoiceEnrichedResponseSchema
-from app.security.entity_scoping import EntityScopingService, ENTITY_INSTITUTION_ENTITY
-from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
-from app.dependencies.database import get_db
+from app.security.entity_scoping import ENTITY_INSTITUTION_ENTITY, EntityScopingService
+from app.services.billing.supplier_invoice_service import (
+    create_supplier_invoice,
+    enrich_with_country_details,
+    get_supplier_invoices,
+    match_invoice_to_bills,
+    resolve_document_url,
+    review_supplier_invoice,
+)
+from app.services.crud_service import supplier_invoice_service
+from app.services.entity_service import get_enriched_supplier_invoices
 from app.services.error_handling import handle_business_operation
-from app.config.enums import SupplierInvoiceType
-from app.config.settings import settings
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
-import psycopg2.extensions
 
 router = APIRouter(prefix="/supplier-invoices", tags=["Supplier Invoices"])
 
 ALLOWED_CONTENT_TYPES = {"application/pdf", "text/xml", "application/xml"}
 
 
-def _parse_country_details_json(country_code: str, details_json: Optional[str]) -> Optional[dict]:
+def _parse_country_details_json(country_code: str, details_json: str | None) -> dict | None:
     """Parse and validate a country_details_json string into the appropriate schema."""
     if not details_json:
         return None
     raw = json.loads(details_json)
     if country_code == "AR":
         return ARInvoiceDetailsSchema(**raw).model_dump()
-    elif country_code == "PE":
+    if country_code == "PE":
         return PEInvoiceDetailsSchema(**raw).model_dump()
-    elif country_code == "US":
+    if country_code == "US":
         return USInvoiceDetailsSchema(**raw).model_dump()
     return raw
 
@@ -63,13 +63,13 @@ async def create_invoice(
     issued_date: date = Form(...),
     amount: Decimal = Form(...),
     currency_code: str = Form(...),
-    external_invoice_number: Optional[str] = Form(None),
-    tax_amount: Optional[Decimal] = Form(None),
-    tax_rate: Optional[Decimal] = Form(None),
-    document_format: Optional[str] = Form(None),
-    country_details_json: Optional[str] = Form(None),
-    bill_matches_json: Optional[str] = Form(None),
-    document: Optional[UploadFile] = File(None),
+    external_invoice_number: str | None = Form(None),
+    tax_amount: Decimal | None = Form(None),
+    tax_rate: Decimal | None = Form(None),
+    document_format: str | None = Form(None),
+    country_details_json: str | None = Form(None),
+    bill_matches_json: str | None = Form(None),
+    document: UploadFile | None = File(None),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -83,9 +83,21 @@ async def create_invoice(
     country_details = _parse_country_details_json(country_code, country_details_json)
 
     # Build the nested schema for validation
-    ar_details = ARInvoiceDetailsSchema(**json.loads(country_details_json)) if country_code == "AR" and country_details_json else None
-    pe_details = PEInvoiceDetailsSchema(**json.loads(country_details_json)) if country_code == "PE" and country_details_json else None
-    us_details = USInvoiceDetailsSchema(**json.loads(country_details_json)) if country_code == "US" and country_details_json else None
+    ar_details = (
+        ARInvoiceDetailsSchema(**json.loads(country_details_json))
+        if country_code == "AR" and country_details_json
+        else None
+    )
+    pe_details = (
+        PEInvoiceDetailsSchema(**json.loads(country_details_json))
+        if country_code == "PE" and country_details_json
+        else None
+    )
+    us_details = (
+        USInvoiceDetailsSchema(**json.loads(country_details_json))
+        if country_code == "US" and country_details_json
+        else None
+    )
 
     create_data = SupplierInvoiceCreateSchema(
         institution_entity_id=institution_entity_id,
@@ -123,9 +135,15 @@ async def create_invoice(
         scope.enforce(str(institution_entity_id))
 
     def _create():
-        data_dict = create_data.model_dump(exclude_none=True, exclude={"bill_matches", "ar_details", "pe_details", "us_details"})
+        data_dict = create_data.model_dump(
+            exclude_none=True, exclude={"bill_matches", "ar_details", "pe_details", "us_details"}
+        )
         data_dict["institution_entity_id"] = str(data_dict["institution_entity_id"])
-        data_dict["invoice_type"] = data_dict["invoice_type"].value if hasattr(data_dict["invoice_type"], "value") else data_dict["invoice_type"]
+        data_dict["invoice_type"] = (
+            data_dict["invoice_type"].value
+            if hasattr(data_dict["invoice_type"], "value")
+            else data_dict["invoice_type"]
+        )
 
         invoice = create_supplier_invoice(data_dict, country_details, file_data, file_content_type, current_user, db)
 
@@ -147,10 +165,10 @@ async def create_invoice(
     return handle_business_operation(_create, "supplier invoice creation")
 
 
-@router.get("", response_model=List[SupplierInvoiceResponseSchema])
+@router.get("", response_model=list[SupplierInvoiceResponseSchema])
 def list_invoices(
-    institution_entity_id: Optional[UUID] = None,
-    status: Optional[str] = None,
+    institution_entity_id: UUID | None = None,
+    status: str | None = None,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -158,9 +176,7 @@ def list_invoices(
     scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
 
     def _list():
-        invoices = get_supplier_invoices(
-            db, scope=scope, entity_id=institution_entity_id, status_filter=status
-        )
+        invoices = get_supplier_invoices(db, scope=scope, entity_id=institution_entity_id, status_filter=status)
         result = []
         for inv in invoices:
             inv_dict = inv.model_dump()
@@ -172,12 +188,12 @@ def list_invoices(
     return handle_business_operation(_list, "supplier invoices listing")
 
 
-@router.get("/enriched", response_model=List[SupplierInvoiceEnrichedResponseSchema])
+@router.get("/enriched", response_model=list[SupplierInvoiceEnrichedResponseSchema])
 def list_enriched_invoices(
     response: Response,
-    institution_entity_id: Optional[UUID] = None,
-    status: Optional[str] = None,
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    institution_entity_id: UUID | None = None,
+    status: str | None = None,
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -190,7 +206,10 @@ def list_enriched_invoices(
 
     def _list_enriched():
         invoices = get_enriched_supplier_invoices(
-            db, scope=scope, institution_entity_id=institution_entity_id, status_filter=status,
+            db,
+            scope=scope,
+            institution_entity_id=institution_entity_id,
+            status_filter=status,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )
@@ -236,6 +255,7 @@ def review_invoice(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Approve or reject a supplier invoice. Internal Admin only."""
+
     def _review():
         invoice = review_supplier_invoice(
             invoice_id,
@@ -252,15 +272,15 @@ def review_invoice(
     return handle_business_operation(_review, "supplier invoice review")
 
 
-@router.post("/{invoice_id}/match", response_model=List[BillInvoiceMatchResponseSchema])
+@router.post("/{invoice_id}/match", response_model=list[BillInvoiceMatchResponseSchema])
 def add_bill_matches(
     invoice_id: UUID,
-    bill_matches: List[BillInvoiceMatchCreateSchema],
+    bill_matches: list[BillInvoiceMatchCreateSchema],
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Add bill matches to an existing supplier invoice."""
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
+    EntityScopingService.get_scope_for_entity(ENTITY_INSTITUTION_ENTITY, current_user)
 
     def _match():
         matches_data = [m.model_dump() for m in bill_matches]

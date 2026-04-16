@@ -1,4 +1,3 @@
-from typing import Optional
 from uuid import UUID
 
 import psycopg2.extensions
@@ -26,9 +25,9 @@ router = APIRouter(
 )
 def list_onboarding_summary(
     institution_type: str = Query("supplier", description="Supplier or Employer"),
-    market_id: Optional[UUID] = Query(None),
-    onboarding_status: Optional[str] = Query(None),
-    stalled_days: Optional[int] = Query(None),
+    market_id: UUID | None = Query(None),
+    onboarding_status: str | None = Query(None),
+    stalled_days: int | None = Query(None),
     current_user: dict = Depends(get_super_admin_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -90,6 +89,7 @@ def run_stall_detection_cron(
 ):
     """Run supplier stall detection cron. Internal only. Sends onboarding outreach emails."""
     from app.services.cron.supplier_stall_detection import run_supplier_stall_detection
+
     return run_supplier_stall_detection()
 
 
@@ -99,4 +99,5 @@ def run_customer_engagement_cron(
 ):
     """Run customer engagement cron. Internal only. Sends subscription prompts to unsubscribed customers."""
     from app.services.cron.customer_engagement import run_customer_engagement
+
     return run_customer_engagement()

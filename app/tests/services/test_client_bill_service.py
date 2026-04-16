@@ -5,15 +5,13 @@ Tests the business logic for client bill operations including
 currency resolution, validation, and bill processing.
 """
 
-import pytest
 from unittest.mock import Mock, patch
-from uuid import UUID, uuid4
-from datetime import datetime
+from uuid import uuid4
+
+import pytest
 from fastapi import HTTPException, status
 
-from app.services.client_bill_service import ClientBillBusinessService, client_bill_business_service
-from app.dto.models import ClientBillDTO, CreditCurrencyDTO
-from app.config import Status
+from app.services.client_bill_service import client_bill_business_service
 
 
 class TestClientBillService:
@@ -24,16 +22,17 @@ class TestClientBillService:
         # Arrange
         mock_currency = Mock()
         mock_currency.currency_code = "EUR"
-        
-        with patch('app.services.client_bill_service.resolve_currency_code') as mock_resolve_currency:
+
+        with patch("app.services.client_bill_service.resolve_currency_code") as mock_resolve_currency:
             # Mock resolve_currency_code to set currency_code directly
             def mock_resolve(data, db):
                 data["currency_code"] = "EUR"
+
             mock_resolve_currency.side_effect = mock_resolve
-            
+
             # Act
             client_bill_business_service._resolve_currency_code(sample_bill_data, mock_db)
-            
+
             # Assert
             mock_resolve_currency.assert_called_once_with(sample_bill_data, mock_db)
             assert sample_bill_data["currency_code"] == "EUR"
@@ -41,13 +40,13 @@ class TestClientBillService:
     def test_resolve_currency_code_handles_missing_currency(self, sample_bill_data, mock_db):
         """Test that currency code resolution handles missing currency."""
         # Arrange
-        with patch('app.services.client_bill_service.credit_currency_service') as mock_currency_service:
+        with patch("app.services.client_bill_service.credit_currency_service") as mock_currency_service:
             mock_currency_service.get_by_id.return_value = None
-            
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 client_bill_business_service._resolve_currency_code(sample_bill_data, mock_db)
-            
+
             assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
             assert "Credit currency not found" in str(exc_info.value.detail)
 
@@ -57,12 +56,10 @@ class TestClientBillService:
         base_amount = 100.0
         tax_rate = 0.08  # 8%
         discount_amount = 10.0
-        
+
         # Act
-        result = client_bill_business_service.calculate_bill_total(
-            base_amount, tax_rate, discount_amount
-        )
-        
+        result = client_bill_business_service.calculate_bill_total(base_amount, tax_rate, discount_amount)
+
         # Assert
         assert result["base_amount"] == 100.0
         assert result["discount_amount"] == 10.0
@@ -75,10 +72,10 @@ class TestClientBillService:
         """Test that bill total calculation handles no tax or discount."""
         # Arrange
         base_amount = 50.0
-        
+
         # Act
         result = client_bill_business_service.calculate_bill_total(base_amount)
-        
+
         # Assert
         assert result["base_amount"] == 50.0
         assert result["discount_amount"] == 0.0
@@ -94,11 +91,11 @@ class TestClientBillService:
             "amount": 25.50
             # Missing currency_metadata_id
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             client_bill_business_service._validate_bill_data(incomplete_data)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Missing required fields" in str(exc_info.value.detail)
         assert "currency_metadata_id" in str(exc_info.value.detail)
@@ -108,13 +105,13 @@ class TestClientBillService:
         # Arrange
         invalid_amount_data = {
             "currency_metadata_id": str(uuid4()),
-            "amount": -10.0  # Invalid - negative amount
+            "amount": -10.0,  # Invalid - negative amount
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             client_bill_business_service._validate_bill_data(invalid_amount_data)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Amount must be a positive number" in str(exc_info.value.detail)
 
@@ -123,13 +120,13 @@ class TestClientBillService:
         # Arrange
         invalid_currency_data = {
             "currency_metadata_id": "invalid-uuid",  # Invalid UUID format
-            "amount": 25.50
+            "amount": 25.50,
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             client_bill_business_service._validate_bill_data(invalid_currency_data)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid currency_metadata_id format" in str(exc_info.value.detail)
 
@@ -137,38 +134,34 @@ class TestClientBillService:
         """Test that bill amount validation checks for positive amounts."""
         # Arrange
         mock_currency = Mock()
-        
-        with patch('app.services.client_bill_service.credit_currency_service') as mock_currency_service:
+
+        with patch("app.services.client_bill_service.credit_currency_service") as mock_currency_service:
             mock_currency_service.get_by_id.return_value = mock_currency
-            
+
             # Act
             result = client_bill_business_service.validate_bill_amount(0, uuid4(), mock_db)
-            
+
             # Assert
             assert result is False
 
     def test_validate_bill_amount_handles_missing_currency(self, mock_db):
         """Test that bill amount validation handles missing currency."""
         # Arrange
-        with patch('app.services.client_bill_service.credit_currency_service') as mock_currency_service:
+        with patch("app.services.client_bill_service.credit_currency_service") as mock_currency_service:
             mock_currency_service.get_by_id.return_value = None
-            
+
             # Act
             result = client_bill_business_service.validate_bill_amount(25.50, uuid4(), mock_db)
-            
+
             # Assert
             assert result is False
 
     def test_get_bills_by_status_filters_correctly(self, mock_db):
         """Test that bills by status filtering works correctly."""
         # Arrange
-        mock_bills = [
-            Mock(status="pending"),
-            Mock(status="paid"),
-            Mock(status="pending")
-        ]
+        mock_bills = [Mock(status="pending"), Mock(status="paid"), Mock(status="pending")]
 
-        with patch('app.services.client_bill_service.client_bill_service') as mock_bill_service:
+        with patch("app.services.client_bill_service.client_bill_service") as mock_bill_service:
             mock_bill_service.get_all.return_value = mock_bills
 
             # Act
@@ -185,15 +178,15 @@ class TestClientBillService:
         mock_bills = [
             Mock(currency_metadata_id=currency_id),
             Mock(currency_metadata_id=uuid4()),
-            Mock(currency_metadata_id=currency_id)
+            Mock(currency_metadata_id=currency_id),
         ]
-        
-        with patch('app.services.client_bill_service.client_bill_service') as mock_bill_service:
+
+        with patch("app.services.client_bill_service.client_bill_service") as mock_bill_service:
             mock_bill_service.get_all.return_value = mock_bills
-            
+
             # Act
             result = client_bill_business_service.get_bills_by_currency(currency_id, mock_db)
-            
+
             # Assert
             assert len(result) == 2
             assert all(bill.currency_metadata_id == currency_id for bill in result)

@@ -10,6 +10,7 @@ from enum import Enum
 
 class CuisineOriginSource(str, Enum):
     """Valid origin source values for cuisine records."""
+
     SEED = "seed"
     SUPPLIER = "supplier"
 

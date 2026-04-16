@@ -3,8 +3,7 @@ Unit tests for AddressAutocompleteService (suggest - autocomplete only, returns 
 Tests use Mapbox format as the default provider.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.services.address_autocomplete_service import AddressAutocompleteService
 
@@ -47,10 +46,7 @@ class TestAddressAutocompleteServiceSuggest:
     def test_suggest_respects_limit(self, mock_get_gateway):
         mock_gateway = MagicMock()
         mock_gateway.suggest.return_value = {
-            "suggestions": [
-                {"mapbox_id": f"id_{i}", "full_address": f"Address {i}"}
-                for i in range(5)
-            ]
+            "suggestions": [{"mapbox_id": f"id_{i}", "full_address": f"Address {i}"} for i in range(5)]
         }
         mock_get_gateway.return_value = mock_gateway
 

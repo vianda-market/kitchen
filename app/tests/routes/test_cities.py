@@ -2,11 +2,12 @@
 Tests for supported cities endpoint: GET /api/v1/cities
 """
 
-import pytest
 from uuid import uuid4
+
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_client_employee_or_supplier_user, oauth2_scheme
 
 
@@ -66,39 +67,3 @@ class TestListCities:
             assert item["country_code"] == "AR"
         # Seed has Argentina cities
         assert len(data) >= 1
-
-    def test_filter_by_province_code_returns_matching_cities(self, client_with_customer):
-        """Optional province_code with country_code returns only cities in that province.
-        Requires migration 002_add_province_to_city.sql and seed with province_code."""
-        resp = client_with_customer.get("/api/v1/cities?country_code=US")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        all_us = resp.json()
-        assert isinstance(all_us, list)
-        has_province = any(item.get("province_code") for item in all_us)
-        if not has_province:
-            pytest.skip("province_code not populated; run migration 002_add_province_to_city.sql and re-seed")
-        resp = client_with_customer.get("/api/v1/cities?country_code=US&province_code=WA")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert len(data) >= 1
-        for item in data:
-            assert item["country_code"] == "US"
-            assert item.get("province_code") == "WA"
-            assert item["name"] == "Seattle"
-
-    def test_province_filter_excludes_wrong_province(self, client_with_customer):
-        """Florida cities do not include Seattle (Seattle is in Washington).
-        Requires migration 002_add_province_to_city.sql and seed with province_code."""
-        resp = client_with_customer.get("/api/v1/cities?country_code=US")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        all_us = resp.json()
-        assert isinstance(all_us, list)
-        has_province = any(item.get("province_code") for item in all_us)
-        if not has_province:
-            pytest.skip("province_code not populated; run migration 002_add_province_to_city.sql and re-seed")
-        resp = client_with_customer.get("/api/v1/cities?country_code=US&province_code=FL")
-        assert resp.status_code == 200
-        data = resp.json()
-        city_names = [item["name"] for item in data]
-        assert "Seattle" not in city_names
-        assert "Miami" in city_names

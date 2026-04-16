@@ -6,27 +6,27 @@ and apply renewal (balance = rolled + plan.credit, renewal_date += 30 days).
 No client_bill is created for this path. Safe to run repeatedly (idempotent).
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Any
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
-from app.utils.db import db_read, get_db_connection, close_db_connection
-from app.utils.log import log_info, log_warning, log_error
 from app.config.enums.subscription_status import SubscriptionStatus
 from app.services.billing.client_bill import apply_subscription_renewal
+from app.utils.db import close_db_connection, db_read, get_db_connection
+from app.utils.log import log_error, log_info, log_warning
 
 # System user for automated operations
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 
-def run_subscription_renewals() -> Dict[str, Any]:
+def run_subscription_renewals() -> dict[str, Any]:
     """
     For each active subscription with renewal_date <= now (UTC), apply renewal:
     balance = rolled (capped by plan.rollover_cap) + plan.credit, renewal_date += 30 days.
     Does not create or process client_bill rows.
     """
-    now_utc = datetime.now(timezone.utc)
-    result: Dict[str, Any] = {
+    now_utc = datetime.now(UTC)
+    result: dict[str, Any] = {
         "cron_job": "subscription_renewals",
         "run_at_utc": now_utc.isoformat(),
         "renewed_count": 0,
@@ -63,10 +63,10 @@ def run_subscription_renewals() -> Dict[str, Any]:
                 # Best-effort ads conversion tracking (non-blocking)
                 try:
                     import asyncio
+
                     from app.services.ads.subscription_ads_hook import notify_ads_subscription_renewed
-                    asyncio.get_event_loop().create_task(
-                        notify_ads_subscription_renewed(subscription_id, connection)
-                    )
+
+                    asyncio.get_event_loop().create_task(notify_ads_subscription_renewed(subscription_id, connection))
                 except Exception as ads_err:
                     log_warning(f"Ads renewal tracking failed for {subscription_id}: {ads_err}")
             except Exception as e:

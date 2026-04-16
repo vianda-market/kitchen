@@ -4,7 +4,7 @@ Tax document generation for institution bills (supplier payouts).
 Stub implementation: returns a placeholder external id; country-specific
 integrations (e.g. e-invoicing) can be added later.
 """
-from typing import Optional
+
 from uuid import UUID
 
 from app.services.crud_service import institution_bill_service
@@ -15,7 +15,7 @@ def issue_tax_doc_for_bill(
     institution_bill_id: UUID,
     country_code: str,
     connection=None,
-) -> Optional[str]:
+) -> str | None:
     """
     Generate (or stub) a tax document for an institution bill and store
     the external id on the bill. Returns the tax_doc_external_id, or None on failure.

@@ -2,11 +2,12 @@
 Integration tests for address autocomplete routes (GET /suggest).
 """
 
-import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import patch
 
+import pytest
 from application import app
+from fastapi.testclient import TestClient
+
 from app.auth.dependencies import get_current_user, oauth2_scheme
 
 
@@ -75,6 +76,7 @@ class TestAddressSuggestRoute:
         mock_svc.suggest.return_value = []
 
         from app.auth.middleware.rate_limit_middleware import _buckets
+
         _buckets.clear()
 
         free_claims = {
@@ -84,9 +86,11 @@ class TestAddressSuggestRoute:
             "institution_id": "11111111-1111-1111-1111-111111111111",
         }
 
-        with patch("app.auth.middleware.rate_limit_middleware.settings") as mock_settings, \
-             patch("app.auth.middleware.rate_limit_middleware._extract_bearer_token", return_value="fake-token"), \
-             patch("app.auth.middleware.rate_limit_middleware._decode_claims", return_value=free_claims):
+        with (
+            patch("app.auth.middleware.rate_limit_middleware.settings") as mock_settings,
+            patch("app.auth.middleware.rate_limit_middleware._extract_bearer_token", return_value="fake-token"),
+            patch("app.auth.middleware.rate_limit_middleware._decode_claims", return_value=free_claims),
+        ):
             mock_settings.RATE_LIMIT_ENABLED = True
             mock_settings.RATE_LIMIT_MAX_TRACKED_USERS = 10_000
             mock_settings.RATE_LIMIT_EVICTION_AGE_SECONDS = 120

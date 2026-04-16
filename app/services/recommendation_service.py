@@ -5,14 +5,15 @@ Consumes signals (favorites today; ML, promoted post-MVP) and computes is_recomm
 plus sort keys. Plates and restaurants surpassing the threshold are sorted to the top.
 """
 
+from typing import Any
 from uuid import UUID
-from typing import Optional, List, Dict, Any
+
 import psycopg2.extensions
 
 from app.config.recommendation_config import (
+    RECOMMENDATION_THRESHOLD,
     WEIGHT_PLATE_FAVORITED,
     WEIGHT_RESTAURANT_FAVORITED,
-    RECOMMENDATION_THRESHOLD,
 )
 from app.services.favorite_service import get_favorite_ids
 
@@ -36,7 +37,7 @@ def _compute_plate_score(
 def _compute_restaurant_score(
     restaurant: dict,
     fav_restaurant_ids: set,
-    plates: List[dict],
+    plates: list[dict],
     fav_plate_ids: set,
 ) -> int:
     """Return recommendation score for one restaurant. MVP: restaurant favorited or any plate favorited."""
@@ -49,11 +50,11 @@ def _compute_restaurant_score(
 
 
 def apply_recommendation(
-    restaurants: List[dict],
-    user_id: Optional[UUID],
+    restaurants: list[dict],
+    user_id: UUID | None,
     db: psycopg2.extensions.connection,
     *,
-    favorite_ids: Optional[Dict[str, List[UUID]]] = None,
+    favorite_ids: dict[str, list[UUID]] | None = None,
 ) -> None:
     """
     Mutates restaurants and plates in-place: sets is_recommended and _recommendation_score.
@@ -79,8 +80,6 @@ def apply_recommendation(
         r["_recommendation_score"] = rest_score
 
         for p in plates:
-            plate_score = _compute_plate_score(
-                p, fav_plate_ids, fav_restaurant_ids, r.get("restaurant_id")
-            )
+            plate_score = _compute_plate_score(p, fav_plate_ids, fav_restaurant_ids, r.get("restaurant_id"))
             p["is_recommended"] = plate_score >= RECOMMENDATION_THRESHOLD
             p["_recommendation_score"] = plate_score

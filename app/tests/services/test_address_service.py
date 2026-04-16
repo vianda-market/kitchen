@@ -5,14 +5,14 @@ Tests the business logic for address operations including
 geocoding integration, timezone calculation, and address validation.
 """
 
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
+
+import pytest
 from fastapi import HTTPException
 
-from app.services.address_service import AddressBusinessService, address_business_service
-from app.dto.models import AddressDTO, GeolocationDTO
+from app.services.address_service import address_business_service
 
 
 class TestAddressService:
@@ -33,27 +33,26 @@ class TestAddressService:
         mock_address.address_id = uuid4()
         mock_address.user_id = sample_current_user["user_id"]
 
-        with patch('app.services.address_service.address_service') as mock_address_service, \
-             patch('app.services.geolocation_service.get_timezone_from_address') as mock_get_timezone, \
-             patch('app.services.address_service.update_address_type_from_linkages') as mock_derive, \
-             patch('app.services.market_service.market_service') as mock_market, \
-             patch('app.services.address_service.db_read') as mock_db_read, \
-             patch('app.services.address_service.db_insert') as mock_db_insert:
+        with (
+            patch("app.services.address_service.address_service") as mock_address_service,
+            patch("app.services.geolocation_service.get_timezone_from_address") as mock_get_timezone,
+            patch("app.services.address_service.update_address_type_from_linkages") as mock_derive,
+            patch("app.services.market_service.market_service") as mock_market,
+            patch("app.services.address_service.db_read") as mock_db_read,
+            patch("app.services.address_service.db_insert") as mock_db_insert,
+        ):
             mock_address_service.create.return_value = mock_address
             mock_address_service.get_by_id.return_value = mock_address
             mock_get_timezone.return_value = "America/New_York"
             mock_derive.return_value = []
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_db_read.side_effect = lambda q, *a, **kw: (
-                {"tz": "America/New_York", "country_iso": "US"}
-                if "city_metadata" in (q or "") else None
+                {"tz": "America/New_York", "country_iso": "US"} if "city_metadata" in (q or "") else None
             )
             mock_db_insert.return_value = None
 
             # Act
-            result = address_business_service.create_address_with_geocoding(
-                address_data, sample_current_user, mock_db
-            )
+            address_business_service.create_address_with_geocoding(address_data, sample_current_user, mock_db)
 
             # Assert
             assert address_data["timezone"] == "America/New_York"
@@ -77,14 +76,16 @@ class TestAddressService:
         mock_geolocation = Mock()
         mock_geolocation.geolocation_id = uuid4()
 
-        with patch('app.services.address_service.address_service') as mock_address_service, \
-             patch('app.services.geolocation_service.get_timezone_from_address') as mock_get_timezone, \
-             patch('app.services.address_service.update_address_type_from_linkages') as mock_derive, \
-             patch('app.services.market_service.market_service') as mock_market, \
-             patch('app.services.address_service.call_geocode_api') as mock_geocode_api, \
-             patch('app.services.address_service.geolocation_service') as mock_geo_service, \
-             patch('app.services.address_service.db_read') as mock_db_read, \
-             patch('app.services.address_service.db_insert') as mock_db_insert:
+        with (
+            patch("app.services.address_service.address_service") as mock_address_service,
+            patch("app.services.geolocation_service.get_timezone_from_address") as mock_get_timezone,
+            patch("app.services.address_service.update_address_type_from_linkages") as mock_derive,
+            patch("app.services.market_service.market_service") as mock_market,
+            patch("app.services.address_service.call_geocode_api") as mock_geocode_api,
+            patch("app.services.address_service.geolocation_service") as mock_geo_service,
+            patch("app.services.address_service.db_read") as mock_db_read,
+            patch("app.services.address_service.db_insert") as mock_db_insert,
+        ):
             mock_address_service.create.return_value = mock_address
             mock_address_service.get_by_id.return_value = mock_address
             mock_get_timezone.return_value = "America/New_York"
@@ -93,13 +94,12 @@ class TestAddressService:
             mock_geocode_api.return_value = {"latitude": 40.7128, "longitude": -74.0060}
             mock_geo_service.create.return_value = mock_geolocation
             mock_db_read.side_effect = lambda q, *a, **kw: (
-                {"tz": "America/New_York", "country_iso": "US"}
-                if "city_metadata" in (q or "") else None
+                {"tz": "America/New_York", "country_iso": "US"} if "city_metadata" in (q or "") else None
             )
             mock_db_insert.return_value = None
 
             # Act
-            result = address_business_service.create_address_with_geocoding(
+            address_business_service.create_address_with_geocoding(
                 restaurant_address_data, sample_current_user, mock_db
             )
 
@@ -107,6 +107,7 @@ class TestAddressService:
             mock_geocode_api.assert_called_once()
             mock_geo_service.create.assert_called_once()
             from app.config import Status
+
             geo_call_args = mock_geo_service.create.call_args[0][0]
             assert geo_call_args["address_id"] == mock_address.address_id
             assert geo_call_args["latitude"] == 40.7128
@@ -128,13 +129,15 @@ class TestAddressService:
         mock_address.address_id = uuid4()
         mock_address.user_id = sample_current_user["user_id"]
 
-        with patch('app.services.address_service.address_service') as mock_address_service, \
-             patch('app.services.geolocation_service.get_timezone_from_address') as mock_get_timezone, \
-             patch('app.services.address_service.update_address_type_from_linkages') as mock_derive, \
-             patch('app.services.market_service.market_service') as mock_market, \
-             patch('app.services.address_service.call_geocode_api') as mock_geocode_api, \
-             patch('app.services.address_service.db_read') as mock_db_read, \
-             patch('app.services.address_service.db_insert') as mock_db_insert:
+        with (
+            patch("app.services.address_service.address_service") as mock_address_service,
+            patch("app.services.geolocation_service.get_timezone_from_address") as mock_get_timezone,
+            patch("app.services.address_service.update_address_type_from_linkages") as mock_derive,
+            patch("app.services.market_service.market_service") as mock_market,
+            patch("app.services.address_service.call_geocode_api") as mock_geocode_api,
+            patch("app.services.address_service.db_read") as mock_db_read,
+            patch("app.services.address_service.db_insert") as mock_db_insert,
+        ):
             mock_address_service.create.return_value = mock_address
             mock_address_service.get_by_id.return_value = mock_address
             mock_get_timezone.return_value = "America/New_York"
@@ -142,8 +145,7 @@ class TestAddressService:
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
             mock_geocode_api.return_value = None  # API failure
             mock_db_read.side_effect = lambda q, *a, **kw: (
-                {"tz": "America/New_York", "country_iso": "US"}
-                if "city_metadata" in (q or "") else None
+                {"tz": "America/New_York", "country_iso": "US"} if "city_metadata" in (q or "") else None
             )
             mock_db_insert.return_value = None
 
@@ -163,13 +165,13 @@ class TestAddressService:
             "building_number": "123",
             "street_name": "Main St",
             # Missing city, province, country
-            "address_type": ["restaurant"]
+            "address_type": ["restaurant"],
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             address_business_service.validate_address_data(incomplete_data)
-        
+
         assert exc_info.value.status_code == 400
         # Country validation happens first, so error message is about country code
         assert "Country" in str(exc_info.value.detail) or "required" in str(exc_info.value.detail).lower()
@@ -188,9 +190,7 @@ class TestAddressService:
         with patch("app.config.settings.get_settings") as mock_get_settings:
             mock_get_settings.return_value = Mock(DEV_MODE=False)
             with pytest.raises(HTTPException) as exc_info:
-                address_business_service.create_address_with_geocoding(
-                    address_data, sample_current_user, mock_db
-                )
+                address_business_service.create_address_with_geocoding(address_data, sample_current_user, mock_db)
             assert exc_info.value.status_code == 403
             assert "manual entry" in str(exc_info.value.detail)
             assert "place_id" in str(exc_info.value.detail)
@@ -204,13 +204,13 @@ class TestAddressService:
             "city": "New York",
             "province": "NY",
             "country": "USA",  # Invalid - should be 2 letters
-            "address_type": "restaurant"
+            "address_type": "restaurant",
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             address_business_service.validate_address_data(invalid_country_data)
-        
+
         assert exc_info.value.status_code == 400
         assert "Country must be a 2-letter country code" in str(exc_info.value.detail)
 
@@ -223,12 +223,12 @@ class TestAddressService:
             "street_name": "Main St",
             "city": "New York",
             "province": "NY",
-            "country": "US"
+            "country": "US",
         }
-        
+
         # Act
         result = address_business_service._build_full_address_string(address_data)
-        
+
         # Assert
         expected = "123 Main St, New York, NY, US"
         assert result == expected
@@ -239,16 +239,17 @@ class TestAddressService:
         address_id = uuid4()
         mock_address = Mock()
         mock_geolocation = Mock()
-        
-        with patch('app.services.address_service.address_service') as mock_address_service, \
-             patch('app.services.address_service.geolocation_service') as mock_geo_service:
-            
+
+        with (
+            patch("app.services.address_service.address_service") as mock_address_service,
+            patch("app.services.address_service.geolocation_service") as mock_geo_service,
+        ):
             mock_address_service.get_by_id.return_value = mock_address
             mock_geo_service.get_by_address.return_value = mock_geolocation
-            
+
             # Act
             result = address_business_service.get_address_with_geolocation(address_id, mock_db)
-            
+
             # Assert
             assert result["address"] == mock_address
             assert result["geolocation"] == mock_geolocation
@@ -257,13 +258,13 @@ class TestAddressService:
         """Test that address with geolocation retrieval handles address not found."""
         # Arrange
         address_id = uuid4()
-        
-        with patch('app.services.address_service.address_service') as mock_address_service:
+
+        with patch("app.services.address_service.address_service") as mock_address_service:
             mock_address_service.get_by_id.return_value = None
-            
+
             # Act
             result = address_business_service.get_address_with_geolocation(address_id, mock_db)
-            
+
             # Assert
             assert result is None
 
@@ -276,10 +277,12 @@ class TestAddressService:
         mock_address.address_id = address_id
         mock_address.user_id = sample_current_user["user_id"]
 
-        with patch('app.services.address_service.address_service') as mock_address_service, \
-             patch('app.services.address_service.db_read') as mock_db_read, \
-             patch('app.services.address_service.db_insert') as mock_db_insert, \
-             patch('app.services.address_service.db_update') as mock_db_update:
+        with (
+            patch("app.services.address_service.address_service") as mock_address_service,
+            patch("app.services.address_service.db_read") as mock_db_read,
+            patch("app.services.address_service.db_insert") as mock_db_insert,
+            patch("app.services.address_service.db_update") as mock_db_update,
+        ):
             mock_address_service.get_by_id.return_value = mock_address
 
             def db_read_side_effect(query, *args, **kwargs):
@@ -305,10 +308,11 @@ class TestAddressService:
                     "timezone": "America/New_York",
                     "is_archived": False,
                     "status": "active",
-                    "created_date": datetime.now(timezone.utc),
+                    "created_date": datetime.now(UTC),
                     "modified_by": sample_current_user["user_id"],
-                    "modified_date": datetime.now(timezone.utc),
+                    "modified_date": datetime.now(UTC),
                 }
+
             mock_db_read.side_effect = db_read_side_effect
             mock_db_insert.return_value = None
             mock_db_update.return_value = None
@@ -333,7 +337,7 @@ class TestAddressService:
         mock_address.address_id = address_id
         mock_address.building_number = "123"
 
-        with patch('app.services.address_service.address_service') as mock_address_service:
+        with patch("app.services.address_service.address_service") as mock_address_service:
             mock_address_service.get_by_id.return_value = mock_address
 
             result = address_business_service.update_address_with_geocoding(
@@ -349,7 +353,7 @@ class TestAddressService:
         address_id = uuid4()
         update_data = {"floor": "2"}
 
-        with patch('app.services.address_service.address_service') as mock_address_service:
+        with patch("app.services.address_service.address_service") as mock_address_service:
             mock_address_service.get_by_id.return_value = None
 
             with pytest.raises(HTTPException) as exc_info:

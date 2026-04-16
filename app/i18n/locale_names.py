@@ -1,7 +1,6 @@
 """Locale-aware name resolution: countries, currencies, and cuisine i18n."""
 
 import gettext
-from typing import Dict, Optional
 
 import pycountry
 
@@ -9,22 +8,18 @@ from app.config.settings import settings
 
 # Eagerly load gettext translation objects for each supported locale.
 # pycountry ships .mo files for iso3166-1 (countries) and iso4217 (currencies).
-_country_translators: Dict[str, gettext.GNUTranslations] = {}
-_currency_translators: Dict[str, gettext.GNUTranslations] = {}
+_country_translators: dict[str, gettext.GNUTranslations] = {}
+_currency_translators: dict[str, gettext.GNUTranslations] = {}
 
 for _locale in settings.SUPPORTED_LOCALES:
     if _locale == "en":
         continue
     try:
-        _country_translators[_locale] = gettext.translation(
-            "iso3166-1", pycountry.LOCALES_DIR, languages=[_locale]
-        )
+        _country_translators[_locale] = gettext.translation("iso3166-1", pycountry.LOCALES_DIR, languages=[_locale])
     except FileNotFoundError:
         pass
     try:
-        _currency_translators[_locale] = gettext.translation(
-            "iso4217", pycountry.LOCALES_DIR, languages=[_locale]
-        )
+        _currency_translators[_locale] = gettext.translation("iso4217", pycountry.LOCALES_DIR, languages=[_locale])
     except FileNotFoundError:
         pass
 

@@ -2,17 +2,18 @@
 Tests for address create route: institution_id/user_id optional for B2C, required for B2B (safeguard).
 """
 
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.config import Status
 from app.dependencies.database import get_db
 from app.dto.models import AddressDTO
-from app.config import Status
 
 
 @pytest.fixture
@@ -76,6 +77,7 @@ def _minimal_address_body(include_institution_and_user=False, institution_id=Non
 @pytest.fixture
 def client_customer_with_institution(customer_user_with_institution, mock_db):
     """Test client with Customer user that has institution_id."""
+
     def _override_oauth2():
         return "test-token"
 
@@ -100,6 +102,7 @@ def client_customer_with_institution(customer_user_with_institution, mock_db):
 @pytest.fixture
 def client_customer_without_institution(customer_user_without_institution, mock_db):
     """Test client with Customer user that has no institution_id."""
+
     def _override_oauth2():
         return "test-token"
 
@@ -124,6 +127,7 @@ def client_customer_without_institution(customer_user_without_institution, mock_
 @pytest.fixture
 def client_b2b_employee(b2b_employee_user, mock_db):
     """Test client with B2B Internal user."""
+
     def _override_oauth2():
         return "test-token"
 
@@ -175,9 +179,9 @@ class TestAddressCreateInstitutionSafeguard:
             timezone="America/Argentina/Buenos_Aires",
             is_archived=False,
             status=Status.ACTIVE,
-            created_date=datetime.now(timezone.utc),
+            created_date=datetime.now(UTC),
             modified_by=uid,
-            modified_date=datetime.now(timezone.utc),
+            modified_date=datetime.now(UTC),
         )
         mock_business_service.create_address_with_geocoding.return_value = mock_dto
 
@@ -195,9 +199,7 @@ class TestAddressCreateInstitutionSafeguard:
         assert addr_data["institution_id"] == iid
         assert addr_data["user_id"] == uid
 
-    def test_customer_without_institution_id_in_jwt_gets_400(
-        self, client_customer_without_institution
-    ):
+    def test_customer_without_institution_id_in_jwt_gets_400(self, client_customer_without_institution):
         """Customer with no institution_id in JWT gets 400 when creating address."""
         resp = client_customer_without_institution.post(
             "/api/v1/addresses",

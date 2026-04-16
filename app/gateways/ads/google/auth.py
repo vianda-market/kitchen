@@ -9,6 +9,7 @@ Credentials come from:
 - Local dev: settings (GOOGLE_ADS_DEVELOPER_TOKEN, etc.)
 - Production: GCP Secret Manager via app/core/gcp_secrets.py
 """
+
 import logging
 import os
 
@@ -93,6 +94,7 @@ def get_customer_id() -> str:
         return settings.GOOGLE_ADS_CUSTOMER_ID.replace("-", "")
 
     from app.core.gcp_secrets import get_secret
+
     return get_secret("google-ads-customer-id").replace("-", "")
 
 
@@ -107,6 +109,7 @@ def get_conversion_action_id() -> str:
         return settings.GOOGLE_ADS_CONVERSION_ACTION_ID
 
     from app.core.gcp_secrets import get_secret
+
     return get_secret("google-ads-conversion-action-id")
 
 

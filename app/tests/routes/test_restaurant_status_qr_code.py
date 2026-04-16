@@ -2,13 +2,14 @@
 Tests for restaurant status validation: cannot set Active without active QR code.
 """
 
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from datetime import datetime, timezone
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
+import pytest
 from application import app
+from fastapi.testclient import TestClient
+
 from app.auth.dependencies import get_current_user, oauth2_scheme
 
 
@@ -51,9 +52,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
     ):
         """When restaurant has plate_kitchen_days but no active QR code, return 400."""
         restaurant_id = uuid4()
-        mock_restaurant_service.get_by_id.return_value = MagicMock(
-            restaurant_id=restaurant_id, institution_id=uuid4()
-        )
+        mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_has_pkd.return_value = True
         mock_has_qr.return_value = False
 
@@ -73,9 +72,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
     ):
         """When restaurant has QR code but no plate_kitchen_days, return 400."""
         restaurant_id = uuid4()
-        mock_restaurant_service.get_by_id.return_value = MagicMock(
-            restaurant_id=restaurant_id, institution_id=uuid4()
-        )
+        mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_has_pkd.return_value = False
         mock_has_qr.return_value = True
 
@@ -90,14 +87,10 @@ class TestRestaurantStatusRequiresActiveQRCode:
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
     @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
-    def test_returns_400_when_both_missing(
-        self, mock_has_pkd, mock_has_qr, mock_restaurant_service, client_with_auth
-    ):
+    def test_returns_400_when_both_missing(self, mock_has_pkd, mock_has_qr, mock_restaurant_service, client_with_auth):
         """When restaurant has neither plate_kitchen_days nor QR code, return 400."""
         restaurant_id = uuid4()
-        mock_restaurant_service.get_by_id.return_value = MagicMock(
-            restaurant_id=restaurant_id, institution_id=uuid4()
-        )
+        mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_has_pkd.return_value = False
         mock_has_qr.return_value = False
 
@@ -114,8 +107,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
     @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
     def test_succeeds_when_both_present(
-        self, mock_has_pkd, mock_has_qr, mock_restaurant_service,
-        mock_get_credit_currency, client_with_auth
+        self, mock_has_pkd, mock_has_qr, mock_restaurant_service, mock_get_credit_currency, client_with_auth
     ):
         """When restaurant has both plate_kitchen_days and QR code, status update succeeds."""
         restaurant_id = uuid4()
@@ -133,7 +125,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
         mock_has_pkd.return_value = True
         mock_has_qr.return_value = True
         mock_get_credit_currency.return_value = currency_metadata_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         updated = MagicMock(
             restaurant_id=restaurant_id,
             institution_id=inst_id,

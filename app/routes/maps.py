@@ -4,11 +4,8 @@ Map endpoints — static map image generation for B2C Explore tab.
 GET /maps/city-snapshot — returns a cached static map image URL with restaurant pin positions.
 """
 
-from typing import Optional
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Query
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db

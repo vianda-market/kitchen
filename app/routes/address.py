@@ -1,39 +1,38 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Response
-from typing import List, Optional
 from uuid import UUID
-from app.services.crud_service import address_service
-from app.services.address_service import address_business_service, get_addresses_for_customer
-from app.services.entity_service import (
-    get_enriched_addresses,
-    get_enriched_address_by_id,
-    get_enriched_addresses_search,
-    get_enriched_addresses_for_customer,
-)
-from app.services.error_handling import handle_get_by_id, handle_get_all, handle_delete, handle_business_operation
+
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+
+from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.config.address_autocomplete_config import get_address_autocomplete_config
+from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     AddressCreateSchema,
-    AddressUpdateSchema,
-    AddressResponseSchema,
     AddressEnrichedResponseSchema,
+    AddressResponseSchema,
     AddressSuggestResponseSchema,
+    AddressUpdateSchema,
 )
+from app.security.entity_scoping import ENTITY_ADDRESS, EntityScopingService
+from app.security.field_policies import (
+    ensure_customer_cannot_edit_employer_address,
+    ensure_supplier_can_create_edit_addresses,
+)
+from app.security.scoping import InstitutionScope, get_user_scope, resolve_institution_filter
 from app.services.address_autocomplete_service import address_autocomplete_service
-from app.config.address_autocomplete_config import get_address_autocomplete_config
-from app.auth.dependencies import get_current_user, oauth2_scheme
-from app.dependencies.database import get_db
-from app.utils.query_params import institution_filter
-from app.security.entity_scoping import EntityScopingService, ENTITY_ADDRESS
-from app.security.scoping import get_user_scope, UserScope, resolve_institution_filter, InstitutionScope
-from app.security.field_policies import ensure_supplier_can_create_edit_addresses, ensure_customer_cannot_edit_employer_address
-from app.services.crud_service import user_service, institution_service
-from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
-import psycopg2.extensions
-
-router = APIRouter(
-    prefix="/addresses",
-    tags=["Addresses"],
-    dependencies=[Depends(oauth2_scheme)]
+from app.services.address_service import address_business_service, get_addresses_for_customer
+from app.services.crud_service import address_service, user_service
+from app.services.entity_service import (
+    get_enriched_address_by_id,
+    get_enriched_addresses,
+    get_enriched_addresses_for_customer,
+    get_enriched_addresses_search,
 )
+from app.services.error_handling import handle_business_operation, handle_delete, handle_get_all, handle_get_by_id
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
+from app.utils.query_params import institution_filter
+
+router = APIRouter(prefix="/addresses", tags=["Addresses"], dependencies=[Depends(oauth2_scheme)])
 
 
 # =============================================================================
@@ -41,15 +40,23 @@ router = APIRouter(
 # Rate limiting handled by UserRateLimitMiddleware (app/auth/middleware/rate_limit_middleware.py)
 # =============================================================================
 
+
 @router.get("/suggest", response_model=AddressSuggestResponseSchema)
 def address_suggest(
     request: Request,
     q: str = Query(..., description="Partial address input (search box)"),
-    country: Optional[str] = Query(None, description="Country code (ISO 3166-1 alpha-2 only, e.g. AR) or country name (e.g. Argentina) to bias or restrict results"),
-    province: Optional[str] = Query(None, description="Province/state (e.g. WA, Washington) to narrow results when used with country and city"),
-    city: Optional[str] = Query(None, description="City name to narrow results when used with country and province"),
+    country: str | None = Query(
+        None,
+        description="Country code (ISO 3166-1 alpha-2 only, e.g. AR) or country name (e.g. Argentina) to bias or restrict results",
+    ),
+    province: str | None = Query(
+        None, description="Province/state (e.g. WA, Washington) to narrow results when used with country and city"
+    ),
+    city: str | None = Query(None, description="City name to narrow results when used with country and province"),
     limit: int = Query(5, ge=1, le=10, description="Max number of suggestions (default 5)"),
-    session_token: Optional[str] = Query(None, description="Session token (UUIDv4) for billing optimization. Auto-generated if omitted."),
+    session_token: str | None = Query(
+        None, description="Session token (UUIDv4) for billing optimization. Auto-generated if omitted."
+    ),
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -62,7 +69,12 @@ def address_suggest(
     if len((q or "").strip()) < config.ADDRESS_AUTOCOMPLETE_MIN_CHARS:
         return AddressSuggestResponseSchema(suggestions=[])
     suggestions = address_autocomplete_service.suggest(
-        q=q, country=country, province=province, city=city, limit=limit, session_token=session_token,
+        q=q,
+        country=country,
+        province=province,
+        city=city,
+        limit=limit,
+        session_token=session_token,
     )
     return AddressSuggestResponseSchema(suggestions=suggestions)
 
@@ -72,14 +84,15 @@ def address_suggest(
 # Must be registered before /{address_id} so /enriched and /search are not parsed as address_id.
 # =============================================================================
 
+
 # GET /addresses/enriched - List all addresses with enriched data
-@router.get("/enriched", response_model=List[AddressEnrichedResponseSchema])
+@router.get("/enriched", response_model=list[AddressEnrichedResponseSchema])
 def list_enriched_addresses(
     response: Response,
-    institution_id: Optional[UUID] = institution_filter(),
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    institution_id: UUID | None = institution_filter(),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Internal dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
     if current_user.get("role_type") == "customer":
@@ -87,15 +100,14 @@ def list_enriched_addresses(
 
         def _get_enriched_addresses():
             return get_enriched_addresses_for_customer(
-                user_scope.user_id, db, include_archived=False,
+                user_scope.user_id,
+                db,
+                include_archived=False,
                 page=pagination.page if pagination else None,
                 page_size=pagination.page_size if pagination else None,
             )
 
-        result = handle_business_operation(
-            _get_enriched_addresses,
-            "enriched address list retrieval"
-        )
+        result = handle_business_operation(_get_enriched_addresses, "enriched address list retrieval")
         set_pagination_headers(response, result)
         return result
 
@@ -104,28 +116,29 @@ def list_enriched_addresses(
 
     def _get_enriched_addresses():
         return get_enriched_addresses(
-            db, scope=scope, include_archived=False, institution_id=effective_institution_id,
+            db,
+            scope=scope,
+            include_archived=False,
+            institution_id=effective_institution_id,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )
 
-    result = handle_business_operation(
-        _get_enriched_addresses,
-        "enriched address list retrieval"
-    )
+    result = handle_business_operation(_get_enriched_addresses, "enriched address list retrieval")
     set_pagination_headers(response, result)
     return result
 
+
 # GET /addresses/search - Search addresses by institution and optional text (for B2B restaurant address picker)
-@router.get("/search", response_model=List[AddressEnrichedResponseSchema])
+@router.get("/search", response_model=list[AddressEnrichedResponseSchema])
 def search_enriched_addresses(
     response: Response,
-    institution_id: Optional[UUID] = Query(None, description="Restrict to addresses for this institution"),
-    q: Optional[str] = Query(None, description="Text search (street_name, city, postal_code, province)"),
+    institution_id: UUID | None = Query(None, description="Restrict to addresses for this institution"),
+    q: str | None = Query(None, description="Text search (street_name, city, postal_code, province)"),
     limit: int = Query(50, ge=1, le=100, description="Max results (default 50)"),
-    pagination: Optional[PaginationParams] = Depends(get_pagination_params),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Search addresses with enriched data. Optional institution_id and q for B2B dropdown/type-to-search. Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
@@ -146,12 +159,13 @@ def search_enriched_addresses(
     set_pagination_headers(response, result)
     return result
 
+
 # GET /addresses/enriched/{address_id} - Get a single address with enriched data
 @router.get("/enriched/{address_id}", response_model=AddressEnrichedResponseSchema)
 def get_enriched_address_by_id_route(
     address_id: UUID,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single address by ID with enriched data (institution_name, user_username, user_first_name, user_last_name). Non-archived only."""
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
@@ -160,28 +174,28 @@ def get_enriched_address_by_id_route(
         enriched_address = get_enriched_address_by_id(address_id, db, scope=scope, include_archived=False)
         if not enriched_address:
             from app.utils.error_messages import address_not_found
+
             raise address_not_found(address_id)
         return enriched_address
 
-    return handle_business_operation(
-        _get_enriched_address,
-        "enriched address retrieval"
-    )
+    return handle_business_operation(_get_enriched_address, "enriched address retrieval")
+
 
 # GET /addresses/{address_id}
 @router.get("/{address_id}", response_model=AddressResponseSchema)
 def get_address(
     address_id: UUID,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get an address by ID. Non-archived only."""
     # Get address first to check user_id
     address = address_service.get_by_id(address_id, db, scope=None)
     if not address:
         from app.utils.error_messages import address_not_found
+
         raise address_not_found(address_id)
-    
+
     # Apply user scoping for Customers: allow if created by user OR if it's their assigned employer_address_id
     if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
@@ -193,31 +207,26 @@ def get_address(
         scope = None  # No institution filtering needed for Customers
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
-    
-    return handle_get_by_id(
-        address_service.get_by_id,
-        address_id,
-        db,
-        "address",
-        extra_kwargs={"scope": scope}
-    )
+
+    return handle_get_by_id(address_service.get_by_id, address_id, db, "address", extra_kwargs={"scope": scope})
+
 
 # GET /addresses
-@router.get("", response_model=List[AddressResponseSchema])
+@router.get("", response_model=list[AddressResponseSchema])
 def get_all_addresses(
-    institution_id: Optional[UUID] = institution_filter(),
+    institution_id: UUID | None = institution_filter(),
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get all addresses. Optional institution_id filters by institution (B2B Internal dropdown scoping). Non-archived only."""
     # Apply user scoping for Customers
     if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
+
         # Customers: home/billing = created by user; employer = only assigned employer_address_id
         def fetch(connection: psycopg2.extensions.connection):
-            return get_addresses_for_customer(
-                user_scope.user_id, connection, include_archived=False
-            )
+            return get_addresses_for_customer(user_scope.user_id, connection, include_archived=False)
+
         scope = None
     else:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
@@ -228,6 +237,7 @@ def get_all_addresses(
             )
         else:
             effective_scope = scope
+
         def fetch(connection: psycopg2.extensions.connection):
             return address_service.get_all(connection, scope=effective_scope, include_archived=False)
 
@@ -238,7 +248,7 @@ def get_all_addresses(
 def create_address(
     addr_create: AddressCreateSchema,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create a new address with geocoding for restaurants. address_type is derived from linkages only (not accepted from client)."""
     user_scope = get_user_scope(current_user)
@@ -281,26 +291,30 @@ def create_address(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="The user assigned to the address must belong to the same institution as the address.",
                 )
-    
+
     # Use institution scope for Suppliers/Internal
-    scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user) if not user_scope.is_customer else None
+    scope = (
+        EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user) if not user_scope.is_customer else None
+    )
 
     session_token = addr_data.pop("session_token", None)
 
     def _create_address_with_geocoding():
         return address_business_service.create_address_with_geocoding(
-            addr_data, current_user, db, scope=scope, session_token=session_token,
+            addr_data,
+            current_user,
+            db,
+            scope=scope,
+            session_token=session_token,
         )
-    
+
     result = handle_business_operation(
-        _create_address_with_geocoding,
-        "address creation with geocoding",
-        "Address created successfully"
+        _create_address_with_geocoding, "address creation with geocoding", "Address created successfully"
     )
-    
+
     if not result:
         raise HTTPException(status_code=500, detail="Error creating address")
-    
+
     return result
 
 
@@ -309,10 +323,10 @@ _SUBPREMISE_UPDATE_KEYS = {"floor", "apartment_unit", "is_default"}
 
 @router.put("/{address_id}", response_model=AddressResponseSchema)
 def update_address(
-    address_id: UUID, 
+    address_id: UUID,
     addr_update: AddressUpdateSchema,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update an existing address. institution_id is immutable after creation."""
     ensure_supplier_can_create_edit_addresses(current_user)
@@ -320,6 +334,7 @@ def update_address(
     existing_address = address_service.get_by_id(address_id, db, scope=None)
     if not existing_address:
         from app.utils.error_messages import address_not_found
+
         raise address_not_found(address_id)
 
     update_data = addr_update.model_dump(exclude_unset=True)
@@ -356,21 +371,18 @@ def update_address(
     def _update_address():
         update_data["modified_by"] = current_user["user_id"]
         return address_business_service.update_address_with_geocoding(
-            address_id,
-            update_data,
-            current_user,
-            db,
-            scope=scope
+            address_id, update_data, current_user, db, scope=scope
         )
 
     return handle_business_operation(_update_address, "address update")
+
 
 # DELETE /addresses/{address_id} – Delete (soft-delete) an address
 @router.delete("/{address_id}", response_model=dict)
 def delete_address(
     address_id: UUID,
     current_user: dict = Depends(get_current_user),
-    db: psycopg2.extensions.connection = Depends(get_db)
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Delete (soft-delete) an address"""
     ensure_supplier_can_create_edit_addresses(current_user)
@@ -378,13 +390,14 @@ def delete_address(
     existing_address = address_service.get_by_id(address_id, db, scope=None)
     if not existing_address:
         from app.utils.error_messages import address_not_found
+
         raise address_not_found(address_id)
-    
+
     ensure_customer_cannot_edit_employer_address(existing_address, current_user)
-    
+
     role_type = current_user.get("role_type")
     role_name = current_user.get("role_name")
-    
+
     # Apply user scoping for Customers and Internal Operators (self-only access)
     if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
         user_scope = get_user_scope(current_user)

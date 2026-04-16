@@ -7,19 +7,17 @@ Mobile number validation and E.164 normalization using the phonenumbers library 
 # Mobile-type enforcement is deferred to SMS verification (Twilio Verify)
 # which rejects landlines at send time. See MOBILE_VERIFICATION_ROADMAP.md.
 
-from typing import Optional
-
 import phonenumbers
-from phonenumbers import PhoneNumberFormat
 from fastapi import HTTPException
+from phonenumbers import PhoneNumberFormat
 
 from app.utils.country import normalize_country_code
 
 
 def _normalize_mobile_or_raise_value_error(
-    raw: Optional[str],
-    country_hint: Optional[str] = None,
-) -> Optional[str]:
+    raw: str | None,
+    country_hint: str | None = None,
+) -> str | None:
     """
     Parse and return E.164, or None for empty input.
     Raises ValueError with a stable message for invalid numbers (Pydantic → 422).
@@ -32,7 +30,7 @@ def _normalize_mobile_or_raise_value_error(
     if not s:
         return None
 
-    region: Optional[str] = None
+    region: str | None = None
     if country_hint:
         cc = normalize_country_code(country_hint) or ""
         if len(cc) == 2:
@@ -42,23 +40,19 @@ def _normalize_mobile_or_raise_value_error(
         parsed = phonenumbers.parse(s, region)
     except phonenumbers.NumberParseException as exc:
         raise ValueError(
-            "Invalid phone number. Expected E.164 format (e.g. +5491112345678) "
-            "or a local number with a country hint."
+            "Invalid phone number. Expected E.164 format (e.g. +5491112345678) or a local number with a country hint."
         ) from exc
 
     if not phonenumbers.is_valid_number(parsed):
-        raise ValueError(
-            "Phone number is not valid for any country. "
-            "Verify the number and try again."
-        )
+        raise ValueError("Phone number is not valid for any country. Verify the number and try again.")
 
     return phonenumbers.format_number(parsed, PhoneNumberFormat.E164)
 
 
 def validate_and_normalize_mobile(
-    raw: Optional[str],
-    country_hint: Optional[str] = None,
-) -> Optional[str]:
+    raw: str | None,
+    country_hint: str | None = None,
+) -> str | None:
     """
     Parse and return E.164, or None for empty input.
     Raises HTTPException 422 if the number is invalid.
@@ -70,14 +64,14 @@ def validate_and_normalize_mobile(
 
 
 def normalize_mobile_for_schema(
-    raw: Optional[str],
-    country_hint: Optional[str] = None,
-) -> Optional[str]:
+    raw: str | None,
+    country_hint: str | None = None,
+) -> str | None:
     """Alias for Pydantic validators: ValueError → 422 via FastAPI."""
     return _normalize_mobile_or_raise_value_error(raw, country_hint)
 
 
-def format_mobile_for_display(e164: Optional[str]) -> Optional[str]:
+def format_mobile_for_display(e164: str | None) -> str | None:
     """
     Return an internationally formatted display string for a stored E.164 number.
     Example: '+5491112345678' → '+54 9 11 2345-6789'
@@ -97,7 +91,7 @@ def format_mobile_for_display(e164: Optional[str]) -> Optional[str]:
         return s
 
 
-def get_mobile_region(e164: str) -> Optional[str]:
+def get_mobile_region(e164: str) -> str | None:
     """Return ISO alpha-2 region for an E.164 number, or None if not parseable/valid."""
     if not e164 or not isinstance(e164, str):
         return None

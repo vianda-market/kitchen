@@ -1,19 +1,21 @@
 # app/services/billing/client_bill.py
 """Client bill processing: process_client_bill_internal and process_completed_bill."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
+
 import psycopg2.extensions
 from fastapi import HTTPException
-from app.dto.models import ClientBillDTO, SubscriptionDTO, CreditCurrencyDTO
+
+from app.config import Status
 from app.services.crud_service import (
     client_bill_service,
-    subscription_service,
     credit_currency_service,
     plan_service,
+    subscription_service,
     update_balance,
 )
-from app.utils.log import log_info, log_warning
-from app.config import Status
+from app.utils.log import log_info
 
 # Threshold below which we may trigger early renewal at order time (low-balance guardrail is renewal_date in future)
 LOW_BALANCE_RENEWAL_THRESHOLD = 10
@@ -58,9 +60,9 @@ def apply_subscription_renewal(
     new_balance = rolled + float(int(plan_credit))
     renewal_date = subscription.renewal_date
     if renewal_date.tzinfo is None:
-        renewal_date = renewal_date.replace(tzinfo=timezone.utc)
+        renewal_date = renewal_date.replace(tzinfo=UTC)
     else:
-        renewal_date = renewal_date.astimezone(timezone.utc)
+        renewal_date = renewal_date.astimezone(UTC)
     new_renewal_date = renewal_date + timedelta(days=30)
     subscription_service.update(
         subscription_id,
@@ -117,7 +119,7 @@ def process_client_bill_internal(
     credits_to_add = float(int(plan_credit))
     log_info(f"Granting plan.credit={plan_credit} credits for subscription {bill.subscription_id}")
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     if is_first_period:
         new_renewal_date = now_utc + timedelta(days=30)
         log_info(f"First period: renewal_date set to activation + 30 days -> {new_renewal_date}")
@@ -175,7 +177,7 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     credits_to_add = float(int(plan_credit))
     new_balance = float(subscription.balance) + credits_to_add
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     next_utc_midnight = (now_utc + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     new_renewal_date = next_utc_midnight + timedelta(days=29)
 
@@ -184,4 +186,6 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
         {"balance": new_balance, "renewal_date": new_renewal_date},
         db,
     )
-    log_info(f"Added {credits_to_add} credits to subscription {bill.subscription_id}. New balance: {new_balance}. Renewal date set to {new_renewal_date}")
+    log_info(
+        f"Added {credits_to_add} credits to subscription {bill.subscription_id}. New balance: {new_balance}. Renewal date set to {new_renewal_date}"
+    )

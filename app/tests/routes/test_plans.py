@@ -3,15 +3,16 @@ Tests for plan create/update: Global Marketplace cannot be assigned to plans (40
 plan create enforces rollover=true, rollover_cap=null.
 """
 
-import pytest
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
+import pytest
 from application import app
+from fastapi.testclient import TestClient
+
 from app.auth.dependencies import get_employee_user, oauth2_scheme
-from app.services.market_service import GLOBAL_MARKET_ID
 from app.services.crud_service import plan_service
+from app.services.market_service import GLOBAL_MARKET_ID
 
 
 @pytest.fixture
@@ -86,9 +87,7 @@ class TestPlanCreateRolloverDefaults:
     """Plan create enforces rollover=true and rollover_cap=null regardless of client payload."""
 
     @patch.object(plan_service, "create")
-    def test_create_plan_enforces_rollover_true_and_cap_null(
-        self, mock_create, client_with_employee
-    ):
+    def test_create_plan_enforces_rollover_true_and_cap_null(self, mock_create, client_with_employee):
         """POST /api/v1/plans ignores client rollover/rollover_cap; service receives rollover=True, rollover_cap=None."""
         created = MagicMock()
         created.plan_id = uuid4()

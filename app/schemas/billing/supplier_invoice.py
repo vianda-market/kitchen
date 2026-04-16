@@ -1,26 +1,27 @@
 # app/schemas/billing/supplier_invoice.py
-from typing import Optional, List
-from uuid import UUID
-from datetime import datetime, date
-from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 import re
+from datetime import date, datetime
+from decimal import Decimal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.config.enums import SupplierInvoiceStatus, SupplierInvoiceType
-
 
 # =============================================================================
 # Country-specific detail schemas (validated per-country)
 # =============================================================================
 
+
 class ARInvoiceDetailsSchema(BaseModel):
     """Argentina AFIP Factura Electronica fields."""
+
     cae_code: str
     cae_expiry_date: date
     afip_point_of_sale: str
     supplier_cuit: str
-    recipient_cuit: Optional[str] = None
-    afip_document_type: Optional[str] = None
+    recipient_cuit: str | None = None
+    afip_document_type: str | None = None
 
     @field_validator("cae_code")
     @classmethod
@@ -31,14 +32,14 @@ class ARInvoiceDetailsSchema(BaseModel):
 
     @field_validator("supplier_cuit", "recipient_cuit")
     @classmethod
-    def validate_cuit(cls, v: Optional[str]) -> Optional[str]:
+    def validate_cuit(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{2}-\d{8}-\d{1}", v):
             raise ValueError("CUIT must match format XX-XXXXXXXX-X")
         return v
 
     @field_validator("afip_document_type")
     @classmethod
-    def validate_afip_document_type(cls, v: Optional[str]) -> Optional[str]:
+    def validate_afip_document_type(cls, v: str | None) -> str | None:
         if v is not None and v not in ("A", "B", "C"):
             raise ValueError("AFIP document type must be one of: A, B, C")
         return v
@@ -46,11 +47,12 @@ class ARInvoiceDetailsSchema(BaseModel):
 
 class PEInvoiceDetailsSchema(BaseModel):
     """Peru SUNAT CPE fields."""
+
     sunat_serie: str
     sunat_correlativo: str
     supplier_ruc: str
-    recipient_ruc: Optional[str] = None
-    cdr_status: Optional[str] = None
+    recipient_ruc: str | None = None
+    cdr_status: str | None = None
 
     @field_validator("sunat_serie")
     @classmethod
@@ -68,14 +70,14 @@ class PEInvoiceDetailsSchema(BaseModel):
 
     @field_validator("supplier_ruc", "recipient_ruc")
     @classmethod
-    def validate_ruc(cls, v: Optional[str]) -> Optional[str]:
+    def validate_ruc(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{11}", v):
             raise ValueError("RUC must be exactly 11 digits")
         return v
 
     @field_validator("cdr_status")
     @classmethod
-    def validate_cdr_status(cls, v: Optional[str]) -> Optional[str]:
+    def validate_cdr_status(cls, v: str | None) -> str | None:
         if v is not None and v not in ("accepted", "rejected", "pending"):
             raise ValueError("CDR status must be one of: accepted, rejected, pending")
         return v
@@ -83,6 +85,7 @@ class PEInvoiceDetailsSchema(BaseModel):
 
 class USInvoiceDetailsSchema(BaseModel):
     """US IRS 1099-NEC fields."""
+
     tax_year: int
 
 
@@ -90,24 +93,26 @@ class USInvoiceDetailsSchema(BaseModel):
 # Core invoice schemas
 # =============================================================================
 
+
 class SupplierInvoiceCreateSchema(BaseModel):
     """Create schema with nested country details."""
+
     institution_entity_id: UUID
     country_code: str
     invoice_type: SupplierInvoiceType
-    external_invoice_number: Optional[str] = None
+    external_invoice_number: str | None = None
     issued_date: date
     amount: Decimal
     currency_code: str
-    tax_amount: Optional[Decimal] = None
-    tax_rate: Optional[Decimal] = None
-    document_format: Optional[str] = None
+    tax_amount: Decimal | None = None
+    tax_rate: Decimal | None = None
+    document_format: str | None = None
     # Country-specific details (one required, based on country_code)
-    ar_details: Optional[ARInvoiceDetailsSchema] = None
-    pe_details: Optional[PEInvoiceDetailsSchema] = None
-    us_details: Optional[USInvoiceDetailsSchema] = None
+    ar_details: ARInvoiceDetailsSchema | None = None
+    pe_details: PEInvoiceDetailsSchema | None = None
+    us_details: USInvoiceDetailsSchema | None = None
     # Bill matches (submitted alongside invoice)
-    bill_matches: Optional[List["BillInvoiceMatchCreateSchema"]] = None
+    bill_matches: list["BillInvoiceMatchCreateSchema"] | None = None
 
     @model_validator(mode="after")
     def validate_country_details(self):
@@ -122,32 +127,33 @@ class SupplierInvoiceCreateSchema(BaseModel):
 
 class SupplierInvoiceResponseSchema(BaseModel):
     """Response schema with nested country details."""
+
     supplier_invoice_id: UUID
     institution_entity_id: UUID
     country_code: str
     invoice_type: str
-    external_invoice_number: Optional[str] = None
+    external_invoice_number: str | None = None
     issued_date: date
     amount: Decimal
     currency_code: str
-    tax_amount: Optional[Decimal] = None
-    tax_rate: Optional[Decimal] = None
+    tax_amount: Decimal | None = None
+    tax_rate: Decimal | None = None
     # Document (signed URL, not storage path)
-    document_url: Optional[str] = None
-    document_format: Optional[str] = None
+    document_url: str | None = None
+    document_format: str | None = None
     # Country-specific details (populated based on country_code)
-    ar_details: Optional[ARInvoiceDetailsSchema] = None
-    pe_details: Optional[PEInvoiceDetailsSchema] = None
-    us_details: Optional[USInvoiceDetailsSchema] = None
+    ar_details: ARInvoiceDetailsSchema | None = None
+    pe_details: PEInvoiceDetailsSchema | None = None
+    us_details: USInvoiceDetailsSchema | None = None
     # Review
     status: str
-    rejection_reason: Optional[str] = None
-    reviewed_by: Optional[UUID] = None
-    reviewed_at: Optional[datetime] = None
+    rejection_reason: str | None = None
+    reviewed_by: UUID | None = None
+    reviewed_at: datetime | None = None
     # Audit
     is_archived: bool
     created_date: datetime
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
     modified_by: UUID
     modified_date: datetime
 
@@ -157,7 +163,7 @@ class SupplierInvoiceResponseSchema(BaseModel):
 # --- Review schema (PATCH /review) ---
 class SupplierInvoiceReviewSchema(BaseModel):
     status: SupplierInvoiceStatus
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
     @model_validator(mode="after")
     def validate_rejection_reason(self):

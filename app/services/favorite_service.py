@@ -6,14 +6,14 @@ Users can flag plates and restaurants as favorites; favorites are surfaced at th
 """
 
 from uuid import UUID
-from typing import Optional, List, Dict, Any
-import psycopg2.extensions
 
-from app.dto.models import UserFavoriteDTO
-from app.config.enums import FavoriteEntityType
-from app.utils.db import db_read, db_insert
-from app.utils.log import log_info, log_error
+import psycopg2.extensions
 from fastapi import HTTPException
+
+from app.config.enums import FavoriteEntityType
+from app.dto.models import UserFavoriteDTO
+from app.utils.db import db_insert, db_read
+from app.utils.log import log_info
 
 
 def add_favorite(
@@ -138,23 +138,26 @@ def remove_favorite(
 def get_favorite_ids(
     user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Dict[str, List[UUID]]:
+) -> dict[str, list[UUID]]:
     """
     Get favorite IDs for fast lookup (sorting, is_favorite flags).
 
     Returns:
         {"plate_ids": [...], "restaurant_ids": [...]}
     """
-    rows = db_read(
-        """
+    rows = (
+        db_read(
+            """
         SELECT entity_type::text, entity_id
         FROM user_favorite_info
         WHERE user_id = %s
         """,
-        (str(user_id),),
-        connection=db,
-        fetch_one=False,
-    ) or []
+            (str(user_id),),
+            connection=db,
+            fetch_one=False,
+        )
+        or []
+    )
     plate_ids = []
     restaurant_ids = []
     for r in rows:
@@ -170,8 +173,8 @@ def get_favorites_by_user(
     user_id: UUID,
     db: psycopg2.extensions.connection,
     *,
-    entity_type: Optional[str] = None,
-) -> List[UserFavoriteDTO]:
+    entity_type: str | None = None,
+) -> list[UserFavoriteDTO]:
     """
     List all favorites for the user. Optional filter by entity_type.
 
@@ -190,28 +193,34 @@ def get_favorites_by_user(
         )
 
     if entity_type:
-        rows = db_read(
-            """
+        rows = (
+            db_read(
+                """
             SELECT favorite_id, user_id, entity_type::text, entity_id, created_date
             FROM user_favorite_info
             WHERE user_id = %s AND entity_type::text = %s
             ORDER BY favorite_id DESC
             """,
-            (str(user_id), entity_type),
-            connection=db,
-            fetch_one=False,
-        ) or []
+                (str(user_id), entity_type),
+                connection=db,
+                fetch_one=False,
+            )
+            or []
+        )
     else:
-        rows = db_read(
-            """
+        rows = (
+            db_read(
+                """
             SELECT favorite_id, user_id, entity_type::text, entity_id, created_date
             FROM user_favorite_info
             WHERE user_id = %s
             ORDER BY favorite_id DESC
             """,
-            (str(user_id),),
-            connection=db,
-            fetch_one=False,
-        ) or []
+                (str(user_id),),
+                connection=db,
+                fetch_one=False,
+            )
+            or []
+        )
 
     return [UserFavoriteDTO(**r) for r in rows]

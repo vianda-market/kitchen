@@ -10,6 +10,7 @@ from enum import Enum
 
 class CuisineSuggestionStatus(str, Enum):
     """Valid status values for cuisine suggestions."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"

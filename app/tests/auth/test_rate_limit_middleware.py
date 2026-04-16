@@ -1,19 +1,18 @@
 """Tests for rate_limit_middleware helper functions."""
 
 import time
-import pytest
 from collections import deque
 from unittest.mock import Mock, patch
 
 from app.auth.middleware.rate_limit_middleware import (
-    _extract_bearer_token,
+    _buckets,
     _check_rate_limit,
     _evict_stale_buckets,
-    _buckets,
+    _extract_bearer_token,
 )
 
-
 # ── _extract_bearer_token ────────────────────────────────────────────────────
+
 
 class TestExtractBearerToken:
     def test_valid_bearer(self):
@@ -38,6 +37,7 @@ class TestExtractBearerToken:
 
 
 # ── _check_rate_limit ────────────────────────────────────────────────────────
+
 
 class TestCheckRateLimit:
     def setup_method(self):
@@ -80,6 +80,7 @@ class TestCheckRateLimit:
 
 
 # ── _evict_stale_buckets ────────────────────────────────────────────────────
+
 
 class TestEvictStaleBuckets:
     def setup_method(self):

@@ -11,8 +11,8 @@ optimization. Handles:
 - action_source selection (website vs app vs system_generated)
 - Batch support (1,000 events per request, Meta limit)
 """
+
 import logging
-from datetime import datetime
 
 from facebook_business.adobjects.serverside.action_source import ActionSource
 from facebook_business.adobjects.serverside.custom_data import CustomData
@@ -192,9 +192,7 @@ class MetaConversionGateway(AdsConversionGateway):
                 error_category=category.value,
             )
 
-    def upload_conversions_batch(
-        self, events: list[ConversionEvent]
-    ) -> list[ConversionResult]:
+    def upload_conversions_batch(self, events: list[ConversionEvent]) -> list[ConversionResult]:
         """Upload a batch of conversions. Max 1,000 per request (Meta limit)."""
         if not events:
             return []

@@ -4,11 +4,13 @@ Referral Status Enumeration
 Defines the valid referral status values used in the referral_info table.
 Referral status tracks the lifecycle state of a referral from pending to rewarded/expired.
 """
+
 from enum import Enum
 
 
 class ReferralStatus(str, Enum):
     """Valid referral status values"""
+
     PENDING = "pending"
     QUALIFIED = "qualified"
     REWARDED = "rewarded"

@@ -6,6 +6,7 @@ Full implementation in Phase 9/14. This stub allows the factory to resolve
 the live campaign gateway without errors while campaign management is not
 yet built.
 """
+
 from app.gateways.ads.base import AdsCampaignGateway
 
 
@@ -14,8 +15,7 @@ class GoogleAdsCampaignGateway(AdsCampaignGateway):
 
     def create_campaign(self, config: dict) -> str:
         raise NotImplementedError(
-            "Google Ads campaign creation not yet implemented (Phase 9). "
-            "Use mock gateway for development."
+            "Google Ads campaign creation not yet implemented (Phase 9). Use mock gateway for development."
         )
 
     def update_campaign(self, campaign_id: str, updates: dict) -> None:

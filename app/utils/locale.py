@@ -1,14 +1,12 @@
 """Locale resolution from Accept-Language and supported locales (see app.config.settings)."""
 
-from typing import Optional
-
 from app.config.settings import settings
 
 SUPPORTED_LOCALES = frozenset(settings.SUPPORTED_LOCALES)
 DEFAULT_LOCALE = settings.DEFAULT_LOCALE
 
 
-def resolve_locale_from_header(accept_language: Optional[str]) -> str:
+def resolve_locale_from_header(accept_language: str | None) -> str:
     """
     Parse Accept-Language header and return best supported locale.
     e.g. 'es-AR,es;q=0.9,en;q=0.8' -> 'es'
@@ -26,6 +24,7 @@ def resolve_locale_from_header(accept_language: Optional[str]) -> str:
 def get_user_locale(user_id, db) -> str:
     """Fetch user's locale from DB; fallback to DEFAULT_LOCALE."""
     from app.utils.db import db_read
+
     row = db_read(
         "SELECT locale FROM user_info WHERE user_id = %s",
         (str(user_id),),
@@ -37,8 +36,8 @@ def get_user_locale(user_id, db) -> str:
 
 
 def resolve_user_locale(
-    current_user: Optional[dict],
-    accept_language: Optional[str] = None,
+    current_user: dict | None,
+    accept_language: str | None = None,
 ) -> str:
     """
     Resolve locale for unauthenticated context: Accept-Language then default.

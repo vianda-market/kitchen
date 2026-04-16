@@ -1,7 +1,8 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
+
+from pydantic import BaseModel
+
 from app.config import Status
 
 # Use UUID (not UUID4) so IDs from seed/DB work (seed uses non-RFC-4122-v4 UUIDs e.g. aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)
@@ -10,10 +11,10 @@ from app.config import Status
 
 
 class ClientBillUpdateSchema(BaseModel):
-    amount: Optional[float]
-    currency_code: Optional[str]
+    amount: float | None
+    currency_code: str | None
     # is_archived field removed - can only be modified via DELETE API
-    status: Optional[Status] = None
+    status: Status | None = None
 
 
 class ClientBillResponseSchema(BaseModel):
@@ -24,7 +25,7 @@ class ClientBillResponseSchema(BaseModel):
     plan_id: UUID
     currency_metadata_id: UUID
     amount: float
-    currency_code: Optional[str]
+    currency_code: str | None
     is_archived: bool
     status: Status
     created_date: datetime

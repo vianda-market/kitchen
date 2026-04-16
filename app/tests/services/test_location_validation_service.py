@@ -4,11 +4,9 @@ Tests for location_validation_service.
 Validates country-province-city combinations (e.g. Florida+Seattle invalid, Washington+Seattle valid).
 """
 
-import pytest
-
 from app.services.location_validation_service import (
-    validate_country_province_city,
     get_validation_error_detail,
+    validate_country_province_city,
 )
 
 

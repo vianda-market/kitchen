@@ -8,31 +8,32 @@ Address type for customer addresses (home/work/other) is user-selected.
 Address type for restaurant, entity, and billing addresses is derived from linkages.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
-from typing import Dict, Any, Optional, List
-from fastapi import HTTPException
-import psycopg2.extensions
 
-from app.dto.models import AddressDTO, GeolocationDTO
-from app.services.crud_service import address_service, geolocation_service
-from app.utils.db import db_read, db_insert, db_update
-from app.security.institution_scope import InstitutionScope
-from app.utils.log import log_info, log_warning
-from app.services.geolocation_service import call_geocode_api
+import psycopg2.extensions
+from fastapi import HTTPException
+
 from app.config import Status
 from app.config.enums.address_types import AddressType
+from app.dto.models import AddressDTO
+from app.security.institution_scope import InstitutionScope
+from app.services.crud_service import address_service, geolocation_service
+from app.services.geolocation_service import call_geocode_api
+from app.utils.db import db_insert, db_read, db_update
+from app.utils.log import log_info, log_warning
 
 
 def derive_address_type_from_linkages(
     address_id: UUID,
     db: psycopg2.extensions.connection,
-) -> List[str]:
+) -> list[str]:
     """
     Derive address_type from connected objects (restaurant, institution entity,
     payment method). Customer address types (home/work/other) are user-selected.
     """
-    types: List[str] = []
+    types: list[str] = []
     aid = str(address_id)
 
     # Restaurant
@@ -103,10 +104,10 @@ def _upsert_address_subpremise(
     modified_by: UUID,
     db: psycopg2.extensions.connection,
     *,
-    floor: Optional[str] = None,
-    apartment_unit: Optional[str] = None,
+    floor: str | None = None,
+    apartment_unit: str | None = None,
     is_default: bool = False,
-    map_center_label: Optional[str] = None,
+    map_center_label: str | None = None,
     commit: bool = True,
 ) -> None:
     """
@@ -133,7 +134,7 @@ def _upsert_address_subpremise(
             "apartment_unit": apartment_unit,
             "is_default": is_default,
             "modified_by": mby,
-            "modified_date": datetime.now(timezone.utc),
+            "modified_date": datetime.now(UTC),
         }
         if map_center_label is not None:
             update_data["map_center_label"] = map_center_label
@@ -169,7 +170,7 @@ def get_addresses_for_customer(
     db: psycopg2.extensions.connection,
     *,
     include_archived: bool = False,
-) -> List[AddressDTO]:
+) -> list[AddressDTO]:
     """
     Get addresses visible to a Customer for GET /addresses and GET /addresses/enriched.
 
@@ -179,7 +180,7 @@ def get_addresses_for_customer(
     """
     uid = str(user_id)
 
-    params: List[Any] = [uid, uid]
+    params: list[Any] = [uid, uid]
     archived = "" if include_archived else " AND a.is_archived = FALSE"
     q = f"""
         SELECT a.*, gc.name AS country_name,
@@ -196,9 +197,14 @@ def get_addresses_for_customer(
     if not rows:
         return []
 
-    result: List[AddressDTO] = []
+    result: list[AddressDTO] = []
     for r in rows:
-        d = {**r, "floor": r.get("floor"), "apartment_unit": r.get("apartment_unit"), "is_default": r.get("is_default") or False}
+        d = {
+            **r,
+            "floor": r.get("floor"),
+            "apartment_unit": r.get("apartment_unit"),
+            "is_default": r.get("is_default") or False,
+        }
         result.append(AddressDTO(**d))
 
     return result
@@ -209,7 +215,7 @@ def update_address_type_from_linkages(
     db: psycopg2.extensions.connection,
     *,
     commit: bool = True,
-) -> List[str]:
+) -> list[str]:
     """
     Recompute address_type from linkages and persist to address_info.
     Returns the new address_type list.
@@ -227,25 +233,25 @@ def update_address_type_from_linkages(
 
 class AddressBusinessService:
     """Service for handling address business logic"""
-    
+
     def __init__(self):
         pass
-    
+
     def create_address_with_geocoding(
         self,
-        address_data: Dict[str, Any],
-        current_user: Dict[str, Any],
+        address_data: dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
-        scope: Optional[InstitutionScope] = None,
+        scope: InstitutionScope | None = None,
         commit: bool = True,
-        session_token: Optional[str] = None,
+        session_token: str | None = None,
     ) -> AddressDTO:
         """
         Create a new address with automatic geocoding for restaurants, customer home, and customer employer addresses.
-        
+
         Geocoding failures are non-blocking - addresses are created successfully
         even if geocoding fails (e.g., when geocoding API is unavailable).
-        
+
         Args:
             address_data: Address data dictionary
             current_user: Current user information
@@ -253,10 +259,10 @@ class AddressBusinessService:
             scope: Optional institution scope for access control
             commit: Whether to commit immediately after insert (default: True).
                     Set to False for atomic multi-operation transactions.
-            
+
         Returns:
             Created address DTO
-            
+
         Raises:
             HTTPException: For validation errors (not for geocoding failures)
         """
@@ -277,6 +283,7 @@ class AddressBusinessService:
         else:
             # Structured (manual) create is internal/testing only. Production must use place_id.
             from app.config.settings import get_settings
+
             if not getattr(get_settings(), "DEV_MODE", False):
                 raise HTTPException(
                     status_code=403,
@@ -289,10 +296,64 @@ class AddressBusinessService:
         subpremise_unit = address_data.pop("apartment_unit", None)
         subpremise_is_default = address_data.pop("is_default", False)
 
-        # Resolve country to alpha-2 only (DB and API standard); accept country_code (normalized by schema) or country (name)
+        country_code, country_name_for_log = self._resolve_country(address_data)
+
+        # Validate address data (required fields, country-province-city combination)
+        self.validate_address_data(address_data)
+
+        self._resolve_city_metadata_and_timezone(address_data, country_code, country_name_for_log, db)
+
+        # Create the address first (even for restaurants), so we get an address_id
+        # NOTE: address_service.create() should ONLY be called from this business service.
+        # All external callers should use address_business_service.create_address_with_geocoding() instead.
+        new_addr = address_service.create(address_data, db, scope=scope, commit=commit)
+
+        # Create address_subpremise when user_id is set (Comensal home/other; floor, unit, is_default)
+        user_id = address_data.get("user_id") or getattr(new_addr, "user_id", None)
+        if user_id:
+            _upsert_address_subpremise(
+                new_addr.address_id,
+                UUID(str(user_id)) if isinstance(user_id, str) else user_id,
+                current_user["user_id"],
+                db,
+                floor=subpremise_floor,
+                apartment_unit=subpremise_unit,
+                is_default=subpremise_is_default,
+                commit=commit,
+            )
+
+        # Refresh address_type from linkages (new address has none, so remains [])
+        derived_types = update_address_type_from_linkages(new_addr.address_id, db, commit=commit)
+        # Re-fetch so response has correct address_type and subpremise (floor, unit, is_default)
+        if user_id:
+            new_addr = (
+                self._get_address_with_subpremise(new_addr.address_id, user_id, db, scope=scope)
+                or address_service.get_by_id(new_addr.address_id, db, scope=scope)
+                or new_addr
+            )
+        else:
+            new_addr = address_service.get_by_id(new_addr.address_id, db, scope=scope) or new_addr
+
+        # Handle geocoding: place_id path stores geolocation immediately; otherwise geocode from derived types
+        self._handle_geocoding(
+            new_addr,
+            address_data,
+            geoloc_from_place,
+            derived_types,
+            current_user,
+            db,
+            commit=commit,
+            country_name=country_name_for_log,
+        )
+
+        return new_addr
+
+    @staticmethod
+    def _resolve_country(address_data: dict[str, Any]) -> tuple[str, str]:
+        """Resolve country_code to alpha-2 and validate market. Returns (country_code, country_name)."""
         from app.services.market_service import market_service
-        from app.utils.country import country_name_to_alpha2
-        from app.utils.country import normalize_country_code
+        from app.utils.country import country_name_to_alpha2, normalize_country_code
+
         country_code = address_data.get("country_code")
         if not country_code and address_data.get("country"):
             raw = (address_data.get("country") or "").strip()
@@ -303,80 +364,90 @@ class AddressBusinessService:
             if alpha2:
                 country_code = normalize_country_code(alpha2)
                 address_data["country_code"] = country_code
-        if country_code:
-            # Already normalized by schema when from body, or by normalize_country_code when from country name
-            address_data["country_code"] = country_code
-            address_data.pop("country_name", None)  # not stored on address; resolved via market_info on read
-            market = market_service.get_by_country_code(country_code)
-            if not market:
-                raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
-            if market.get("country_code") == "XG":
-                raise HTTPException(
-                    status_code=400,
-                    detail="Addresses cannot be registered to Global Marketplace. Please select a specific country (e.g. Argentina, Peru, Chile).",
-                )
-            country_name_for_log = market["country_name"]
-        else:
+        if not country_code:
             raise HTTPException(
                 status_code=400,
-                detail="country_code or country (country name) is required. If sending country name, use a supported value (e.g. Argentina, Peru, Chile)."
+                detail="country_code or country (country name) is required. If sending country name, use a supported value (e.g. Argentina, Peru, Chile).",
             )
+        address_data["country_code"] = country_code
+        address_data.pop("country_name", None)
+        market = market_service.get_by_country_code(country_code)
+        if not market:
+            raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
+        if market.get("country_code") == "XG":
+            raise HTTPException(
+                status_code=400,
+                detail="Addresses cannot be registered to Global Marketplace. Please select a specific country (e.g. Argentina, Peru, Chile).",
+            )
+        return country_code, market["country_name"]
 
-        # Validate address data (required fields, country-province-city combination)
-        self.validate_address_data(address_data)
-
-        # Timezone resolution: city_metadata_id is the authoritative input — always NOT NULL in DB.
-        # Manual/structured path: client provides city_metadata_id (enforced by schema validator).
-        # place_id path: resolved server-side from Mapbox-derived (country_code, city) against
-        # core.city_metadata JOIN external.geonames_city. If no exact ascii_name match, falls
-        # back to any seeded city_metadata row in the same country.
+    @staticmethod
+    def _resolve_city_metadata_id(
+        address_data: dict[str, Any],
+        country_code: str,
+        db: psycopg2.extensions.connection,
+    ) -> Any:
+        """Resolve city_metadata_id from address data, city name, or country fallback."""
         city_metadata_id = address_data.get("city_metadata_id")
-        if not city_metadata_id:
-            city_name_from_place = (address_data.get("city") or "").strip()
-            if city_name_from_place:
-                resolve_row = db_read(
-                    """
-                    SELECT cm.city_metadata_id
-                    FROM core.city_metadata cm
-                    JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
-                    WHERE cm.country_iso = %s
-                      AND cm.is_archived = FALSE
-                      AND LOWER(gc.ascii_name) = LOWER(%s)
-                    ORDER BY gc.population DESC NULLS LAST
-                    LIMIT 1
-                    """,
-                    (country_code, city_name_from_place),
-                    connection=db,
-                    fetch_one=True,
-                )
-                if resolve_row and resolve_row.get("city_metadata_id"):
-                    city_metadata_id = resolve_row["city_metadata_id"]
-            if not city_metadata_id:
-                # Fallback: pick any active seeded city_metadata for this country.
-                fallback_row = db_read(
-                    """
-                    SELECT cm.city_metadata_id
-                    FROM core.city_metadata cm
-                    WHERE cm.country_iso = %s AND cm.is_archived = FALSE
-                    LIMIT 1
-                    """,
-                    (country_code,),
-                    connection=db,
-                    fetch_one=True,
-                )
-                if fallback_row and fallback_row.get("city_metadata_id"):
-                    city_metadata_id = fallback_row["city_metadata_id"]
-            if not city_metadata_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Could not resolve a city_metadata_id for country {country_code}. "
-                        "Either send city_metadata_id in the body or ensure core.city_metadata "
-                        "has at least one active row for this country."
-                    ),
-                )
+        if city_metadata_id:
+            return city_metadata_id
+        city_name_from_place = (address_data.get("city") or "").strip()
+        if city_name_from_place:
+            resolve_row = db_read(
+                """
+                SELECT cm.city_metadata_id
+                FROM core.city_metadata cm
+                JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+                WHERE cm.country_iso = %s
+                  AND cm.is_archived = FALSE
+                  AND LOWER(gc.ascii_name) = LOWER(%s)
+                ORDER BY gc.population DESC NULLS LAST
+                LIMIT 1
+                """,
+                (country_code, city_name_from_place),
+                connection=db,
+                fetch_one=True,
+            )
+            if resolve_row and resolve_row.get("city_metadata_id"):
+                return resolve_row["city_metadata_id"]
+        # Fallback: pick any active seeded city_metadata for this country
+        fallback_row = db_read(
+            """
+            SELECT cm.city_metadata_id
+            FROM core.city_metadata cm
+            WHERE cm.country_iso = %s AND cm.is_archived = FALSE
+            LIMIT 1
+            """,
+            (country_code,),
+            connection=db,
+            fetch_one=True,
+        )
+        if fallback_row and fallback_row.get("city_metadata_id"):
+            return fallback_row["city_metadata_id"]
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Could not resolve a city_metadata_id for country {country_code}. "
+                "Either send city_metadata_id in the body or ensure core.city_metadata "
+                "has at least one active row for this country."
+            ),
+        )
+
+    def _resolve_city_metadata_and_timezone(
+        self,
+        address_data: dict[str, Any],
+        country_code: str,
+        country_name_for_log: str,
+        db: psycopg2.extensions.connection,
+    ) -> None:
+        """Resolve city_metadata_id and set timezone on address_data."""
+        city_metadata_id = self._resolve_city_metadata_id(address_data, country_code, db)
+        if not address_data.get("city_metadata_id"):
             address_data["city_metadata_id"] = city_metadata_id
-            log_info(f"Resolved city_metadata_id {city_metadata_id} from place_id → ({country_code}, {city_name_from_place or '<fallback>'})")
+            city_name = (address_data.get("city") or "").strip()
+            log_info(
+                f"Resolved city_metadata_id {city_metadata_id} from place_id → ({country_code}, {city_name or '<fallback>'})"
+            )
         row = db_read(
             """
             SELECT gc.timezone AS tz, cm.country_iso
@@ -403,64 +474,41 @@ class AddressBusinessService:
                     "Resolve a city in the same country via GET /api/v1/cities?country_code=..."
                 ),
             )
-        tz = row.get("tz") or "UTC"  # Global synthetic row has no GeoNames tz — fall back to UTC.
+        tz = row.get("tz") or "UTC"
         address_data["timezone"] = tz
         log_info(f"Set timezone '{tz}' from city_metadata_id for address in {country_name_for_log} ({country_code})")
 
-        # Create the address first (even for restaurants), so we get an address_id
-        # NOTE: address_service.create() should ONLY be called from this business service.
-        # All external callers should use address_business_service.create_address_with_geocoding() instead.
-        new_addr = address_service.create(address_data, db, scope=scope, commit=commit)
-
-        # Create address_subpremise when user_id is set (Comensal home/other; floor, unit, is_default)
-        user_id = address_data.get("user_id") or getattr(new_addr, "user_id", None)
-        if user_id:
-            _upsert_address_subpremise(
-                new_addr.address_id,
-                UUID(str(user_id)) if isinstance(user_id, str) else user_id,
-                current_user["user_id"],
-                db,
-                floor=subpremise_floor,
-                apartment_unit=subpremise_unit,
-                is_default=subpremise_is_default,
-                commit=commit,
-            )
-
-        # Refresh address_type from linkages (new address has none, so remains [])
-        derived_types = update_address_type_from_linkages(new_addr.address_id, db, commit=commit)
-        # Re-fetch so response has correct address_type and subpremise (floor, unit, is_default)
-        if user_id:
-            new_addr = self._get_address_with_subpremise(
-                new_addr.address_id, user_id, db, scope=scope
-            ) or address_service.get_by_id(new_addr.address_id, db, scope=scope) or new_addr
-        else:
-            new_addr = address_service.get_by_id(new_addr.address_id, db, scope=scope) or new_addr
-
-        # Handle geocoding: when we have Place Details (place_id path), store immediately.
-        # Otherwise geocode for restaurant/customer employer/customer home from derived types.
-        address_types = derived_types
-        if geoloc_from_place:
-            self._create_geolocation_from_place_details(new_addr, geoloc_from_place, current_user, db, commit=commit)
-        elif isinstance(address_types, list):
-            should_geocode = (
-                "restaurant" in address_types or
-                "customer_employer" in address_types or
-                "customer_home" in address_types
-            )
-            if should_geocode:
-                self._geocode_address(new_addr, address_data, current_user, db, commit=commit, country_name=country_name_for_log)
-
-        return new_addr
-    
-    def _geocode_address(
+    def _handle_geocoding(
         self,
         address: AddressDTO,
-        address_data: Dict[str, Any],
-        current_user: Dict[str, Any],
+        address_data: dict[str, Any],
+        geoloc_from_place: dict | None,
+        derived_types: list | Any,
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
         commit: bool = True,
         *,
-        country_name: Optional[str] = None
+        country_name: str | None = None,
+    ) -> None:
+        """Handle geocoding: place_id path stores immediately; otherwise geocode from derived types."""
+        if geoloc_from_place:
+            self._create_geolocation_from_place_details(address, geoloc_from_place, current_user, db, commit=commit)
+            return
+        if not isinstance(derived_types, list):
+            return
+        geocodable_types = {"restaurant", "customer_employer", "customer_home"}
+        if geocodable_types & set(derived_types):
+            self._geocode_address(address, address_data, current_user, db, commit=commit, country_name=country_name)
+
+    def _geocode_address(
+        self,
+        address: AddressDTO,
+        address_data: dict[str, Any],
+        current_user: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        commit: bool = True,
+        *,
+        country_name: str | None = None,
     ) -> None:
         """
         Geocode an address and create geolocation record.
@@ -481,20 +529,22 @@ class AddressBusinessService:
         """
         # Build full address string for geocoding (country_name from market, not stored on address)
         full_address = self._build_full_address_string(address_data, country_name=country_name)
-        
+
         # Determine address type for logging
         address_types = address_data.get("address_type", [])
         address_type_str = ", ".join(address_types) if isinstance(address_types, list) else str(address_types)
-        
+
         try:
             # Call geocoding API
             geocode_result = call_geocode_api(full_address)
-            
+
             # Validate geocoding result
             if not geocode_result or "latitude" not in geocode_result or "longitude" not in geocode_result:
-                log_warning(f"Geolocation failed for {address_type_str} address: {full_address}. Address created without geolocation.")
+                log_warning(
+                    f"Geolocation failed for {address_type_str} address: {full_address}. Address created without geolocation."
+                )
                 return  # Non-blocking: address is already created, just skip geocoding
-            
+
             # Create geolocation record
             geodata = {
                 "address_id": address.address_id,
@@ -503,22 +553,26 @@ class AddressBusinessService:
                 "is_archived": False,
                 "status": Status.ACTIVE,
                 "modified_by": current_user["user_id"],
-                "modified_date": datetime.now(timezone.utc)
+                "modified_date": datetime.now(UTC),
             }
-            
+
             new_geo = geolocation_service.create(geodata, db, commit=commit)
-            
-            log_info(f"{address_type_str} address geocoded and saved (Geo ID: {new_geo.geolocation_id}) for address ID {address.address_id}")
+
+            log_info(
+                f"{address_type_str} address geocoded and saved (Geo ID: {new_geo.geolocation_id}) for address ID {address.address_id}"
+            )
         except Exception as e:
             # Log but don't block - address is already created
-            log_warning(f"Geocoding error for {address_type_str} address {address.address_id}: {e}. Address created without geolocation.")
-    
+            log_warning(
+                f"Geocoding error for {address_type_str} address {address.address_id}: {e}. Address created without geolocation."
+            )
+
     def _resolve_address_from_place_id(
         self,
         place_id: str,
-        address_data: Dict[str, Any],
-        current_user: Dict[str, Any],
-        session_token: Optional[str] = None,
+        address_data: dict[str, Any],
+        current_user: dict[str, Any],
+        session_token: str | None = None,
     ) -> tuple:
         """
         Fetch address details for place_id/mapbox_id, map to address, validate geography.
@@ -528,9 +582,9 @@ class AddressBusinessService:
         """
         from app.gateways.address_provider import get_search_gateway
         from app.services.address_autocomplete_mapping import (
-            map_place_details_to_address,
             extract_place_details_geolocation,
             get_city_candidates_from_place_details,
+            map_place_details_to_address,
         )
         from app.services.market_service import market_service
         from app.utils.country import normalize_country_code
@@ -538,7 +592,7 @@ class AddressBusinessService:
         gateway = get_search_gateway()
         try:
             # Mapbox: retrieve by mapbox_id; Google: place_details by place_id
-            if hasattr(gateway, 'retrieve'):
+            if hasattr(gateway, "retrieve"):
                 details = gateway.retrieve(place_id, session_token=session_token)
             else:
                 details = gateway.place_details(place_id)
@@ -551,7 +605,7 @@ class AddressBusinessService:
 
         mapped = map_place_details_to_address(details)
         country_code = (mapped.get("country_code") or "").strip().upper()
-        province = (mapped.get("province") or "").strip()
+        (mapped.get("province") or "").strip()
 
         if not country_code:
             raise HTTPException(
@@ -578,13 +632,15 @@ class AddressBusinessService:
         address_data.pop("place_id", None)
 
         geoloc = extract_place_details_geolocation(details)
-        return address_data, geoloc if (geoloc.get("latitude") is not None and geoloc.get("longitude") is not None) else None
+        return address_data, geoloc if (
+            geoloc.get("latitude") is not None and geoloc.get("longitude") is not None
+        ) else None
 
     def _create_geolocation_from_place_details(
         self,
         address: AddressDTO,
-        geoloc: Dict[str, Any],
-        current_user: Dict[str, Any],
+        geoloc: dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
         commit: bool = True,
     ) -> None:
@@ -599,26 +655,33 @@ class AddressBusinessService:
             "is_archived": False,
             "status": Status.ACTIVE,
             "modified_by": current_user["user_id"],
-            "modified_date": datetime.now(timezone.utc),
+            "modified_date": datetime.now(UTC),
         }
         geolocation_service.create(geodata, db, commit=commit)
-        log_info(f"Geolocation created from Place Details (place_id={geoloc.get('place_id')}) for address ID {address.address_id}")
+        log_info(
+            f"Geolocation created from Place Details (place_id={geoloc.get('place_id')}) for address ID {address.address_id}"
+        )
 
-    def _build_full_address_string(self, address_data: Dict[str, Any], *, country_name: Optional[str] = None) -> str:
+    def _build_full_address_string(self, address_data: dict[str, Any], *, country_name: str | None = None) -> str:
         """
         Build a full address string for geocoding.
         country_name is not stored on address; pass from market_info lookup or use country_code as fallback.
         """
-        name = country_name or address_data.get("country_name") or address_data.get("country_code") or address_data.get("country", "")
+        name = (
+            country_name
+            or address_data.get("country_name")
+            or address_data.get("country_code")
+            or address_data.get("country", "")
+        )
         return f"{address_data['building_number']} {address_data['street_name']}, {address_data['city']}, {address_data['province']}, {name}"
-    
-    def validate_address_data(self, address_data: Dict[str, Any]) -> None:
+
+    def validate_address_data(self, address_data: dict[str, Any]) -> None:
         """
         Validate address data for business rules.
-        
+
         Args:
             address_data: Address data dictionary
-            
+
         Raises:
             HTTPException: For validation failures
         """
@@ -627,13 +690,13 @@ class AddressBusinessService:
         if isinstance(address_types, list) and "restaurant" in address_types:
             required_fields = ["building_number", "street_name", "city", "province", "country_code"]
             missing_fields = [field for field in required_fields if not address_data.get(field)]
-            
+
             if missing_fields:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Missing required fields for restaurant address: {', '.join(missing_fields)}"
+                    detail=f"Missing required fields for restaurant address: {', '.join(missing_fields)}",
                 )
-        
+
         # Validate country code format (alpha-2 after normalization)
         country_code = address_data.get("country_code", "").strip()
         country_raw = (address_data.get("country") or "").strip()
@@ -645,25 +708,22 @@ class AddressBusinessService:
         if country_code and len(country_code) != 2:
             raise HTTPException(
                 status_code=400,
-                detail="country_code must be valid ISO 3166-1 alpha-2 or alpha-3; API normalizes to alpha-2. Invalid or unsupported code."
+                detail="country_code must be valid ISO 3166-1 alpha-2 or alpha-3; API normalizes to alpha-2. Invalid or unsupported code.",
             )
 
         # No city-in-supported-list check: any city within a supported country is accepted.
         # Structured create is DEV-only (guardrail above); place_id path gets city from Google.
-    
+
     def get_address_with_geolocation(
-        self, 
-        address_id: UUID, 
-        db: psycopg2.extensions.connection,
-        scope: Optional[InstitutionScope] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, address_id: UUID, db: psycopg2.extensions.connection, scope: InstitutionScope | None = None
+    ) -> dict[str, Any] | None:
         """
         Get address with associated geolocation data.
-        
+
         Args:
             address_id: Address ID
             db: Database connection
-            
+
         Returns:
             Dictionary with address and geolocation data, or None if not found
         """
@@ -671,24 +731,21 @@ class AddressBusinessService:
         address = address_service.get_by_id(address_id, db, scope=scope)
         if not address:
             return None
-        
+
         # Get geolocation if exists
         geolocation = geolocation_service.get_by_address(address_id, db)
-        
-        result = {
-            "address": address,
-            "geolocation": geolocation
-        }
-        
+
+        result = {"address": address, "geolocation": geolocation}
+
         return result
-    
+
     def update_address_with_geocoding(
-        self, 
-        address_id: UUID, 
-        address_data: Dict[str, Any], 
-        current_user: Dict[str, Any], 
+        self,
+        address_id: UUID,
+        address_data: dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
-        scope: Optional[InstitutionScope] = None
+        scope: InstitutionScope | None = None,
     ) -> AddressDTO:
         """
         Update address subpremise only (floor, apartment_unit, is_default). Address core is immutable.
@@ -704,8 +761,12 @@ class AddressBusinessService:
         if "floor" not in address_data and "apartment_unit" not in address_data and "is_default" not in address_data:
             return current_address  # No-op
 
-        user_id = UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"]
-        modified_by = UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"]
+        user_id = (
+            UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"]
+        )
+        modified_by = (
+            UUID(str(current_user["user_id"])) if isinstance(current_user["user_id"], str) else current_user["user_id"]
+        )
 
         # Preserve existing subpremise values when field not in update
         existing_sp = db_read(
@@ -715,8 +776,16 @@ class AddressBusinessService:
             fetch_one=True,
         )
         floor_val = floor if "floor" in address_data else (existing_sp.get("floor") if existing_sp else None)
-        unit_val = apartment_unit if "apartment_unit" in address_data else (existing_sp.get("apartment_unit") if existing_sp else None)
-        default_val = is_default if "is_default" in address_data else (existing_sp.get("is_default", False) if existing_sp else False)
+        unit_val = (
+            apartment_unit
+            if "apartment_unit" in address_data
+            else (existing_sp.get("apartment_unit") if existing_sp else None)
+        )
+        default_val = (
+            is_default
+            if "is_default" in address_data
+            else (existing_sp.get("is_default", False) if existing_sp else False)
+        )
 
         _upsert_address_subpremise(
             address_id,
@@ -737,8 +806,8 @@ class AddressBusinessService:
         address_id: UUID,
         user_id: UUID,
         db: psycopg2.extensions.connection,
-        scope: Optional[InstitutionScope] = None,
-    ) -> Optional[AddressDTO]:
+        scope: InstitutionScope | None = None,
+    ) -> AddressDTO | None:
         """Fetch address with floor, apartment_unit, is_default from subpremise for given user."""
         addr = address_service.get_by_id(address_id, db, scope=scope)
         if not addr:
@@ -761,19 +830,24 @@ class AddressBusinessService:
         )
         if not row:
             return addr
-        d = {**row, "floor": row.get("floor"), "apartment_unit": row.get("apartment_unit"), "is_default": row.get("is_default") or False}
+        d = {
+            **row,
+            "floor": row.get("floor"),
+            "apartment_unit": row.get("apartment_unit"),
+            "is_default": row.get("is_default") or False,
+        }
         return AddressDTO(**d)
-    
+
     def _update_geolocation_for_address(
-        self, 
-        address: AddressDTO, 
-        address_data: Dict[str, Any], 
-        current_user: Dict[str, Any], 
-        db: psycopg2.extensions.connection
+        self,
+        address: AddressDTO,
+        address_data: dict[str, Any],
+        current_user: dict[str, Any],
+        db: psycopg2.extensions.connection,
     ) -> None:
         """
         Update geolocation for an address.
-        
+
         Args:
             address: Address DTO
             address_data: Address data for geocoding
@@ -782,32 +856,28 @@ class AddressBusinessService:
         """
         # Get existing geolocation
         existing_geo = geolocation_service.get_by_address(address.address_id, db)
-        
+
         # Build full address string for geocoding
         full_address = self._build_full_address_string(address_data)
-        
+
         # Call geocoding API
         geocode_result = call_geocode_api(full_address)
-        
+
         if geocode_result and "latitude" in geocode_result and "longitude" in geocode_result:
             geodata = {
                 "latitude": geocode_result["latitude"],
                 "longitude": geocode_result["longitude"],
                 "modified_by": current_user["user_id"],
-                "modified_date": datetime.now(timezone.utc)
+                "modified_date": datetime.now(UTC),
             }
-            
+
             if existing_geo:
                 # Update existing geolocation
                 geolocation_service.update(existing_geo.geolocation_id, geodata, db)
                 log_info(f"Updated geolocation for address ID {address.address_id}")
             else:
                 # Create new geolocation
-                geodata.update({
-                    "address_id": address.address_id,
-                    "is_archived": False,
-                    "status": Status.ACTIVE
-                })
+                geodata.update({"address_id": address.address_id, "is_archived": False, "status": Status.ACTIVE})
                 geolocation_service.create(geodata, db)
                 log_info(f"Created new geolocation for address ID {address.address_id}")
         else:
@@ -816,7 +886,7 @@ class AddressBusinessService:
     def geocode_address_if_required(
         self,
         address_id: UUID,
-        current_user: Dict[str, Any],
+        current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
         *,
         commit: bool = True,

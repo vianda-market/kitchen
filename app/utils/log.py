@@ -24,31 +24,36 @@ console_handler.setFormatter(formatter)
 # Add the handler to the logger
 logger.addHandler(console_handler)
 
-def log_info(message: str):
+
+def log_info(message: str) -> None:
     """
     Log an informational message.
     """
     logger.info(message)
 
-def log_warning(message: str):
+
+def log_warning(message: str) -> None:
     """
     Log a warning message.
     """
     logger.warning(message)
 
-def log_error(message: str):
+
+def log_error(message: str) -> None:
     """
     Log an error message.
     """
     logger.error(message)
 
-def log_debug(message: str):
+
+def log_debug(message: str) -> None:
     """
     Log a debug message.
     """
     logger.debug(message)
 
-def log_critical(message: str):
+
+def log_critical(message: str) -> None:
     """
     Log a critical message.
     """
@@ -99,6 +104,7 @@ def _is_employer_assign_debug_enabled() -> bool:
         return val in ("1", "true", "yes")
     try:
         from app.config.settings import get_settings
+
         val = (get_settings().LOG_EMPLOYER_ASSIGN or "").strip().lower()
         return val in ("1", "true", "yes")
     except Exception:

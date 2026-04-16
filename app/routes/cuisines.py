@@ -4,7 +4,6 @@ Cuisines API — public list/search and supplier suggestion endpoints.
 Replaces the static config-based cuisine list with DB-backed queries.
 """
 
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -28,10 +27,10 @@ from app.utils.locale import resolve_locale_from_header
 router = APIRouter(prefix="/cuisines", tags=["Cuisines"])
 
 
-@router.get("", response_model=List[CuisineResponseSchema])
+@router.get("", response_model=list[CuisineResponseSchema])
 def list_cuisines(
     request: Request,
-    search: Optional[str] = Query(None, description="Filter by cuisine name (case-insensitive partial match)"),
+    search: str | None = Query(None, description="Filter by cuisine name (case-insensitive partial match)"),
     language: str = Query(
         None,
         description="Locale for cuisine names (en, es, pt). Falls back to Accept-Language header, then 'en'.",

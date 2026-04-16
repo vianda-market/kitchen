@@ -2,8 +2,7 @@
 Unit tests for CityMapService (static map snapshot generation and caching).
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 from app.services.city_map_service import CityMapService
 
@@ -17,9 +16,14 @@ class TestCityMapServiceGetSnapshot:
         mock_db_read.return_value = []
         svc = self._make_service()
         result = svc.get_snapshot(
-            center_lat=-34.59, center_lng=-58.40,
-            city="Buenos Aires", country_code="AR",
-            width=600, height=400, retina=True, style="light",
+            center_lat=-34.59,
+            center_lng=-58.40,
+            city="Buenos Aires",
+            country_code="AR",
+            width=600,
+            height=400,
+            retina=True,
+            style="light",
             db=MagicMock(),
         )
         assert result["image_url"] is None
@@ -45,9 +49,14 @@ class TestCityMapServiceGetSnapshot:
         ]
         svc = self._make_service()
         result = svc.get_snapshot(
-            center_lat=-34.59, center_lng=-58.40,
-            city="Buenos Aires", country_code="AR",
-            width=600, height=400, retina=True, style="light",
+            center_lat=-34.59,
+            center_lng=-58.40,
+            city="Buenos Aires",
+            country_code="AR",
+            width=600,
+            height=400,
+            retina=True,
+            style="light",
             db=MagicMock(),
         )
         # Only the near restaurant should be in markers
@@ -74,9 +83,14 @@ class TestCityMapServiceGetSnapshot:
         ]
         svc = self._make_service()
         result = svc.get_snapshot(
-            center_lat=-34.59, center_lng=-58.40,
-            city="Buenos Aires", country_code="AR",
-            width=600, height=400, retina=True, style="light",
+            center_lat=-34.59,
+            center_lng=-58.40,
+            city="Buenos Aires",
+            country_code="AR",
+            width=600,
+            height=400,
+            retina=True,
+            style="light",
             db=MagicMock(),
         )
         assert len(result["markers"]) <= 5
@@ -98,9 +112,14 @@ class TestCityMapServiceGetSnapshot:
         ]
         svc = self._make_service()
         result = svc.get_snapshot(
-            center_lat=-34.59, center_lng=-58.40,
-            city="Buenos Aires", country_code="AR",
-            width=600, height=400, retina=True, style="light",
+            center_lat=-34.59,
+            center_lng=-58.40,
+            city="Buenos Aires",
+            country_code="AR",
+            width=600,
+            height=400,
+            retina=True,
+            style="light",
             db=MagicMock(),
         )
         assert len(result["markers"]) == 1

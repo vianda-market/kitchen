@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
-from app.auth.dependencies import oauth2_scheme
-import httpx
 import os
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.auth.dependencies import oauth2_scheme
 
 MERCADOPAGO_CLIENT_ID = os.getenv("MERCADOPAGO_CLIENT_ID")
 MERCADOPAGO_CLIENT_SECRET = os.getenv("MERCADOPAGO_CLIENT_SECRET")
@@ -13,6 +15,7 @@ router = APIRouter(
     dependencies=[Depends(oauth2_scheme)],
     include_in_schema=False,  # Stub — not production-ready; hidden until Mercado Pago integration is implemented
 )
+
 
 @router.get("/mercadopago/callback")
 async def mercadopago_callback(request: Request):
@@ -28,9 +31,9 @@ async def mercadopago_callback(request: Request):
                 "client_id": MERCADOPAGO_CLIENT_ID,
                 "client_secret": MERCADOPAGO_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": MERCADOPAGO_REDIRECT_URI
+                "redirect_uri": MERCADOPAGO_REDIRECT_URI,
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
         if response.status_code != 200:

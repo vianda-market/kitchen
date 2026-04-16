@@ -4,11 +4,13 @@ Subscription Status Enumeration
 Defines the valid subscription status values used in the subscription_info table.
 Subscription status tracks the lifecycle state of a user's subscription.
 """
+
 from enum import Enum
 
 
 class SubscriptionStatus(str, Enum):
     """Valid subscription status values"""
+
     ACTIVE = "active"
     ON_HOLD = "on_hold"
     PENDING = "pending"

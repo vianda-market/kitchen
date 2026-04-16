@@ -3,9 +3,9 @@ Message catalog for localized API responses.
 Phase 1: scaffold. Phase 5: full entity CRUD, DB constraint, and email subject translations.
 """
 
-from typing import Any, Dict
+from typing import Any
 
-MESSAGES: Dict[str, Dict[str, str]] = {
+MESSAGES: dict[str, dict[str, str]] = {
     "en": {
         # Auth / user errors
         "error.user_not_found": "User not found.",

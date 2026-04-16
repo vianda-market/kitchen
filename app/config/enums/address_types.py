@@ -4,11 +4,13 @@ Address Type Enumeration
 Defines the valid address types that can be assigned to addresses.
 Addresses can have multiple types (array), but each type must be from this enum.
 """
+
 from enum import Enum
 
 
 class AddressType(str, Enum):
     """Valid address types"""
+
     RESTAURANT = "restaurant"
     ENTITY_BILLING = "entity_billing"
     ENTITY_ADDRESS = "entity_address"
@@ -26,4 +28,3 @@ class AddressType(str, Enum):
     def is_valid(cls, value: str) -> bool:
         """Check if a value is a valid address type"""
         return value in cls.values()
-

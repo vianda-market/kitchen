@@ -6,24 +6,22 @@ restaurant pins within the visible frame. Images are cached in GCS with grid-cel
 keys so nearby users share the same cached image.
 """
 
-import hashlib
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import psycopg2.extensions
 
 from app.config.settings import get_settings
 from app.gateways.mapbox_static_gateway import get_mapbox_static_gateway
 from app.utils.db import db_read
-from app.utils.map_projection import (
-    lat_lng_to_pixel,
-    is_within_frame,
-    grid_cell,
-    distance_from_center,
-)
 from app.utils.log import log_info, log_warning
+from app.utils.map_projection import (
+    distance_from_center,
+    grid_cell,
+    is_within_frame,
+    lat_lng_to_pixel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,7 @@ class CityMapService:
         retina: bool,
         style: str,
         db: psycopg2.extensions.connection,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get a cached or freshly generated static map image for the given center point.
 
@@ -65,7 +63,13 @@ class CityMapService:
 
         # 2. Filter to restaurants within the zoom 14 frame and cap at max_pins
         visible_markers = self._filter_to_frame(
-            restaurants, center_lat, center_lng, zoom, width, height, max_pins,
+            restaurants,
+            center_lat,
+            center_lng,
+            zoom,
+            width,
+            height,
+            max_pins,
         )
 
         if not visible_markers:
@@ -82,8 +86,16 @@ class CityMapService:
         # 5. On cache miss: generate and upload
         if not image_url:
             image_url = self._generate_and_cache(
-                style_id, center_lat, center_lng, zoom, width, height, retina,
-                visible_markers, pin_color, blob_name,
+                style_id,
+                center_lat,
+                center_lng,
+                zoom,
+                width,
+                height,
+                retina,
+                visible_markers,
+                pin_color,
+                blob_name,
             )
 
         return {
@@ -97,8 +109,11 @@ class CityMapService:
         }
 
     def _query_restaurants(
-        self, city: str, country_code: str, db: psycopg2.extensions.connection,
-    ) -> List[Dict[str, Any]]:
+        self,
+        city: str,
+        country_code: str,
+        db: psycopg2.extensions.connection,
+    ) -> list[dict[str, Any]]:
         """Query active restaurants with valid coordinates in the city."""
         query = """
             SELECT r.restaurant_id, r.name, g.latitude, g.longitude
@@ -128,24 +143,26 @@ class CityMapService:
 
     def _filter_to_frame(
         self,
-        restaurants: List[Dict[str, Any]],
+        restaurants: list[dict[str, Any]],
         center_lat: float,
         center_lng: float,
         zoom: int,
         width: int,
         height: int,
         max_pins: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Filter restaurants to those visible in the frame and cap at max_pins."""
         visible = []
         for r in restaurants:
             px, py = lat_lng_to_pixel(r["lat"], r["lng"], center_lat, center_lng, zoom, width, height)
             if is_within_frame(px, py, width, height):
-                visible.append({
-                    **r,
-                    "pixel_x": px,
-                    "pixel_y": py,
-                })
+                visible.append(
+                    {
+                        **r,
+                        "pixel_x": px,
+                        "pixel_y": py,
+                    }
+                )
 
         if len(visible) > max_pins:
             visible.sort(key=lambda m: distance_from_center(m["lat"], m["lng"], center_lat, center_lng))
@@ -153,7 +170,7 @@ class CityMapService:
 
         return visible
 
-    def _get_cached_url(self, blob_name: str, cache_seconds: int) -> Optional[str]:
+    def _get_cached_url(self, blob_name: str, cache_seconds: int) -> str | None:
         """Check if a fresh cached image exists in GCS. Returns signed URL or None."""
         settings = get_settings()
         bucket = settings.GCS_INTERNAL_BUCKET
@@ -161,7 +178,8 @@ class CityMapService:
             return None
 
         try:
-            from app.utils.gcs import get_gcs_client, generate_signed_url
+            from app.utils.gcs import generate_signed_url, get_gcs_client
+
             client = get_gcs_client()
             bucket_obj = client.bucket(bucket)
             blob = bucket_obj.blob(blob_name)
@@ -171,7 +189,7 @@ class CityMapService:
 
             blob.reload()
             if blob.updated:
-                age = datetime.now(timezone.utc) - blob.updated
+                age = datetime.now(UTC) - blob.updated
                 if age < timedelta(seconds=cache_seconds):
                     url = generate_signed_url(bucket, blob_name, expiration_seconds=cache_seconds)
                     log_info(f"Map cache hit: {blob_name} (age: {age.total_seconds():.0f}s)")
@@ -192,10 +210,10 @@ class CityMapService:
         width: int,
         height: int,
         retina: bool,
-        markers: List[Dict[str, Any]],
+        markers: list[dict[str, Any]],
         pin_color: str,
         blob_name: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate a static map image via Mapbox and upload to GCS."""
         settings = get_settings()
         bucket = settings.GCS_INTERNAL_BUCKET
@@ -225,7 +243,8 @@ class CityMapService:
             return None
 
         try:
-            from app.utils.gcs import upload_file, generate_signed_url
+            from app.utils.gcs import generate_signed_url, upload_file
+
             upload_file(bucket, blob_name, png_bytes, content_type="image/png")
             url = generate_signed_url(bucket, blob_name, expiration_seconds=settings.MAPBOX_SNAPSHOT_CACHE_SECONDS)
             log_info(f"Map generated and cached: {blob_name} ({len(png_bytes)} bytes)")
@@ -235,8 +254,14 @@ class CityMapService:
             return None
 
     def _empty_response(
-        self, center_lat: float, center_lng: float, zoom: int, width: int, height: int, retina: bool,
-    ) -> Dict[str, Any]:
+        self,
+        center_lat: float,
+        center_lng: float,
+        zoom: int,
+        width: int,
+        height: int,
+        retina: bool,
+    ) -> dict[str, Any]:
         return {
             "image_url": None,
             "center": {"lat": center_lat, "lng": center_lng},

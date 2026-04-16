@@ -1,8 +1,9 @@
 # app/services/stripe_customer_payment_method_sync.py
 """Stripe webhook helpers: persist customer payment methods from payment_method.* events."""
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -14,7 +15,7 @@ from app.utils.log import log_info, log_warning
 def resolve_user_id_for_stripe_customer(
     stripe_customer_id: str,
     db: psycopg2.extensions.connection,
-) -> Optional[UUID]:
+) -> UUID | None:
     row = db_read(
         """
         SELECT u.user_id FROM user_payment_provider upp
@@ -37,8 +38,8 @@ def stripe_pm_attached_insert_if_new(
     user_id: UUID,
     stripe_customer_id: str,
     external_pm_id: str,
-    last4: Optional[str],
-    brand: Optional[str],
+    last4: str | None,
+    brand: str | None,
     db: psycopg2.extensions.connection,
 ) -> None:
     """
@@ -107,9 +108,7 @@ def stripe_pm_attached_insert_if_new(
         )
         if cur.rowcount == 0:
             db.rollback()
-            log_info(
-                f"stripe PM attach: ON CONFLICT epm {external_pm_id}, rolled back orphan payment_method"
-            )
+            log_info(f"stripe PM attach: ON CONFLICT epm {external_pm_id}, rolled back orphan payment_method")
             return
         db.commit()
         log_info(f"stripe PM attach: user={user_id} pm={external_pm_id}")
@@ -132,9 +131,7 @@ def handle_payment_method_attached(
 
     user_id = resolve_user_id_for_stripe_customer(str(customer_id), db)
     if not user_id:
-        log_warning(
-            f"payment_method.attached: no user for stripe_customer_id={customer_id}; skip insert"
-        )
+        log_warning(f"payment_method.attached: no user for stripe_customer_id={customer_id}; skip insert")
         return
 
     card = getattr(payment_method_obj, "card", None)

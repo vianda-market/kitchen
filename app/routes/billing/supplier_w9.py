@@ -1,24 +1,24 @@
 # app/routes/billing/supplier_w9.py
-from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 
+import psycopg2.extensions
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from app.auth.dependencies import get_current_user
+from app.config.enums import TaxClassification
+from app.config.settings import settings
+from app.dependencies.database import get_db
+from app.schemas.billing.supplier_w9 import (
+    SupplierW9CreateSchema,
+    SupplierW9ResponseSchema,
+)
+from app.security.entity_scoping import ENTITY_INSTITUTION_ENTITY, EntityScopingService
 from app.services.billing.supplier_w9_service import (
     create_or_update_w9,
     get_w9_by_entity,
     resolve_w9_document_url,
 )
-from app.schemas.billing.supplier_w9 import (
-    SupplierW9CreateSchema,
-    SupplierW9ResponseSchema,
-)
-from app.security.entity_scoping import EntityScopingService, ENTITY_INSTITUTION_ENTITY
-from app.auth.dependencies import get_current_user
-from app.dependencies.database import get_db
 from app.services.error_handling import handle_business_operation
-from app.config.enums import TaxClassification
-from app.config.settings import settings
-import psycopg2.extensions
 
 router = APIRouter(prefix="/supplier-w9", tags=["Supplier W-9"])
 
@@ -32,8 +32,8 @@ async def submit_w9(
     tax_classification: TaxClassification = Form(...),
     ein_last_four: str = Form(...),
     address_line: str = Form(...),
-    business_name: Optional[str] = Form(None),
-    document: Optional[UploadFile] = File(None),
+    business_name: str | None = Form(None),
+    document: UploadFile | None = File(None),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -71,7 +71,11 @@ async def submit_w9(
     def _submit():
         data_dict = create_data.model_dump(exclude_none=True)
         data_dict["institution_entity_id"] = str(data_dict["institution_entity_id"])
-        data_dict["tax_classification"] = data_dict["tax_classification"].value if hasattr(data_dict["tax_classification"], "value") else data_dict["tax_classification"]
+        data_dict["tax_classification"] = (
+            data_dict["tax_classification"].value
+            if hasattr(data_dict["tax_classification"], "value")
+            else data_dict["tax_classification"]
+        )
 
         w9 = create_or_update_w9(data_dict, file_data, file_content_type, current_user, db)
         w9_dict = w9.model_dump()

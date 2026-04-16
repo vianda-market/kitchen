@@ -1,0 +1,115 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["app"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "T20",    # flake8-print (catches stray print() calls)
+    "RET",    # flake8-return
+    "PIE",    # flake8-pie
+    "C4",     # flake8-comprehensions
+    "PT",     # flake8-pytest-style
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "E402",   # module-level import not at top — needed for sys.path setup patterns
+    "B008",   # function calls in argument defaults — FastAPI Depends() pattern
+"RET504", # unnecessary assignment before return — sometimes aids readability
+    "UP042",  # replace-str-enum — TODO: migrate to StrEnum incrementally
+    "UP045",  # non-pep604-annotation-optional — TODO: migrate Optional[X] to X | None
+    "UP046",  # non-pep695-generic-class — Python 3.12+ syntax, migrate later
+    "UP047",  # non-pep695-generic-function — Python 3.12+ syntax, migrate later
+    "SIM102", # collapsible-if — sometimes nested ifs are clearer
+    "SIM105", # suppressible-exception — contextlib.suppress not always clearer
+    "SIM108", # ternary instead of if-else — readability preference
+    "SIM117", # multiple-with — readability preference
+    "PT009",  # pytest-unittest-assertion — existing tests use unittest style
+    "PT011",  # pytest-raises-too-broad — fix incrementally
+    "PT018",  # pytest-composite-assertion — fix incrementally
+    "PT019",  # pytest-fixture-param-without-value — fix incrementally
+    "SIM103", # needless-bool — 2 remaining are intentionally verbose for readability
+    "C408",   # unnecessary dict() call — stylistic, dict(k=v) is fine
+    "PT012",  # pytest-raises multiple statements — fix incrementally
+    "PT027",  # pytest-unittest-raises-assertion — fix incrementally
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/tests/**/*.py" = ["T20"]                   # allow print in tests
+"app/db/**/*.py" = ["T20", "F403", "F405"]      # allow print and star imports in DB scripts
+"app/config/**/*.py" = ["F405", "F403"]         # config uses star imports
+"app/schemas/versioned_schemas.py" = ["F403", "F405"]  # re-exports via star import
+"scripts/**/*.py" = ["T20", "INP001"]           # allow print, no package needed
+"app/scripts/**/*.py" = ["T20", "INP001"]       # allow print in app scripts
+"docs/**/*.py" = ["INP001"]                     # docs scripts don't need __init__
+
+# ─── mypy ───────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+strict_equality = true
+ignore_missing_imports = true
+
+# Existing errors are tracked in mypy-baseline.txt (mypy-baseline package).
+# New code must pass all checks above. To fix a baseline error, remove its
+# line from mypy-baseline.txt and fix the code — the CI will enforce it.
+
+# Tests: require typed defs but relax some checks
+[[tool.mypy.overrides]]
+module = "app.tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# ─── radon ──────────────────────────────────────────────────────
+[tool.radon]
+# Complexity grades: A (1-5), B (6-10), C (11-15), D (16-20), E (21-25), F (26+)
+# CI gate: fail if any function exceeds grade D (complexity > 25)
+cc_min = "D"
+exclude = "app/tests/*,venv/*,.venv/*"
+
+# ─── wily ───────────────────────────────────────────────────────
+[tool.wily]
+# Track complexity trends over git history
+path = "app"
+max_revisions = 50
+operators = "raw,cyclomatic,maintainability,halstead"
+
+# ─── mutmut ─────────────────────────────────────────────────────
+[tool.mutmut]
+# Scoped to Tier 1 critical business logic only (money/credits).
+# Full-codebase mutation testing is impractical — these are the files
+# where a surviving mutant means financial loss.
+paths_to_mutate = [
+    "app/services/credit_validation_service.py",
+    "app/services/credit_loading_service.py",
+    "app/services/discretionary_service.py",
+    "app/services/billing/institution_billing.py",
+]
+tests_dir = ["app/tests/services/"]
+also_copy = [
+    "app/",
+    "application.py",
+    ".env",
+]
+pytest_add_cli_args = [
+    "--no-header",
+    "-q",
+    "--tb=short",
+]

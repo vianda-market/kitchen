@@ -10,7 +10,7 @@ In PROD_MODE: Makes real API calls. Requires Mapbox access token.
 
 import base64
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -35,6 +35,7 @@ class MapboxStaticGateway(BaseGateway):
     def __init__(self):
         super().__init__()
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if token:
             self.dev_mode = False
@@ -44,7 +45,7 @@ class MapboxStaticGateway(BaseGateway):
     def service_name(self) -> str:
         return "Mapbox Static Images API"
 
-    def _load_mock_responses(self) -> Dict[str, Any]:
+    def _load_mock_responses(self) -> dict[str, Any]:
         return self._load_mock_file("mapbox_static_mocks.json")
 
     def _get_mock_response(self, operation: str, **kwargs) -> Any:
@@ -64,6 +65,7 @@ class MapboxStaticGateway(BaseGateway):
         Returns raw PNG bytes.
         """
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
         if not token:
             raise ExternalServiceError(
@@ -100,7 +102,7 @@ class MapboxStaticGateway(BaseGateway):
         zoom: int,
         width: int,
         height: int,
-        markers: List[Dict[str, Any]],
+        markers: list[dict[str, Any]],
         retina: bool = True,
         pin_color: str = "4a7c59",
     ) -> bytes:
@@ -120,6 +122,7 @@ class MapboxStaticGateway(BaseGateway):
             Raw PNG bytes of the generated map image
         """
         from app.config.settings import get_mapbox_access_token
+
         token = get_mapbox_access_token()
 
         # Build marker overlay string
@@ -153,7 +156,8 @@ class MapboxStaticGateway(BaseGateway):
         if len(url) > MAX_URL_LENGTH:
             logger.warning(
                 "Mapbox Static Images URL exceeds %d chars (%d). Trimming markers.",
-                MAX_URL_LENGTH, len(url),
+                MAX_URL_LENGTH,
+                len(url),
             )
             # Trim markers until URL fits
             while len(url) > MAX_URL_LENGTH and overlay_parts:
@@ -171,7 +175,7 @@ class MapboxStaticGateway(BaseGateway):
 
 
 # Singleton
-_mapbox_static_gateway: Optional[MapboxStaticGateway] = None
+_mapbox_static_gateway: MapboxStaticGateway | None = None
 
 
 def get_mapbox_static_gateway() -> MapboxStaticGateway:

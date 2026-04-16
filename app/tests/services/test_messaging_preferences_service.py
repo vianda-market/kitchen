@@ -4,10 +4,9 @@ Unit tests for Messaging Preferences Service.
 Tests get/update for preference toggles and cascade when can_participate_in_plate_pickups is set to false.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from datetime import datetime, timezone
 
 from app.services.messaging_preferences_service import (
     get_messaging_preferences,
@@ -33,8 +32,8 @@ class TestMessagingPreferencesService:
                 "notify_promotions_email": True,
                 "coworkers_can_see_my_orders": True,
                 "can_participate_in_plate_pickups": True,
-                "created_date": datetime.now(timezone.utc),
-                "modified_date": datetime.now(timezone.utc),
+                "created_date": datetime.now(UTC),
+                "modified_date": datetime.now(UTC),
             },
         ]
         mock_db = MagicMock()

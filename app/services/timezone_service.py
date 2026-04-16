@@ -6,15 +6,15 @@ For single-timezone countries, uses market_info table as source of truth.
 For multi-timezone countries, uses province/state mappings.
 """
 
-from typing import Dict, Optional
 import psycopg2.extensions
 from fastapi import HTTPException
+
 from app.utils.log import log_info, log_warning
-from app.utils.db import db_read
+
 
 class TimezoneService:
     """Service for managing timezone assignments based on country_code and province"""
-    
+
     # Mapping for multi-timezone countries only (country_code alpha-2 -> province -> timezone)
     # Single-timezone countries (AR, PE, CL, etc.) use market_info table
     PROVINCE_TIMEZONE_MAPPING = {
@@ -216,14 +216,14 @@ class TimezoneService:
             "Veracruz": "America/Mexico_City",
             "Yucatan": "America/Merida",
             "Zacatecas": "America/Mexico_City",
-        }
+        },
     }
-    
+
     @classmethod
-    def deduce_timezone(cls, country_code: str, province: Optional[str], db: psycopg2.extensions.connection) -> str:
+    def deduce_timezone(cls, country_code: str, province: str | None, db: psycopg2.extensions.connection) -> str:
         """
         Deduce timezone from country_code and optional province/state.
-        
+
         Logic:
         1. Query market_info for country's default timezone
         2. If country not found → raise HTTPException (400)
@@ -232,40 +232,39 @@ class TimezoneService:
            - If province provided → lookup in PROVINCE_TIMEZONE_MAPPING
            - If province found → return province timezone
            - If province not found or not provided → return market default + log warning
-        
+
         Args:
             country_code: ISO 3166-1 alpha-2 country code (e.g., "AR", "US", "BR")
             province: Province/state name or code (optional for single-TZ countries)
             db: Database connection
-            
+
         Returns:
             Timezone string (e.g., "America/New_York", "America/Argentina/Buenos_Aires")
-            
+
         Raises:
             HTTPException: 400 if country_code not found in market_info
         """
         if not country_code:
             raise HTTPException(status_code=400, detail="country_code is required for timezone deduction")
-        
+
         # Callers (route, address_service) pass already-normalized country_code.
-        
+
         # Query market_info for default timezone
         market_data = cls._get_market_timezone(country_code, db)
         if not market_data:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid country_code: {country_code}. Market not found in market_info."
+                status_code=400, detail=f"Invalid country_code: {country_code}. Market not found in market_info."
             )
-        
+
         default_timezone = market_data["timezone"]
         country_name = market_data["country_name"]
-        
+
         # Check if this is a multi-timezone country
         if country_code not in cls.PROVINCE_TIMEZONE_MAPPING:
             # Single-timezone country - use market default
             log_info(f"Single-timezone country {country_name} ({country_code}): using {default_timezone}")
             return default_timezone
-        
+
         # Multi-timezone country - check province
         if not province:
             log_warning(
@@ -273,19 +272,17 @@ class TimezoneService:
                 f"Using default timezone: {default_timezone}"
             )
             return default_timezone
-        
+
         # Normalize province name
         normalized_province = cls._normalize_province_name(province)
-        
+
         # Lookup province in mapping
         province_mapping = cls.PROVINCE_TIMEZONE_MAPPING[country_code]
         if normalized_province in province_mapping:
             province_timezone = province_mapping[normalized_province]
-            log_info(
-                f"Found timezone for {normalized_province}, {country_name} ({country_code}): {province_timezone}"
-            )
+            log_info(f"Found timezone for {normalized_province}, {country_name} ({country_code}): {province_timezone}")
             return province_timezone
-        
+
         # Province not found - use default + warning
         log_warning(
             f"Province '{province}' not found in timezone mapping for {country_name} ({country_code}). "
@@ -293,7 +290,7 @@ class TimezoneService:
             f"Available provinces: {list(province_mapping.keys())[:10]}..."
         )
         return default_timezone
-    
+
     # Primary timezone per seeded market (ops-curated; single-TZ countries use this directly,
     # multi-TZ countries (US, BR, CA, MX) use PROVINCE_TIMEZONE_MAPPING and fall back to this).
     # Replaces the former SELECT m.timezone from market_info (column dropped in PR2b).
@@ -308,7 +305,7 @@ class TimezoneService:
     }
 
     @classmethod
-    def _get_market_timezone(cls, country_code: str, db: psycopg2.extensions.connection) -> Optional[Dict]:
+    def _get_market_timezone(cls, country_code: str, db: psycopg2.extensions.connection) -> dict | None:
         """
         Return a primary timezone for a country. Used by address-create fallback for
         single-TZ countries. `db` is unused (kept for signature compatibility with callers
@@ -326,62 +323,63 @@ class TimezoneService:
         if tz is None:
             return None
         return {"timezone": tz, "country_name": cc}
-    
+
     @classmethod
     def _normalize_province_name(cls, province: str) -> str:
         """
         Normalize province/state name for consistent lookups.
         Handles variations like "New York" vs "NY" vs "New York State".
-        
+
         Args:
             province: Province/state name or code
-            
+
         Returns:
             Normalized province name
         """
         if not province:
             return ""
-        
+
         # Strip whitespace and convert to title case
         normalized = province.strip().title()
-        
+
         # Remove common suffixes
         suffixes_to_remove = [" State", " Province", " Territory"]
         for suffix in suffixes_to_remove:
             if normalized.endswith(suffix):
-                normalized = normalized[:-len(suffix)].strip()
-        
+                normalized = normalized[: -len(suffix)].strip()
+
         # If it's already uppercase and 2 chars, assume it's a state code
         if province.strip().isupper() and len(province.strip()) == 2:
             normalized = province.strip().upper()
-        
+
         return normalized
-    
+
     @classmethod
     def get_supported_multi_timezone_countries(cls) -> list:
         """
         Get list of country codes with multiple timezones.
-        
+
         Returns:
             List of country codes alpha-2 (e.g., ["US", "BR", "CA", "MX"])
         """
         return list(cls.PROVINCE_TIMEZONE_MAPPING.keys())
-    
+
     @classmethod
     def get_supported_provinces(cls, country_code: str) -> list:
         """
         Get list of supported provinces/states for a multi-timezone country.
-        
+
         Args:
             country_code: ISO 3166-1 alpha-2 country code
-            
+
         Returns:
             List of province names/codes, or empty list if single-timezone country
         """
         if country_code not in cls.PROVINCE_TIMEZONE_MAPPING:
             return []
-        
+
         return list(cls.PROVINCE_TIMEZONE_MAPPING[country_code].keys())
+
 
 # Convenience function for backward compatibility (deprecated)
 def get_timezone_for_location(country: str, city: str) -> str:
@@ -396,16 +394,17 @@ def get_timezone_for_location(country: str, city: str) -> str:
     # Fallback to a default timezone
     return "America/New_York"
 
-def deduce_timezone_from_address(country_code: str, province: Optional[str], db: psycopg2.extensions.connection) -> str:
+
+def deduce_timezone_from_address(country_code: str, province: str | None, db: psycopg2.extensions.connection) -> str:
     """
     Deduce timezone from country_code and province.
     Convenience function that delegates to TimezoneService.deduce_timezone().
-    
+
     Args:
         country_code: ISO 3166-1 alpha-2 country code (e.g., "AR", "US")
         province: Province/state name or code (optional for single-TZ countries)
         db: Database connection
-        
+
     Returns:
         Timezone string (e.g., "America/New_York")
     """

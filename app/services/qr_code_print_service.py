@@ -7,8 +7,6 @@ from __future__ import annotations
 import base64
 import html
 import os
-from typing import Optional
-from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
@@ -17,7 +15,6 @@ from app.config.settings import settings
 from app.schemas.consolidated_schemas import QRCodePrintContextSchema
 from app.utils.address_formatting import format_street_display
 from app.utils.log import log_error
-
 
 _PRINT_CSS = """
 @media print {
@@ -54,7 +51,7 @@ _PRINT_CSS = """
 """
 
 
-def autoprint_enabled(autoprint: Optional[str]) -> bool:
+def autoprint_enabled(autoprint: str | None) -> bool:
     """True only when the query value is the word 'true' (case-insensitive).
 
     Callers must pass the raw query string from ``Query(None)``, not a FastAPI
@@ -102,9 +99,7 @@ def format_address_lines_for_print(ctx: QRCodePrintContextSchema) -> tuple[str, 
         ctx.building_number,
     )
     locality_parts = [
-        p.strip()
-        for p in (ctx.city, ctx.province, ctx.postal_code, ctx.country_name)
-        if p and str(p).strip()
+        p.strip() for p in (ctx.city, ctx.province, ctx.postal_code, ctx.country_name) if p and str(p).strip()
     ]
     locality = ", ".join(locality_parts)
     return street, locality
@@ -125,20 +120,18 @@ def build_qr_code_print_html(
 
     autoprint_script = ""
     if autoprint:
-        autoprint_script = (
-            "<script>window.onload = function() { window.print(); }</script>"
-        )
+        autoprint_script = "<script>window.onload = function() { window.print(); }</script>"
 
     address_block = ""
     if street_esc or locality_esc:
-        address_block = "<div class=\"address\">"
+        address_block = '<div class="address">'
         if street_esc:
             address_block += f"<p>{street_esc}</p>"
         if locality_esc:
             address_block += f"<p>{locality_esc}</p>"
         address_block += "</div>"
 
-    footer = "<p class=\"footer\">Scan to confirm pickup</p>"
+    footer = '<p class="footer">Scan to confirm pickup</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -165,7 +158,7 @@ def build_qr_code_print_html(
 def qr_code_print_response(
     ctx: QRCodePrintContextSchema,
     *,
-    autoprint: Optional[str],
+    autoprint: str | None,
 ) -> HTMLResponse:
     """Build HTMLResponse with embedded QR image."""
     b64 = load_qr_png_base64(ctx.image_storage_path)

@@ -7,20 +7,21 @@ Provides get_coworkers_with_eligibility for the "Offer to pick up" flow:
 - Ineligible: has order for different restaurant or conflicting pickup time
 """
 
-from typing import List, Dict, Any
+from typing import Any
 from uuid import UUID
+
 import psycopg2.extensions
 from fastapi import HTTPException
 
 from app.utils.db import db_read
-from app.utils.log import log_info, log_warning
+from app.utils.log import log_info
 
 
 def get_coworkers_with_eligibility(
     plate_selection_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Get coworkers (same employer) with eligibility for pickup notification.
 
@@ -90,8 +91,9 @@ def get_coworkers_with_eligibility(
 
     if match_field == "workplace_group_id":
         # workplace_group_id takes precedence — match all users in the same group
-        coworkers = db_read(
-            """
+        coworkers = (
+            db_read(
+                """
             SELECT u.user_id, u.first_name, u.last_name
             FROM user_info u
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
@@ -100,12 +102,15 @@ def get_coworkers_with_eligibility(
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
-            (str(match_value), str(current_user_id)),
-            connection=db,
-        ) or []
+                (str(match_value), str(current_user_id)),
+                connection=db,
+            )
+            or []
+        )
     elif employer_address_id is not None:
-        coworkers = db_read(
-            """
+        coworkers = (
+            db_read(
+                """
             SELECT u.user_id, u.first_name, u.last_name
             FROM user_info u
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
@@ -115,13 +120,16 @@ def get_coworkers_with_eligibility(
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
-            (str(match_value), str(current_user_id), str(employer_address_id)),
-            connection=db,
-        ) or []
+                (str(match_value), str(current_user_id), str(employer_address_id)),
+                connection=db,
+            )
+            or []
+        )
     else:
         # User has no employer_address_id: only match coworkers who also have no employer_address_id
-        coworkers = db_read(
-            """
+        coworkers = (
+            db_read(
+                """
             SELECT u.user_id, u.first_name, u.last_name
             FROM user_info u
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
@@ -131,9 +139,11 @@ def get_coworkers_with_eligibility(
               AND ump.can_participate_in_plate_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
-            (str(match_value), str(current_user_id)),
-            connection=db,
-        ) or []
+                (str(match_value), str(current_user_id)),
+                connection=db,
+            )
+            or []
+        )
 
     # For each coworker, check if they have a plate_selection for same kitchen_day
     # Eligible = no selection for this kitchen_day
@@ -172,23 +182,25 @@ def get_coworkers_with_eligibility(
             else:
                 ineligibility_reason = "already_ordered_different_pickup_time"
 
-        result.append({
-            "user_id": user_id,
-            "first_name": first_name,
-            "last_initial": last_initial,
-            "eligible": eligible,
-            "ineligibility_reason": ineligibility_reason,
-        })
+        result.append(
+            {
+                "user_id": user_id,
+                "first_name": first_name,
+                "last_initial": last_initial,
+                "eligible": eligible,
+                "ineligibility_reason": ineligibility_reason,
+            }
+        )
 
     return result
 
 
 def notify_coworkers(
     plate_selection_id: UUID,
-    user_ids: List[UUID],
+    user_ids: list[UUID],
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Record coworker pickup notifications. Validates all user_ids are eligible.
 

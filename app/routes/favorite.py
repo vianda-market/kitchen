@@ -5,22 +5,22 @@ Customer-only: add, remove, and list favorites (plates and restaurants).
 """
 
 from uuid import UUID
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+
 import psycopg2.extensions
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_client_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     FavoriteCreateSchema,
-    FavoriteResponseSchema,
     FavoriteIdsResponseSchema,
+    FavoriteResponseSchema,
 )
 from app.services.favorite_service import (
     add_favorite,
-    remove_favorite,
     get_favorite_ids,
     get_favorites_by_user,
+    remove_favorite,
 )
 from app.utils.log import log_error
 
@@ -59,7 +59,7 @@ def create_favorite(
         raise
     except Exception as e:
         log_error(f"Error adding favorite: {e}")
-        raise HTTPException(status_code=500, detail="Failed to add favorite")
+        raise HTTPException(status_code=500, detail="Failed to add favorite") from None
 
 
 @router.delete("/{entity_type}/{entity_id}", status_code=204)
@@ -80,17 +80,17 @@ def delete_favorite(
             entity_id=entity_id,
             db=db,
         )
-        return None
+        return
     except HTTPException:
         raise
     except Exception as e:
         log_error(f"Error removing favorite: {e}")
-        raise HTTPException(status_code=500, detail="Failed to remove favorite")
+        raise HTTPException(status_code=500, detail="Failed to remove favorite") from None
 
 
 @router.get("/me", response_model=list[FavoriteResponseSchema])
 def list_my_favorites(
-    entity_type: Optional[str] = Query(None, description="Filter by 'plate' or 'restaurant'"),
+    entity_type: str | None = Query(None, description="Filter by 'plate' or 'restaurant'"),
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):

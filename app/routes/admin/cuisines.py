@@ -5,7 +5,6 @@ Internal-only endpoints for managing the canonical cuisine list
 and reviewing supplier suggestions.
 """
 
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,19 +14,20 @@ from app.auth.dependencies import get_admin_user
 from app.dependencies.database import get_db
 from app.schemas.consolidated_schemas import (
     CuisineCreateSchema,
-    CuisineUpdateSchema,
     CuisineDetailResponseSchema,
-    CuisineSuggestionResponseSchema,
     CuisineSuggestionApproveSchema,
     CuisineSuggestionRejectSchema,
+    CuisineSuggestionResponseSchema,
+    CuisineUpdateSchema,
 )
-from app.services.crud_service import cuisine_crud_service
 from app.services import cuisine_service
+from app.services.crud_service import cuisine_crud_service
 
 router = APIRouter(prefix="/admin/cuisines", tags=["Admin Cuisines"])
 
 
 # ---- Cuisine CRUD ----
+
 
 @router.post("", response_model=CuisineDetailResponseSchema, status_code=201)
 def create_cuisine(
@@ -51,7 +51,7 @@ def create_cuisine(
     return result
 
 
-@router.get("", response_model=List[CuisineDetailResponseSchema])
+@router.get("", response_model=list[CuisineDetailResponseSchema])
 def list_all_cuisines(
     current_user: dict = Depends(get_admin_user),
     db: connection = Depends(get_db),
@@ -61,7 +61,7 @@ def list_all_cuisines(
     return [CuisineDetailResponseSchema(**row) for row in rows]
 
 
-@router.get("/suggestions", response_model=List[CuisineSuggestionResponseSchema])
+@router.get("/suggestions", response_model=list[CuisineSuggestionResponseSchema])
 def list_pending_suggestions(
     current_user: dict = Depends(get_admin_user),
     db: connection = Depends(get_db),
@@ -122,6 +122,7 @@ def soft_delete_cuisine(
 
 
 # ---- Suggestion Review ----
+
 
 @router.put("/suggestions/{suggestion_id}/approve", response_model=CuisineSuggestionResponseSchema)
 def approve_suggestion(

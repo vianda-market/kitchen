@@ -3,8 +3,8 @@
 Mock Stripe Connect implementation. Same signatures as connect_gateway.py; no HTTP calls.
 Used when SUPPLIER_PAYOUT_PROVIDER=mock (default for dev/test environments).
 """
+
 import uuid
-from typing import Optional
 from uuid import UUID
 
 import psycopg2.extensions
@@ -12,7 +12,7 @@ import psycopg2.extensions
 from app.utils.log import log_info
 
 
-def create_connected_account(entity_id: UUID, name: str, email: Optional[str] = None) -> str:
+def create_connected_account(entity_id: UUID, name: str, email: str | None = None) -> str:
     """Return a fake acct_mock_… ID; no Stripe call made."""
     mock_id = f"acct_mock_{uuid.uuid4().hex[:16]}"
     log_info(f"[MOCK] Created Connect account {mock_id} for entity {entity_id}")
@@ -76,6 +76,7 @@ def execute_supplier_payout(
     but uses fake transfer IDs. No real Stripe calls.
     """
     from fastapi import HTTPException
+
     from app.services.crud_service import institution_bill_service, institution_entity_service
 
     bill = institution_bill_service.get_by_id(str(institution_bill_id), db)
@@ -159,4 +160,4 @@ def execute_supplier_payout(
         )
         row = cur.fetchone()
         cols = [desc[0] for desc in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))

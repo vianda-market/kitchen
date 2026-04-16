@@ -4,6 +4,7 @@ restaurant update validation and by leads/explorer filtering (via shared SQL pat
 """
 
 from uuid import UUID
+
 import psycopg2.extensions
 
 from app.utils.db import db_read

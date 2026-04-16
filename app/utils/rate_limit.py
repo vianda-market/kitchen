@@ -16,6 +16,7 @@ Production (DEV_MODE=False) always enforces limits.
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 from app.config.settings import settings
 
 limiter = Limiter(

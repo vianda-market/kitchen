@@ -5,11 +5,9 @@ Read-only endpoints for the superadmin city/country promotion UI.
 Queries raw GeoNames tables in the `external` schema.
 """
 
-from typing import List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query
 from psycopg2.extensions import connection
+from pydantic import BaseModel
 
 from app.auth.dependencies import get_super_admin_user
 from app.dependencies.database import get_db
@@ -22,36 +20,38 @@ router = APIRouter(prefix="/admin/external", tags=["Admin: External Data"])
 # Response schemas (admin-only, not in consolidated_schemas.py)
 # ---------------------------------------------------------------------------
 
+
 class GeonamesCountryResponse(BaseModel):
     iso_alpha2: str
     name: str
-    population: Optional[int] = None
-    continent: Optional[str] = None
+    population: int | None = None
+    continent: str | None = None
 
 
 class GeonamesProvinceResponse(BaseModel):
     admin1_full_code: str
     country_iso: str
     name: str
-    ascii_name: Optional[str] = None
-    geonames_id: Optional[int] = None
+    ascii_name: str | None = None
+    geonames_id: int | None = None
 
 
 class GeonamesCityResponse(BaseModel):
     geonames_id: int
     name: str
-    ascii_name: Optional[str] = None
+    ascii_name: str | None = None
     country_iso: str
-    admin1_code: Optional[str] = None
-    population: Optional[int] = None
-    timezone: Optional[str] = None
+    admin1_code: str | None = None
+    population: int | None = None
+    timezone: str | None = None
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/countries", response_model=List[GeonamesCountryResponse])
+
+@router.get("/countries", response_model=list[GeonamesCountryResponse])
 async def list_geonames_countries(
     current_user: dict = Depends(get_super_admin_user),
     db: connection = Depends(get_db),
@@ -72,7 +72,7 @@ async def list_geonames_countries(
     return rows
 
 
-@router.get("/provinces", response_model=List[GeonamesProvinceResponse])
+@router.get("/provinces", response_model=list[GeonamesProvinceResponse])
 async def list_geonames_provinces(
     country_iso: str = Query(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 country code"),
     current_user: dict = Depends(get_super_admin_user),
@@ -96,11 +96,11 @@ async def list_geonames_provinces(
     return rows
 
 
-@router.get("/cities", response_model=List[GeonamesCityResponse])
+@router.get("/cities", response_model=list[GeonamesCityResponse])
 async def list_geonames_cities(
     country_iso: str = Query(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 country code"),
-    admin1_code: Optional[str] = Query(None, description="Admin1 code to filter provinces"),
-    q: Optional[str] = Query(None, description="Search string (matches ascii_name, case-insensitive)"),
+    admin1_code: str | None = Query(None, description="Admin1 code to filter provinces"),
+    q: str | None = Query(None, description="Search string (matches ascii_name, case-insensitive)"),
     current_user: dict = Depends(get_super_admin_user),
     db: connection = Depends(get_db),
 ):

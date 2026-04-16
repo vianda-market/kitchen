@@ -1,0 +1,5 @@
+# Baselined high-complexity functions (cyclomatic complexity > 25).
+# These existed before the complexity gate was added.
+# Remove entries as you refactor them — the CI gate will then enforce the limit.
+#
+# Format: file_path:function_name

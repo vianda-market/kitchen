@@ -8,8 +8,8 @@ and Supplier role restrictions (e.g. Admin-only vs Manager read-only).
 """
 
 from typing import Any
-from fastapi import HTTPException, status
 
+from fastapi import HTTPException, status
 
 # Supplier may only use these address types (no customer-facing types on main address API)
 SUPPLIER_ALLOWED_ADDRESS_TYPES = {"restaurant", "entity_billing", "entity_address"}
@@ -127,7 +127,11 @@ def ensure_address_type_matches_institution_type(
     """
     if not address_type_list or not institution_type:
         return
-    inst_type = (institution_type if isinstance(institution_type, str) else getattr(institution_type, "value", str(institution_type))).strip()
+    inst_type = (
+        institution_type
+        if isinstance(institution_type, str)
+        else getattr(institution_type, "value", str(institution_type))
+    ).strip()
     types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
     has_customer_types = bool(types_set & CUSTOMER_INSTITUTION_ADDRESS_TYPES)
     has_entity_types = bool(types_set & ENTITY_INSTITUTION_ADDRESS_TYPES)
@@ -217,7 +221,7 @@ def ensure_operator_cannot_create_users(current_user: dict) -> None:
     - Supplier Operator: Cannot create users (403; also blocked by ensure_supplier_can_create_edit_users).
     - All other roles: No restriction.
     """
-    role_type = (current_user.get("role_type") or "").strip()
+    (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     if role_name == "operator":
         raise HTTPException(
@@ -247,6 +251,7 @@ def ensure_can_assign_role_name(
     Customer role_names (Comensal only) and Employer role_names (Admin, Manager, Comensal) are validated
     by ensure_user_role_name_allowed; only Internal can create Customer and Employer users.
     """
+
     def _str(v: Any) -> str:
         if v is None:
             return ""
@@ -317,6 +322,7 @@ def ensure_can_edit_user(
     - Admin cannot edit Super Admin (prevents downgrading Super Admin).
     - Operator cannot edit anyone (enforced elsewhere).
     """
+
     def _str(v: Any) -> str:
         if v is None:
             return ""
@@ -473,9 +479,7 @@ def ensure_supplier_admin_only(current_user: dict) -> None:
     if role_type != "supplier" or role_name not in SUPPLIER_ADMIN_ONLY_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only Supplier Admin can access this resource."
-            ),
+            detail=("Only Supplier Admin can access this resource."),
         )
 
 

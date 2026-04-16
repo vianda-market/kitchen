@@ -4,9 +4,8 @@ Unit tests for ads models (app/services/ads/models.py).
 Verifies enum values, ConversionEvent serialization round-trip,
 and ConversionResult construction.
 """
-from datetime import datetime, timezone
 
-import pytest
+from datetime import UTC, datetime
 
 from app.services.ads.models import (
     AdsPlatform,
@@ -49,7 +48,7 @@ class TestConversionEventSerialization:
             user_phone="+5491155550001",
             conversion_value=10.0,
             currency_code="ARS",
-            event_time=datetime(2026, 4, 9, 12, 0, 0, tzinfo=timezone.utc),
+            event_time=datetime(2026, 4, 9, 12, 0, 0, tzinfo=UTC),
             gclid=None,
             fbc="fb.1.1234.abcd",
             fbp="fb.1.1234.9876",
@@ -103,7 +102,8 @@ class TestConversionEventSerialization:
             event_type=ConversionEventType.SUBSCRIBE,
             strategy=CampaignStrategy.B2C_SUBSCRIBER,
             gclid="CjwKCAtest",
-            fbc=None, fbp=None,
+            fbc=None,
+            fbp=None,
         )
         d = event.to_dict()
         assert d["platform"] == "google"
@@ -112,9 +112,7 @@ class TestConversionEventSerialization:
 
 class TestConversionResult:
     def test_success_result(self):
-        result = ConversionResult(
-            success=True, platform=AdsPlatform.META, entity_id="sub-123"
-        )
+        result = ConversionResult(success=True, platform=AdsPlatform.META, entity_id="sub-123")
         assert result.success
         assert result.error_message is None
 

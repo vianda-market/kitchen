@@ -5,15 +5,16 @@ Tests the business logic for user signup operations including
 password hashing, role assignment, institution assignment, and validation.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from datetime import UTC
+from unittest.mock import MagicMock, patch
 from uuid import UUID
+
+import pytest
 from fastapi import HTTPException, status
 
-from app.services.user_signup_service import UserSignupService, user_signup_service
-from app.dto.models import UserDTO
-from app.config import RoleType, RoleName, Status
+from app.config import Status
 from app.config.settings import get_vianda_customers_institution_id
+from app.services.user_signup_service import UserSignupService, user_signup_service
 
 
 class TestUserSignupService:
@@ -23,11 +24,11 @@ class TestUserSignupService:
         """Test that customer signup validates required fields."""
         # Arrange
         incomplete_data = {"email": "test@example.com"}  # Missing required fields
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_customer_signup(incomplete_data, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Missing required fields" in str(exc_info.value.detail)
 
@@ -38,13 +39,13 @@ class TestUserSignupService:
             "email": "invalid-email",
             "password": "plaintext123",
             "first_name": "John",
-            "last_name": "Doe"
+            "last_name": "Doe",
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_customer_signup(invalid_email_data, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid email format" in str(exc_info.value.detail)
 
@@ -55,23 +56,33 @@ class TestUserSignupService:
             "email": "test@example.com",
             "password": "123",  # Too short
             "first_name": "John",
-            "last_name": "Doe"
+            "last_name": "Doe",
         }
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_customer_signup(weak_password_data, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Password must be at least 8 characters long" in str(exc_info.value.detail)
 
-    @patch('app.utils.db.db_read')
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_user_with_validation')
-    def test_process_customer_signup_hashes_password(self, mock_create_user, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db, sample_user_dto):
+    @patch("app.utils.db.db_read")
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_user_with_validation")
+    def test_process_customer_signup_hashes_password(
+        self,
+        mock_create_user,
+        mock_market_service,
+        mock_city_service,
+        mock_db_read,
+        sample_user_data,
+        mock_db,
+        sample_user_dto,
+    ):
         """Test that password is hashed during customer signup process."""
         from app.tests.conftest import SAMPLE_MARKET_ID
+
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
@@ -81,7 +92,7 @@ class TestUserSignupService:
         mock_create_user.return_value = sample_user_dto
 
         # Act
-        result = user_signup_service.process_customer_signup(sample_user_data, mock_db)
+        user_signup_service.process_customer_signup(sample_user_data, mock_db)
 
         # Assert
         # Verify password was hashed and plain password removed
@@ -90,20 +101,30 @@ class TestUserSignupService:
         assert "password" not in call_args
         assert call_args["hashed_password"] != original_password
 
-    @patch('app.utils.db.db_read')
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_user_with_validation')
-    def test_process_customer_signup_applies_customer_rules(self, mock_create_user, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db, sample_user_dto):
+    @patch("app.utils.db.db_read")
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_user_with_validation")
+    def test_process_customer_signup_applies_customer_rules(
+        self,
+        mock_create_user,
+        mock_market_service,
+        mock_city_service,
+        mock_db_read,
+        sample_user_data,
+        mock_db,
+        sample_user_dto,
+    ):
         """Test that customer signup applies correct business rules; country_code is resolved to market_id."""
         from app.tests.conftest import SAMPLE_MARKET_ID
+
         mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False}
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         mock_db_read.return_value = None  # No employer domain match
         mock_create_user.return_value = sample_user_dto
 
-        result = user_signup_service.process_customer_signup(sample_user_data, mock_db)
+        user_signup_service.process_customer_signup(sample_user_data, mock_db)
 
         call_args = mock_create_user.call_args[0][0]
         assert call_args["institution_id"] == get_vianda_customers_institution_id()
@@ -117,16 +138,12 @@ class TestUserSignupService:
     def test_process_customer_signup_handles_missing_password(self, mock_db):
         """Test that customer signup handles missing password gracefully."""
         # Arrange
-        user_data_without_password = {
-            "email": "test@example.com",
-            "first_name": "John",
-            "last_name": "Doe"
-        }
-        
+        user_data_without_password = {"email": "test@example.com", "first_name": "John", "last_name": "Doe"}
+
         # Act & Assert - Should raise validation error for missing password
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_customer_signup(user_data_without_password, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Missing required fields" in str(exc_info.value.detail)
         assert "password" in str(exc_info.value.detail)
@@ -136,18 +153,18 @@ class TestUserSignupService:
         # Arrange
         incomplete_data = {"email": "test@example.com"}  # Missing required fields
         current_user = {"user_id": str(UUID("12345678-1234-1234-1234-123456789012"))}
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_admin_user_creation(incomplete_data, current_user, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         # Validation fails on role_type/role_name or institution_id
         detail = str(exc_info.value.detail)
         assert "role" in detail.lower() or "institution" in detail.lower()
 
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.city_service')
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.city_service")
     def test_process_admin_user_creation_validates_institution_required(
         self, mock_city_service, mock_market_service, mock_db
     ):
@@ -160,7 +177,7 @@ class TestUserSignupService:
             "first_name": "John",
             "last_name": "Doe",
             "role_type": "supplier",
-            "role_name": "admin"
+            "role_name": "admin",
         }
         current_user = {"user_id": str(UUID("12345678-1234-1234-1234-123456789012"))}
 
@@ -178,21 +195,23 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "institution_id": str(UUID("12345678-1234-1234-1234-123456789012"))
+            "institution_id": str(UUID("12345678-1234-1234-1234-123456789012")),
         }
         current_user = {"user_id": str(UUID("12345678-1234-1234-1234-123456789012"))}
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.process_admin_user_creation(data_without_role, current_user, mock_db)
-        
+
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         # Error message should mention role_type or role_name
         assert "role" in str(exc_info.value.detail).lower()
 
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_user_with_validation')
-    def test_process_admin_user_creation_sets_modified_by(self, mock_create_user, mock_market_service, sample_current_user, mock_db, sample_user_dto):
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_user_with_validation")
+    def test_process_admin_user_creation_sets_modified_by(
+        self, mock_create_user, mock_market_service, sample_current_user, mock_db, sample_user_dto
+    ):
         """Test that admin user creation sets modified_by to current user."""
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         # Arrange - use Employee Admin (no institution market check, no db cursor)
@@ -202,23 +221,30 @@ class TestUserSignupService:
             "last_name": "Doe",
             "password": "Password123!",
             "role_type": "internal",
-            "role_name": "admin"
+            "role_name": "admin",
         }
         mock_create_user.return_value = sample_user_dto
-        
+
         # Act
-        result = user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)
-        
+        user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)
+
         # Assert
         call_args = mock_create_user.call_args[0][0]
         assert call_args["modified_by"] == sample_current_user["user_id"]
 
-    @patch.object(user_signup_service, '_send_b2b_invite_email')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_user_with_validation')
-    @patch('secrets.choice')
+    @patch.object(user_signup_service, "_send_b2b_invite_email")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_user_with_validation")
+    @patch("secrets.choice")
     def test_process_admin_user_creation_generates_temp_password_and_sends_invite(
-        self, mock_secrets, mock_create_user, mock_market_service, mock_send_invite, sample_current_user, mock_db, sample_user_dto
+        self,
+        mock_secrets,
+        mock_create_user,
+        mock_market_service,
+        mock_send_invite,
+        sample_current_user,
+        mock_db,
+        sample_user_dto,
     ):
         """Test that admin user creation generates placeholder hash and sends invite email when no password provided."""
         mock_market_service.get_by_id.return_value = {"is_archived": False}
@@ -229,13 +255,13 @@ class TestUserSignupService:
             "first_name": "John",
             "last_name": "Doe",
             "role_type": "internal",
-            "role_name": "admin"
+            "role_name": "admin",
         }
         mock_create_user.return_value = sample_user_dto
-        mock_secrets.return_value = 'a'  # Mock random character
+        mock_secrets.return_value = "a"  # Mock random character
 
         # Act
-        result = user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)
+        user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)
 
         # Assert
         call_args = mock_create_user.call_args[0][0]
@@ -249,9 +275,9 @@ class TestUserSignupService:
             mock_db,
         )
 
-    @patch.object(user_signup_service, '_send_b2b_invite_email')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_user_with_validation')
+    @patch.object(user_signup_service, "_send_b2b_invite_email")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_user_with_validation")
     def test_process_admin_user_creation_with_password_does_not_send_invite(
         self, mock_create_user, mock_market_service, mock_send_invite, sample_current_user, mock_db, sample_user_dto
     ):
@@ -263,7 +289,7 @@ class TestUserSignupService:
             "first_name": "John",
             "password": "SecurePass123!",
             "role_type": "internal",
-            "role_name": "admin"
+            "role_name": "admin",
         }
 
         result = user_signup_service.process_admin_user_creation(user_data, sample_current_user, mock_db)
@@ -278,11 +304,11 @@ class TestUserSignupService:
         """Test that user permission validation requires authentication."""
         # Arrange
         no_user = None
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.validate_user_permissions(no_user)
-        
+
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Authentication required" in str(exc_info.value.detail)
 
@@ -290,11 +316,11 @@ class TestUserSignupService:
         """Test that user permission validation requires user_id."""
         # Arrange
         user_without_id = {"username": "admin"}
-        
+
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.validate_user_permissions(user_without_id)
-        
+
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Authentication required" in str(exc_info.value.detail)
 
@@ -307,19 +333,22 @@ class TestUserSignupService:
         """Test that signup constants are returned correctly."""
         # Act
         constants = user_signup_service.get_signup_constants()
-        
+
         # Assert
         assert constants["customer_institution"] == get_vianda_customers_institution_id()
         assert constants["customer_role_type"] == UserSignupService.CUSTOMER_ROLE_TYPE.value
         assert constants["customer_role_name"] == UserSignupService.CUSTOMER_ROLE_NAME.value
         assert constants["bot_user_id"] == UserSignupService.BOT_USER_ID
 
-    @patch('app.utils.db.db_read')
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    def test_apply_customer_signup_rules_sets_defaults(self, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db):
+    @patch("app.utils.db.db_read")
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    def test_apply_customer_signup_rules_sets_defaults(
+        self, mock_market_service, mock_city_service, mock_db_read, sample_user_data, mock_db
+    ):
         """Test that customer signup rules set correct default values; market_id and city_metadata_id are preserved from input."""
         from app.tests.conftest import SAMPLE_MARKET_ID
+
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         mock_market_service.get_by_id.return_value = {"is_archived": False}
         mock_db_read.return_value = None  # No employer domain match
@@ -343,12 +372,12 @@ class TestUserSignupService:
         user_data = {
             "email": "TEST@EXAMPLE.COM",  # Should be lowercased
             "first_name": "John",
-            "last_name": "Doe"
+            "last_name": "Doe",
         }
-        
+
         # Act
         user_signup_service._apply_admin_creation_rules(user_data, sample_current_user)
-        
+
         # Assert - no hashed_password = invite flow, status = Inactive
         assert user_data["modified_by"] == sample_current_user["user_id"]
         assert user_data["email"] == "test@example.com"  # Should be lowercase
@@ -362,23 +391,23 @@ class TestUserSignupService:
             "email": "test@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "hashed_password": "already_hashed"
+            "hashed_password": "already_hashed",
         }
         # Act
         user_signup_service._apply_admin_creation_rules(user_data, sample_current_user)
         # Assert
         assert user_data["status"] == Status.ACTIVE
 
-    @patch('app.auth.security.hash_password')
+    @patch("app.auth.security.hash_password")
     def test_process_password_security_hashes_password(self, mock_hash_password, sample_user_data):
         """Test that password security processing hashes password correctly."""
         # Arrange
         user_data = sample_user_data.copy()
         mock_hash_password.return_value = "hashed_password_123"
-        
+
         # Act
         user_signup_service._process_password_security(user_data)
-        
+
         # Assert
         mock_hash_password.assert_called_once_with(sample_user_data["password"])
         assert user_data["hashed_password"] == "hashed_password_123"
@@ -409,18 +438,29 @@ class TestUserSignupService:
 
     # ========== Email verification flow: request_customer_signup ==========
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.email_service')
-    @patch('app.services.user_signup_service.get_user_by_email')
-    @patch('app.services.user_signup_service.get_user_by_username')
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.email_service")
+    @patch("app.services.user_signup_service.get_user_by_email")
+    @patch("app.services.user_signup_service.get_user_by_username")
     def test_request_customer_signup_returns_success_and_sends_email(
-        self, mock_get_by_username, mock_get_by_email, mock_email_service, mock_market_service,
-        mock_city_service, sample_user_data, mock_db
+        self,
+        mock_get_by_username,
+        mock_get_by_email,
+        mock_email_service,
+        mock_market_service,
+        mock_city_service,
+        sample_user_data,
+        mock_db,
     ):
         """request_customer_signup stores pending and sends email when email/username free."""
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
+
+        mock_market_service.get_by_country_code.return_value = {
+            "market_id": SAMPLE_MARKET_ID,
+            "is_archived": False,
+            "country_code": "US",
+        }
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
@@ -441,17 +481,21 @@ class TestUserSignupService:
         assert "verification code" in result["message"].lower() or "sent" in result["message"].lower()
         mock_email_service.send_signup_verification_email.assert_called_once()
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.get_user_by_email')
-    @patch('app.services.user_signup_service.get_user_by_username')
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.get_user_by_email")
+    @patch("app.services.user_signup_service.get_user_by_username")
     def test_request_customer_signup_raises_when_username_exists(
-        self, mock_get_by_username, mock_get_by_email, mock_market_service, mock_city_service,
-        sample_user_data, mock_db
+        self, mock_get_by_username, mock_get_by_email, mock_market_service, mock_city_service, sample_user_data, mock_db
     ):
         """request_customer_signup returns 400 when username already in user_info."""
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
+
+        mock_market_service.get_by_country_code.return_value = {
+            "market_id": SAMPLE_MARKET_ID,
+            "is_archived": False,
+            "country_code": "US",
+        }
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
@@ -463,17 +507,21 @@ class TestUserSignupService:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Username already exists" in str(exc_info.value.detail)
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.get_user_by_email')
-    @patch('app.services.user_signup_service.get_user_by_username')
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.get_user_by_email")
+    @patch("app.services.user_signup_service.get_user_by_username")
     def test_request_customer_signup_returns_already_registered_when_email_exists(
-        self, mock_get_by_username, mock_get_by_email, mock_market_service, mock_city_service,
-        sample_user_data, mock_db
+        self, mock_get_by_username, mock_get_by_email, mock_market_service, mock_city_service, sample_user_data, mock_db
     ):
         """When email already registered, return already_registered true and message to log in; no email sent."""
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
+
+        mock_market_service.get_by_country_code.return_value = {
+            "market_id": SAMPLE_MARKET_ID,
+            "is_archived": False,
+            "country_code": "US",
+        }
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="US")
         sample_user_data["mobile_number"] = "+14155552671"
@@ -494,9 +542,11 @@ class TestUserSignupService:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "country_code" in str(exc_info.value.detail).lower()
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    def test_request_customer_signup_raises_when_country_code_invalid(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    def test_request_customer_signup_raises_when_country_code_invalid(
+        self, mock_market_service, mock_city_service, sample_user_data, mock_db
+    ):
         """request_customer_signup returns 400 when country_code has no market or market is archived."""
         mock_market_service.get_by_country_code.return_value = None
         with pytest.raises(HTTPException) as exc_info:
@@ -504,25 +554,33 @@ class TestUserSignupService:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "market" in str(exc_info.value.detail).lower()
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    def test_request_customer_signup_raises_when_country_resolves_to_global(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    def test_request_customer_signup_raises_when_country_resolves_to_global(
+        self, mock_market_service, mock_city_service, sample_user_data, mock_db
+    ):
         """request_customer_signup returns 400 when country resolves to Global Marketplace (B2C cannot use Global)."""
         from app.services.market_service import GLOBAL_MARKET_ID
+
         mock_market_service.get_by_country_code.return_value = {"market_id": GLOBAL_MARKET_ID, "is_archived": False}
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Global" in str(exc_info.value.detail)
 
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.city_service')
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.city_service")
     def test_request_customer_signup_raises_when_city_metadata_id_missing(
         self, mock_city_service, mock_market_service, sample_user_data, mock_db
     ):
         """request_customer_signup returns 400 when city_metadata_id is missing."""
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
+
+        mock_market_service.get_by_country_code.return_value = {
+            "market_id": SAMPLE_MARKET_ID,
+            "is_archived": False,
+            "country_code": "US",
+        }
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         sample_user_data.pop("city_metadata_id", None)
         with pytest.raises(HTTPException) as exc_info:
@@ -530,13 +588,20 @@ class TestUserSignupService:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "city_metadata_id" in str(exc_info.value.detail).lower()
 
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    def test_request_customer_signup_raises_when_city_metadata_id_global(self, mock_market_service, mock_city_service, sample_user_data, mock_db):
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    def test_request_customer_signup_raises_when_city_metadata_id_global(
+        self, mock_market_service, mock_city_service, sample_user_data, mock_db
+    ):
         """request_customer_signup returns 400 when city_metadata_id is Global (B2C customers cannot get Global city)."""
         from app.config.supported_cities import GLOBAL_CITY_ID
         from app.tests.conftest import SAMPLE_MARKET_ID
-        mock_market_service.get_by_country_code.return_value = {"market_id": SAMPLE_MARKET_ID, "is_archived": False, "country_code": "US"}
+
+        mock_market_service.get_by_country_code.return_value = {
+            "market_id": SAMPLE_MARKET_ID,
+            "is_archived": False,
+            "country_code": "US",
+        }
         mock_market_service.get_by_id.return_value = {"is_archived": False, "country_code": "US"}
         mock_city_service.get_by_id.return_value = MagicMock(is_archived=False, country_iso="XG")
         sample_user_data["city_metadata_id"] = GLOBAL_CITY_ID
@@ -547,17 +612,26 @@ class TestUserSignupService:
 
     # ========== Email verification flow: verify_and_complete_signup ==========
 
-    @patch('app.services.user_signup_service.set_user_market_assignments')
-    @patch('app.services.user_signup_service.city_service')
-    @patch('app.services.user_signup_service.market_service')
-    @patch('app.services.user_signup_service.create_access_token')
-    @patch('app.services.user_signup_service.create_user_with_validation')
+    @patch("app.services.user_signup_service.set_user_market_assignments")
+    @patch("app.services.user_signup_service.city_service")
+    @patch("app.services.user_signup_service.market_service")
+    @patch("app.services.user_signup_service.create_access_token")
+    @patch("app.services.user_signup_service.create_user_with_validation")
     def test_verify_and_complete_signup_creates_user_and_returns_token(
-        self, mock_create_user, mock_create_token, mock_market_service, mock_city_service, mock_set_assignments, sample_user_dto, mock_db
+        self,
+        mock_create_user,
+        mock_create_token,
+        mock_market_service,
+        mock_city_service,
+        mock_set_assignments,
+        sample_user_dto,
+        mock_db,
     ):
         """verify_and_complete_signup loads pending (incl. market_id, city_metadata_id), creates user, sets market assignment, marks used, returns user and JWT."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from app.tests.conftest import SAMPLE_MARKET_ID
+
         mock_market_service.get_by_id.return_value = {
             "is_archived": False,
             "country_code": "AR",
@@ -568,6 +642,7 @@ class TestUserSignupService:
         mock_create_token.return_value = "fake.jwt.token"
 
         from app.tests.conftest import SAMPLE_CITY_ID
+
         pending_row = {
             "pending_id": "11111111-1111-1111-1111-111111111111",
             "email": "test@example.com",
@@ -580,7 +655,7 @@ class TestUserSignupService:
             "market_id": SAMPLE_MARKET_ID,
             "city_metadata_id": SAMPLE_CITY_ID,
             "used": False,
-            "token_expiry": datetime.now(timezone.utc) + timedelta(hours=1),
+            "token_expiry": datetime.now(UTC) + timedelta(hours=1),
         }
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = pending_row

@@ -23,9 +23,7 @@ def validate_phone_number(
     Always returns 200; the `valid` field indicates whether the number is valid.
     """
     try:
-        e164 = _normalize_mobile_or_raise_value_error(
-            payload.mobile_number, payload.country_code
-        )
+        e164 = _normalize_mobile_or_raise_value_error(payload.mobile_number, payload.country_code)
     except ValueError as exc:
         return PhoneValidateResponseSchema(valid=False, error=str(exc))
 

@@ -10,18 +10,19 @@ Handles password reset flow:
 """
 
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
+
 import psycopg2.extensions
 import psycopg2.extras
 
+from app.auth.security import hash_password
+from app.config import Status
 from app.services.crud_service import user_service
 from app.services.email_service import email_service
-from app.auth.security import hash_password
 from app.utils.locale import get_user_locale
-from app.utils.log import log_info, log_error, log_warning, log_password_recovery_debug
-from app.config import Status
+from app.utils.log import log_error, log_info, log_password_recovery_debug, log_warning
 
 
 class PasswordRecoveryService:
@@ -31,22 +32,18 @@ class PasswordRecoveryService:
     def generate_reset_code(self) -> str:
         """Generate a 6-digit reset code for password reset."""
         return str(secrets.randbelow(1_000_000)).zfill(6)
-    
-    def request_password_reset(
-        self,
-        email: str,
-        db: psycopg2.extensions.connection
-    ) -> Dict[str, Any]:
+
+    def request_password_reset(self, email: str, db: psycopg2.extensions.connection) -> dict[str, Any]:
         """
         Handle password reset request.
-        
+
         Args:
             email: User's email address
             db: Database connection
-        
+
         Returns:
             dict: {"success": bool, "message": str}
-        
+
         Note: For security, always return success even if email doesn't exist.
         This prevents email enumeration attacks.
         """
@@ -62,12 +59,12 @@ class PasswordRecoveryService:
                 log_warning(f"Password reset requested for non-existent email: {email_normalized}")
                 return {
                     "success": True,
-                    "message": "If an account with that email exists, a password reset link has been sent."
+                    "message": "If an account with that email exists, a password reset link has been sent.",
                 }
 
             log_password_recovery_debug(f"user found user_id={user.user_id}; generating reset code")
             reset_code = self.generate_reset_code()
-            expiry_time = datetime.now(timezone.utc) + timedelta(hours=self.token_expiry_hours)
+            expiry_time = datetime.now(UTC) + timedelta(hours=self.token_expiry_hours)
 
             # Store code in database (str(user_id) for psycopg2 UUID adaptation)
             user_id_val = str(user.user_id)
@@ -82,7 +79,7 @@ class PasswordRecoveryService:
                       AND is_used = FALSE
                       AND is_archived = FALSE
                     """,
-                    (user_id_val,)
+                    (user_id_val,),
                 )
 
                 cursor.execute(
@@ -97,20 +94,15 @@ class PasswordRecoveryService:
                     ) VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING credential_recovery_id
                     """,
-                    (
-                        user_id_val,
-                        reset_code,
-                        expiry_time,
-                        False,
-                        Status.ACTIVE.value,
-                        False
-                    )
+                    (user_id_val, reset_code, expiry_time, False, Status.ACTIVE.value, False),
                 )
                 result = cursor.fetchone()
-                credential_recovery_id = result['credential_recovery_id']
+                credential_recovery_id = result["credential_recovery_id"]
                 db.commit()
 
-            log_password_recovery_debug(f"reset code stored credential_recovery_id={credential_recovery_id}; sending email")
+            log_password_recovery_debug(
+                f"reset code stored credential_recovery_id={credential_recovery_id}; sending email"
+            )
             email_sent = email_service.send_password_reset_email(
                 to_email=email_normalized,
                 reset_code=reset_code,
@@ -118,7 +110,7 @@ class PasswordRecoveryService:
                 expiry_hours=self.token_expiry_hours,
                 locale=get_user_locale(user.user_id, db),
             )
-            
+
             if not email_sent:
                 log_password_recovery_debug("send_password_reset_email returned False")
                 log_error(f"Failed to send password reset email to {email_normalized}")
@@ -128,26 +120,23 @@ class PasswordRecoveryService:
                 log_password_recovery_debug("password reset email sent successfully")
 
             log_info(f"Password reset requested for user {user.user_id}, token ID: {credential_recovery_id}")
-            
+
             return {
                 "success": True,
-                "message": "If an account with that email exists, a password reset code has been sent."
+                "message": "If an account with that email exists, a password reset code has been sent.",
             }
-        
+
         except Exception as e:
             log_error(f"Error requesting password reset for {email}: {str(e)}")
             db.rollback()
             return {
                 "success": False,
-                "message": "An error occurred while processing your request. Please try again later."
+                "message": "An error occurred while processing your request. Please try again later.",
             }
 
     def request_username_recovery(
-        self,
-        email: str,
-        send_password_reset: bool,
-        db: psycopg2.extensions.connection
-    ) -> Dict[str, Any]:
+        self, email: str, send_password_reset: bool, db: psycopg2.extensions.connection
+    ) -> dict[str, Any]:
         """
         Handle username recovery (forgot username). Send email with username; optionally
         also send password reset link (second email). Always return generic success to avoid enumeration.
@@ -161,12 +150,14 @@ class PasswordRecoveryService:
             dict: {"success": True, "message": str} with generic message
         """
         try:
-            log_password_recovery_debug(f"request_username_recovery called email={email!r} send_password_reset={send_password_reset}")
+            log_password_recovery_debug(
+                f"request_username_recovery called email={email!r} send_password_reset={send_password_reset}"
+            )
             email_normalized = (email or "").strip().lower()
             if not email_normalized:
                 return {
                     "success": True,
-                    "message": "If an account exists for this email, we have sent your username to it."
+                    "message": "If an account exists for this email, we have sent your username to it.",
                 }
             user = user_service.get_by_field("email", email_normalized, db)
             if not user:
@@ -174,7 +165,7 @@ class PasswordRecoveryService:
                 log_warning(f"Username recovery requested for non-existent email: {email_normalized}")
                 return {
                     "success": True,
-                    "message": "If an account exists for this email, we have sent your username to it."
+                    "message": "If an account exists for this email, we have sent your username to it.",
                 }
             log_password_recovery_debug(f"username recovery: user found user_id={user.user_id}; sending username email")
             username_sent = email_service.send_username_recovery_email(
@@ -194,7 +185,7 @@ class PasswordRecoveryService:
             log_info(f"Username recovery sent for user {user.user_id}")
             return {
                 "success": True,
-                "message": "If an account exists for this email, we have sent your username to it."
+                "message": "If an account exists for this email, we have sent your username to it.",
             }
         except Exception as e:
             log_error(f"Error requesting username recovery for {email}: {str(e)}")
@@ -205,14 +196,10 @@ class PasswordRecoveryService:
                     pass
             return {
                 "success": True,
-                "message": "If an account exists for this email, we have sent your username to it."
+                "message": "If an account exists for this email, we have sent your username to it.",
             }
 
-    def validate_reset_code(
-        self,
-        code: str,
-        db: psycopg2.extensions.connection
-    ) -> Optional[Dict[str, Any]]:
+    def validate_reset_code(self, code: str, db: psycopg2.extensions.connection) -> dict[str, Any] | None:
         """
         Validate a password reset code (6-digit or legacy token for compat).
 
@@ -243,7 +230,7 @@ class PasswordRecoveryService:
                     WHERE cr.recovery_code = %s
                       AND cr.is_archived = FALSE
                     """,
-                    (raw,)
+                    (raw,),
                 )
                 result = cursor.fetchone()
 
@@ -252,15 +239,15 @@ class PasswordRecoveryService:
                 log_warning("Invalid reset code attempted")
                 return None
 
-            if result['is_used']:
+            if result["is_used"]:
                 log_password_recovery_debug(f"validate_reset_code: code already used user_id={result['user_id']}")
                 log_warning(f"Already used reset code attempted for user {result['user_id']}")
                 return None
 
-            now = datetime.now(timezone.utc)
-            if result['token_expiry'].tzinfo is None:
-                result['token_expiry'] = result['token_expiry'].replace(tzinfo=timezone.utc)
-            if now > result['token_expiry']:
+            now = datetime.now(UTC)
+            if result["token_expiry"].tzinfo is None:
+                result["token_expiry"] = result["token_expiry"].replace(tzinfo=UTC)
+            if now > result["token_expiry"]:
                 log_password_recovery_debug(f"validate_reset_code: code expired user_id={result['user_id']}")
                 log_warning(f"Expired reset code attempted for user {result['user_id']}")
                 return None
@@ -271,13 +258,8 @@ class PasswordRecoveryService:
         except Exception as e:
             log_error(f"Error validating reset code: {str(e)}")
             return None
-    
-    def reset_password(
-        self,
-        code: str,
-        new_password: str,
-        db: psycopg2.extensions.connection
-    ) -> Dict[str, Any]:
+
+    def reset_password(self, code: str, new_password: str, db: psycopg2.extensions.connection) -> dict[str, Any]:
         """
         Reset user's password using valid reset code (6-digit or legacy token).
 
@@ -295,17 +277,14 @@ class PasswordRecoveryService:
 
             if not token_data:
                 log_password_recovery_debug("reset_password: code invalid or expired; returning 400")
-                return {
-                    "success": False,
-                    "message": "Invalid or expired reset code."
-                }
-            
-            user_id = str(token_data['user_id'])
-            credential_recovery_id = str(token_data['credential_recovery_id'])
-            
+                return {"success": False, "message": "Invalid or expired reset code."}
+
+            user_id = str(token_data["user_id"])
+            credential_recovery_id = str(token_data["credential_recovery_id"])
+
             # Hash new password
             password_hash = hash_password(new_password)
-            
+
             # Update user's password and set status = Active (invite flow or password recovery)
             with db.cursor() as cursor:
                 cursor.execute(
@@ -318,9 +297,9 @@ class PasswordRecoveryService:
                         email_verified_at = CURRENT_TIMESTAMP
                     WHERE user_id = %s
                     """,
-                    (password_hash, user_id)
+                    (password_hash, user_id),
                 )
-                
+
                 # Mark token as used
                 cursor.execute(
                     """
@@ -330,9 +309,9 @@ class PasswordRecoveryService:
                         is_archived = TRUE
                     WHERE credential_recovery_id = %s
                     """,
-                    (credential_recovery_id,)
+                    (credential_recovery_id,),
                 )
-                
+
                 db.commit()
 
             log_password_recovery_debug(f"reset_password: password updated and code marked used for user_id={user_id}")
@@ -344,20 +323,17 @@ class PasswordRecoveryService:
                 "message": "Password reset successful. You can now log in with your new password.",
                 "user": refreshed,
             }
-        
+
         except Exception as e:
             log_error(f"Error resetting password: {str(e)}")
             db.rollback()
-            return {
-                "success": False,
-                "message": "An error occurred while resetting your password. Please try again."
-            }
-    
+            return {"success": False, "message": "An error occurred while resetting your password. Please try again."}
+
     def cleanup_expired_tokens(self, db: psycopg2.extensions.connection) -> int:
         """
         Archive expired password reset tokens.
         Should be run periodically (e.g., daily cron job).
-        
+
         Returns:
             int: Number of tokens archived
         """
@@ -371,13 +347,13 @@ class PasswordRecoveryService:
                       AND is_archived = FALSE
                     """,
                 )
-                
+
                 archived_count = cursor.rowcount
                 db.commit()
-            
+
             log_info(f"Archived {archived_count} expired password reset tokens")
             return archived_count
-        
+
         except Exception as e:
             log_error(f"Error cleaning up expired tokens: {str(e)}")
             db.rollback()

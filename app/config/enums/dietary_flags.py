@@ -5,6 +5,7 @@ Defines the structured dietary restriction/preference flags for products.
 Replaces the free-text VARCHAR(255) dietary field with a validated multi-select.
 Stored as TEXT[] on product_info; validated at the API layer by this enum.
 """
+
 from enum import Enum
 
 

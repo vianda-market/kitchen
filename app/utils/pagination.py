@@ -8,13 +8,14 @@ pagination only activates when explicit page/page_size are passed from routes.
 """
 
 from dataclasses import dataclass
-from typing import Optional
+
 from fastapi import Query, Response
 
 
 @dataclass(frozen=True)
 class PaginationParams:
     """Validated, clamped pagination parameters."""
+
     page: int
     page_size: int
 
@@ -37,9 +38,9 @@ class PaginatedList(list):
 
 
 def get_pagination_params(
-    page: Optional[int] = Query(None, ge=1, description="1-based page number"),
-    page_size: Optional[int] = Query(None, ge=1, le=100, description="Rows per page (max 100)"),
-) -> Optional[PaginationParams]:
+    page: int | None = Query(None, ge=1, description="1-based page number"),
+    page_size: int | None = Query(None, ge=1, le=100, description="Rows per page (max 100)"),
+) -> PaginationParams | None:
     """FastAPI dependency that returns PaginationParams when both params are
     provided, or None when neither is (backward-compatible no-pagination mode).
     """

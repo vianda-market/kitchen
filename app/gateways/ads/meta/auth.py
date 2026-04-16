@@ -8,6 +8,7 @@ The token is created in Business Manager UI and stored in Secret Manager.
 appsecret_proof is computed per request by the SDK when app_secret is provided,
 preventing token hijacking.
 """
+
 import logging
 import os
 
@@ -85,6 +86,7 @@ def get_pixel_id() -> str:
         return settings.META_ADS_PIXEL_ID
 
     from app.core.gcp_secrets import get_secret
+
     return get_secret("meta-ads-pixel-id")
 
 
@@ -95,6 +97,7 @@ def get_ad_account_id() -> str:
         return settings.META_ADS_AD_ACCOUNT_ID
 
     from app.core.gcp_secrets import get_secret
+
     return get_secret("meta-ads-ad-account-id")
 
 

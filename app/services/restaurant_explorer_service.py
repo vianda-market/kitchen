@@ -7,29 +7,30 @@ Restaurant explorer service for B2C explore-by-city flow.
 - resolve_kitchen_day_for_explore(country_code, timezone_str, db): next available kitchen day (or today if still open).
 """
 
-from typing import Optional, List, Any, Tuple
-from datetime import datetime, date, timedelta, time
+from datetime import date, datetime, time, timedelta
+from typing import Any
 from uuid import UUID
+
 import psycopg2.extensions
 import pytz
 
-from app.utils.db import db_read
-from app.utils.address_formatting import format_street_display
-from app.utils.portion_size import bucket_portion_size
-from app.utils.cursor_pagination import slice_restaurants_by_cursor
-from app.services.plate_review_service import get_plate_review_aggregates
 from app.services.kitchen_day_service import (
-    get_effective_current_day,
-    is_today_kitchen_closed,
     VALID_KITCHEN_DAYS,
     WEEKDAY_NUM_TO_NAME,
+    get_effective_current_day,
+    is_today_kitchen_closed,
 )
+from app.services.plate_review_service import get_plate_review_aggregates
 from app.services.plate_selection_validation import _find_next_available_kitchen_day_in_week
+from app.utils.address_formatting import format_street_display
+from app.utils.cursor_pagination import slice_restaurants_by_cursor
+from app.utils.db import db_read
+from app.utils.portion_size import bucket_portion_size
 
 WEEKDAY_NAME_TO_NUM = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4}
 
 
-def _parse_window_to_minutes(window: str) -> Optional[int]:
+def _parse_window_to_minutes(window: str) -> int | None:
     """Parse 'HH:MM-HH:MM' to start minutes since midnight. Returns None if invalid."""
     try:
         parts = window.strip().split("-")
@@ -42,12 +43,12 @@ def _parse_window_to_minutes(window: str) -> Optional[int]:
         return None
 
 
-def _expand_flexible_windows(original_window: str, all_windows: List[str]) -> List[str]:
+def _expand_flexible_windows(original_window: str, all_windows: list[str]) -> list[str]:
     """Given original window and all valid windows, return original + adjacent within ±30 min."""
     start_min = _parse_window_to_minutes(original_window)
     if start_min is None:
         return [original_window]
-    out: List[str] = []
+    out: list[str] = []
     for w in all_windows:
         w_min = _parse_window_to_minutes(w)
         if w_min is not None and abs(w_min - start_min) <= 30:
@@ -60,7 +61,7 @@ def get_coworker_pickup_windows(
     kitchen_day: str,
     user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> List[dict]:
+) -> list[dict]:
     """
     Return pickup windows from coworkers (same employer) with offer/request for this restaurant+kitchen_day.
     Excludes users who opted out (coworkers_can_see_my_orders=false or can_participate_in_plate_pickups=false).
@@ -146,7 +147,7 @@ def get_coworker_pickup_windows(
 
     rows = db_read(sel_query, params, connection=db) or []
     seen: set = set()
-    result: List[dict] = []
+    result: list[dict] = []
     for r in rows:
         ptr = (r.get("pickup_time_range") or "").strip()
         intent = (r.get("pickup_intent") or "self").strip()
@@ -159,20 +160,24 @@ def get_coworker_pickup_windows(
                 key = (w, intent)
                 if key not in seen:
                     seen.add(key)
-                    result.append({
-                        "pickup_time_range": w,
-                        "intent": intent,
-                        "flexible_on_time": True if w == ptr else None,
-                    })
+                    result.append(
+                        {
+                            "pickup_time_range": w,
+                            "intent": intent,
+                            "flexible_on_time": True if w == ptr else None,
+                        }
+                    )
         else:
             key = (ptr, intent)
             if key not in seen:
                 seen.add(key)
-                result.append({
-                    "pickup_time_range": ptr,
-                    "intent": intent,
-                    "flexible_on_time": None,
-                })
+                result.append(
+                    {
+                        "pickup_time_range": ptr,
+                        "intent": intent,
+                        "flexible_on_time": None,
+                    }
+                )
     return result
 
 
@@ -187,7 +192,7 @@ def _compute_savings_pct(plate_price: float, plate_credit: int, credit_cost_loca
     return int(round(max(0.0, min(100.0, raw))))
 
 
-def get_allowed_kitchen_date_range(timezone_str: str) -> Tuple[date, date]:
+def get_allowed_kitchen_date_range(timezone_str: str) -> tuple[date, date]:
     """
     Allowed kitchen_day window: today (in market TZ) through next week's Friday inclusive.
     Returns (start_date, end_date) for validation.
@@ -211,6 +216,7 @@ def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> 
     all operate on the same date and the E2E flow works any day of the week.
     """
     from app.config.settings import settings as _settings
+
     try:
         tz = pytz.timezone(timezone_str or "UTC")
     except Exception:
@@ -230,8 +236,8 @@ def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> 
 
 def get_allowed_kitchen_days_sorted_by_date(
     timezone_str: str,
-    country_code: Optional[str] = None,
-) -> List[dict]:
+    country_code: str | None = None,
+) -> list[dict]:
     """
     Return the list of allowed kitchen days for the explore window (today through next week's Friday),
     ordered by date ascending (closest first). Each item has kitchen_day (weekday name) and date (ISO).
@@ -242,7 +248,7 @@ def get_allowed_kitchen_days_sorted_by_date(
     country_code is omitted, today is always included (backward compatible).
     """
     start_date, end_date = get_allowed_kitchen_date_range(timezone_str or "UTC")
-    out: List[dict] = []
+    out: list[dict] = []
     d = start_date
     while d <= end_date:
         if d.weekday() < 5:  # Monday=0 .. Friday=4
@@ -250,10 +256,12 @@ def get_allowed_kitchen_days_sorted_by_date(
             if d == start_date and country_code and is_today_kitchen_closed(country_code, timezone_str):
                 d += timedelta(days=1)
                 continue
-            out.append({
-                "kitchen_day": WEEKDAY_NUM_TO_NAME[d.weekday()],
-                "date": d.isoformat(),
-            })
+            out.append(
+                {
+                    "kitchen_day": WEEKDAY_NUM_TO_NAME[d.weekday()],
+                    "date": d.isoformat(),
+                }
+            )
         d += timedelta(days=1)
     return out
 
@@ -262,7 +270,7 @@ def get_pickup_windows_for_kitchen_day(
     country_code: str,
     kitchen_day: str,
     target_date: date,
-) -> List[str]:
+) -> list[str]:
     """
     Return 15-minute pickup windows for a given kitchen day and market, in market local time.
 
@@ -292,7 +300,7 @@ def get_pickup_windows_for_kitchen_day(
     if open_t >= close_t:
         return []
 
-    windows: List[str] = []
+    windows: list[str] = []
     current_minutes = open_t.hour * 60 + open_t.minute
     close_minutes = close_t.hour * 60 + close_t.minute
     while current_minutes + 15 <= close_minutes:
@@ -339,9 +347,7 @@ def resolve_kitchen_day_for_explore(
     config = MarketConfiguration.get_market_config((country_code or "").upper()) if country_code else None
 
     if current_day not in VALID_KITCHEN_DAYS:
-        next_day = _find_next_available_kitchen_day_in_week(
-            current_day, list(VALID_KITCHEN_DAYS), country_code, db
-        )
+        next_day = _find_next_available_kitchen_day_in_week(current_day, list(VALID_KITCHEN_DAYS), country_code, db)
         return next_day or "monday"
 
     if config and config.kitchen_day_config:
@@ -356,9 +362,7 @@ def resolve_kitchen_day_for_explore(
             if close_time and now_local.time() < close_time:
                 return current_day
 
-    next_day = _find_next_available_kitchen_day_in_week(
-        current_day, list(VALID_KITCHEN_DAYS), country_code, db
-    )
+    next_day = _find_next_available_kitchen_day_in_week(current_day, list(VALID_KITCHEN_DAYS), country_code, db)
     return next_day or "monday"
 
 
@@ -378,11 +382,11 @@ def _build_lean_plate_dict(plate: dict) -> dict:
 
 
 def get_plates_for_restaurants(
-    restaurant_ids: List[Any],
+    restaurant_ids: list[Any],
     kitchen_day: str,
     db: psycopg2.extensions.connection,
     *,
-    favorite_plate_ids: Optional[List[UUID]] = None,
+    favorite_plate_ids: list[UUID] | None = None,
 ) -> dict:
     """
     Return map restaurant_id -> list of plates (plate_id, product_name, price, credit, kitchen_day,
@@ -393,7 +397,8 @@ def get_plates_for_restaurants(
     if not restaurant_ids or kitchen_day not in VALID_KITCHEN_DAYS:
         return {}
     ids_placeholder = ",".join("%s" for _ in restaurant_ids)
-    query = """
+    query = (
+        """
         SELECT
             p.restaurant_id,
             p.plate_id,
@@ -407,38 +412,43 @@ def get_plates_for_restaurants(
         INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.kitchen_day = %s
           AND pkd.is_archived = FALSE AND pkd.status = 'active'
         INNER JOIN product_info pr ON pr.product_id = p.product_id AND pr.is_archived = FALSE
-        WHERE p.restaurant_id IN (""" + ids_placeholder + """)
+        WHERE p.restaurant_id IN ("""
+        + ids_placeholder
+        + """)
           AND p.is_archived = FALSE
         ORDER BY p.restaurant_id, pr.name
     """
+    )
     params = [kitchen_day] + [str(rid) for rid in restaurant_ids]
     rows = db_read(query, tuple(params), connection=db) or []
     by_restaurant: dict = {}
-    plate_ids: List[Any] = []
+    plate_ids: list[Any] = []
     for row in rows:
         rid = row["restaurant_id"]
         plate_ids.append(row["plate_id"])
         if rid not in by_restaurant:
             by_restaurant[rid] = []
-        fav_ids = set(str(x) for x in (favorite_plate_ids or []))
-        by_restaurant[rid].append({
-            "plate_id": row["plate_id"],
-            "product_name": (row.get("product_name") or "").strip(),
-            "price": float(row["price"]),
-            "credit": int(row["credit"]),
-            "kitchen_day": row["kitchen_day"],
-            "image_url": (row.get("image_url") or "").strip() or None,
-            "ingredients": (row.get("ingredients") or "").strip() or None,
-            "savings": 0,  # Set by get_restaurants_by_city from credit_cost_local_currency
-            "average_stars": None,
-            "average_portion_size": None,
-            "portion_size": "insufficient_reviews",
-            "review_count": 0,
-            "is_favorite": str(row["plate_id"]) in fav_ids,
-        })
+        fav_ids = {str(x) for x in (favorite_plate_ids or [])}
+        by_restaurant[rid].append(
+            {
+                "plate_id": row["plate_id"],
+                "product_name": (row.get("product_name") or "").strip(),
+                "price": float(row["price"]),
+                "credit": int(row["credit"]),
+                "kitchen_day": row["kitchen_day"],
+                "image_url": (row.get("image_url") or "").strip() or None,
+                "ingredients": (row.get("ingredients") or "").strip() or None,
+                "savings": 0,  # Set by get_restaurants_by_city from credit_cost_local_currency
+                "average_stars": None,
+                "average_portion_size": None,
+                "portion_size": "insufficient_reviews",
+                "review_count": 0,
+                "is_favorite": str(row["plate_id"]) in fav_ids,
+            }
+        )
     # Merge review aggregates; apply minimum-threshold (5 reviews) and portion_size bucketing
     aggregates = get_plate_review_aggregates(plate_ids, db)
-    for rid, plates in by_restaurant.items():
+    for _rid, plates in by_restaurant.items():
         for p in plates:
             pid_str = str(p["plate_id"])
             if pid_str in aggregates:
@@ -457,49 +467,12 @@ def get_plates_for_restaurants(
     return by_restaurant
 
 
-def get_restaurants_by_city(
-    city: str,
-    country_code: str,
+def _match_city_in_country(
+    requested: str,
+    country: str,
     db: psycopg2.extensions.connection,
-    *,
-    timezone_str: Optional[str] = None,
-    kitchen_day: Optional[str] = None,
-    credit_cost_local_currency: Optional[float] = None,
-    user_id: Optional[UUID] = None,
-    employer_entity_id: Optional[UUID] = None,
-    employer_address_id: Optional[UUID] = None,
-    workplace_group_id: Optional[UUID] = None,
-    locale: str = "en",
-    cursor: Optional[str] = None,
-    limit: Optional[int] = None,
-) -> dict[str, Any]:
-    """
-    Return restaurants in the given city (case-insensitive match) in the given country.
-    Only restaurants with status = 'Active' and is_archived = FALSE are returned
-    (Pending/Inactive or archived restaurants are excluded).
-    Response: requested_city, city (matched), center (optional lat/lng), optional kitchen_day,
-    and restaurants list with restaurant_id, name, cuisine, lat, lng, etc.
-    When timezone_str is set and kitchen_day is omitted, resolve next available kitchen day.
-    When kitchen_day is set (or resolved), attach plates for that day to each restaurant.
-    credit_cost_local_currency: optional plan credit cost (local currency per credit); when set, savings
-    are computed per plate; otherwise savings=0.
-    user_id: optional; when set, favorites are surfaced at top and is_favorite set on items.
-    workplace_group_id: optional; takes precedence over employer_entity_id for coworker matching.
-    employer_entity_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
-    and has_coworker_request are computed per restaurant for coworker-scoped pickup intents.
-    No institution scope; B2C explore by market (country + city).
-    """
-    country = (country_code or "").strip().upper()
-    requested = (city or "").strip()
-
-    # Resolve kitchen_day when not provided but we have market timezone (explore-with-plates flow)
-    resolved_kitchen_day: Optional[str] = None
-    if kitchen_day and kitchen_day in VALID_KITCHEN_DAYS:
-        resolved_kitchen_day = kitchen_day
-    elif timezone_str and country:
-        resolved_kitchen_day = resolve_kitchen_day_for_explore(country, timezone_str, db)
-
-    # 1) Check we have this city in this country (Active + plate_kitchen_days)
+) -> str:
+    """Case-insensitive match of requested city against active restaurant cities in the country."""
     query_cities = """
         SELECT DISTINCT TRIM(a.city) AS city
         FROM address_info a
@@ -520,16 +493,23 @@ def get_restaurants_by_city(
           AND TRIM(a.city) != ''
     """
     rows = db_read(query_cities, (country,), connection=db)
-    cities = [r["city"] for r in rows] if rows else []
-    matched_city = requested
-    if requested and cities:
-        requested_lower = requested.lower()
-        for c in cities:
-            if (c or "").strip().lower() == requested_lower:
-                matched_city = (c or "").strip()
-                break
+    if not requested or not rows:
+        return requested
+    requested_lower = requested.lower()
+    for c in rows:
+        city_val = (c["city"] or "").strip()
+        if city_val.lower() == requested_lower:
+            return city_val
+    return requested
 
-    # 2) Restaurants in matched_city (Active + plate_kitchen_days) with geolocation and address line
+
+def _query_city_restaurants(
+    country: str,
+    matched_city: str,
+    locale: str,
+    db: psycopg2.extensions.connection,
+) -> list[dict]:
+    """Query active restaurants with geolocation in the given city/country."""
     query_restaurants = """
         SELECT
             r.restaurant_id,
@@ -564,234 +544,363 @@ def get_restaurants_by_city(
           )
         ORDER BY r.name
     """
-    rest_rows = db_read(
-        query_restaurants,
-        (locale, locale, country, matched_city),
-        connection=db,
-    ) or []
-    restaurants: List[dict] = []
-    for row in rest_rows:
-        restaurants.append({
-            "restaurant_id": row["restaurant_id"],
-            "name": row["name"] or "",
-            "cuisine_name": row.get("cuisine_name"),
-            "tagline": row.get("tagline"),
-            "pickup_instructions": (row.get("pickup_instructions") or "").strip() or None,
-            "lat": float(row["lat"]) if row.get("lat") is not None else None,
-            "lng": float(row["lng"]) if row.get("lng") is not None else None,
-            "postal_code": (row.get("postal_code") or "").strip() or None,
-            "city": (row.get("city") or "").strip() or None,
-            "street_type": (row.get("street_type") or "").strip() or None,
-            "street_name": (row.get("street_name") or "").strip() or None,
-            "building_number": (row.get("building_number") or "").strip() or None,
-            "address_display": format_street_display(
-                country,
-                (row.get("street_type") or "").strip() or None,
-                (row.get("street_name") or "").strip() or None,
-                (row.get("building_number") or "").strip() or None,
-            ),
-            "plates": None,
-            "has_volunteer": False,
-            "has_coworker_offer": False,
-            "has_coworker_request": False,
-        })
+    rest_rows = db_read(query_restaurants, (locale, locale, country, matched_city), connection=db) or []
+    return [_build_restaurant_dict(row, country) for row in rest_rows]
 
-        # 3) Plates for resolved/requested kitchen_day; compute savings from credit_cost_local_currency
-    if resolved_kitchen_day and restaurants:
-        rest_ids = [r["restaurant_id"] for r in restaurants]
-        plates_by_restaurant = get_plates_for_restaurants(rest_ids, resolved_kitchen_day, db)
-        for r in restaurants:
-            plates = plates_by_restaurant.get(r["restaurant_id"]) or []
-            for plate in plates:
-                plate["savings"] = (
-                    _compute_savings_pct(plate["price"], plate["credit"], credit_cost_local_currency)
-                    if credit_cost_local_currency is not None else 0
-                )
-            r["plates"] = plates
 
-        # 3.4) has_volunteer: at least one user has pickup_intent=offer for this restaurant + kitchen_day
-        # Exclude users who opted out (coworkers_can_see_my_orders=false or can_participate_in_plate_pickups=false)
-        rest_ids_str = [str(rid) for rid in rest_ids]
-        vol_query = """
-            SELECT DISTINCT ps.restaurant_id
-            FROM plate_selection_info ps
-            INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-            WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-              AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
-              AND ump.coworkers_can_see_my_orders = TRUE
-              AND ump.can_participate_in_plate_pickups = TRUE
+def _strip_or_none(value: Any) -> str | None:
+    """Strip whitespace from a string value, returning None if empty or None."""
+    return (value or "").strip() or None
+
+
+def _build_restaurant_dict(row: dict, country: str) -> dict:
+    """Build a restaurant dict from a DB row."""
+    street_type = _strip_or_none(row.get("street_type"))
+    street_name = _strip_or_none(row.get("street_name"))
+    building_number = _strip_or_none(row.get("building_number"))
+    return {
+        "restaurant_id": row["restaurant_id"],
+        "name": row["name"] or "",
+        "cuisine_name": row.get("cuisine_name"),
+        "tagline": row.get("tagline"),
+        "pickup_instructions": _strip_or_none(row.get("pickup_instructions")),
+        "lat": float(row["lat"]) if row.get("lat") is not None else None,
+        "lng": float(row["lng"]) if row.get("lng") is not None else None,
+        "postal_code": _strip_or_none(row.get("postal_code")),
+        "city": _strip_or_none(row.get("city")),
+        "street_type": street_type,
+        "street_name": street_name,
+        "building_number": building_number,
+        "address_display": format_street_display(country, street_type, street_name, building_number),
+        "plates": None,
+        "has_volunteer": False,
+        "has_coworker_offer": False,
+        "has_coworker_request": False,
+    }
+
+
+def _attach_plates_and_savings(
+    restaurants: list[dict],
+    kitchen_day: str,
+    credit_cost_local_currency: float | None,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Attach plates for the kitchen day and compute savings per plate."""
+    rest_ids = [r["restaurant_id"] for r in restaurants]
+    plates_by_restaurant = get_plates_for_restaurants(rest_ids, kitchen_day, db)
+    for r in restaurants:
+        plates = plates_by_restaurant.get(r["restaurant_id"]) or []
+        for plate in plates:
+            plate["savings"] = (
+                _compute_savings_pct(plate["price"], plate["credit"], credit_cost_local_currency)
+                if credit_cost_local_currency is not None
+                else 0
+            )
+        r["plates"] = plates
+
+
+def _mark_volunteer_restaurants(
+    restaurants: list[dict],
+    rest_ids_str: list[str],
+    kitchen_day: str,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Set has_volunteer flag on restaurants that have a pickup_intent=offer."""
+    vol_query = """
+        SELECT DISTINCT ps.restaurant_id
+        FROM plate_selection_info ps
+        INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
+        WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
+          AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
+          AND ump.coworkers_can_see_my_orders = TRUE
+          AND ump.can_participate_in_plate_pickups = TRUE
+    """
+    vol_rows = db_read(vol_query, (rest_ids_str, kitchen_day), connection=db) or []
+    volunteer_rest_ids = {r["restaurant_id"] for r in vol_rows}
+    for r in restaurants:
+        r["has_volunteer"] = r["restaurant_id"] in volunteer_rest_ids
+
+
+def _build_coworker_match_clause(
+    workplace_group_id: UUID | None,
+    employer_entity_id: UUID | None,
+    employer_address_id: UUID | None,
+) -> tuple[str, tuple]:
+    """Return (SQL clause, params) for coworker matching based on workplace/employer scope."""
+    if workplace_group_id:
+        return "AND u_ps.workplace_group_id = %s", (str(workplace_group_id),)
+    if employer_address_id is not None:
+        return (
+            "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id = %s",
+            (str(employer_entity_id), str(employer_address_id)),
+        )
+    return (
+        "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id IS NULL",
+        (str(employer_entity_id),),
+    )
+
+
+def _query_coworker_intent_restaurants(
+    rest_ids_str: list[str],
+    kitchen_day: str,
+    intent: str,
+    coworker_match_clause: str,
+    match_params: tuple,
+    user_id: UUID | None,
+    db: psycopg2.extensions.connection,
+) -> set:
+    """Query restaurant IDs that have coworker pickup intents (offer or request)."""
+    exclude_self_clause = " AND ps.user_id != %s" if user_id else ""
+    query = (
+        f"""
+        SELECT DISTINCT ps.restaurant_id
+        FROM plate_selection_info ps
+        INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
+        INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
+        WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
+          AND ps.pickup_intent = %s AND ps.is_archived = FALSE
+          AND ump.coworkers_can_see_my_orders = TRUE
+          AND ump.can_participate_in_plate_pickups = TRUE
+          {coworker_match_clause}
+    """
+        + exclude_self_clause
+    )
+    params = (rest_ids_str, kitchen_day, intent) + match_params
+    if user_id:
+        params += (str(user_id),)
+    rows = db_read(query, params, connection=db) or []
+    return {r["restaurant_id"] for r in rows}
+
+
+def _mark_coworker_restaurants(
+    restaurants: list[dict],
+    rest_ids_str: list[str],
+    kitchen_day: str,
+    user_id: UUID | None,
+    workplace_group_id: UUID | None,
+    employer_entity_id: UUID | None,
+    employer_address_id: UUID | None,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Set has_coworker_offer and has_coworker_request flags on restaurants."""
+    if not (workplace_group_id or employer_entity_id):
+        return
+    coworker_match_clause, match_params = _build_coworker_match_clause(
+        workplace_group_id,
+        employer_entity_id,
+        employer_address_id,
+    )
+    offer_ids = _query_coworker_intent_restaurants(
+        rest_ids_str,
+        kitchen_day,
+        "offer",
+        coworker_match_clause,
+        match_params,
+        user_id,
+        db,
+    )
+    request_ids = _query_coworker_intent_restaurants(
+        rest_ids_str,
+        kitchen_day,
+        "request",
+        coworker_match_clause,
+        match_params,
+        user_id,
+        db,
+    )
+    for r in restaurants:
+        r["has_coworker_offer"] = r["restaurant_id"] in offer_ids
+        r["has_coworker_request"] = r["restaurant_id"] in request_ids
+
+
+def _mark_reserved_plates(
+    restaurants: list[dict],
+    user_id: UUID | None,
+    kitchen_day: str | None,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Mark plates the user has already reserved for the kitchen day."""
+    reserved_plate_to_selection: dict = {}
+    if user_id and kitchen_day:
+        reserved_query = """
+            SELECT plate_id, plate_selection_id FROM plate_selection_info
+            WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
         """
-        vol_rows = db_read(vol_query, (rest_ids_str, resolved_kitchen_day), connection=db) or []
-        volunteer_rest_ids = {r["restaurant_id"] for r in vol_rows}
-        for r in restaurants:
-            r["has_volunteer"] = r["restaurant_id"] in volunteer_rest_ids
-
-        # 3.41) has_coworker_offer, has_coworker_request: coworker-scoped when user has employer/workplace_group
-        # Exclude current user's own offer/request so pills show only when another coworker has need
-        # workplace_group_id takes precedence over employer_entity_id
-        coworker_match_active = (workplace_group_id or employer_entity_id) and resolved_kitchen_day
-        if coworker_match_active:
-            exclude_self_clause = " AND ps.user_id != %s" if user_id else ""
-            if workplace_group_id:
-                # Match by workplace_group_id (takes precedence)
-                coworker_match_clause = "AND u_ps.workplace_group_id = %s"
-                match_params = (str(workplace_group_id),)
-            elif employer_address_id is not None:
-                coworker_match_clause = "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id = %s"
-                match_params = (str(employer_entity_id), str(employer_address_id))
+        reserved_rows = db_read(reserved_query, (str(user_id), kitchen_day), connection=db) or []
+        reserved_plate_to_selection = {str(r["plate_id"]): str(r["plate_selection_id"]) for r in reserved_rows}
+    for r in restaurants:
+        for p in r.get("plates") or []:
+            pid_str = str(p.get("plate_id", ""))
+            if pid_str in reserved_plate_to_selection:
+                p["is_already_reserved"] = True
+                p["existing_plate_selection_id"] = reserved_plate_to_selection[pid_str]
             else:
-                coworker_match_clause = "AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id IS NULL"
-                match_params = (str(employer_entity_id),)
+                p["is_already_reserved"] = False
+                p["existing_plate_selection_id"] = None
 
-            coworker_offer_query = f"""
-                SELECT DISTINCT ps.restaurant_id
-                FROM plate_selection_info ps
-                INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                  AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
-                  AND ump.coworkers_can_see_my_orders = TRUE
-                  AND ump.can_participate_in_plate_pickups = TRUE
-                  {coworker_match_clause}
-            """ + exclude_self_clause
-            coworker_request_query = f"""
-                SELECT DISTINCT ps.restaurant_id
-                FROM plate_selection_info ps
-                INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
-                INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
-                WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
-                  AND ps.pickup_intent = 'request' AND ps.is_archived = FALSE
-                  AND ump.coworkers_can_see_my_orders = TRUE
-                  AND ump.can_participate_in_plate_pickups = TRUE
-                  {coworker_match_clause}
-            """ + exclude_self_clause
-            offer_params = (rest_ids_str, resolved_kitchen_day) + match_params
-            request_params = (rest_ids_str, resolved_kitchen_day) + match_params
-            if user_id:
-                offer_params += (str(user_id),)
-                request_params += (str(user_id),)
-            offer_rows = db_read(coworker_offer_query, offer_params, connection=db) or []
-            request_rows = db_read(coworker_request_query, request_params, connection=db) or []
-            coworker_offer_rest_ids = {r["restaurant_id"] for r in offer_rows}
-            coworker_request_rest_ids = {r["restaurant_id"] for r in request_rows}
-            for r in restaurants:
-                r["has_coworker_offer"] = r["restaurant_id"] in coworker_offer_rest_ids
-                r["has_coworker_request"] = r["restaurant_id"] in coworker_request_rest_ids
 
-        # 3.45) is_already_reserved: when user_id + kitchen_day present, mark plates user has reserved
-        reserved_plate_to_selection: dict = {}
-        if user_id and resolved_kitchen_day:
-            reserved_query = """
-                SELECT plate_id, plate_selection_id FROM plate_selection_info
-                WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
-            """
-            reserved_rows = db_read(
-                reserved_query,
-                (str(user_id), resolved_kitchen_day),
-                connection=db,
-            ) or []
-            reserved_plate_to_selection = {
-                str(r["plate_id"]): str(r["plate_selection_id"]) for r in reserved_rows
-            }
-        for r in restaurants:
-            for p in (r.get("plates") or []):
-                pid_str = str(p.get("plate_id", ""))
-                if pid_str in reserved_plate_to_selection:
-                    p["is_already_reserved"] = True
-                    p["existing_plate_selection_id"] = reserved_plate_to_selection[pid_str]
-                else:
-                    p["is_already_reserved"] = False
-                    p["existing_plate_selection_id"] = None
-
-    # 3.5) Favorites (is_favorite for UI) + Recommendation layer (is_recommended, sort to top)
+def _apply_favorites_and_recommendations(
+    restaurants: list[dict],
+    user_id: UUID | None,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Apply favorites, recommendations, sorting, and narrow plates to lean payload."""
     if user_id:
         from app.services.favorite_service import get_favorite_ids
         from app.services.recommendation_service import apply_recommendation
 
         fav = get_favorite_ids(user_id, db)
+        fav_rest_str = {str(rid) for rid in fav["restaurant_ids"]}
+        fav_plate_str = {str(pid) for pid in fav["plate_ids"]}
         for r in restaurants:
-            r["is_favorite"] = str(r["restaurant_id"]) in {str(rid) for rid in fav["restaurant_ids"]}
-            for p in (r.get("plates") or []):
-                p["is_favorite"] = str(p["plate_id"]) in {str(pid) for pid in fav["plate_ids"]}
+            r["is_favorite"] = str(r["restaurant_id"]) in fav_rest_str
+            for p in r.get("plates") or []:
+                p["is_favorite"] = str(p["plate_id"]) in fav_plate_str
         apply_recommendation(restaurants, user_id, db, favorite_ids=fav)
-        for r in restaurants:
-            plates = r.get("plates") or []
-            plates.sort(
-                key=lambda x: (
-                    not x.get("is_recommended", False),
-                    -(x.get("_recommendation_score", 0)),
-                    (x.get("product_name") or "").lower(),
-                )
-            )
-            r["plates"] = plates
-        restaurants.sort(
-            key=lambda x: (
-                not x.get("is_recommended", False),
-                -(x.get("_recommendation_score", 0)),
-                (x.get("name") or "").lower(),
-            )
-        )
-        # Narrow plates to lean payload after favorites/recommendation applied (modal fetches via enriched)
-        for r in restaurants:
-            r["plates"] = [_build_lean_plate_dict(p) for p in (r.get("plates") or [])]
+        _sort_by_recommendation(restaurants)
     else:
         for r in restaurants:
             r["is_favorite"] = False
             r["is_recommended"] = False
-            for p in (r.get("plates") or []):
+            for p in r.get("plates") or []:
                 p["is_favorite"] = False
                 p["is_recommended"] = False
-        # Narrow plates to lean payload when no user (modal fetches via enriched)
-        for r in restaurants:
-            r["plates"] = [_build_lean_plate_dict(p) for p in (r.get("plates") or [])]
+    # Narrow plates to lean payload (modal fetches via enriched)
+    for r in restaurants:
+        r["plates"] = [_build_lean_plate_dict(p) for p in (r.get("plates") or [])]
 
-    # 5) Cursor pagination: slice the sorted list before building the response.
-    page_restaurants, next_cursor, has_more = slice_restaurants_by_cursor(
-        restaurants, cursor, limit,
+
+def _recommendation_sort_key(x: dict) -> tuple:
+    """Sort key: recommended first, then by score descending, then name."""
+    return (
+        not x.get("is_recommended", False),
+        -(x.get("_recommendation_score", 0)),
+        (x.get("name", x.get("product_name", "")) or "").lower(),
     )
+
+
+def _sort_by_recommendation(restaurants: list[dict]) -> None:
+    """Sort restaurants and their plates by recommendation score."""
+    for r in restaurants:
+        plates = r.get("plates") or []
+        plates.sort(
+            key=lambda x: (
+                not x.get("is_recommended", False),
+                -(x.get("_recommendation_score", 0)),
+                (x.get("product_name") or "").lower(),
+            )
+        )
+        r["plates"] = plates
+    restaurants.sort(key=_recommendation_sort_key)
+
+
+def _compute_city_center(
+    country: str,
+    matched_city: str,
+    db: psycopg2.extensions.connection,
+) -> dict | None:
+    """Compute center lat/lng from active restaurants, falling back to city default."""
+    query_center = """
+        SELECT AVG(g.latitude) AS lat, AVG(g.longitude) AS lng
+        FROM geolocation_info g
+        INNER JOIN address_info a ON g.address_id = a.address_id
+        INNER JOIN restaurant_info r ON r.address_id = a.address_id
+        WHERE a.country_code = %s
+          AND TRIM(a.city) = %s
+          AND a.is_archived = FALSE
+          AND r.is_archived = FALSE
+          AND r.status = 'active'
+          AND EXISTS (
+            SELECT 1 FROM plate_info p
+            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
+          )
+          AND EXISTS (
+            SELECT 1 FROM qr_code qc
+            WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
+          )
+          AND g.is_archived = FALSE
+    """
+    center_row = db_read(query_center, (country, matched_city), connection=db, fetch_one=True)
+    if center_row and center_row.get("lat") is not None and center_row.get("lng") is not None:
+        return {"lat": float(center_row["lat"]), "lng": float(center_row["lng"])}
+    from app.config.supported_cities_default_location import get_city_default_location_by_name
+
+    return get_city_default_location_by_name(country, matched_city)
+
+
+def get_restaurants_by_city(
+    city: str,
+    country_code: str,
+    db: psycopg2.extensions.connection,
+    *,
+    timezone_str: str | None = None,
+    kitchen_day: str | None = None,
+    credit_cost_local_currency: float | None = None,
+    user_id: UUID | None = None,
+    employer_entity_id: UUID | None = None,
+    employer_address_id: UUID | None = None,
+    workplace_group_id: UUID | None = None,
+    locale: str = "en",
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    """
+    Return restaurants in the given city (case-insensitive match) in the given country.
+    Only restaurants with status = 'Active' and is_archived = FALSE are returned
+    (Pending/Inactive or archived restaurants are excluded).
+    Response: requested_city, city (matched), center (optional lat/lng), optional kitchen_day,
+    and restaurants list with restaurant_id, name, cuisine, lat, lng, etc.
+    When timezone_str is set and kitchen_day is omitted, resolve next available kitchen day.
+    When kitchen_day is set (or resolved), attach plates for that day to each restaurant.
+    credit_cost_local_currency: optional plan credit cost (local currency per credit); when set, savings
+    are computed per plate; otherwise savings=0.
+    user_id: optional; when set, favorites are surfaced at top and is_favorite set on items.
+    workplace_group_id: optional; takes precedence over employer_entity_id for coworker matching.
+    employer_entity_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
+    and has_coworker_request are computed per restaurant for coworker-scoped pickup intents.
+    No institution scope; B2C explore by market (country + city).
+    """
+    country = (country_code or "").strip().upper()
+    requested = (city or "").strip()
+
+    # Resolve kitchen_day
+    resolved_kitchen_day: str | None = None
+    if kitchen_day and kitchen_day in VALID_KITCHEN_DAYS:
+        resolved_kitchen_day = kitchen_day
+    elif timezone_str and country:
+        resolved_kitchen_day = resolve_kitchen_day_for_explore(country, timezone_str, db)
+
+    matched_city = _match_city_in_country(requested, country, db)
+    restaurants = _query_city_restaurants(country, matched_city, locale, db)
+
+    # Attach plates, volunteers, coworker flags, and reservations
+    if resolved_kitchen_day and restaurants:
+        rest_ids_str = [str(r["restaurant_id"]) for r in restaurants]
+        _attach_plates_and_savings(restaurants, resolved_kitchen_day, credit_cost_local_currency, db)
+        _mark_volunteer_restaurants(restaurants, rest_ids_str, resolved_kitchen_day, db)
+        _mark_coworker_restaurants(
+            restaurants,
+            rest_ids_str,
+            resolved_kitchen_day,
+            user_id,
+            workplace_group_id,
+            employer_entity_id,
+            employer_address_id,
+            db,
+        )
+        _mark_reserved_plates(restaurants, user_id, resolved_kitchen_day, db)
+
+    _apply_favorites_and_recommendations(restaurants, user_id, db)
+
+    # Cursor pagination
+    page_restaurants, next_cursor, has_more = slice_restaurants_by_cursor(restaurants, cursor, limit)
     restaurants = page_restaurants
 
-    # 4) Center: avg lat/lng for the city (Active + plate_kitchen_days)
-    # Skip center query on page 2+ — the frontend caches it from page 1.
-    is_first_page = cursor is None
-    center: Optional[dict] = None
-    if is_first_page and matched_city and restaurants:
-        query_center = """
-            SELECT AVG(g.latitude) AS lat, AVG(g.longitude) AS lng
-            FROM geolocation_info g
-            INNER JOIN address_info a ON g.address_id = a.address_id
-            INNER JOIN restaurant_info r ON r.address_id = a.address_id
-            WHERE a.country_code = %s
-              AND TRIM(a.city) = %s
-              AND a.is_archived = FALSE
-              AND r.is_archived = FALSE
-              AND r.status = 'active'
-              AND EXISTS (
-                SELECT 1 FROM plate_info p
-                INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
-                WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
-              )
-              AND EXISTS (
-                SELECT 1 FROM qr_code qc
-                WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
-              )
-              AND g.is_archived = FALSE
-        """
-        center_row = db_read(
-            query_center,
-            (country, matched_city),
-            connection=db,
-            fetch_one=True,
-        )
-        if center_row and center_row.get("lat") is not None and center_row.get("lng") is not None:
-            center = {"lat": float(center_row["lat"]), "lng": float(center_row["lng"])}
-
-    # Fallback: when no center from restaurants, use city default (for users without default address)
-    if is_first_page and center is None and matched_city and country:
-        from app.config.supported_cities_default_location import get_city_default_location_by_name
-        city_default = get_city_default_location_by_name(country, matched_city)
-        if city_default:
-            center = city_default
+    # Center: avg lat/lng (first page only — frontend caches it)
+    center = None
+    if cursor is None and matched_city and country:
+        center = _compute_city_center(country, matched_city, db)
 
     out: dict[str, Any] = {
         "requested_city": requested or "",

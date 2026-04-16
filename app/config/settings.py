@@ -1,6 +1,5 @@
 # config/settings.py
 import os
-from typing import List
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,9 +33,9 @@ class Settings(BaseSettings):
     # Email provider: "smtp" (Gmail SMTP, default for dev) or "sendgrid" (production).
     EMAIL_PROVIDER: str = "smtp"
     SENDGRID_API_KEY: str = ""
-    EMAIL_FROM_ADDRESS: str = ""    # e.g. hello@vianda.market (falls back to FROM_EMAIL env var)
-    EMAIL_FROM_NAME: str = ""       # e.g. Vianda (falls back to FROM_NAME env var)
-    EMAIL_REPLY_TO: str = ""        # e.g. support@vianda.market
+    EMAIL_FROM_ADDRESS: str = ""  # e.g. hello@vianda.market (falls back to FROM_EMAIL env var)
+    EMAIL_FROM_NAME: str = ""  # e.g. Vianda (falls back to FROM_NAME env var)
+    EMAIL_REPLY_TO: str = ""  # e.g. support@vianda.market
 
     # Stripe (required when PAYMENT_PROVIDER=stripe; use test keys sk_test_/pk_test_ for sandbox)
     STRIPE_SECRET_KEY: str = ""
@@ -46,7 +45,7 @@ class Settings(BaseSettings):
     STRIPE_CUSTOMER_SETUP_SUCCESS_URL: str = ""
     # Stripe Connect (supplier outbound payouts). SUPPLIER_PAYOUT_PROVIDER=stripe to activate.
     STRIPE_CONNECT_WEBHOOK_SECRET: str = ""  # whsec_… from sandbox/live Connect webhook endpoint
-    STRIPE_PLATFORM_ACCOUNT_ID: str = ""    # acct_… of the Vianda platform account (optional; for logging)
+    STRIPE_PLATFORM_ACCOUNT_ID: str = ""  # acct_… of the Vianda platform account (optional; for logging)
 
     # App store URLs for benefit employee invite emails (placeholder until apps are published)
     APP_STORE_URL: str = "https://apps.apple.com/app/vianda/id_placeholder"
@@ -99,21 +98,21 @@ class Settings(BaseSettings):
 
     # Archival Configuration - Days to retain records before archiving
     RETENTION_PERIODS: dict = {
-        "orders": 30,              # Customer service window
-        "transactions": 90,        # Financial dispute resolution
-        "subscriptions": 365,      # Annual billing cycles
-        "user_data": 2555,         # Legal compliance (7 years)
-        "payments": 180,           # Payment processing disputes
-        "restaurant_data": 90,     # Restaurant operational data
+        "orders": 30,  # Customer service window
+        "transactions": 90,  # Financial dispute resolution
+        "subscriptions": 365,  # Annual billing cycles
+        "user_data": 2555,  # Legal compliance (7 years)
+        "payments": 180,  # Payment processing disputes
+        "restaurant_data": 90,  # Restaurant operational data
         # Financial tables (HIGH PRIORITY)
-        "client_bills": 365,       # Financial records - 1 year
-        "client_transactions": 90, # Client payments - 90 days
+        "client_bills": 365,  # Financial records - 1 year
+        "client_transactions": 90,  # Client payments - 90 days
         # Operational tables (MEDIUM PRIORITY)
-        "plate_selections": 60,    # Order history - 60 days
-        "payment_methods": 365,    # Payment methods - 1 year
-        "plans": 730,             # Service plans - 2 years
-        "qr_codes": 180,          # QR codes - 180 days
-        "products": 365,          # Product catalog - 1 year
+        "plate_selections": 60,  # Order history - 60 days
+        "payment_methods": 365,  # Payment methods - 1 year
+        "plans": 730,  # Service plans - 2 years
+        "qr_codes": 180,  # QR codes - 180 days
+        "products": 365,  # Product catalog - 1 year
     }
 
     # Grace period before archival eligibility (days)
@@ -124,41 +123,41 @@ class Settings(BaseSettings):
 
     # i18n: supported API/UI locales (ISO 639-1 short codes)
     DEFAULT_LOCALE: str = "en"
-    SUPPORTED_LOCALES: List[str] = ["en", "es", "pt"]
+    SUPPORTED_LOCALES: list[str] = ["en", "es", "pt"]
 
     # Open Food Facts (OFF) — real-time ingredient autocomplete
-    OFF_ENABLED: bool = True                        # kill switch for OFF real-time calls
-    OFF_LOCAL_MIN_VERIFIED_RESULTS: int = 5         # min verified local results before calling OFF
+    OFF_ENABLED: bool = True  # kill switch for OFF real-time calls
+    OFF_LOCAL_MIN_VERIFIED_RESULTS: int = 5  # min verified local results before calling OFF
 
     # Ingredient enrichment cron — image phase (Wikidata, CC licensed, permanent storage)
-    WIKIDATA_ENRICHMENT_ENABLED: bool = False       # kill switch for Wikidata image cron
-    ENRICHMENT_BATCH_SIZE: int = 50                 # rows per cron run (shared by all enrichment phases)
+    WIKIDATA_ENRICHMENT_ENABLED: bool = False  # kill switch for Wikidata image cron
+    ENRICHMENT_BATCH_SIZE: int = 50  # rows per cron run (shared by all enrichment phases)
 
     # Ingredient enrichment cron — nutrition phase (USDA FoodData Central, Phase 7)
-    USDA_ENRICHMENT_ENABLED: bool = False           # kill switch for USDA nutrition cron
+    USDA_ENRICHMENT_ENABLED: bool = False  # kill switch for USDA nutrition cron
 
     # QR code HMAC signing (HMAC-SHA256 secret for signed QR code URLs)
     QR_HMAC_SECRET: str = ""
 
     # Pickup timer configuration (B2C app reads these from scan-qr response)
     PICKUP_COUNTDOWN_SECONDS: int = 300  # Timer duration in seconds (default 5 min)
-    PICKUP_MAX_EXTENSIONS: int = 3       # Max timer extensions allowed
+    PICKUP_MAX_EXTENSIONS: int = 3  # Max timer extensions allowed
 
     # Handoff confirmation timeout (seconds after clerk marks Delivered before auto-completing)
     HANDOFF_CONFIRMATION_TIMEOUT_SECONDS: int = 300
 
     # Dispute auto-escalation (flags restaurants for Layer 2 code verification)
-    DISPUTE_AUTO_ESCALATION_RATE: float = 0.03    # 3% dispute rate threshold
-    DISPUTE_ESCALATION_MIN_ORDERS: int = 20        # Minimum orders before escalation applies
-    DISPUTE_ESCALATION_LOOKBACK_DAYS: int = 30     # Rolling window for rate calculation
+    DISPUTE_AUTO_ESCALATION_RATE: float = 0.03  # 3% dispute rate threshold
+    DISPUTE_ESCALATION_MIN_ORDERS: int = 20  # Minimum orders before escalation applies
+    DISPUTE_ESCALATION_LOOKBACK_DAYS: int = 30  # Rolling window for rate calculation
 
     # Portion complaint flag rate (size-1 + complaint, not size-1 alone)
-    PORTION_COMPLAINT_FLAG_RATE: float = 0.05      # 5% triggers restaurant SLA review
+    PORTION_COMPLAINT_FLAG_RATE: float = 0.05  # 5% triggers restaurant SLA review
 
     # Authenticated user rate limiting (middleware). Off by default for safe rollout.
     RATE_LIMIT_ENABLED: bool = False
-    RATE_LIMIT_MAX_TRACKED_USERS: int = 10_000     # eviction threshold for in-memory buckets
-    RATE_LIMIT_EVICTION_AGE_SECONDS: int = 120     # stale bucket age before eviction
+    RATE_LIMIT_MAX_TRACKED_USERS: int = 10_000  # eviction threshold for in-memory buckets
+    RATE_LIMIT_EVICTION_AGE_SECONDS: int = 120  # stale bucket age before eviction
 
     # Firebase Cloud Messaging (push notifications)
     FIREBASE_CREDENTIALS_PATH: str = ""  # Path to Firebase service account JSON. Empty = push disabled.
@@ -190,28 +189,28 @@ class Settings(BaseSettings):
     CAPTCHA_EVICTION_AGE_SECONDS: int = 1800
 
     # --- Ads Platform: Shared Infrastructure ---
-    ADS_ENABLED_PLATFORMS: str = ""          # Comma-separated: "google,meta" or "" (disabled)
-    ADS_DRY_RUN: bool = False               # Log payloads without uploading (all platforms)
+    ADS_ENABLED_PLATFORMS: str = ""  # Comma-separated: "google,meta" or "" (disabled)
+    ADS_DRY_RUN: bool = False  # Log payloads without uploading (all platforms)
 
     # --- Ads Platform: Redis / ARQ ---
     REDIS_URL: str = "redis://localhost:6379"
     ARQ_MAX_JOBS: int = 100
-    ARQ_JOB_TIMEOUT: int = 300              # Seconds per job
+    ARQ_JOB_TIMEOUT: int = 300  # Seconds per job
     ARQ_MAX_RETRIES: int = 3
 
     # --- Ads Platform: Google Ads ---
-    GOOGLE_ADS_PROVIDER: str = "mock"       # "mock" | "live"
+    GOOGLE_ADS_PROVIDER: str = "mock"  # "mock" | "live"
     GOOGLE_ADS_CUSTOMER_ID: str = ""
     GOOGLE_ADS_CONVERSION_ACTION_ID: str = ""
-    GOOGLE_ADS_DEVELOPER_TOKEN: str = ""    # Local dev only; prod uses Secret Manager
+    GOOGLE_ADS_DEVELOPER_TOKEN: str = ""  # Local dev only; prod uses Secret Manager
     GOOGLE_ADS_UPLOAD_DELAY_HOURS: int = 24
 
     # --- Ads Platform: Meta Ads ---
-    META_ADS_PROVIDER: str = "mock"         # "mock" | "live"
+    META_ADS_PROVIDER: str = "mock"  # "mock" | "live"
     META_ADS_PIXEL_ID: str = ""
     META_ADS_AD_ACCOUNT_ID: str = ""
-    META_ADS_SYSTEM_USER_TOKEN: str = ""    # Local dev only; prod uses Secret Manager
-    META_ADS_APP_SECRET: str = ""           # Local dev only
+    META_ADS_SYSTEM_USER_TOKEN: str = ""  # Local dev only; prod uses Secret Manager
+    META_ADS_APP_SECRET: str = ""  # Local dev only
     META_ADS_UPLOAD_DELAY_MINUTES: int = 5
     META_ADS_API_VERSION: str = "v25.0"
 
@@ -219,8 +218,8 @@ class Settings(BaseSettings):
     ZONE_MIN_RADIUS_KM: float = 1.5
     ZONE_DEFAULT_RADIUS_KM: float = 2.0
     ZONE_MIN_ESTIMATED_MAU: int = 40_000
-    ZONE_BUDGET_FLOOR_SMALL_RADIUS: int = 5000   # Cents/day for radius < 2km
-    ZONE_BUDGET_FLOOR_LARGE_RADIUS: int = 3000   # Cents/day for radius >= 2km
+    ZONE_BUDGET_FLOOR_SMALL_RADIUS: int = 5000  # Cents/day for radius < 2km
+    ZONE_BUDGET_FLOOR_LARGE_RADIUS: int = 3000  # Cents/day for radius >= 2km
     ZONE_DBSCAN_MIN_LEADS: int = 40
     ZONE_DBSCAN_EPSILON_KM: float = 2.0
     ZONE_MAU_CACHE_TTL_HOURS: int = 24
@@ -238,15 +237,35 @@ class Settings(BaseSettings):
     GEMINI_BUDGET_CHANGE_LIMIT_PCT: float = 0.20
     GEMINI_STRATEGY_SHIFT_LIMIT_PCT: float = 0.10
 
+
 settings = Settings()
 
 # Common email providers that cannot be registered as employer domains
 EMPLOYER_DOMAIN_BLACKLIST = {
-    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "yahoo.com",
-    "yahoo.co.uk", "yahoo.co.jp", "live.com", "msn.com", "aol.com",
-    "icloud.com", "me.com", "mac.com", "protonmail.com", "proton.me",
-    "mail.com", "zoho.com", "yandex.com", "yandex.ru", "tutanota.com",
-    "gmx.com", "gmx.net", "fastmail.com", "hey.com",
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "yahoo.com",
+    "yahoo.co.uk",
+    "yahoo.co.jp",
+    "live.com",
+    "msn.com",
+    "aol.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "protonmail.com",
+    "proton.me",
+    "mail.com",
+    "zoho.com",
+    "yandex.com",
+    "yandex.ru",
+    "tutanota.com",
+    "gmx.com",
+    "gmx.net",
+    "fastmail.com",
+    "hey.com",
 }
 
 
@@ -291,7 +310,7 @@ def get_mapbox_access_token() -> str:
 def get_settings() -> Settings:
     """
     Get application settings singleton.
-    
+
     Returns:
         Settings instance
     """

@@ -6,6 +6,7 @@ Used when GOOGLE_ADS_PROVIDER=mock / META_ADS_PROVIDER=mock / DEV_MODE=true.
 Allows full end-to-end testing of the conversion pipeline without live
 credentials or external API calls.
 """
+
 import logging
 
 from app.gateways.ads.base import AdsCampaignGateway, AdsConversionGateway
@@ -39,9 +40,7 @@ class MockConversionGateway(AdsConversionGateway):
             entity_id=event.entity_id,
         )
 
-    def upload_conversions_batch(
-        self, events: list[ConversionEvent]
-    ) -> list[ConversionResult]:
+    def upload_conversions_batch(self, events: list[ConversionEvent]) -> list[ConversionResult]:
         return [self.upload_conversion(e) for e in events]
 
 

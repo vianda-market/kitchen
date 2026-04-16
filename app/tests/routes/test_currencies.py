@@ -2,11 +2,12 @@
 Tests for supported currencies endpoint: GET /api/v1/currencies
 """
 
-import pytest
 from uuid import uuid4
+
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_employee_user, oauth2_scheme
 
 

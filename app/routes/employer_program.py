@@ -1,33 +1,35 @@
 """Employer Benefits Program routes — program config, enrollment, billing."""
-from typing import List, Optional
+
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.auth.dependencies import get_current_user, get_employee_user
 from app.dependencies.database import get_db
 from app.schemas.employer_program import (
-    ProgramCreateSchema,
-    ProgramUpdateSchema,
-    ProgramResponseSchema,
-    EmployeeEnrollSchema,
-    EmployeeSubscribeSchema,
     BenefitEmployeeResponseSchema,
     BulkEnrollResultSchema,
-    EmployerBillResponseSchema,
+    EmployeeEnrollSchema,
+    EmployeeSubscribeSchema,
     EmployerBillDetailResponseSchema,
+    EmployerBillResponseSchema,
     GenerateBillRequestSchema,
     # Domain schemas REMOVED — email_domain is on institution_entity_info
+    ProgramCreateSchema,
+    ProgramResponseSchema,
+    ProgramUpdateSchema,
 )
-from app.services.employer import program_service, enrollment_service, billing_service
+from app.services.employer import billing_service, enrollment_service, program_service
 
 router = APIRouter(prefix="/employer", tags=["Employer Program"])
 
 
 def _get_institution_id_param(
-    institution_id: Optional[UUID] = Query(None, description="Employer institution ID (required for Internal users, ignored for Employer users)")
-) -> Optional[UUID]:
+    institution_id: UUID | None = Query(
+        None, description="Employer institution ID (required for Internal users, ignored for Employer users)"
+    ),
+) -> UUID | None:
     """FastAPI dependency: extract optional institution_id query param."""
     return institution_id
 
@@ -35,6 +37,7 @@ def _get_institution_id_param(
 # =============================================================================
 # Program CRUD
 # =============================================================================
+
 
 @router.post("/program", response_model=ProgramResponseSchema, status_code=201)
 def create_program(
@@ -49,8 +52,10 @@ def create_program(
 
 @router.get("/program", response_model=ProgramResponseSchema)
 def get_program(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
-    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level program. Omit for institution-level."),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
+    institution_entity_id: UUID | None = Query(
+        None, description="Entity ID for entity-level program. Omit for institution-level."
+    ),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -66,9 +71,9 @@ def get_program(
     return program
 
 
-@router.get("/programs", response_model=List[ProgramResponseSchema])
+@router.get("/programs", response_model=list[ProgramResponseSchema])
 def list_programs(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -80,8 +85,10 @@ def list_programs(
 @router.put("/program", response_model=ProgramResponseSchema)
 def update_program(
     body: ProgramUpdateSchema,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
-    institution_entity_id: Optional[UUID] = Query(None, description="Entity ID for entity-level program. Omit for institution-level."),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
+    institution_entity_id: UUID | None = Query(
+        None, description="Entity ID for entity-level program. Omit for institution-level."
+    ),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -97,7 +104,7 @@ def update_program(
 
 @router.delete("/program", status_code=204)
 def archive_entity_program(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     institution_entity_id: UUID = Query(..., description="Entity ID whose program override to archive (required)"),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -108,7 +115,10 @@ def archive_entity_program(
     if not program:
         raise HTTPException(status_code=404, detail="Entity-level program not found")
     program_service.update_program(
-        program.program_id, {"is_archived": True}, db, modified_by=current_user["user_id"],
+        program.program_id,
+        {"is_archived": True},
+        db,
+        modified_by=current_user["user_id"],
     )
 
 
@@ -116,10 +126,11 @@ def archive_entity_program(
 # Employee Enrollment
 # =============================================================================
 
+
 @router.post("/employees", response_model=BenefitEmployeeResponseSchema, status_code=201)
 def enroll_employee(
     body: EmployeeEnrollSchema,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -141,7 +152,7 @@ def enroll_employee(
 async def enroll_employees_bulk(
     file: UploadFile = File(..., description="CSV file with columns: email, first_name, last_name"),
     city_metadata_id: UUID = Form(..., description="City for all employees in this batch"),
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -160,9 +171,9 @@ async def enroll_employees_bulk(
     return result
 
 
-@router.get("/employees", response_model=List[BenefitEmployeeResponseSchema])
+@router.get("/employees", response_model=list[BenefitEmployeeResponseSchema])
 def list_employees(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -175,7 +186,7 @@ def list_employees(
 @router.delete("/employees/{user_id}", status_code=204)
 def deactivate_employee(
     user_id: UUID,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -188,7 +199,7 @@ def deactivate_employee(
 def subscribe_employee(
     user_id: UUID,
     body: EmployeeSubscribeSchema,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -208,9 +219,10 @@ def subscribe_employee(
 # Billing
 # =============================================================================
 
-@router.get("/billing", response_model=List[EmployerBillResponseSchema])
+
+@router.get("/billing", response_model=list[EmployerBillResponseSchema])
 def list_bills(
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -222,7 +234,7 @@ def list_bills(
 @router.get("/billing/{bill_id}", response_model=EmployerBillDetailResponseSchema)
 def get_bill_detail(
     bill_id: UUID,
-    institution_id_param: Optional[UUID] = Depends(_get_institution_id_param),
+    institution_id_param: UUID | None = Depends(_get_institution_id_param),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -254,6 +266,7 @@ def run_billing_cron(
 ):
     """Run the employer billing cron job. Internal only. Checks all active programs and generates bills where due."""
     from app.services.cron.employer_billing import run_employer_billing
+
     result = run_employer_billing()
     return result
 
@@ -262,7 +275,8 @@ def run_billing_cron(
 # Helpers
 # =============================================================================
 
-def _resolve_employer_institution(current_user: dict, institution_id_override: Optional[UUID] = None) -> UUID:
+
+def _resolve_employer_institution(current_user: dict, institution_id_override: UUID | None = None) -> UUID:
     """Resolve the employer institution_id.
     - Employer users: use their own institution_id from JWT.
     - Internal users: must provide institution_id via query param (they are global-scoped, not tied to an Employer institution)."""
@@ -290,6 +304,7 @@ def _resolve_market_and_locale_for_city(
     city_metadata doesn't carry market_id/language directly — both come from
     core.market_info joined on country_iso → country_code."""
     from app.utils.db import db_read
+
     row = db_read(
         """
         SELECT m.market_id, m.language
@@ -319,6 +334,7 @@ def _require_employer_admin(current_user: dict):
 def _user_to_employee_response(user, db) -> dict:
     """Convert a user DTO to BenefitEmployeeResponseSchema-compatible dict."""
     from app.services.crud_service import subscription_service
+
     sub = subscription_service.get_by_user(user.user_id, db)
     return {
         "user_id": user.user_id,

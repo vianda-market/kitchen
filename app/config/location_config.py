@@ -6,9 +6,7 @@ country as location; US is split by timezone region (Eastern, Central, Mountain,
 Aligned with TimezoneService.PROVINCE_TIMEZONE_MAPPING for US.
 """
 
-from typing import List, Dict, Optional
-
-LOCATIONS: List[Dict[str, str]] = [
+LOCATIONS: list[dict[str, str]] = [
     {"location": "AR", "market": "AR", "timezone": "America/Argentina/Buenos_Aires"},
     {"location": "PE", "market": "PE", "timezone": "America/Lima"},
     {"location": "US-Eastern", "market": "US", "timezone": "America/New_York"},
@@ -18,23 +16,23 @@ LOCATIONS: List[Dict[str, str]] = [
 ]
 
 
-def get_location_config(location_id: str) -> Optional[Dict[str, str]]:
+def get_location_config(location_id: str) -> dict[str, str] | None:
     """Get config for location_id (e.g. AR, US-Eastern)."""
-    loc = next((l for l in LOCATIONS if l["location"] == location_id), None)
+    loc = next((loc for loc in LOCATIONS if loc["location"] == location_id), None)
     return loc
 
 
-def get_all_locations() -> List[Dict[str, str]]:
+def get_all_locations() -> list[dict[str, str]]:
     """Get all location configs."""
     return list(LOCATIONS)
 
 
-def get_locations_for_market(market: str) -> List[Dict[str, str]]:
+def get_locations_for_market(market: str) -> list[dict[str, str]]:
     """Get locations for a market (e.g. US returns US-Eastern, US-Central, etc.)."""
-    return [l for l in LOCATIONS if l["market"] == market]
+    return [loc for loc in LOCATIONS if loc["market"] == market]
 
 
-def get_location_id_for_timezone(tz: str) -> Optional[str]:
+def get_location_id_for_timezone(tz: str) -> str | None:
     """Map IANA timezone to location_id. e.g. America/Los_Angeles -> US-Pacific."""
     for loc in LOCATIONS:
         if loc["timezone"] == tz:

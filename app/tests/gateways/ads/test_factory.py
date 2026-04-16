@@ -4,6 +4,7 @@ Unit tests for ads gateway factory (app/gateways/ads/factory.py).
 Verifies factory routes to mock in DEV_MODE and resolves live gateways
 when configured. Uses unittest.mock to avoid needing real credentials.
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -45,19 +46,23 @@ class TestConversionGatewayFactory:
             assert isinstance(gw, MockConversionGateway)
 
     def test_google_returns_live_when_configured(self):
+        pytest.importorskip("google.ads.googleads", reason="google-ads package not installed")
         with patch("app.gateways.ads.factory.settings") as mock_settings:
             mock_settings.DEV_MODE = False
             mock_settings.GOOGLE_ADS_PROVIDER = "live"
             gw = get_conversion_gateway(AdsPlatform.GOOGLE)
             from app.gateways.ads.google.conversion_gateway import GoogleAdsConversionGateway
+
             assert isinstance(gw, GoogleAdsConversionGateway)
 
     def test_meta_returns_live_when_configured(self):
+        pytest.importorskip("facebook_business", reason="facebook-business package not installed")
         with patch("app.gateways.ads.factory.settings") as mock_settings:
             mock_settings.DEV_MODE = False
             mock_settings.META_ADS_PROVIDER = "live"
             gw = get_conversion_gateway(AdsPlatform.META)
             from app.gateways.ads.meta.conversion_gateway import MetaConversionGateway
+
             assert isinstance(gw, MetaConversionGateway)
 
     def test_invalid_platform_raises(self):

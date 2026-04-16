@@ -4,9 +4,8 @@ Unit tests for mock ads gateway (app/gateways/ads/mock_gateway.py).
 Verifies mock handles all event types and strategies correctly,
 batch uploads, and campaign CRUD stubs.
 """
-from datetime import datetime, timezone
 
-import pytest
+from datetime import UTC, datetime
 
 from app.gateways.ads.mock_gateway import MockCampaignGateway, MockConversionGateway
 from app.services.ads.models import (
@@ -27,7 +26,7 @@ def _make_event(**overrides):
         user_phone=None,
         conversion_value=29.99,
         currency_code="USD",
-        event_time=datetime.now(timezone.utc),
+        event_time=datetime.now(UTC),
     )
     defaults.update(overrides)
     return ConversionEvent(**defaults)

@@ -2,15 +2,17 @@
 Unit tests for MapboxGeocodingGateway (geocode + reverse_geocode).
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import patch, Mock
 
 from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway, get_mapbox_geocoding_gateway
 
 
 class TestMapboxGeocodingGatewayGeocode:
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_geocode_returns_lat_lng(self, mock_settings):
+    def test_dev_mode_geocode_returns_lat_lng(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxGeocodingGateway()
         lat, lng = gw.geocode("Av. Santa Fe 2567, Buenos Aires")
@@ -20,16 +22,18 @@ class TestMapboxGeocodingGatewayGeocode:
         assert lat == pytest.approx(-34.5880634)
         assert lng == pytest.approx(-58.4023328)
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_reverse_geocode_returns_address(self, mock_settings):
+    def test_dev_mode_reverse_geocode_returns_address(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxGeocodingGateway()
         address = gw.reverse_geocode(-34.5880634, -58.4023328)
         assert isinstance(address, str)
         assert "Santa Fe" in address
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_geocode_full_returns_dict(self, mock_settings):
+    def test_dev_mode_geocode_full_returns_dict(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxGeocodingGateway()
         result = gw.geocode_full("Av. Santa Fe 2567")
@@ -38,8 +42,9 @@ class TestMapboxGeocodingGatewayGeocode:
         assert result["mapbox_id"]
         assert result["formatted_address"]
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_get_address_components(self, mock_settings):
+    def test_dev_mode_get_address_components(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxGeocodingGateway()
         components = gw.get_address_components("Av. Santa Fe 2567")
@@ -48,8 +53,9 @@ class TestMapboxGeocodingGatewayGeocode:
         assert "locality" in components
         assert components["locality"] == "Buenos Aires"
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_dev_mode_validate_address(self, mock_settings):
+    def test_dev_mode_validate_address(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         gw = MapboxGeocodingGateway()
         assert gw.validate_address("Av. Santa Fe 2567") is True
@@ -63,7 +69,12 @@ class TestMapboxGeocodingGatewayGeocode:
         mock_response.ok = True
         mock_response.content = b'{"features": [{"geometry": {"coordinates": [-58.40, -34.58]}, "properties": {"mapbox_id": "test", "full_address": "Test"}}]}'
         mock_response.json.return_value = {
-            "features": [{"geometry": {"coordinates": [-58.40, -34.58]}, "properties": {"mapbox_id": "test", "full_address": "Test"}}]
+            "features": [
+                {
+                    "geometry": {"coordinates": [-58.40, -34.58]},
+                    "properties": {"mapbox_id": "test", "full_address": "Test"},
+                }
+            ]
         }
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
@@ -76,10 +87,12 @@ class TestMapboxGeocodingGatewayGeocode:
 
 
 class TestMapboxGeocodingGatewaySingleton:
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
-    def test_singleton_returns_same_instance(self, mock_settings):
+    def test_singleton_returns_same_instance(self, mock_settings, _mock_token):
         mock_settings.return_value = Mock(DEV_MODE=True)
         import app.gateways.mapbox_geocoding_gateway as mod
+
         mod._mapbox_geocoding_gateway = None
         gw1 = get_mapbox_geocoding_gateway()
         gw2 = get_mapbox_geocoding_gateway()

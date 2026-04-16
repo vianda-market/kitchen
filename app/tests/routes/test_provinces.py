@@ -2,11 +2,12 @@
 Tests for supported provinces endpoint: GET /api/v1/provinces
 """
 
-import pytest
 from uuid import uuid4
+
+import pytest
+from application import app
 from fastapi.testclient import TestClient
 
-from application import app
 from app.auth.dependencies import get_client_employee_or_supplier_user, oauth2_scheme
 
 

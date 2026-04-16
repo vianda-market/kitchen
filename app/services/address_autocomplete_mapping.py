@@ -10,24 +10,43 @@ Mapbox context hierarchy:
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.utils.country import country_alpha3_to_alpha2, country_name_to_alpha2, normalize_country_code
 
 # Route prefix patterns to street_type (short). Order matters: longer matches first.
 _ROUTE_PREFIXES = [
-    ("avenida", "ave"), ("av.", "ave"), ("av ", "ave"), ("av. ", "ave"),
-    ("calle", "st"), ("cal ", "st"), ("cal. ", "st"),
-    ("boulevard", "blvd"), ("bulevar", "blvd"), ("blvd.", "blvd"), ("blvd ", "blvd"),
-    ("road", "rd"), ("rd.", "rd"), ("rd ", "rd"),
-    ("drive", "dr"), ("dr.", "dr"), ("dr ", "dr"),
-    ("lane", "ln"), ("ln.", "ln"), ("ln ", "ln"),
-    ("way", "way"), ("court", "ct"), ("ct.", "ct"), ("place", "pl"), ("circle", "cir"),
-    ("cir.", "cir"), ("circuit", "cir"),
+    ("avenida", "ave"),
+    ("av.", "ave"),
+    ("av ", "ave"),
+    ("av. ", "ave"),
+    ("calle", "st"),
+    ("cal ", "st"),
+    ("cal. ", "st"),
+    ("boulevard", "blvd"),
+    ("bulevar", "blvd"),
+    ("blvd.", "blvd"),
+    ("blvd ", "blvd"),
+    ("road", "rd"),
+    ("rd.", "rd"),
+    ("rd ", "rd"),
+    ("drive", "dr"),
+    ("dr.", "dr"),
+    ("dr ", "dr"),
+    ("lane", "ln"),
+    ("ln.", "ln"),
+    ("ln ", "ln"),
+    ("way", "way"),
+    ("court", "ct"),
+    ("ct.", "ct"),
+    ("place", "pl"),
+    ("circle", "cir"),
+    ("cir.", "cir"),
+    ("circuit", "cir"),
 ]
 
 
-def _route_to_street_type_and_name(route: str) -> Tuple[str, str]:
+def _route_to_street_type_and_name(route: str) -> tuple[str, str]:
     """
     Split route (e.g. 'Av. Corrientes', 'Avenida Santa Fe') into street_type and street_name.
     Returns (street_type, street_name). street_type defaults to 'St' if no match.
@@ -38,14 +57,14 @@ def _route_to_street_type_and_name(route: str) -> Tuple[str, str]:
     r_lower = r.lower()
     for prefix, st in _ROUTE_PREFIXES:
         if r_lower.startswith(prefix):
-            rest = r[len(prefix):].strip()
+            rest = r[len(prefix) :].strip()
             # Remove leading punctuation/dot
             rest = re.sub(r"^[\s.,]+", "", rest)
             return st, rest or r
     return "st", r
 
 
-def _extract_from_context(context: Dict[str, Any]) -> Dict[str, str]:
+def _extract_from_context(context: dict[str, Any]) -> dict[str, str]:
     """Extract flat field values from Mapbox nested context hierarchy."""
     return {
         "country_code": (context.get("country", {}).get("country_code") or "").upper(),
@@ -61,7 +80,7 @@ def _extract_from_context(context: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def get_city_candidates_from_place_details(feature: Dict[str, Any]) -> List[str]:
+def get_city_candidates_from_place_details(feature: dict[str, Any]) -> list[str]:
     """
     Return city candidates from Mapbox Feature context.
     Priority: place > district > locality > neighborhood.
@@ -79,9 +98,9 @@ def get_city_candidates_from_place_details(feature: Dict[str, Any]) -> List[str]
 
 
 def map_place_details_to_address(
-    feature: Dict[str, Any],
-    country_override: Optional[str] = None,
-) -> Dict[str, Any]:
+    feature: dict[str, Any],
+    country_override: str | None = None,
+) -> dict[str, Any]:
     """
     Map a Mapbox GeoJSON Feature (from retrieve or geocode) to backend address schema.
     country_override: if set, use as country_code (alpha-2); else derive from context.
@@ -129,7 +148,7 @@ def map_place_details_to_address(
     }
 
 
-def extract_place_details_geolocation(feature: Dict[str, Any]) -> Dict[str, Any]:
+def extract_place_details_geolocation(feature: dict[str, Any]) -> dict[str, Any]:
     """
     Extract mapbox_id, viewport, formatted_address, latitude, longitude from Mapbox Feature.
 

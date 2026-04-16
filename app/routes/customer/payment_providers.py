@@ -10,17 +10,17 @@ Note: Archiving a provider does NOT delete the Stripe Customer object via the St
 API — Stripe Customer deletion is irreversible and out of scope. The record is only
 archived locally, along with all associated payment methods.
 """
+
 from uuid import UUID
-from typing import List
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_client_user
 from app.dependencies.database import get_db
+from app.schemas.payment_method import UserPaymentProviderResponseSchema
 from app.utils.db import db_read
 from app.utils.log import log_info, log_warning
-from app.schemas.payment_method import UserPaymentProviderResponseSchema
 
 router = APIRouter(prefix="/payment-providers", tags=["Customer Payment Providers"])
 
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/payment-providers", tags=["Customer Payment Provider
 def _get_providers_for_user(
     user_id: UUID,
     db: psycopg2.extensions.connection,
-) -> List[UserPaymentProviderResponseSchema]:
+) -> list[UserPaymentProviderResponseSchema]:
     rows = db_read(
         """
         SELECT
@@ -100,8 +100,7 @@ def _archive_provider(
         archived_pm_count = cur.rowcount
         db.commit()
         log_info(
-            f"provider disconnect: user={user_id} provider={provider} "
-            f"archived {archived_pm_count} payment method(s)"
+            f"provider disconnect: user={user_id} provider={provider} archived {archived_pm_count} payment method(s)"
         )
     except HTTPException:
         raise
@@ -111,16 +110,16 @@ def _archive_provider(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to disconnect payment provider.",
-        )
+        ) from None
     finally:
         cur.close()
 
 
-@router.get("", response_model=List[UserPaymentProviderResponseSchema])
+@router.get("", response_model=list[UserPaymentProviderResponseSchema])
 def list_payment_providers(
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-) -> List[UserPaymentProviderResponseSchema]:
+) -> list[UserPaymentProviderResponseSchema]:
     """List connected payment provider accounts for the current user."""
     user_id = UUID(str(current_user["user_id"]))
     return _get_providers_for_user(user_id, db)

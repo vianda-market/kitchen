@@ -6,17 +6,18 @@ Database tests for the new subscription payment flow (Stripe atomic flow).
 - Integration: create subscription (Pending), record subscription_payment, activate subscription.
 """
 
+from datetime import UTC
+from uuid import UUID, uuid4
+
 import pytest
-from uuid import uuid4, UUID
+
 from app.tests.database.conftest import (
-    db_transaction,
     get_table_columns,
 )
 from app.tests.database.test_data.expected_seed_data import (
     SEED_INSTITUTION_CUSTOMERS_ID,
     SEED_SUPERADMIN_USER_ID,
 )
-
 
 # Argentina market for plan/subscription inserts (plans cannot use Global Marketplace)
 ARGENTINA_MARKET_ID = UUID("00000000-0000-0000-0000-000000000002")
@@ -115,6 +116,7 @@ class TestPaymentProviderMock:
     def test_mock_returns_id_client_secret_status(self):
         """create_payment_for_subscription (mock) returns id, client_secret, status."""
         from app.services.payment_provider.stripe.mock import create_payment_for_subscription as mock_create
+
         sub_id = uuid4()
         result = mock_create(sub_id, 1000, "usd", {})
         assert "id" in result
@@ -129,8 +131,9 @@ class TestSubscriptionPaymentFlow:
 
     def test_activate_subscription_after_payment_sets_active(self, db_transaction):
         """Create Pending subscription + subscription_payment, then activate; subscription becomes Active."""
-        from app.services.subscription_action_service import activate_subscription_after_payment
         from app.services.crud_service import subscription_service
+        from app.services.subscription_action_service import activate_subscription_after_payment
+
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
@@ -167,11 +170,12 @@ class TestSubscriptionPaymentFlow:
 
     def test_create_and_process_bill_for_subscription_payment(self, db_transaction):
         """Confirm-payment path: create client_bill for subscription_payment and process (credits + Processed)."""
-        from app.services.subscription_action_service import create_and_process_bill_for_subscription_payment
         from app.services.crud_service import (
             get_client_bill_by_subscription_payment,
             subscription_service,
         )
+        from app.services.subscription_action_service import create_and_process_bill_for_subscription_payment
+
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
@@ -210,12 +214,14 @@ class TestSubscriptionPaymentFlow:
 
     def test_first_period_bill_grants_plan_credit_and_renewal_30_days(self, db_transaction):
         """First bill (balance 0): balance = plan.credit, renewal_date = activation + 30 days."""
-        from datetime import datetime, timezone, timedelta
-        from app.services.subscription_action_service import create_and_process_bill_for_subscription_payment
+        from datetime import datetime, timedelta
+
         from app.services.crud_service import (
             get_client_bill_by_subscription_payment,
             subscription_service,
         )
+        from app.services.subscription_action_service import create_and_process_bill_for_subscription_payment
+
         admin_id = SEED_SUPERADMIN_USER_ID
         plan_credits = 70
         with db_transaction.cursor() as cur:
@@ -245,9 +251,9 @@ class TestSubscriptionPaymentFlow:
                 (str(sub_id),),
             )
             sp_id = cur.fetchone()[0]
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         create_and_process_bill_for_subscription_payment(sub_id, UUID(str(sp_id)), user_id, db_transaction)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
         bill = get_client_bill_by_subscription_payment(UUID(str(sp_id)), db_transaction)
         assert bill is not None
         assert bill.status.value == "processed"
@@ -258,20 +264,26 @@ class TestSubscriptionPaymentFlow:
         expected_renewal_max = after + timedelta(days=31)
         renewal = sub.renewal_date
         if renewal.tzinfo is None:
-            renewal = renewal.replace(tzinfo=timezone.utc)
+            renewal = renewal.replace(tzinfo=UTC)
         else:
-            renewal = renewal.astimezone(timezone.utc)
-        assert expected_renewal_min <= renewal <= expected_renewal_max, "First period renewal_date should be activation + 30 days"
+            renewal = renewal.astimezone(UTC)
+        assert expected_renewal_min <= renewal <= expected_renewal_max, (
+            "First period renewal_date should be activation + 30 days"
+        )
 
     def test_renewal_period_bill_uses_plan_credit_and_extends_renewal(self, db_transaction):
         """Later bill (balance > 0): credits = plan.credit (same as first period), renewal_date = previous + 30 days."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from app.services.billing.client_bill import process_client_bill_internal
         from app.services.crud_service import subscription_service
+
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
-            cur.execute("SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
+            cur.execute(
+                "SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),)
+            )
             row = cur.fetchone()
             assert row is not None
             currency_metadata_id = row[0]
@@ -284,7 +296,7 @@ class TestSubscriptionPaymentFlow:
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
             sub_id = uuid4()
-            old_renewal = datetime.now(timezone.utc) + timedelta(days=5)
+            old_renewal = datetime.now(UTC) + timedelta(days=5)
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, renewal_date, modified_by)
@@ -307,7 +319,15 @@ class TestSubscriptionPaymentFlow:
                 INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, currency_metadata_id, amount, currency_code, status, modified_by)
                 VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
-                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(currency_metadata_id), str(user_id)),
+                (
+                    str(bill_id),
+                    str(sp_id),
+                    str(sub_id),
+                    str(user_id),
+                    str(plan_id),
+                    str(currency_metadata_id),
+                    str(user_id),
+                ),
             )
         process_client_bill_internal(bill_id, db_transaction, user_id, commit=True)
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
@@ -315,16 +335,22 @@ class TestSubscriptionPaymentFlow:
         assert float(sub.balance) == 50 + 70, "Renewal: credits = plan.credit (70), balance 50+70=120"
         renewal = sub.renewal_date
         if renewal.tzinfo is None:
-            renewal = renewal.replace(tzinfo=timezone.utc)
+            renewal = renewal.replace(tzinfo=UTC)
         else:
-            renewal = renewal.astimezone(timezone.utc)
-        expected_renewal = (old_renewal.replace(tzinfo=timezone.utc) if old_renewal.tzinfo is None else old_renewal.astimezone(timezone.utc)) + timedelta(days=30)
-        assert abs((renewal - expected_renewal).total_seconds()) < 2, "Renewal date should be previous renewal_date + 30 days"
+            renewal = renewal.astimezone(UTC)
+        expected_renewal = (
+            old_renewal.replace(tzinfo=UTC) if old_renewal.tzinfo is None else old_renewal.astimezone(UTC)
+        ) + timedelta(days=30)
+        assert abs((renewal - expected_renewal).total_seconds()) < 2, (
+            "Renewal date should be previous renewal_date + 30 days"
+        )
 
     def test_zero_plan_credit_raises_400(self, db_transaction):
         """Processing a bill for a plan with credit=0 raises HTTPException 400 (no fallback)."""
         from fastapi import HTTPException
+
         from app.services.subscription_action_service import create_and_process_bill_for_subscription_payment
+
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
@@ -360,13 +386,17 @@ class TestSubscriptionPaymentFlow:
 
     def test_renewal_with_rollover_cap_sets_balance_rolled_plus_plan_credit(self, db_transaction):
         """Renewal with rollover_cap: balance 50, cap 20, plan.credit 70 -> new balance = 20 + 70 = 90."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from app.services.billing.client_bill import process_client_bill_internal
         from app.services.crud_service import subscription_service
+
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
-            cur.execute("SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),))
+            cur.execute(
+                "SELECT currency_metadata_id FROM market_info WHERE market_id = %s", (str(ARGENTINA_MARKET_ID),)
+            )
             row = cur.fetchone()
             assert row is not None
             currency_metadata_id = row[0]
@@ -379,7 +409,7 @@ class TestSubscriptionPaymentFlow:
                 (str(plan_id), str(ARGENTINA_MARKET_ID), str(admin_id)),
             )
             sub_id = uuid4()
-            old_renewal = datetime.now(timezone.utc) + timedelta(days=5)
+            old_renewal = datetime.now(UTC) + timedelta(days=5)
             cur.execute(
                 """
                 INSERT INTO subscription_info (subscription_id, user_id, market_id, plan_id, subscription_status, status, balance, renewal_date, modified_by)
@@ -402,7 +432,15 @@ class TestSubscriptionPaymentFlow:
                 INSERT INTO client_bill_info (client_bill_id, subscription_payment_id, subscription_id, user_id, plan_id, currency_metadata_id, amount, currency_code, status, modified_by)
                 VALUES (%s, %s, %s, %s, %s, %s, 200.0, 'USD', 'active'::status_enum, %s)
                 """,
-                (str(bill_id), str(sp_id), str(sub_id), str(user_id), str(plan_id), str(currency_metadata_id), str(user_id)),
+                (
+                    str(bill_id),
+                    str(sp_id),
+                    str(sub_id),
+                    str(user_id),
+                    str(plan_id),
+                    str(currency_metadata_id),
+                    str(user_id),
+                ),
             )
         process_client_bill_internal(bill_id, db_transaction, user_id, commit=True)
         sub = subscription_service.get_by_id(sub_id, db_transaction, scope=None)
@@ -411,11 +449,13 @@ class TestSubscriptionPaymentFlow:
 
     def test_apply_subscription_renewal_sets_rolled_plus_plan_credit(self, db_transaction):
         """apply_subscription_renewal (used by cron and renewal bill): balance = rolled + plan.credit, renewal_date += 30."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from app.services.billing.client_bill import apply_subscription_renewal
         from app.services.crud_service import subscription_service
+
         admin_id = SEED_SUPERADMIN_USER_ID
-        past_renewal = datetime.now(timezone.utc) - timedelta(days=1)
+        past_renewal = datetime.now(UTC) - timedelta(days=1)
         with db_transaction.cursor() as cur:
             user_id = _make_subscription_user(cur, admin_id)
             plan_id = uuid4()
@@ -440,16 +480,16 @@ class TestSubscriptionPaymentFlow:
         assert float(sub.balance) == 35, "Rolled 5 + plan.credit 30 = 35"
         renewal = sub.renewal_date
         if renewal.tzinfo is None:
-            renewal = renewal.replace(tzinfo=timezone.utc)
+            renewal = renewal.replace(tzinfo=UTC)
         else:
-            renewal = renewal.astimezone(timezone.utc)
-        expected_min = (past_renewal if past_renewal.tzinfo else past_renewal.replace(tzinfo=timezone.utc)) + timedelta(days=29)
+            renewal = renewal.astimezone(UTC)
+        expected_min = (past_renewal if past_renewal.tzinfo else past_renewal.replace(tzinfo=UTC)) + timedelta(days=29)
         assert renewal >= expected_min, "renewal_date should be previous + 30 days"
 
     def test_cancel_active_subscription_archives(self, db_transaction):
         """Cancel Active subscription archives it; get_by_id and get_by_user exclude it."""
+        from app.services.crud_service import get_subscription_by_user_and_market, subscription_service
         from app.services.subscription_action_service import cancel_subscription
-        from app.services.crud_service import subscription_service, get_subscription_by_user_and_market
 
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:
@@ -491,11 +531,11 @@ class TestSubscriptionPaymentFlow:
 
     def test_resubscribe_after_cancel(self, db_transaction):
         """After cancelling Active subscription, user can create new subscription in same market."""
-        from app.services.subscription_action_service import cancel_subscription
         from app.services.crud_service import (
-            subscription_service,
             get_subscription_by_user_and_market,
+            subscription_service,
         )
+        from app.services.subscription_action_service import cancel_subscription
 
         admin_id = SEED_SUPERADMIN_USER_ID
         with db_transaction.cursor() as cur:

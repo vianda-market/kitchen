@@ -8,15 +8,17 @@ not usable for plate collection, and excluded from get_by_id (404). On cancel we
 set subscription_status = Cancelled, status = Cancelled, and is_archived = True,
 so the user can re-subscribe in the same market (unique index is WHERE is_archived = FALSE).
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 from uuid import UUID
+
 import psycopg2.extensions
 from fastapi import HTTPException
 
-from app.services.crud_service import subscription_service
-from app.config.enums.subscription_status import SubscriptionStatus
 from app.config import Status
+from app.config.enums.subscription_status import SubscriptionStatus
 from app.dto.models import SubscriptionDTO
+from app.services.crud_service import subscription_service
 from app.utils.db import db_update
 
 
@@ -152,7 +154,7 @@ def reconcile_hold_subscriptions(db: psycopg2.extensions.connection) -> None:
     subscriptions (is_archived=TRUE). Called before enriched list/by-id so
     clients see correct status.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = db.cursor()
     try:
         cursor.execute(
@@ -212,13 +214,13 @@ def create_and_process_bill_for_subscription_payment(
     Idempotent: if a bill already exists for this subscription_payment_id, skip create; if not Processed, process it.
     Caller must commit; this function does not commit (for use in confirm-payment or webhook transaction).
     """
+    from app.services.billing import process_client_bill_internal
     from app.services.crud_service import (
-        get_client_bill_by_subscription_payment,
         client_bill_service,
+        get_client_bill_by_subscription_payment,
         plan_service,
     )
     from app.services.market_service import market_service
-    from app.services.billing import process_client_bill_internal
     from app.utils.db import db_read
 
     existing = get_client_bill_by_subscription_payment(subscription_payment_id, db)

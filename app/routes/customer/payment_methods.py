@@ -5,31 +5,31 @@ Mock endpoints for UI development. Phase 2: persists mock data to DB (user_payme
 payment_method, external_payment_method). DELETE and PUT default perform real DB updates.
 See docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md.
 """
-import uuid as uuid_module
-from uuid import UUID
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional
 
-import stripe
-from fastapi import APIRouter, Depends, HTTPException, Body
+import uuid as uuid_module
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
+
 import psycopg2.extensions
+import stripe
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.auth.dependencies import get_client_user
-from app.dependencies.database import get_db
-from app.config.settings import settings
 from app.config import Status
-from app.utils.db import db_read, db_insert, db_update
-from app.utils.log import log_warning
+from app.config.settings import settings
+from app.dependencies.database import get_db
+from app.schemas.customer_payment_method import (
+    CustomerPaymentMethodItemSchema,
+    CustomerPaymentMethodListResponseSchema,
+    SetupSessionRequestSchema,
+    SetupSessionResponseSchema,
+)
 from app.services.payment_provider.stripe.live import (
     create_customer_checkout_setup_session,
     detach_customer_payment_method_external,
 )
-from app.schemas.customer_payment_method import (
-    CustomerPaymentMethodListResponseSchema,
-    CustomerPaymentMethodItemSchema,
-    SetupSessionRequestSchema,
-    SetupSessionResponseSchema,
-)
+from app.utils.db import db_insert, db_read, db_update
+from app.utils.log import log_warning
 
 router = APIRouter(prefix="/payment-methods", tags=["Customer Payment Methods"])
 
@@ -67,7 +67,7 @@ def _ensure_stripe_customer_for_mock(
         return provider_rows[0]["provider_customer_id"]
 
     mock_cus_id = f"cus_mock_{str(user_id).replace('-', '')[:24]}"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db_insert(
         "user_payment_provider",
         {
@@ -82,7 +82,7 @@ def _ensure_stripe_customer_for_mock(
     return mock_cus_id
 
 
-def _list_from_db(user_id: UUID, db: psycopg2.extensions.connection) -> List[CustomerPaymentMethodItemSchema]:
+def _list_from_db(user_id: UUID, db: psycopg2.extensions.connection) -> list[CustomerPaymentMethodItemSchema]:
     """Fetch payment methods from DB for user (Stripe provider only)."""
     rows = db_read(
         """
@@ -109,7 +109,7 @@ def _list_from_db(user_id: UUID, db: psycopg2.extensions.connection) -> List[Cus
     ]
 
 
-def _get_payment_method_owner(payment_method_id: UUID, db: psycopg2.extensions.connection) -> Optional[UUID]:
+def _get_payment_method_owner(payment_method_id: UUID, db: psycopg2.extensions.connection) -> UUID | None:
     """Return user_id if payment method exists and is not archived, else None."""
     rows = db_read(
         """
@@ -141,7 +141,7 @@ def list_customer_payment_methods(
 
 @router.post("/setup-session", response_model=SetupSessionResponseSchema)
 def create_setup_session(
-    body: Optional[SetupSessionRequestSchema] = Body(None),
+    body: SetupSessionRequestSchema | None = Body(None),
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -153,15 +153,15 @@ def create_setup_session(
     user_id = UUID(str(current_user["user_id"]))
     if _get_payment_provider() == "mock":
         _ensure_stripe_customer_for_mock(user_id, db)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
         return SetupSessionResponseSchema(
             setup_url=MOCK_SETUP_URL,
             expires_at=expires_at,
         )
 
     # TODO(MAX_PM): cap saved Stripe cards per user before creating Session — STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md
-    success_url: Optional[str] = None
-    cancel_url: Optional[str] = None
+    success_url: str | None = None
+    cancel_url: str | None = None
     if body:
         success_url = body.success_url or body.return_url
         cancel_url = body.cancel_url
@@ -176,9 +176,7 @@ def create_setup_session(
     if not cancel_url:
         cancel_url = success_url
     try:
-        setup_url, expires_at = create_customer_checkout_setup_session(
-            user_id, success_url, cancel_url, db
-        )
+        setup_url, expires_at = create_customer_checkout_setup_session(user_id, success_url, cancel_url, db)
         return SetupSessionResponseSchema(setup_url=setup_url, expires_at=expires_at)
     except ValueError as e:
         msg = str(e)

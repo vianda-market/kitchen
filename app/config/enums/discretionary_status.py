@@ -10,6 +10,7 @@ from enum import Enum
 
 class DiscretionaryStatus(str, Enum):
     """Valid discretionary status values."""
+
     PENDING = "pending"
     CANCELLED = "cancelled"
     APPROVED = "approved"

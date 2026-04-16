@@ -6,24 +6,23 @@ Runs periodically (e.g. every 5-15 min). For each location where kitchen has sta
 and restaurant_transaction. Idempotent.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
+
 import pytz
 
 from app.config.location_config import get_all_locations, get_location_config
 from app.config.market_config import MarketConfiguration
 from app.services.kitchen_day_service import get_kitchen_day_for_date
 from app.services.plate_selection_promotion_service import promote_plate_selection_to_live
-from app.utils.log import log_info, log_warning, log_error
-from app.utils.db import db_read, get_db_connection, close_db_connection
+from app.utils.db import close_db_connection, db_read, get_db_connection
+from app.utils.log import log_error, log_info, log_warning
 
 SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 
-def run_kitchen_start_promotion(
-    location_id: Optional[str] = None
-) -> Dict[str, Any]:
+def run_kitchen_start_promotion(location_id: str | None = None) -> dict[str, Any]:
     """
     Promote locked plate selections to live for locations where kitchen has started.
 
@@ -41,18 +40,14 @@ def run_kitchen_start_promotion(
     """
     result = {
         "cron_job": "kitchen_start_promotion",
-        "execution_time": datetime.now(timezone.utc).isoformat(),
+        "execution_time": datetime.now(UTC).isoformat(),
         "location_id": location_id,
         "promoted_count": 0,
         "locations_processed": 0,
         "errors": [],
     }
 
-    locations_to_process = (
-        [get_location_config(location_id)]
-        if location_id
-        else get_all_locations()
-    )
+    locations_to_process = [get_location_config(location_id)] if location_id else get_all_locations()
     locations_to_process = [loc for loc in locations_to_process if loc]
 
     for loc in locations_to_process:
@@ -68,8 +63,10 @@ def run_kitchen_start_promotion(
             log_error(msg)
             result["errors"].append(msg)
 
-    log_info(f"Kitchen start promotion: promoted {result['promoted_count']} selections "
-             f"across {result['locations_processed']} location(s)")
+    log_info(
+        f"Kitchen start promotion: promoted {result['promoted_count']} selections "
+        f"across {result['locations_processed']} location(s)"
+    )
     return result
 
 
@@ -95,6 +92,7 @@ def _promote_for_location(
 
     # DEV_MODE: treat any day as a valid kitchen day so E2E tests work on weekends
     from app.config.settings import Settings
+
     _dev_mode = Settings().DEV_MODE
     if not _dev_mode and kitchen_day not in valid_days:
         log_info(f"Location {location_id}: {kitchen_day} is not a kitchen day, skip")
@@ -110,11 +108,11 @@ def _promote_for_location(
 
     open_time = day_hours["open"]
     if isinstance(open_time, str):
-        from datetime import time as dt_time
         open_time = datetime.strptime(open_time, "%H:%M").time()
 
     # DEV_MODE: skip kitchen hours check so E2E tests can run at any time
     from app.config.settings import Settings
+
     if not Settings().DEV_MODE and now_local.time() < open_time:
         log_info(f"Location {location_id}: kitchen not yet open (open={open_time})")
         return 0
@@ -163,9 +161,7 @@ def _promote_for_location(
         for row in rows:
             try:
                 plate_selection_id = UUID(str(row["plate_selection_id"]))
-                pid = promote_plate_selection_to_live(
-                    plate_selection_id, system_user_id, conn, commit=False
-                )
+                pid = promote_plate_selection_to_live(plate_selection_id, system_user_id, conn, commit=False)
                 if pid:
                     promoted += 1
                     conn.commit()
