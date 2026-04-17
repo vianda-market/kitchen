@@ -124,7 +124,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # schema.sql uses uuidv7() (built-in on Postgres 18+). Prod target is also 18.
+        image: postgres:18
         env:
           POSTGRES_USER: kitchen
           POSTGRES_PASSWORD: kitchen
