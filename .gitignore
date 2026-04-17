@@ -145,6 +145,8 @@ build/
 # Seed data scripts (may contain production/sensitive data)
 .seed_data.py
 *seed_data.py
+# Test expected-values file uses UUIDs/counts only — safe to track
+!app/tests/database/test_data/expected_seed_data.py
 
 # Generated static files (created by build scripts, API uploads, and tests)
 static/qr_codes/**/*.png
