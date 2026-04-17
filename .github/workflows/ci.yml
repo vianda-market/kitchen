@@ -89,6 +89,13 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    # app.config.Settings loads at import time and requires these three fields
+    # (all other Settings fields have defaults). Without them, pytest fails at
+    # collection with pydantic ValidationError before any test runs.
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
       - uses: actions/checkout@v4
 
