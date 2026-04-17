@@ -12,6 +12,10 @@ from fastapi.testclient import TestClient
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 
+# Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
+# Excluded from unit test job by -m "not database"; runs in acceptance (Newman).
+pytestmark = pytest.mark.database
+
 
 @pytest.fixture
 def mock_current_user():
