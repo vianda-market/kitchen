@@ -123,14 +123,17 @@ jobs:
           --ignore=app/tests/database
 
       - name: Run unit tests
+        # Route and database tests use TestClient/psycopg2 against a live Postgres.
+        # Per CLAUDE.md, routes+services are tested via Postman (acceptance job).
         # Local equivalent:
         #   pytest -m "not integration and not database and not slow" \
-        #     --ignore=app/tests/database \
+        #     --ignore=app/tests/database --ignore=app/tests/routes \
         #     --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
         run: >
           pytest
           -m "not integration and not database and not slow"
           --ignore=app/tests/database
+          --ignore=app/tests/routes
           --tb=short
           --cov=app
           --cov-report=term-missing
