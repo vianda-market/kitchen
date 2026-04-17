@@ -18,6 +18,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Rebuild DB (fresh):** `bash app/db/build_kitchen_db.sh` (full tear-down — use for new environments or clean reset only)
 - **Import check:** `python3 -c "from application import app; print('OK')"`
 - **Run tests:** `pytest app/tests/`
+- **Diff-coverage gate (local):** `pytest --cov=app --cov-report=xml --cov-fail-under=0 && diff-cover coverage.xml --compare-branch=origin/main --fail-under=80`
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 

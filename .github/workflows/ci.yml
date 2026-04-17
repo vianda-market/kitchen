@@ -98,6 +98,9 @@ jobs:
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so diff-cover can diff against origin/main.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -110,14 +113,24 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Run unit tests
+        # Local equivalent:
+        #   pytest -m "not integration and not database and not slow" \
+        #     --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
         run: >
           pytest
           -m "not integration and not database and not slow"
           --tb=short
           --cov=app
           --cov-report=term-missing
+          --cov-report=xml
           --cov-fail-under=0
           -q
+
+      - name: Diff coverage gate (changed lines only, >=80%)
+        # Local equivalent:
+        #   diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
+        # On main, HEAD == origin/main so the diff is empty and the gate passes trivially.
+        run: diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 
   acceptance:
     name: Acceptance Tests (Newman)

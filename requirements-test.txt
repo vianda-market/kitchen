@@ -10,6 +10,7 @@ pytest>=8.1.0
 pytest-asyncio>=0.21.0
 pytest-mock>=3.10.0
 pytest-cov>=4.0.0  # Coverage reporting
+diff-cover>=9.0.0  # Diff-based coverage gate (enforces coverage on changed lines only)
 
 # HTTP testing for FastAPI
 httpx>=0.27.0  # HTTP client for testing
