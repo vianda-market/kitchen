@@ -2,10 +2,15 @@
 
 from uuid import uuid4
 
+import pytest
 from application import app
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
+
+# Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
+# Excluded from unit test job by -m "not database"; runs in acceptance (Newman).
+pytestmark = pytest.mark.database
 
 
 def test_put_me_invalid_locale_returns_422():

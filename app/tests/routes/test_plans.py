@@ -14,6 +14,10 @@ from app.auth.dependencies import get_employee_user, oauth2_scheme
 from app.services.crud_service import plan_service
 from app.services.market_service import GLOBAL_MARKET_ID
 
+# Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
+# Excluded from unit test job by -m "not database"; runs in acceptance (Newman).
+pytestmark = pytest.mark.database
+
 
 @pytest.fixture
 def mock_employee_user():

@@ -112,13 +112,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-test.txt
 
+      - name: Verify test collection
+        # Catches import errors, missing deps, and broken fixtures before
+        # running the full suite. Fails fast with a clear error message.
+        # Local equivalent:
+        #   pytest --collect-only -q --ignore=app/tests/database
+        run: >
+          pytest
+          --collect-only -q
+          --ignore=app/tests/database
+
       - name: Run unit tests
+        # Route and database tests use TestClient/psycopg2 against a live Postgres.
+        # Per CLAUDE.md, routes+services are tested via Postman (acceptance job).
         # Local equivalent:
         #   pytest -m "not integration and not database and not slow" \
+        #     --ignore=app/tests/database --ignore=app/tests/routes \
         #     --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
         run: >
           pytest
           -m "not integration and not database and not slow"
+          --ignore=app/tests/database
+          --ignore=app/tests/routes
           --tb=short
           --cov=app
           --cov-report=term-missing

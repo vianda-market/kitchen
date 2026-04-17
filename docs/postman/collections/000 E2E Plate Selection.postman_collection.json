@@ -1869,7 +1869,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"address_id\": \"{{supplierAddressId}}\",\n  \"tax_id\": \"SUPPLIER-TAX-001\",\n  \"name\": \"Fresh Ingredients Supplier Corp\"\n}",
+              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"address_id\": \"{{supplierAddressId}}\",\n  \"tax_id\": \"30123456789\",\n  \"name\": \"Fresh Ingredients Supplier Corp\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
