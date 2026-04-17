@@ -135,6 +135,9 @@ jobs:
       DB_NAME: kitchen
       DB_USER: kitchen
       DB_PASSWORD: kitchen
+      # libpq reads PGPASSWORD; build_kitchen_db.sh calls psql without -W.
+      # Without this, psql prompts interactively → auth failure in CI.
+      PGPASSWORD: kitchen
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
