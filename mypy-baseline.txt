@@ -2529,7 +2529,6 @@ app/services/cron/billing_events.py:0: error: Function is missing a return type 
 app/services/cron/billing_events.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/plate_pickup.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/plate_pickup.py:0: error: Function is missing a return type annotation  [no-untyped-def]
-app/routes/plate_pickup.py:0: error: Missing named argument "qr_code_sig" for "PendingOrdersResponse"  [call-arg]
 app/routes/plate_pickup.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/plate_pickup.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/plate_pickup.py:0: error: Function is missing a return type annotation  [no-untyped-def]
