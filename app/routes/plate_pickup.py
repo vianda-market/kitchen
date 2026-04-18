@@ -109,6 +109,7 @@ def get_pending_order(
             restaurant_id=result["restaurant_id"],
             restaurant_name=result["restaurant_name"],
             qr_code_id=result["qr_code_id"],
+            qr_code_sig=result["qr_code_sig"],
             total_orders=result["total_orders"],
             total_plate_count=result.get("total_plate_count", result["total_orders"]),
             plate_pickup_ids=result.get("plate_pickup_ids"),
