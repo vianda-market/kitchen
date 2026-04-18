@@ -21,6 +21,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Test collection check (local):** `pytest --collect-only -q --ignore=app/tests/database`
 - **Diff-coverage gate (local):** `pytest --cov=app --cov-report=xml --cov-fail-under=0 && diff-cover coverage.xml --compare-branch=origin/main --fail-under=80`
 - **Secret scan (local):** `gitleaks detect --source . --verbose` (allowlist: `.gitleaksignore`)
+- **Maintainability gate (local):** `bash scripts/check_maintainability.sh` (fails if MI drops >5% on changed files vs origin/main)
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 

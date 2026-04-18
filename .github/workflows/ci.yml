@@ -69,6 +69,11 @@ jobs:
       - name: Check complexity
         run: bash scripts/check_complexity.sh
 
+      - name: Check maintainability index (>5% drop = fail)
+        # Local equivalent:  bash scripts/check_maintainability.sh
+        # Uses radon mi to compare changed files vs origin/main.
+        run: bash scripts/check_maintainability.sh
+
   security:
     name: Dependency Audit
     runs-on: ubuntu-latest
