@@ -74,6 +74,25 @@ jobs:
         # Uses radon mi to compare changed files vs origin/main.
         run: bash scripts/check_maintainability.sh
 
+  deadcode:
+    name: Dead Code Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install vulture
+        run: pip install vulture>=2.14
+
+      - name: Check dead code
+        # Local equivalent:  bash scripts/check_vulture.sh
+        # Baseline update:   bash scripts/check_vulture.sh --update
+        run: bash scripts/check_vulture.sh
+
   security:
     name: Dependency Audit
     runs-on: ubuntu-latest
