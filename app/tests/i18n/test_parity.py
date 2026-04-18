@@ -26,8 +26,7 @@ def test_messages_keys_match_reference(locale: str) -> None:
     extra = sorted(actual - reference)
 
     assert not missing and not extra, (
-        f"MESSAGES['{locale}'] drift vs '{REFERENCE_LOCALE}': "
-        f"missing={missing}, extra={extra}"
+        f"MESSAGES['{locale}'] drift vs '{REFERENCE_LOCALE}': missing={missing}, extra={extra}"
     )
 
 
@@ -56,7 +55,4 @@ def test_enum_labels_codes_match_reference(locale: str) -> None:
         if missing or extra:
             drift.append(f"{enum_type}: missing={missing}, extra={extra}")
 
-    assert not drift, (
-        f"ENUM_LABELS['{locale}'] code drift vs '{REFERENCE_LOCALE}':\n  "
-        + "\n  ".join(drift)
-    )
+    assert not drift, f"ENUM_LABELS['{locale}'] code drift vs '{REFERENCE_LOCALE}':\n  " + "\n  ".join(drift)
