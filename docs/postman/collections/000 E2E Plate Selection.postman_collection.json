@@ -3816,7 +3816,7 @@
                   "    console.warn(\"⚠️ Set PAYMENT_PROVIDER=mock in .env to run full Client Setup. With Stripe, use webhook instead.\");",
                   "} else {",
                   "    pm.test(\"Status 200\", () => { pm.response.to.have.status(200); });",
-                  "    pm.test(\"Subscription is Active\", () => { pm.expect(body.subscription_status).to.eql(\"Active\"); });",
+                  "    pm.test(\"Subscription is Active\", () => { pm.expect(body.subscription_status).to.eql(\"active\"); });",
                   "    console.log(\"✅ Subscription activated:\", body.subscription_id);",
                   "}"
                 ],
