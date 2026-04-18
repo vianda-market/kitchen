@@ -25,6 +25,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Dead code gate (local):** `bash scripts/check_vulture.sh` (baseline: `.vulture-baseline.txt`; update: `--update`)
 - **Pre-commit hooks (setup):** `pip install pre-commit && pre-commit install` (runs ruff, gitleaks, complexity, yaml/large-file/merge checks)
 - **Strict complexity (local):** `bash scripts/check_complexity_strict.sh` (CC ≤ 15 on changed files; repo-wide CC ≤ 25 is separate)
+- **Layer boundaries (local):** `lint-imports` (contracts in `.importlinter`: dto/schemas/services isolation)
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 

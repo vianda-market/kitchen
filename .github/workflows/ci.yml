@@ -50,6 +50,31 @@ jobs:
       - name: Run mypy (baseline-filtered)
         run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
 
+  layers:
+    name: Layer Boundaries
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Check import boundaries
+        # Local equivalent:  lint-imports
+        # Contracts defined in .importlinter
+        run: lint-imports
+
   complexity:
     name: Complexity Gate
     runs-on: ubuntu-latest
