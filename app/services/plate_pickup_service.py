@@ -742,6 +742,8 @@ class PlatePickupService:
         ]
 
         return {
+            "status": "arrived",
+            "message": f"You have arrived at {restaurant_name}. Your order is being prepared.",
             "plate_pickup_id": plate_pickup_ids[0] if plate_pickup_ids else None,
             "plate_pickup_ids": plate_pickup_ids,
             "restaurant_name": restaurant_name,
