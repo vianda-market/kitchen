@@ -48,6 +48,8 @@ echo "---"
 
 failed=0
 passed=0
+failed_names=()
+passed_names=()
 
 for collection in "${collections[@]}"; do
     name=$(basename "$collection" .json | sed 's/.postman_collection//')
@@ -62,14 +64,36 @@ for collection in "${collections[@]}"; do
         --reporters cli \
         --timeout-request 10000; then
         ((passed++))
+        passed_names+=("$name")
     else
         ((failed++))
+        failed_names+=("$name")
         echo "FAILED: $name"
     fi
 done
 
 echo ""
-echo "---"
-echo "Results: $passed passed, $failed failed (${#collections[@]} total)"
+echo "============================================"
+echo "  NEWMAN SUMMARY"
+echo "============================================"
+echo "  Total: ${#collections[@]} | Passed: $passed | Failed: $failed"
+echo ""
+
+if [ "$passed" -gt 0 ]; then
+    echo "  ✅ Passed:"
+    for n in "${passed_names[@]}"; do
+        echo "     $n"
+    done
+fi
+
+if [ "$failed" -gt 0 ]; then
+    echo ""
+    echo "  ❌ Failed:"
+    for n in "${failed_names[@]}"; do
+        echo "     $n"
+    done
+fi
+
+echo "============================================"
 
 [ "$failed" -eq 0 ]
