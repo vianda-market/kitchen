@@ -29,6 +29,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Security lint (local):** `bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json`
 - **SQL lint (local):** `bash scripts/check_sqlfluff.sh` (config: `.sqlfluff`; baseline: `.sqlfluff-baseline.txt`)
 - **License check (local):** `pip install pip-licenses && python scripts/check_licenses.py` (allowlist: MIT/Apache/BSD/ISC/MPL/PSF; per-package exemptions in the script)
+- **CRAP analysis (local, ad-hoc):** `pytest --cov=app --cov-report=xml --cov-fail-under=0 && python scripts/analyze_crap.py` (ranks complex + under-tested functions; not a gate, run periodically to pick refactor targets)
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 
