@@ -27,6 +27,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **Strict complexity (local):** `bash scripts/check_complexity_strict.sh` (CC ≤ 15 on changed files; repo-wide CC ≤ 25 is separate)
 - **Layer boundaries (local):** `lint-imports` (contracts in `.importlinter`: dto/schemas/services isolation)
 - **Security lint (local):** `bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json`
+- **SQL lint (local):** `bash scripts/check_sqlfluff.sh` (config: `.sqlfluff`; baseline: `.sqlfluff-baseline.txt`)
 - **Paths:** Always use `~/learn/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 

@@ -1,0 +1,15 @@
+[sqlfluff]
+dialect = postgres
+# Match project line length (pyproject.toml line-length = 120)
+max_line_length = 120
+large_file_skip_byte_limit = 0
+
+[sqlfluff:rules:capitalisation.types]
+# Allow existing mixed case in types (e.g., UUID, TEXT)
+extended_capitalisation_policy = consistent
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = consistent
