@@ -141,6 +141,27 @@ jobs:
       - name: Audit production dependencies
         run: pip-audit -r requirements.txt
 
+  bandit:
+    name: Security Lint (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install bandit
+        run: pip install bandit>=1.9.0
+
+      - name: Run bandit (high severity, baselined)
+        # Local equivalent:
+        #   bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
+        # Baseline update:
+        #   bandit -r app/ -lll --exclude app/tests -f json -o .bandit-baseline.json
+        run: bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
+
   secrets:
     name: Secret Scanning
     runs-on: ubuntu-latest
