@@ -95,12 +95,15 @@ jobs:
           # Full history on push to main; the action limits to PR diff on pull_request.
           fetch-depth: 0
 
+      - name: Install gitleaks
+        # gitleaks-action@v2 requires a paid license for org repos.
+        # The CLI is free — install via pip and run directly.
+        run: pip install gitleaks==8.24.3
+
       - name: Gitleaks
         # Local equivalent:  gitleaks detect --source . --verbose
         # Allowlisted fingerprints in .gitleaksignore (false positives from docs).
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gitleaks detect --source . --verbose --redact
 
   test:
     name: Unit Tests
@@ -197,6 +200,7 @@ jobs:
       PAYMENT_PROVIDER: mock
       SUPPLIER_PAYOUT_PROVIDER: mock
       EMAIL_PROVIDER: smtp
+      QR_HMAC_SECRET: ci-test-hmac-secret
     steps:
       - uses: actions/checkout@v4
 
