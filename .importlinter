@@ -1,0 +1,34 @@
+[importlinter]
+root_packages =
+    app
+
+# ── Contract 1: DTOs are pure data — no service or route logic ──
+[importlinter:contract:dto-independence]
+name = DTOs must not import from services or routes
+type = forbidden
+source_modules =
+    app.dto
+forbidden_modules =
+    app.services
+    app.routes
+
+# ── Contract 2: Schemas are API contracts — no service logic ────
+[importlinter:contract:schema-independence]
+name = Schemas must not import from services
+type = forbidden
+source_modules =
+    app.schemas
+forbidden_modules =
+    app.services
+
+# ── Contract 3: Services must not import from routes ────────────
+[importlinter:contract:no-service-to-route]
+name = Services must not import from routes
+type = forbidden
+source_modules =
+    app.services
+forbidden_modules =
+    app.routes
+# route_factory wires routes — deferred import, not a logic dependency.
+ignore_imports =
+    app.services.route_factory -> app.routes.restaurant
