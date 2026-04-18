@@ -1,0 +1,5 @@
+# SQL files exempt from sqlfluff linting (pre-existing, too costly to fix).
+# New migrations must pass: sqlfluff lint <file> --dialect postgres
+# Remove a line to start enforcing that file.
+app/db/schema.sql
+app/db/migrations/0001_restaurant_lead.sql

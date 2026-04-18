@@ -162,6 +162,25 @@ jobs:
         #   bandit -r app/ -lll --exclude app/tests -f json -o .bandit-baseline.json
         run: bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
 
+  sqllint:
+    name: SQL Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install sqlfluff
+        run: pip install sqlfluff>=3.0.0
+
+      - name: Lint new SQL files
+        # Local equivalent:  bash scripts/check_sqlfluff.sh
+        # Existing files baselined in .sqlfluff-baseline.txt.
+        run: bash scripts/check_sqlfluff.sh
+
   secrets:
     name: Secret Scanning
     runs-on: ubuntu-latest
