@@ -17,6 +17,9 @@ select = [
     "PIE",    # flake8-pie
     "C4",     # flake8-comprehensions
     "PT",     # flake8-pytest-style
+    "PLR0912", # too-many-branches (default: 12)
+    "PLR0913", # too-many-arguments (default: 5)
+    "PLR0915", # too-many-statements (default: 50 — matches CLAUDE.md <50 lines rule)
 ]
 ignore = [
     "E501",   # line too long — handled by formatter
@@ -52,6 +55,78 @@ known-first-party = ["app"]
 "scripts/**/*.py" = ["T20", "INP001"]           # allow print, no package needed
 "app/scripts/**/*.py" = ["T20", "INP001"]       # allow print in app scripts
 "docs/**/*.py" = ["INP001"]                     # docs scripts don't need __init__
+
+# ─── PLR0912/PLR0913/PLR0915 baseline ────────────────────────────
+# Pre-existing function-size violations. New code (and edits to these
+# functions) must pass the rule — remove the file from the list once
+# it's below the threshold. Generated via:
+#   ruff check --select=PLR0912,PLR0913,PLR0915 . --output-format=json
+"app/core/versioning.py" = ["PLR0912"]
+"app/gateways/mapbox_geocoding_gateway.py" = ["PLR0912"]
+"app/gateways/mapbox_search_gateway.py" = ["PLR0912"]
+"app/gateways/mapbox_static_gateway.py" = ["PLR0913"]
+"app/routes/address.py" = ["PLR0913"]
+"app/routes/admin/leads.py" = ["PLR0913"]
+"app/routes/billing/institution_bill.py" = ["PLR0913"]
+"app/routes/billing/supplier_invoice.py" = ["PLR0913"]
+"app/routes/billing/supplier_w9.py" = ["PLR0913"]
+"app/routes/maps.py" = ["PLR0913"]
+"app/routes/onboarding.py" = ["PLR0913"]
+"app/routes/restaurant.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/routes/restaurant_holidays.py" = ["PLR0912"]
+"app/routes/subscription_payment.py" = ["PLR0913"]
+"app/routes/user.py" = ["PLR0913"]
+"app/security/scoping.py" = ["PLR0912"]
+"app/services/address_autocomplete_service.py" = ["PLR0912", "PLR0913"]
+"app/services/address_service.py" = ["PLR0913"]
+"app/services/archival.py" = ["PLR0915"]
+"app/services/billing/institution_billing.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/billing/supplier_invoice_service.py" = ["PLR0913"]
+"app/services/city_map_service.py" = ["PLR0913"]
+"app/services/coworker_service.py" = ["PLR0912"]
+"app/services/cron/currency_refresh.py" = ["PLR0912", "PLR0915"]
+"app/services/cron/holiday_refresh.py" = ["PLR0912", "PLR0915"]
+"app/services/cron/kitchen_start_promotion.py" = ["PLR0912"]
+"app/services/cron/supplier_stall_detection.py" = ["PLR0912", "PLR0915"]
+"app/services/crud_service.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/discretionary_service.py" = ["PLR0912"]
+"app/services/email/providers/base.py" = ["PLR0913"]
+"app/services/email/providers/sendgrid_provider.py" = ["PLR0913"]
+"app/services/email/providers/smtp_provider.py" = ["PLR0913"]
+"app/services/email_change_service.py" = ["PLR0915"]
+"app/services/email_service.py" = ["PLR0913"]
+"app/services/employer/billing_service.py" = ["PLR0913"]
+"app/services/employer/enrollment_service.py" = ["PLR0913"]
+"app/services/enriched_service.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/entity_service.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/ingredient_service.py" = ["PLR0913"]
+"app/services/kitchen_day_service.py" = ["PLR0912"]
+"app/services/leads_public_service.py" = ["PLR0913"]
+"app/services/market_service.py" = ["PLR0913"]
+"app/services/notification_banner_service.py" = ["PLR0913"]
+"app/services/payment_method_service.py" = ["PLR0913"]
+"app/services/payment_provider/stripe/connect_gateway.py" = ["PLR0913"]
+"app/services/payment_provider/stripe/connect_mock.py" = ["PLR0913"]
+"app/services/plate_pickup_service.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/plate_review_service.py" = ["PLR0913"]
+"app/services/plate_selection_promotion_service.py" = ["PLR0912"]
+"app/services/plate_selection_service.py" = ["PLR0912", "PLR0915"]
+"app/services/plate_selection_validation.py" = ["PLR0913"]
+"app/services/product_image_service.py" = ["PLR0915"]
+"app/services/referral_service.py" = ["PLR0913"]
+"app/services/restaurant_explorer_service.py" = ["PLR0912", "PLR0913"]
+"app/services/restaurant_staff_service.py" = ["PLR0912", "PLR0913", "PLR0915"]
+"app/services/route_factory.py" = ["PLR0913", "PLR0915"]
+"app/services/stripe_customer_payment_method_sync.py" = ["PLR0913"]
+"app/services/versioned_route_factory.py" = ["PLR0913"]
+"app/tests/services/test_credit_loading_service.py" = ["PLR0913"]
+"app/tests/services/test_crud_service.py" = ["PLR0913"]
+"app/tests/services/test_discretionary_service.py" = ["PLR0913"]
+"app/tests/services/test_user_signup_service.py" = ["PLR0913"]
+"app/utils/address_formatting.py" = ["PLR0913"]
+"app/utils/map_projection.py" = ["PLR0913"]
+"application.py" = ["PLR0915"]
+"scripts/analyze_performance.py" = ["PLR0915"]
 
 # ─── mypy ───────────────────────────────────────────────────────
 [tool.mypy]
