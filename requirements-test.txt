@@ -30,6 +30,7 @@ wily>=1.25.0  # Complexity trend tracking over git history
 mutmut>=3.5.0  # Mutation testing for critical business logic
 vulture>=2.14  # Dead code detection (baseline in .vulture-baseline.txt)
 import-linter>=2.11  # Layer boundary enforcement (contracts in .importlinter)
+bandit>=1.9.0  # Security linting (baseline in .bandit-baseline.json)
 
 # Type stubs for mypy
 types-requests>=2.31.0
