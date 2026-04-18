@@ -63,10 +63,10 @@ for collection in "${collections[@]}"; do
         --color on \
         --reporters cli \
         --timeout-request 10000; then
-        ((passed++))
+        passed=$((passed + 1))
         passed_names+=("$name")
     else
-        ((failed++))
+        failed=$((failed + 1))
         failed_names+=("$name")
         echo "FAILED: $name"
     fi
