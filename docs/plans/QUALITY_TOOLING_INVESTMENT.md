@@ -54,3 +54,4 @@ None of the above matters much without CI enforcement. A single GitHub Actions w
 3. ~~**newman in CI**~~ DONE — `scripts/run_newman.sh` + CI job with Postgres service container, runs all 17 collections
 4. ~~**radon/wily**~~ DONE — CI complexity gate (max CC 25) + `.complexity-baseline.txt` (6 functions baselined), wily for local trend tracking
 5. ~~**mutmut**~~ DONE — scoped to Tier 1 critical business logic (credit validation, credit loading, discretionary credits, institution billing). Weekly CI + manual trigger.
+6. ~~**i18n locale key parity test**~~ DONE — `app/tests/i18n/test_parity.py`. Asserts every non-`en` locale in `MESSAGES` and `ENUM_LABELS` (top-level + nested codes) matches the English reference; currently all locales in sync, so 6 parametrized tests pass. Guards against silent fallback drift when new keys land without translations.
