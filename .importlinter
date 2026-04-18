@@ -32,3 +32,45 @@ forbidden_modules =
 # route_factory wires routes — deferred import, not a logic dependency.
 ignore_imports =
     app.services.route_factory -> app.routes.restaurant
+
+# ── Contract 4: Layered architecture (one-way dependency flow) ──
+# routes → services → gateways → dto. A higher layer may import a lower
+# layer; the reverse is forbidden. Sibling independence is not enforced.
+[importlinter:contract:layered-architecture]
+name = Layered architecture (routes -> services -> gateways -> dto)
+type = layers
+layers =
+    app.routes
+    app.services
+    app.gateways
+    app.dto
+# Pre-existing cross-layer imports. New code must not add to this list.
+# To clear a line, fix the underlying import and re-run `lint-imports`.
+#
+# app.gateways.ads.* → app.services.ads.*: the ads package was designed
+#   with shared DTOs/helpers living under services/ads. Moving them to
+#   app.dto (or a neutral package) would clear these — tracked as follow-up.
+# app.services.route_factory → app.routes.restaurant: route_factory wires
+#   routes as a deferred import (same rationale as contract 3).
+ignore_imports =
+    app.gateways.ads.factory -> app.services.ads.models
+    app.gateways.ads.base -> app.services.ads.models
+    app.gateways.ads.mock_gateway -> app.services.ads.models
+    app.gateways.ads.meta.conversion_gateway -> app.services.ads.models
+    app.gateways.ads.meta.conversion_gateway -> app.services.ads.pii_hasher
+    app.gateways.ads.meta.conversion_gateway -> app.services.ads.error_handler
+    app.gateways.ads.google.conversion_gateway -> app.services.ads.models
+    app.gateways.ads.google.conversion_gateway -> app.services.ads.pii_hasher
+    app.gateways.ads.google.conversion_gateway -> app.services.ads.error_handler
+    app.services.route_factory -> app.routes.restaurant
+
+# ── Contract 5: DTOs must not import from the DB layer ──────────
+# DTOs are pure data structures (app/dto/models.py). Reaching into
+# app.db would couple the data model to a transport/driver concern.
+[importlinter:contract:dto-no-db]
+name = DTOs must not import from app.db
+type = forbidden
+source_modules =
+    app.dto
+forbidden_modules =
+    app.db
