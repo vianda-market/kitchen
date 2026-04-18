@@ -135,11 +135,25 @@ jobs:
           python-version: "3.14"
           allow-prereleases: true
 
-      - name: Install pip-audit
-        run: pip install pip-audit>=2.7.0
+      - name: Install pip-audit + pip-licenses
+        run: pip install pip-audit>=2.7.0 pip-licenses>=5.0
 
       - name: Audit production dependencies
         run: pip-audit -r requirements.txt
+
+      - name: Install production dependencies (for license inspection)
+        # pip-licenses reads installed package metadata, so requirements.txt
+        # must be installed in the current env before the gate runs.
+        run: pip install -r requirements.txt
+
+      - name: Check license compliance
+        # Local equivalent:
+        #   pip install -r requirements.txt pip-licenses
+        #   python scripts/check_licenses.py
+        # Allowlist (MIT/Apache/BSD/ISC/MPL/PSF) + per-package exemptions
+        # for google-crc32c, google-ads, facebook_business (ambiguous
+        # metadata) and psycopg2-binary, pycountry (LGPL, dynamic-linked).
+        run: python scripts/check_licenses.py
 
   bandit:
     name: Security Lint (Bandit)
