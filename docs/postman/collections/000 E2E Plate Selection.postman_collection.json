@@ -5719,11 +5719,11 @@
     },
     {
       "key": "productImagePath",
-      "value": ""
+      "value": "docs/postman/fixtures/test_product_image.jpeg"
     },
     {
       "key": "productImageChecksum",
-      "value": ""
+      "value": "9b616590a4eb0c185c040e13289ebfbb006ed4721453dbc3f030f965d53c366e"
     },
     {
       "key": "qrCodeChecksum",
