@@ -66,13 +66,19 @@ jobs:
       - name: Install radon
         run: pip install radon>=5.1.0
 
-      - name: Check complexity
+      - name: Check complexity (repo-wide, CC ≤ 25)
         run: bash scripts/check_complexity.sh
 
       - name: Check maintainability index (>5% drop = fail)
         # Local equivalent:  bash scripts/check_maintainability.sh
         # Uses radon mi to compare changed files vs origin/main.
         run: bash scripts/check_maintainability.sh
+
+      - name: Check complexity (strict, CC ≤ 15 on changed files)
+        # Tighter gate: functions in files you touched must be CC ≤ 15.
+        # Pre-existing complexity is allowed if baselined.
+        # Local equivalent:  bash scripts/check_complexity_strict.sh
+        run: bash scripts/check_complexity_strict.sh
 
   deadcode:
     name: Dead Code Gate
