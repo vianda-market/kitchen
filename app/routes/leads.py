@@ -12,7 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.auth.recaptcha import verify_recaptcha
 from app.config import Status
+from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.locale_names import localize_country_name
 from app.schemas.consolidated_schemas import (
     CityMetricsResponseSchema,
     EmailRegisteredResponseSchema,
@@ -46,6 +48,7 @@ from app.services.market_service import get_markets_with_coverage, is_global_mar
 from app.services.zipcode_metrics_service import get_zipcode_metrics
 from app.utils.country import normalize_country_code
 from app.utils.db import db_read
+from app.utils.locale import resolve_locale_from_header
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/leads", tags=["Leads"], dependencies=[Depends(verify_recaptcha)])

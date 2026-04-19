@@ -3,3 +3,5 @@
 # Remove entries as you refactor them — the CI gate will then enforce the limit.
 #
 # Format: file_path:function_name
+
+app/services/leads_public_service.py:create_lead_interest
