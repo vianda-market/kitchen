@@ -6,9 +6,8 @@ adding a route here forces a code review on the allowlist edit.
 """
 
 import pytest
-from fastapi.routing import APIRoute
-
 from application import app
+from fastapi.routing import APIRoute
 
 pytestmark = pytest.mark.policy
 

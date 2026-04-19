@@ -8,9 +8,8 @@ Pattern lifted from infra-kitchen-gcp/tests/test_smoke.py.
 """
 
 import pytest
-from fastapi.routing import APIRoute
-
 from application import app
+from fastapi.routing import APIRoute
 
 pytestmark = pytest.mark.smoke
 
