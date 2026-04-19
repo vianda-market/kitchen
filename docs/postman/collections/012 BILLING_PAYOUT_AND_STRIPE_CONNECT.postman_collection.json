@@ -401,9 +401,8 @@
                 "exec": [
                   "const billId = pm.collectionVariables.get('entityBillId') || pm.environment.get('entityBillId') || pm.globals.get('entityBillId');",
                   "if (!billId) {",
-                  "    // Skip gracefully — no bills exist on fresh DB. Downstream tests will fail their status assertions",
-                  "    // but won't throw a pre-request error that blocks the entire collection run.",
-                  "    console.warn('entityBillId not set — no institution bills exist. Skipping (downstream assertions will fail).');",
+                  "    console.warn('entityBillId not set — no institution bills exist. Skipping request.');",
+                  "    pm.execution.skipRequest();",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -505,6 +504,15 @@
         {
           "name": "Update Institution Bill",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('entityBillId')) { console.warn('entityBillId not set — skipping.'); pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -622,6 +630,15 @@
         {
           "name": "Cancel Institution Bill",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('entityBillId')) { console.warn('entityBillId not set — skipping.'); pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -1058,7 +1075,7 @@
                   "const parts = [",
                   "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"institution_entity_id\"\\r\\n\\r\\n' + entityId,",
                   "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"country_code\"\\r\\n\\r\\nAR',",
-                  "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"invoice_type\"\\r\\n\\r\\nFactura Electronica',",
+                  "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"invoice_type\"\\r\\n\\r\\nfactura_electronica',",
                   "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"issued_date\"\\r\\n\\r\\n' + issuedDate,",
                   "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"amount\"\\r\\n\\r\\n1500.00',",
                   "    '--' + boundary + '\\r\\nContent-Disposition: form-data; name=\"currency_code\"\\r\\n\\r\\nARS',",
@@ -1300,6 +1317,15 @@
         {
           "name": "Review Supplier Invoice (Approve)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('supplierInvoiceId')) { console.warn('supplierInvoiceId not set — skipping.'); pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {

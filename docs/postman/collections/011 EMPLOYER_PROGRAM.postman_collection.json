@@ -272,6 +272,18 @@
           "name": "2.2 Create Employer Admin User",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Unique username per run to avoid 'Username already exists' across reruns",
+                  "const suffix = Date.now();",
+                  "pm.collectionVariables.set('employerAdminUsername', 'employer_admin_011_' + suffix);",
+                  "pm.collectionVariables.set('employerAdminEmail', 'employer_admin_011_' + suffix + '@postman-test.com');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -301,7 +313,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"employer_admin_011\",\n    \"email\": \"employer_admin_011@postman-test.com\",\n    \"password\": \"Employer123!\",\n    \"role_type\": \"employer\",\n    \"role_name\": \"admin\",\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"market_id\": \"{{marketId}}\",\n    \"city_metadata_id\": \"{{cityMetadataId}}\"\n}"
+              "raw": "{\n    \"username\": \"{{employerAdminUsername}}\",\n    \"email\": \"{{employerAdminEmail}}\",\n    \"password\": \"Employer123!\",\n    \"role_type\": \"employer\",\n    \"role_name\": \"admin\",\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"market_id\": \"{{marketId}}\",\n    \"city_metadata_id\": \"{{cityMetadataId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
@@ -398,7 +410,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"address_id\": \"{{entityAddressId}}\",\n    \"tax_id\": \"30-12345678-9\",\n    \"name\": \"Postman Employer AR S.A.\",\n    \"email_domain\": \"postman-employer.com\"\n}"
+              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"address_id\": \"{{entityAddressId}}\",\n    \"tax_id\": \"30123456789\",\n    \"name\": \"Postman Employer AR S.A.\",\n    \"email_domain\": \"postman-employer.com\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/institution-entities",
@@ -444,7 +456,7 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "employer_admin_011"
+                  "value": "{{employerAdminUsername}}"
                 },
                 {
                   "key": "password",
