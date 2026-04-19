@@ -24,7 +24,7 @@ from app.schemas.consolidated_schemas import (
 )
 from app.services.entity_service import get_enriched_market_by_id, get_enriched_markets
 from app.services.error_handling import handle_business_operation
-from app.services.market_service import is_global_market, market_service
+from app.services.market_service import is_global_market, market_has_active_plate_coverage, market_service
 from app.utils.country import resolve_country_name
 from app.utils.error_messages import entity_not_found
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
@@ -208,7 +208,10 @@ async def create_market(market_data: MarketCreateSchema, current_user: dict = De
 
 @router.put("/{market_id}", response_model=MarketResponseSchema)
 async def update_market(
-    market_id: UUID, market_data: MarketUpdateSchema, current_user: dict = Depends(get_employee_user)
+    market_id: UUID,
+    market_data: MarketUpdateSchema,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     Update an existing market.
@@ -237,6 +240,29 @@ async def update_market(
             status_code=403,
             detail="Only Super Admin can edit the Global Marketplace.",
         )
+
+    # Admin status override guardrails (non-global markets only).
+    # These keep the `status` field honest in the absence of the auto-flip cron
+    # (tracked in docs/plans/market-status-cron.md).
+    if market_data.status is not None and not is_global_market(market_id):
+        has_coverage = market_has_active_plate_coverage(market_id, db)
+        if market_data.status == Status.ACTIVE and not has_coverage:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Cannot activate: market has no active restaurant with an active plate on an "
+                    "active weekly kitchen-day. Schedule coverage first, then set status='active'."
+                ),
+            )
+        if market_data.status == Status.INACTIVE and has_coverage and not market_data.confirm_deactivate:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This market currently has active plate coverage. Deactivating will hide it "
+                    "from customers immediately. Resubmit with confirm_deactivate=true to proceed."
+                ),
+            )
+
     country_name = None
     country_code = None
     if market_data.country_code is not None:

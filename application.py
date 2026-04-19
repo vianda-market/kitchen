@@ -50,6 +50,7 @@ from app.routes.favorite import router as favorite_router
 from app.routes.institution_entity import router as institution_entity_router
 
 # Leads (unauthenticated, rate-limited)
+from app.routes.leads import public_router as leads_public_router
 from app.routes.leads import router as leads_router
 from app.routes.main import router as main_router
 from app.routes.national_holidays import router as national_holidays_router
@@ -462,8 +463,12 @@ def create_app() -> FastAPI:
     app.include_router(v1_locales_router)
 
     # Leads router (versioned; no auth, rate-limited)
+    # `leads_router` gates every route behind reCAPTCHA. `leads_public_router` carves out the
+    # two navbar-load country endpoints (/countries, /supplier-countries) that the marketing
+    # site fetches on every page render and therefore cannot sit behind a challenge.
     v1_leads_router = create_versioned_router("api", ["Leads"], APIVersion.V1)
     v1_leads_router.include_router(leads_router)
+    v1_leads_router.include_router(leads_public_router)
     app.include_router(v1_leads_router)
 
     # Phone pre-validation (versioned; no auth, real-time form feedback)

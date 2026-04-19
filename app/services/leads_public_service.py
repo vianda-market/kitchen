@@ -18,39 +18,47 @@ from app.utils.db import db_read
 
 def get_public_restaurants(
     locale: str,
+    country_code: str,
     db: psycopg2.extensions.connection,
     *,
     featured_only: bool = False,
     limit: int = 12,
 ) -> list[dict]:
     """
-    Return active restaurants for public display.
-    Limited projection: id, name, cuisine, tagline, rating, cover image.
+    Return active restaurants for public display, scoped to a country.
+
+    Country scoping: restaurant → institution → institution_market → market_info.country_code.
+    This mirrors how market coverage is modeled elsewhere (see get_markets_with_coverage).
     I18n resolved via COALESCE on JSONB fields.
     """
     featured_clause = "AND r.is_featured = TRUE" if featured_only else ""
     query = f"""
-        SELECT r.restaurant_id, r.name,
+        SELECT DISTINCT r.restaurant_id, r.name,
                COALESCE(cu.cuisine_name_i18n->>%s, cu.cuisine_name) AS cuisine_name,
                COALESCE(r.tagline_i18n->>%s, r.tagline) AS tagline,
-               r.average_rating, r.review_count, r.cover_image_url
-        FROM restaurant_info r
-        LEFT JOIN cuisine cu ON r.cuisine_id = cu.cuisine_id
+               r.average_rating, r.review_count, r.cover_image_url, r.is_featured
+        FROM ops.restaurant_info r
+        LEFT JOIN ops.cuisine cu ON r.cuisine_id = cu.cuisine_id
+        JOIN core.institution_info i ON i.institution_id = r.institution_id
+        JOIN core.institution_market im ON im.institution_id = i.institution_id
+        JOIN core.market_info m ON m.market_id = im.market_id
         WHERE r.is_archived = FALSE AND r.status = 'active'
+          AND m.country_code = %s AND m.status = 'active' AND m.is_archived = FALSE
           {featured_clause}
         ORDER BY r.is_featured DESC, r.average_rating DESC NULLS LAST
         LIMIT %s
     """
-    rows = db_read(query, (locale, locale, limit), connection=db)
+    rows = db_read(query, (locale, locale, country_code, limit), connection=db)
     return [dict(r) for r in rows] if rows else []
 
 
 def get_public_plans(
     locale: str,
+    country_code: str,
     db: psycopg2.extensions.connection,
 ) -> list[dict]:
     """
-    Return active plans for public pricing display.
+    Return active plans for public pricing display, scoped to a country.
     Limited projection with currency from market's credit_currency.
     Excludes Global Marketplace plans. I18n resolved for name,
     marketing_description, cta_label. Features i18n resolved in Python.
@@ -69,9 +77,10 @@ def get_public_plans(
         JOIN currency_metadata cc ON m.currency_metadata_id = cc.currency_metadata_id
         WHERE p.is_archived = FALSE AND p.status = 'active'
           AND p.market_id != '00000000-0000-0000-0000-000000000001'::uuid
+          AND m.country_code = %s AND m.status = 'active' AND m.is_archived = FALSE
         ORDER BY p.price ASC
         """,
-        (locale, locale, locale),
+        (locale, locale, locale, country_code),
         connection=db,
     )
     if not rows:
@@ -87,6 +96,50 @@ def get_public_plans(
         plan["features"] = plan.get("features") or []
         results.append(plan)
     return results
+
+
+def _query_public_countries(
+    db: psycopg2.extensions.connection,
+    *,
+    include_inactive: bool,
+) -> list[dict]:
+    """
+    Core country query shared by /leads/countries (include_inactive=False) and
+    /leads/supplier-countries (include_inactive=True).
+
+    Projection carries modified_date from market_info and currency_metadata so the
+    route layer can derive an ETag without a second query.
+    """
+    status_clause = "m.status IN ('active', 'inactive')" if include_inactive else "m.status = 'active'"
+    rows = db_read(
+        f"""
+        SELECT m.country_code AS code,
+               cc.currency_code AS currency,
+               m.phone_dial_code AS phone_prefix,
+               m.language AS default_locale,
+               m.modified_date AS market_modified_date,
+               cc.modified_date AS currency_modified_date
+        FROM core.market_info m
+        JOIN core.currency_metadata cc ON m.currency_metadata_id = cc.currency_metadata_id
+        WHERE {status_clause}
+          AND m.is_archived = FALSE
+          AND m.market_id != '00000000-0000-0000-0000-000000000001'::uuid
+        ORDER BY m.country_code
+        """,
+        (),
+        connection=db,
+    )
+    return [dict(r) for r in rows] if rows else []
+
+
+def get_public_countries(db: psycopg2.extensions.connection) -> list[dict]:
+    """Markets currently serving customers. Drives /leads/countries (navbar + scoping)."""
+    return _query_public_countries(db, include_inactive=False)
+
+
+def get_public_supplier_countries(db: psycopg2.extensions.connection) -> list[dict]:
+    """All configured non-global markets (active + inactive). Drives RestaurantApplicationForm."""
+    return _query_public_countries(db, include_inactive=True)
 
 
 # ---------------------------------------------------------------------------

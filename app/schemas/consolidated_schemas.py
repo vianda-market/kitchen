@@ -2879,6 +2879,18 @@ class LeadsPlanSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadsCountrySchema(BaseModel):
+    """GET /leads/countries and /leads/supplier-countries — one launched or configured country."""
+
+    code: str = Field(..., description="ISO 3166-1 alpha-2 (e.g. 'AR')")
+    name: str = Field(..., description="Country name, localized per `language` query param")
+    currency: str = Field(..., description="ISO 4217 currency code used by the market (e.g. 'ARS')")
+    phone_prefix: str | None = Field(None, description="E.164 dial code (e.g. '+54'); null for pseudo-markets")
+    default_locale: str = Field(..., description="Market default UI locale — one of 'en', 'es', 'pt'")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LeadInterestCreateSchema(BaseModel):
     """POST /leads/interest — notify-me request from marketing site or B2C app."""
 
@@ -3103,6 +3115,14 @@ class MarketUpdateSchema(BaseModel):
     phone_dial_code: str | None = Field(None, max_length=6, description="E.164 dial code prefix (e.g. '+54').")
     phone_local_digits: int | None = Field(
         None, description="Max digits in the national number after the dial code (e.g. 10)."
+    )
+    confirm_deactivate: bool = Field(
+        False,
+        description=(
+            "Second-confirm flag for setting status='inactive' on a market that currently has active "
+            "plate coverage. Required (must be True) for that specific case; ignored otherwise. "
+            "Prevents accidental customer-facing takedowns."
+        ),
     )
 
     @field_validator("country_code")
