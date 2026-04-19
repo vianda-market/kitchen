@@ -3,7 +3,7 @@
 **Audience:** vianda-home (marketing site) agent  
 **Backend base URL:** `VITE_API_BASE_URL` env var (e.g. `https://api.dev.vianda.market`)  
 **Auth:** None — all endpoints are public, unauthenticated  
-**Bot protection:** reCAPTCHA v3 required on all `/leads/*` calls (see section below)
+**Bot protection:** reCAPTCHA v3 required on most `/leads/*` calls. **Exceptions:** `/leads/countries` and `/leads/supplier-countries` are navbar-load fetches and do not require a token. See the reCAPTCHA section below.
 
 ---
 
@@ -15,9 +15,67 @@ The marketing site is the top-of-funnel qualification tool. Visitors check if th
 
 ## Endpoints
 
+### Country Selector — Site-Wide Scoping
+
+The marketing site runs a single country selector in the navbar; every country-scoped surface
+reads from it. Two endpoints drive this selector depending on audience.
+
+#### 0a. Customer-facing country list
+```
+GET /api/v1/leads/countries?language={locale}
+```
+
+Returns markets with `status='active'` — countries currently serving customers. Drives the
+navbar country selector and scopes plans, restaurants, featured-restaurant, coverage checker,
+and metrics.
+
+**Response:** `[{ code, name, currency, phone_prefix, default_locale }]`
+- `code` — ISO 3166-1 alpha-2 (e.g. `"AR"`)
+- `name` — localized per `language`
+- `currency` — ISO 4217 code (e.g. `"ARS"`)
+- `phone_prefix` — E.164 dial code, may be `null` for pseudo-markets
+- `default_locale` — one of `en`, `es`, `pt`
+
+**Empty array contract:** `[]` means no markets currently serve customers. The frontend hides
+the navbar country selector and every country-scoped section (plans, restaurants,
+featured-restaurant, coverage checker, metrics). Country-agnostic sections (hero, how-it-works,
+footer, supplier CTA) stay visible. The supplier application form is unaffected — it reads
+`/leads/supplier-countries`.
+
+**Caching:** `Cache-Control: public, max-age=86400, stale-while-revalidate=3600`.
+Response includes an `ETag` header. Send `If-None-Match` on revalidation to get `304 Not Modified`.
+The ETag is a hash of response-field values plus per-row `modified_date` from `market_info` and
+`currency_metadata` — no triggers or cross-table reasoning in the DB layer (see §ETag Strategy).
+
+**reCAPTCHA:** **not required** — this is a navbar-load fetch called on every page render.
+
+**Rate limit:** 60/min per IP.
+
+#### 0b. Supplier-facing country list
+```
+GET /api/v1/leads/supplier-countries?language={locale}
+```
+
+Superset of `/leads/countries`: markets with `status IN ('active', 'inactive')`. `inactive`
+markets are configured in `market_info` but not yet serving customers — suppliers can still
+apply, and we capture interest ahead of launch. Same response shape as `/leads/countries`.
+
+**Empty array contract:** `[]` means no markets are configured at all. Frontend renders
+`RestaurantApplicationForm` **without** the country dropdown and promotes
+`mailto:partners@vianda.market` as the primary CTA: *"We'd still love to hear from you —
+email partners@vianda.market to tell us where you're cooking."* Same email as the
+"don't see your country?" fallback shown when a supplier's country is not in a non-empty list,
+promoted to primary when the list is empty.
+
+**Caching & reCAPTCHA & rate limit:** same as `/leads/countries`.
+
+**Automated status maintenance (planned, not in v1):** the `active`/`inactive` flips are
+currently admin-maintained. The daily auto-flip cron is covered in
+`docs/plans/market-status-cron.md` (pending implementation).
+
 ### Coverage Check Flow
 
-#### 1. Country dropdown
+#### 1. Country dropdown (legacy — prefer `/leads/countries`)
 ```
 GET /api/v1/leads/markets?language={locale}
 ```
@@ -75,25 +133,35 @@ GET /api/v1/leads/city-metrics?city={name}&country_code={code}
 
 #### 4. Restaurant list
 ```
-GET /api/v1/leads/restaurants?language={locale}&featured={bool}&limit={int}
+GET /api/v1/leads/restaurants?language={locale}&country_code={CC}&featured={bool}&limit={int}
 ```
-Active restaurants for grid display. `featured=true` filters to featured only. Default limit 12, max 50.
+Active restaurants for grid display, **scoped to a country**. `featured=true` filters to featured only. Default limit 12, max 50.
+
+- `country_code` is **required** (ISO 3166-1 alpha-2). Missing/empty → `400 {"detail": "country_code is required"}`.
+- Unsupported or supported-but-empty country → `[]` (HTTP 200), cacheable.
 
 **Response:** `[{ restaurant_id, name, cuisine_name, tagline, average_rating, review_count, cover_image_url }]`
 
 #### 5. Featured restaurant spotlight
 ```
-GET /api/v1/leads/featured-restaurant?language={locale}
+GET /api/v1/leads/featured-restaurant?language={locale}&country_code={CC}
 ```
-Single featured restaurant with spotlight label, badge, and perks. Returns 404 if none is featured.
+Single featured restaurant with spotlight label, badge, and perks, **scoped to a country**.
 
-**Response:** `{ restaurant_id, name, cuisine_name, tagline, average_rating, review_count, cover_image_url, spotlight_label, verified_badge, member_perks }`
+- `country_code` is **required**. Missing/empty → `400`.
+- **No match for the requested country → JSON body `null`, HTTP 200, `Content-Type: application/json`.** The legacy 404 response has been retired — callers must handle a literal `null` body.
+
+**Response (match):** `{ restaurant_id, name, cuisine_name, tagline, average_rating, review_count, cover_image_url, spotlight_label, verified_badge, member_perks }`
+**Response (no match):** `null`
 
 #### 6. Pricing table
 ```
-GET /api/v1/leads/plans?language={locale}
+GET /api/v1/leads/plans?language={locale}&country_code={CC}
 ```
-All active plans with currency. All prices are monthly. `highlighted: true` indicates the recommended plan.
+Active plans with currency, **scoped to a country**. All prices are monthly. `highlighted: true` indicates the recommended plan.
+
+- `country_code` is **required**. Missing/empty → `400`.
+- Unsupported or supported-but-empty country → `[]` (HTTP 200), cacheable.
 
 **Response:** `[{ plan_id, name, marketing_description, features, cta_label, credit, price, highlighted, currency }]`
 
@@ -178,7 +246,13 @@ UX placement (separate forms, tabs, or distinct sections) is your design decisio
 
 ## reCAPTCHA v3 Integration
 
-**Every `/api/v1/leads/*` call must include a reCAPTCHA v3 token.** Requests without a valid token receive 403.
+**Most `/api/v1/leads/*` calls must include a reCAPTCHA v3 token.** Requests without a valid token receive 403.
+
+**Exceptions — tokens NOT required:**
+- `GET /api/v1/leads/countries`
+- `GET /api/v1/leads/supplier-countries`
+
+These are navbar-load fetches executed on every page render and cannot sit behind a challenge. They are rate-limited (60/min per IP) and return cacheable responses with ETags, so the anti-scraping story relies on the per-IP limiter rather than a per-request token. A rate-limit-breach → CAPTCHA-unlock handshake for the other country-scoped reads is planned for v2 (see the feedback note).
 
 ### Setup
 1. Add reCAPTCHA v3 JS script to the page:
@@ -202,6 +276,7 @@ Use distinct `action` values per endpoint type:
 - `leads_coverage_check` — markets, cities, city-metrics, zipcode-metrics
 - `leads_content` — restaurants, featured-restaurant, plans
 - `leads_interest_submit` — POST /leads/interest
+- *(no token)* — countries, supplier-countries
 
 ### Error handling
 - **403 "Missing reCAPTCHA token"** — token header not sent
@@ -248,6 +323,8 @@ Parse and forward UTM params from marketing campaigns. Firebase Analytics handle
 
 | Endpoint | Limit |
 |----------|-------|
+| `/leads/countries` | 60/min per IP |
+| `/leads/supplier-countries` | 60/min per IP |
 | `/leads/markets` | 60/min per IP |
 | `/leads/cities` | 20/min per IP |
 | `/leads/city-metrics` | 20/min per IP |
@@ -278,3 +355,49 @@ The backend returns **snake_case** field names (e.g. `restaurant_id`, `cover_ima
 The following items in `src/api/types.ts` need updating:
 - `PublicPlan.yearlyPrice` — **remove**. All prices are monthly. No `yearly_price` field exists.
 - `PlatformMetrics` type — **keep as stub**. The `/leads/platform-metrics` endpoint is deferred (early-stage numbers aren't compelling). Keep using placeholder data until backend ships this endpoint.
+
+---
+
+## Country-Scoped Endpoint Contract (reference table)
+
+| Endpoint | `country_code` param | Missing param | Unsupported country |
+|---|---|---|---|
+| `/leads/countries` | n/a (returns the list) | — | — |
+| `/leads/supplier-countries` | n/a | — | — |
+| `/leads/markets` | key of the row, implicit | returns all | — |
+| `/leads/cities` | optional, defaults to `US` | returns `US` cities | empty list |
+| `/leads/city-metrics` | optional, defaults to `US` | evaluates against `US` | `has_coverage: false` |
+| `/leads/zipcode-metrics` | optional, defaults to `US` | evaluates against `US` | `has_coverage: false` |
+| `/leads/plans` | **required** | `400` | `[]`, 200 |
+| `/leads/restaurants` | **required** | `400` | `[]`, 200 |
+| `/leads/featured-restaurant` | **required** | `400` | `null`, 200 |
+
+Legacy default-to-`US` on `/leads/cities`, `/leads/city-metrics`, and `/leads/zipcode-metrics` predates the country selector and is kept for backward compatibility; the marketing site should pass `country_code` explicitly.
+
+---
+
+## Error Code Conventions
+
+- **`400`** — business-rule violation (e.g. missing required `country_code`).
+- **`422`** — request-schema validation (FastAPI/Pydantic default, e.g. unknown `language`).
+
+---
+
+## ETag Strategy (option c — response-field-scoped)
+
+Applies to `/leads/countries` and `/leads/supplier-countries`.
+
+- The ETag is a truncated SHA-256 hash over per-row `(code, currency, phone_prefix, default_locale, market_info.modified_date, currency_metadata.modified_date)` plus the `language` query param.
+- No triggers on `currency_metadata` that bump `market_info.modified_date`. No materialized invalidation columns. The hash input lives entirely at the query/response boundary — a reader can see the full story in one function.
+- Natural invalidation: when an admin flips `status` or edits currency metadata, `modified_date` bumps → ETag bumps → the browser's next `If-None-Match` revalidation gets a `200` with fresh data instead of a `304`.
+- Browser cache: `max-age=86400, stale-while-revalidate=3600`. Users see fresh data within 1h of the stale window on their next navigation.
+
+## Server-Side Cache Semantics
+
+- Both country endpoints use a process-local, locale-keyed cache with a 10-minute TTL (mirrors `_markets_cache` / `_cities_cache`).
+- **Per-worker visibility:** when an admin flips a market to `active`/`inactive`, other workers pick up the change over the next 10 minutes. Combined with the 1h `stale-while-revalidate` window, end users see fresh data within ~1h of an admin flip. Acceptable at marketing-site change cadence.
+- **Redis:** scaffolded in the repo but not used for this feature. A shared cross-worker cache isn't needed at the current change frequency. Considered, deferred.
+
+## Future "All Countries" View
+
+The `is_global_market` sentinel row in `market_info` (UUID `00000000-0000-0000-0000-000000000001`) is the intended primitive for a future "global / all countries" aggregate view. The country endpoints exclude it today. Any later work that exposes per-country metrics in an aggregate form should start from this row rather than introducing a new "global" mechanism.

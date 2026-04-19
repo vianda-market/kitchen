@@ -183,7 +183,7 @@ Request
 | Admin (versioned) | `/api/v1/admin/archival/*`, `/api/v1/admin/archival-config/*`, `/api/v1/admin/discretionary/*`, `/api/v1/admin/markets/*`, `/api/v1/admin/leads/*` | Internal |
 | Super-Admin (versioned) | `/api/v1/super-admin/discretionary/*` | Super Admin only |
 | Webhooks | `/api/v1/webhooks/*` | Stripe signature |
-| Leads | `/api/v1/leads/*` | None, rate-limited, reCAPTCHA v3 required (exempt for b2c-mobile) |
+| Leads | `/api/v1/leads/*` | None, rate-limited, reCAPTCHA v3 required (exempt for b2c-mobile, **also exempt for `/leads/countries` and `/leads/supplier-countries`** — navbar-load fetches) |
 | Locales | `/api/v1/locales` | None, cacheable |
 
 ---
@@ -441,6 +441,21 @@ Payment webhook -> subscription confirmed -> subscription_ads_hook.py [best-effo
 
 ---
 
+## Marketing Site (vianda-home) API Surface
+
+Unauthenticated, rate-limited endpoints under `/api/v1/leads/*` that the marketing site reads on every page render. Two sub-groups with different bot-protection treatment:
+
+- **Navbar-load country selectors — no reCAPTCHA, ETag + long cache.** `/leads/countries` (customer-facing, `market_info.status = 'active'`) and `/leads/supplier-countries` (supplier form, `status IN ('active', 'inactive')`). Both return `[{code, name, currency, phone_prefix, default_locale}]`, honor `If-None-Match` → 304, and set `Cache-Control: public, max-age=86400, stale-while-revalidate=3600`. Mounted on a sibling router (`app/routes/leads.py::public_router`) that skips the router-level `Depends(verify_recaptcha)`.
+- **Country-scoped content reads — reCAPTCHA v3 required, `country_code` required.** `/leads/plans`, `/leads/restaurants`, `/leads/featured-restaurant`. Missing `country_code` → 400. Unsupported country → `[]` (plans, restaurants) or `null` (featured-restaurant), always 200 and cacheable. Replaces the prior "return everything across countries" behavior that caused the mixed-currency flood on the dev marketing site.
+
+**Empty-state contracts are documented behavior.** `[]` from `/leads/countries` means the frontend hides the navbar selector and every country-scoped section. `[]` from `/leads/supplier-countries` means the supplier form drops the country dropdown and promotes `partners@vianda.market` as the primary CTA. The 429 → reCAPTCHA-unlock handshake for country-scoped reads is planned for a v2 ticket.
+
+**ETag strategy (option c):** hash over response-field values + per-row `market_info.modified_date` and `currency_metadata.modified_date` + the `language` query param. No triggers, no materialized invalidation columns — natural invalidation via `modified_date` bumps when admins flip status or edit currencies.
+
+Full contract + examples: `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md`. Cross-repo feedback note: `vianda-home/docs/frontend/feedback_for_backend/country-filter-backend.md`. Postman coverage: `docs/postman/collections/006 LEADS_MARKETING_SITE.postman_collection.json` — one collection per frontend consumer; conventions in `docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md`.
+
+---
+
 ## Country / City / Currency Data Layer
 
 Two-tier geographic and currency data model replacing the retired `core.city_info` and `core.credit_currency_info` tables.
@@ -450,6 +465,7 @@ Two-tier geographic and currency data model replacing the retired `core.city_inf
 - **Timezone**: Lives on `address_info.timezone` (per-restaurant address), NOT on `market_info`. Derived from `external.geonames_city.timezone` at address write time. Market-level fallback for cron jobs: `TimezoneService._MARKET_PRIMARY_TIMEZONE`.
 - **XG pseudo-country**: ISO 3166-1 user-assigned code for Vianda's Global market. Synthetic rows in `external.geonames_country` (name="Global") and `geonames_city` (geonames_id=-1). `core.city_metadata` Global row at UUID `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`.
 - **Audience flags**: `country_metadata.is_customer_audience`, `is_supplier_audience`, `is_employer_audience` control `/leads/markets` and `/leads/cities` filtering.
+- **Market operational status**: `market_info.status` is the source of truth for whether a country surfaces to customers. `active` → serving customers; surfaces in `/leads/countries` + scopes plans/restaurants/featured-restaurant. `inactive` → configured in `market_info` but not serving; surfaces only in `/leads/supplier-countries` (supplier application form). Admin overrides are guardrailed (`app/routes/admin/markets.py:update_market` — refuses `→ active` without coverage, warns on `→ inactive` when coverage exists). Automated status maintenance via a daily forward-window cron is tracked in `docs/plans/market-status-cron.md` (not yet implemented — admin-maintained in the interim).
 - **Country/currency names**: Always derived via JOIN to external tables, never stored redundantly.
 - **Institution-market link**: `core.institution_market` junction table assigns markets to institutions (replaces former `institution_info.market_id`). An institution can operate in multiple markets. Enriched institution responses include `market_ids` array.
 - **Key files**: `app/db/schema.sql`, `app/db/seed/reference_data.sql`, `app/scripts/import_geonames.py`, `app/services/timezone_service.py`, `app/routes/admin/external_data.py`, `app/routes/leads.py`

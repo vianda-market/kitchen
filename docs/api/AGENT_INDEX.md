@@ -65,7 +65,7 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_MARKETS.md` | Markets API — multi-currency, multi-timezone, institution scoping |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_INSTITUTIONS.md` | Multinational institution model — `market_ids` array, entity-based employers, `email_domain` |
 | Both | `/Users/cdeachaval/learn/kitchen/docs/api/shared_client/ZIPCODE_METRICS_LEAD_API.md` | Pre-signup coverage check with restaurant count by zipcode |
-| Marketing | `/Users/cdeachaval/learn/kitchen/docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Coverage checker, interest forms, reCAPTCHA, restaurant/plan endpoints for marketing site |
+| Marketing | `/Users/cdeachaval/learn/kitchen/docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Coverage checker, interest forms, reCAPTCHA, restaurant/plan endpoints for marketing site. **Country selector** via `/leads/countries` + `/leads/supplier-countries` (ETag + 24h cache). `country_code` required on `/leads/plans`, `/leads/restaurants`, `/leads/featured-restaurant`. |
 | B2C | `/Users/cdeachaval/learn/kitchen/docs/api/b2c_client/LEADS_SIMPLIFICATION.md` | Remove coverage check from app, simplify signup, add "not served" → marketing site link |
 | B2B | `/Users/cdeachaval/learn/kitchen/docs/api/b2b_client/API_CLIENT_INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
 | Infra | `/Users/cdeachaval/learn/kitchen/docs/api/infrastructure/LEADS_MIGRATION_INFRA.md` | reCAPTCHA and CORS env vars for Cloud Run |

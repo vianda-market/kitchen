@@ -15,7 +15,7 @@ All importable Postman collections live here:
 - **`ADDRESS_AUTOCOMPLETE_AND_VALIDATION.postman_collection.json`** - Address suggest/validate and E2E create
 - **`TIMEZONE_DEDUCTION_TESTS.postman_collection.json`** - Timezone auto-deduction by country/province
 - **`ENUM_SERVICE.postman_collection.json`** - Enum service API tests
-- **`ZIPCODE_LEAD_METRICS.postman_collection.json`** - Zipcode lead metrics
+- **`006 LEADS_MARKETING_SITE.postman_collection.json`** - All public `/leads/*` surface consumed by vianda-home: zipcode metrics, country selectors (with ETag/304/Cache-Control), `country_code` contract on plans/restaurants/featured-restaurant, and admin override guardrails on `PUT /admin/markets/{id}`. Replaces the previous per-endpoint splits (`006 ZIPCODE_LEAD_METRICS`, `017 LEADS_COUNTRY_FILTER`). See `guidelines/LEADS_COLLECTION_CONVENTIONS.md` for the per-frontend-consumer organizing rule.
 - **`Geolocation Testing.postman_collection.json`** - Geolocation testing
 - **`009 CUSTOMER_STRIPE_CONFIG.postman_collection.json`** - Customer Stripe payment method management (Phase 2 mock): list, setup-session, mock-add, delete, set default. Requires Customer auth; run after E2E Client Setup. **Requires `PAYMENT_PROVIDER=mock`** in `.env` for mock-add/PUT/DELETE flow; with Stripe, mock-add returns 400 (tests treat as skipped).
 - **`010 Permissions Testing - Employee-Only Access.postman_collection.json`** - Permissions testing (runs last; archives customer at end).
@@ -38,6 +38,7 @@ Guides, setup, and reference for using the Postman collections:
 - **`COLLECTION_UPDATE_VERIFICATION.md`** - Verifying versioned paths in collections
 - **`BANK_ACCOUNT_COLLECTION_FIX.md`** - Bank account collection variable fix
 - **`TESTING_STRATEGY.md`** - Testing strategy
+- **`LEADS_COLLECTION_CONVENTIONS.md`** - One leads-adjacent collection per frontend consumer; canonical `recaptchaToken` variable name; shared super-admin auth pattern (idempotent in-collection login + Newman `--globals`)
 
 #### `../zArchive/postman/` - Archived Documentation
 Contains historical/outdated documentation that has been superseded:

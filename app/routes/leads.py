@@ -14,9 +14,7 @@ from app.auth.recaptcha import verify_recaptcha
 from app.config import Status
 from app.config.settings import settings
 from app.dependencies.database import get_db
-from app.i18n.locale_names import (
-    localize_country_name,
-)
+from app.i18n.locale_names import localize_country_name
 from app.schemas.consolidated_schemas import (
     CityMetricsResponseSchema,
     EmailRegisteredResponseSchema,
@@ -54,6 +52,19 @@ from app.utils.locale import resolve_locale_from_header
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/leads", tags=["Leads"], dependencies=[Depends(verify_recaptcha)])
+
+
+def _require_country_code(country_code: str | None) -> str:
+    """Normalize + validate the required country_code query param.
+
+    Missing/empty → 400 (business-rule violation). Downstream endpoints treat
+    "valid but unsupported country" as an empty response, 200, cacheable.
+    """
+    normalized = normalize_country_code(country_code, default=None) if country_code else None
+    if not normalized:
+        raise HTTPException(status_code=400, detail="country_code is required")
+    return normalized
+
 
 # -----------------------------------------------------------------------------
 # Public markets (no auth): rate limit and cache — country_code + country_name only
@@ -133,7 +144,7 @@ async def list_leads_markets(
     return [m.model_copy(update={"country_name": localize_country_name(m.country_code, locale)}) for m in markets]
 
 
-@router.get("/featured-restaurant", response_model=LeadsFeaturedRestaurantSchema)
+@router.get("/featured-restaurant", response_model=LeadsFeaturedRestaurantSchema | None)
 @limiter.limit("60/minute")
 async def get_featured_restaurant(
     request: Request,
@@ -141,17 +152,24 @@ async def get_featured_restaurant(
         None,
         description="Locale for display names (en, es, pt). Falls back to Accept-Language header.",
     ),
+    country_code: str | None = Query(
+        None,
+        description="Required ISO 3166-1 alpha-2 country code. Missing/empty → 400.",
+    ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Public (no auth) featured restaurant for marketing site spotlight.
+    Public (no auth) featured restaurant for marketing site spotlight, scoped to a country.
 
     Returns a single curated restaurant with localized tagline, spotlight label, and member perks.
-    Returns 404 if no restaurant is currently featured.
+    **Returns JSON `null` (HTTP 200) when no featured restaurant exists for the requested country**
+    (either unsupported country or supported country with no match). The legacy 404 behavior has
+    been retired — callers must handle a null body.
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+    country = _require_country_code(country_code)
     row = db_read(
         """
         SELECT r.restaurant_id, r.name,
@@ -160,17 +178,21 @@ async def get_featured_restaurant(
                r.average_rating, r.review_count, r.cover_image_url,
                COALESCE(r.spotlight_label_i18n->>%s, r.spotlight_label) AS spotlight_label,
                r.verified_badge, r.member_perks, r.member_perks_i18n
-        FROM restaurant_info r
-        LEFT JOIN cuisine cu ON r.cuisine_id = cu.cuisine_id
+        FROM ops.restaurant_info r
+        LEFT JOIN ops.cuisine cu ON r.cuisine_id = cu.cuisine_id
+        JOIN core.institution_info i ON i.institution_id = r.institution_id
+        JOIN core.institution_market im ON im.institution_id = i.institution_id
+        JOIN core.market_info m ON m.market_id = im.market_id
         WHERE r.is_featured = TRUE AND r.is_archived = FALSE AND r.status = 'active'
+          AND m.country_code = %s AND m.status = 'active' AND m.is_archived = FALSE
         LIMIT 1
         """,
-        (locale, locale, locale),
+        (locale, locale, locale, country),
         connection=db,
         fetch_one=True,
     )
     if not row:
-        raise HTTPException(status_code=404, detail="No featured restaurant available")
+        return None
     result = dict(row)
     # Resolve member_perks from i18n if non-English
     if locale != "en":
@@ -304,18 +326,22 @@ async def get_zipcode_metrics_endpoint(
 
 @router.get("/restaurants", response_model=list[LeadsRestaurantSchema])
 @limiter.limit("60/minute")
-async def list_leads_restaurants(
+async def list_leads_restaurants(  # noqa: PLR0913 — declarative FastAPI Query params, not algorithmic args
     request: Request,
     language: str = Query(
         None,
         description="Locale for display names (en, es, pt). Falls back to Accept-Language header.",
+    ),
+    country_code: str | None = Query(
+        None,
+        description="Required ISO 3166-1 alpha-2 country code. Missing/empty → 400. Unsupported → [].",
     ),
     featured: bool = Query(False, description="Filter to featured restaurants only"),
     limit: int = Query(12, ge=1, le=50, description="Max results (1-50, default 12)"),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Public (no auth) list of restaurants for marketing site.
+    Public (no auth) list of restaurants for marketing site, scoped to a country.
 
     Limited projection of restaurant_info: name, cuisine, tagline, rating, cover image.
     Pass `?featured=true` to get only featured restaurants. Rate-limited per IP.
@@ -323,7 +349,8 @@ async def list_leads_restaurants(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
-    rows = get_public_restaurants(locale, db, featured_only=featured, limit=limit)
+    country = _require_country_code(country_code)
+    rows = get_public_restaurants(locale, country, db, featured_only=featured, limit=limit)
     return [LeadsRestaurantSchema(**r) for r in rows]
 
 
@@ -335,10 +362,14 @@ async def list_leads_plans(
         None,
         description="Locale for display names (en, es, pt). Falls back to Accept-Language header.",
     ),
+    country_code: str | None = Query(
+        None,
+        description="Required ISO 3166-1 alpha-2 country code. Missing/empty → 400. Unsupported → [].",
+    ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Public (no auth) pricing table for marketing site.
+    Public (no auth) pricing table for marketing site, scoped to a country.
 
     Limited projection of plan_info with currency. All prices are monthly.
     Excludes Global Marketplace plans. Rate-limited per IP.
@@ -346,7 +377,8 @@ async def list_leads_plans(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
-    rows = get_public_plans(locale, db)
+    country = _require_country_code(country_code)
+    rows = get_public_plans(locale, country, db)
     return [LeadsPlanSchema(**r) for r in rows]
 
 

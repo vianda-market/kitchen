@@ -97,6 +97,7 @@ These are backend-only planned changes. Client agents should read them when they
 | File | What Is Planned |
 |------|-----------------|
 | `/Users/cdeachaval/learn/kitchen/docs/plans/LEAD_INTEREST_ALERT_CRONS.md` | Zipcode + city alert crons — notify leads when new restaurants open in their area |
+| `/Users/cdeachaval/learn/kitchen/docs/plans/market-status-cron.md` | Daily cron to auto-flip `market_info.status` between `active`/`inactive` based on a forward coverage window. Complements the admin-maintained status model shipped with the country-filter feature. |
 
 ### Security & Infrastructure
 
