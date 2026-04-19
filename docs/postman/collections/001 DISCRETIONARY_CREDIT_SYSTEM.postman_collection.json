@@ -293,7 +293,7 @@
                   "// Find first customer user (enriched endpoint includes role_type)",
                   "if (Array.isArray(response)) {",
                   "    const customerUser = response.find(user => {",
-                  "        const isCustomer = user.role_type === 'Customer';",
+                  "        const isCustomer = user.role_type === 'customer';",
                   "        const notArchived = !user.is_archived;",
                   "        return isCustomer && notArchived;",
                   "    });",

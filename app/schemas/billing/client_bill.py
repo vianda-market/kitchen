@@ -11,8 +11,8 @@ from app.config import Status
 
 
 class ClientBillUpdateSchema(BaseModel):
-    amount: float | None
-    currency_code: str | None
+    amount: float | None = None
+    currency_code: str | None = None
     # is_archived field removed - can only be modified via DELETE API
     status: Status | None = None
 

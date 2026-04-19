@@ -68,11 +68,11 @@ print(f'{drop:.1f}')
 
     exceeds=$(python3 -c "print('yes' if float('${drop}') > ${MAX_DROP} else 'no')")
 
-    ((checked++))
+    checked=$((checked + 1))
 
     if [ "$exceeds" = "yes" ]; then
         echo "  ✘ ${filepath}: MI ${baseline_mi} → ${current_mi} (dropped ${drop} points)"
-        ((failed++))
+        failed=$((failed + 1))
     fi
 done <<< "$files"
 
