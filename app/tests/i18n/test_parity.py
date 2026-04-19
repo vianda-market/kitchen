@@ -12,6 +12,8 @@ from app.i18n.messages import MESSAGES
 
 REFERENCE_LOCALE = "en"
 
+pytestmark = pytest.mark.parity
+
 
 def _non_reference_locales(catalog: dict[str, dict]) -> list[str]:
     return sorted(loc for loc in catalog if loc != REFERENCE_LOCALE)

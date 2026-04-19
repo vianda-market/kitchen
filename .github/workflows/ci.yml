@@ -10,48 +10,57 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Required by dorny/paths-filter to read changed files on pull_request events.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
-  lint:
-    name: Lint & Format
+  # ──────────────────────────────────────────────────────────────────────────
+  # changes: compute path filters once. Heavy jobs key off `app-relevant` to
+  # skip on docs-only PRs. Never set to false on push to main — main must
+  # always carry the full signal even on a docs commit, so we hard-true it.
+  # ──────────────────────────────────────────────────────────────────────────
+  changes:
+    name: Detect Changed Paths
     runs-on: ubuntu-latest
+    outputs:
+      app-relevant: ${{ steps.filter.outputs.app-relevant }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          python-version: "3.14"
-          allow-prereleases: true
+          # On push to main, force every filter true (paths-filter returns
+          # `true` for all keys when base is unset and ref-name matches `main`,
+          # but we set `predicate-quantifier: every` and an explicit pattern to
+          # be safe). For PRs, paths-filter diffs PR head vs base.
+          predicate-quantifier: "some"
+          filters: |
+            app-relevant:
+              - 'app/**'
+              - 'application.py'
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+              - 'pytest.ini'
+              - '.importlinter'
+              - '.bandit-baseline.json'
+              - '.sqlfluff*'
+              - '.vulture-baseline.txt'
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
 
-      - name: Install ruff
-        run: pip install ruff>=0.8.0
-
-      - name: Ruff check
-        run: ruff check .
-
-      - name: Ruff format check
-        run: ruff format --check .
-
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-          cache: pip
-          cache-dependency-path: requirements-test.txt
-
-      - name: Install dependencies
-        run: pip install -r requirements-test.txt
-
-      - name: Run mypy (baseline-filtered)
-        run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
-
-  layers:
-    name: Layer Boundaries
+  # ──────────────────────────────────────────────────────────────────────────
+  # fast-checks: every cheap gate that only needs Python + the test
+  # requirements. Consolidated from 8 separate jobs (lint, typecheck, layers,
+  # complexity, deadcode, security, bandit, sqllint) so we pay `pip install`
+  # once instead of 8×. Saves ~4 min of pure install time per PR.
+  #
+  # Secret scanning stays separate because it needs full git history and
+  # downloads the gitleaks binary.
+  # ──────────────────────────────────────────────────────────────────────────
+  fast-checks:
+    name: Fast Checks (lint, types, layers, complexity, security)
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
@@ -59,6 +68,9 @@ jobs:
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # complexity_strict + maintainability diff against origin/main.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -67,161 +79,86 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-test.txt
 
-      - name: Install dependencies
-        run: pip install -r requirements-test.txt
+      - name: Install test + lint dependencies
+        # requirements-test.txt pins ruff, mypy, lint-imports, radon, vulture,
+        # pip-audit, bandit, sqlfluff. pip-licenses is installed inline because
+        # it's only used by this gate and not by local development.
+        run: |
+          pip install -r requirements-test.txt
+          pip install pip-licenses>=5.0
 
-      - name: Check import boundaries
-        # Local equivalent:  lint-imports
-        # Contracts defined in .importlinter
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Mypy (baseline-filtered)
+        run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
+
+      - name: Import boundaries
+        # Local: lint-imports — contracts in .importlinter
         run: lint-imports
 
-  complexity:
-    name: Complexity Gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-
-      - name: Install radon
-        run: pip install radon>=5.1.0
-
-      - name: Check complexity (repo-wide, CC ≤ 25)
+      - name: Complexity (repo-wide, CC ≤ 25)
         run: bash scripts/check_complexity.sh
 
-      - name: Check maintainability index (>5% drop = fail)
-        # Local equivalent:  bash scripts/check_maintainability.sh
-        # Uses radon mi to compare changed files vs origin/main.
+      - name: Maintainability index (>5% drop = fail)
         run: bash scripts/check_maintainability.sh
 
-      - name: Check complexity (strict, CC ≤ 15 on changed files)
-        # Tighter gate: functions in files you touched must be CC ≤ 15.
-        # Pre-existing complexity is allowed if baselined.
-        # Local equivalent:  bash scripts/check_complexity_strict.sh
+      - name: Complexity (strict, CC ≤ 15 on changed files)
         run: bash scripts/check_complexity_strict.sh
 
-  deadcode:
-    name: Dead Code Gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-
-      - name: Install vulture
-        run: pip install vulture>=2.14
-
-      - name: Check dead code
-        # Local equivalent:  bash scripts/check_vulture.sh
-        # Baseline update:   bash scripts/check_vulture.sh --update
+      - name: Dead code (vulture, baselined)
         run: bash scripts/check_vulture.sh
 
-  security:
-    name: Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-
-      - name: Install pip-audit + pip-licenses
-        run: pip install pip-audit>=2.7.0 pip-licenses>=5.0
-
-      - name: Audit production dependencies
-        run: pip-audit -r requirements.txt
-
-      - name: Install production dependencies (for license inspection)
-        # pip-licenses reads installed package metadata, so requirements.txt
-        # must be installed in the current env before the gate runs.
-        run: pip install -r requirements.txt
-
-      - name: Check license compliance
-        # Local equivalent:
-        #   pip install -r requirements.txt pip-licenses
-        #   python scripts/check_licenses.py
-        # Allowlist (MIT/Apache/BSD/ISC/MPL/PSF) + per-package exemptions
-        # for google-crc32c, google-ads, facebook_business (ambiguous
-        # metadata) and psycopg2-binary, pycountry (LGPL, dynamic-linked).
-        run: python scripts/check_licenses.py
-
-  bandit:
-    name: Security Lint (Bandit)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-
-      - name: Install bandit
-        run: pip install bandit>=1.9.0
-
-      - name: Run bandit (high severity, baselined)
-        # Local equivalent:
-        #   bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
-        # Baseline update:
-        #   bandit -r app/ -lll --exclude app/tests -f json -o .bandit-baseline.json
+      - name: Bandit (high severity, baselined)
         run: bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
 
-  sqllint:
-    name: SQL Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-
-      - name: Install sqlfluff
-        run: pip install sqlfluff>=3.0.0
-
-      - name: Lint new SQL files
-        # Local equivalent:  bash scripts/check_sqlfluff.sh
-        # Existing files baselined in .sqlfluff-baseline.txt.
+      - name: SQL lint (sqlfluff, baselined)
         run: bash scripts/check_sqlfluff.sh
 
+      - name: Audit production dependencies (pip-audit)
+        run: pip-audit -r requirements.txt
+
+      - name: Install production dependencies for license inspection
+        run: pip install -r requirements.txt
+
+      - name: License compliance
+        run: python scripts/check_licenses.py
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # secrets: separate job because it needs `fetch-depth: 0` and the gitleaks
+  # binary (gitleaks-action requires a paid license for org repos).
+  # ──────────────────────────────────────────────────────────────────────────
   secrets:
-    name: Secret Scanning
+    name: Secret Scanning (Gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history on push to main; the action limits to PR diff on pull_request.
           fetch-depth: 0
 
       - name: Install gitleaks
-        # gitleaks-action@v2 requires a paid license for org repos.
-        # The CLI binary is free — download from GitHub releases.
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
             | tar xz -C /usr/local/bin gitleaks
 
       - name: Gitleaks
-        # Local equivalent:  gitleaks detect --source . --verbose
-        # Allowlisted fingerprints in .gitleaksignore (false positives from docs).
+        # Local: gitleaks detect --source . --verbose
+        # Allowlisted fingerprints in .gitleaksignore.
         run: gitleaks detect --source . --verbose --redact
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # test: pytest. Gated behind fast-checks so a syntax error doesn't waste
+  # a Python boot. Skipped on docs-only PRs (changes.app-relevant=false) but
+  # always runs on push to main.
+  # ──────────────────────────────────────────────────────────────────────────
   test:
     name: Unit Tests
+    needs: [changes, fast-checks]
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
-    # app.config.Settings loads at import time and requires these three fields
-    # (all other Settings fields have defaults). Without them, pytest fails at
-    # collection with pydantic ValidationError before any test runs.
     env:
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
@@ -243,22 +180,11 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Verify test collection
-        # Catches import errors, missing deps, and broken fixtures before
-        # running the full suite. Fails fast with a clear error message.
-        # Local equivalent:
-        #   pytest --collect-only -q --ignore=app/tests/database
-        run: >
-          pytest
-          --collect-only -q
-          --ignore=app/tests/database
+        run: pytest --collect-only -q --ignore=app/tests/database
 
       - name: Run unit tests
-        # Route and database tests use TestClient/psycopg2 against a live Postgres.
-        # Per CLAUDE.md, routes+services are tested via Postman (acceptance job).
-        # Local equivalent:
-        #   pytest -m "not integration and not database and not slow" \
-        #     --ignore=app/tests/database --ignore=app/tests/routes \
-        #     --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
+        # Routes/services tested via Postman (acceptance job). pytest scope:
+        # app/utils, app/gateways, app/auth, app/security, app/i18n + smoke + policy.
         run: >
           pytest
           -m "not integration and not database and not slow"
@@ -272,24 +198,32 @@ jobs:
           -q
 
       - name: Diff coverage gate (changed lines only, >=80%)
-        # Per CLAUDE.md, app/routes/ and app/services/ are tested via Postman
-        # (acceptance job) — pytest is reserved for app/utils, app/gateways,
-        # app/auth, app/security. Excluding routes+services from this gate keeps
-        # it consistent with the unit-test job above (which already
-        # --ignore=app/tests/routes) instead of failing every route/service PR
-        # for "missing pytest coverage" that policy explicitly forbids.
-        # Local equivalent:
-        #   diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 \
-        #     --exclude "app/routes/*" --exclude "app/services/*"
-        # On main, HEAD == origin/main so the diff is empty and the gate passes trivially.
+        # Routes/services excluded — they're tested via Postman per CLAUDE.md.
         run: >
           diff-cover coverage.xml
           --compare-branch=origin/main
           --fail-under=80
           --exclude "*app/routes/*" "*app/services/*"
 
+      - name: CRAP analysis (non-blocking signal)
+        # Ranks complex + under-tested functions using coverage.xml from the
+        # previous step. Currently advisory only — flip to blocking once we
+        # have a baseline of "tolerable CRAP" and a reduction trend on main
+        # (mirrors vianda-platform's non-blocking → blocking pattern).
+        # Plan to flip: when no function in app/utils, app/auth, app/security
+        # exceeds CRAP > 100 for two consecutive weeks on main.
+        continue-on-error: true
+        run: python scripts/analyze_crap.py --top 30 || true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # acceptance: Newman against a real Postgres + uvicorn. By far the heaviest
+  # job (~5+ min). Gated behind fast-checks so a typo doesn't burn the boot;
+  # skipped on docs-only PRs but always runs on push to main.
+  # ──────────────────────────────────────────────────────────────────────────
   acceptance:
     name: Acceptance Tests (Newman)
+    needs: [changes, fast-checks]
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -312,8 +246,6 @@ jobs:
       DB_NAME: kitchen
       DB_USER: kitchen
       DB_PASSWORD: kitchen
-      # libpq reads PGPASSWORD; build_kitchen_db.sh calls psql without -W.
-      # Without this, psql prompts interactively → auth failure in CI.
       PGPASSWORD: kitchen
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
@@ -350,7 +282,6 @@ jobs:
         run: |
           uvicorn application:app --host 0.0.0.0 --port 8000 &
           echo $! > /tmp/server.pid
-          # Wait for server to be ready
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8000/docs > /dev/null 2>&1; then
               echo "Server ready after ${i}s"
