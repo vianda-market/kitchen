@@ -11,7 +11,22 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, status
 
+from app.schemas.billing.client_bill import ClientBillUpdateSchema
 from app.services.client_bill_service import client_bill_business_service
+
+
+class TestClientBillUpdateSchema:
+    """Schema accepts partial payloads (all fields optional with None defaults)."""
+
+    def test_empty_payload_is_valid(self):
+        schema = ClientBillUpdateSchema()
+        assert schema.amount is None
+        assert schema.currency_code is None
+
+    def test_partial_payload_only_currency(self):
+        schema = ClientBillUpdateSchema(currency_code="ARS")
+        assert schema.currency_code == "ARS"
+        assert schema.amount is None
 
 
 class TestClientBillService:
