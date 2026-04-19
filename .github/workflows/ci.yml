@@ -286,8 +286,7 @@ jobs:
           diff-cover coverage.xml
           --compare-branch=origin/main
           --fail-under=80
-          --exclude "*app/routes/*"
-          --exclude "*app/services/*"
+          --exclude "*app/routes/*" "*app/services/*"
 
   acceptance:
     name: Acceptance Tests (Newman)

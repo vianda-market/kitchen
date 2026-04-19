@@ -65,6 +65,7 @@ def _require_country_code(country_code: str | None) -> str:
         raise HTTPException(status_code=400, detail="country_code is required")
     return normalized
 
+
 # -----------------------------------------------------------------------------
 # Public markets (no auth): rate limit and cache — country_code + country_name only
 # -----------------------------------------------------------------------------
@@ -471,4 +472,3 @@ async def submit_restaurant_interest(
             detail="Invalid restaurant lead data. Check referral_source and cuisine_ids.",
         )
     return RestaurantLeadResponseSchema(**row)
-
