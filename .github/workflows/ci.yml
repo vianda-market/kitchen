@@ -272,10 +272,22 @@ jobs:
           -q
 
       - name: Diff coverage gate (changed lines only, >=80%)
+        # Per CLAUDE.md, app/routes/ and app/services/ are tested via Postman
+        # (acceptance job) — pytest is reserved for app/utils, app/gateways,
+        # app/auth, app/security. Excluding routes+services from this gate keeps
+        # it consistent with the unit-test job above (which already
+        # --ignore=app/tests/routes) instead of failing every route/service PR
+        # for "missing pytest coverage" that policy explicitly forbids.
         # Local equivalent:
-        #   diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
+        #   diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 \
+        #     --exclude "app/routes/*" --exclude "app/services/*"
         # On main, HEAD == origin/main so the diff is empty and the gate passes trivially.
-        run: diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
+        run: >
+          diff-cover coverage.xml
+          --compare-branch=origin/main
+          --fail-under=80
+          --exclude "app/routes/*"
+          --exclude "app/services/*"
 
   acceptance:
     name: Acceptance Tests (Newman)

@@ -12,6 +12,7 @@ timezone and currency_metadata.currency_name compatibility columns are no longer
 read by this module.
 """
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -136,7 +137,9 @@ def market_has_active_plate_coverage(market_id: UUID, db) -> bool:
         connection=db,
         fetch_one=True,
     )
-    return bool(row and row["has_coverage"])
+    if not isinstance(row, dict):
+        return False
+    return bool(row.get("has_coverage"))
 
 
 def get_markets_with_coverage(db) -> list[dict]:
@@ -581,7 +584,7 @@ class MarketService:
 
         return self.get_billing_config(market_id, db)
 
-    def get_billing_propagation_preview(self, market_id: UUID, db) -> dict:
+    def get_billing_propagation_preview(self, market_id: UUID, db: Any) -> dict:
         """Preview which suppliers inherit billing config from this market.
         Read-only — returns affected suppliers with their effective values."""
         config = self.get_billing_config(market_id, db)

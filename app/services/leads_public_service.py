@@ -326,7 +326,9 @@ def get_lead_interests(
         tuple(params) + (page_size, offset),
         connection=db,
     )
-    return ([dict(r) for r in rows] if rows else [], total)
+    if not rows or isinstance(rows, dict):
+        return ([], total)
+    return ([dict(r) for r in rows], total)
 
 
 # ---------------------------------------------------------------------------

@@ -50,8 +50,8 @@ from app.routes.favorite import router as favorite_router
 from app.routes.institution_entity import router as institution_entity_router
 
 # Leads (unauthenticated, rate-limited)
-from app.routes.leads import public_router as leads_public_router
 from app.routes.leads import router as leads_router
+from app.routes.leads_country import public_router as leads_public_router
 from app.routes.main import router as main_router
 from app.routes.national_holidays import router as national_holidays_router
 from app.routes.notification_banner import router as notification_banner_router
