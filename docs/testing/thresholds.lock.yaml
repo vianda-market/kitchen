@@ -1,0 +1,72 @@
+# Machine-readable mirror of docs/testing/THRESHOLDS.md.
+#
+# scripts/check_thresholds_parity.py reads this file and asserts that every
+# `value` matches the captured group in every listed `pattern` of every
+# listed `file`, and that the same value appears in THRESHOLDS.md.
+# CI runs the parity check on every push and PR via the fast-checks job.
+#
+# When you bump a threshold, update all three in the same PR:
+#   1. The source file (ci.yml, scripts/check_*, pyproject.toml, …).
+#   2. The matching `value` here.
+#   3. The row in docs/testing/THRESHOLDS.md.
+#
+# If you forget any one, CI fails and tells you which one is out of step.
+# Pattern lifted from infra-kitchen-gcp; same shape across every Vianda repo.
+
+gates:
+  - name: diff-coverage
+    value: 80
+    sources:
+      - file: .github/workflows/ci.yml
+        # diff-cover invocation is YAML-folded across multiple lines in ci.yml;
+        # anchor on `--fail-under` alone and rely on uniqueness (only one such
+        # flag exists in the workflow — --cov-fail-under has its own prefix).
+        pattern: '^          --fail-under=(\d+)$'
+
+  - name: max-cc-repo-wide
+    value: 25
+    sources:
+      - file: scripts/check_complexity.sh
+        pattern: 'MAX_CC="\$\{MAX_COMPLEXITY:-(\d+)\}"'
+
+  - name: max-cc-strict-changed
+    value: 15
+    sources:
+      - file: scripts/check_complexity_strict.sh
+        pattern: 'STRICT_CC=(\d+)'
+
+  - name: maintainability-max-drop
+    value: 5
+    sources:
+      - file: scripts/check_maintainability.sh
+        pattern: 'MAX_DROP=(\d+)'
+
+  - name: layer-coverage-utils
+    value: 40
+    sources:
+      - file: scripts/check_coverage_floor.py
+        pattern: '"utils": (\d+)\.0,'
+
+  - name: layer-coverage-auth
+    value: 25
+    sources:
+      - file: scripts/check_coverage_floor.py
+        pattern: '"auth": (\d+)\.0,'
+
+  - name: layer-coverage-security
+    value: 20
+    sources:
+      - file: scripts/check_coverage_floor.py
+        pattern: '"security": (\d+)\.0,'
+
+  - name: layer-coverage-gateways
+    value: 45
+    sources:
+      - file: scripts/check_coverage_floor.py
+        pattern: '"gateways": (\d+)\.0,'
+
+  - name: layer-coverage-i18n
+    value: 30
+    sources:
+      - file: scripts/check_coverage_floor.py
+        pattern: '"i18n": (\d+)\.0,'
