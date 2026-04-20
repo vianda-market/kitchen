@@ -367,3 +367,9 @@ jobs:
           results='${{ toJSON(needs) }}'
           echo "$results" | jq .
           echo "$results" | jq -e '[.[] | .result] | all(. == "success" or . == "skipped")' > /dev/null
+
+      - name: Notify Claude routine on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: ./.github/actions/notify-routine
+        with:
+          routine-token: ${{ secrets.CLAUDE_CI_ROUTINE_TOKEN }}
