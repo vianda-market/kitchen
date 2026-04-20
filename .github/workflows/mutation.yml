@@ -1,17 +1,68 @@
 name: Mutation Testing
 
+# Mutation testing against Tier 1 critical business logic (money/credits).
+# Scope and tool: see [tool.mutmut] in pyproject.toml.
+#
+# Two modes:
+#   - pull_request (path-scoped): incremental run; restores the cache built
+#     by the last push to main and re-mutates only what's changed.
+#   - push: main: refreshes the cache so subsequent PRs start warm.
+#   - workflow_dispatch: manual re-runs (rebaselines, config changes).
+#
+# No `schedule:` cron. Drift is caught by per-PR + per-main-push runs.
+#
+# Seeding: the main-branch cache is seeded by a one-off dispatch on main with
+# timeout-minutes temporarily bumped to 360. See docs/testing/MUTATION_SEEDING.md.
+#
+# Forked-PR caveat: GitHub Actions cannot read cache across repo boundaries,
+# so forked PRs do a cold re-run (slow). All Vianda repos are private today,
+# so this is a non-issue.
+
 on:
-  # Manual trigger from GitHub Actions UI
+  pull_request:
+    branches: [main]
+    paths:
+      # Stay in sync with [tool.mutmut].paths_to_mutate in pyproject.toml.
+      - "app/services/credit_validation_service.py"
+      - "app/services/credit_loading_service.py"
+      - "app/services/discretionary_service.py"
+      - "app/services/billing/institution_billing.py"
+      # Re-run whenever the tests change — a test edit can turn a killed
+      # mutant into a survivor even if the target code is untouched.
+      - "app/tests/services/**"
+      # Re-run whenever the config changes.
+      - "pyproject.toml"
+      - ".github/workflows/mutation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/services/credit_validation_service.py"
+      - "app/services/credit_loading_service.py"
+      - "app/services/discretionary_service.py"
+      - "app/services/billing/institution_billing.py"
+      - "app/tests/services/**"
+      - "pyproject.toml"
+      - ".github/workflows/mutation.yml"
   workflow_dispatch:
-  # Weekly schedule — Sunday midnight UTC
-  schedule:
-    - cron: "0 0 * * 0"
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   mutate:
     name: Mutation Tests (Tier 1)
     runs-on: ubuntu-latest
+    # 60 min is the normal incremental budget. The seeding PR bumps this to
+    # 360 one time — do not leave it elevated.
     timeout-minutes: 60
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -25,21 +76,72 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-test.txt
 
+      # Restore mutmut's cache. On PRs, the restore-keys fallback to the
+      # latest main-branch cache so PR runs don't start cold. On push to
+      # main, this writes the fresh cache back (see cache-hit logic below).
+      - name: Restore mutmut cache
+        uses: actions/cache@v4
+        with:
+          path: .mutmut-cache
+          key: mutmut-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            mutmut-${{ github.ref }}-
+            mutmut-refs/heads/main-
+
       - name: Run mutation tests
+        # mutmut run is incremental by default: files it has already seen
+        # are skipped unless the source or tests changed. The cache hydrated
+        # above is what makes PR runs fast.
         run: mutmut run
 
-      - name: Show results
+      - name: Results summary
         if: always()
         run: mutmut results
 
-      - name: Check for survivors
+      - name: Write GitHub step summary
+        # Surface the headline score + any survivors directly in the PR's
+        # Actions tab — nobody reads the HTML report otherwise.
         if: always()
+        run: |
+          {
+            echo "## Mutation Testing — Tier 1 Results"
+            echo ""
+            echo "**Scope:** credit_validation, credit_loading, discretionary, institution_billing"
+            echo ""
+            echo "\`\`\`"
+            mutmut results 2>&1 | head -100
+            echo "\`\`\`"
+            survivors=$(mutmut results 2>&1 | grep -cE "^  [0-9]+-[0-9]+$|^[0-9]+$" || true)
+            if [ "${survivors:-0}" -gt 0 ]; then
+              echo ""
+              echo "⚠️ **Survivors present.** Run \`mutmut show <id>\` locally to inspect each one."
+            else
+              echo ""
+              echo "✅ All mutants killed."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate HTML report
+        if: always()
+        run: mutmut html || true
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutmut-report-${{ github.run_id }}
+          path: html/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Check for survivors (warn only)
+        # Intentionally non-blocking for now. Flip `continue-on-error: false`
+        # and exit non-zero once we have a stable baseline kill-rate on main
+        # and have published a `break` threshold in docs/testing/THRESHOLDS.md.
+        continue-on-error: true
         run: |
           survivors=$(mutmut results 2>&1 | grep -c "survived" || true)
           echo "Survived mutants: $survivors"
           if [ "$survivors" -gt 0 ]; then
-            echo ""
-            echo "::warning::$survivors mutant(s) survived — tests did not catch these code mutations"
-            echo ""
-            echo "Run 'mutmut show <name>' locally to inspect each survivor"
+            echo "::warning::$survivors mutant(s) survived — tests did not catch these mutations"
           fi
