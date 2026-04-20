@@ -90,7 +90,32 @@ def load_layer_coverage(xml_path: Path) -> dict[str, float]:
     return weighted
 
 
+def suggest_mode() -> int:
+    """Print the current weighted coverage per layer + next-ratchet suggestion."""
+    weighted = load_layer_coverage(Path("coverage.xml"))
+    print("Per-layer ratchet suggestions:")
+    print(f"  {'LAYER':10s} {'MEASURED':>9s}  {'FLOOR':>6s}  {'NEXT':>6s}")
+    for layer, floor in LAYER_FLOORS.items():
+        measured = weighted.get(layer)
+        if measured is None:
+            print(f"  {layer:10s} {'—':>9s}  {floor:5.1f}%  —      no matching files")
+            continue
+        # Safe next bump = halfway between current floor and measured, rounded down.
+        # Guarantees the floor stays below measured and leaves headroom to absorb
+        # a small regression in the next PR.
+        safe_next = int(floor + (measured - floor) / 2) if measured > floor else int(floor)
+        suffix = "  at-or-below floor — add tests" if measured <= floor else ""
+        print(f"  {layer:10s} {measured:8.1f}%  {floor:5.1f}%  {safe_next:5d}%{suffix}")
+    print(
+        "\nTo bump, edit LAYER_FLOORS in scripts/check_coverage_floor.py, update the matching "
+        "row in docs/testing/THRESHOLDS.md, and update docs/testing/thresholds.lock.yaml."
+    )
+    return 0
+
+
 def main() -> int:
+    if "--suggest" in sys.argv:
+        return suggest_mode()
     weighted = load_layer_coverage(Path("coverage.xml"))
     failures: list[str] = []
     print("Layer coverage floor check:")
