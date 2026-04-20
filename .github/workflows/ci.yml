@@ -205,6 +205,14 @@ jobs:
           --fail-under=80
           --exclude "*app/routes/*" "*app/services/*"
 
+      - name: Per-layer coverage floor (absolute)
+        # Complements diff-cover (changed lines) with an absolute floor on
+        # testable layers (utils, auth, security, gateways, i18n). Catches
+        # the case where someone deletes tests without changing source code.
+        # Floors baselined 2026-04-19 with ~5pt buffer below measured reality.
+        # Raise in small steps via scripts/coverage_ratchet.py output.
+        run: python scripts/check_coverage_floor.py
+
       - name: CRAP analysis (non-blocking signal)
         # Ranks complex + under-tested functions using coverage.xml from the
         # previous step. Currently advisory only — flip to blocking once we
