@@ -11,8 +11,10 @@ name: Mutation Testing
 #
 # No `schedule:` cron. Drift is caught by per-PR + per-main-push runs.
 #
-# Seeding: the main-branch cache is seeded by a one-off dispatch on main with
-# timeout-minutes temporarily bumped to 360. See docs/testing/MUTATION_SEEDING.md.
+# Seeding: no ceremony needed. The initial cold run on main took 2m49s for
+# Tier-1 scope (790 mutants) — well inside the 60-min default. A seeding
+# PR was attempted (PR #29, timeout bumped to 360) but that was predicated
+# on a Stryker assumption that doesn't hold for mutmut at this scope.
 #
 # Forked-PR caveat: GitHub Actions cannot read cache across repo boundaries,
 # so forked PRs do a cold re-run (slow). All Vianda repos are private today,
@@ -56,10 +58,8 @@ jobs:
   mutate:
     name: Mutation Tests (Tier 1)
     runs-on: ubuntu-latest
-    # TEMP: bumped from 60 → 360 for the one-time cache-seeding run on main.
-    # Revert to 60 in the immediate follow-up PR after confirming the
-    # main-branch cache exists. See docs/testing/MUTATION_SEEDING.md.
-    timeout-minutes: 360
+    # Cold Tier-1 run measured at 2m49s; incremental runs are faster.
+    timeout-minutes: 60
     env:
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
@@ -83,7 +83,11 @@ jobs:
       - name: Restore mutmut cache
         uses: actions/cache@v4
         with:
-          path: .mutmut-cache
+          # mutmut 3.x stores all state (incremental + HTML report) in the
+          # `mutants/` directory. The mutmut-2 name `.mutmut-cache/` is
+          # obsolete and caused silent "Path does not exist" warnings on
+          # the first main run — cache was never written.
+          path: mutants
           key: mutmut-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             mutmut-${{ github.ref }}-

@@ -1,58 +1,50 @@
-# Seeding the mutation-testing cache
+# Mutation-testing cache — how it works in kitchen
 
-This is the one-time procedure for populating the main-branch mutmut cache that PR runs restore from. Follow when:
+**Short version:** kitchen does not need a seeding ceremony. The first cold run of the Tier-1 scope on main completed in **2m49s** (790 mutants, 415 killed, 276 survived). Every subsequent run — PR or push — uses `actions/cache@v4` with a `mutmut-refs/heads/main-` fallback to hydrate from the last main-branch run.
 
-- First wiring up mutation CI.
-- Changing `[tool.mutmut].paths_to_mutate` in `pyproject.toml` (invalidates the current cache).
-- `mutmut` is upgraded across a major version.
+This doc exists for the case where the Tier-1 scope grows large enough that a cold run exceeds the 60-minute job timeout, at which point a seeding ceremony becomes necessary. That threshold hasn't been reached and isn't expected in the near term.
 
-Pattern lifted from the Stryker "enterprise cold-baseline" approach described in `infra-kitchen-gcp/docs/testing/CROSS_REPO_PROMPT.md`; adapted for mutmut.
+## Why no ceremony today
 
-## Why
+The "enterprise-seeded baseline" procedure (originally documented from `infra-kitchen-gcp/docs/testing/CROSS_REPO_PROMPT.md`) is a Stryker pattern where cold mutation runs routinely take hours because of static-mutant explosion in JavaScript codebases. For mutmut on a 4-service Python scope there is no static-mutant equivalent — the cold run is small enough that the default 60-minute timeout is generous.
 
-`mutmut run` is incremental: it reuses killed-mutant state from `.mutmut-cache/` and only re-mutates what changed. Without a seeded cache, every PR's first run is cold — tens of minutes to hours on Tier-1 scope. The GitHub-hosted runner hard cap is 360 minutes; nothing above that helps.
+PR #29 executed the 360-min-bump procedure unnecessarily. The follow-up fix dropped `timeout-minutes` back to 60 and corrected an independent bug: the cache path was `.mutmut-cache/` (mutmut 2 layout), which does not exist at runtime under mutmut 3.x. Cache writes were silently failing. The path is now `mutants/` — mutmut 3's actual state directory.
 
-With a seeded main-branch cache, `actions/cache@v4`'s `restore-keys` fallback hydrates every PR with the main cache, so subsequent runs are seconds-to-minutes on incremental.
+## Cache flow today
 
-## Procedure
+```
+push: main     →  actions/cache@v4 saves mutants/ under key mutmut-refs/heads/main-<sha>
+pull_request   →  actions/cache@v4 restores the most recent mutmut-refs/heads/main- key
+                  (via restore-keys fallback); mutmut run does incremental work only
+```
 
-1. **Open the seed PR.** Bump `timeout-minutes: 60` to `timeout-minutes: 360` in `.github/workflows/mutation.yml`. Commit with a message making the temporary nature explicit (e.g. `ci(mutation): TEMP 360-min timeout for cache seed — revert in follow-up PR`). Do not change anything else in the same PR.
+Forked PRs cannot read the cache across repo boundaries. All Vianda repos are private, so no impact today.
 
-2. **Merge the seed PR.** The merge triggers a `push: main` run under the elevated timeout. Monitor:
+## When you would actually need to seed
 
-   ```bash
-   gh run watch --exit-status
-   ```
+If, after enlarging `[tool.mutmut].paths_to_mutate` in `pyproject.toml`, a cold main-branch run starts approaching 60 minutes:
 
-   Expected wall time: tens of minutes to a couple of hours for Tier-1 scope. If the run hits 360 minutes, the scope is too broad for a single cold run — narrow `paths_to_mutate`, open a separate "shrink scope" PR, merge, then retry seeding.
-
-3. **Confirm the cache was written.**
+1. Open a PR that bumps `timeout-minutes: 60` → a value that comfortably covers the new cold run time (GitHub's hard cap is 360 minutes).
+2. Merge. The `push: main` run kicks off under the elevated timeout and writes the cache.
+3. Confirm:
 
    ```bash
    gh cache list --limit 20 | grep "mutmut-refs/heads/main-"
    ```
 
-   A row whose key starts with `mutmut-refs/heads/main-` and size is non-trivial (typically tens to hundreds of MB) confirms the cache is hydrated. If no row appears, the run likely failed partway — inspect the logs and re-dispatch.
-
-4. **Open the revert PR.** Drop `timeout-minutes` back to `60`. Merge. Do **not** trigger another `push: main` mutation run from this PR — the change is workflow-only and doesn't touch the mutation scope, so the `paths:` filter on `push: main` will skip the job.
-
-5. **Verify with a real PR.** Open any PR that touches a mutated file. Confirm the mutation job:
-   - starts within seconds,
-   - logs `Cache restored successfully` (with a restore-key matching `mutmut-refs/heads/main-`),
-   - finishes in minutes, not hours.
-
-## Don't do these
-
-- **Don't** raise `timeout-minutes` above 360 — GitHub silently caps at the runner hard limit.
-- **Don't** merge the revert PR without waiting for the seed run to finish. If the revert merges first, the next `push: main` uses 60 minutes and the cold seed run dies halfway.
-- **Don't** `gh cache delete` the seeded cache casually. If you need to invalidate (e.g. mutmut version bump), repeat the seeding procedure; don't trust that PRs will transparently rebuild it.
-- **Don't** try to seed from a forked PR. GitHub Actions cannot write the parent repo's cache from a fork.
+   The cache row is typically tens to hundreds of MB once `mutants/` contains results for every file in scope.
+4. Open a revert PR dropping `timeout-minutes` back to 60. Subsequent PRs restore from the seeded cache and finish in minutes.
 
 ## Drift check
 
-The `pull_request` and `push: main` triggers in `mutation.yml` have a `paths:` filter. That list must stay in sync with `[tool.mutmut].paths_to_mutate` in `pyproject.toml`:
+The `pull_request` and `push: main` triggers in `mutation.yml` have a `paths:` filter that must stay in sync with `[tool.mutmut].paths_to_mutate` in `pyproject.toml`:
 
 - Add a file to `paths_to_mutate` → add it to both `paths:` blocks in the workflow.
 - Shrink scope → shrink both.
 
-Drift here means either under-run (silent coverage loss: a mutated file's PRs skip the job) or over-run (workflow fires when the mutated code didn't change).
+Drift means either under-run (silent coverage loss: a mutated file's PRs skip the job) or over-run (workflow fires when the mutated code didn't change).
+
+## Also watch out for
+
+- **mutmut version bumps.** Major upgrades have changed the cache layout (2.x → 3.x moved from `.mutmut-cache/` to `mutants/`). If a future mutmut version changes the state directory again, `actions/cache@v4` will silently warn `Path does not exist` and cache writes stop. Check the post-run logs for that warning on the first push-to-main after a bump.
+- **Forked PRs.** Cache is not shared across repo boundaries. If Vianda ever open-sources a repo running this workflow, expect cold runs on community PRs.
