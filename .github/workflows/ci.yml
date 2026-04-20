@@ -10,7 +10,8 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Required by dorny/paths-filter to read changed files on pull_request events.
+# dorny/paths-filter needs pull-requests:read. The coverage PR-comment step
+# in the `test` job needs pull-requests:write; set at job level (below).
 permissions:
   contents: read
   pull-requests: read
@@ -159,6 +160,12 @@ jobs:
     needs: [changes, fast-checks]
     if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
+    # Needed by the sticky PR coverage comment step at the end. contents:read
+    # is inherited; pull-requests elevated from workflow-level `read` to
+    # `write` for gh pr comment / PATCH on issue comments.
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
@@ -212,6 +219,19 @@ jobs:
         # Floors baselined 2026-04-19 with ~5pt buffer below measured reality.
         # Raise in small steps via scripts/coverage_ratchet.py output.
         run: python scripts/check_coverage_floor.py
+
+      - name: Post sticky PR coverage comment
+        # Builds a single markdown comment from coverage.xml and updates it
+        # in place on every push via an HTML marker. Non-blocking — if this
+        # fails we don't want to red-flag the PR, the comment is informational.
+        # Skipped on push to main (no PR number) and on forked PRs (no
+        # pull-requests:write available cross-repo).
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash scripts/build_pr_coverage_comment.sh
 
       - name: CRAP analysis (non-blocking signal)
         # Ranks complex + under-tested functions using coverage.xml from the
