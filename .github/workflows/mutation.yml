@@ -150,3 +150,9 @@ jobs:
           if [ "$survivors" -gt 0 ]; then
             echo "::warning::$survivors mutant(s) survived — tests did not catch these mutations"
           fi
+
+      - name: Notify Claude routine on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: ./.github/actions/notify-routine
+        with:
+          routine-token: ${{ secrets.CLAUDE_CI_ROUTINE_TOKEN }}

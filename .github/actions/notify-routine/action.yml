@@ -1,0 +1,46 @@
+name: Notify Claude routine
+description: >
+  POSTs to the Claude Code routine /fire endpoint so a remote session is
+  spawned to triage the failed PR. Expects the caller to gate with
+  `if: failure() && github.event_name == 'pull_request'` — this composite
+  does not re-check job status on its own because `failure()` inside a
+  composite scopes to the composite, not the parent job.
+
+inputs:
+  routine-token:
+    required: true
+    description: Secret bearer token for the routine (repo secret CLAUDE_CI_ROUTINE_TOKEN).
+  trigger-id:
+    required: false
+    default: trig_01JB3WQ9xyrye1UUFyHyDbBs
+    description: Claude Code routine trigger ID. Default points at the shared "CI failure investigator" routine.
+
+runs:
+  using: composite
+  steps:
+    - name: POST to routine /fire
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.routine-token }}
+        TRIGGER_ID: ${{ inputs.trigger-id }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        WORKFLOW: ${{ github.workflow }}
+        JOB: ${{ github.job }}
+        RUN_ID: ${{ github.run_id }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        if [ -z "${TOKEN:-}" ]; then
+          echo "::warning::CLAUDE_CI_ROUTINE_TOKEN not set — skipping routine notify"
+          exit 0
+        fi
+        text="CI failed. repo: ${REPO}, PR: #${PR}, workflow: ${WORKFLOW}, job: ${JOB}, run_id: ${RUN_ID}, url: ${RUN_URL}"
+        payload=$(jq -n --arg text "$text" '{text: $text}')
+        curl -sSf -X POST "https://api.anthropic.com/v1/claude_code/routines/${TRIGGER_ID}/fire" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+          -H "Content-Type: application/json" \
+          -d "$payload" \
+          > /dev/null
+        echo "Routine ${TRIGGER_ID} notified for ${REPO}#${PR}"
