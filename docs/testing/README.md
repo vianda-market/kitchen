@@ -95,6 +95,8 @@ Kitchen CI runs these in addition to tests; agents auditing other repos should c
 | License check | pip-licenses + allowlist | `python scripts/check_licenses.py` |
 | Diff coverage (changed lines ≥ 80%) | diff-cover | see CLAUDE.md |
 
+**Threshold parity:** every numeric gate in the table is bound to [`docs/testing/THRESHOLDS.md`](THRESHOLDS.md), [`docs/testing/thresholds.lock.yaml`](thresholds.lock.yaml), and the source file that enforces it. [`scripts/check_thresholds_parity.py`](../../scripts/check_thresholds_parity.py) (wired into `fast-checks`) fails CI if any of the three disagree. Pattern from `infra-kitchen-gcp`.
+
 **Baseline pattern:** every gate that had pre-existing debt is configured with a baseline file so new code is held to the new standard without blocking on legacy cleanup. Other repos adopting these gates should do the same — a gate that can never be made green gets disabled within a week.
 
 **`diff-cover --exclude` gotcha:** multiple `--exclude` flags overwrite each other (argparse `nargs='+'`). Combine all patterns into a single flag. This has bitten every Vianda repo that wires up diff-cover; copy the kitchen invocation verbatim.

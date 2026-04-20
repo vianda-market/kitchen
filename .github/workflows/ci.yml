@@ -115,6 +115,11 @@ jobs:
       - name: Bandit (high severity, baselined)
         run: bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
 
+      - name: Threshold parity (lock ↔ source ↔ doc)
+        # Every numeric gate lives in three places. This check fails if
+        # they disagree. See docs/testing/THRESHOLDS.md.
+        run: python scripts/check_thresholds_parity.py
+
       - name: SQL lint (sqlfluff, baselined)
         run: bash scripts/check_sqlfluff.sh
 
