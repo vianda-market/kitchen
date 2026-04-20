@@ -56,9 +56,10 @@ jobs:
   mutate:
     name: Mutation Tests (Tier 1)
     runs-on: ubuntu-latest
-    # 60 min is the normal incremental budget. The seeding PR bumps this to
-    # 360 one time — do not leave it elevated.
-    timeout-minutes: 60
+    # TEMP: bumped from 60 → 360 for the one-time cache-seeding run on main.
+    # Revert to 60 in the immediate follow-up PR after confirming the
+    # main-branch cache exists. See docs/testing/MUTATION_SEEDING.md.
+    timeout-minutes: 360
     env:
       SECRET_KEY: ci-test-secret-key
       ALGORITHM: HS256
