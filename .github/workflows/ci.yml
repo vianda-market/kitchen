@@ -342,3 +342,28 @@ jobs:
         if: always()
         run: |
           [ -f /tmp/server.pid ] && kill "$(cat /tmp/server.pid)" 2>/dev/null || true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # ci-pass: aggregator gate for branch protection. Point branch protection
+  # at this single "CI" check instead of enumerating every job — when jobs
+  # are added/renamed/split, only this `needs:` list changes, and branch
+  # protection keeps working without a GitHub settings edit.
+  #
+  # `if: always()` so the gate evaluates even when upstream jobs are skipped
+  # (e.g. docs-only PR skips test + acceptance). The jq check passes on
+  # `success` or `skipped`; any `failure` / `cancelled` fails the gate.
+  #
+  # Auxiliary workflows (mutation.yml) are NOT covered here — their display
+  # names must be added to branch protection individually.
+  # ──────────────────────────────────────────────────────────────────────────
+  ci-pass:
+    name: CI
+    if: always()
+    needs: [changes, fast-checks, secrets, test, acceptance]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed or intentionally skipped
+        run: |
+          results='${{ toJSON(needs) }}'
+          echo "$results" | jq .
+          echo "$results" | jq -e '[.[] | .result] | all(. == "success" or . == "skipped")' > /dev/null
