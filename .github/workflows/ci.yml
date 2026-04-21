@@ -362,6 +362,11 @@ jobs:
     needs: [changes, fast-checks, secrets, test, acceptance]
     runs-on: ubuntu-latest
     steps:
+      # Required so `./.github/actions/notify-routine` (below) can resolve its
+      # action.yml. Without it the notify step fails with "Can't find action.yml"
+      # and Claude is silently never paged on CI failures.
+      - uses: actions/checkout@v4
+
       - name: All required jobs passed or intentionally skipped
         run: |
           results='${{ toJSON(needs) }}'
