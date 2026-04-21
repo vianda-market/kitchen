@@ -23,18 +23,13 @@ name: Mutation Testing
 on:
   pull_request:
     branches: [main]
-    paths:
-      # Stay in sync with [tool.mutmut].paths_to_mutate in pyproject.toml.
-      - "app/services/credit_validation_service.py"
-      - "app/services/credit_loading_service.py"
-      - "app/services/discretionary_service.py"
-      - "app/services/billing/institution_billing.py"
-      # Re-run whenever the tests change — a test edit can turn a killed
-      # mutant into a survivor even if the target code is untouched.
-      - "app/tests/services/**"
-      # Re-run whenever the config changes.
-      - "pyproject.toml"
-      - ".github/workflows/mutation.yml"
+    # NOTE: no top-level `paths:` filter. This workflow is a required
+    # branch-protection check; if it filtered at the workflow level, PRs that
+    # don't touch mutation paths would never trigger it and the required check
+    # would stay pending forever, blocking merge. Instead, trigger on every PR
+    # and gate the heavy work with a dorny/paths-filter step inside the job
+    # (see `filter` step below), then always run a terminal step so the job
+    # reports a conclusion even on skip.
   push:
     branches: [main]
     paths:
@@ -67,7 +62,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Gate heavy work on the same path list that used to be at the workflow
+      # level. Keep in sync with [tool.mutmut].paths_to_mutate in pyproject.toml.
+      # On `push` events there is no PR base to diff against, so dorny returns
+      # true for every key — that's fine, push to main should always run.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'app/services/credit_validation_service.py'
+              - 'app/services/credit_loading_service.py'
+              - 'app/services/discretionary_service.py'
+              - 'app/services/billing/institution_billing.py'
+              - 'app/tests/services/**'
+              - 'pyproject.toml'
+              - '.github/workflows/mutation.yml'
+
       - uses: actions/setup-python@v5
+        if: steps.filter.outputs.relevant == 'true'
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -75,12 +88,14 @@ jobs:
           cache-dependency-path: requirements-test.txt
 
       - name: Install dependencies
+        if: steps.filter.outputs.relevant == 'true'
         run: pip install -r requirements-test.txt
 
       # Restore mutmut's cache. On PRs, the restore-keys fallback to the
       # latest main-branch cache so PR runs don't start cold. On push to
       # main, this writes the fresh cache back (see cache-hit logic below).
       - name: Restore mutmut cache
+        if: steps.filter.outputs.relevant == 'true'
         uses: actions/cache@v4
         with:
           # mutmut 3.x stores all state (incremental + HTML report) in the
@@ -97,16 +112,17 @@ jobs:
         # mutmut run is incremental by default: files it has already seen
         # are skipped unless the source or tests changed. The cache hydrated
         # above is what makes PR runs fast.
+        if: steps.filter.outputs.relevant == 'true'
         run: mutmut run
 
       - name: Results summary
-        if: always()
+        if: always() && steps.filter.outputs.relevant == 'true'
         run: mutmut results
 
       - name: Write GitHub step summary
         # Surface the headline score + any survivors directly in the PR's
         # Actions tab — nobody reads the HTML report otherwise.
-        if: always()
+        if: always() && steps.filter.outputs.relevant == 'true'
         run: |
           {
             echo "## Mutation Testing — Tier 1 Results"
@@ -127,11 +143,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate HTML report
-        if: always()
+        if: always() && steps.filter.outputs.relevant == 'true'
         run: mutmut html || true
 
       - name: Upload mutation report
-        if: always()
+        if: always() && steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mutmut-report-${{ github.run_id }}
@@ -143,12 +159,26 @@ jobs:
         # Intentionally non-blocking for now. Flip `continue-on-error: false`
         # and exit non-zero once we have a stable baseline kill-rate on main
         # and have published a `break` threshold in docs/testing/THRESHOLDS.md.
+        if: steps.filter.outputs.relevant == 'true'
         continue-on-error: true
         run: |
           survivors=$(mutmut results 2>&1 | grep -c "survived" || true)
           echo "Survived mutants: $survivors"
           if [ "$survivors" -gt 0 ]; then
             echo "::warning::$survivors mutant(s) survived — tests did not catch these mutations"
+          fi
+
+      # Terminal step — runs unconditionally so the job always reports a
+      # conclusion. Without this, a PR that doesn't touch mutation paths would
+      # have ALL steps skipped, and some branch-protection configs treat a
+      # fully-skipped job as pending rather than success, blocking merge.
+      - name: Mutation check complete
+        if: always()
+        run: |
+          if [ "${{ steps.filter.outputs.relevant }}" = "true" ]; then
+            echo "Mutation tests ran (see steps above)."
+          else
+            echo "Mutation tests skipped — no Tier-1 paths changed in this PR."
           fi
 
       - name: Notify Claude routine on failure
