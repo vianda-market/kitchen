@@ -70,3 +70,9 @@ gates:
     sources:
       - file: scripts/check_coverage_floor.py
         pattern: '"i18n": (\d+)\.0,'
+
+  - name: mutation-kill-rate
+    value: 65
+    sources:
+      - file: .github/workflows/mutation.yml
+        pattern: '^          KILL_RATE_MIN: "(\d+)"$'

@@ -58,6 +58,8 @@ class TestCreditValidationService:
             assert result.shortfall == 0.0
             assert result.can_proceed is True
             assert "Sufficient credits available" in result.message
+            # Lock args to kill None-substitution mutants on this call.
+            mock_get_by_user.assert_called_once_with(user_id, mock_db)
 
     def test_validate_sufficient_credits_allows_when_balance_equals_required(self, mock_db):
         """Test that validation passes when user has exactly enough credits (resulting in 0 balance)."""
@@ -266,6 +268,8 @@ class TestCreditValidationService:
 
             # Assert
             assert result == 10.0
+            # Lock args to kill None-substitution mutants on this call.
+            mock_get_by_user.assert_called_once_with(user_id, mock_db)
 
     def test_get_user_balance_returns_none_when_not_found(self, mock_db):
         """Test that get_user_balance returns None when subscription is not found."""
