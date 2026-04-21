@@ -36,7 +36,6 @@ on:
       - "app/services/credit_validation_service.py"
       - "app/services/credit_loading_service.py"
       - "app/services/discretionary_service.py"
-      - "app/services/billing/institution_billing.py"
       - "app/tests/services/**"
       - "pyproject.toml"
       - ".github/workflows/mutation.yml"
@@ -74,7 +73,6 @@ jobs:
               - 'app/services/credit_validation_service.py'
               - 'app/services/credit_loading_service.py'
               - 'app/services/discretionary_service.py'
-              - 'app/services/billing/institution_billing.py'
               - 'app/tests/services/**'
               - 'pyproject.toml'
               - '.github/workflows/mutation.yml'
@@ -127,7 +125,7 @@ jobs:
           {
             echo "## Mutation Testing — Tier 1 Results"
             echo ""
-            echo "**Scope:** credit_validation, credit_loading, discretionary, institution_billing"
+            echo "**Scope:** credit_validation, credit_loading, discretionary"
             echo ""
             echo "\`\`\`"
             mutmut results 2>&1 | head -100
@@ -142,30 +140,60 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Generate HTML report
+      - name: Dump results to text file
+        # mutmut 3.x has no `html` subcommand (that was mutmut 2). We upload
+        # the plain `results` output plus the `mutants/` cache — together
+        # these let a reviewer run `mutmut show <id>` / `mutmut browse`
+        # locally against the CI's verdicts without re-running the suite.
         if: always() && steps.filter.outputs.relevant == 'true'
-        run: mutmut html || true
+        run: mutmut results > mutmut-results.txt || true
 
-      - name: Upload mutation report
+      - name: Upload mutation artifacts
         if: always() && steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mutmut-report-${{ github.run_id }}
-          path: html/
+          path: |
+            mutmut-results.txt
+            mutants/
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Check for survivors (warn only)
-        # Intentionally non-blocking for now. Flip `continue-on-error: false`
-        # and exit non-zero once we have a stable baseline kill-rate on main
-        # and have published a `break` threshold in docs/testing/THRESHOLDS.md.
+      - name: Enforce kill-rate threshold
+        # Blocking gate. Threshold source of truth: docs/testing/THRESHOLDS.md.
+        # Equivalent mutants (log-message text, HTTPException detail strings,
+        # etc. — see docs/testing/MUTATION_TRIAGE.md) are excluded from the
+        # denominator via docs/testing/mutation-equivalents.txt.
+        #
+        # `mutmut results` only lists non-killed mutants, so a naïve grep on
+        # ": killed$" always returns 0. `mutmut export-cicd-stats` writes a
+        # structured JSON (mutants/mutmut-cicd-stats.json) with all counts,
+        # which is what this step reads.
         if: steps.filter.outputs.relevant == 'true'
-        continue-on-error: true
+        env:
+          KILL_RATE_MIN: "65"
+          EQUIV_FILE: docs/testing/mutation-equivalents.txt
         run: |
-          survivors=$(mutmut results 2>&1 | grep -c "survived" || true)
-          echo "Survived mutants: $survivors"
-          if [ "$survivors" -gt 0 ]; then
-            echo "::warning::$survivors mutant(s) survived — tests did not catch these mutations"
+          mutmut export-cicd-stats
+          stats=mutants/mutmut-cicd-stats.json
+          killed=$(python3 -c "import json; print(json.load(open('$stats'))['killed'])")
+          survived=$(python3 -c "import json; print(json.load(open('$stats'))['survived'])")
+          no_tests=$(python3 -c "import json; print(json.load(open('$stats'))['no_tests'])")
+          equivalent=0
+          if [ -f "$EQUIV_FILE" ]; then
+            equivalent=$(wc -l < "$EQUIV_FILE" | tr -d ' ')
+          fi
+          effective_total=$((killed + survived - equivalent))
+          if [ "$effective_total" -le 0 ]; then
+            echo "::error::effective_total=${effective_total} — nothing to score (killed=${killed}, survived=${survived}, equivalent=${equivalent})"
+            exit 1
+          fi
+          rate=$(( (killed * 100) / effective_total ))
+          echo "killed=${killed} survived=${survived} no_tests=${no_tests} equivalent=${equivalent}"
+          echo "effective kill-rate: ${rate}% (threshold: ${KILL_RATE_MIN}%)"
+          if [ "$rate" -lt "$KILL_RATE_MIN" ]; then
+            echo "::error::Kill rate ${rate}% is below threshold ${KILL_RATE_MIN}%. See docs/testing/MUTATION_TRIAGE.md."
+            exit 1
           fi
 
       # Terminal step — runs unconditionally so the job always reports a

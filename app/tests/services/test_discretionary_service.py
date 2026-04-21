@@ -7,7 +7,7 @@ including creation, approval, rejection, and validation.
 
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -156,7 +156,7 @@ class TestDiscretionaryService:
             # Assert
             assert result == mock_discretionary
             mock_user_service.get_by_id.assert_called_once_with(sample_request_data["user_id"], mock_db)
-            mock_discretionary_service.create.assert_called_once()
+            mock_discretionary_service.create.assert_called_once_with(ANY, mock_db)
 
             # Verify request data was properly prepared
             from app.config import Status
@@ -194,7 +194,7 @@ class TestDiscretionaryService:
             # Assert
             assert result == mock_discretionary
             mock_restaurant_service.get_by_id.assert_called_once_with(request_data["restaurant_id"], mock_db)
-            mock_discretionary_service.create.assert_called_once()
+            mock_discretionary_service.create.assert_called_once_with(ANY, mock_db)
 
     def test_create_discretionary_request_missing_required_fields(
         self, discretionary_service, sample_admin_user, mock_db
@@ -454,7 +454,12 @@ class TestDiscretionaryService:
             # Assert
             assert result == mock_resolution
             mock_discretionary_service.get_by_id.assert_called_once_with(discretionary_id, mock_db)
-            mock_resolution_service.create.assert_called_once()
+            mock_resolution_service.create.assert_called_once_with(ANY, mock_db)
+            resolution_call_data = mock_resolution_service.create.call_args[0][0]
+            assert resolution_call_data["discretionary_id"] == discretionary_id
+            assert resolution_call_data["resolution"] == DiscretionaryStatus.APPROVED
+            assert resolution_call_data["resolved_by"] == sample_super_admin["user_id"]
+            assert resolution_call_data["status"] == Status.ACTIVE
             mock_create_transaction.assert_called_once_with(mock_discretionary, sample_super_admin, mock_db)
 
             # Verify discretionary request was updated
@@ -540,7 +545,13 @@ class TestDiscretionaryService:
             # Assert
             assert result == mock_resolution
             mock_discretionary_service.get_by_id.assert_called_once_with(discretionary_id, mock_db)
-            mock_resolution_service.create.assert_called_once()
+            mock_resolution_service.create.assert_called_once_with(ANY, mock_db)
+            resolution_call_data = mock_resolution_service.create.call_args[0][0]
+            assert resolution_call_data["discretionary_id"] == discretionary_id
+            assert resolution_call_data["resolution"] == DiscretionaryStatus.REJECTED
+            assert resolution_call_data["resolved_by"] == sample_super_admin["user_id"]
+            assert resolution_call_data["resolution_comment"] == rejection_reason
+            assert resolution_call_data["status"] == Status.ACTIVE
 
             # Verify discretionary request was updated
             mock_discretionary_service.update.assert_called_once_with(
@@ -639,6 +650,7 @@ class TestDiscretionaryService:
             assert len(result) == 1
             assert result[0] == pending_request
             assert result[0].status == DiscretionaryStatus.PENDING
+            mock_discretionary_service.get_all.assert_called_once_with(mock_db)
 
     def test_get_pending_requests_empty(self, discretionary_service, sample_discretionary_dto, mock_db):
         """Test retrieval of pending requests when none exist"""
@@ -711,6 +723,7 @@ class TestDiscretionaryService:
             assert len(result) == 1
             assert result[0] == admin_request
             assert result[0].modified_by == admin_user_id
+            mock_discretionary_service.get_all.assert_called_once_with(mock_db)
 
     def test_get_requests_by_admin_empty(self, discretionary_service, sample_discretionary_dto, mock_db):
         """Test retrieval of requests by admin when none exist"""
@@ -730,3 +743,184 @@ class TestDiscretionaryService:
 
             # Assert
             assert len(result) == 0
+
+    # =============================================================================
+    # _CREATE_DISCRETIONARY_TRANSACTION TESTS
+    #
+    # Direct tests for the private dispatcher. approve_discretionary_request
+    # patches this helper out, so without these tests mutmut marked all of its
+    # mutants as "no tests". We cover both branches (restaurant vs client) and
+    # the error-wrapping path.
+    # =============================================================================
+
+    def test_create_discretionary_transaction_routes_restaurant_branch(
+        self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
+    ):
+        restaurant_request = sample_discretionary_dto
+        restaurant_request.restaurant_id = uuid4()
+        restaurant_request.user_id = None
+
+        with patch("app.services.credit_loading_service.CreditLoadingService") as mock_cls:
+            mock_instance = mock_cls.return_value
+
+            discretionary_service._create_discretionary_transaction(restaurant_request, sample_super_admin, mock_db)
+
+            mock_instance.create_restaurant_credit_transaction.assert_called_once_with(
+                restaurant_request.restaurant_id,
+                restaurant_request.amount,
+                restaurant_request.discretionary_id,
+                sample_super_admin["user_id"],
+                mock_db,
+            )
+            mock_instance.create_client_credit_transaction.assert_not_called()
+
+    def test_create_discretionary_transaction_routes_client_branch(
+        self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
+    ):
+        client_request = sample_discretionary_dto
+        client_request.restaurant_id = None
+        client_request.user_id = uuid4()
+
+        with patch("app.services.credit_loading_service.CreditLoadingService") as mock_cls:
+            mock_instance = mock_cls.return_value
+
+            discretionary_service._create_discretionary_transaction(client_request, sample_super_admin, mock_db)
+
+            mock_instance.create_client_credit_transaction.assert_called_once_with(
+                client_request.user_id,
+                client_request.amount,
+                client_request.discretionary_id,
+                sample_super_admin["user_id"],
+                mock_db,
+            )
+            mock_instance.create_restaurant_credit_transaction.assert_not_called()
+
+    def test_create_discretionary_transaction_wraps_downstream_error(
+        self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
+    ):
+        client_request = sample_discretionary_dto
+        client_request.restaurant_id = None
+        client_request.user_id = uuid4()
+
+        with patch("app.services.credit_loading_service.CreditLoadingService") as mock_cls:
+            mock_cls.return_value.create_client_credit_transaction.side_effect = RuntimeError("boom")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service._create_discretionary_transaction(client_request, sample_super_admin, mock_db)
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to create discretionary transaction" in exc_info.value.detail
+
+    # =============================================================================
+    # _VALIDATE_DISCRETIONARY_REQUEST_DATA BOUNDARY TEST
+    # Pins `amount > 0` at the boundary so mutants that flip `<= 0` → `<= 1`
+    # are killed.
+    # =============================================================================
+
+    def test_validate_request_data_accepts_amount_one(self, discretionary_service):
+        valid_data = {
+            "user_id": uuid4(),
+            "category": DiscretionaryReason.MARKETING_CAMPAIGN,
+            "amount": Decimal("1"),
+        }
+
+        # Should not raise — amount=1 is strictly greater than 0.
+        discretionary_service._validate_discretionary_request_data(valid_data)
+
+    def test_validate_request_data_rejects_amount_just_below_one(self, discretionary_service):
+        # Ensures the comparison is `<= 0`, not `< 0`. amount=0 must still fail.
+        invalid_data = {
+            "user_id": uuid4(),
+            "category": DiscretionaryReason.MARKETING_CAMPAIGN,
+            "amount": Decimal("0"),
+        }
+
+        with pytest.raises(HTTPException) as exc_info:
+            discretionary_service._validate_discretionary_request_data(invalid_data)
+
+        assert exc_info.value.status_code == 400
+        assert "greater than 0" in exc_info.value.detail
+
+    # =============================================================================
+    # GENERIC-EXCEPTION (500) PATH TESTS
+    #
+    # Each public method wraps its body in `try/except Exception` and re-raises
+    # as a 500. Without these tests the `status_code=500` mutants survive
+    # because no assertion pins the value.
+    # =============================================================================
+
+    def test_create_discretionary_request_wraps_downstream_error_as_500(
+        self, discretionary_service, sample_admin_user, sample_request_data, sample_user_dto, mock_db
+    ):
+        with (
+            patch("app.services.discretionary_service.user_service") as mock_user_service,
+            patch("app.services.discretionary_service.discretionary_service") as mock_disc_service,
+        ):
+            mock_user_service.get_by_id.return_value = sample_user_dto
+            mock_disc_service.create.side_effect = RuntimeError("db down")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service.create_discretionary_request(sample_request_data, sample_admin_user, mock_db)
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to create discretionary request" in exc_info.value.detail
+
+    def test_approve_discretionary_request_wraps_downstream_error_as_500(
+        self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
+    ):
+        discretionary_id = uuid4()
+        sample_discretionary_dto.status = DiscretionaryStatus.PENDING
+
+        with (
+            patch("app.services.discretionary_service.discretionary_service") as mock_disc_service,
+            patch("app.services.discretionary_service.discretionary_resolution_service") as mock_res_service,
+        ):
+            mock_disc_service.get_by_id.return_value = sample_discretionary_dto
+            mock_res_service.create.side_effect = RuntimeError("db down")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service.approve_discretionary_request(discretionary_id, sample_super_admin, mock_db)
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to approve discretionary request" in exc_info.value.detail
+
+    def test_reject_discretionary_request_wraps_downstream_error_as_500(
+        self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
+    ):
+        discretionary_id = uuid4()
+        sample_discretionary_dto.status = DiscretionaryStatus.PENDING
+
+        with (
+            patch("app.services.discretionary_service.discretionary_service") as mock_disc_service,
+            patch("app.services.discretionary_service.discretionary_resolution_service") as mock_res_service,
+        ):
+            mock_disc_service.get_by_id.return_value = sample_discretionary_dto
+            mock_res_service.create.side_effect = RuntimeError("db down")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service.reject_discretionary_request(
+                    discretionary_id, sample_super_admin, "reason", mock_db
+                )
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to reject discretionary request" in exc_info.value.detail
+
+    def test_get_pending_requests_wraps_downstream_error_as_500(self, discretionary_service, mock_db):
+        with patch("app.services.discretionary_service.discretionary_service") as mock_disc_service:
+            mock_disc_service.get_all.side_effect = RuntimeError("db down")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service.get_pending_requests(mock_db)
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to retrieve pending requests" in exc_info.value.detail
+
+    def test_get_requests_by_admin_wraps_downstream_error_as_500(self, discretionary_service, mock_db):
+        with patch("app.services.discretionary_service.discretionary_service") as mock_disc_service:
+            mock_disc_service.get_all.side_effect = RuntimeError("db down")
+
+            with pytest.raises(HTTPException) as exc_info:
+                discretionary_service.get_requests_by_admin(uuid4(), mock_db)
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to retrieve admin requests" in exc_info.value.detail

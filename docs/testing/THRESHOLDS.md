@@ -23,6 +23,7 @@ When you bump a threshold, all three get updated in the same PR. CI tells you wh
 | `layer-coverage-security` | 20 | 2026-04-19 | Baselined ~5pt below measured weighted coverage (27.2%). | `scripts/check_coverage_floor.py` |
 | `layer-coverage-gateways` | 45 | 2026-04-19 | Baselined ~5pt below measured weighted coverage (55.9%). | `scripts/check_coverage_floor.py` |
 | `layer-coverage-i18n` | 30 | 2026-04-19 | Baselined ~5pt below measured weighted coverage (40.2%). | `scripts/check_coverage_floor.py` |
+| `mutation-kill-rate` | 65 | 2026-04-20 | Baselined ~5pt below cleaned-up Tier-1 rate (70.6% after excluding 103 equivalent mutants — log/error-text mutations). See `MUTATION_TRIAGE.md`. | `.github/workflows/mutation.yml` (`KILL_RATE_MIN`) |
 
 ## Ratcheting
 

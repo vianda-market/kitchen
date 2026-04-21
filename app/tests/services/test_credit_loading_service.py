@@ -7,7 +7,7 @@ that feed into the existing balance management system.
 
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -182,7 +182,13 @@ class TestCreditLoadingService:
 
             # Assert
             assert result == mock_transaction
-            mock_service.create.assert_called_once()
+            mock_service.create.assert_called_once_with(ANY, mock_db)
+            # Lock args on the subscription lookup + balance update so None
+            # substitutions on these calls get killed.
+            mock_get_by_user.assert_called_once_with(sample_user_id, mock_db)
+            mock_update_balance.assert_called_once_with(
+                mock_subscription.subscription_id, float(sample_amount), mock_db
+            )
 
             # Verify transaction data
             call_args = mock_service.create.call_args[0][0]
@@ -293,7 +299,7 @@ class TestCreditLoadingService:
             assert result == mock_transaction
             mock_restaurant_service.get_by_id.assert_called_once_with(sample_restaurant_id, mock_db)
             mock_currency_service.get_by_id.assert_called_once_with(expected_cc_id, mock_db)
-            mock_create_with_balance.assert_called_once()
+            mock_create_with_balance.assert_called_once_with(ANY, mock_db)
 
             # Verify transaction data
             call_args = mock_create_with_balance.call_args[0][0]
@@ -454,6 +460,134 @@ class TestCreditLoadingService:
             # Verify decimal precision is maintained
             call_args = mock_service.create.call_args[0][0]
             assert call_args["credit"] == precise_amount
+
+    # =============================================================================
+    # BOUNDARY TESTS — pin `amount > 0` at the exact boundary so mutants
+    # that flip the comparison (`<= 0` → `<= 1`) get killed.
+    # =============================================================================
+
+    def test_create_client_credit_transaction_amount_one_is_accepted(
+        self,
+        credit_loading_service,
+        sample_user_id,
+        sample_discretionary_id,
+        sample_modified_by,
+        sample_client_transaction_dto,
+        mock_db,
+    ):
+        amount = Decimal("1")
+        with (
+            patch("app.services.credit_loading_service.client_transaction_service") as mock_service,
+            patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user,
+            patch("app.services.crud_service.update_balance") as mock_update_balance,
+        ):
+            mock_service.create.return_value = sample_client_transaction_dto
+            mock_get_by_user.return_value = None  # subscription path is optional
+            mock_update_balance.return_value = True
+
+            result = credit_loading_service.create_client_credit_transaction(
+                sample_user_id, amount, sample_discretionary_id, sample_modified_by, mock_db
+            )
+
+            assert result == sample_client_transaction_dto
+            assert mock_service.create.call_args[0][0]["credit"] == amount
+
+    def test_create_restaurant_credit_transaction_amount_one_is_accepted(
+        self,
+        credit_loading_service,
+        sample_restaurant_id,
+        sample_discretionary_id,
+        sample_modified_by,
+        sample_restaurant_dto,
+        sample_restaurant_transaction_dto,
+        sample_credit_currency_dto,
+        mock_db,
+    ):
+        amount = Decimal("1")
+        with (
+            patch("app.services.credit_loading_service.restaurant_service") as mock_restaurant_service,
+            patch(
+                "app.services.entity_service.get_currency_metadata_id_for_restaurant",
+                return_value=sample_credit_currency_dto.currency_metadata_id,
+            ),
+            patch("app.services.credit_loading_service.credit_currency_service") as mock_currency_service,
+            patch(
+                "app.services.credit_loading_service.create_with_conservative_balance_update"
+            ) as mock_create_with_balance,
+        ):
+            mock_restaurant_service.get_by_id.return_value = sample_restaurant_dto
+            mock_currency_service.get_by_id.return_value = sample_credit_currency_dto
+            mock_create_with_balance.return_value = sample_restaurant_transaction_dto
+
+            result = credit_loading_service.create_restaurant_credit_transaction(
+                sample_restaurant_id, amount, sample_discretionary_id, sample_modified_by, mock_db
+            )
+
+            assert result == sample_restaurant_transaction_dto
+            assert mock_create_with_balance.call_args[0][0]["credit"] == amount
+
+    # =============================================================================
+    # TYPE-COERCION TESTS — pin the `if not isinstance(amount, Decimal)` branch
+    # so mutants that flip the isinstance check get killed. The function must
+    # accept a non-Decimal input (str/float) and coerce it to Decimal before
+    # the positive-amount check, or the coerced value gets compared as a str.
+    # =============================================================================
+
+    def test_create_client_credit_transaction_coerces_string_amount(
+        self,
+        credit_loading_service,
+        sample_user_id,
+        sample_discretionary_id,
+        sample_modified_by,
+        sample_client_transaction_dto,
+        mock_db,
+    ):
+        with (
+            patch("app.services.credit_loading_service.client_transaction_service") as mock_service,
+            patch("app.services.crud_service.subscription_service.get_by_user") as mock_get_by_user,
+            patch("app.services.crud_service.update_balance") as mock_update_balance,
+        ):
+            mock_service.create.return_value = sample_client_transaction_dto
+            mock_get_by_user.return_value = None
+            mock_update_balance.return_value = True
+
+            credit_loading_service.create_client_credit_transaction(
+                sample_user_id, "7.5", sample_discretionary_id, sample_modified_by, mock_db
+            )
+
+            assert mock_service.create.call_args[0][0]["credit"] == Decimal("7.5")
+
+    def test_create_restaurant_credit_transaction_coerces_string_amount(
+        self,
+        credit_loading_service,
+        sample_restaurant_id,
+        sample_discretionary_id,
+        sample_modified_by,
+        sample_restaurant_dto,
+        sample_restaurant_transaction_dto,
+        sample_credit_currency_dto,
+        mock_db,
+    ):
+        with (
+            patch("app.services.credit_loading_service.restaurant_service") as mock_restaurant_service,
+            patch(
+                "app.services.entity_service.get_currency_metadata_id_for_restaurant",
+                return_value=sample_credit_currency_dto.currency_metadata_id,
+            ),
+            patch("app.services.credit_loading_service.credit_currency_service") as mock_currency_service,
+            patch(
+                "app.services.credit_loading_service.create_with_conservative_balance_update"
+            ) as mock_create_with_balance,
+        ):
+            mock_restaurant_service.get_by_id.return_value = sample_restaurant_dto
+            mock_currency_service.get_by_id.return_value = sample_credit_currency_dto
+            mock_create_with_balance.return_value = sample_restaurant_transaction_dto
+
+            credit_loading_service.create_restaurant_credit_transaction(
+                sample_restaurant_id, "7.5", sample_discretionary_id, sample_modified_by, mock_db
+            )
+
+            assert mock_create_with_balance.call_args[0][0]["credit"] == Decimal("7.5")
 
     def test_create_restaurant_credit_transaction_decimal_precision(
         self,
