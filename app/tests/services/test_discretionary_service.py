@@ -763,9 +763,7 @@ class TestDiscretionaryService:
         with patch("app.services.credit_loading_service.CreditLoadingService") as mock_cls:
             mock_instance = mock_cls.return_value
 
-            discretionary_service._create_discretionary_transaction(
-                restaurant_request, sample_super_admin, mock_db
-            )
+            discretionary_service._create_discretionary_transaction(restaurant_request, sample_super_admin, mock_db)
 
             mock_instance.create_restaurant_credit_transaction.assert_called_once_with(
                 restaurant_request.restaurant_id,
@@ -786,9 +784,7 @@ class TestDiscretionaryService:
         with patch("app.services.credit_loading_service.CreditLoadingService") as mock_cls:
             mock_instance = mock_cls.return_value
 
-            discretionary_service._create_discretionary_transaction(
-                client_request, sample_super_admin, mock_db
-            )
+            discretionary_service._create_discretionary_transaction(client_request, sample_super_admin, mock_db)
 
             mock_instance.create_client_credit_transaction.assert_called_once_with(
                 client_request.user_id,
@@ -810,9 +806,7 @@ class TestDiscretionaryService:
             mock_cls.return_value.create_client_credit_transaction.side_effect = RuntimeError("boom")
 
             with pytest.raises(HTTPException) as exc_info:
-                discretionary_service._create_discretionary_transaction(
-                    client_request, sample_super_admin, mock_db
-                )
+                discretionary_service._create_discretionary_transaction(client_request, sample_super_admin, mock_db)
 
             assert exc_info.value.status_code == 500
             assert "Failed to create discretionary transaction" in exc_info.value.detail

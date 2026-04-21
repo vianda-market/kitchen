@@ -164,15 +164,21 @@ jobs:
         # Equivalent mutants (log-message text, HTTPException detail strings,
         # etc. — see docs/testing/MUTATION_TRIAGE.md) are excluded from the
         # denominator via docs/testing/mutation-equivalents.txt.
+        #
+        # `mutmut results` only lists non-killed mutants, so a naïve grep on
+        # ": killed$" always returns 0. `mutmut export-cicd-stats` writes a
+        # structured JSON (mutants/mutmut-cicd-stats.json) with all counts,
+        # which is what this step reads.
         if: steps.filter.outputs.relevant == 'true'
         env:
           KILL_RATE_MIN: "65"
           EQUIV_FILE: docs/testing/mutation-equivalents.txt
         run: |
-          results=$(mutmut results 2>&1)
-          killed=$(echo "$results" | grep -cE ": killed$" || true)
-          survived=$(echo "$results" | grep -cE ": survived$" || true)
-          no_tests=$(echo "$results" | grep -cE ": no tests$" || true)
+          mutmut export-cicd-stats
+          stats=mutants/mutmut-cicd-stats.json
+          killed=$(python3 -c "import json; print(json.load(open('$stats'))['killed'])")
+          survived=$(python3 -c "import json; print(json.load(open('$stats'))['survived'])")
+          no_tests=$(python3 -c "import json; print(json.load(open('$stats'))['no_tests'])")
           equivalent=0
           if [ -f "$EQUIV_FILE" ]; then
             equivalent=$(wc -l < "$EQUIV_FILE" | tr -d ' ')
