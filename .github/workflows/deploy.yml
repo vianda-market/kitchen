@@ -1,0 +1,148 @@
+name: Deploy Kitchen Backend
+
+# Builds the Docker image, pushes it to Artifact Registry, and rolls a new
+# Cloud Run revision on the dev service.
+#
+# Triggers:
+#   - pull_request: closed + merged + has `deploy:dev` label → auto-deploy
+#     the merged commit (checked out via pull_request.base.ref = main).
+#   - workflow_dispatch (reason required) → manual deploy for infra validation
+#     or rollback. `github.ref` is the deploy target, so picking an older SHA
+#     from the Actions UI rolls back.
+#
+# Not gated on push to main: per 2026-04-20 pattern roundup we only ship PRs
+# that explicitly carry the deploy:dev label — most merges to main (docs,
+# refactors, tests) should not auto-ship.
+#
+# Prereqs (one-time, per infra-kitchen-gcp/docs/plans/ci-cd-activation-manual.md):
+#   - GitHub Environment `dev` with vars: WIF_PROVIDER, DEPLOY_SA, GCP_PROJECT,
+#     CLOUD_RUN_SERVICE.
+#   - `deploy:dev` label created (see README / architecture doc).
+#   - WIF pool/provider provisioned on infra dev stack (`pulumi up` on dev).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this manual deploy? (e.g. 'infra validation', 'rollback to <sha>')"
+        required: true
+        type: string
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('Manual deploy from {0} — {1}', github.ref_name, inputs.reason)
+      || '' }}
+
+# Fixed group (not per-ref) so manual + PR-merge runs serialize on the same
+# Cloud Run service. cancel-in-progress=false because interrupting a half-rolled
+# revision is worse than queuing.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write       # WIF federation
+  pull-requests: write  # update marker comment on the merged PR
+
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  REGION: us-central1
+
+jobs:
+  deploy:
+    name: Build + Deploy to dev
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name, 'deploy:dev'))
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      # ───── In-progress PR marker (PR-merge path only) ─────
+      - name: Post in-progress deploy marker
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- cloud-run-deploy-dev -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n⏳ Deploying to dev… ([view run](${runUrl}))`;
+            const prNumber = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
+            }
+
+      # ───── Checkout target commit ─────
+      # PR-merge path: base.ref = main (post-merge HEAD is the merged commit).
+      # Manual path: github.ref (defaults to main, accepts older SHAs for rollback).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref }}
+
+      # ───── GCP auth via Workload Identity Federation ─────
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      # ───── Build + push image ─────
+      - name: Build and push image
+        id: build
+        run: |
+          TAG="${GITHUB_SHA::7}-$(date +%Y%m%d%H%M%S)"
+          IMAGE="${{ env.REGISTRY }}/${{ vars.GCP_PROJECT }}/kitchen/kitchen-backend:${TAG}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # ───── Roll Cloud Run revision ─────
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run services update ${{ vars.CLOUD_RUN_SERVICE }} \
+            --image "${{ steps.build.outputs.image }}" \
+            --region ${{ env.REGION }} \
+            --project ${{ vars.GCP_PROJECT }}
+
+      # ───── Final PR marker (success or failure) ─────
+      - name: Post final deploy marker
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- cloud-run-deploy-dev -->';
+            const ok = '${{ job.status }}' === 'success';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const tag = '${{ steps.build.outputs.tag }}';
+            const body = ok
+              ? `${marker}\n✅ Deployed to dev — image tag \`${tag}\` ([view run](${runUrl}))`
+              : `${marker}\n❌ Deploy to dev failed ([view run](${runUrl}))`;
+            const prNumber = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
+            }
