@@ -1,0 +1,77 @@
+# Dependabot: weekly-grouped minor/patch bumps, deferred majors.
+#
+# Rationale: one grouped PR per Monday = one CI run, one review context, one
+# deploy event per week. Majors for system-critical libraries are deferred and
+# must be proposed manually as tracked migrations (the ignore list below).
+#
+# Grouping follows the vianda-platform pattern (see
+# infra-kitchen-gcp/docs/plans/ci-cd-activation-manual.md and the CI/CD pattern
+# roundup from 2026-04-20).
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      pip-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Deferred majors — any library whose major bump can break the running
+      # system. Each becomes a tracked manual migration. Minor/patch still flow
+      # through the weekly grouped PR.
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "uvicorn"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic-settings"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "psycopg2-binary"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "PyJWT"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "passlib"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "bcrypt"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "stripe"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sendgrid"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "google-cloud-storage"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "google-auth"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "google-cloud-secret-manager"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "google-ads"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "facebook-business"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "arq"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "httpx"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Pillow"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

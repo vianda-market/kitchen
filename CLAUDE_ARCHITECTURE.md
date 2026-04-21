@@ -485,3 +485,39 @@ Institutions can operate across multiple countries. One institution = one set of
 - **JWT `market_id`:** B2C-only (plate/restaurant scoping). Orthogonal to institution structure. B2B users use primary market for language default.
 - **Validation:** Entity creation validates address country against `institution_market`. User market assignments validate against `institution_market` (Internal bypasses).
 - **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`
+
+## CI/CD
+
+### Workflows
+
+| File | Trigger | Purpose | Label gate |
+|---|---|---|---|
+| `.github/workflows/ci.yml` | PR to `main`, push to `main` | Lint/type/complexity/security/SQL/license/pytest/Newman acceptance. `ci-pass` aggregator job is the single required check for branch protection. | — |
+| `.github/workflows/mutation.yml` | PR or push touching Tier-1 services, `workflow_dispatch` | Mutation testing via `mutmut` against money/credit business logic. Cache restored from `main`. | — |
+| `.github/workflows/deploy.yml` | PR merged with label, `workflow_dispatch` (reason required) | Builds Docker image → Artifact Registry → `gcloud run services update` on Cloud Run dev service. No auto-deploy on every merge. | `deploy:dev` |
+
+### Label semantics
+
+- **`deploy:dev`** — opt-in gate on `deploy.yml`. Apply before merging a PR that should ship to the dev Cloud Run service (`vianda-dev-api` in `kitchen-dev-490222`). Merging without the label is a no-op for deploy.
+
+### Deploy command
+
+```
+gcloud run services update ${CLOUD_RUN_SERVICE} \
+  --image us-central1-docker.pkg.dev/${GCP_PROJECT}/kitchen/kitchen-backend:<sha7>-<ts> \
+  --region us-central1 --project ${GCP_PROJECT}
+```
+
+Image tag format: `${GITHUB_SHA::7}-YYYYMMDDHHMMSS`. Auth is Workload Identity Federation — no service-account key secret in the repo.
+
+### Rollback
+
+Actions → *Deploy Kitchen Backend* → *Run workflow* → pick an older SHA as the ref, supply a `reason` like `"rollback to <sha>"`. The `run-name` surfaces the reason in the run title.
+
+### Dependabot
+
+`.github/dependabot.yml` — one weekly (Mondays 09:00 America/New_York) grouped `pip-minor-patch` PR + one grouped `github-actions` PR. Majors for system-critical libraries (fastapi, pydantic, psycopg2-binary, stripe, google-*, redis, httpx, etc.) are deferred and must be proposed as tracked manual migrations.
+
+### Prerequisites (operational setup)
+
+GitHub Environment `dev` on this repo needs variables `WIF_PROVIDER`, `DEPLOY_SA`, `GCP_PROJECT`, `CLOUD_RUN_SERVICE`. Full one-time setup (environments, WIF, Pulumi outputs): `infra-kitchen-gcp/docs/plans/ci-cd-activation-manual.md`.
