@@ -150,7 +150,7 @@ jobs:
 
       - name: Upload mutation artifacts
         if: always() && steps.filter.outputs.relevant == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutmut-report-${{ github.run_id }}
           path: |
