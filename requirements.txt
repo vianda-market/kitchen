@@ -35,7 +35,7 @@ requests>=2.33.0        # HTTP requests library (CVE-2024-35195, CVE-2024-47081,
 urllib3>=2.6.3          # HTTP client (CVE-2025-50181, CVE-2025-66418, CVE-2025-66471, CVE-2026-21441)
 
 # QR Code generation
-qrcode[pil]==7.4.2     # QR code generation with PIL support
+qrcode[pil]==8.2     # QR code generation with PIL support
 Pillow>=12.0.0         # Python Imaging Library; 12.0+ for Python 3.14 compatibility
 
 # GCS (Google Cloud Storage)
