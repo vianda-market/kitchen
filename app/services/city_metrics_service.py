@@ -71,6 +71,58 @@ def get_cities_with_coverage(
     return [r["name"] for r in rows] if rows else []
 
 
+def get_cities_with_restaurant_counts(
+    country_code: str,
+    db: psycopg2.extensions.connection,
+) -> list[dict]:
+    """
+    Return cities with active restaurant counts for the marketing site coverage display.
+
+    Each row: {"city": <display name>, "restaurant_count": <int>}.
+    Only cities in city_metadata (show_in_signup_picker = TRUE) with >=1 active restaurant
+    that has plate_kitchen_days + QR code are returned. Single JOIN query — no N+1.
+
+    Backing the GET /leads/cities?mode=coverage endpoint (vianda-home multi-country landing page).
+    """
+    country = (country_code or "").strip().upper()
+    if not country:
+        return []
+    query = """
+        SELECT
+            COALESCE(cm.display_name_override, gc.name) AS city,
+            COUNT(DISTINCT r.restaurant_id) AS restaurant_count
+        FROM core.city_metadata cm
+        JOIN external.geonames_city gc ON gc.geonames_id = cm.geonames_id
+        JOIN core.address_info a ON (
+            UPPER(TRIM(a.city)) = UPPER(TRIM(COALESCE(cm.display_name_override, gc.name)))
+            AND a.country_code = cm.country_iso
+            AND a.is_archived = FALSE
+        )
+        JOIN ops.restaurant_info r ON r.address_id = a.address_id
+            AND r.is_archived = FALSE
+            AND r.status = 'active'
+        WHERE cm.country_iso = %s
+          AND cm.city_metadata_id != %s
+          AND cm.is_archived = FALSE
+          AND cm.show_in_signup_picker = TRUE
+          AND EXISTS (
+            SELECT 1 FROM ops.plate_info p
+            JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+              AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
+          )
+          AND EXISTS (
+            SELECT 1 FROM ops.qr_code qc
+            WHERE qc.restaurant_id = r.restaurant_id
+              AND qc.is_archived = FALSE AND qc.status = 'active'
+          )
+        GROUP BY COALESCE(cm.display_name_override, gc.name)
+        ORDER BY LOWER(COALESCE(cm.display_name_override, gc.name))
+    """
+    rows = db_read(query, (country, str(GLOBAL_CITY_ID)), connection=db)
+    return [{"city": r["city"], "restaurant_count": r["restaurant_count"]} for r in rows] if rows else []
+
+
 def get_supplier_cities_for_country(
     country_code: str,
     db: psycopg2.extensions.connection,

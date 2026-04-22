@@ -22,6 +22,7 @@ from app.schemas.consolidated_schemas import (
     LeadInterestCreateSchema,
     LeadInterestResponseSchema,
     LeadsCitiesResponseSchema,
+    LeadsCityWithCountSchema,
     LeadsCuisineSchema,
     LeadsFeaturedRestaurantSchema,
     LeadsPlanSchema,
@@ -33,6 +34,7 @@ from app.schemas.consolidated_schemas import (
 )
 from app.services.city_metrics_service import (
     get_cities_with_coverage,
+    get_cities_with_restaurant_counts,
     get_city_metrics,
 )
 from app.services.entity_service import get_user_by_email
@@ -44,7 +46,12 @@ from app.services.leads_public_service import (
     get_public_plans,
     get_public_restaurants,
 )
-from app.services.market_service import get_markets_with_coverage, is_global_market, market_service
+from app.services.market_service import (
+    get_coverage_flags_for_markets,
+    get_markets_with_coverage,
+    is_global_market,
+    market_service,
+)
 from app.services.zipcode_metrics_service import get_zipcode_metrics
 from app.utils.country import normalize_country_code
 from app.utils.db import db_read
@@ -83,6 +90,9 @@ def _get_cached_markets(audience: str, db) -> list[MarketPublicMinimalSchema]:
 
     if audience == "supplier":
         raw = market_service.get_all(include_archived=False, status=Status.ACTIVE)
+        filtered = [m for m in raw if not is_global_market(m.get("market_id"))]
+        market_ids = [str(m["market_id"]) for m in filtered if m.get("market_id")]
+        covered = get_coverage_flags_for_markets(market_ids, db)
         slim = [
             {
                 "country_code": m["country_code"],
@@ -90,9 +100,9 @@ def _get_cached_markets(audience: str, db) -> list[MarketPublicMinimalSchema]:
                 "language": m.get("language") or "en",
                 "phone_dial_code": m.get("phone_dial_code"),
                 "phone_local_digits": m.get("phone_local_digits"),
+                "has_active_kitchens": str(m.get("market_id")) in covered,
             }
-            for m in raw
-            if not is_global_market(m.get("market_id"))
+            for m in filtered
         ]
     else:
         slim = [
@@ -102,6 +112,7 @@ def _get_cached_markets(audience: str, db) -> list[MarketPublicMinimalSchema]:
                 "language": m.get("language") or "en",
                 "phone_dial_code": m.get("phone_dial_code"),
                 "phone_local_digits": m.get("phone_local_digits"),
+                "has_active_kitchens": True,
             }
             for m in get_markets_with_coverage(db)
         ]
@@ -205,6 +216,7 @@ async def get_featured_restaurant(
 
 # Cities cache — keyed by (country, audience), 600s TTL (same pattern as _markets_cache)
 _cities_cache: dict[str, tuple[list[str], float]] = {}
+_cities_coverage_cache: dict[str, tuple[list[dict], float]] = {}
 CITIES_CACHE_TTL_SECONDS = 600  # 10 minutes
 
 
@@ -229,7 +241,7 @@ def _get_cached_cities(country: str, audience: str, db) -> list[str]:
     return cities or []
 
 
-@router.get("/cities", response_model=LeadsCitiesResponseSchema)
+@router.get("/cities", response_model=LeadsCitiesResponseSchema | list[LeadsCityWithCountSchema])
 @limiter.limit("20/minute")
 async def get_leads_cities(
     request: Request,
@@ -243,20 +255,42 @@ async def get_leads_cities(
             "Default returns only served cities (active restaurants with plates + QR)."
         ),
     ),
+    mode: str = Query(
+        None,
+        description=(
+            "Optional. Pass 'coverage' to receive [{city, restaurant_count}] objects instead of "
+            "the default flat string list. Intended for the vianda-home marketing site landing page. "
+            "Combines coverage filtering with restaurant counts in one query."
+        ),
+    ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     List city names for lead forms. No auth; rate-limited per IP.
 
-    Default (no audience): cities with ≥1 active restaurant with plate_kitchen_days + QR.
-    ?audience=supplier: all cities in supplier-audience countries (GeoNames ∪ city_metadata ∪ restaurant_lead).
+    Default (no audience): cities with >=1 active restaurant with plate_kitchen_days + QR.
+    ?audience=supplier: all cities in supplier-audience countries (GeoNames u city_metadata u restaurant_lead).
+    ?mode=coverage: returns [{city, restaurant_count}] -- coverage-filtered with counts, for marketing site.
 
     Client sends selected city_name in the lead/signup form body.
     """
     country = normalize_country_code(country_code, default="US")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+
+    if mode == "coverage":
+        global _cities_coverage_cache
+        now = time.time()
+        entry = _cities_coverage_cache.get(country)
+        if not (entry and now < entry[1]):
+            data = get_cities_with_restaurant_counts(country, db)
+            if data is not None:
+                _cities_coverage_cache[country] = (data, now + CITIES_CACHE_TTL_SECONDS)
+        else:
+            data = entry[0]
+        return data or []
+
     effective_audience = "supplier" if audience == "supplier" else "customer"
     cities = _get_cached_cities(country, effective_audience, db)
-    response.headers["Cache-Control"] = "public, max-age=3600"
     return LeadsCitiesResponseSchema(cities=cities)
 
 
