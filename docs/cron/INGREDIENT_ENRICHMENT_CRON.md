@@ -133,7 +133,7 @@ Add to `docs/cron/CRON_JOBS_CHEATSHEET.md`:
 ## 8. Infra request for `infra-kitchen-gcp`
 
 The following is a request to the infra team. File the infra feedback at
-`/Users/cdeachaval/learn/infra-kitchen-gcp/docs/infrastructure/feedback_for_infra.md`
+`/Users/cdeachaval/learn/vianda/infra-kitchen-gcp/docs/infrastructure/feedback_for_infra.md`
 or communicate directly to the infra agent.
 
 **What infra needs to do:**
@@ -236,7 +236,7 @@ Until a written partnership agreement is in place, Spoonacular integration remai
 - `app/services/open_food_facts_service.py` — Phase 1 OFF gateway (compare pattern)
 - `app/services/cron/currency_refresh.py` — reference cron pattern in this codebase
 - `docs/cron/CRON_JOBS_CHEATSHEET.md` — full cron inventory
-- `/Users/cdeachaval/learn/infra-kitchen-gcp/docs/infrastructure/CRON_JOBS_CHEATSHEET.md` — Cloud Scheduler job inventory
+- `/Users/cdeachaval/learn/vianda/infra-kitchen-gcp/docs/infrastructure/CRON_JOBS_CHEATSHEET.md` — Cloud Scheduler job inventory
 - Wikidata API docs: https://www.wikidata.org/wiki/Wikidata:Data_access
 - Wikimedia Commons file path: https://commons.wikimedia.org/wiki/Special:FilePath
 - USDA FoodData Central: https://fdc.nal.usda.gov/api-guide

@@ -132,10 +132,10 @@ If you find a pattern in a sibling repo that improves on what's here, propose it
 ## 8. Cross-repo references
 
 Sibling testing docs (read these when auditing or aligning):
-- **vianda-platform** (`/Users/cdeachaval/learn/vianda-platform/docs/testing/README.md`) — Vitest layer, scoped coverage with `perFile: true`, StrykerJS two-mode (weekly full + per-PR incremental), 4-job consolidated CI with path filters
-- **vianda-app** (`/Users/cdeachaval/learn/vianda-app/docs/testing/README.md`) — Jest + RN testing, property-based tests with `fast-check`, mutation-equivalent disable conventions, coverage ratchet script
-- **vianda-home** (`/Users/cdeachaval/learn/vianda-home/docs/testing/README.md`) — i18n shape-parity test, Playwright with `mockApiRoutes` helper, layered CI where cheap gates expensive
-- **infra-kitchen-gcp** (`/Users/cdeachaval/learn/infra-kitchen-gcp/docs/testing/README.md`) — Pulumi mock pattern (capture inputs as data), policy-as-code allowlists, test categorization (smoke/convention/policy/toggle/behavior), 94% branch-coverage floor
+- **vianda-platform** (`/Users/cdeachaval/learn/vianda/vianda-platform/docs/testing/README.md`) — Vitest layer, scoped coverage with `perFile: true`, StrykerJS two-mode (weekly full + per-PR incremental), 4-job consolidated CI with path filters
+- **vianda-app** (`/Users/cdeachaval/learn/vianda/vianda-app/docs/testing/README.md`) — Jest + RN testing, property-based tests with `fast-check`, mutation-equivalent disable conventions, coverage ratchet script
+- **vianda-home** (`/Users/cdeachaval/learn/vianda/vianda-home/docs/testing/README.md`) — i18n shape-parity test, Playwright with `mockApiRoutes` helper, layered CI where cheap gates expensive
+- **infra-kitchen-gcp** (`/Users/cdeachaval/learn/vianda/infra-kitchen-gcp/docs/testing/README.md`) — Pulumi mock pattern (capture inputs as data), policy-as-code allowlists, test categorization (smoke/convention/policy/toggle/behavior), 94% branch-coverage floor
 
 ---
 

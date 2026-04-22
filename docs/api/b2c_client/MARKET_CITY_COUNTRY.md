@@ -1,7 +1,7 @@
 # Market, City & Country Selection
 
 **Audience**: B2C app (React Native / mobile), vianda-platform (B2B admin), vianda-home (marketing site)
-**Related**: [CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md) (full signup flow), [COUNTRY_CITY_DATA_STRUCTURE.md](/Users/cdeachaval/learn/kitchen/docs/api/internal/COUNTRY_CITY_DATA_STRUCTURE.md) (backend architecture)
+**Related**: [CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md](CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md) (full signup flow), [COUNTRY_CITY_DATA_STRUCTURE.md](/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/COUNTRY_CITY_DATA_STRUCTURE.md) (backend architecture)
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Purpose:** Fast reference for AI-assisted development. Reduces exploratory searches and provides structural context in one place.
 
-**Keep in context with:** [CLAUDE.md](./CLAUDE.md)
+**Keep in context with:** [CLAUDE.MD](./CLAUDE.MD)
 
 ---
 
@@ -521,3 +521,14 @@ Actions → *Deploy Kitchen Backend* → *Run workflow* → pick an older SHA as
 ### Prerequisites (operational setup)
 
 GitHub Environment `dev` on this repo needs variables `WIF_PROVIDER`, `DEPLOY_SA`, `GCP_PROJECT`, `CLOUD_RUN_SERVICE`. Full one-time setup (environments, WIF, Pulumi outputs): `infra-kitchen-gcp/docs/plans/ci-cd-activation-manual.md`.
+
+<!-- vianda-siblings-backlinks -->
+## Siblings
+
+Part of the `~/learn/vianda/` tree. Cross-repo index at `/Users/cdeachaval/learn/vianda/CLAUDE_ARCHITECTURE.MD`.
+
+- **infra-kitchen-gcp** — Pulumi + GCP infra; source of truth for GCP resources, WIF, CI deploy flow. `/Users/cdeachaval/learn/vianda/infra-kitchen-gcp/CLAUDE_ARCHITECTURE.MD`
+- **vianda-platform** — B2B admin React web frontend. `/Users/cdeachaval/learn/vianda/vianda-platform/CLAUDE_ARCHITECTURE.MD`
+- **vianda-app** — B2C consumer React Native app. `/Users/cdeachaval/learn/vianda/vianda-app/CLAUDE_ARCHITECTURE.MD`
+- **vianda-home** — B2B2C React web marketing site. `/Users/cdeachaval/learn/vianda/vianda-home/CLAUDE_ARCHITECTURE.MD`
+- **vianda-hooks** — Shared frontend hooks package. `/Users/cdeachaval/learn/vianda/vianda-hooks/CLAUDE_ARCHITECTURE.MD`

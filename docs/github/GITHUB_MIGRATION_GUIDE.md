@@ -33,7 +33,7 @@
 
 ```bash
 # Navigate to your project
-cd ~/learn/kitchen
+cd ~/learn/vianda/kitchen
 
 # Initialize Git
 git init

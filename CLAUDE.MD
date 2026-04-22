@@ -1,9 +1,9 @@
-# CLAUDE.md
+# CLAUDE.MD
 
 ## Project
 Vianda marketplace backend — PostgreSQL + FastAPI. Multi-market B2B/B2C food subscription platform.
-Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flow.
-Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, routes, or subsystems.
+Read `CLAUDE_ARCHITECTURE.MD` before planning new features or modifying data flow.
+Update `CLAUDE_ARCHITECTURE.MD` after adding new modules, tables, services, routes, or subsystems.
 
 ## Never Do These
 - Never pass UUID directly to psycopg2 — always `str(uuid_value)`
@@ -30,7 +30,7 @@ Update `CLAUDE_ARCHITECTURE.md` after adding new modules, tables, services, rout
 - **SQL lint (local):** `bash scripts/check_sqlfluff.sh` (config: `.sqlfluff`; baseline: `.sqlfluff-baseline.txt`)
 - **License check (local):** `pip install pip-licenses && python scripts/check_licenses.py` (allowlist: MIT/Apache/BSD/ISC/MPL/PSF; per-package exemptions in the script)
 - **CRAP analysis (local, ad-hoc):** `pytest --cov=app --cov-report=xml --cov-fail-under=0 && python scripts/analyze_crap.py` (ranks complex + under-tested functions; not a gate, run periodically to pick refactor targets)
-- **Paths:** Always use `~/learn/kitchen`
+- **Paths:** Always use `~/learn/vianda/kitchen`
 - **User quoting agent output:** When user writes "[Copied output from you kitchen Agent]", treat as self-citation
 
 ## DB Schema Change — Sync All Layers (in order)
@@ -106,7 +106,7 @@ Server-side pagination is **opt-in per route** — not all endpoints need it.
 ## Reference Map — Read When
 | Document | Read when |
 |---|---|
-| `CLAUDE_ARCHITECTURE.md` | Planning new features, modifying data flow, locating modules |
+| `CLAUDE_ARCHITECTURE.MD` | Planning new features, modifying data flow, locating modules |
 | `docs/guidelines/SCHEMA_CHANGE_GUIDE.md` | Adding or modifying any DB column |
 | `docs/guidelines/ENRICHED_ENDPOINTS.md` | Building enriched endpoints or joining tables for UI display |
 | `docs/guidelines/CODE_CONVENTIONS.md` | Unsure about function design, error handling, or service patterns |
@@ -131,11 +131,11 @@ This repo (kitchen) is the **backend source of truth**. It produces API docs and
 
 **Doc locations produced by this repo:**
 - `docs/api/` — **Permanent** API integration docs (endpoints, contracts, auth). Indexed in `docs/api/AGENT_INDEX.md`. This is the source of truth for how the system works. Other repo agents read these to understand established functionality.
-- `docs/plans/` — **Ephemeral** feature plans and design decisions. Plans are consumed during implementation, then archived. Never reference old plans to understand how things work — that information belongs in `docs/api/` or `CLAUDE_ARCHITECTURE.md`. When completing a plan, summarize any long-term relevant info (endpoint contracts, behaviors, constraints) into the appropriate `docs/api/` doc before archiving the plan.
-- `CLAUDE_ARCHITECTURE.md` — System overview for cross-repo context
+- `docs/plans/` — **Ephemeral** feature plans and design decisions. Plans are consumed during implementation, then archived. Never reference old plans to understand how things work — that information belongs in `docs/api/` or `CLAUDE_ARCHITECTURE.MD`. When completing a plan, summarize any long-term relevant info (endpoint contracts, behaviors, constraints) into the appropriate `docs/api/` doc before archiving the plan.
+- `CLAUDE_ARCHITECTURE.MD` — System overview for cross-repo context
 
 **Agent index files in other repos (read-only, for context):**
-- **vianda-platform (B2B):** `/Users/cdeachaval/learn/vianda-platform/docs/frontend/AGENT_INDEX.md`
-- **vianda-app (B2C):** `/Users/cdeachaval/learn/vianda-app/docs/frontend/AGENT_INDEX.md`
-- **vianda-home (marketing):** `/Users/cdeachaval/learn/vianda-home/docs/frontend/AGENT_INDEX.md`
-- **infra-kitchen-gcp:** `/Users/cdeachaval/learn/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`
+- **vianda-platform (B2B):** `/Users/cdeachaval/learn/vianda/vianda-platform/docs/frontend/AGENT_INDEX.md`
+- **vianda-app (B2C):** `/Users/cdeachaval/learn/vianda/vianda-app/docs/frontend/AGENT_INDEX.md`
+- **vianda-home (marketing):** `/Users/cdeachaval/learn/vianda/vianda-home/docs/frontend/AGENT_INDEX.md`
+- **infra-kitchen-gcp:** `/Users/cdeachaval/learn/vianda/infra-kitchen-gcp/docs/infrastructure/AGENT_INDEX.md`

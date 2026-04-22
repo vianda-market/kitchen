@@ -1,8 +1,8 @@
 # vianda-home Marketing Site — Public Leads API
 
 **Status:** Implemented (2026-04-05)
-**Source requirements:** `/Users/cdeachaval/learn/vianda-home/docs/frontend/feedback_for_backend/api-requirements.md`
-**Frontend index:** `/Users/cdeachaval/learn/vianda-home/docs/frontend/AGENT_INDEX.md`
+**Source requirements:** `/Users/cdeachaval/learn/vianda/vianda-home/docs/frontend/feedback_for_backend/api-requirements.md`
+**Frontend index:** `/Users/cdeachaval/learn/vianda/vianda-home/docs/frontend/AGENT_INDEX.md`
 
 ---
 

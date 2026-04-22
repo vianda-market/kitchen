@@ -6,7 +6,7 @@ FastAPI + PostgreSQL backend for the Kitchen platform. Manages restaurants, plat
 
 ```bash
 # Clone and enter project
-cd ~/learn/kitchen
+cd ~/learn/vianda/kitchen
 
 # Create virtual environment
 python -m venv venv
