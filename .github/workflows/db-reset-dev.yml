@@ -1,0 +1,70 @@
+name: Reset Dev Database
+
+# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema.
+# Dev data is disposable; never run against staging or prod.
+#
+# Requires:
+#   - Manual approval via GitHub Environment `dev-destructive` (configure in
+#     Settings → Environments → dev-destructive → Required reviewers).
+#   - Operator must type "RESET-DEV-DB" in the `confirm` input to prevent
+#     fat-finger runs.
+#   - GitHub Environment vars: WIF_PROVIDER, DEPLOY_SA, GCP_PROJECT,
+#     CLOUD_SQL_CONNECTION_NAME (e.g. kitchen-dev-490222:us-central1:vianda-dev-postgres).
+#   - GCP secret: vianda-dev-db-password
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "RESET-DEV-DB" to confirm you want to wipe and rebuild the dev database'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  reset:
+    name: Wipe + rebuild dev DB schema
+    runs-on: ubuntu-latest
+    environment: dev-destructive
+    if: inputs.confirm == 'RESET-DEV-DB'
+    steps:
+      - name: Abort on wrong confirmation token
+        if: inputs.confirm != 'RESET-DEV-DB'
+        run: |
+          echo "::error::Confirmation input was '${{ inputs.confirm }}', expected 'RESET-DEV-DB'. Aborting."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          curl -fsSL -o /usr/local/bin/cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.linux.amd64
+          chmod +x /usr/local/bin/cloud-sql-proxy
+
+      - name: Start proxy + rebuild schema
+        env:
+          SQL_CONNECTION_NAME: ${{ vars.CLOUD_SQL_CONNECTION_NAME }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: |
+          cloud-sql-proxy "${SQL_CONNECTION_NAME}" --port 5432 &
+          PROXY_PID=$!
+          sleep 3
+          PGPASSWORD=$(gcloud secrets versions access latest \
+            --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+          DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=kitchen \
+            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+            bash app/db/build_kitchen_db.sh
+          kill $PROXY_PID

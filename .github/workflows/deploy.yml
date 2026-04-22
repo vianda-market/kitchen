@@ -122,6 +122,31 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ vars.GCP_PROJECT }}
 
+      # ───── Run incremental migrations (dev only) ─────
+      # TECH DEBT: CLOUD_SQL_CONNECTION_NAME is a manual GitHub Environment var
+      # (kitchen-dev-490222:us-central1:vianda-dev-postgres). Ideally this comes
+      # from a Pulumi stack output once stack-output plumbing is wired up.
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          curl -fsSL -o /usr/local/bin/cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.linux.amd64
+          chmod +x /usr/local/bin/cloud-sql-proxy
+
+      - name: Run migrations via Auth Proxy
+        env:
+          SQL_CONNECTION_NAME: ${{ vars.CLOUD_SQL_CONNECTION_NAME }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: |
+          cloud-sql-proxy "${SQL_CONNECTION_NAME}" --port 5432 &
+          PROXY_PID=$!
+          sleep 3
+          PGPASSWORD=$(gcloud secrets versions access latest \
+            --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+          DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=kitchen \
+            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" \
+            bash app/db/migrate.sh
+          kill $PROXY_PID
+
       # ───── Final PR marker (success or failure) ─────
       - name: Post final deploy marker
         if: always() && github.event_name == 'pull_request'
