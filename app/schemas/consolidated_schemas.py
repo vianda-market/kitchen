@@ -2997,6 +2997,10 @@ class MarketPublicMinimalSchema(BaseModel):
         None,
         description="Max digits in the national number after the dial code. Use as maxLength hint for phone input (e.g. 10).",
     )
+    has_active_kitchens: bool = Field(
+        ...,
+        description="True when this market has at least one active institution → restaurant → plate → plate_kitchen_days chain. Use to gate subscribable markets on the marketing site.",
+    )
 
     @computed_field
     @property
@@ -3198,6 +3202,13 @@ class ZipcodeMetricsResponseSchema(BaseModel):
     matched_zipcode: str = Field(..., description="Zipcode used for the count (exact or closest match)")
     restaurant_count: int = Field(..., description="Number of restaurants in the matched zipcode")
     has_coverage: bool = Field(..., description="True if restaurant_count > 0")
+
+
+class LeadsCityWithCountSchema(BaseModel):
+    """Single city entry for GET /api/v1/leads/cities?mode=coverage (vianda-home marketing site)."""
+
+    city: str = Field(..., description="City display name")
+    restaurant_count: int = Field(..., ge=0, description="Active restaurants with plate coverage in this city")
 
 
 class LeadsCitiesResponseSchema(BaseModel):

@@ -175,6 +175,35 @@ def get_markets_with_coverage(db) -> list[dict]:
     return [dict(r) for r in rows] if rows else []
 
 
+def get_coverage_flags_for_markets(market_ids: list[str], db) -> set[str]:
+    """
+    Return set of market_id strings that have active plate coverage.
+
+    Batch alternative to calling market_has_active_plate_coverage per market — single query
+    for all market_ids. Used by GET /leads/markets supplier audience to annotate has_active_kitchens.
+    """
+    if not market_ids:
+        return set()
+    rows = db_read(
+        """
+        SELECT DISTINCT im_sub.market_id::text AS market_id
+        FROM core.institution_market im_sub
+        JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
+        JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
+        JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
+        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        WHERE im_sub.market_id = ANY(%s::uuid[])
+          AND i.status = 'active' AND i.is_archived = FALSE
+          AND r.status = 'active' AND r.is_archived = FALSE
+          AND p.is_archived = FALSE
+          AND pkd.status = 'active' AND pkd.is_archived = FALSE
+        """,
+        (market_ids,),
+        connection=db,
+    )
+    return {r["market_id"] for r in rows} if rows else set()
+
+
 class MarketService:
     """Service for managing markets (country-based subscription regions)"""
 
