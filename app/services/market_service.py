@@ -175,7 +175,6 @@ def get_markets_with_coverage(db) -> list[dict]:
     return [dict(r) for r in rows] if rows else []
 
 
-
 def get_coverage_flags_for_markets(market_ids: list[str], db) -> set[str]:
     """
     Return set of market_id strings that have active plate coverage.

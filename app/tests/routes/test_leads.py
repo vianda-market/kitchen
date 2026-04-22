@@ -191,6 +191,7 @@ class TestZipcodeMetricsEndpoint:
         # If all 21 returned 200, rate limiting may be disabled in test (e.g. limiter bypass)
         pytest.skip("Rate limit not triggered in test env (limiter may be disabled)")
 
+
 class TestLeadsCitiesEndpoint:
     """GET /api/v1/leads/cities."""
 
@@ -343,4 +344,3 @@ class TestLeadsMarketsHasActiveKitchens:
         assert resp.status_code == 200
         data = resp.json()
         assert data[0]["has_active_kitchens"] is False
-
