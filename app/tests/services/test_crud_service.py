@@ -189,8 +189,8 @@ class TestBuildJoinQueryWithScope:
             scope=supplier_scope,
             include_archived=False,
             additional_conditions=[
-                ("plate_kitchen_days.kitchen_day = %s", "monday"),
-                ("p.plate_id = %s::uuid", str(uuid4())),
+                ("plate_kitchen_days.kitchen_day = %s", ["monday"]),
+                ("p.plate_id = %s::uuid", [str(uuid4())]),
             ],
         )
 

@@ -59,6 +59,7 @@ from app.services.restaurant_visibility import (
 )
 from app.utils.country import normalize_country_code
 from app.utils.error_messages import entity_not_found
+from app.utils.filter_builder import build_filter_conditions
 from app.utils.log import log_error, log_info
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 from app.utils.query_params import institution_filter, limit_query, market_filter
@@ -496,12 +497,37 @@ def get_restaurants_by_city_route(
 def list_enriched_restaurants(
     response: Response,
     institution_id: UUID | None = institution_filter(),
+    city: str | None = Query(None, description="Filter by city name (case-sensitive)"),
+    market_id: UUID | None = Query(None, description="Filter by market ID"),
+    kitchen_day: str | None = Query(None, description="Filter to restaurants serving this kitchen day (monday–friday)"),
+    cuisine: list[str] | None = Query(None, description="Filter by one or more cuisine names (multi-select)"),
+    search: str | None = Query(None, description="Search across restaurant name and tagline (case-insensitive substring)"),
+    bbox: str | None = Query(
+        None,
+        description=(
+            "Bounding box filter (PostGIS). Comma-separated: min_lng,min_lat,max_lng,max_lat. "
+            "Example: ?bbox=-74.05,40.68,-73.91,40.83 (lon/lat, WGS84). "
+            "Requires PostGIS on the database."
+        ),
+    ),
+    center: str | None = Query(
+        None,
+        description=(
+            "Center point for radius filter (PostGIS). Comma-separated: lat,lng. "
+            "Must be combined with radius_m. Example: ?center=40.7484,-73.9857&radius_m=1000"
+        ),
+    ),
+    radius_m: float | None = Query(
+        None,
+        description="Search radius in metres for proximity filter. Must be combined with center.",
+        gt=0,
+    ),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
+    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). Optional filters: city, market_id, kitchen_day, cuisine (multi-select), search, bbox (bounding box), center+radius_m (proximity). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
         effective_institution_id = resolve_institution_filter(institution_id, scope)
@@ -512,12 +538,57 @@ def list_enriched_restaurants(
             inst_markets = get_institution_market_ids(effective_institution_id, db)
             if inst_markets and len(inst_markets) == 1 and not is_global_market(inst_markets[0]):
                 institution_market_id = inst_markets[0]
+
+        # Parse geo params from query string into the shapes filter_builder expects.
+        bbox_value: list[float] | None = None
+        if bbox is not None:
+            try:
+                parts = [p.strip() for p in bbox.split(",")]
+                if len(parts) != 4:
+                    raise ValueError(f"bbox requires 4 comma-separated values (min_lng,min_lat,max_lng,max_lat), got {len(parts)}")
+                bbox_value = [float(p) for p in parts]
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+
+        radius_value: list[float] | None = None
+        if center is not None or radius_m is not None:
+            if center is None or radius_m is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Both center (lat,lng) and radius_m are required for proximity filtering",
+                )
+            try:
+                center_parts = [p.strip() for p in center.split(",")]
+                if len(center_parts) != 2:
+                    raise ValueError(f"center requires 2 comma-separated values (lat,lng), got {len(center_parts)}")
+                lat = float(center_parts[0])
+                lng = float(center_parts[1])
+                radius_value = [lat, lng, float(radius_m)]
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+
+        try:
+            filter_conditions = build_filter_conditions(
+                "restaurants",
+                {
+                    "city": city,
+                    "market_id": market_id,
+                    "kitchen_day": kitchen_day,
+                    "cuisine": cuisine,
+                    "search": search,
+                    "bbox": bbox_value,
+                    "radius": radius_value,
+                },
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
         enriched_restaurants = get_enriched_restaurants(
             db,
             scope=scope,
             include_archived=False,
             institution_id=effective_institution_id,
             institution_market_id=institution_market_id,
+            additional_conditions=filter_conditions,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )

@@ -732,19 +732,19 @@ def get_enriched_institution_entities(
     Returns:
         List of enriched institution entity schemas with institution, address, and market details
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    additional_conditions: list[tuple[str, list]] = []
     if institution_id is not None:
         additional_conditions.append(
             (
                 f"{_institution_entity_enriched_service.institution_table_alias}.{_institution_entity_enriched_service.institution_column} = %s",
-                institution_id,
+                [institution_id],
             )
         )
     if institution_market_id is not None:
         additional_conditions.append(
             (
                 "a.country_code = (SELECT country_code FROM market_info WHERE market_id = %s AND is_archived = FALSE LIMIT 1)",
-                institution_market_id,
+                [institution_market_id],
             )
         )
     return _institution_entity_enriched_service.get_enriched(
@@ -911,9 +911,9 @@ def get_enriched_addresses(
     Returns:
         List of enriched address schemas with institution name and user details
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    additional_conditions: list[tuple[str, list]] = []
     if institution_id is not None:
-        additional_conditions.append(("a.institution_id = %s", institution_id))
+        additional_conditions.append(("a.institution_id = %s", [institution_id]))
     addresses = _address_enriched_service.get_enriched(
         db,
         select_fields=[
@@ -1086,10 +1086,10 @@ def get_enriched_addresses_search(
     For B2B restaurant address picker: filter by institution_id and optionally search by q
     (matches street_name, city, postal_code, province, formatted_address).
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    additional_conditions: list[tuple[str, list]] = []
     effective_scope = scope
     if institution_id is not None:
-        additional_conditions.append(("a.institution_id = %s", institution_id))
+        additional_conditions.append(("a.institution_id = %s", [institution_id]))
         if scope is None or scope.is_global:
             effective_scope = InstitutionScope(institution_id=institution_id, is_global=False)
     if effective_scope is None and institution_id is not None:
@@ -1188,6 +1188,7 @@ def get_enriched_restaurants(
     include_archived: bool = False,
     institution_id: UUID | None = None,
     institution_market_id: UUID | None = None,
+    additional_conditions: list[tuple[str, list]] | None = None,
     page: int | None = None,
     page_size: int | None = None,
 ) -> list[RestaurantEnrichedResponseSchema]:
@@ -1202,6 +1203,9 @@ def get_enriched_restaurants(
         institution_market_id: Optional market ID when institution is local (v1 bloat control:
             only restaurants whose address is in this market are returned; pass when
             institution has a non-Global market_id)
+        additional_conditions: Optional extra (condition, param_list) tuples from the filter
+            registry (e.g. city, market_id, kitchen_day, cuisine, search). Merged with the
+            institution_id / institution_market_id conditions built internally.
 
     Returns:
         List of RestaurantEnrichedResponseSchema with institution, entity, and address details
@@ -1209,15 +1213,15 @@ def get_enriched_restaurants(
     Raises:
         HTTPException: For system errors or database failures
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    merged_conditions: list[tuple[str, list]] = list(additional_conditions or [])
     if institution_id is not None:
-        additional_conditions.append(("r.institution_id = %s", institution_id))
+        merged_conditions.append(("r.institution_id = %s", [institution_id]))
     if institution_market_id is not None:
         # Restrict to restaurants in this market (address.country_code = market.country_code)
-        additional_conditions.append(
+        merged_conditions.append(
             (
                 "a.country_code = (SELECT country_code FROM market_info WHERE market_id = %s AND is_archived = FALSE LIMIT 1)",
-                institution_market_id,
+                [institution_market_id],
             )
         )
     return _restaurant_enriched_service.get_enriched(
@@ -1255,6 +1259,13 @@ def get_enriched_restaurants(
             "r.status",
             "r.created_date",
             "r.modified_date",
+            # PostGIS: serialise geometry point as GeoJSON. The ::jsonb cast causes
+            # psycopg2 to return a parsed Python dict ({"type":"Point","coordinates":[lng,lat]}).
+            # ::jsonb (not ::json) is required because this query uses SELECT DISTINCT, and
+            # PostgreSQL's json type has no equality operator — jsonb does.
+            # GeoJSON coordinate order is [longitude, latitude] — the reverse of conversational
+            # "lat/lng" ordering. NULL when location is not yet geocoded.
+            "ST_AsGeoJSON(r.location)::jsonb as location",
         ],
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
@@ -1264,12 +1275,18 @@ def get_enriched_restaurants(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            # Filter-only joins for kitchen_day. plate_info → plate_kitchen_days is 1:N per
+            # restaurant, so rows are deduplicated via distinct=True below. These joins surface
+            # pkd.kitchen_day for WHERE filtering without adding it to the SELECT shape.
+            ("LEFT", "ops.plate_info", "pi", "pi.restaurant_id = r.restaurant_id AND pi.is_archived = FALSE"),
+            ("LEFT", "ops.plate_kitchen_days", "pkd", "pkd.plate_id = pi.plate_id AND pkd.is_archived = FALSE"),
         ],
         scope=scope,
         include_archived=include_archived,
-        additional_conditions=additional_conditions if additional_conditions else None,
+        additional_conditions=merged_conditions if merged_conditions else None,
         page=page,
         page_size=page_size,
+        distinct=True,
     )
 
 
@@ -1331,6 +1348,13 @@ def get_enriched_restaurant_by_id(
             "r.status",
             "r.created_date",
             "r.modified_date",
+            # PostGIS: serialise geometry point as GeoJSON. The ::jsonb cast causes
+            # psycopg2 to return a parsed Python dict ({"type":"Point","coordinates":[lng,lat]}).
+            # ::jsonb (not ::json) is required because this query uses SELECT DISTINCT, and
+            # PostgreSQL's json type has no equality operator — jsonb does.
+            # GeoJSON coordinate order is [longitude, latitude] — the reverse of conversational
+            # "lat/lng" ordering. NULL when location is not yet geocoded.
+            "ST_AsGeoJSON(r.location)::jsonb as location",
         ],
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
@@ -1836,6 +1860,7 @@ def get_enriched_plates(
     *,
     scope: InstitutionScope | None = None,
     include_archived: bool = False,
+    additional_conditions: list[tuple[str, list]] | None = None,
     page: int | None = None,
     page_size: int | None = None,
 ) -> list[PlateEnrichedResponseSchema]:
@@ -1846,6 +1871,8 @@ def get_enriched_plates(
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
+        additional_conditions: Optional extra (condition, param_list) tuples from the filter
+            registry (e.g. status, market_id, restaurant_id, plate_date_from, plate_date_to).
 
     Returns:
         List of PlateEnrichedResponseSchema with enriched data
@@ -1912,6 +1939,7 @@ def get_enriched_plates(
         ],
         scope=scope,
         include_archived=include_archived,
+        additional_conditions=additional_conditions,
         page=page,
         page_size=page_size,
     )
@@ -2409,7 +2437,7 @@ def get_enriched_credit_currency_by_id(
         select_fields=_CREDIT_CURRENCY_SELECT,
         aggregate_fields=[_CREDIT_CURRENCY_MARKETS_AGG],
         joins=_CREDIT_CURRENCY_JOINS,
-        additional_conditions=[("cc.currency_metadata_id = %s", str(currency_metadata_id))],
+        additional_conditions=[("cc.currency_metadata_id = %s", [str(currency_metadata_id)])],
         scope=None,
         include_archived=include_archived,
     )
@@ -2859,7 +2887,7 @@ def get_enriched_subscriptions(
     reconcile_hold_subscriptions(db)
     additional_conditions = []
     if user_id:
-        additional_conditions.append(("s.user_id = %s::uuid", str(user_id)))
+        additional_conditions.append(("s.user_id = %s::uuid", [str(user_id)]))
 
     return _subscription_enriched_service.get_enriched(
         db,
@@ -3143,11 +3171,11 @@ def get_enriched_supplier_invoices(
     Get supplier invoices with enriched data (entity name, institution name, created-by name).
     Uses SQL JOINs to avoid N+1 queries.
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    additional_conditions: list[tuple[str, list]] = []
     if institution_entity_id is not None:
-        additional_conditions.append(("si.institution_entity_id = %s", institution_entity_id))
+        additional_conditions.append(("si.institution_entity_id = %s", [institution_entity_id]))
     if status_filter is not None:
-        additional_conditions.append(("si.status = %s::supplier_invoice_status_enum", status_filter))
+        additional_conditions.append(("si.status = %s::supplier_invoice_status_enum", [status_filter]))
 
     return _supplier_invoice_enriched_service.get_enriched(
         db,
@@ -3522,6 +3550,7 @@ def get_enriched_plate_pickups(
     user_id: UUID | None = None,
     include_archived: bool = False,
     completed_only: bool = False,
+    additional_conditions: list[tuple[str, list]] | None = None,
 ) -> list[PlatePickupEnrichedResponseSchema]:
     """
     Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
@@ -3537,6 +3566,8 @@ def get_enriched_plate_pickups(
         scope: Optional institution scope for filtering (for Internal/Suppliers)
         user_id: Optional user ID for user-level filtering (for Customers)
         include_archived: Whether to include archived records (default: False)
+        additional_conditions: Optional extra (condition, param_list) tuples from the filter
+            registry (e.g. status, market_id, window_from, window_to).
 
     Returns:
         List of PlatePickupEnrichedResponseSchema with restaurant, address, product, and credit information
@@ -3566,6 +3597,13 @@ def get_enriched_plate_pickups(
         # For Customers: filter to completed pickups only (order history page)
         if completed_only and user_id is not None:
             conditions.append("ppl.was_collected = TRUE")
+
+        # Apply registry-based filter conditions (e.g. status, market_id, window_from, window_to)
+        if additional_conditions:
+            for condition, param_list in additional_conditions:
+                conditions.append(condition)
+                if param_list is not None:
+                    params.extend(param_list)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -3708,9 +3746,9 @@ def get_enriched_plate_kitchen_days(
     Raises:
         HTTPException: For system errors or database failures
     """
-    additional_conditions: list[tuple[str, Any]] = []
+    additional_conditions: list[tuple[str, list]] = []
     if institution_id is not None:
-        additional_conditions.append(("r.institution_id = %s", institution_id))
+        additional_conditions.append(("r.institution_id = %s", [institution_id]))
     return _plate_kitchen_day_enriched_service.get_enriched(
         db,
         select_fields=[
@@ -4067,7 +4105,7 @@ def get_enriched_payment_methods(
     """
     additional_conditions = []
     if user_id:
-        additional_conditions.append(("pm.user_id = %s::uuid", str(user_id)))
+        additional_conditions.append(("pm.user_id = %s::uuid", [str(user_id)]))
 
     return _payment_method_enriched_service.get_enriched(
         db,

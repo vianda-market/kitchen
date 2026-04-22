@@ -191,6 +191,16 @@ _Routes: `/referrals/`, `/admin/referral-config/`_
 
 ---
 
+## Filter Subsystem
+_Registry, builder, and machine-readable schema for query-param filtering on list endpoints_
+
+| Audience | File | Description |
+|----------|------|-------------|
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/filters.md` | **Filter contract** — registry shape, all ops/casts, URL encoding conventions, `filters.json` schema, pagination interaction, gotchas |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/filters.json` | **Generated schema** — machine-readable filter spec consumed by vianda-hooks, vianda-platform, vianda-app. Never hand-edit; regenerate via `python3 scripts/generate_filter_schema.py` |
+
+---
+
 ## Plans
 _Routes: `/plans/`_
 

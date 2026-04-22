@@ -12,6 +12,7 @@ from app.schemas.consolidated_schemas import PlatePickupEnrichedResponseSchema
 from app.services.entity_service import get_enriched_plate_pickups
 from app.services.error_handling import handle_business_operation
 from app.services.plate_pickup_service import plate_pickup_service
+from app.utils.filter_builder import build_filter_conditions
 from app.utils.log import log_warning
 
 router = APIRouter(prefix="/plate-pickup", tags=["Plate Pickup"], dependencies=[Depends(oauth2_scheme)])
@@ -128,12 +129,17 @@ def get_enriched_plate_pickups_endpoint(
         False,
         description="When true (Customers only), filter to pickups with was_collected=true for order history page",
     ),
+    status: str | None = Query(None, description="Filter by pickup status (e.g. pending, arrived, completed, cancelled)"),
+    market_id: UUID | None = Query(None, description="Filter by market ID"),
+    window_from: str | None = Query(None, description="Filter pickups with expected_completion_time on or after this timestamp (ISO 8601)"),
+    window_to: str | None = Query(None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
     Returns an array of enriched plate pickup records.
 
+    Optional filters: status, market_id, window_from, window_to (filter by expected_completion_time).
     Use completed_only=true for the customer order history page (pickups they have collected).
 
     Scoping:
@@ -159,12 +165,25 @@ def get_enriched_plate_pickups_endpoint(
                 log_warning(f"Invalid user_id in current_user: {current_user.get('user_id')}. Error: {e}")
                 raise HTTPException(status_code=400, detail=f"Invalid user ID format: {e}") from None
 
+        try:
+            filter_conditions = build_filter_conditions(
+                "pickups",
+                {
+                    "status": status,
+                    "market_id": market_id,
+                    "window_from": window_from,
+                    "window_to": window_to,
+                },
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
         return get_enriched_plate_pickups(
             db,
             scope=scope,
             user_id=user_id,
             include_archived=False,
             completed_only=completed_only if user_id else False,
+            additional_conditions=filter_conditions,
         )
 
     return handle_business_operation(_get_enriched_pickups, "enriched plate pickup retrieval")

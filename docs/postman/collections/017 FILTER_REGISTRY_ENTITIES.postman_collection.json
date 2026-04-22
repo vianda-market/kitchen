@@ -1,0 +1,971 @@
+{
+  "info": {
+    "_postman_id": "filter-registry-entities-2026-v1",
+    "name": "017 FILTER_REGISTRY_ENTITIES",
+    "description": "017 – Filter Registry Entities. Covers restaurants, plates, and pickups filter params registered in §3.2. Flow: (1) Login as admin, (2) Restaurants – eq (city, kitchen_day), in (cuisine), ilike search, (3) Plates – eq status, eq restaurant_id, eq market_id, date range, (4) Pickups – eq status, eq market_id, timestamptz window range. Run after DB has seeded test data. Uses {{baseUrl}} and {{adminAuthToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has access_token', function () {",
+                  "    pm.expect(response).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "const token = response.access_token;",
+                  "pm.collectionVariables.set('adminAuthToken', token);",
+                  "pm.environment.set('adminAuthToken', token);",
+                  "pm.globals.set('adminAuthToken', token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{adminUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Restaurants",
+      "item": [
+        {
+          "name": "GET /restaurants/enriched – no filter (baseline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Store first restaurant_id for downstream tests",
+                  "const body = pm.response.json();",
+                  "if (body.length > 0) {",
+                  "    pm.collectionVariables.set('sampleRestaurantId', body[0].restaurant_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – filter by city (eq)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// All returned restaurants must have the filtered city",
+                  "const restaurants = pm.response.json();",
+                  "const city = pm.request.url.query.toObject().city;",
+                  "restaurants.forEach(function(r) {",
+                  "    pm.test('Restaurant city matches filter', function () {",
+                  "        pm.expect(r.city).to.equal(city);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?city=Buenos Aires",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Buenos Aires"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – filter by kitchen_day (eq via pkd join)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?kitchen_day=monday",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "kitchen_day",
+                  "value": "monday"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – filter by cuisine (in/multi-select)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?cuisine=Italian&cuisine=Mexican",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "cuisine",
+                  "value": "Italian"
+                },
+                {
+                  "key": "cuisine",
+                  "value": "Mexican"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – search (ilike OR name+tagline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Results should have name or tagline containing the search term (case-insensitive)",
+                  "const term = 'Vianda';",
+                  "const restaurants = pm.response.json();",
+                  "restaurants.forEach(function(r) {",
+                  "    pm.test('Restaurant name or tagline matches search term', function () {",
+                  "        const nameMatch = r.name && r.name.toLowerCase().includes(term.toLowerCase());",
+                  "        const taglineMatch = r.tagline && r.tagline.toLowerCase().includes(term.toLowerCase());",
+                  "        pm.expect(nameMatch || taglineMatch).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?search=Vianda",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Vianda"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – with pagination (X-Total-Count check)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('X-Total-Count header is set', function () {",
+                  "    pm.expect(pm.response.headers.get('X-Total-Count')).to.not.be.null;",
+                  "    pm.expect(parseInt(pm.response.headers.get('X-Total-Count'))).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?page=1&page_size=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Plates",
+      "item": [
+        {
+          "name": "GET /plates/enriched – no filter (baseline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /plates/enriched – filter by status (eq)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const plates = pm.response.json();",
+                  "plates.forEach(function(p) {",
+                  "    pm.test('Plate status matches filter', function () {",
+                  "        pm.expect(p.status).to.equal('active');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /plates/enriched – filter by restaurant_id (eq/uuid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "const restaurantId = pm.collectionVariables.get('sampleRestaurantId');",
+                  "const plates = pm.response.json();",
+                  "plates.forEach(function(p) {",
+                  "    pm.test('Plate restaurant_id matches filter', function () {",
+                  "        pm.expect(p.restaurant_id).to.equal(restaurantId);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?restaurant_id={{sampleRestaurantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"],
+              "query": [
+                {
+                  "key": "restaurant_id",
+                  "value": "{{sampleRestaurantId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /plates/enriched – filter by date range (gte/lte)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?plate_date_from=2024-01-01&plate_date_to=2026-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"],
+              "query": [
+                {
+                  "key": "plate_date_from",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "plate_date_to",
+                  "value": "2026-12-31"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pickups",
+      "item": [
+        {
+          "name": "GET /plate-pickup/enriched – no filter (baseline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plate-pickup", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /plate-pickup/enriched – filter by status (eq)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const pickups = pm.response.json();",
+                  "pickups.forEach(function(p) {",
+                  "    pm.test('Pickup status matches filter', function () {",
+                  "        pm.expect(p.status).to.equal('pending');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plate-pickup", "enriched"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /plate-pickup/enriched – filter by market_id (eq/uuid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?market_id={{sampleMarketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plate-pickup", "enriched"],
+              "query": [
+                {
+                  "key": "market_id",
+                  "value": "{{sampleMarketId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /plate-pickup/enriched – filter by window range (gte/lte timestamptz)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?window_from=2024-01-01T00:00:00Z&window_to=2026-12-31T23:59:59Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plate-pickup", "enriched"],
+              "query": [
+                {
+                  "key": "window_from",
+                  "value": "2024-01-01T00:00:00Z"
+                },
+                {
+                  "key": "window_to",
+                  "value": "2026-12-31T23:59:59Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Geo Filters (restaurants)",
+      "description": "Geo bbox and radius filter tests for GET /restaurants/enriched. Requires PostGIS installed and ops.restaurant_info.location populated with seed data. Use a bbox / center point that covers at least one seeded restaurant to verify a 200 with results.",
+      "item": [
+        {
+          "name": "GET /restaurants/enriched – bbox (wide NYC area, expects results if seeded)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Uncomment to assert at least one result when seed data is present:",
+                  "// pm.test('At least one restaurant in bbox', function () {",
+                  "//     pm.expect(pm.response.json().length).to.be.above(0);",
+                  "// });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?bbox=-74.05,40.68,-73.91,40.83",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "bbox",
+                  "value": "-74.05,40.68,-73.91,40.83",
+                  "description": "min_lng,min_lat,max_lng,max_lat — NYC bounding box"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – bbox (Antarctic, expects empty result)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('No restaurants in Antarctic bbox', function () {",
+                  "    pm.expect(pm.response.json().length).to.equal(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?bbox=-10.0,-80.0,10.0,-70.0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "bbox",
+                  "value": "-10.0,-80.0,10.0,-70.0",
+                  "description": "Antarctic bounding box — no restaurants expected"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – radius (1 km from midtown NYC)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Uncomment to assert at least one result when seed data is present:",
+                  "// pm.test('At least one restaurant within radius', function () {",
+                  "//     pm.expect(pm.response.json().length).to.be.above(0);",
+                  "// });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?center=40.7484,-73.9857&radius_m=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "center",
+                  "value": "40.7484,-73.9857",
+                  "description": "lat,lng — midtown Manhattan"
+                },
+                {
+                  "key": "radius_m",
+                  "value": "1000",
+                  "description": "1 km radius"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – bbox + city (AND semantics)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?bbox=-74.05,40.68,-73.91,40.83&city=New York",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "bbox",
+                  "value": "-74.05,40.68,-73.91,40.83"
+                },
+                {
+                  "key": "city",
+                  "value": "New York"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – bad bbox (not numbers) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?bbox=not-numbers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "bbox",
+                  "value": "not-numbers"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – bad bbox (wrong arity, 3 values) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?bbox=1,2,3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "bbox",
+                  "value": "1,2,3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurants/enriched – center without radius_m → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?center=40.7484,-73.9857",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurants", "enriched"],
+              "query": [
+                {
+                  "key": "center",
+                  "value": "40.7484,-73.9857"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "adminAuthToken",
+      "value": ""
+    },
+    {
+      "key": "sampleRestaurantId",
+      "value": ""
+    },
+    {
+      "key": "sampleMarketId",
+      "value": ""
+    }
+  ]
+}
