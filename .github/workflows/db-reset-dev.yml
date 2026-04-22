@@ -1,0 +1,71 @@
+name: Reset Dev Database
+
+# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema.
+# Dev data is disposable; never run against staging or prod.
+#
+# Requires:
+#   - Manual approval via GitHub Environment `dev-destructive` (configure in
+#     Settings → Environments → dev-destructive → Required reviewers).
+#   - Operator must type "RESET-DEV-DB" in the `confirm` input to prevent
+#     fat-finger runs.
+#   - GitHub Environment vars: WIF_PROVIDER, DEPLOY_SA, GCP_PROJECT, DB_PRIVATE_IP.
+#   - GCP secret: vianda-dev-db-password
+#   - Bastion VM `vianda-dev-bastion` (zone us-central1-a) reachable via IAP.
+#   - Deploy SA has roles/iap.tunnelResourceAccessor + roles/compute.osLogin.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "RESET-DEV-DB" to confirm you want to wipe and rebuild the dev database'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  reset:
+    name: Wipe + rebuild dev DB schema
+    runs-on: ubuntu-latest
+    environment: dev-destructive
+    if: inputs.confirm == 'RESET-DEV-DB'
+    steps:
+      - name: Abort on wrong confirmation token
+        if: inputs.confirm != 'RESET-DEV-DB'
+        run: |
+          echo "::error::Confirmation input was '${{ inputs.confirm }}', expected 'RESET-DEV-DB'. Aborting."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Open IAP SSH tunnel + rebuild schema
+        env:
+          DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: |
+          gcloud compute ssh vianda-dev-bastion \
+            --project="${GCP_PROJECT}" \
+            --zone=us-central1-a \
+            --tunnel-through-iap \
+            --ssh-flag="-L 5433:${DB_PRIVATE_IP}:5432" \
+            --ssh-flag="-N" \
+            --ssh-flag="-o StrictHostKeyChecking=no" &
+          TUNNEL_PID=$!
+          trap "kill ${TUNNEL_PID} 2>/dev/null" EXIT
+          for i in $(seq 1 20); do nc -z 127.0.0.1 5433 && break; sleep 1; done
+          PGPASSWORD=$(gcloud secrets versions access latest \
+            --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+          DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
+            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+            bash app/db/build_kitchen_db.sh
