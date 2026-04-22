@@ -39,7 +39,7 @@ GOOGLE_API_KEY_DEV=your_actual_api_key_here  # local uses dev key
 The collection requires at least one address in the database:
 
 ```bash
-cd /Users/cdeachaval/learn/kitchen
+cd /Users/cdeachaval/learn/vianda/kitchen
 ./app/db/build_kitchen_db.sh
 ```
 
