@@ -243,7 +243,7 @@ def _get_cached_cities(country: str, audience: str, db) -> list[str]:
 
 @router.get("/cities", response_model=LeadsCitiesResponseSchema | list[LeadsCityWithCountSchema])
 @limiter.limit("20/minute")
-async def get_leads_cities(
+async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query params, not algorithmic args
     request: Request,
     response: Response,
     country_code: str | None = "US",
