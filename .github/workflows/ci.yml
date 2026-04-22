@@ -211,11 +211,15 @@ jobs:
 
       - name: Diff coverage gate (changed lines only, >=80%)
         # Routes/services excluded — they're tested via Postman per CLAUDE.md.
+        # app/tests/routes/** also excluded because pytest --ignore=app/tests/routes
+        # above skips that directory (historical pytest tests are being migrated
+        # to Postman collections). Without this exclude, any PR adding a file
+        # there trips diff-cov at 0% coverage for unrun test lines.
         run: >
           diff-cover coverage.xml
           --compare-branch=origin/main
           --fail-under=80
-          --exclude "*app/routes/*" "*app/services/*"
+          --exclude "*app/routes/*" "*app/services/*" "*app/tests/routes/*"
 
       - name: Per-layer coverage floor (absolute)
         # Complements diff-cover (changed lines) with an absolute floor on
