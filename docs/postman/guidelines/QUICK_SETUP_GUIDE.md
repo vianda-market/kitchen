@@ -4,7 +4,7 @@
 
 ### 1. Run the Enhanced Seed Script
 ```bash
-cd /Users/cdeachaval/learn/kitchen
+cd /Users/cdeachaval/learn/vianda/kitchen
 source venv/bin/activate
 RUN_SEED=true python .seed_data.py
 ```
@@ -18,7 +18,7 @@ This will create:
 
 ### 2. Start the API Server
 ```bash
-cd /Users/cdeachaval/learn/kitchen
+cd /Users/cdeachaval/learn/vianda/kitchen
 source venv/bin/activate
 uvicorn application:app --reload --host 0.0.0.0 --port 8000
 ```

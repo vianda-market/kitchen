@@ -4,7 +4,7 @@
 
 1. **Navigate to the project directory:**
    ```bash
-   cd /Users/cdeachaval/learn/kitchen
+   cd /Users/cdeachaval/learn/vianda/kitchen
    ```
 
 2. **Activate the virtual environment:**
@@ -52,7 +52,7 @@ Press `CTRL+C` in the terminal to stop the server.
 
 If you see import errors or module not found:
 - Make sure the virtual environment is activated (you should see `(venv)` in your prompt)
-- Verify you're in the correct directory: `/Users/cdeachaval/learn/kitchen`
+- Verify you're in the correct directory: `/Users/cdeachaval/learn/vianda/kitchen`
 
 ## Testing the Enriched Endpoint
 

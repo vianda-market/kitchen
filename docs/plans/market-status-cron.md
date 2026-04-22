@@ -83,4 +83,4 @@ Pick the window based on whether calendar-date coverage columns have been introd
 - Original feature plan: `docs/plans/` (country-filter work, consumed by vianda-home).
 - Shipped contract and semantics: `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md`.
 - Admin override predicate (already in code): `market_has_active_plate_coverage` in `app/services/market_service.py`.
-- vianda-home frontend spec: `/Users/cdeachaval/learn/vianda-home/docs/plans/country-filter.md`.
+- vianda-home frontend spec: `/Users/cdeachaval/learn/vianda/vianda-home/docs/plans/country-filter.md`.
