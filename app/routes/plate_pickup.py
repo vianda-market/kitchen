@@ -129,10 +129,16 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
         False,
         description="When true (Customers only), filter to pickups with was_collected=true for order history page",
     ),
-    status: str | None = Query(None, description="Filter by pickup status (e.g. pending, arrived, completed, cancelled)"),
+    status: str | None = Query(
+        None, description="Filter by pickup status (e.g. pending, arrived, completed, cancelled)"
+    ),
     market_id: UUID | None = Query(None, description="Filter by market ID"),
-    window_from: str | None = Query(None, description="Filter pickups with expected_completion_time on or after this timestamp (ISO 8601)"),
-    window_to: str | None = Query(None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"),
+    window_from: str | None = Query(
+        None, description="Filter pickups with expected_completion_time on or after this timestamp (ISO 8601)"
+    ),
+    window_to: str | None = Query(
+        None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"
+    ),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):

@@ -83,10 +83,8 @@ def _validate_enum_value(value: str, class_name: str, context: str | None, param
     """Raise ValueError if value is not in the valid set for this enum/context."""
     valid = _valid_enum_values(class_name, context)
     if value not in valid:
-        raise ValueError(
-            f"Invalid value '{value}' for filter '{param_name}' "
-            f"(expected one of: {sorted(valid)})"
-        )
+        raise ValueError(f"Invalid value '{value}' for filter '{param_name}' (expected one of: {sorted(valid)})")
+
 
 _CAST_SQL: dict[str, str] = {
     "uuid": "%s::uuid",
@@ -128,6 +126,7 @@ def _col_ref(field: dict) -> str:
 # ---------------------------------------------------------------------------
 # Geo helpers
 # ---------------------------------------------------------------------------
+
 
 def _to_float(raw: Any, label: str) -> float:
     """Coerce raw to float, raise ValueError with descriptive message on failure."""
@@ -187,13 +186,11 @@ def _build_geo_radius(col: str, value: Any, param_name: str) -> tuple[str, list]
         items = list(value)
     except TypeError:
         raise ValueError(
-            f"Geo radius filter '{param_name}' expects a 3-element sequence "
-            f"[lat, lng, radius_m], got {value!r}"
+            f"Geo radius filter '{param_name}' expects a 3-element sequence [lat, lng, radius_m], got {value!r}"
         ) from None
     if len(items) != 3:
         raise ValueError(
-            f"Geo radius filter '{param_name}' requires exactly 3 values "
-            f"[lat, lng, radius_m], got {len(items)}"
+            f"Geo radius filter '{param_name}' requires exactly 3 values [lat, lng, radius_m], got {len(items)}"
         )
     lat = _to_float(items[0], f"{param_name}[lat]")
     lng = _to_float(items[1], f"{param_name}[lng]")
@@ -203,10 +200,7 @@ def _build_geo_radius(col: str, value: Any, param_name: str) -> tuple[str, list]
     if radius_m <= 0:
         raise ValueError(f"Geo filter param '{param_name}[radius_m]' must be > 0, got {radius_m}")
     # ST_SetSRID(ST_MakePoint(lng, lat), 4326) — PostGIS takes lng first, lat second.
-    condition = (
-        f"ST_DWithin({col}::geography, "
-        f"ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s)"
-    )
+    condition = f"ST_DWithin({col}::geography, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s)"
     return condition, [lng, lat, radius_m]
 
 
@@ -216,6 +210,7 @@ def _build_geo_radius(col: str, value: Any, param_name: str) -> tuple[str, list]
 # with no cols declared). Unknown ops are handled at the dispatcher — these
 # helpers trust their op.
 # ---------------------------------------------------------------------------
+
 
 def _op_eq(field: dict, value: Any, param_name: str) -> tuple[str, list]:
     cast = field.get("cast", "text")
@@ -259,11 +254,7 @@ def _op_ilike(field: dict, value: Any, param_name: str) -> tuple[str, list] | No
     if not cols:
         return None
     wrapped = f"%{value}%"
-    condition = (
-        f"({' OR '.join(f'{col} ILIKE %s' for col in cols)})"
-        if len(cols) > 1
-        else f"{cols[0]} ILIKE %s"
-    )
+    condition = f"({' OR '.join(f'{col} ILIKE %s' for col in cols)})" if len(cols) > 1 else f"{cols[0]} ILIKE %s"
     return (condition, [wrapped] * len(cols))
 
 
@@ -278,10 +269,7 @@ def _op_geo(field: dict, value: Any, param_name: str) -> tuple[str, list]:
         return _build_geo_bbox(col, value, param_name)
     if mode == "radius":
         return _build_geo_radius(col, value, param_name)
-    raise ValueError(
-        f"Geo filter '{param_name}' has unknown mode '{mode}'. "
-        "Supported modes: 'bbox', 'radius'."
-    )
+    raise ValueError(f"Geo filter '{param_name}' has unknown mode '{mode}'. Supported modes: 'bbox', 'radius'.")
 
 
 _OP_BUILDERS = {
