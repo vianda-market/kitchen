@@ -501,7 +501,9 @@ def list_enriched_restaurants(
     market_id: UUID | None = Query(None, description="Filter by market ID"),
     kitchen_day: str | None = Query(None, description="Filter to restaurants serving this kitchen day (monday–friday)"),
     cuisine: list[str] | None = Query(None, description="Filter by one or more cuisine names (multi-select)"),
-    search: str | None = Query(None, description="Search across restaurant name and tagline (case-insensitive substring)"),
+    search: str | None = Query(
+        None, description="Search across restaurant name and tagline (case-insensitive substring)"
+    ),
     bbox: str | None = Query(
         None,
         description=(
@@ -545,7 +547,9 @@ def list_enriched_restaurants(
             try:
                 parts = [p.strip() for p in bbox.split(",")]
                 if len(parts) != 4:
-                    raise ValueError(f"bbox requires 4 comma-separated values (min_lng,min_lat,max_lng,max_lat), got {len(parts)}")
+                    raise ValueError(
+                        f"bbox requires 4 comma-separated values (min_lng,min_lat,max_lng,max_lat), got {len(parts)}"
+                    )
                 bbox_value = [float(p) for p in parts]
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from None
