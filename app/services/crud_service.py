@@ -97,7 +97,7 @@ class CRUDService(Generic[T]):
         self,
         scope: InstitutionScope | None,
         include_archived: bool = False,
-        additional_conditions: list[tuple[str, Any]] | None = None,
+        additional_conditions: list[tuple[str, list]] | None = None,
         select_fields: str | None = None,
         order_by: str | None = None,
     ) -> tuple[str, list[Any]]:
@@ -107,7 +107,7 @@ class CRUDService(Generic[T]):
         Args:
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records
-            additional_conditions: List of (condition, param) tuples for custom conditions
+            additional_conditions: List of (condition, list_of_params) tuples for custom conditions
             select_fields: Custom SELECT fields (defaults to base table.*)
             order_by: Custom ORDER BY clause (defaults to primary key DESC for newest first)
 
@@ -144,10 +144,10 @@ class CRUDService(Generic[T]):
 
         # Add custom conditions
         if additional_conditions:
-            for condition, param in additional_conditions:
+            for condition, param_list in additional_conditions:
                 conditions.append(condition)
-                if param is not None:
-                    params.append(param)
+                if param_list is not None:
+                    params.extend(param_list)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -370,7 +370,7 @@ class CRUDService(Generic[T]):
         try:
             # Use JOIN-based query if institution_join_path is configured
             if self.institution_join_path:
-                additional_conditions = [(f"{self.table_name}.{self.id_column} = %s", str(record_id))]
+                additional_conditions = [(f"{self.table_name}.{self.id_column} = %s", [str(record_id)])]
                 query, params = self._build_join_query_with_scope(
                     scope=scope,
                     include_archived=False,

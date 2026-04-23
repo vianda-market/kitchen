@@ -775,8 +775,11 @@ def create_plan_routes() -> APIRouter:
             from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_list_field
 
             filters = {"market_id": market_id, "status": status, "currency_code": currency_code}
-            additional_conditions = list(build_filter_conditions("plans", filters) or [])
-            additional_conditions.append(("pl.market_id != %s::uuid", str(GLOBAL_MARKET_ID)))
+            try:
+                additional_conditions = list(build_filter_conditions("plans", filters) or [])
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+            additional_conditions.append(("pl.market_id != %s::uuid", [str(GLOBAL_MARKET_ID)]))
             enriched_plans = get_enriched_plans(db, include_archived=False, additional_conditions=additional_conditions)
             if locale != "en":
                 for p in enriched_plans:
@@ -1750,6 +1753,7 @@ def create_plate_routes() -> APIRouter:
     from app.services.entity_service import get_enriched_plate_by_id, get_enriched_plates
     from app.services.error_handling import handle_get_all, handle_get_by_id
     from app.utils.error_messages import entity_not_found
+    from app.utils.filter_builder import build_filter_conditions
     from app.utils.log import log_error
 
     config = RouteConfig(
@@ -1781,11 +1785,16 @@ def create_plate_routes() -> APIRouter:
         # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
         @router.get("/enriched", response_model=list[PlateEnrichedResponseSchema])
         def list_enriched_plates(
+            status: str | None = Query(None, description="Filter by plate status (e.g. active, inactive)"),
+            market_id: UUID | None = Query(None, description="Filter by market ID"),
+            restaurant_id: UUID | None = Query(None, description="Filter by restaurant ID"),
+            plate_date_from: str | None = Query(None, description="Filter plates created on or after this date (YYYY-MM-DD)"),
+            plate_date_to: str | None = Query(None, description="Filter plates created on or before this date (YYYY-MM-DD)"),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """List plates with enriched data - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
+            """List plates with enriched data. Optional filters: status, market_id, restaurant_id, plate_date_from, plate_date_to. Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 from app.i18n.locale_names import resolve_cuisine_name
 
@@ -1793,7 +1802,25 @@ def create_plate_routes() -> APIRouter:
                     scope = None
                 else:
                     scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
-                plates = get_enriched_plates(db, scope=scope, include_archived=False)
+                try:
+                    filter_conditions = build_filter_conditions(
+                        "plates",
+                        {
+                            "status": status,
+                            "market_id": market_id,
+                            "restaurant_id": restaurant_id,
+                            "plate_date_from": plate_date_from,
+                            "plate_date_to": plate_date_to,
+                        },
+                    )
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from None
+                plates = get_enriched_plates(
+                    db,
+                    scope=scope,
+                    include_archived=False,
+                    additional_conditions=filter_conditions,
+                )
                 if locale != "en":
                     from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_field_aliased
 

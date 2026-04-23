@@ -10,4 +10,165 @@
 
 SET search_path = core, ops, customer, billing, audit, public;
 
--- (no dev fixtures yet — add test scenarios here as needed)
+-- =============================================================================
+-- DEV FIXTURE: Buenos Aires supplier with geocoded restaurants
+-- Provides seed data for geo filter live verification (§3.4).
+--
+-- Fixed UUIDs used throughout so the fixture is idempotent and easy to reference
+-- in curl / psql queries.
+--
+-- Supplier institution:  aaaaaaaa-aaaa-0001-0000-000000000001
+-- Institution entity:    aaaaaaaa-aaaa-0001-0000-000000000002
+-- Supplier address (entity):  aaaaaaaa-aaaa-0001-0000-000000000003
+-- Restaurant 1 address:       aaaaaaaa-aaaa-0001-0000-000000000004
+-- Restaurant 2 address:       aaaaaaaa-aaaa-0001-0000-000000000005
+-- Restaurant 1 (geocoded):    aaaaaaaa-aaaa-0001-0000-000000000010
+-- Restaurant 2 (no location): aaaaaaaa-aaaa-0001-0000-000000000011
+-- =============================================================================
+
+-- Supplier institution (Argentina)
+INSERT INTO core.institution_info (institution_id, name, institution_type, is_archived, status, created_date, created_by, modified_by, modified_date)
+VALUES (
+    'aaaaaaaa-aaaa-0001-0000-000000000001',
+    'Mercado Vianda BA (dev fixture)',
+    'supplier'::institution_type_enum,
+    FALSE,
+    'active'::status_enum,
+    CURRENT_TIMESTAMP,
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    CURRENT_TIMESTAMP
+);
+
+-- Assign institution to AR market
+INSERT INTO core.institution_market (institution_id, market_id, is_primary)
+VALUES ('aaaaaaaa-aaaa-0001-0000-000000000001', '00000000-0000-0000-0000-000000000002', TRUE);
+
+-- Resolve Buenos Aires city_metadata_id once for reuse across all addresses.
+-- This subquery is evaluated at seed time against already-loaded reference data.
+DO $$
+DECLARE
+    v_ba_city_id UUID;
+BEGIN
+    SELECT cm.city_metadata_id INTO v_ba_city_id
+    FROM core.city_metadata cm
+    JOIN external.geonames_city gc ON cm.geonames_id = gc.geonames_id
+    WHERE gc.ascii_name = 'Buenos Aires' AND cm.country_iso = 'AR'
+    LIMIT 1;
+
+    IF v_ba_city_id IS NULL THEN
+        RAISE EXCEPTION 'Buenos Aires city_metadata not found — reference data may not be loaded';
+    END IF;
+
+    -- Address for institution entity (Buenos Aires, Argentina)
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'aaaaaaaa-aaaa-0001-0000-000000000003',
+        'aaaaaaaa-aaaa-0001-0000-000000000001',
+        v_ba_city_id,
+        ARRAY['entity_address'::address_type_enum],
+        'AR', 'Buenos Aires', 'Buenos Aires', 'C1425',
+        'ave'::street_type_enum, 'Corrientes', '1234',
+        'America/Argentina/Buenos_Aires',
+        FALSE, 'active'::status_enum,
+        'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    );
+
+    -- Restaurant 1 address — Palermo, Buenos Aires (-34.5854, -58.4352)
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'aaaaaaaa-aaaa-0001-0000-000000000004',
+        'aaaaaaaa-aaaa-0001-0000-000000000001',
+        v_ba_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'AR', 'Buenos Aires', 'Buenos Aires', 'C1425',
+        'ave'::street_type_enum, 'Santa Fe', '3200',
+        'America/Argentina/Buenos_Aires',
+        FALSE, 'active'::status_enum,
+        'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    );
+
+    -- Restaurant 2 address — San Telmo, Buenos Aires (-34.6226, -58.3701)
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'aaaaaaaa-aaaa-0001-0000-000000000005',
+        'aaaaaaaa-aaaa-0001-0000-000000000001',
+        v_ba_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'AR', 'Buenos Aires', 'Buenos Aires', 'C1066',
+        'st'::street_type_enum, 'Defensa', '500',
+        'America/Argentina/Buenos_Aires',
+        FALSE, 'active'::status_enum,
+        'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    );
+END $$;
+
+-- Institution entity (AR legal entity, ARS currency)
+INSERT INTO ops.institution_entity_info (
+    institution_entity_id, institution_id, address_id,
+    currency_metadata_id, tax_id, name,
+    is_archived, status, created_by, modified_by
+) VALUES (
+    'aaaaaaaa-aaaa-0001-0000-000000000002',
+    'aaaaaaaa-aaaa-0001-0000-000000000001',
+    'aaaaaaaa-aaaa-0001-0000-000000000003',
+    '66666666-6666-6666-6666-666666666601',  -- ARS currency_metadata
+    '20-12345678-9',
+    'Mercado Vianda BA Entidad (dev)',
+    FALSE, 'active'::status_enum,
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+);
+
+-- Restaurant 1: geocoded at Palermo, Buenos Aires
+-- ST_MakePoint(longitude, latitude) — PostGIS convention: X=lng, Y=lat
+INSERT INTO ops.restaurant_info (
+    restaurant_id, institution_id, institution_entity_id, address_id,
+    name, is_featured, is_archived, status,
+    location,
+    created_by, modified_by
+) VALUES (
+    'aaaaaaaa-aaaa-0001-0000-000000000010',
+    'aaaaaaaa-aaaa-0001-0000-000000000001',
+    'aaaaaaaa-aaaa-0001-0000-000000000002',
+    'aaaaaaaa-aaaa-0001-0000-000000000004',
+    'La Cocina Porteña (dev)',
+    FALSE, FALSE, 'active'::status_enum,
+    ST_SetSRID(ST_MakePoint(-58.4352, -34.5854), 4326),  -- Palermo: lng=-58.4352, lat=-34.5854
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+);
+
+-- Restaurant 2: no geocoded location (location IS NULL)
+INSERT INTO ops.restaurant_info (
+    restaurant_id, institution_id, institution_entity_id, address_id,
+    name, is_featured, is_archived, status,
+    created_by, modified_by
+) VALUES (
+    'aaaaaaaa-aaaa-0001-0000-000000000011',
+    'aaaaaaaa-aaaa-0001-0000-000000000001',
+    'aaaaaaaa-aaaa-0001-0000-000000000002',
+    'aaaaaaaa-aaaa-0001-0000-000000000005',
+    'Bodegón San Telmo (dev, no location)',
+    FALSE, FALSE, 'active'::status_enum,
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+);

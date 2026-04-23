@@ -79,7 +79,7 @@ class EnrichedService(Generic[T]):
         self,
         include_archived: bool = False,
         scope: InstitutionScope | None = None,
-        additional_conditions: list[tuple[str, Any]] | None = None,
+        additional_conditions: list[tuple[str, list]] | None = None,
     ) -> tuple[str, list[Any]]:
         """
         Build WHERE clause and parameters for enriched queries.
@@ -87,7 +87,7 @@ class EnrichedService(Generic[T]):
         Args:
             include_archived: Whether to include archived records
             scope: Optional institution scope for filtering
-            additional_conditions: List of (condition, param) tuples for custom conditions
+            additional_conditions: List of (condition, list_of_params) tuples for custom conditions
 
         Returns:
             Tuple of (where_clause, params)
@@ -106,11 +106,11 @@ class EnrichedService(Generic[T]):
 
         # Add custom conditions
         if additional_conditions:
-            for condition, param in additional_conditions:
+            for condition, param_list in additional_conditions:
                 conditions.append(condition)
-                if param is not None:
-                    # psycopg2 can't adapt uuid.UUID; convert to str for query params
-                    params.append(str(param) if isinstance(param, UUID) else param)
+                if param_list is not None:
+                    # param_list is now a list of parameters for this condition
+                    params.extend(param_list)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         return where_clause, params
@@ -166,11 +166,12 @@ class EnrichedService(Generic[T]):
         joins: list[tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
         scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: list[tuple[str, Any]] | None = None,
+        additional_conditions: list[tuple[str, list]] | None = None,
         order_by: str | None = None,
         row_transform: Callable[[dict], dict] | None = None,
         page: int | None = None,
         page_size: int | None = None,
+        distinct: bool = False,
     ) -> Union[list[T], "PaginatedList[T]"]:
         """
         Get all enriched records with JOINs and filtering.
@@ -181,10 +182,13 @@ class EnrichedService(Generic[T]):
             joins: List of JOIN clauses as (table, alias, condition) tuples
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records
-            additional_conditions: List of (condition, param) tuples for custom WHERE conditions
+            additional_conditions: List of (condition, list_of_params) tuples for custom WHERE conditions
             order_by: ORDER BY clause (defaults to self.default_order_by)
             page: Optional 1-based page number (activates pagination when both page and page_size are set)
             page_size: Optional rows per page (clamped to 1-100)
+            distinct: When True, emits SELECT DISTINCT to eliminate duplicate rows produced by
+                1:N filter-only JOINs (e.g. restaurant × kitchen_days). Only set to True when
+                the joins list includes a 1:N table that is not represented in select_fields.
 
         Returns:
             List of enriched schema objects, or PaginatedList with .total_count when paginated
@@ -210,10 +214,12 @@ class EnrichedService(Generic[T]):
             order_by_clause = order_by or self.default_order_by
 
             # Run COUNT query before pagination LIMIT/OFFSET
+            select_distinct = "SELECT DISTINCT" if distinct else "SELECT"
+            count_expr = f"COUNT(DISTINCT {self.table_alias}.{self.id_column})" if distinct else "COUNT(*)"
             total_count = 0
             if paginate:
                 count_query = f"""
-                    SELECT COUNT(*)
+                    SELECT {count_expr}
                     FROM {self.base_table} {self.table_alias}
                     {" ".join(join_clauses)}
                     {where_clause}
@@ -229,7 +235,7 @@ class EnrichedService(Generic[T]):
                 query_params.extend([page_size, offset])
 
             query = f"""
-                SELECT
+                {select_distinct}
                     {", ".join(select_fields)}
                 FROM {self.base_table} {self.table_alias}
                 {" ".join(join_clauses)}
@@ -277,7 +283,7 @@ class EnrichedService(Generic[T]):
         joins: list[tuple[str, str, str, str]],  # (join_type, table, alias, join_condition)
         scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: list[tuple[str, Any]] | None = None,
+        additional_conditions: list[tuple[str, list]] | None = None,
         row_transform: Callable[[dict], dict] | None = None,
     ) -> T | None:
         """
@@ -290,7 +296,7 @@ class EnrichedService(Generic[T]):
             joins: List of JOIN clauses as (join_type, table, alias, condition) tuples
             scope: Optional institution scope for filtering
             include_archived: Whether to include archived records
-            additional_conditions: List of (condition, param) tuples for custom WHERE conditions
+            additional_conditions: List of (condition, list_of_params) tuples for custom WHERE conditions
 
         Returns:
             Enriched schema object or None if not found
@@ -353,7 +359,7 @@ class EnrichedService(Generic[T]):
         group_by_fields: list[str] | None = None,
         scope: InstitutionScope | None = None,
         include_archived: bool = False,
-        additional_conditions: list[tuple[str, Any]] | None = None,
+        additional_conditions: list[tuple[str, list]] | None = None,
         order_by: str | None = None,
         row_transform: Callable[[dict], dict] | None = None,
         page: int | None = None,

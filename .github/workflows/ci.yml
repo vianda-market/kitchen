@@ -121,6 +121,9 @@ jobs:
         # they disagree. See docs/testing/THRESHOLDS.md.
         run: python scripts/check_thresholds_parity.py
 
+      - name: Filter schema sync (filters.json vs FILTER_REGISTRY)
+        run: bash scripts/check_filter_schema.sh
+
       - name: SQL lint (sqlfluff, baselined)
         run: bash scripts/check_sqlfluff.sh
 

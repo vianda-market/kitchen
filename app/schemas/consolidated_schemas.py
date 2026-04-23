@@ -1831,6 +1831,11 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
+    # PostGIS location as GeoJSON dict: {"type": "Point", "coordinates": [lng, lat]}.
+    # IMPORTANT: GeoJSON uses [longitude, latitude] ordering — the reverse of conversational
+    # "lat/lng". Consumers must read coordinates[0] as longitude and coordinates[1] as latitude.
+    # None when the restaurant has not been geocoded yet.
+    location: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

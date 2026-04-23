@@ -114,6 +114,9 @@ CREATE INDEX IF NOT EXISTS idx_restaurant_info_institution_id ON ops.restaurant_
 CREATE INDEX IF NOT EXISTS idx_restaurant_info_institution_entity_id ON ops.restaurant_info(institution_entity_id) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_restaurant_info_address_id ON ops.restaurant_info(address_id) WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_restaurant_info_status ON ops.restaurant_info(status) WHERE NOT is_archived;
+-- GIST spatial index for geo proximity and bbox queries on restaurant location.
+-- Supports ST_DWithin (geography cast) and ST_MakeEnvelope && operator efficiently.
+CREATE INDEX IF NOT EXISTS idx_restaurant_info_location_gist ON ops.restaurant_info USING GIST(location) WHERE location IS NOT NULL;
 
 -- Address indexes
 -- Single column indexes for foreign keys and common filters

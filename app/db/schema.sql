@@ -3,6 +3,8 @@ CREATE EXTENSION IF NOT EXISTS citext;
 -- pg_trgm powers GIN trigram indexes on external.geonames_city.ascii_name
 -- for the superadmin cascading city picker (type-ahead search against ~68k cities).
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- PostGIS enables spatial queries on ops.restaurant_info.location (GIST index, ST_DWithin, ST_MakeEnvelope).
+CREATE EXTENSION IF NOT EXISTS postgis;
 -- pgtap extension (optional - only needed for test files in app/db/tests/)
 -- Uncomment and install pgtap if you need to run database tests:
 -- CREATE EXTENSION IF NOT EXISTS pgtap;
@@ -1606,6 +1608,9 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_info (
     -- TIME is naive wall-clock, interpreted per-restaurant in address_info.timezone at runtime.
     kitchen_open_time  TIME NOT NULL DEFAULT '09:00',
     kitchen_close_time TIME NOT NULL DEFAULT '13:30',
+    -- PostGIS point (SRID 4326 = WGS84 lon/lat) for geo proximity and bbox filtering.
+    -- NULL = location not yet geocoded. Populated via API or admin tooling.
+    location geometry(Point, 4326),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'pending'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1642,6 +1647,7 @@ CREATE TABLE IF NOT EXISTS audit.restaurant_history (
     require_kiosk_code_verification BOOLEAN,
     kitchen_open_time  TIME NOT NULL,
     kitchen_close_time TIME NOT NULL,
+    location geometry(Point, 4326),
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,

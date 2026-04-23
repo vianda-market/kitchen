@@ -109,7 +109,7 @@ class TestBuildWhereClause:
     def test_build_where_clause_additional_conditions(self, enriched_service):
         """Test WHERE clause with additional conditions"""
         where_clause, params = enriched_service._build_where_clause(
-            additional_conditions=[("tt.status = %s", "active"), ("tt.created_date > %s", "2024-01-01")]
+            additional_conditions=[("tt.status = %s", ["active"]), ("tt.created_date > %s", ["2024-01-01"])]
         )
         assert "tt.status = %s" in where_clause
         assert "tt.created_date > %s" in where_clause

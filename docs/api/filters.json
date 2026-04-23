@@ -1,0 +1,155 @@
+[
+  {
+    "entity": "pickups",
+    "fields": [
+      {
+        "cast": "text",
+        "context": "plate_pickup",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "select",
+        "values": [
+          "pending",
+          "arrived",
+          "handed_out",
+          "completed",
+          "cancelled"
+        ]
+      },
+      {
+        "cast": "uuid",
+        "key": "market_id",
+        "kind": "select"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "window_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "window_to",
+        "kind": "range-bound"
+      }
+    ]
+  },
+  {
+    "entity": "plans",
+    "fields": [
+      {
+        "cast": "uuid",
+        "key": "market_id",
+        "kind": "select"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "select",
+        "values": [
+          "active",
+          "inactive",
+          "pending",
+          "arrived",
+          "handed_out",
+          "completed",
+          "cancelled",
+          "processed"
+        ]
+      },
+      {
+        "cast": "upper",
+        "key": "currency_code",
+        "kind": "select"
+      }
+    ]
+  },
+  {
+    "entity": "plates",
+    "fields": [
+      {
+        "cast": "text",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "select",
+        "values": [
+          "active",
+          "inactive",
+          "pending",
+          "arrived",
+          "handed_out",
+          "completed",
+          "cancelled",
+          "processed"
+        ]
+      },
+      {
+        "cast": "uuid",
+        "key": "market_id",
+        "kind": "select"
+      },
+      {
+        "cast": "uuid",
+        "key": "restaurant_id",
+        "kind": "select"
+      },
+      {
+        "cast": "date",
+        "key": "plate_date_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "date",
+        "key": "plate_date_to",
+        "kind": "range-bound"
+      }
+    ]
+  },
+  {
+    "entity": "restaurants",
+    "fields": [
+      {
+        "cast": "text",
+        "key": "city",
+        "kind": "select"
+      },
+      {
+        "cast": "uuid",
+        "key": "market_id",
+        "kind": "select"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "KitchenDay",
+        "key": "kitchen_day",
+        "kind": "select",
+        "values": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday"
+        ]
+      },
+      {
+        "cast": "text",
+        "key": "cuisine",
+        "kind": "multi-select"
+      },
+      {
+        "key": "search",
+        "kind": "search"
+      },
+      {
+        "key": "bbox",
+        "kind": "geo-bbox",
+        "mode": "bbox"
+      },
+      {
+        "key": "radius",
+        "kind": "geo-radius",
+        "mode": "radius"
+      }
+    ]
+  }
+]
