@@ -210,6 +210,91 @@ def _build_geo_radius(col: str, value: Any, param_name: str) -> tuple[str, list]
     return condition, [lng, lat, radius_m]
 
 
+# ---------------------------------------------------------------------------
+# Per-op builders (dispatch table below). Each returns (condition, param_list),
+# or None if the field's shape means it should be silently skipped (e.g. ilike
+# with no cols declared). Unknown ops are handled at the dispatcher — these
+# helpers trust their op.
+# ---------------------------------------------------------------------------
+
+def _op_eq(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    cast = field.get("cast", "text")
+    enum_name = field.get("enum")
+    if enum_name:
+        # For upper cast the DB column stores upper-cased values; validate the
+        # upper-cased form so the check matches what is stored.
+        check_value = value.upper() if cast == "upper" else value
+        _validate_enum_value(check_value, enum_name, field.get("context"), param_name)
+    return (f"{_col_ref(field)} = {_placeholder(cast)}", [_coerce(value, cast)])
+
+
+def _op_in(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    cast = field.get("cast", "text")
+    items = list(value) if isinstance(value, (list, tuple)) else [value]
+    enum_name = field.get("enum")
+    if enum_name:
+        context = field.get("context")
+        for item in items:
+            check_item = item.upper() if cast == "upper" else item
+            _validate_enum_value(check_item, enum_name, context, param_name)
+    coerced = [_coerce(i, cast) for i in items]
+    # psycopg2 list binding: col = ANY(%s) with a list as the single param
+    return (f"{_col_ref(field)} = ANY(%s)", [coerced])
+
+
+def _op_gte(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    cast = field.get("cast", "text")
+    return (f"{_col_ref(field)} >= {_placeholder(cast)}", [_coerce(value, cast)])
+
+
+def _op_lte(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    cast = field.get("cast", "text")
+    return (f"{_col_ref(field)} <= {_placeholder(cast)}", [_coerce(value, cast)])
+
+
+def _op_ilike(field: dict, value: Any, param_name: str) -> tuple[str, list] | None:
+    # Emit a single OR-compound condition with N placeholders and N identical
+    # params. AND-join in enriched_service naturally composes with siblings.
+    cols = field.get("cols", [])
+    if not cols:
+        return None
+    wrapped = f"%{value}%"
+    condition = (
+        f"({' OR '.join(f'{col} ILIKE %s' for col in cols)})"
+        if len(cols) > 1
+        else f"{cols[0]} ILIKE %s"
+    )
+    return (condition, [wrapped] * len(cols))
+
+
+def _op_bool(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    return (f"{_col_ref(field)} = %s::bool", [bool(value)])
+
+
+def _op_geo(field: dict, value: Any, param_name: str) -> tuple[str, list]:
+    mode = field.get("mode")
+    col = _col_ref(field)
+    if mode == "bbox":
+        return _build_geo_bbox(col, value, param_name)
+    if mode == "radius":
+        return _build_geo_radius(col, value, param_name)
+    raise ValueError(
+        f"Geo filter '{param_name}' has unknown mode '{mode}'. "
+        "Supported modes: 'bbox', 'radius'."
+    )
+
+
+_OP_BUILDERS = {
+    "eq": _op_eq,
+    "in": _op_in,
+    "gte": _op_gte,
+    "lte": _op_lte,
+    "ilike": _op_ilike,
+    "bool": _op_bool,
+    "geo": _op_geo,
+}
+
+
 def build_filter_conditions(
     entity_key: str,
     filters: dict[str, Any],
@@ -224,94 +309,21 @@ def build_filter_conditions(
     Returns:
         List of (condition, list_of_params) tuples for additional_conditions, or None if empty.
 
-        op semantics:
-          eq       — alias.col = <cast placeholder>; param_list is [scalar]
-          in       — alias.col = ANY(%s); param_list is [list_of_items] (psycopg2 list binding)
-          gte      — alias.col >= <cast placeholder>; param_list is [scalar]
-          lte      — alias.col <= <cast placeholder>; param_list is [scalar]
-          ilike    — OR-compound across cols: "(col1 ILIKE %s OR col2 ILIKE %s ...)";
-                     param_list has N identical wrapped values (one per col).
-                     Single-col: "(col1 ILIKE %s)", param_list is [wrapped_value].
-          bool     — alias.col = %s::bool; param_list is [bool]
+        Op semantics live in each _op_* helper; see module docstring for the overview.
+        Unknown ops are silently skipped — keeps callers safe from registry drift.
     """
     registry = FILTER_REGISTRY.get(entity_key, {})
     conditions: list[tuple[str, list]] = []
 
     for param_name, value in filters.items():
-        if value is None:
+        if value is None or param_name not in registry:
             continue
-        if param_name not in registry:
-            continue
-
         field = registry[param_name]
-        op: str = field.get("op", "eq")
-
-        if op == "eq":
-            cast = field.get("cast", "text")
-            enum_name = field.get("enum")
-            if enum_name:
-                # For upper cast the DB column stores upper-cased values; validate
-                # the upper-cased form so the check matches what is stored.
-                check_value = value.upper() if cast == "upper" else value
-                context = field.get("context")
-                _validate_enum_value(check_value, enum_name, context, param_name)
-            placeholder = _placeholder(cast)
-            param = _coerce(value, cast)
-            conditions.append((f"{_col_ref(field)} = {placeholder}", [param]))
-
-        elif op == "in":
-            cast = field.get("cast", "text")
-            items = list(value) if isinstance(value, (list, tuple)) else [value]
-            enum_name = field.get("enum")
-            if enum_name:
-                context = field.get("context")
-                for item in items:
-                    check_item = item.upper() if cast == "upper" else item
-                    _validate_enum_value(check_item, enum_name, context, param_name)
-            coerced = [_coerce(i, cast) for i in items]
-            # psycopg2 list binding: col = ANY(%s) with a list as the single param
-            conditions.append((f"{_col_ref(field)} = ANY(%s)", [coerced]))
-
-        elif op == "gte":
-            cast = field.get("cast", "text")
-            placeholder = _placeholder(cast)
-            param = _coerce(value, cast)
-            conditions.append((f"{_col_ref(field)} >= {placeholder}", [param]))
-
-        elif op == "lte":
-            cast = field.get("cast", "text")
-            placeholder = _placeholder(cast)
-            param = _coerce(value, cast)
-            conditions.append((f"{_col_ref(field)} <= {placeholder}", [param]))
-
-        elif op == "ilike":
-            # Emit a single OR-compound condition with N placeholders and N identical params.
-            # The AND-join in enriched_service naturally composes with other conditions.
-            cols = field.get("cols", [])
-            if not cols:
-                continue
-            wrapped = f"%{value}%"
-            or_parts = " OR ".join(f"{col} ILIKE %s" for col in cols)
-            condition = f"({or_parts})" if len(cols) > 1 else f"{cols[0]} ILIKE %s"
-            params = [wrapped] * len(cols)
-            conditions.append((condition, params))
-
-        elif op == "bool":
-            conditions.append((f"{_col_ref(field)} = %s::bool", [bool(value)]))
-
-        elif op == "geo":
-            mode = field.get("mode")
-            col = _col_ref(field)
-            if mode == "bbox":
-                conditions.append(_build_geo_bbox(col, value, param_name))
-            elif mode == "radius":
-                conditions.append(_build_geo_radius(col, value, param_name))
-            else:
-                raise ValueError(
-                    f"Geo filter '{param_name}' has unknown mode '{mode}'. "
-                    "Supported modes: 'bbox', 'radius'."
-                )
-
-        # Unknown ops are silently skipped — keeps callers safe from registry drift.
+        builder = _OP_BUILDERS.get(field.get("op", "eq"))
+        if builder is None:
+            continue
+        result = builder(field, value, param_name)
+        if result is not None:
+            conditions.append(result)
 
     return conditions if conditions else None

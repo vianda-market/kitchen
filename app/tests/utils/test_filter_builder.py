@@ -85,7 +85,7 @@ def test_eq_uuid_cast():
     assert result is not None
     assert len(result) == 1
     condition, param = result[0]
-    assert "t.market_id = %s::uuid" == condition
+    assert condition == "t.market_id = %s::uuid"
     assert param == [str(uid)]
 
 
@@ -210,7 +210,7 @@ def test_range_both_bounds():
     result = build_filter_conditions("test_entity", {"price_min": 5.0, "price_max": 50.0})
     assert result is not None
     assert len(result) == 2
-    ops = {cond: param for cond, param in result}
+    ops = dict(result)
     assert "t.price >= %s::float" in ops
     assert "t.price <= %s::float" in ops
     assert ops["t.price >= %s::float"] == [5.0]
@@ -359,7 +359,7 @@ def test_plans_registry_market_id():
         assert result is not None
         assert len(result) == 1
         condition, param = result[0]
-        assert "pl.market_id = %s::uuid" == condition
+        assert condition == "pl.market_id = %s::uuid"
         assert param == [str(uid)]
 
 
@@ -420,7 +420,7 @@ FAKE_REGISTRY_ENUM: dict = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def patch_enum_registry():
     """Patch registry for enum validation tests (does NOT use autouse fixture)."""
     with patch("app.utils.filter_builder.FILTER_REGISTRY", FAKE_REGISTRY_ENUM):
@@ -505,7 +505,7 @@ FAKE_REGISTRY_GEO: dict = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def patch_geo_registry():
     with patch("app.utils.filter_builder.FILTER_REGISTRY", FAKE_REGISTRY_GEO):
         yield

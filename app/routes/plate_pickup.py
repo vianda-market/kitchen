@@ -124,7 +124,7 @@ def get_pending_order(
 
 
 @router.get("/enriched", response_model=list[PlatePickupEnrichedResponseSchema])
-def get_enriched_plate_pickups_endpoint(
+def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAPI Query params, not algorithmic args
     completed_only: bool = Query(
         False,
         description="When true (Customers only), filter to pickups with was_collected=true for order history page",
