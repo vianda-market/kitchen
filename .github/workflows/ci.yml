@@ -268,7 +268,9 @@ jobs:
     services:
       postgres:
         # schema.sql uses uuidv7() (built-in on Postgres 18+). Prod target is also 18.
-        image: postgres:18
+        # postgis/postgis bundles PostGIS on top of stock postgres — required by
+        # schema.sql:7 (CREATE EXTENSION postgis) for ops.restaurant_info.location.
+        image: postgis/postgis:18-3.6
         env:
           POSTGRES_USER: kitchen
           POSTGRES_PASSWORD: kitchen
