@@ -741,4 +741,374 @@ INVENTORY: dict[str, InventoryEntry] = {
     # .provider surfaces in UserPaymentProviderResponseSchema.
     # vianda-app: api/types.ts (PaymentProvider.provider).
     "customer.user_payment_provider.provider": {"surfaces": ["app"]},
+    # ==========================================================================
+    # billing schema
+    # ==========================================================================
+    #
+    # Billing is primarily an admin/internal domain (vianda-platform). The B2C
+    # app surface is modest: employer bill line context (benefit rate/cap shown
+    # to employees) and supplier balance/credit values. Over-exposure candidates
+    # and uncertain columns are documented below.
+    #
+    # Rename-at-API (Convention 4): document_storage_path → document_url on
+    # billing.supplier_invoice and billing.supplier_w9. The DB column name is
+    # used as the inventory key; an inline comment documents the API rename.
+    #
+    # Tables excluded from inventory (not in any API response):
+    #   billing.client_transaction — internal accounting; no response schema.
+    #   billing.institution_settlement — pipeline-internal; no API endpoint.
+    #
+    # Over-exposure candidates (ships in response but zero confirmed frontend
+    # references — not inventoried, flagged for Phase 2 lint):
+    #   billing.client_bill_info: client_bill_id, subscription_payment_id,
+    #     subscription_id, user_id, plan_id, currency_metadata_id, amount,
+    #     currency_code, is_archived, status, created_date, modified_by,
+    #     modified_date
+    #   billing.bill_invoice_match: match_id, institution_bill_id,
+    #     supplier_invoice_id, matched_amount, matched_by, matched_at
+    #
+    # Uncertain / deferred (generic_name=Y — catalog hits are incidental matches
+    # on common field names, not confirmed per-table frontend usage):
+    #   "status" across all billing tables — defer to Phase 2 lint.
+    #   "amount" across all billing tables — defer to Phase 2 lint.
+    #   "is_archived", "created_date", "modified_date", "modified_by" —
+    #     admin/audit metadata, defer to Phase 2 lint.
+    #
+    # --- billing.discretionary_info ---
+    #
+    # .category surfaces in DiscretionaryResponseSchema and
+    # DiscretionaryEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — category badge in the discretionary dashboard.
+    "billing.discretionary_info.category": {"surfaces": ["platform"]},
+    #
+    # .reason surfaces in DiscretionaryResponseSchema and
+    # DiscretionaryEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — free-form explanation shown in admin review view.
+    # vianda-app: types/api.ts (3 hits — supplier discretionary context).
+    "billing.discretionary_info.reason": {"surfaces": ["platform", "app"]},
+    #
+    # .comment surfaces in DiscretionaryResponseSchema and
+    # DiscretionaryEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — admin comment field in discretionary detail view.
+    # vianda-app: types/api.ts (4 hits — supplementary note context).
+    "billing.discretionary_info.comment": {"surfaces": ["platform", "app"]},
+    # --- billing.discretionary_resolution_info ---
+    #
+    # .resolution surfaces in DiscretionaryResolutionResponseSchema.
+    # vianda-platform: types/api.ts — approval outcome shown in the resolution panel.
+    "billing.discretionary_resolution_info.resolution": {"surfaces": ["platform"]},
+    #
+    # .resolution_comment surfaces in DiscretionaryResolutionResponseSchema.
+    # vianda-platform: types/api.ts — admin note explaining the approval/rejection decision.
+    "billing.discretionary_resolution_info.resolution_comment": {"surfaces": ["platform"]},
+    # --- billing.restaurant_transaction ---
+    #
+    # .credit surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — credit amount in restaurant transaction list.
+    # vianda-app: types/api.ts (7 hits — credit value rendered in transaction context).
+    "billing.restaurant_transaction.credit": {"surfaces": ["platform", "app"]},
+    #
+    # .no_show_discount surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — no-show discount applied to this transaction.
+    "billing.restaurant_transaction.no_show_discount": {"surfaces": ["platform"]},
+    #
+    # .was_collected surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — pickup confirmation flag in transaction detail.
+    "billing.restaurant_transaction.was_collected": {"surfaces": ["platform"]},
+    #
+    # .arrival_time surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — customer arrival time in transaction detail.
+    # vianda-app: types/api.ts (2 hits — arrival time displayed in pickup context).
+    "billing.restaurant_transaction.arrival_time": {"surfaces": ["platform", "app"]},
+    #
+    # .completion_time surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — pickup completion timestamp in transaction list.
+    "billing.restaurant_transaction.completion_time": {"surfaces": ["platform"]},
+    #
+    # .expected_completion_time surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — expected pickup window in admin transaction view.
+    "billing.restaurant_transaction.expected_completion_time": {"surfaces": ["platform"]},
+    #
+    # .transaction_type surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — transaction classification in the restaurant billing view.
+    "billing.restaurant_transaction.transaction_type": {"surfaces": ["platform"]},
+    #
+    # .final_amount surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — net payout amount after discounts in transaction detail.
+    "billing.restaurant_transaction.final_amount": {"surfaces": ["platform"]},
+    #
+    # .ordered_timestamp surfaces in RestaurantTransactionResponseSchema.
+    # vianda-platform: types/api.ts — when the order was placed; shown in transaction timeline.
+    "billing.restaurant_transaction.ordered_timestamp": {"surfaces": ["platform"]},
+    # --- billing.restaurant_balance_info ---
+    #
+    # .balance surfaces in RestaurantBalanceResponseSchema and
+    # RestaurantBalanceEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — pending payout balance on the restaurant balance page.
+    # vianda-app: types/api.ts (8 hits — balance displayed in supplier billing context).
+    "billing.restaurant_balance_info.balance": {"surfaces": ["platform", "app"]},
+    #
+    # .transaction_count surfaces in RestaurantBalanceResponseSchema.
+    # vianda-platform: types/api.ts — number of unpaid transactions contributing to the balance.
+    "billing.restaurant_balance_info.transaction_count": {"surfaces": ["platform"]},
+    # --- billing.institution_bill_info ---
+    #
+    # .period_start surfaces in InstitutionBillEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — billing period start date in institution bill view.
+    "billing.institution_bill_info.period_start": {"surfaces": ["platform"]},
+    #
+    # .period_end surfaces in InstitutionBillEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — billing period end date in institution bill view.
+    "billing.institution_bill_info.period_end": {"surfaces": ["platform"]},
+    #
+    # .resolution surfaces in InstitutionBillEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — bill payment state (pending/invoiced/paid/cancelled).
+    "billing.institution_bill_info.resolution": {"surfaces": ["platform"]},
+    #
+    # .transaction_count surfaces in InstitutionBillEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — number of transactions included in this bill.
+    "billing.institution_bill_info.transaction_count": {"surfaces": ["platform"]},
+    # --- billing.institution_bill_payout ---
+    #
+    # .provider surfaces in InstitutionBillPayoutResponseSchema and
+    # BillPayoutEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — payout provider identifier in the payout detail view.
+    # vianda-app: types/api.ts (9 hits — provider rendered in supplier billing context).
+    "billing.institution_bill_payout.provider": {"surfaces": ["platform", "app"]},
+    # --- billing.market_payout_aggregator ---
+    #
+    # .aggregator surfaces in MarketPayoutAggregatorResponseSchema.
+    # vianda-platform: types/api.ts — payment aggregator name in market billing config.
+    "billing.market_payout_aggregator.aggregator": {"surfaces": ["platform"]},
+    #
+    # .require_invoice surfaces in MarketPayoutAggregatorResponseSchema.
+    # vianda-platform: types/api.ts — invoice requirement toggle in market billing settings.
+    "billing.market_payout_aggregator.require_invoice": {"surfaces": ["platform"]},
+    #
+    # .max_unmatched_bill_days surfaces in MarketPayoutAggregatorResponseSchema.
+    # vianda-platform: types/api.ts — max unmatched bill age threshold in billing config.
+    "billing.market_payout_aggregator.max_unmatched_bill_days": {"surfaces": ["platform"]},
+    #
+    # .kitchen_open_time surfaces in MarketPayoutAggregatorResponseSchema.
+    # vianda-platform: types/api.ts — market default kitchen open time in billing settings.
+    "billing.market_payout_aggregator.kitchen_open_time": {"surfaces": ["platform"]},
+    #
+    # .kitchen_close_time surfaces in MarketPayoutAggregatorResponseSchema.
+    # vianda-platform: types/api.ts — market default kitchen close time in billing settings.
+    "billing.market_payout_aggregator.kitchen_close_time": {"surfaces": ["platform"]},
+    # --- billing.supplier_invoice ---
+    #
+    # .country_code surfaces in SupplierInvoiceResponseSchema and
+    # SupplierInvoiceEnrichedResponseSchema.
+    # vianda-platform: types/api.ts — country of invoice shown in invoice list and detail.
+    # vianda-app: types/api.ts (20 hits — country context in supplier invoice flow).
+    # vianda-home: types/api.ts (21 hits — country displayed in supplier application flow).
+    "billing.supplier_invoice.country_code": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .invoice_type surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — invoice type badge in invoice list.
+    "billing.supplier_invoice.invoice_type": {"surfaces": ["platform"]},
+    #
+    # .external_invoice_number surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — supplier-assigned invoice number in invoice detail.
+    "billing.supplier_invoice.external_invoice_number": {"surfaces": ["platform"]},
+    #
+    # .issued_date surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — invoice issue date shown in invoice list and detail.
+    "billing.supplier_invoice.issued_date": {"surfaces": ["platform"]},
+    #
+    # .rejection_reason surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — admin-entered reason when an invoice is rejected.
+    "billing.supplier_invoice.rejection_reason": {"surfaces": ["platform"]},
+    #
+    # .document_storage_path surfaces as "document_url" in SupplierInvoiceResponseSchema
+    # (renamed at the response layer — DB path converted to a GCS signed URL).
+    # vianda-platform: types/api.ts — document_url link to view/download the invoice PDF.
+    "billing.supplier_invoice.document_storage_path": {"surfaces": ["platform"]},
+    #
+    # .tax_amount surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — tax amount shown in invoice detail for compliance review.
+    "billing.supplier_invoice.tax_amount": {"surfaces": ["platform"]},
+    #
+    # .tax_rate surfaces in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — tax rate shown in invoice detail for compliance review.
+    "billing.supplier_invoice.tax_rate": {"surfaces": ["platform"]},
+    # --- billing.supplier_invoice_ar ---
+    #
+    # .cae_code surfaces as nested ar_details.cae_code in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — AFIP CAE code shown in AR invoice detail.
+    "billing.supplier_invoice_ar.cae_code": {"surfaces": ["platform"]},
+    #
+    # .cae_expiry_date surfaces as nested ar_details.cae_expiry_date.
+    # vianda-platform: types/api.ts — CAE expiry date shown in AR invoice detail.
+    "billing.supplier_invoice_ar.cae_expiry_date": {"surfaces": ["platform"]},
+    #
+    # .afip_point_of_sale surfaces as nested ar_details.afip_point_of_sale.
+    # vianda-platform: types/api.ts — AFIP punto de venta shown in AR invoice detail.
+    "billing.supplier_invoice_ar.afip_point_of_sale": {"surfaces": ["platform"]},
+    #
+    # .supplier_cuit surfaces as nested ar_details.supplier_cuit.
+    # vianda-platform: types/api.ts — supplier CUIT shown in AR invoice detail.
+    "billing.supplier_invoice_ar.supplier_cuit": {"surfaces": ["platform"]},
+    #
+    # .recipient_cuit surfaces as nested ar_details.recipient_cuit.
+    # vianda-platform: types/api.ts — recipient CUIT (Vianda) shown in AR invoice detail.
+    "billing.supplier_invoice_ar.recipient_cuit": {"surfaces": ["platform"]},
+    #
+    # .afip_document_type surfaces as nested ar_details.afip_document_type.
+    # vianda-platform: types/api.ts — AFIP document type (A/B/C) shown in AR invoice detail.
+    "billing.supplier_invoice_ar.afip_document_type": {"surfaces": ["platform"]},
+    # --- billing.supplier_invoice_pe ---
+    #
+    # .sunat_serie surfaces as nested pe_details.sunat_serie in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — SUNAT serie shown in PE invoice detail.
+    "billing.supplier_invoice_pe.sunat_serie": {"surfaces": ["platform"]},
+    #
+    # .sunat_correlativo surfaces as nested pe_details.sunat_correlativo.
+    # vianda-platform: types/api.ts — SUNAT correlativo shown in PE invoice detail.
+    "billing.supplier_invoice_pe.sunat_correlativo": {"surfaces": ["platform"]},
+    #
+    # .cdr_status surfaces as nested pe_details.cdr_status.
+    # vianda-platform: types/api.ts — CDR validation status shown in PE invoice detail.
+    "billing.supplier_invoice_pe.cdr_status": {"surfaces": ["platform"]},
+    #
+    # .supplier_ruc surfaces as nested pe_details.supplier_ruc.
+    # vianda-platform: types/api.ts — supplier RUC shown in PE invoice detail.
+    "billing.supplier_invoice_pe.supplier_ruc": {"surfaces": ["platform"]},
+    #
+    # .recipient_ruc surfaces as nested pe_details.recipient_ruc.
+    # vianda-platform: types/api.ts — recipient RUC (Vianda) shown in PE invoice detail.
+    "billing.supplier_invoice_pe.recipient_ruc": {"surfaces": ["platform"]},
+    # --- billing.supplier_invoice_us ---
+    #
+    # .tax_year surfaces as nested us_details.tax_year in SupplierInvoiceResponseSchema.
+    # vianda-platform: types/api.ts — tax year shown in US invoice detail (1099-NEC context).
+    "billing.supplier_invoice_us.tax_year": {"surfaces": ["platform"]},
+    # --- billing.supplier_w9 ---
+    #
+    # .legal_name surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — legal entity name shown in W-9 detail view.
+    "billing.supplier_w9.legal_name": {"surfaces": ["platform"]},
+    #
+    # .business_name surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — DBA / trade name shown in W-9 detail.
+    # vianda-home: types/api.ts (4 hits — business name shown in supplier onboarding context).
+    "billing.supplier_w9.business_name": {"surfaces": ["platform", "home"]},
+    #
+    # .tax_classification surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — IRS entity tax classification shown in W-9 detail.
+    "billing.supplier_w9.tax_classification": {"surfaces": ["platform"]},
+    #
+    # .ein_last_four surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — last 4 digits of EIN/SSN shown in W-9 detail (masked).
+    "billing.supplier_w9.ein_last_four": {"surfaces": ["platform"]},
+    #
+    # .address_line surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — US mailing address shown in W-9 detail.
+    "billing.supplier_w9.address_line": {"surfaces": ["platform"]},
+    #
+    # .document_storage_path surfaces as "document_url" in SupplierW9ResponseSchema
+    # (renamed at the response layer — DB path converted to a GCS signed URL).
+    # vianda-platform: types/api.ts — document_url link to download the W-9 PDF.
+    "billing.supplier_w9.document_storage_path": {"surfaces": ["platform"]},
+    #
+    # .collected_at surfaces in SupplierW9ResponseSchema.
+    # vianda-platform: types/api.ts — timestamp when the W-9 was submitted.
+    "billing.supplier_w9.collected_at": {"surfaces": ["platform"]},
+    # --- billing.employer_bill ---
+    #
+    # .billing_period_start surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — employer billing period start in employer bill view.
+    "billing.employer_bill.billing_period_start": {"surfaces": ["platform"]},
+    #
+    # .billing_period_end surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — employer billing period end in employer bill view.
+    "billing.employer_bill.billing_period_end": {"surfaces": ["platform"]},
+    #
+    # .billing_cycle surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — billing cycle (monthly/weekly) shown in employer bill.
+    "billing.employer_bill.billing_cycle": {"surfaces": ["platform"]},
+    #
+    # .total_renewal_events surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — total subscription renewals in this billing period.
+    "billing.employer_bill.total_renewal_events": {"surfaces": ["platform"]},
+    #
+    # .gross_employer_share surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — gross subsidy amount before discounts in employer bill.
+    "billing.employer_bill.gross_employer_share": {"surfaces": ["platform"]},
+    #
+    # .price_discount surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — discount percentage applied to employer billing.
+    "billing.employer_bill.price_discount": {"surfaces": ["platform"]},
+    #
+    # .discounted_amount surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — subsidy amount after price discount applied.
+    "billing.employer_bill.discounted_amount": {"surfaces": ["platform"]},
+    #
+    # .minimum_fee_applied surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — flag indicating minimum monthly fee was charged.
+    "billing.employer_bill.minimum_fee_applied": {"surfaces": ["platform"]},
+    #
+    # .billed_amount surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — final invoiced amount shown in employer bill detail.
+    "billing.employer_bill.billed_amount": {"surfaces": ["platform"]},
+    #
+    # .payment_status surfaces in EmployerBillResponseSchema.
+    # vianda-platform: types/api.ts — Stripe invoice payment status in employer bill view.
+    "billing.employer_bill.payment_status": {"surfaces": ["platform"]},
+    # --- billing.employer_bill_line ---
+    #
+    # .plan_price surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — plan subscription price at renewal time.
+    # vianda-app: types/api.ts (1 hit — plan price shown in employee benefit context).
+    "billing.employer_bill_line.plan_price": {"surfaces": ["platform", "app"]},
+    #
+    # .benefit_rate surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — employer subsidy rate (%) applied to this line.
+    # vianda-app: types/api.ts (1 hit — benefit rate in employee benefit summary).
+    "billing.employer_bill_line.benefit_rate": {"surfaces": ["platform", "app"]},
+    #
+    # .benefit_cap surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — benefit cap applied at renewal for this employee.
+    # vianda-app: types/api.ts (1 hit — cap shown in employee benefit context).
+    "billing.employer_bill_line.benefit_cap": {"surfaces": ["platform", "app"]},
+    #
+    # .benefit_cap_period surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — period for the benefit cap (monthly/annual).
+    # vianda-app: types/api.ts (1 hit — cap period shown in employee benefit summary).
+    "billing.employer_bill_line.benefit_cap_period": {"surfaces": ["platform", "app"]},
+    #
+    # .employee_benefit surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — actual subsidy amount charged to employer per renewal.
+    "billing.employer_bill_line.employee_benefit": {"surfaces": ["platform"]},
+    #
+    # .renewal_date surfaces in EmployerBillLineResponseSchema.
+    # vianda-platform: types/api.ts — date of the subscription renewal event for this line.
+    # vianda-app: types/api.ts (4 hits — renewal date shown in employee benefit history).
+    "billing.employer_bill_line.renewal_date": {"surfaces": ["platform", "app"]},
+    # --- billing.supplier_terms ---
+    #
+    # .no_show_discount surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — no-show penalty percentage in supplier terms settings.
+    "billing.supplier_terms.no_show_discount": {"surfaces": ["platform"]},
+    #
+    # .payment_frequency surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — payout frequency setting in supplier terms.
+    "billing.supplier_terms.payment_frequency": {"surfaces": ["platform"]},
+    #
+    # .kitchen_open_time surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — supplier-level kitchen open time override.
+    "billing.supplier_terms.kitchen_open_time": {"surfaces": ["platform"]},
+    #
+    # .kitchen_close_time surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — supplier-level kitchen close time override.
+    "billing.supplier_terms.kitchen_close_time": {"surfaces": ["platform"]},
+    #
+    # .require_invoice surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — invoice requirement override at supplier level.
+    "billing.supplier_terms.require_invoice": {"surfaces": ["platform"]},
+    #
+    # .invoice_hold_days surfaces in SupplierTermsResponseSchema.
+    # vianda-platform: types/api.ts — days to hold payout pending invoice submission.
+    "billing.supplier_terms.invoice_hold_days": {"surfaces": ["platform"]},
 }
