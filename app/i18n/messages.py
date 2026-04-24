@@ -71,6 +71,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "email.subject_subscription_promo": "Special offer: {promo_details}",
         # Rate limiting
         "error.rate_limit_exceeded": "Too many requests. Please try again later.",
+        # ── ErrorCode registry keys (K2) ──────────────────────────────────
+        # request.* — pre-route errors (set by catch-all handler, K3)
+        "request.not_found": "The requested resource was not found.",
+        "request.method_not_allowed": "This HTTP method is not allowed for this endpoint.",
+        "request.malformed_body": "The request body could not be parsed.",
+        "request.too_large": "The request payload is too large.",
+        "request.rate_limited": "Too many requests. Please try again in {retry_after_seconds} seconds.",
+        # legacy.* — transitional; wrapping handler maps unmigrated bare-string raises
+        "legacy.uncoded": "{message}",
+        # validation.* — emitted by RequestValidationError handler (K3/K5)
+        "validation.field_required": "This field is required.",
+        "validation.invalid_format": "The value has an invalid format.",
+        "validation.value_too_short": "The value is too short.",
+        "validation.value_too_long": "The value is too long.",
+        "validation.custom": "{msg}",
+        # auth.*
+        "auth.invalid_token": "Authentication token is invalid or expired.",
+        "auth.captcha_required": "CAPTCHA verification is required.",
+        # subscription.*
+        "subscription.already_active": "This subscription is already active.",
     },
     "es": {
         # Auth / user errors
@@ -137,6 +157,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "email.subject_subscription_promo": "Oferta especial: {promo_details}",
         # Rate limiting
         "error.rate_limit_exceeded": "Demasiadas solicitudes. Intenta de nuevo más tarde.",
+        # ── ErrorCode registry keys (K2) ──────────────────────────────────
+        # request.*
+        "request.not_found": "El recurso solicitado no fue encontrado.",
+        "request.method_not_allowed": "Este método HTTP no está permitido para este endpoint.",
+        "request.malformed_body": "No se pudo interpretar el cuerpo de la solicitud.",
+        "request.too_large": "El cuerpo de la solicitud es demasiado grande.",
+        "request.rate_limited": "Demasiadas solicitudes. Intenta de nuevo en {retry_after_seconds} segundos.",
+        # legacy.*
+        "legacy.uncoded": "{message}",
+        # validation.*
+        "validation.field_required": "Este campo es obligatorio.",
+        "validation.invalid_format": "El valor tiene un formato inválido.",
+        "validation.value_too_short": "El valor es demasiado corto.",
+        "validation.value_too_long": "El valor es demasiado largo.",
+        "validation.custom": "{msg}",
+        # auth.*
+        "auth.invalid_token": "El token de autenticación es inválido o expiró.",
+        "auth.captcha_required": "Se requiere verificación CAPTCHA.",
+        # subscription.*
+        "subscription.already_active": "Esta suscripción ya está activa.",
     },
     "pt": {
         # Auth / user errors
@@ -203,6 +243,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "email.subject_subscription_promo": "Oferta especial: {promo_details}",
         # Rate limiting
         "error.rate_limit_exceeded": "Muitas solicitações. Tente novamente mais tarde.",
+        # ── ErrorCode registry keys (K2) ──────────────────────────────────
+        # request.*
+        "request.not_found": "O recurso solicitado não foi encontrado.",
+        "request.method_not_allowed": "Este método HTTP não é permitido para este endpoint.",
+        "request.malformed_body": "Não foi possível interpretar o corpo da solicitação.",
+        "request.too_large": "O corpo da solicitação é muito grande.",
+        "request.rate_limited": "Muitas solicitações. Tente novamente em {retry_after_seconds} segundos.",
+        # legacy.*
+        "legacy.uncoded": "{message}",
+        # validation.*
+        "validation.field_required": "Este campo é obrigatório.",
+        "validation.invalid_format": "O valor tem um formato inválido.",
+        "validation.value_too_short": "O valor é muito curto.",
+        "validation.value_too_long": "O valor é muito longo.",
+        "validation.custom": "{msg}",
+        # auth.*
+        "auth.invalid_token": "O token de autenticação é inválido ou expirou.",
+        "auth.captcha_required": "Verificação CAPTCHA é necessária.",
+        # subscription.*
+        "subscription.already_active": "Esta assinatura já está ativa.",
     },
 }
 
