@@ -86,7 +86,14 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         # status is on plate_pickup_live, alias "ppl"
         # context="plate_pickup" scopes valid values to the pickup lifecycle subset
         # (pending, arrived, handed_out, completed, cancelled) — not the full Status enum.
-        "status": {"col": "status", "alias": "ppl", "op": "eq", "cast": "text", "enum": "Status", "context": "plate_pickup"},
+        "status": {
+            "col": "status",
+            "alias": "ppl",
+            "op": "eq",
+            "cast": "text",
+            "enum": "Status",
+            "context": "plate_pickup",
+        },
         # market_id is on market_info, alias "m" (joined via restaurant → address → market)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
         # window_from / window_to filter by expected_completion_time (TIMESTAMPTZ)
