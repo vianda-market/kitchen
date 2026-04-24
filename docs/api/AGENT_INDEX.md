@@ -229,6 +229,7 @@ _Routes: `/ad-tracking`, `/admin/ad-zones/`_
 | Audience | File | Description |
 |----------|------|-------------|
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/i18n.md` | Catalog modules, locale resolution precedence, resolver selection guide, code lifecycle, parity tests index. **Start here for any i18n/locale work.** |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/error-envelope.md` | Error envelope wire shape, code namespaces, how to raise, pre-route handler behavior, validation handling (K3/K5), frontend contract via `resolveErrorMessage`, legacy transition. |
 
 ---
 

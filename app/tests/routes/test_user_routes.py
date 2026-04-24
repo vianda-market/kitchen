@@ -229,7 +229,10 @@ def test_assign_employer_address_not_belonging_to_employer(client_customer, cust
         )
 
         assert response.status_code == 400
-        assert "does not belong" in response.json().get("detail", "").lower()
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = response.json().get("detail", "")
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "does not belong" in detail_str.lower()
         mock_user.update.assert_not_called()
 
 
@@ -244,7 +247,10 @@ def test_assign_employer_supplier_forbidden(client_supplier, mock_db):
     )
 
     assert response.status_code == 403
-    assert "Supplier" in response.json().get("detail", "")
+    # K3+: detail is now an envelope dict; extract message for string checks.
+    raw = response.json().get("detail", "")
+    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+    assert "Supplier" in detail_str
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +282,10 @@ def test_deprecated_get_user_self_read_returns_410_gone(client_customer, custome
         mock_user.get_by_id.return_value = user_dto
         response = client_customer.get(f"/api/v1/users/{user_id}")
     assert response.status_code == 410
-    assert "users/me" in (response.json().get("detail") or "")
+    # K3+: detail is now an envelope dict; extract message for string checks.
+    raw = response.json().get("detail") or ""
+    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+    assert "users/me" in detail_str
 
 
 def test_deprecated_put_user_self_update_returns_410_gone(client_customer, customer_user, mock_db):
@@ -307,7 +316,10 @@ def test_deprecated_put_user_self_update_returns_410_gone(client_customer, custo
             json={"first_name": "Updated"},
         )
     assert response.status_code == 410
-    assert "users/me" in (response.json().get("detail") or "")
+    # K3+: detail is now an envelope dict; extract message for string checks.
+    raw = response.json().get("detail") or ""
+    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+    assert "users/me" in detail_str
 
 
 def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer, customer_user, mock_db):
@@ -339,7 +351,10 @@ def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer
         mock_get.return_value = enriched
         response = client_customer.get(f"/api/v1/users/enriched/{user_id}")
     assert response.status_code == 410
-    assert "users/me" in (response.json().get("detail") or "")
+    # K3+: detail is now an envelope dict; extract message for string checks.
+    raw = response.json().get("detail") or ""
+    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+    assert "users/me" in detail_str
 
 
 def test_put_me_mobile_change_resets_verification_flags(client_customer, customer_user, mock_db):

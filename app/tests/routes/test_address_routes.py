@@ -206,7 +206,10 @@ class TestAddressCreateInstitutionSafeguard:
             json=_minimal_address_body(include_institution_and_user=False),
         )
         assert resp.status_code == 400
-        assert "institution" in resp.json().get("detail", "").lower()
+        raw = resp.json().get("detail", "")
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        detail_str = (raw.get("message", "") if isinstance(raw, dict) else raw).lower()
+        assert "institution" in detail_str
 
     def test_b2b_omitting_institution_id_gets_400(self, client_b2b_employee):
         """B2B (Internal) omitting institution_id or user_id gets 400."""
@@ -215,5 +218,7 @@ class TestAddressCreateInstitutionSafeguard:
             json=_minimal_address_body(include_institution_and_user=False),
         )
         assert resp.status_code == 400
-        detail = resp.json().get("detail", "")
+        raw = resp.json().get("detail", "")
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        detail = raw.get("message", "") if isinstance(raw, dict) else raw
         assert "institution_id" in detail or "B2B" in detail or "required" in detail

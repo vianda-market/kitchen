@@ -37,7 +37,10 @@ def client_internal_enums():
 def test_get_enums_rejects_invalid_language(client_internal_enums):
     r = client_internal_enums.get("/api/v1/enums", params={"language": "xx"})
     assert r.status_code == 422
-    assert "Unsupported language" in r.json()["detail"]
+    # K3+: detail is now an envelope dict (bare-string raise wrapped as legacy.uncoded).
+    raw = r.json()["detail"]
+    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+    assert "Unsupported language" in detail_str or "unsupported" in detail_str.lower()
 
 
 def test_get_enums_spanish_street_type_label(client_internal_enums):
