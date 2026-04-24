@@ -2314,6 +2314,28 @@ CREATE TABLE IF NOT EXISTS customer.credential_recovery (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credential_recovery_code ON customer.credential_recovery(recovery_code);
 CREATE INDEX IF NOT EXISTS idx_credential_recovery_user_id ON customer.credential_recovery(user_id);
+COMMENT ON TABLE customer.credential_recovery IS
+    'One-time recovery tokens for password reset. Each row is a single-use code '
+    'delivered to the user by email; invalidated on use or expiry.';
+COMMENT ON COLUMN customer.credential_recovery.credential_recovery_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.credential_recovery.user_id IS
+    'FK to core.user_info. The user who requested the password reset.';
+COMMENT ON COLUMN customer.credential_recovery.recovery_code IS
+    'Random one-time code (up to 10 chars) delivered to the user. '
+    'Unique index prevents brute-force code re-use across users.';
+COMMENT ON COLUMN customer.credential_recovery.token_expiry IS
+    'UTC timestamp after which this code is no longer accepted.';
+COMMENT ON COLUMN customer.credential_recovery.is_used IS
+    'TRUE once the code has been validated and the password changed.';
+COMMENT ON COLUMN customer.credential_recovery.used_date IS
+    'UTC timestamp when the code was consumed. NULL if not yet used.';
+COMMENT ON COLUMN customer.credential_recovery.status IS
+    'Record lifecycle from status_enum (active/inactive). Soft disable without deletion.';
+COMMENT ON COLUMN customer.credential_recovery.is_archived IS
+    'Soft-delete tombstone. Archived rows are excluded from active recovery lookups.';
+COMMENT ON COLUMN customer.credential_recovery.created_date IS
+    'UTC timestamp when the recovery request was created.';
 
 \echo 'Creating table: customer.email_change_request'
 CREATE TABLE IF NOT EXISTS customer.email_change_request (
@@ -2329,6 +2351,29 @@ CREATE TABLE IF NOT EXISTS customer.email_change_request (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.email_change_request IS
+    'One-time verification tokens for email address changes. The new email is held '
+    'here pending verification; committed to core.user_info on success.';
+COMMENT ON COLUMN customer.email_change_request.email_change_request_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.email_change_request.user_id IS
+    'FK to core.user_info. The user requesting the email change.';
+COMMENT ON COLUMN customer.email_change_request.new_email IS
+    'Candidate email address (citext — case-insensitive). Written to user_info.email on verification.';
+COMMENT ON COLUMN customer.email_change_request.verification_code IS
+    'Random one-time code (up to 10 chars) sent to new_email to prove ownership.';
+COMMENT ON COLUMN customer.email_change_request.token_expiry IS
+    'UTC timestamp after which this code is no longer accepted.';
+COMMENT ON COLUMN customer.email_change_request.is_used IS
+    'TRUE once the verification code has been consumed and the email updated.';
+COMMENT ON COLUMN customer.email_change_request.used_date IS
+    'UTC timestamp when the code was consumed. NULL if not yet used.';
+COMMENT ON COLUMN customer.email_change_request.status IS
+    'Record lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.email_change_request.is_archived IS
+    'Soft-delete tombstone. Archived rows are excluded from active verification lookups.';
+COMMENT ON COLUMN customer.email_change_request.created_date IS
+    'UTC timestamp when the change request was created.';
 
 \echo 'Creating table: customer.pending_customer_signup'
 CREATE TABLE IF NOT EXISTS customer.pending_customer_signup (
@@ -2350,6 +2395,38 @@ CREATE TABLE IF NOT EXISTS customer.pending_customer_signup (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_code ON customer.pending_customer_signup(verification_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_customer_signup_email_active ON customer.pending_customer_signup(email) WHERE used = FALSE;
 CREATE INDEX IF NOT EXISTS idx_pending_customer_signup_expiry ON customer.pending_customer_signup(token_expiry);
+COMMENT ON TABLE customer.pending_customer_signup IS
+    'Staging row for an in-progress customer self-signup. Holds the candidate account data '
+    'and a one-time email verification code. Committed to core.user_info on verification; '
+    'expires automatically via token_expiry. Never exposed in API responses.';
+COMMENT ON COLUMN customer.pending_customer_signup.pending_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.pending_customer_signup.email IS
+    'Candidate email (citext — case-insensitive). Unique partial index prevents duplicate pending signups for the same email.';
+COMMENT ON COLUMN customer.pending_customer_signup.verification_code IS
+    'Random one-time code sent to the email to confirm ownership. Unique — used as lookup key.';
+COMMENT ON COLUMN customer.pending_customer_signup.token_expiry IS
+    'UTC timestamp after which this pending signup is invalid. Indexed for expiry-sweep queries.';
+COMMENT ON COLUMN customer.pending_customer_signup.used IS
+    'TRUE once the code has been verified and the user row created. Partial index on (email) WHERE used = FALSE prevents concurrent pending signups.';
+COMMENT ON COLUMN customer.pending_customer_signup.created_at IS
+    'UTC timestamp when the signup request was submitted.';
+COMMENT ON COLUMN customer.pending_customer_signup.username IS
+    'Candidate username (citext — case-insensitive). Checked for uniqueness against core.user_info at commit time.';
+COMMENT ON COLUMN customer.pending_customer_signup.hashed_password IS
+    'bcrypt-hashed password. Stored here temporarily; moved to core.user_info on success.';
+COMMENT ON COLUMN customer.pending_customer_signup.first_name IS
+    'Candidate first name. Optional at signup; can be filled later in profile.';
+COMMENT ON COLUMN customer.pending_customer_signup.last_name IS
+    'Candidate last name. Optional at signup; can be filled later in profile.';
+COMMENT ON COLUMN customer.pending_customer_signup.mobile_number IS
+    'E.164-format phone number (+country digits, 7–15 digits). Optional at signup.';
+COMMENT ON COLUMN customer.pending_customer_signup.market_id IS
+    'FK to core.market_info. The market (country) the user signed up in; copied to user_info on commit.';
+COMMENT ON COLUMN customer.pending_customer_signup.city_metadata_id IS
+    'FK to core.city_metadata. The city the user selected at signup; copied to user_info on commit.';
+COMMENT ON COLUMN customer.pending_customer_signup.referral_code IS
+    'Referrer code supplied at signup time (max 20 chars). Used to credit the referrer after the first qualifying plan purchase.';
 
 \echo 'Creating table: core.geolocation_info'
 CREATE TABLE IF NOT EXISTS core.geolocation_info (
@@ -2939,6 +3016,47 @@ CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
     FOREIGN KEY (qr_code_id) REFERENCES ops.qr_code(qr_code_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.plate_selection_info IS
+    'A customer meal reservation for a specific plate on a specific kitchen day. '
+    'One active row per user per kitchen day (enforced in application logic). '
+    'Becomes a plate_pickup_live row when the customer scans the QR code at pickup time.';
+COMMENT ON COLUMN customer.plate_selection_info.plate_selection_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.plate_selection_info.user_id IS
+    'FK to core.user_info. The customer who made the reservation.';
+COMMENT ON COLUMN customer.plate_selection_info.plate_id IS
+    'FK to ops.plate_info. The plate edition reserved.';
+COMMENT ON COLUMN customer.plate_selection_info.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant serving the plate.';
+COMMENT ON COLUMN customer.plate_selection_info.product_id IS
+    'FK to ops.product_info. The product (recipe) behind the plate.';
+COMMENT ON COLUMN customer.plate_selection_info.qr_code_id IS
+    'FK to ops.qr_code. The QR code the user must scan at the restaurant to start pickup.';
+COMMENT ON COLUMN customer.plate_selection_info.credit IS
+    'Credit cost deducted from the user subscription balance when this reservation is made.';
+COMMENT ON COLUMN customer.plate_selection_info.kitchen_day IS
+    'Day-of-week the kitchen operates from kitchen_day_enum (e.g. monday, tuesday). '
+    'Determines which plate edition is active.';
+COMMENT ON COLUMN customer.plate_selection_info.pickup_date IS
+    'Calendar date (DATE, no time) of the pickup day. Derived from kitchen_day at reservation time.';
+COMMENT ON COLUMN customer.plate_selection_info.pickup_time_range IS
+    'Human-readable time window string (e.g. ''11:30-12:00'') for the chosen pickup window.';
+COMMENT ON COLUMN customer.plate_selection_info.pickup_intent IS
+    'Coworker pickup coordination mode: ''self'' (default), ''offer'' (volunteer to carry), or ''request'' (needs someone to bring it).';
+COMMENT ON COLUMN customer.plate_selection_info.flexible_on_time IS
+    'Only meaningful when pickup_intent = ''request''. TRUE = user is flexible ±30 min on pickup time.';
+COMMENT ON COLUMN customer.plate_selection_info.is_archived IS
+    'Soft-delete tombstone. Archived reservations (e.g. cancellations) are excluded from active queries.';
+COMMENT ON COLUMN customer.plate_selection_info.status IS
+    'Lifecycle state from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.plate_selection_info.created_date IS
+    'UTC timestamp when the reservation was placed.';
+COMMENT ON COLUMN customer.plate_selection_info.created_by IS
+    'FK to core.user_info. UUID of the user who created the reservation; NULL for system-created rows.';
+COMMENT ON COLUMN customer.plate_selection_info.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.plate_selection_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.plate_selection_history'
 CREATE TABLE IF NOT EXISTS audit.plate_selection_history (
@@ -2990,6 +3108,20 @@ CREATE TABLE IF NOT EXISTS customer.coworker_pickup_notification (
 );
 
 CREATE INDEX IF NOT EXISTS idx_coworker_pickup_notification_plate_selection ON customer.coworker_pickup_notification(plate_selection_id);
+COMMENT ON TABLE customer.coworker_pickup_notification IS
+    'Records a push notification sent to a coworker to alert them that a colleague '
+    'with pickup_intent=''offer'' is available at their restaurant. One row per (plate_selection, notified_user) pair. '
+    'Read-only after insert — no updates needed.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.notification_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.plate_selection_id IS
+    'FK to customer.plate_selection_info. The offering pickup that triggered the notification.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.notifier_user_id IS
+    'FK to core.user_info. The user with pickup_intent=''offer'' who initiated the alert.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.notified_user_id IS
+    'FK to core.user_info. The coworker who received the notification.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.created_date IS
+    'UTC timestamp when the notification was dispatched.';
 
 \echo 'Creating table: customer.notification_banner'
 CREATE TABLE IF NOT EXISTS customer.notification_banner (
@@ -3017,6 +3149,41 @@ CREATE INDEX IF NOT EXISTS idx_notification_banner_user_active
 CREATE INDEX IF NOT EXISTS idx_notification_banner_expires
     ON customer.notification_banner(expires_at)
     WHERE action_status = 'active';
+COMMENT ON TABLE customer.notification_banner IS
+    'In-app notification banners surfaced to the user while the app is foregrounded. '
+    'Max 5 active at once (service layer); deduplication via UNIQUE(user_id, dedup_key). '
+    'Frontends poll GET /notifications/active; acknowledge via POST /notifications/{id}/acknowledge.';
+COMMENT ON COLUMN customer.notification_banner.notification_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.notification_banner.user_id IS
+    'FK to core.user_info (ON DELETE CASCADE). The user this banner is for.';
+COMMENT ON COLUMN customer.notification_banner.notification_type IS
+    'Banner category from notification_banner_type_enum: survey_available, peer_pickup_volunteer, reservation_reminder.';
+COMMENT ON COLUMN customer.notification_banner.priority IS
+    'Display priority from notification_banner_priority_enum: normal or high. High-priority banners sort first.';
+COMMENT ON COLUMN customer.notification_banner.payload IS
+    'JSONB envelope with banner-type-specific data (e.g. plate_name, pickup_window). '
+    'Schema is per notification_type; frontends read fields by type.';
+COMMENT ON COLUMN customer.notification_banner.action_type IS
+    'Slug describing the frontend action to perform when tapped (e.g. open_survey, view_pickup).';
+COMMENT ON COLUMN customer.notification_banner.action_label IS
+    'Localised call-to-action button label shown on the banner (e.g. ''Rate your plate'').';
+COMMENT ON COLUMN customer.notification_banner.client_types IS
+    'Array of client identifiers that should display this banner (e.g. {b2c-mobile,b2c-web}). '
+    'Backend-owned filter; frontends pass their client type and only receive relevant banners.';
+COMMENT ON COLUMN customer.notification_banner.action_status IS
+    'Lifecycle state from notification_banner_action_status_enum: active → dismissed/opened/completed/expired.';
+COMMENT ON COLUMN customer.notification_banner.expires_at IS
+    'UTC timestamp after which the banner is no longer shown (even if action_status = active).';
+COMMENT ON COLUMN customer.notification_banner.acknowledged_at IS
+    'UTC timestamp when the user acknowledged the banner. NULL while still active.';
+COMMENT ON COLUMN customer.notification_banner.dedup_key IS
+    'Domain-specific key (e.g. survey:<plate_pickup_id>) that prevents duplicate banners '
+    'for the same event via UNIQUE(user_id, dedup_key).';
+COMMENT ON COLUMN customer.notification_banner.created_date IS
+    'UTC timestamp when the banner was created.';
+COMMENT ON COLUMN customer.notification_banner.modified_date IS
+    'UTC timestamp of the most recent update (e.g. status change on acknowledgement).';
 
 \echo 'Creating table: customer.plate_pickup_live'
 CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
@@ -3051,6 +3218,65 @@ CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
     FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (qr_code_id) REFERENCES ops.qr_code(qr_code_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.plate_pickup_live IS
+    'Live pickup session created when a customer scans the restaurant QR code. '
+    'Tracks the full lifecycle: QR scan → arrival → (optional kiosk handoff) → completion. '
+    'Used by B2B daily-orders view (restaurant staff) and B2C order history.';
+COMMENT ON COLUMN customer.plate_pickup_live.plate_pickup_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.plate_pickup_live.plate_selection_id IS
+    'FK to customer.plate_selection_info. The reservation that this pickup fulfils.';
+COMMENT ON COLUMN customer.plate_pickup_live.user_id IS
+    'FK to core.user_info. The customer picking up.';
+COMMENT ON COLUMN customer.plate_pickup_live.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant where pickup occurs.';
+COMMENT ON COLUMN customer.plate_pickup_live.plate_id IS
+    'FK to ops.plate_info. The plate being picked up.';
+COMMENT ON COLUMN customer.plate_pickup_live.product_id IS
+    'FK to ops.product_info. The product (recipe) for this pickup.';
+COMMENT ON COLUMN customer.plate_pickup_live.qr_code_id IS
+    'FK to ops.qr_code. The QR code scanned to create this pickup session.';
+COMMENT ON COLUMN customer.plate_pickup_live.qr_code_payload IS
+    'Signed URL payload encoded in the QR code image. Surfaced in enriched pickup responses '
+    'for the B2C order history screen so the user can re-scan if needed.';
+COMMENT ON COLUMN customer.plate_pickup_live.is_archived IS
+    'Soft-delete tombstone. Archived pickup records are excluded from active queries.';
+COMMENT ON COLUMN customer.plate_pickup_live.status IS
+    'Lifecycle state from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.plate_pickup_live.was_collected IS
+    'TRUE once the pickup is fully completed (plate handed to customer). '
+    'Used by order history and no-show detection.';
+COMMENT ON COLUMN customer.plate_pickup_live.arrival_time IS
+    'UTC timestamp when the customer scanned the QR code (pickup session started). '
+    'Used for countdown timer start in the B2C app.';
+COMMENT ON COLUMN customer.plate_pickup_live.completion_time IS
+    'UTC timestamp when the pickup was completed (was_collected set to TRUE).';
+COMMENT ON COLUMN customer.plate_pickup_live.expected_completion_time IS
+    'UTC countdown deadline: arrival_time + PICKUP_COUNTDOWN_SECONDS setting. '
+    'Surfaced in restaurant daily-orders for staff timer display.';
+COMMENT ON COLUMN customer.plate_pickup_live.confirmation_code IS
+    '6-digit numeric kiosk code for Layer 2 hand-off verification. '
+    'Generated at QR scan; consumed by POST /restaurant-staff/verify-and-handoff.';
+COMMENT ON COLUMN customer.plate_pickup_live.completion_type IS
+    'How the pickup was closed: user_confirmed, user_disputed, timer_expired, '
+    'confirmation_timeout, or kitchen_day_close. Stored for analytics.';
+COMMENT ON COLUMN customer.plate_pickup_live.extensions_used IS
+    'Number of timer extensions the customer has consumed (max PICKUP_MAX_EXTENSIONS, default 3).';
+COMMENT ON COLUMN customer.plate_pickup_live.code_verified IS
+    'TRUE once the kiosk confirmation code has been validated by restaurant staff.';
+COMMENT ON COLUMN customer.plate_pickup_live.code_verified_time IS
+    'UTC timestamp when the kiosk code was verified. NULL if kiosk verification is not used.';
+COMMENT ON COLUMN customer.plate_pickup_live.handed_out_time IS
+    'UTC timestamp when the plate was physically handed out (Handed Out lifecycle step). '
+    'Separates "customer is here" (arrival) from "plate given" (handed_out) from "customer confirms" (completion).';
+COMMENT ON COLUMN customer.plate_pickup_live.created_date IS
+    'UTC timestamp when the pickup session was created (QR scan moment).';
+COMMENT ON COLUMN customer.plate_pickup_live.created_by IS
+    'FK to core.user_info. UUID of the user who created the session; NULL for system-created rows.';
+COMMENT ON COLUMN customer.plate_pickup_live.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.plate_pickup_live.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.plate_review_info'
 CREATE TABLE IF NOT EXISTS customer.plate_review_info (
@@ -3071,6 +3297,34 @@ CREATE TABLE IF NOT EXISTS customer.plate_review_info (
 );
 
 CREATE INDEX IF NOT EXISTS idx_plate_review_plate_id ON customer.plate_review_info(plate_id) WHERE NOT is_archived;
+COMMENT ON TABLE customer.plate_review_info IS
+    'Post-pickup ratings submitted by customers. One review per plate_pickup_live row; '
+    'immutable after creation. Aggregated into ops.plate_info.average_rating and review_count '
+    'for the explore feed. Supplier-facing enriched view (GET /plate-reviews/by-institution/enriched) '
+    'strips customer PII.';
+COMMENT ON COLUMN customer.plate_review_info.plate_review_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.plate_review_info.user_id IS
+    'FK to core.user_info. The customer who submitted the review.';
+COMMENT ON COLUMN customer.plate_review_info.plate_id IS
+    'FK to ops.plate_info. The plate edition being reviewed. Indexed for aggregate queries.';
+COMMENT ON COLUMN customer.plate_review_info.plate_pickup_id IS
+    'FK to customer.plate_pickup_live. The completed pickup that this review covers. One-to-one.';
+COMMENT ON COLUMN customer.plate_review_info.stars_rating IS
+    'Overall star rating 1–5 (CHECK enforced). Aggregated into plate average_rating.';
+COMMENT ON COLUMN customer.plate_review_info.portion_size_rating IS
+    'Portion size rating 1–3 (1=too small, 2=just right, 3=too much). CHECK enforced.';
+COMMENT ON COLUMN customer.plate_review_info.would_order_again IS
+    'Optional boolean: would the customer order this plate again? NULL = not answered.';
+COMMENT ON COLUMN customer.plate_review_info.comment IS
+    'Optional free-text feedback for the restaurant (max 500 chars). '
+    'Visible to restaurant via enriched review endpoint; NOT shown in B2C app.';
+COMMENT ON COLUMN customer.plate_review_info.is_archived IS
+    'Soft-delete tombstone. Archived reviews are excluded from aggregate calculations.';
+COMMENT ON COLUMN customer.plate_review_info.created_date IS
+    'UTC timestamp when the review was submitted.';
+COMMENT ON COLUMN customer.plate_review_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.portion_complaint'
 CREATE TABLE IF NOT EXISTS customer.portion_complaint (
@@ -3088,6 +3342,31 @@ CREATE TABLE IF NOT EXISTS customer.portion_complaint (
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.portion_complaint IS
+    'Customer complaint filed when a plate_review_info.portion_size_rating = 1 (too small). '
+    'Optional photo stored in GCS customer bucket; resolution managed by Internal ops.';
+COMMENT ON COLUMN customer.portion_complaint.complaint_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.portion_complaint.plate_pickup_id IS
+    'FK to customer.plate_pickup_live. The pickup the complaint is about.';
+COMMENT ON COLUMN customer.portion_complaint.plate_review_id IS
+    'FK to customer.plate_review_info. The associated review (nullable — complaint can exist without a review row in edge cases).';
+COMMENT ON COLUMN customer.portion_complaint.user_id IS
+    'FK to core.user_info. The customer who filed the complaint.';
+COMMENT ON COLUMN customer.portion_complaint.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant responsible for the portion.';
+COMMENT ON COLUMN customer.portion_complaint.photo_storage_path IS
+    'GCS object path for the complaint photo (e.g. customers/{user_id}/complaints/{complaint_id}/photo.jpg). '
+    'NULL if no photo was attached. Surfaced in PortionComplaintResponseSchema.';
+COMMENT ON COLUMN customer.portion_complaint.complaint_text IS
+    'Optional free-text description of the portion issue (max 1000 chars).';
+COMMENT ON COLUMN customer.portion_complaint.resolution_status IS
+    'Internal resolution state: open (default), investigating, resolved, dismissed. '
+    'Managed by Internal ops; not configurable via a typed enum to allow future values.';
+COMMENT ON COLUMN customer.portion_complaint.created_date IS
+    'UTC timestamp when the complaint was filed.';
+COMMENT ON COLUMN customer.portion_complaint.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.user_favorite_info'
 CREATE TABLE IF NOT EXISTS customer.user_favorite_info (
@@ -3100,6 +3379,20 @@ CREATE TABLE IF NOT EXISTS customer.user_favorite_info (
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_user_favorite_user_entity ON customer.user_favorite_info(user_id, entity_type);
+COMMENT ON TABLE customer.user_favorite_info IS
+    'Customer-saved favourites. Polymorphic junction: entity_type determines whether '
+    'entity_id is a plate or restaurant. UNIQUE(user_id, entity_type, entity_id) prevents duplicate favourites.';
+COMMENT ON COLUMN customer.user_favorite_info.favorite_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.user_favorite_info.user_id IS
+    'FK to core.user_info (ON DELETE CASCADE). The customer who saved the favourite.';
+COMMENT ON COLUMN customer.user_favorite_info.entity_type IS
+    'Polymorphic type discriminator from favorite_entity_type_enum: plate or restaurant.';
+COMMENT ON COLUMN customer.user_favorite_info.entity_id IS
+    'UUID of the favourited entity. Resolves to ops.plate_info or ops.restaurant_info depending on entity_type. '
+    'No FK constraint (polymorphic); application layer enforces referential integrity.';
+COMMENT ON COLUMN customer.user_favorite_info.created_date IS
+    'UTC timestamp when the favourite was saved.';
 
 \echo 'Creating table: customer.pickup_preferences'
 CREATE TABLE IF NOT EXISTS customer.pickup_preferences (
@@ -3122,6 +3415,40 @@ CREATE TABLE IF NOT EXISTS customer.pickup_preferences (
     FOREIGN KEY (matched_with_preference_id) REFERENCES customer.pickup_preferences(preference_id) ON DELETE SET NULL,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.pickup_preferences IS
+    'Coworker pickup coordination preferences per plate_selection_info row. '
+    'Records whether the user wants to carry a coworker''s plate (offer) or needs one carried (request), '
+    'and whether they were matched with another user. Never exposed directly in API responses; '
+    'used internally by the matching service and surfaced as pickup_type in daily-orders.';
+COMMENT ON COLUMN customer.pickup_preferences.preference_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.pickup_preferences.plate_selection_id IS
+    'FK to customer.plate_selection_info. The reservation this preference belongs to.';
+COMMENT ON COLUMN customer.pickup_preferences.user_id IS
+    'FK to core.user_info. The user expressing this pickup preference.';
+COMMENT ON COLUMN customer.pickup_preferences.pickup_type IS
+    'Coordination role from pickup_type_enum: offer (will carry for coworker) or request (needs someone to carry).';
+COMMENT ON COLUMN customer.pickup_preferences.target_pickup_time IS
+    'UTC timestamp of the preferred pickup time for matching. NULL when flexible.';
+COMMENT ON COLUMN customer.pickup_preferences.time_window_minutes IS
+    'Tolerance window in minutes around target_pickup_time (default ±30 min) for matching.';
+COMMENT ON COLUMN customer.pickup_preferences.is_matched IS
+    'TRUE once the matching service has paired this preference with another user.';
+COMMENT ON COLUMN customer.pickup_preferences.matched_with_preference_id IS
+    'FK to customer.pickup_preferences (self-referential). The paired counterpart preference. '
+    'NULL until matched; ON DELETE SET NULL to gracefully handle cancellations.';
+COMMENT ON COLUMN customer.pickup_preferences.is_archived IS
+    'Soft-delete tombstone. Archived preferences are excluded from active matching.';
+COMMENT ON COLUMN customer.pickup_preferences.status IS
+    'Record lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.pickup_preferences.created_date IS
+    'UTC timestamp when the preference was created.';
+COMMENT ON COLUMN customer.pickup_preferences.created_by IS
+    'FK to core.user_info. UUID of the user who created this preference; NULL for system rows.';
+COMMENT ON COLUMN customer.pickup_preferences.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.pickup_preferences.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.plan_info'
 CREATE TABLE IF NOT EXISTS customer.plan_info (
@@ -3152,6 +3479,58 @@ CREATE TABLE IF NOT EXISTS customer.plan_info (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     CONSTRAINT chk_plan_info_not_global_market CHECK (market_id != '00000000-0000-0000-0000-000000000001'::uuid)
 );
+COMMENT ON TABLE customer.plan_info IS
+    'Subscription plan catalogue. Each plan belongs to one market (country) and defines the '
+    'credit grant, price, rollover rules, and localised marketing copy. '
+    'Cannot be assigned to the Global (XG) pseudo-market — enforced by CHECK constraint.';
+COMMENT ON COLUMN customer.plan_info.plan_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.plan_info.market_id IS
+    'FK to core.market_info. The market (country) this plan is sold in. '
+    'Global market (UUID ending …0001) is excluded by CHECK constraint.';
+COMMENT ON COLUMN customer.plan_info.name IS
+    'Default (fallback) plan name. Localised alternatives in name_i18n.';
+COMMENT ON COLUMN customer.plan_info.name_i18n IS
+    'JSONB locale map {en: ''...'', es: ''...'', pt: ''...''}. Backend resolves the correct locale at response time.';
+COMMENT ON COLUMN customer.plan_info.marketing_description IS
+    'Default marketing description shown on the plan selection screen. Localised in marketing_description_i18n.';
+COMMENT ON COLUMN customer.plan_info.marketing_description_i18n IS
+    'JSONB locale map for marketing_description.';
+COMMENT ON COLUMN customer.plan_info.features IS
+    'Default array of feature bullet points. Localised in features_i18n.';
+COMMENT ON COLUMN customer.plan_info.features_i18n IS
+    'JSONB locale map {en: [...], es: [...]} for features.';
+COMMENT ON COLUMN customer.plan_info.cta_label IS
+    'Default call-to-action button label (e.g. ''Subscribe''). Localised in cta_label_i18n.';
+COMMENT ON COLUMN customer.plan_info.cta_label_i18n IS
+    'JSONB locale map for cta_label.';
+COMMENT ON COLUMN customer.plan_info.credit IS
+    'Number of meal credits granted per subscription renewal.';
+COMMENT ON COLUMN customer.plan_info.price IS
+    'Plan price in the market local currency (DOUBLE PRECISION). Used with credit_cost_* for display.';
+COMMENT ON COLUMN customer.plan_info.highlighted IS
+    'TRUE when this plan is visually featured/recommended in the plan selection UI.';
+COMMENT ON COLUMN customer.plan_info.credit_cost_local_currency IS
+    'Cost per credit in local currency (price ÷ credit). Pre-computed for display; '
+    'derived from price and credit but stored to avoid per-request division.';
+COMMENT ON COLUMN customer.plan_info.credit_cost_usd IS
+    'Cost per credit converted to USD. Pre-computed using currency_conversion_usd at plan-edit time.';
+COMMENT ON COLUMN customer.plan_info.rollover IS
+    'TRUE (default) if unused credits carry over to the next period. FALSE = credits expire on renewal.';
+COMMENT ON COLUMN customer.plan_info.rollover_cap IS
+    'Maximum credits that can roll over (NULL = no cap). Only meaningful when rollover = TRUE.';
+COMMENT ON COLUMN customer.plan_info.is_archived IS
+    'Soft-delete tombstone. Archived plans are hidden from plan selection but retained for subscription history.';
+COMMENT ON COLUMN customer.plan_info.status IS
+    'Lifecycle state from status_enum (active/inactive). Inactive plans are not offered to new subscribers.';
+COMMENT ON COLUMN customer.plan_info.created_date IS
+    'UTC timestamp when the plan was created.';
+COMMENT ON COLUMN customer.plan_info.created_by IS
+    'FK to core.user_info. UUID of the admin who created the plan; NULL for system-seeded plans.';
+COMMENT ON COLUMN customer.plan_info.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.plan_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.plan_history'
 CREATE TABLE IF NOT EXISTS audit.plan_history (
@@ -3216,6 +3595,38 @@ CREATE TABLE IF NOT EXISTS billing.discretionary_info (
     -- Ensure either user_id (Client) or restaurant_id (Supplier) is provided
     CHECK ((user_id IS NOT NULL AND restaurant_id IS NULL) OR (user_id IS NULL AND restaurant_id IS NOT NULL))
 );
+COMMENT ON TABLE billing.discretionary_info IS
+    'Manual credit or debit adjustments issued by admins. Each row is either a Client-side '
+    'adjustment (user_id set, restaurant_id NULL) or a Supplier-side adjustment '
+    '(restaurant_id set, user_id NULL). Backed by discretionary_resolution_info for approval.';
+COMMENT ON COLUMN billing.discretionary_info.discretionary_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.discretionary_info.user_id IS
+    'FK to core.user_info. Set for Client-side adjustments; NULL for Supplier-side.';
+COMMENT ON COLUMN billing.discretionary_info.restaurant_id IS
+    'FK to ops.restaurant_info. Set for Supplier-side adjustments; NULL for Client-side.';
+COMMENT ON COLUMN billing.discretionary_info.approval_id IS
+    'FK to billing.discretionary_resolution_info. Populated once an admin approves or rejects.';
+COMMENT ON COLUMN billing.discretionary_info.category IS
+    'Adjustment classification from discretionary_reason_enum (e.g. marketing_campaign, credit_refund).';
+COMMENT ON COLUMN billing.discretionary_info.reason IS
+    'Free-form admin-entered explanation for the adjustment.';
+COMMENT ON COLUMN billing.discretionary_info.amount IS
+    'Monetary amount of the adjustment in market currency. Positive = credit, negative = debit.';
+COMMENT ON COLUMN billing.discretionary_info.comment IS
+    'Optional additional notes from the approving admin.';
+COMMENT ON COLUMN billing.discretionary_info.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.discretionary_info.status IS
+    'Approval workflow state from discretionary_status_enum (pending / approved / rejected).';
+COMMENT ON COLUMN billing.discretionary_info.created_date IS
+    'UTC timestamp when the adjustment was created.';
+COMMENT ON COLUMN billing.discretionary_info.created_by IS
+    'FK to core.user_info. Admin who submitted the adjustment; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.discretionary_info.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN billing.discretionary_info.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
 
 \echo 'Creating table: audit.discretionary_history'
 CREATE TABLE IF NOT EXISTS audit.discretionary_history (
@@ -3265,6 +3676,26 @@ CREATE TABLE IF NOT EXISTS billing.discretionary_resolution_info (
     FOREIGN KEY (resolved_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (discretionary_id) REFERENCES billing.discretionary_info(discretionary_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.discretionary_resolution_info IS
+    'Admin approval decisions for billing.discretionary_info requests. One row per resolution event.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.approval_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.discretionary_id IS
+    'FK to billing.discretionary_info. The adjustment being resolved.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.resolution IS
+    'Outcome from discretionary_status_enum (approved / rejected / pending).';
+COMMENT ON COLUMN billing.discretionary_resolution_info.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.discretionary_resolution_info.resolved_by IS
+    'FK to core.user_info. Admin who made the approval decision.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.resolved_date IS
+    'UTC timestamp when the resolution was recorded.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.created_date IS
+    'UTC timestamp when this resolution row was created.';
+COMMENT ON COLUMN billing.discretionary_resolution_info.resolution_comment IS
+    'Optional free-form note from the resolving admin.';
 
 \echo 'Creating table: audit.discretionary_resolution_history'
 CREATE TABLE IF NOT EXISTS audit.discretionary_resolution_history (
@@ -3553,6 +3984,35 @@ CREATE TABLE IF NOT EXISTS billing.client_transaction (
     FOREIGN KEY (discretionary_id) REFERENCES billing.discretionary_info(discretionary_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.client_transaction IS
+    'Ledger of credit movements for individual users (consumers). Source of wallet balance for '
+    'client-facing billing. Not exposed directly in API responses; balance is derived.';
+COMMENT ON COLUMN billing.client_transaction.transaction_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.client_transaction.user_id IS
+    'FK to core.user_info. The consumer whose balance this transaction affects.';
+COMMENT ON COLUMN billing.client_transaction.source IS
+    'Originating event type (e.g. ''plate_selection'', ''discretionary_promotion'', ''referral_program'').';
+COMMENT ON COLUMN billing.client_transaction.plate_selection_id IS
+    'FK to customer.plate_selection_info. Populated when source = ''plate_selection''; NULL otherwise.';
+COMMENT ON COLUMN billing.client_transaction.discretionary_id IS
+    'FK to billing.discretionary_info. Populated when source = ''discretionary''; NULL otherwise.';
+COMMENT ON COLUMN billing.client_transaction.referral_id IS
+    'FK to referral record. Populated when source = ''referral_program''; NULL otherwise.';
+COMMENT ON COLUMN billing.client_transaction.credit IS
+    'Amount credited (positive) or debited (negative) to the user wallet in market currency.';
+COMMENT ON COLUMN billing.client_transaction.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.client_transaction.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.client_transaction.created_date IS
+    'UTC timestamp when the transaction was recorded.';
+COMMENT ON COLUMN billing.client_transaction.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.client_transaction.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.client_transaction.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- =============================================================================
 -- REFERRAL SYSTEM
@@ -3580,6 +4040,42 @@ CREATE TABLE IF NOT EXISTS customer.referral_config (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_config_market_active ON customer.referral_config(market_id) WHERE is_archived = FALSE;
+COMMENT ON TABLE customer.referral_config IS
+    'Per-market referral programme configuration. At most one active config per market '
+    '(unique partial index on market_id WHERE is_archived = FALSE). '
+    'Managed by Internal admins; read by the referral service when rewarding referrers.';
+COMMENT ON COLUMN customer.referral_config.referral_config_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.referral_config.market_id IS
+    'FK to core.market_info. The market this configuration applies to.';
+COMMENT ON COLUMN customer.referral_config.is_enabled IS
+    'Master toggle for the referral programme in this market. FALSE = referral codes generate no rewards.';
+COMMENT ON COLUMN customer.referral_config.referrer_bonus_rate IS
+    'Percentage of the referee''s first qualifying plan price awarded to the referrer (1–100). Default 15.';
+COMMENT ON COLUMN customer.referral_config.referrer_bonus_cap IS
+    'Maximum bonus credits a referrer can earn per single referral (NULL = uncapped).';
+COMMENT ON COLUMN customer.referral_config.referrer_monthly_cap IS
+    'Maximum number of successful referrals a single referrer can be rewarded in a calendar month (NULL = uncapped). Default 5.';
+COMMENT ON COLUMN customer.referral_config.min_plan_price_to_qualify IS
+    'Minimum plan price (local currency) the referee must pay for the referral to qualify. Default 0.';
+COMMENT ON COLUMN customer.referral_config.cooldown_days IS
+    'Minimum days that must elapse between two referrals from the same referrer. Default 0 (no cooldown).';
+COMMENT ON COLUMN customer.referral_config.held_reward_expiry_hours IS
+    'Hours after qualifying that the reward remains in ''held'' state before auto-releasing. Default 48.';
+COMMENT ON COLUMN customer.referral_config.pending_expiry_days IS
+    'Days after referral creation that a pending referral expires if never qualified. Default 90.';
+COMMENT ON COLUMN customer.referral_config.is_archived IS
+    'Soft-delete tombstone. Archived configs are excluded from active referral processing.';
+COMMENT ON COLUMN customer.referral_config.status IS
+    'Record lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.referral_config.created_date IS
+    'UTC timestamp when the config was created.';
+COMMENT ON COLUMN customer.referral_config.created_by IS
+    'FK to core.user_info. UUID of the admin who created the config; NULL for seeded rows.';
+COMMENT ON COLUMN customer.referral_config.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.referral_config.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.referral_info'
 CREATE TABLE IF NOT EXISTS customer.referral_info (
@@ -3613,6 +4109,54 @@ CREATE TABLE IF NOT EXISTS customer.referral_info (
 CREATE INDEX IF NOT EXISTS idx_referral_info_referrer ON customer.referral_info(referrer_user_id);
 CREATE INDEX IF NOT EXISTS idx_referral_info_referee ON customer.referral_info(referee_user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_info_referee_unique ON customer.referral_info(referee_user_id) WHERE referral_status NOT IN ('cancelled');
+COMMENT ON TABLE customer.referral_info IS
+    'Records a referral event: one referrer brought one referee to the platform. '
+    'Lifecycle: pending → qualified (referee paid qualifying plan) → rewarded (bonus issued) '
+    'or expired / cancelled. One non-cancelled referral per referee enforced by unique partial index.';
+COMMENT ON COLUMN customer.referral_info.referral_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.referral_info.referrer_user_id IS
+    'FK to core.user_info. The user whose referral code was used (earns the bonus).';
+COMMENT ON COLUMN customer.referral_info.referee_user_id IS
+    'FK to core.user_info. The new user who signed up with the referral code.';
+COMMENT ON COLUMN customer.referral_info.referral_code_used IS
+    'The referral code string as used at signup (matches core.user_info.referral_code of the referrer).';
+COMMENT ON COLUMN customer.referral_info.market_id IS
+    'FK to core.market_info. The market in which the referral occurred.';
+COMMENT ON COLUMN customer.referral_info.referral_status IS
+    'Lifecycle state from referral_status_enum: pending, qualified, rewarded, expired, cancelled.';
+COMMENT ON COLUMN customer.referral_info.bonus_credits_awarded IS
+    'Credits actually awarded to the referrer. NULL until status = rewarded.';
+COMMENT ON COLUMN customer.referral_info.bonus_plan_price IS
+    'The referee''s qualifying plan price (local currency) used to compute the bonus. NULL until qualified.';
+COMMENT ON COLUMN customer.referral_info.bonus_rate_applied IS
+    'The referrer_bonus_rate (%) from referral_config that was in effect at reward time. NULL until rewarded.';
+COMMENT ON COLUMN customer.referral_info.qualified_date IS
+    'UTC timestamp when the referral transitioned to qualified. NULL if not yet qualified.';
+COMMENT ON COLUMN customer.referral_info.rewarded_date IS
+    'UTC timestamp when the bonus was credited to the referrer. NULL if not yet rewarded.';
+COMMENT ON COLUMN customer.referral_info.reward_held_until IS
+    'UTC timestamp until which the reward is on hold (held_reward_expiry_hours from config). '
+    'NULL once released or if no hold applies.';
+COMMENT ON COLUMN customer.referral_info.expired_date IS
+    'UTC timestamp when the referral expired (pending_expiry_days exceeded). NULL if not expired.';
+COMMENT ON COLUMN customer.referral_info.cancelled_date IS
+    'UTC timestamp when the referral was manually cancelled. NULL if not cancelled.';
+COMMENT ON COLUMN customer.referral_info.transaction_id IS
+    'FK to billing.client_transaction. The credit transaction created when the bonus was issued. '
+    'NULL until rewarded. Added as a deferred FK to break the circular dependency with billing.client_transaction.';
+COMMENT ON COLUMN customer.referral_info.is_archived IS
+    'Soft-delete tombstone. Archived rows are excluded from active referral queries.';
+COMMENT ON COLUMN customer.referral_info.status IS
+    'Record lifecycle from status_enum (active/inactive). Distinct from referral_status.';
+COMMENT ON COLUMN customer.referral_info.created_date IS
+    'UTC timestamp when the referral was recorded (at signup).';
+COMMENT ON COLUMN customer.referral_info.created_by IS
+    'FK to core.user_info. UUID of the user who triggered the creation; NULL for system rows.';
+COMMENT ON COLUMN customer.referral_info.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.referral_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- Deferred FK: client_transaction.referral_id -> referral_info (circular dependency)
 ALTER TABLE billing.client_transaction
@@ -3698,6 +4242,21 @@ CREATE TABLE IF NOT EXISTS customer.referral_code_assignment (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_assignment_device_active ON customer.referral_code_assignment(device_id) WHERE used = FALSE;
 CREATE INDEX IF NOT EXISTS idx_referral_assignment_created ON customer.referral_code_assignment(created_at);
+COMMENT ON TABLE customer.referral_code_assignment IS
+    'Transient table that binds a referral code to a device fingerprint before the user signs up. '
+    'Written when the user taps a referral deep link (POST /referrals/assign-code). '
+    'Consumed at signup and marked used; entries expire after 48 hours (enforced in application code, not a DB column).';
+COMMENT ON COLUMN customer.referral_code_assignment.assignment_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.referral_code_assignment.device_id IS
+    'Device fingerprint (max 255 chars) identifying the pre-auth user. '
+    'Unique partial index on (device_id) WHERE used = FALSE ensures one active assignment per device.';
+COMMENT ON COLUMN customer.referral_code_assignment.referral_code IS
+    'The referral code (max 20 chars) associated with this device.';
+COMMENT ON COLUMN customer.referral_code_assignment.used IS
+    'TRUE once the code has been consumed at signup and copied into pending_customer_signup.referral_code.';
+COMMENT ON COLUMN customer.referral_code_assignment.created_at IS
+    'UTC timestamp when the assignment was created. Used for the 48-hour expiry check at signup.';
 
 \echo 'Creating table: customer.subscription_info'
 CREATE TABLE IF NOT EXISTS customer.subscription_info (
@@ -3729,9 +4288,54 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_user_market_active
     WHERE is_archived = FALSE;
 
 -- Index for querying subscriptions by market
-CREATE INDEX IF NOT EXISTS idx_subscription_market 
-    ON customer.subscription_info(market_id) 
+CREATE INDEX IF NOT EXISTS idx_subscription_market
+    ON customer.subscription_info(market_id)
     WHERE is_archived = FALSE;
+COMMENT ON TABLE customer.subscription_info IS
+    'Active and historical meal subscriptions. One non-archived subscription per user per market '
+    '(unique partial index). Holds the credit balance, renewal date, and hold/pause state. '
+    'Audit-trailed via audit.subscription_history.';
+COMMENT ON COLUMN customer.subscription_info.subscription_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.subscription_info.user_id IS
+    'FK to core.user_info. The subscriber.';
+COMMENT ON COLUMN customer.subscription_info.market_id IS
+    'FK to core.market_info. The market (country) this subscription is for. '
+    'Unique partial index (user_id, market_id) WHERE is_archived = FALSE prevents duplicate active subscriptions.';
+COMMENT ON COLUMN customer.subscription_info.plan_id IS
+    'FK to customer.plan_info. The plan the user is subscribed to.';
+COMMENT ON COLUMN customer.subscription_info.renewal_date IS
+    'UTC timestamp of the next scheduled renewal. Default: now + 30 days. '
+    'Updated by the renewal cron after each successful charge.';
+COMMENT ON COLUMN customer.subscription_info.balance IS
+    'Current meal credit balance. Decremented by plate_selection_info.credit on reservation; '
+    'topped up on renewal. Can temporarily go negative during order processing.';
+COMMENT ON COLUMN customer.subscription_info.subscription_status IS
+    'Operational lifecycle: active, on_hold, pending, cancelled. '
+    'Distinct from the status_enum column (kept for backward compatibility).';
+COMMENT ON COLUMN customer.subscription_info.hold_start_date IS
+    'UTC timestamp when the subscription was paused (PUT /subscriptions/{id}/hold). '
+    'NULL when not on hold.';
+COMMENT ON COLUMN customer.subscription_info.hold_end_date IS
+    'UTC timestamp when the hold expires and the subscription resumes. '
+    'NULL = indefinite hold. Max 3 months from hold_start_date (application-enforced).';
+COMMENT ON COLUMN customer.subscription_info.early_renewal_threshold IS
+    'Credit balance floor that triggers early renewal (integer >= 1). '
+    'NULL = period-end only (no early renewal). '
+    'Updated via PATCH /subscriptions/me/renewal-preferences.';
+COMMENT ON COLUMN customer.subscription_info.is_archived IS
+    'Soft-delete tombstone. Archived subscriptions are excluded from the active-subscription unique index.';
+COMMENT ON COLUMN customer.subscription_info.status IS
+    'Record lifecycle from status_enum (active/inactive). Retained for backward compatibility; '
+    'subscription_status is the authoritative operational state.';
+COMMENT ON COLUMN customer.subscription_info.created_date IS
+    'UTC timestamp when the subscription was first created.';
+COMMENT ON COLUMN customer.subscription_info.created_by IS
+    'FK to core.user_info. UUID of the user who created the subscription; NULL for system-created rows.';
+COMMENT ON COLUMN customer.subscription_info.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.subscription_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.subscription_history'
 CREATE TABLE IF NOT EXISTS audit.subscription_history (
@@ -3781,6 +4385,29 @@ CREATE TABLE IF NOT EXISTS customer.subscription_payment (
 );
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_subscription_id ON customer.subscription_payment(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_external_id ON customer.subscription_payment(external_payment_id);
+COMMENT ON TABLE customer.subscription_payment IS
+    'Immutable payment event record created when a subscription charge is initiated. '
+    'One row per payment attempt; duplicates avoided by external_payment_id uniqueness at the provider. '
+    'Used to populate billing.client_bill_info and for payment confirmation webhooks.';
+COMMENT ON COLUMN customer.subscription_payment.subscription_payment_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.subscription_payment.subscription_id IS
+    'FK to customer.subscription_info. The subscription being paid for.';
+COMMENT ON COLUMN customer.subscription_payment.payment_provider IS
+    'Payment provider identifier (e.g. ''stripe''). Extensible for future providers.';
+COMMENT ON COLUMN customer.subscription_payment.external_payment_id IS
+    'Provider-assigned payment identifier (e.g. Stripe PaymentIntent ID). '
+    'Indexed for webhook lookup by external ID.';
+COMMENT ON COLUMN customer.subscription_payment.status IS
+    'Payment state: pending, succeeded, failed. Updated by webhook handler.';
+COMMENT ON COLUMN customer.subscription_payment.amount_cents IS
+    'Charge amount in the smallest currency unit (e.g. cents for USD/ARS). '
+    'Surfaced in SubscriptionWithPaymentResponseSchema.amount_cents.';
+COMMENT ON COLUMN customer.subscription_payment.currency IS
+    'ISO 4217 currency code for this charge (e.g. ARS, USD). '
+    'Surfaced in SubscriptionWithPaymentResponseSchema.currency.';
+COMMENT ON COLUMN customer.subscription_payment.created_at IS
+    'UTC timestamp when the payment record was created.';
 
 \echo 'Creating table: customer.payment_method'
 CREATE TABLE IF NOT EXISTS customer.payment_method (
@@ -3800,6 +4427,38 @@ CREATE TABLE IF NOT EXISTS customer.payment_method (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (address_id) REFERENCES core.address_info(address_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE customer.payment_method IS
+    'Aggregator record linking a user to a specific payment method. '
+    'method_type determines the provider (Stripe, Mercado Pago, etc.); '
+    'provider-specific detail lives in customer.external_payment_method. '
+    'The is_default flag marks the preferred payment method for automatic charges.';
+COMMENT ON COLUMN customer.payment_method.payment_method_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.payment_method.user_id IS
+    'FK to core.user_info. The customer who owns this payment method.';
+COMMENT ON COLUMN customer.payment_method.method_type IS
+    'Provider slug (max 50 chars) from PaymentMethodProvider enum: stripe, mercado_pago, payu. '
+    'Determines which external table holds the provider detail.';
+COMMENT ON COLUMN customer.payment_method.method_type_id IS
+    'Optional UUID linking to a provider-specific sub-record. NULL for simple card-only flows.';
+COMMENT ON COLUMN customer.payment_method.address_id IS
+    'FK to core.address_info. Billing address associated with this payment method. '
+    'NULL if no billing address was captured.';
+COMMENT ON COLUMN customer.payment_method.is_archived IS
+    'Soft-delete tombstone. Archived payment methods are excluded from active payment flows.';
+COMMENT ON COLUMN customer.payment_method.status IS
+    'Lifecycle state from status_enum (active/inactive/pending).';
+COMMENT ON COLUMN customer.payment_method.is_default IS
+    'TRUE for the user''s preferred card. At most one default per user (application-enforced). '
+    'Surfaced in PaymentMethodResponseSchema and CustomerPaymentMethodItemSchema.';
+COMMENT ON COLUMN customer.payment_method.created_date IS
+    'UTC timestamp when the payment method was added.';
+COMMENT ON COLUMN customer.payment_method.created_by IS
+    'FK to core.user_info. UUID of the user who added this method; NULL for system rows.';
+COMMENT ON COLUMN customer.payment_method.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.payment_method.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.external_payment_method'
 CREATE TABLE IF NOT EXISTS customer.external_payment_method (
@@ -3817,6 +4476,31 @@ CREATE TABLE IF NOT EXISTS customer.external_payment_method (
 );
 CREATE INDEX IF NOT EXISTS idx_external_payment_method_payment_method_id ON customer.external_payment_method(payment_method_id);
 CREATE INDEX IF NOT EXISTS idx_external_payment_method_provider ON customer.external_payment_method(provider);
+COMMENT ON TABLE customer.external_payment_method IS
+    'Provider-specific details for a customer payment method. One-to-one with customer.payment_method '
+    '(UNIQUE on payment_method_id). Holds the masked card display fields (last4, brand) and '
+    'the opaque provider identifier used for charging.';
+COMMENT ON COLUMN customer.external_payment_method.external_payment_method_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.external_payment_method.payment_method_id IS
+    'FK to customer.payment_method (UNIQUE). The aggregator record this detail belongs to.';
+COMMENT ON COLUMN customer.external_payment_method.provider IS
+    'Payment provider slug (e.g. ''stripe''). Paired with external_id for uniqueness across providers.';
+COMMENT ON COLUMN customer.external_payment_method.external_id IS
+    'Provider-assigned payment method identifier (e.g. Stripe pm_xxx). '
+    'UNIQUE(provider, external_id) prevents duplicate records.';
+COMMENT ON COLUMN customer.external_payment_method.last4 IS
+    'Last 4 digits of the card number. Surfaced in CustomerPaymentMethodItemSchema.last4 and '
+    'PaymentMethodEnrichedResponseSchema.last4 for display purposes.';
+COMMENT ON COLUMN customer.external_payment_method.brand IS
+    'Card network brand (e.g. ''visa'', ''mastercard''). Surfaced alongside last4 for display.';
+COMMENT ON COLUMN customer.external_payment_method.provider_customer_id IS
+    'Provider-side customer identifier (e.g. Stripe cus_xxx). '
+    'Intentionally omitted from all API responses — internal system field only.';
+COMMENT ON COLUMN customer.external_payment_method.created_at IS
+    'UTC timestamp when this provider detail was first recorded.';
+COMMENT ON COLUMN customer.external_payment_method.updated_at IS
+    'UTC timestamp of the most recent update (e.g. card expiry refresh from webhook).';
 
 \echo 'Creating table: customer.user_payment_provider'
 CREATE TABLE IF NOT EXISTS customer.user_payment_provider (
@@ -3842,6 +4526,32 @@ CREATE UNIQUE INDEX uq_user_payment_provider_provider_customer
     ON customer.user_payment_provider (provider, provider_customer_id)
     WHERE is_archived = FALSE;
 CREATE INDEX IF NOT EXISTS idx_user_payment_provider_user_id ON customer.user_payment_provider(user_id);
+COMMENT ON TABLE customer.user_payment_provider IS
+    'Links a user to their payment provider account (e.g. Stripe Customer object). '
+    'One active account per (user, provider) pair — unique partial index WHERE is_archived = FALSE. '
+    'provider_customer_id is intentionally omitted from all API responses.';
+COMMENT ON COLUMN customer.user_payment_provider.user_payment_provider_id IS
+    'UUIDv7 primary key. Time-ordered. Surfaced in UserPaymentProviderResponseSchema.';
+COMMENT ON COLUMN customer.user_payment_provider.user_id IS
+    'FK to core.user_info. The customer who owns this provider account.';
+COMMENT ON COLUMN customer.user_payment_provider.provider IS
+    'Payment provider slug (e.g. ''stripe''). Part of the unique active-account constraint.';
+COMMENT ON COLUMN customer.user_payment_provider.provider_customer_id IS
+    'Provider-side customer identifier (e.g. Stripe cus_xxx). '
+    'Internal system field — never returned in API responses. '
+    'UNIQUE(provider, provider_customer_id) WHERE is_archived = FALSE prevents one user sharing another''s provider account.';
+COMMENT ON COLUMN customer.user_payment_provider.is_archived IS
+    'Soft-delete tombstone. Archived records are excluded from uniqueness checks.';
+COMMENT ON COLUMN customer.user_payment_provider.status IS
+    'Record lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.user_payment_provider.created_date IS
+    'UTC timestamp when the provider account was linked. Surfaced in UserPaymentProviderResponseSchema.created_date.';
+COMMENT ON COLUMN customer.user_payment_provider.created_by IS
+    'FK to core.user_info. UUID of the user who linked the provider; NULL for system rows.';
+COMMENT ON COLUMN customer.user_payment_provider.modified_by IS
+    'FK to core.user_info. UUID of the last user to write this row.';
+COMMENT ON COLUMN customer.user_payment_provider.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.user_payment_provider_history'
 CREATE TABLE IF NOT EXISTS audit.user_payment_provider_history (
@@ -3894,6 +4604,37 @@ CREATE TABLE IF NOT EXISTS billing.client_bill_info (
     FOREIGN KEY (subscription_payment_id) REFERENCES customer.subscription_payment(subscription_payment_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.client_bill_info IS
+    'One bill per subscription payment cycle for a consumer. Links a subscription payment event '
+    'to the plan, user, and currency at the time of billing.';
+COMMENT ON COLUMN billing.client_bill_info.client_bill_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.client_bill_info.subscription_payment_id IS
+    'FK to customer.subscription_payment. The payment event that generated this bill.';
+COMMENT ON COLUMN billing.client_bill_info.subscription_id IS
+    'FK to customer.subscription_info. The active subscription at billing time.';
+COMMENT ON COLUMN billing.client_bill_info.user_id IS
+    'FK to core.user_info. The consumer being billed.';
+COMMENT ON COLUMN billing.client_bill_info.plan_id IS
+    'FK to customer.plan_info. The plan the consumer was on at billing time.';
+COMMENT ON COLUMN billing.client_bill_info.currency_metadata_id IS
+    'FK to core.currency_metadata. Currency in effect at billing time.';
+COMMENT ON COLUMN billing.client_bill_info.amount IS
+    'Total billed amount in market currency.';
+COMMENT ON COLUMN billing.client_bill_info.currency_code IS
+    'ISO 4217 currency code denormalized at write time.';
+COMMENT ON COLUMN billing.client_bill_info.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.client_bill_info.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.client_bill_info.created_date IS
+    'UTC timestamp when the bill was created.';
+COMMENT ON COLUMN billing.client_bill_info.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.client_bill_info.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.client_bill_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.client_bill_history'
 CREATE TABLE IF NOT EXISTS audit.client_bill_history (
@@ -3955,6 +4696,54 @@ CREATE TABLE IF NOT EXISTS billing.restaurant_transaction (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.restaurant_transaction IS
+    'Ledger of per-order financial events for supplier restaurants. Each row represents one '
+    'order, discretionary credit, or other event that contributes to the restaurant balance. '
+    'Consumed by the settlement pipeline to compute payouts.';
+COMMENT ON COLUMN billing.restaurant_transaction.transaction_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.restaurant_transaction.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant whose balance this event affects.';
+COMMENT ON COLUMN billing.restaurant_transaction.plate_selection_id IS
+    'FK to customer.plate_selection_info. The order that generated this transaction; NULL for non-order events.';
+COMMENT ON COLUMN billing.restaurant_transaction.discretionary_id IS
+    'FK to billing.discretionary_info. The discretionary adjustment; NULL for order-based events.';
+COMMENT ON COLUMN billing.restaurant_transaction.currency_metadata_id IS
+    'FK to core.currency_metadata. Currency in effect at transaction time.';
+COMMENT ON COLUMN billing.restaurant_transaction.was_collected IS
+    'TRUE once the transaction has been included in a settlement run.';
+COMMENT ON COLUMN billing.restaurant_transaction.ordered_timestamp IS
+    'UTC timestamp when the order was placed.';
+COMMENT ON COLUMN billing.restaurant_transaction.collected_timestamp IS
+    'UTC timestamp when the transaction was swept into a settlement; NULL until collected.';
+COMMENT ON COLUMN billing.restaurant_transaction.arrival_time IS
+    'UTC timestamp when the diner arrived at the restaurant.';
+COMMENT ON COLUMN billing.restaurant_transaction.completion_time IS
+    'UTC timestamp when the order was marked complete.';
+COMMENT ON COLUMN billing.restaurant_transaction.expected_completion_time IS
+    'UTC timestamp of the expected order completion (kitchen prep deadline).';
+COMMENT ON COLUMN billing.restaurant_transaction.transaction_type IS
+    'Classification from transaction_type_enum (e.g. order, no_show, discretionary).';
+COMMENT ON COLUMN billing.restaurant_transaction.credit IS
+    'Base amount credited to the restaurant before discounts, in market currency.';
+COMMENT ON COLUMN billing.restaurant_transaction.no_show_discount IS
+    'Amount deducted for a no-show event; NULL for non-no-show transactions.';
+COMMENT ON COLUMN billing.restaurant_transaction.currency_code IS
+    'ISO 4217 currency code denormalized at write time.';
+COMMENT ON COLUMN billing.restaurant_transaction.final_amount IS
+    'Net amount after any discounts (credit minus no_show_discount).';
+COMMENT ON COLUMN billing.restaurant_transaction.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.restaurant_transaction.status IS
+    'Row lifecycle from status_enum (active/inactive/pending).';
+COMMENT ON COLUMN billing.restaurant_transaction.created_date IS
+    'UTC timestamp when the transaction was recorded.';
+COMMENT ON COLUMN billing.restaurant_transaction.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.restaurant_transaction.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.restaurant_transaction.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: billing.restaurant_balance_info'
 CREATE TABLE IF NOT EXISTS billing.restaurant_balance_info (
@@ -3972,6 +4761,31 @@ CREATE TABLE IF NOT EXISTS billing.restaurant_balance_info (
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.restaurant_balance_info IS
+    'Running balance for each supplier restaurant. One row per restaurant (PK = restaurant_id). '
+    'Updated atomically with each transaction. Zeroed out when the settlement pipeline runs.';
+COMMENT ON COLUMN billing.restaurant_balance_info.restaurant_id IS
+    'PK and FK to ops.restaurant_info. One balance row per restaurant.';
+COMMENT ON COLUMN billing.restaurant_balance_info.currency_metadata_id IS
+    'FK to core.currency_metadata. Currency of the balance.';
+COMMENT ON COLUMN billing.restaurant_balance_info.transaction_count IS
+    'Number of unsettled transactions included in the current balance.';
+COMMENT ON COLUMN billing.restaurant_balance_info.balance IS
+    'Current outstanding balance in market currency. Reset to zero after each settlement run.';
+COMMENT ON COLUMN billing.restaurant_balance_info.currency_code IS
+    'ISO 4217 currency code denormalized at write time.';
+COMMENT ON COLUMN billing.restaurant_balance_info.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.restaurant_balance_info.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.restaurant_balance_info.created_date IS
+    'UTC timestamp when this balance row was first created.';
+COMMENT ON COLUMN billing.restaurant_balance_info.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.restaurant_balance_info.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.restaurant_balance_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.restaurant_balance_history'
 CREATE TABLE IF NOT EXISTS audit.restaurant_balance_history (
@@ -4025,6 +4839,44 @@ CREATE TABLE IF NOT EXISTS billing.institution_bill_info (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.institution_bill_info IS
+    'Periodic bill issued to a supplier institution for a given billing period. Aggregates '
+    'settled restaurant transactions for one institution_entity across a period. '
+    'The resolution field tracks whether the bill has been invoiced and paid.';
+COMMENT ON COLUMN billing.institution_bill_info.institution_bill_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.institution_bill_info.institution_id IS
+    'FK to core.institution_info. The institution being billed.';
+COMMENT ON COLUMN billing.institution_bill_info.institution_entity_id IS
+    'FK to ops.institution_entity_info. The legal entity within the institution (per-country).';
+COMMENT ON COLUMN billing.institution_bill_info.currency_metadata_id IS
+    'FK to core.currency_metadata. Currency in effect for this bill.';
+COMMENT ON COLUMN billing.institution_bill_info.transaction_count IS
+    'Number of restaurant transactions included in this bill.';
+COMMENT ON COLUMN billing.institution_bill_info.amount IS
+    'Total billed amount in market currency.';
+COMMENT ON COLUMN billing.institution_bill_info.currency_code IS
+    'ISO 4217 currency code denormalized at write time.';
+COMMENT ON COLUMN billing.institution_bill_info.period_start IS
+    'UTC start of the billing period (inclusive).';
+COMMENT ON COLUMN billing.institution_bill_info.period_end IS
+    'UTC end of the billing period (inclusive).';
+COMMENT ON COLUMN billing.institution_bill_info.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.institution_bill_info.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.institution_bill_info.resolution IS
+    'Payment resolution state from bill_resolution_enum (pending / invoiced / paid / cancelled).';
+COMMENT ON COLUMN billing.institution_bill_info.tax_doc_external_id IS
+    'External tax document identifier (e.g. AFIP/SUNAT document number) once the invoice is issued.';
+COMMENT ON COLUMN billing.institution_bill_info.created_date IS
+    'UTC timestamp when the bill was created by the billing pipeline.';
+COMMENT ON COLUMN billing.institution_bill_info.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for pipeline-generated rows.';
+COMMENT ON COLUMN billing.institution_bill_info.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.institution_bill_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.institution_bill_history'
 CREATE TABLE IF NOT EXISTS audit.institution_bill_history (
@@ -4079,6 +4931,31 @@ CREATE TABLE IF NOT EXISTS billing.institution_bill_payout (
 CREATE INDEX IF NOT EXISTS idx_bill_payout_bill_id  ON billing.institution_bill_payout(institution_bill_id);
 CREATE INDEX IF NOT EXISTS idx_bill_payout_provider ON billing.institution_bill_payout(provider);
 CREATE INDEX IF NOT EXISTS idx_bill_payout_transfer_id ON billing.institution_bill_payout(provider_transfer_id);
+COMMENT ON TABLE billing.institution_bill_payout IS
+    'Tracks payout transfers from Vianda to supplier institutions. Each row is one transfer '
+    'attempt via an external payment provider (e.g. Stripe). Idempotency key prevents double-pays.';
+COMMENT ON COLUMN billing.institution_bill_payout.bill_payout_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.institution_bill_payout.institution_bill_id IS
+    'FK to billing.institution_bill_info. The bill being paid.';
+COMMENT ON COLUMN billing.institution_bill_payout.provider IS
+    'Payment provider identifier (e.g. ''stripe'').';
+COMMENT ON COLUMN billing.institution_bill_payout.provider_transfer_id IS
+    'External transfer reference from the payment provider (e.g. Stripe transfer ID). NULL until the provider confirms.';
+COMMENT ON COLUMN billing.institution_bill_payout.amount IS
+    'Amount transferred in the bill''s currency.';
+COMMENT ON COLUMN billing.institution_bill_payout.currency_code IS
+    'ISO 4217 currency code for the transfer.';
+COMMENT ON COLUMN billing.institution_bill_payout.status IS
+    'Transfer state from bill_payout_status_enum (pending / succeeded / failed).';
+COMMENT ON COLUMN billing.institution_bill_payout.idempotency_key IS
+    'Unique key passed to the payment provider to prevent duplicate transfers.';
+COMMENT ON COLUMN billing.institution_bill_payout.created_at IS
+    'UTC timestamp when this payout row was created.';
+COMMENT ON COLUMN billing.institution_bill_payout.completed_at IS
+    'UTC timestamp when the provider confirmed the transfer; NULL until resolved.';
+COMMENT ON COLUMN billing.institution_bill_payout.modified_by IS
+    'FK to core.user_info. Admin who last updated this row; NULL for system-initiated rows.';
 
 \echo 'Creating table: billing.market_payout_aggregator'
 CREATE TABLE IF NOT EXISTS billing.market_payout_aggregator (
@@ -4100,6 +4977,37 @@ CREATE TABLE IF NOT EXISTS billing.market_payout_aggregator (
     FOREIGN KEY (market_id)  REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.market_payout_aggregator IS
+    'Market-level payout configuration used by the billing pipeline. One row per market. '
+    'Controls the payout provider, invoice requirements, max unmatched bill age, and the '
+    'default kitchen-hours window that supplier restaurant records inherit at create time.';
+COMMENT ON COLUMN billing.market_payout_aggregator.market_id IS
+    'PK and FK to core.market_info. One configuration row per market.';
+COMMENT ON COLUMN billing.market_payout_aggregator.aggregator IS
+    'Payment aggregator identifier for this market (e.g. ''stripe'').';
+COMMENT ON COLUMN billing.market_payout_aggregator.is_active IS
+    'TRUE when payout processing is enabled for this market.';
+COMMENT ON COLUMN billing.market_payout_aggregator.require_invoice IS
+    'Market-level default: TRUE = supplier must submit an invoice before payout is released. '
+    'Can be overridden per supplier via billing.supplier_terms.require_invoice.';
+COMMENT ON COLUMN billing.market_payout_aggregator.max_unmatched_bill_days IS
+    'Maximum days a bill may remain unmatched to an invoice before automatic follow-up is triggered.';
+COMMENT ON COLUMN billing.market_payout_aggregator.kitchen_open_time IS
+    'Default kitchen open time (wall-clock, naive) used when creating new supplier restaurant records.';
+COMMENT ON COLUMN billing.market_payout_aggregator.kitchen_close_time IS
+    'Default kitchen close time (wall-clock, naive) used when creating new supplier restaurant records.';
+COMMENT ON COLUMN billing.market_payout_aggregator.notes IS
+    'Free-form admin notes about this market''s payout configuration.';
+COMMENT ON COLUMN billing.market_payout_aggregator.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.market_payout_aggregator.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.market_payout_aggregator.created_date IS
+    'UTC timestamp when this configuration row was created.';
+COMMENT ON COLUMN billing.market_payout_aggregator.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.market_payout_aggregator.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.market_payout_aggregator_history'
 CREATE TABLE IF NOT EXISTS audit.market_payout_aggregator_history (
@@ -4163,6 +5071,54 @@ CREATE TABLE IF NOT EXISTS billing.institution_settlement (
 CREATE INDEX IF NOT EXISTS idx_institution_settlement_entity_period ON billing.institution_settlement(institution_entity_id, period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_institution_settlement_restaurant_period ON billing.institution_settlement(restaurant_id, period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_institution_settlement_bill ON billing.institution_settlement(institution_bill_id);
+COMMENT ON TABLE billing.institution_settlement IS
+    'Per-restaurant payout computation for one kitchen day within a billing run. '
+    'Multiple settlement rows roll up into one billing.institution_bill_info per entity. '
+    'References audit.restaurant_balance_history (balance_event_id) to anchor the balance '
+    'snapshot used at settlement time. Not exposed in any API response; used by billing pipeline only.';
+COMMENT ON COLUMN billing.institution_settlement.settlement_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.institution_settlement.institution_entity_id IS
+    'FK to ops.institution_entity_info. The legal entity to which this settlement is credited.';
+COMMENT ON COLUMN billing.institution_settlement.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant whose earnings are settled.';
+COMMENT ON COLUMN billing.institution_settlement.period_start IS
+    'UTC start of the settlement period (inclusive).';
+COMMENT ON COLUMN billing.institution_settlement.period_end IS
+    'UTC end of the settlement period (inclusive).';
+COMMENT ON COLUMN billing.institution_settlement.kitchen_day IS
+    'The calendar date (YYYY-MM-DD as string) this settlement covers, in market local time.';
+COMMENT ON COLUMN billing.institution_settlement.amount IS
+    'Total payout amount for this restaurant for this kitchen day, in market currency.';
+COMMENT ON COLUMN billing.institution_settlement.currency_code IS
+    'ISO 4217 currency code denormalized at write time.';
+COMMENT ON COLUMN billing.institution_settlement.currency_metadata_id IS
+    'FK to core.currency_metadata. Currency configuration at settlement time.';
+COMMENT ON COLUMN billing.institution_settlement.transaction_count IS
+    'Number of finalized transactions included in this settlement row.';
+COMMENT ON COLUMN billing.institution_settlement.balance_event_id IS
+    'FK to audit.restaurant_balance_history.event_id. Links to the balance snapshot computed '
+    'immediately before this settlement zeroed out the balance.';
+COMMENT ON COLUMN billing.institution_settlement.settlement_number IS
+    'Human-readable settlement reference code (e.g. ''SET-20240101-001'') for admin reporting.';
+COMMENT ON COLUMN billing.institution_settlement.settlement_run_id IS
+    'UUID grouping all settlement rows created in the same billing cron run. Useful for debugging.';
+COMMENT ON COLUMN billing.institution_settlement.institution_bill_id IS
+    'FK to billing.institution_bill_info. Set once this settlement is rolled up into a bill.';
+COMMENT ON COLUMN billing.institution_settlement.country_code IS
+    'ISO 3166-1 alpha-2 country code of the restaurant''s entity. Denormalized for reporting.';
+COMMENT ON COLUMN billing.institution_settlement.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.institution_settlement.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.institution_settlement.created_at IS
+    'UTC timestamp when the settlement record was created by the billing pipeline.';
+COMMENT ON COLUMN billing.institution_settlement.created_by IS
+    'FK to core.user_info. UUID of the actor who created this row; NULL for pipeline-generated rows.';
+COMMENT ON COLUMN billing.institution_settlement.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.institution_settlement.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.institution_settlement_history'
 CREATE TABLE IF NOT EXISTS audit.institution_settlement_history (
@@ -4243,6 +5199,54 @@ CREATE TABLE IF NOT EXISTS billing.supplier_invoice (
 CREATE INDEX IF NOT EXISTS idx_supplier_invoice_entity ON billing.supplier_invoice(institution_entity_id);
 CREATE INDEX IF NOT EXISTS idx_supplier_invoice_status ON billing.supplier_invoice(status);
 CREATE INDEX IF NOT EXISTS idx_supplier_invoice_country ON billing.supplier_invoice(country_code);
+COMMENT ON TABLE billing.supplier_invoice IS
+    'Supplier-submitted invoices for payout compliance. Each invoice covers a period of work '
+    'by one institution entity. Country-specific details are stored in extension tables '
+    '(supplier_invoice_ar, supplier_invoice_pe, supplier_invoice_us). '
+    'document_storage_path holds the internal GCS path; API responses expose a signed URL instead.';
+COMMENT ON COLUMN billing.supplier_invoice.supplier_invoice_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.supplier_invoice.institution_entity_id IS
+    'FK to ops.institution_entity_info. The legal entity that submitted this invoice.';
+COMMENT ON COLUMN billing.supplier_invoice.country_code IS
+    'ISO 3166-1 alpha-2 country code. Determines which extension table holds compliance details.';
+COMMENT ON COLUMN billing.supplier_invoice.invoice_type IS
+    'Invoice classification from supplier_invoice_type_enum (e.g. standard, credit_note).';
+COMMENT ON COLUMN billing.supplier_invoice.external_invoice_number IS
+    'Supplier-assigned invoice number from their internal system; NULL if not provided.';
+COMMENT ON COLUMN billing.supplier_invoice.issued_date IS
+    'Calendar date the supplier issued the invoice, in local time.';
+COMMENT ON COLUMN billing.supplier_invoice.amount IS
+    'Total invoice amount in the invoice currency (12 digits, 2 decimal places).';
+COMMENT ON COLUMN billing.supplier_invoice.currency_code IS
+    'ISO 4217 currency code of the invoice.';
+COMMENT ON COLUMN billing.supplier_invoice.tax_amount IS
+    'Tax component of the invoice amount; NULL if not applicable.';
+COMMENT ON COLUMN billing.supplier_invoice.tax_rate IS
+    'Applicable tax rate as a percentage (e.g. 21.00 for 21%); NULL if not applicable.';
+COMMENT ON COLUMN billing.supplier_invoice.document_storage_path IS
+    'Internal GCS object path for the uploaded invoice file. '
+    'API responses expose a time-limited signed URL (document_url) instead of this path.';
+COMMENT ON COLUMN billing.supplier_invoice.document_format IS
+    'File format of the uploaded document (e.g. ''pdf'', ''xml'').';
+COMMENT ON COLUMN billing.supplier_invoice.status IS
+    'Review state from supplier_invoice_status_enum (pending_review / approved / rejected).';
+COMMENT ON COLUMN billing.supplier_invoice.rejection_reason IS
+    'Admin-entered reason if status = rejected; NULL otherwise.';
+COMMENT ON COLUMN billing.supplier_invoice.reviewed_by IS
+    'FK to core.user_info. Admin who completed the review; NULL until reviewed.';
+COMMENT ON COLUMN billing.supplier_invoice.reviewed_at IS
+    'UTC timestamp when the review decision was recorded; NULL until reviewed.';
+COMMENT ON COLUMN billing.supplier_invoice.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.supplier_invoice.created_date IS
+    'UTC timestamp when the invoice was submitted.';
+COMMENT ON COLUMN billing.supplier_invoice.created_by IS
+    'FK to core.user_info. Actor who submitted this invoice; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.supplier_invoice.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.supplier_invoice.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.supplier_invoice_history'
 CREATE TABLE IF NOT EXISTS audit.supplier_invoice_history (
@@ -4297,6 +5301,21 @@ CREATE TABLE IF NOT EXISTS billing.bill_invoice_match (
 );
 CREATE INDEX IF NOT EXISTS idx_bill_invoice_match_bill ON billing.bill_invoice_match(institution_bill_id);
 CREATE INDEX IF NOT EXISTS idx_bill_invoice_match_invoice ON billing.bill_invoice_match(supplier_invoice_id);
+COMMENT ON TABLE billing.bill_invoice_match IS
+    'Many-to-many join between institution bills and supplier invoices. Records which invoice '
+    'covers (part of) which bill, enabling partial matching across periods.';
+COMMENT ON COLUMN billing.bill_invoice_match.match_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.bill_invoice_match.institution_bill_id IS
+    'FK to billing.institution_bill_info. The bill being matched.';
+COMMENT ON COLUMN billing.bill_invoice_match.supplier_invoice_id IS
+    'FK to billing.supplier_invoice. The invoice covering part of the bill.';
+COMMENT ON COLUMN billing.bill_invoice_match.matched_amount IS
+    'Amount of the invoice applied to this bill (partial matches allowed).';
+COMMENT ON COLUMN billing.bill_invoice_match.matched_by IS
+    'FK to core.user_info. Admin who recorded the match.';
+COMMENT ON COLUMN billing.bill_invoice_match.matched_at IS
+    'UTC timestamp when the match was recorded.';
 
 \echo 'Creating table: billing.supplier_invoice_ar'
 CREATE TABLE IF NOT EXISTS billing.supplier_invoice_ar (
@@ -4309,6 +5328,24 @@ CREATE TABLE IF NOT EXISTS billing.supplier_invoice_ar (
     afip_document_type      VARCHAR(20) NULL,
     FOREIGN KEY (supplier_invoice_id) REFERENCES billing.supplier_invoice(supplier_invoice_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.supplier_invoice_ar IS
+    'Argentina-specific compliance extension for billing.supplier_invoice. '
+    'Holds AFIP CAE fields required for electronic invoicing (factura electrónica). '
+    'One row per Argentina supplier invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.supplier_invoice_id IS
+    'PK and FK to billing.supplier_invoice. Shares the parent row''s UUIDv7.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.cae_code IS
+    'AFIP-issued Código de Autorización Electrónica (CAE) for this invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.cae_expiry_date IS
+    'Expiry date of the CAE code issued by AFIP.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.afip_point_of_sale IS
+    'AFIP point-of-sale number (punto de venta) used to issue this invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.supplier_cuit IS
+    'CUIT (tax ID) of the supplier issuing the invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.recipient_cuit IS
+    'CUIT of the recipient (Vianda entity); NULL if not required.';
+COMMENT ON COLUMN billing.supplier_invoice_ar.afip_document_type IS
+    'AFIP document type code (e.g. ''01'' for Factura A); NULL if not applicable.';
 
 \echo 'Creating table: billing.supplier_invoice_pe'
 CREATE TABLE IF NOT EXISTS billing.supplier_invoice_pe (
@@ -4321,6 +5358,25 @@ CREATE TABLE IF NOT EXISTS billing.supplier_invoice_pe (
     recipient_ruc           VARCHAR(11) NULL,
     FOREIGN KEY (supplier_invoice_id) REFERENCES billing.supplier_invoice(supplier_invoice_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.supplier_invoice_pe IS
+    'Peru-specific compliance extension for billing.supplier_invoice. '
+    'Holds SUNAT fields required for electronic invoicing (comprobante electrónico). '
+    'One row per Peru supplier invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.supplier_invoice_id IS
+    'PK and FK to billing.supplier_invoice. Shares the parent row''s UUIDv7.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.sunat_serie IS
+    'SUNAT series identifier (e.g. ''F001'') for the electronic receipt.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.sunat_correlativo IS
+    'SUNAT sequential correlative number within the series.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.cdr_status IS
+    'Constancia de Recepción status returned by SUNAT (e.g. ''accepted'', ''rejected''); NULL until CDR received.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.cdr_received_at IS
+    'UTC timestamp when the SUNAT CDR response was received; NULL until processed. '
+    'Not exposed in API responses.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.supplier_ruc IS
+    'RUC (tax ID) of the supplier issuing the invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_pe.recipient_ruc IS
+    'RUC of the recipient (Vianda entity); NULL if not required.';
 
 \echo 'Creating table: billing.supplier_invoice_us'
 CREATE TABLE IF NOT EXISTS billing.supplier_invoice_us (
@@ -4328,6 +5384,13 @@ CREATE TABLE IF NOT EXISTS billing.supplier_invoice_us (
     tax_year                SMALLINT    NOT NULL,
     FOREIGN KEY (supplier_invoice_id) REFERENCES billing.supplier_invoice(supplier_invoice_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE billing.supplier_invoice_us IS
+    'United States-specific compliance extension for billing.supplier_invoice. '
+    'Holds the IRS tax year for 1099-NEC reporting. One row per US supplier invoice.';
+COMMENT ON COLUMN billing.supplier_invoice_us.supplier_invoice_id IS
+    'PK and FK to billing.supplier_invoice. Shares the parent row''s UUIDv7.';
+COMMENT ON COLUMN billing.supplier_invoice_us.tax_year IS
+    'IRS tax year this invoice is reported under (e.g. 2024). Used for 1099-NEC aggregation.';
 
 \echo 'Creating table: billing.supplier_w9'
 CREATE TABLE IF NOT EXISTS billing.supplier_w9 (
@@ -4348,6 +5411,37 @@ CREATE TABLE IF NOT EXISTS billing.supplier_w9 (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_supplier_w9_entity ON billing.supplier_w9(institution_entity_id);
+COMMENT ON TABLE billing.supplier_w9 IS
+    'IRS W-9 form data collected from US-based supplier entities. One row per institution_entity '
+    '(UNIQUE constraint). document_storage_path holds the internal GCS path; API responses '
+    'expose a signed URL (document_url) instead.';
+COMMENT ON COLUMN billing.supplier_w9.w9_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.supplier_w9.institution_entity_id IS
+    'FK to ops.institution_entity_info. UNIQUE — one W-9 per entity.';
+COMMENT ON COLUMN billing.supplier_w9.legal_name IS
+    'Legal business name as it appears on the W-9.';
+COMMENT ON COLUMN billing.supplier_w9.business_name IS
+    'DBA or trade name; NULL if the business operates under the legal name only.';
+COMMENT ON COLUMN billing.supplier_w9.tax_classification IS
+    'IRS entity classification (e.g. ''sole_proprietor'', ''llc'', ''c_corp'').';
+COMMENT ON COLUMN billing.supplier_w9.ein_last_four IS
+    'Last four digits of the EIN (Employer Identification Number). Full EIN is not stored.';
+COMMENT ON COLUMN billing.supplier_w9.address_line IS
+    'Full mailing address as provided on the W-9.';
+COMMENT ON COLUMN billing.supplier_w9.document_storage_path IS
+    'Internal GCS object path for the uploaded W-9 scan. '
+    'API responses expose a time-limited signed URL (document_url) instead of this path.';
+COMMENT ON COLUMN billing.supplier_w9.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.supplier_w9.collected_at IS
+    'UTC timestamp when the W-9 was submitted by the supplier.';
+COMMENT ON COLUMN billing.supplier_w9.created_by IS
+    'FK to core.user_info. Actor who submitted this W-9; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.supplier_w9.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN billing.supplier_w9.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
 
 -- ─────────────────────────────────────────────────────────────
 -- EMPLOYER BILLING
@@ -4384,6 +5478,54 @@ CREATE TABLE IF NOT EXISTS billing.employer_bill (
 CREATE INDEX IF NOT EXISTS idx_employer_bill_institution ON billing.employer_bill(institution_id);
 CREATE INDEX IF NOT EXISTS idx_employer_bill_entity ON billing.employer_bill(institution_entity_id);
 CREATE INDEX IF NOT EXISTS idx_employer_bill_period ON billing.employer_bill(billing_period_start, billing_period_end);
+COMMENT ON TABLE billing.employer_bill IS
+    'Periodic bill charged to an employer institution for the benefit subsidy it owes. '
+    'One bill per institution_entity per billing cycle. Line items live in employer_bill_line. '
+    'Stripe invoice tracking is via stripe_invoice_id.';
+COMMENT ON COLUMN billing.employer_bill.employer_bill_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.employer_bill.institution_id IS
+    'FK to core.institution_info. The employer institution being billed.';
+COMMENT ON COLUMN billing.employer_bill.institution_entity_id IS
+    'FK to ops.institution_entity_info. The legal entity within the institution (per-country/currency).';
+COMMENT ON COLUMN billing.employer_bill.billing_period_start IS
+    'Start date of the billing period (inclusive), in market local time.';
+COMMENT ON COLUMN billing.employer_bill.billing_period_end IS
+    'End date of the billing period (inclusive), in market local time.';
+COMMENT ON COLUMN billing.employer_bill.billing_cycle IS
+    'Cycle identifier (e.g. ''monthly'', ''weekly'').';
+COMMENT ON COLUMN billing.employer_bill.total_renewal_events IS
+    'Count of subscription renewals included in this bill.';
+COMMENT ON COLUMN billing.employer_bill.gross_employer_share IS
+    'Sum of employer subsidy amounts across all line items, before discount.';
+COMMENT ON COLUMN billing.employer_bill.price_discount IS
+    'Percentage discount applied to the gross employer share (integer, 0–100).';
+COMMENT ON COLUMN billing.employer_bill.discounted_amount IS
+    'Gross employer share after applying price_discount.';
+COMMENT ON COLUMN billing.employer_bill.minimum_fee_applied IS
+    'TRUE if a minimum fee floor was enforced, overriding the discounted_amount.';
+COMMENT ON COLUMN billing.employer_bill.billed_amount IS
+    'Final amount charged to the employer after all adjustments and minimums.';
+COMMENT ON COLUMN billing.employer_bill.currency_code IS
+    'ISO 4217 currency code for this bill.';
+COMMENT ON COLUMN billing.employer_bill.stripe_invoice_id IS
+    'Stripe invoice ID for this bill; NULL until the invoice is created in Stripe.';
+COMMENT ON COLUMN billing.employer_bill.payment_status IS
+    'Payment state from employer_bill_payment_status_enum (pending / paid / failed / cancelled).';
+COMMENT ON COLUMN billing.employer_bill.paid_date IS
+    'UTC timestamp when payment was confirmed; NULL until paid.';
+COMMENT ON COLUMN billing.employer_bill.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.employer_bill.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.employer_bill.created_date IS
+    'UTC timestamp when the bill was generated.';
+COMMENT ON COLUMN billing.employer_bill.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for pipeline-generated rows.';
+COMMENT ON COLUMN billing.employer_bill.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.employer_bill.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: billing.employer_bill_line'
 CREATE TABLE IF NOT EXISTS billing.employer_bill_line (
@@ -4405,6 +5547,34 @@ CREATE TABLE IF NOT EXISTS billing.employer_bill_line (
     FOREIGN KEY (plan_id) REFERENCES customer.plan_info(plan_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_employer_bill_line_bill ON billing.employer_bill_line(employer_bill_id);
+COMMENT ON TABLE billing.employer_bill_line IS
+    'One line per subscription renewal event within an employer bill. '
+    'Records the plan price, benefit rate, and computed benefit amount at renewal time. '
+    'Immutable once created — no audit history table (billing_line is append-only).';
+COMMENT ON COLUMN billing.employer_bill_line.line_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.employer_bill_line.employer_bill_id IS
+    'FK to billing.employer_bill. The parent bill this line belongs to.';
+COMMENT ON COLUMN billing.employer_bill_line.subscription_id IS
+    'FK to customer.subscription_info. The subscription that renewed.';
+COMMENT ON COLUMN billing.employer_bill_line.user_id IS
+    'FK to core.user_info. The employee who renewed.';
+COMMENT ON COLUMN billing.employer_bill_line.plan_id IS
+    'FK to customer.plan_info. The plan at renewal time.';
+COMMENT ON COLUMN billing.employer_bill_line.plan_price IS
+    'Plan price at the time of renewal, in the bill''s currency.';
+COMMENT ON COLUMN billing.employer_bill_line.benefit_rate IS
+    'Employer benefit rate as an integer percentage (e.g. 50 = 50% subsidy).';
+COMMENT ON COLUMN billing.employer_bill_line.benefit_cap IS
+    'Maximum benefit amount per renewal period; NULL if uncapped.';
+COMMENT ON COLUMN billing.employer_bill_line.benefit_cap_period IS
+    'Period to which benefit_cap applies (e.g. ''monthly''); NULL if uncapped.';
+COMMENT ON COLUMN billing.employer_bill_line.employee_benefit IS
+    'Actual employer subsidy amount for this renewal, after applying rate and cap.';
+COMMENT ON COLUMN billing.employer_bill_line.renewal_date IS
+    'UTC timestamp of the subscription renewal event this line records.';
+COMMENT ON COLUMN billing.employer_bill_line.created_date IS
+    'UTC timestamp when this line was written by the billing pipeline.';
 
 \echo 'Creating table: audit.employer_bill_history'
 CREATE TABLE IF NOT EXISTS audit.employer_bill_history (
@@ -4479,6 +5649,43 @@ CREATE TABLE IF NOT EXISTS billing.supplier_terms (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     CONSTRAINT uq_supplier_terms_scope UNIQUE (institution_id, institution_entity_id)
 );
+COMMENT ON TABLE billing.supplier_terms IS
+    'Payout and invoice configuration per supplier institution. Implements a three-tier cascade: '
+    'entity-level override (institution_entity_id IS NOT NULL) → institution default '
+    '(institution_entity_id IS NULL) → market default (billing.market_payout_aggregator) → '
+    'hardcoded fallback. Unique on (institution_id, institution_entity_id).';
+COMMENT ON COLUMN billing.supplier_terms.supplier_terms_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.supplier_terms.institution_id IS
+    'FK to core.institution_info. The supplier institution these terms apply to.';
+COMMENT ON COLUMN billing.supplier_terms.institution_entity_id IS
+    'FK to ops.institution_entity_info. NULL = institution-level defaults; '
+    'NOT NULL = entity-level override for that specific legal entity.';
+COMMENT ON COLUMN billing.supplier_terms.no_show_discount IS
+    'Percentage deducted from payouts for no-show events (0–100).';
+COMMENT ON COLUMN billing.supplier_terms.payment_frequency IS
+    'How often payouts are issued, from payment_frequency_enum (e.g. daily, weekly).';
+COMMENT ON COLUMN billing.supplier_terms.kitchen_open_time IS
+    'Override for kitchen open time (wall-clock, naive). NULL = inherit from market_payout_aggregator.';
+COMMENT ON COLUMN billing.supplier_terms.kitchen_close_time IS
+    'Override for kitchen close time (wall-clock, naive). NULL = inherit from market_payout_aggregator.';
+COMMENT ON COLUMN billing.supplier_terms.require_invoice IS
+    'Override for invoice requirement. NULL = inherit from market_payout_aggregator.require_invoice.';
+COMMENT ON COLUMN billing.supplier_terms.invoice_hold_days IS
+    'Override for how many days payouts are held pending invoice submission. '
+    'NULL = inherit from market default. Must be > 0 when set.';
+COMMENT ON COLUMN billing.supplier_terms.is_archived IS
+    'Soft-delete flag. TRUE = logically deleted.';
+COMMENT ON COLUMN billing.supplier_terms.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN billing.supplier_terms.created_date IS
+    'UTC timestamp when this terms row was created.';
+COMMENT ON COLUMN billing.supplier_terms.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN billing.supplier_terms.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN billing.supplier_terms.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.supplier_terms_history'
 CREATE TABLE IF NOT EXISTS audit.supplier_terms_history (
