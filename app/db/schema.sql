@@ -883,6 +883,12 @@ CREATE TABLE IF NOT EXISTS audit.national_holidays_history (
     source VARCHAR(20) NOT NULL,
     history_date TIMESTAMPTZ DEFAULT NOW()
 );
+COMMENT ON TABLE audit.national_holidays_history IS
+    'Trigger-managed history mirror of core.national_holidays. Never written by application code.';
+COMMENT ON COLUMN audit.national_holidays_history.history_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.national_holidays_history.history_date IS
+    'UTC timestamp when this history row was inserted by the trigger.';
 
 -- role_info, role_history, status_info, status_history, transaction_type_info, transaction_type_history
 -- tables removed - enums are now stored directly on entities (core.user_info, etc.)
@@ -992,6 +998,14 @@ CREATE TABLE IF NOT EXISTS audit.address_history (
     -- Note: city_metadata_id is history-mirrored (no FK enforced — history rows must survive city_metadata archival)
     -- Note: floor, apartment_unit, is_default in core.address_subpremise
 );
+COMMENT ON TABLE audit.address_history IS
+    'Trigger-managed history mirror of core.address_info. Never written by application code.';
+COMMENT ON COLUMN audit.address_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.address_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.address_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- core.employer_info REMOVED — employer identity is institution_info (type=employer) + institution_entity_info per country.
 -- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
@@ -1125,6 +1139,14 @@ CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
     FOREIGN KEY (program_id) REFERENCES core.employer_benefits_program(program_id) ON DELETE RESTRICT
     -- Note: modified_by FK not enforced on audit tables (history rows must survive user changes)
 );
+COMMENT ON TABLE audit.employer_benefits_program_history IS
+    'Trigger-managed history mirror of core.employer_benefits_program. Never written by application code.';
+COMMENT ON COLUMN audit.employer_benefits_program_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.employer_benefits_program_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.employer_benefits_program_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- core.employer_domain REMOVED — replaced by email_domain column on ops.institution_entity_info.
 -- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
@@ -1352,6 +1374,14 @@ CREATE TABLE IF NOT EXISTS audit.workplace_group_history (
     valid_until        TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (workplace_group_id) REFERENCES core.workplace_group(workplace_group_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.workplace_group_history IS
+    'Trigger-managed history mirror of core.workplace_group. Never written by application code.';
+COMMENT ON COLUMN audit.workplace_group_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.workplace_group_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.workplace_group_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- Deferred FK: address_info.workplace_group_id → workplace_group (address_info created before workplace_group)
 \echo 'Adding deferred FK: address_info.workplace_group_id -> workplace_group'
@@ -1592,6 +1622,14 @@ CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.currency_metadata_history IS
+    'Trigger-managed history mirror of core.currency_metadata. Never written by application code.';
+COMMENT ON COLUMN audit.currency_metadata_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.currency_metadata_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.currency_metadata_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: core.market_info'
 -- PR2a/PR2b note: country_name and timezone columns dropped. country_name derives
@@ -1743,6 +1781,14 @@ CREATE TABLE IF NOT EXISTS audit.market_history (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.market_history IS
+    'Trigger-managed history mirror of core.market_info. Never written by application code.';
+COMMENT ON COLUMN audit.market_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.market_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.market_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- =============================================================================
 -- METADATA LAYER (Vianda flags + policy on top of external.* raw data)
@@ -1847,6 +1893,14 @@ CREATE TABLE IF NOT EXISTS audit.country_metadata_history (
     FOREIGN KEY (country_metadata_id) REFERENCES core.country_metadata(country_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.country_metadata_history IS
+    'Trigger-managed history mirror of core.country_metadata. Never written by application code.';
+COMMENT ON COLUMN audit.country_metadata_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.country_metadata_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.country_metadata_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: core.city_metadata'
 CREATE TABLE IF NOT EXISTS core.city_metadata (
@@ -1949,6 +2003,14 @@ CREATE TABLE IF NOT EXISTS audit.city_metadata_history (
     FOREIGN KEY (city_metadata_id) REFERENCES core.city_metadata(city_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.city_metadata_history IS
+    'Trigger-managed history mirror of core.city_metadata. Never written by application code.';
+COMMENT ON COLUMN audit.city_metadata_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.city_metadata_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.city_metadata_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- core.currency_metadata + audit moved above core.market_info (market_info FKs it inline).
 
@@ -2181,6 +2243,14 @@ CREATE TABLE IF NOT EXISTS audit.institution_history (
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.institution_history IS
+    'Trigger-managed history mirror of core.institution_info. Never written by application code.';
+COMMENT ON COLUMN audit.institution_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.institution_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.institution_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: audit.user_history'
 CREATE TABLE IF NOT EXISTS audit.user_history (
@@ -2220,6 +2290,14 @@ CREATE TABLE IF NOT EXISTS audit.user_history (
     FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.user_history IS
+    'Trigger-managed history mirror of core.user_info. Never written by application code.';
+COMMENT ON COLUMN audit.user_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.user_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.user_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.credential_recovery'
 CREATE TABLE IF NOT EXISTS customer.credential_recovery (
@@ -2347,6 +2425,14 @@ CREATE TABLE IF NOT EXISTS audit.geolocation_history (
     valid_until TIMESTAMP DEFAULT 'infinity',
     FOREIGN KEY (geolocation_id) REFERENCES core.geolocation_info(geolocation_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.geolocation_history IS
+    'Trigger-managed history mirror of core.geolocation_info. Never written by application code.';
+COMMENT ON COLUMN audit.geolocation_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.geolocation_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.geolocation_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: ops.institution_entity_info'
 CREATE TABLE IF NOT EXISTS ops.institution_entity_info (
@@ -2400,6 +2486,14 @@ CREATE TABLE IF NOT EXISTS audit.institution_entity_history (
     FOREIGN KEY (institution_entity_id) REFERENCES ops.institution_entity_info(institution_entity_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.institution_entity_history IS
+    'Trigger-managed history mirror of ops.institution_entity_info. Never written by application code.';
+COMMENT ON COLUMN audit.institution_entity_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.institution_entity_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.institution_entity_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- Deferred FKs: tables created before ops.institution_entity_info that reference it
 \echo 'Adding deferred FK: employer_benefits_program.institution_entity_id -> institution_entity_info'
@@ -2456,6 +2550,14 @@ CREATE TABLE IF NOT EXISTS audit.cuisine_history (
     FOREIGN KEY (cuisine_id) REFERENCES ops.cuisine(cuisine_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.cuisine_history IS
+    'Trigger-managed history mirror of ops.cuisine. Never written by application code.';
+COMMENT ON COLUMN audit.cuisine_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.cuisine_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.cuisine_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: ops.restaurant_info'
 CREATE TABLE IF NOT EXISTS ops.restaurant_info (
@@ -2534,6 +2636,14 @@ CREATE TABLE IF NOT EXISTS audit.restaurant_history (
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.restaurant_history IS
+    'Trigger-managed history mirror of ops.restaurant_info. Never written by application code.';
+COMMENT ON COLUMN audit.restaurant_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.restaurant_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.restaurant_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: ops.cuisine_suggestion'
 CREATE TABLE IF NOT EXISTS ops.cuisine_suggestion (
@@ -2643,6 +2753,14 @@ CREATE TABLE IF NOT EXISTS audit.product_history (
     FOREIGN KEY (product_id) REFERENCES ops.product_info(product_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.product_history IS
+    'Trigger-managed history mirror of ops.product_info. Never written by application code.';
+COMMENT ON COLUMN audit.product_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.product_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.product_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: ops.plate_info'
 CREATE TABLE IF NOT EXISTS ops.plate_info (
@@ -2707,6 +2825,17 @@ CREATE TABLE IF NOT EXISTS audit.restaurant_holidays_history (
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity'
 );
+COMMENT ON TABLE audit.restaurant_holidays_history IS
+    'Trigger-managed history mirror of ops.restaurant_holidays. Never written by application code.';
+COMMENT ON COLUMN audit.restaurant_holidays_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.restaurant_holidays_history.operation IS
+    'DML operation that produced this row: ''create'', ''update'', or ''delete''. '
+    'From the audit_operation_enum type.';
+COMMENT ON COLUMN audit.restaurant_holidays_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.restaurant_holidays_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: ops.plate_kitchen_days'
 CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
@@ -2740,6 +2869,17 @@ CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity'
 );
+COMMENT ON TABLE audit.plate_kitchen_days_history IS
+    'Trigger-managed history mirror of ops.plate_kitchen_days. Never written by application code.';
+COMMENT ON COLUMN audit.plate_kitchen_days_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.plate_kitchen_days_history.operation IS
+    'DML operation that produced this row: ''create'', ''update'', or ''delete''. '
+    'From the audit_operation_enum type.';
+COMMENT ON COLUMN audit.plate_kitchen_days_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.plate_kitchen_days_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: audit.plate_history'
 CREATE TABLE IF NOT EXISTS audit.plate_history (
@@ -2761,6 +2901,14 @@ CREATE TABLE IF NOT EXISTS audit.plate_history (
     FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.plate_history IS
+    'Trigger-managed history mirror of ops.plate_info. Never written by application code.';
+COMMENT ON COLUMN audit.plate_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.plate_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.plate_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.plate_selection_info'
 CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
@@ -2820,6 +2968,14 @@ CREATE TABLE IF NOT EXISTS audit.plate_selection_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_plate_selection_history_plate_selection ON audit.plate_selection_history(plate_selection_id) WHERE is_current = TRUE;
+COMMENT ON TABLE audit.plate_selection_history IS
+    'Trigger-managed history mirror of customer.plate_selection_info. Never written by application code.';
+COMMENT ON COLUMN audit.plate_selection_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.plate_selection_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.plate_selection_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.coworker_pickup_notification'
 CREATE TABLE IF NOT EXISTS customer.coworker_pickup_notification (
@@ -3029,6 +3185,14 @@ CREATE TABLE IF NOT EXISTS audit.plan_history (
     FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.plan_history IS
+    'Trigger-managed history mirror of customer.plan_info. Never written by application code.';
+COMMENT ON COLUMN audit.plan_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.plan_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.plan_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.discretionary_info'
 CREATE TABLE IF NOT EXISTS billing.discretionary_info (
@@ -3075,6 +3239,17 @@ CREATE TABLE IF NOT EXISTS audit.discretionary_history (
     changed_by UUID,
     FOREIGN KEY (discretionary_id) REFERENCES billing.discretionary_info(discretionary_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.discretionary_history IS
+    'Trigger-managed history mirror of billing.discretionary_info. Never written by application code.';
+COMMENT ON COLUMN audit.discretionary_history.history_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.discretionary_history.operation IS
+    'DML operation that produced this row: ''create'', ''update'', or ''delete''. '
+    'From the audit_operation_enum type.';
+COMMENT ON COLUMN audit.discretionary_history.changed_at IS
+    'UTC timestamp when this history row was inserted by the trigger.';
+COMMENT ON COLUMN audit.discretionary_history.changed_by IS
+    'UUID of the user whose action triggered this audit row. Derived from modified_by on the source row.';
 
 \echo 'Creating table: billing.discretionary_resolution_info'
 CREATE TABLE IF NOT EXISTS billing.discretionary_resolution_info (
@@ -3108,6 +3283,17 @@ CREATE TABLE IF NOT EXISTS audit.discretionary_resolution_history (
     changed_by UUID,
     FOREIGN KEY (approval_id) REFERENCES billing.discretionary_resolution_info(approval_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.discretionary_resolution_history IS
+    'Trigger-managed history mirror of billing.discretionary_resolution_info. Never written by application code.';
+COMMENT ON COLUMN audit.discretionary_resolution_history.history_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.discretionary_resolution_history.operation IS
+    'DML operation that produced this row: ''create'', ''update'', or ''delete''. '
+    'From the audit_operation_enum type.';
+COMMENT ON COLUMN audit.discretionary_resolution_history.changed_at IS
+    'UTC timestamp when this history row was inserted by the trigger.';
+COMMENT ON COLUMN audit.discretionary_resolution_history.changed_by IS
+    'UUID of the user whose action triggered this audit row. Derived from resolved_by on the source row.';
 
 \echo 'Creating trigger function: discretionary_info_history_trigger'
 CREATE OR REPLACE FUNCTION discretionary_info_history_trigger()
@@ -3457,6 +3643,14 @@ CREATE TABLE IF NOT EXISTS audit.referral_config_history (
     FOREIGN KEY (referral_config_id) REFERENCES customer.referral_config(referral_config_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.referral_config_history IS
+    'Trigger-managed history mirror of customer.referral_config. Never written by application code.';
+COMMENT ON COLUMN audit.referral_config_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.referral_config_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.referral_config_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: audit.referral_info_history'
 CREATE TABLE IF NOT EXISTS audit.referral_info_history (
@@ -3485,6 +3679,14 @@ CREATE TABLE IF NOT EXISTS audit.referral_info_history (
     FOREIGN KEY (referral_id) REFERENCES customer.referral_info(referral_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.referral_info_history IS
+    'Trigger-managed history mirror of customer.referral_info. Never written by application code.';
+COMMENT ON COLUMN audit.referral_info_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.referral_info_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.referral_info_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.referral_code_assignment'
 CREATE TABLE IF NOT EXISTS customer.referral_code_assignment (
@@ -3556,6 +3758,14 @@ CREATE TABLE IF NOT EXISTS audit.subscription_history (
     FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.subscription_history IS
+    'Trigger-managed history mirror of customer.subscription_info. Never written by application code.';
+COMMENT ON COLUMN audit.subscription_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.subscription_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.subscription_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.subscription_payment'
 CREATE TABLE IF NOT EXISTS customer.subscription_payment (
@@ -3652,6 +3862,14 @@ CREATE TABLE IF NOT EXISTS audit.user_payment_provider_history (
         REFERENCES customer.user_payment_provider(user_payment_provider_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.user_payment_provider_history IS
+    'Trigger-managed history mirror of customer.user_payment_provider. Never written by application code.';
+COMMENT ON COLUMN audit.user_payment_provider_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.user_payment_provider_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.user_payment_provider_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.client_bill_info'
 CREATE TABLE IF NOT EXISTS billing.client_bill_info (
@@ -3698,6 +3916,14 @@ CREATE TABLE IF NOT EXISTS audit.client_bill_history (
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (client_bill_id) REFERENCES billing.client_bill_info(client_bill_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.client_bill_history IS
+    'Trigger-managed history mirror of billing.client_bill_info. Never written by application code.';
+COMMENT ON COLUMN audit.client_bill_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.client_bill_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.client_bill_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.restaurant_transaction'
 CREATE TABLE IF NOT EXISTS billing.restaurant_transaction (
@@ -3765,6 +3991,15 @@ CREATE TABLE IF NOT EXISTS audit.restaurant_balance_history (
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (restaurant_id) REFERENCES billing.restaurant_balance_info(restaurant_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.restaurant_balance_history IS
+    'Trigger-managed history mirror of billing.restaurant_balance_info. Never written by application code.';
+COMMENT ON COLUMN audit.restaurant_balance_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered. '
+    'Referenced by billing.institution_settlement.balance_event_id to link settlements to the balance snapshot they were computed from.';
+COMMENT ON COLUMN audit.restaurant_balance_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.restaurant_balance_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.institution_bill_info'
 CREATE TABLE IF NOT EXISTS billing.institution_bill_info (
@@ -3816,6 +4051,14 @@ CREATE TABLE IF NOT EXISTS audit.institution_bill_history (
     FOREIGN KEY (institution_bill_id) REFERENCES billing.institution_bill_info(institution_bill_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.institution_bill_history IS
+    'Trigger-managed history mirror of billing.institution_bill_info. Never written by application code.';
+COMMENT ON COLUMN audit.institution_bill_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.institution_bill_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.institution_bill_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.institution_bill_payout'
 CREATE TABLE IF NOT EXISTS billing.institution_bill_payout (
@@ -3878,6 +4121,14 @@ CREATE TABLE IF NOT EXISTS audit.market_payout_aggregator_history (
     valid_until              TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (market_id)  REFERENCES billing.market_payout_aggregator(market_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.market_payout_aggregator_history IS
+    'Trigger-managed history mirror of billing.market_payout_aggregator. Never written by application code.';
+COMMENT ON COLUMN audit.market_payout_aggregator_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.market_payout_aggregator_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.market_payout_aggregator_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.institution_settlement'
 CREATE TABLE IF NOT EXISTS billing.institution_settlement (
@@ -3943,6 +4194,14 @@ CREATE TABLE IF NOT EXISTS audit.institution_settlement_history (
     FOREIGN KEY (balance_event_id) REFERENCES audit.restaurant_balance_history(event_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.institution_settlement_history IS
+    'Trigger-managed history mirror of billing.institution_settlement. Never written by application code.';
+COMMENT ON COLUMN audit.institution_settlement_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.institution_settlement_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.institution_settlement_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- ─────────────────────────────────────────────────────────────
 -- SUPPLIER INVOICE COMPLIANCE
@@ -4014,6 +4273,14 @@ CREATE TABLE IF NOT EXISTS audit.supplier_invoice_history (
     FOREIGN KEY (supplier_invoice_id) REFERENCES billing.supplier_invoice(supplier_invoice_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.supplier_invoice_history IS
+    'Trigger-managed history mirror of billing.supplier_invoice. Never written by application code.';
+COMMENT ON COLUMN audit.supplier_invoice_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.supplier_invoice_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.supplier_invoice_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: billing.bill_invoice_match'
 CREATE TABLE IF NOT EXISTS billing.bill_invoice_match (
@@ -4169,6 +4436,14 @@ CREATE TABLE IF NOT EXISTS audit.employer_bill_history (
     FOREIGN KEY (employer_bill_id) REFERENCES billing.employer_bill(employer_bill_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.employer_bill_history IS
+    'Trigger-managed history mirror of billing.employer_bill. Never written by application code.';
+COMMENT ON COLUMN audit.employer_bill_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.employer_bill_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.employer_bill_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- ─────────────────────────────────────────────────────────────
 -- SUPPLIER TERMS
@@ -4227,6 +4502,14 @@ CREATE TABLE IF NOT EXISTS audit.supplier_terms_history (
     valid_until             TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (supplier_terms_id) REFERENCES billing.supplier_terms(supplier_terms_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE audit.supplier_terms_history IS
+    'Trigger-managed history mirror of billing.supplier_terms. Never written by application code.';
+COMMENT ON COLUMN audit.supplier_terms_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.supplier_terms_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.supplier_terms_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 -- ─────────────────────────────────────────────────────────────
 -- INGREDIENT CATALOG
