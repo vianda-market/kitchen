@@ -152,6 +152,16 @@ module = "app.tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
+# ─── mypy-baseline ──────────────────────────────────────────────
+# Drop "note:" diagnostics from the baseline. Notes are informational
+# only — they explain an error, never represent one. Including them
+# makes the baseline drift across mypy patch versions (the same overload
+# gets rendered with different type-arg text), forcing baseline churn
+# on every PR. The underlying errors stay baselined; only the explanatory
+# notes are filtered out.
+[tool.mypy_baseline]
+ignore_categories = ["note"]
+
 # ─── radon ──────────────────────────────────────────────────────
 [tool.radon]
 # Complexity grades: A (1-5), B (6-10), C (11-15), D (16-20), E (21-25), F (26+)
