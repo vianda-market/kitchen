@@ -2539,6 +2539,44 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_email_domain
     ON ops.institution_entity_info(email_domain)
     WHERE email_domain IS NOT NULL AND is_archived = FALSE;
 
+COMMENT ON TABLE ops.institution_entity_info IS
+    'Legal/fiscal boundary for a supplier or employer institution in one country. '
+    'One row per country the institution operates in. '
+    'Owns tax identity, currency, payout config, and email domain for enrollment. '
+    'Part of the three-tier cascade: institution_info → institution_entity_info → restaurant_info / employer_benefits_program.';
+COMMENT ON COLUMN ops.institution_entity_info.institution_entity_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.institution_entity_info.institution_id IS
+    'FK to core.institution_info. The parent institution that owns this legal entity.';
+COMMENT ON COLUMN ops.institution_entity_info.address_id IS
+    'FK to core.address_info. Registered office address for this legal entity.';
+COMMENT ON COLUMN ops.institution_entity_info.currency_metadata_id IS
+    'FK to core.currency_metadata. The operating currency for this entity''s market.';
+COMMENT ON COLUMN ops.institution_entity_info.tax_id IS
+    'Tax identification number (RFC, RUT, NIF, etc.) for the entity''s jurisdiction.';
+COMMENT ON COLUMN ops.institution_entity_info.name IS
+    'Legal entity name as registered with the tax authority.';
+COMMENT ON COLUMN ops.institution_entity_info.payout_provider_account_id IS
+    'External account ID at the payout aggregator (e.g. Stripe Connect account ID). NULL until onboarding completes.';
+COMMENT ON COLUMN ops.institution_entity_info.payout_aggregator IS
+    'Payout provider slug (e.g. ''stripe''). NULL if payout not yet configured.';
+COMMENT ON COLUMN ops.institution_entity_info.payout_onboarding_status IS
+    'Current payout onboarding state (e.g. ''pending'', ''restricted'', ''complete''). Sourced from the provider webhook.';
+COMMENT ON COLUMN ops.institution_entity_info.email_domain IS
+    'Domain used for domain-gated employer enrollment (e.g. ''acme.com''). NULL for suppliers. Unique across active entities.';
+COMMENT ON COLUMN ops.institution_entity_info.is_archived IS
+    'Soft-delete tombstone. Archived entities are excluded from active payout and enrollment flows.';
+COMMENT ON COLUMN ops.institution_entity_info.status IS
+    'Lifecycle status (active_enum). Controls visibility in supplier and employer management UIs.';
+COMMENT ON COLUMN ops.institution_entity_info.created_date IS
+    'UTC timestamp when the entity row was first inserted.';
+COMMENT ON COLUMN ops.institution_entity_info.created_by IS
+    'FK to core.user_info. NULL if created via migration or seed script.';
+COMMENT ON COLUMN ops.institution_entity_info.modified_by IS
+    'FK to core.user_info. Last user to update this entity record.';
+COMMENT ON COLUMN ops.institution_entity_info.modified_date IS
+    'UTC timestamp of the most recent update. Maintained by the application layer.';
+
 \echo 'Creating table: audit.institution_entity_history'
 CREATE TABLE IF NOT EXISTS audit.institution_entity_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -2604,6 +2642,39 @@ CREATE TABLE IF NOT EXISTS ops.cuisine (
 CREATE INDEX IF NOT EXISTS idx_cuisine_slug ON ops.cuisine(slug);
 CREATE INDEX IF NOT EXISTS idx_cuisine_parent ON ops.cuisine(parent_cuisine_id) WHERE parent_cuisine_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cuisine_active ON ops.cuisine(cuisine_id) WHERE NOT is_archived AND status = 'active';
+
+COMMENT ON TABLE ops.cuisine IS
+    'Cuisine taxonomy used to categorise restaurants (e.g. Mexican, Italian, Vegan). '
+    'Supports a single level of hierarchy via parent_cuisine_id. '
+    'Seeded from a curated list; suppliers may propose additions via ops.cuisine_suggestion.';
+COMMENT ON COLUMN ops.cuisine.cuisine_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.cuisine.cuisine_name IS
+    'Canonical display name in the market''s primary language.';
+COMMENT ON COLUMN ops.cuisine.cuisine_name_i18n IS
+    'JSONB map of locale → translated cuisine name (e.g. {"es": "Mexicana", "pt": "Mexicana"}). NULL until translations are provided.';
+COMMENT ON COLUMN ops.cuisine.slug IS
+    'URL-safe unique identifier derived from cuisine_name. Used in API filters and frontend routing.';
+COMMENT ON COLUMN ops.cuisine.parent_cuisine_id IS
+    'Self-referencing FK to ops.cuisine. NULL for top-level cuisines. Used for sub-cuisine grouping (e.g. Tacos under Mexican).';
+COMMENT ON COLUMN ops.cuisine.description IS
+    'Short description of the cuisine style, shown on restaurant detail pages.';
+COMMENT ON COLUMN ops.cuisine.origin_source IS
+    'Provenance of this cuisine entry: ''seed'' (curated at launch) or ''supplier'' (promoted from a cuisine_suggestion).';
+COMMENT ON COLUMN ops.cuisine.display_order IS
+    'Optional sort weight for UI ordering. NULL = alphabetical fallback.';
+COMMENT ON COLUMN ops.cuisine.is_archived IS
+    'Soft-delete tombstone. Archived cuisines are hidden from selection dropdowns.';
+COMMENT ON COLUMN ops.cuisine.status IS
+    'Lifecycle status (status_enum). Controls visibility in restaurant setup and filtering UIs.';
+COMMENT ON COLUMN ops.cuisine.created_date IS
+    'UTC timestamp when the cuisine row was first inserted.';
+COMMENT ON COLUMN ops.cuisine.created_by IS
+    'FK to core.user_info. NULL if created via seed script.';
+COMMENT ON COLUMN ops.cuisine.modified_by IS
+    'FK to core.user_info. Last user to update this cuisine record.';
+COMMENT ON COLUMN ops.cuisine.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.cuisine_history'
 CREATE TABLE IF NOT EXISTS audit.cuisine_history (
@@ -2677,6 +2748,67 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_info (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
+COMMENT ON TABLE ops.restaurant_info IS
+    'A restaurant (kitchen) that delivers meals on the platform. '
+    'Belongs to an institution_entity_info (legal entity) and a cuisine category. '
+    'Owns its address, kitchen hours, image assets, rating aggregates, and PostGIS location point.';
+COMMENT ON COLUMN ops.restaurant_info.restaurant_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.restaurant_info.institution_id IS
+    'FK to core.institution_info. The supplier institution that operates this restaurant.';
+COMMENT ON COLUMN ops.restaurant_info.institution_entity_id IS
+    'FK to ops.institution_entity_info. The legal entity (market-level) that owns this restaurant.';
+COMMENT ON COLUMN ops.restaurant_info.address_id IS
+    'FK to core.address_info. Physical address of the kitchen/pickup location.';
+COMMENT ON COLUMN ops.restaurant_info.name IS
+    'Display name of the restaurant shown to consumers and in admin UIs.';
+COMMENT ON COLUMN ops.restaurant_info.cuisine_id IS
+    'FK to ops.cuisine. Primary cuisine category. NULL if not yet assigned.';
+COMMENT ON COLUMN ops.restaurant_info.pickup_instructions IS
+    'Free-text instructions shown to the consumer at pickup (e.g. "Ring bell on arrival").';
+COMMENT ON COLUMN ops.restaurant_info.tagline IS
+    'Short marketing tagline shown on restaurant cards. Primary-locale version.';
+COMMENT ON COLUMN ops.restaurant_info.tagline_i18n IS
+    'JSONB map of locale → translated tagline. NULL until translations are provided.';
+COMMENT ON COLUMN ops.restaurant_info.is_featured IS
+    'When TRUE, restaurant is boosted in explore listings. Managed by internal admins.';
+COMMENT ON COLUMN ops.restaurant_info.cover_image_url IS
+    'CDN URL of the restaurant''s cover image. Rendered on restaurant cards and detail pages.';
+COMMENT ON COLUMN ops.restaurant_info.average_rating IS
+    'Denormalised average star rating computed from plate_review_info. Updated by cron or post-review trigger.';
+COMMENT ON COLUMN ops.restaurant_info.review_count IS
+    'Denormalised count of approved plate reviews. Updated alongside average_rating.';
+COMMENT ON COLUMN ops.restaurant_info.verified_badge IS
+    'When TRUE, restaurant has passed quality verification. Shown as a badge on detail pages.';
+COMMENT ON COLUMN ops.restaurant_info.spotlight_label IS
+    'Short promotional label (e.g. "New", "Popular"). Primary-locale version.';
+COMMENT ON COLUMN ops.restaurant_info.spotlight_label_i18n IS
+    'JSONB map of locale → translated spotlight label.';
+COMMENT ON COLUMN ops.restaurant_info.member_perks IS
+    'Array of member perk strings shown on the restaurant detail page. Primary-locale version.';
+COMMENT ON COLUMN ops.restaurant_info.member_perks_i18n IS
+    'JSONB map of locale → array of translated member perk strings.';
+COMMENT ON COLUMN ops.restaurant_info.require_kiosk_code_verification IS
+    'When TRUE, the kiosk flow requires a QR/code scan for pickup confirmation.';
+COMMENT ON COLUMN ops.restaurant_info.kitchen_open_time IS
+    'Wall-clock time when the kitchen starts accepting orders. Interpreted in address_info.timezone. Naive TIME (no zone stored).';
+COMMENT ON COLUMN ops.restaurant_info.kitchen_close_time IS
+    'Wall-clock time when the kitchen stops accepting orders. Interpreted in address_info.timezone. Naive TIME (no zone stored).';
+COMMENT ON COLUMN ops.restaurant_info.location IS
+    'PostGIS Point (SRID 4326, WGS84 lon/lat) for geo proximity and bounding-box filtering. NULL until geocoded.';
+COMMENT ON COLUMN ops.restaurant_info.is_archived IS
+    'Soft-delete tombstone. Archived restaurants are hidden from consumer explore and supplier management.';
+COMMENT ON COLUMN ops.restaurant_info.status IS
+    'Lifecycle status (status_enum). Controls whether the restaurant is live for ordering.';
+COMMENT ON COLUMN ops.restaurant_info.created_date IS
+    'UTC timestamp when the restaurant row was first inserted.';
+COMMENT ON COLUMN ops.restaurant_info.created_by IS
+    'FK to core.user_info. NULL if created via migration or seed script.';
+COMMENT ON COLUMN ops.restaurant_info.modified_by IS
+    'FK to core.user_info. Last user to update this restaurant record.';
+COMMENT ON COLUMN ops.restaurant_info.modified_date IS
+    'UTC timestamp of the most recent update.';
+
 \echo 'Creating table: audit.restaurant_history'
 CREATE TABLE IF NOT EXISTS audit.restaurant_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -2743,6 +2875,41 @@ CREATE TABLE IF NOT EXISTS ops.cuisine_suggestion (
 );
 CREATE INDEX IF NOT EXISTS idx_cuisine_suggestion_pending ON ops.cuisine_suggestion(suggestion_status) WHERE suggestion_status = 'pending';
 
+COMMENT ON TABLE ops.cuisine_suggestion IS
+    'Supplier-submitted proposals for new cuisine categories not yet in ops.cuisine. '
+    'Workflow: pending → approved (creates/maps a cuisine) or rejected. '
+    'Internal admins review; resolved_cuisine_id is set on approval.';
+COMMENT ON COLUMN ops.cuisine_suggestion.suggestion_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.cuisine_suggestion.suggested_name IS
+    'Name proposed by the supplier for the new cuisine category.';
+COMMENT ON COLUMN ops.cuisine_suggestion.suggested_by IS
+    'FK to core.user_info. The supplier user who submitted the suggestion.';
+COMMENT ON COLUMN ops.cuisine_suggestion.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant on whose behalf the suggestion was submitted. NULL if the restaurant was later deleted.';
+COMMENT ON COLUMN ops.cuisine_suggestion.suggestion_status IS
+    'Workflow state: ''pending'' awaits review; ''approved'' mapped to a cuisine; ''rejected'' dismissed.';
+COMMENT ON COLUMN ops.cuisine_suggestion.reviewed_by IS
+    'FK to core.user_info. Internal admin who reviewed the suggestion. NULL until reviewed.';
+COMMENT ON COLUMN ops.cuisine_suggestion.reviewed_date IS
+    'UTC timestamp when the review decision was recorded.';
+COMMENT ON COLUMN ops.cuisine_suggestion.review_notes IS
+    'Free-text notes from the reviewer explaining the decision.';
+COMMENT ON COLUMN ops.cuisine_suggestion.resolved_cuisine_id IS
+    'FK to ops.cuisine. Set on approval to point at the cuisine created or matched for this suggestion.';
+COMMENT ON COLUMN ops.cuisine_suggestion.is_archived IS
+    'Soft-delete tombstone. Archived suggestions are excluded from the review queue.';
+COMMENT ON COLUMN ops.cuisine_suggestion.status IS
+    'Lifecycle status (status_enum). Mirrors is_archived for consistency with other ops tables.';
+COMMENT ON COLUMN ops.cuisine_suggestion.created_date IS
+    'UTC timestamp when the suggestion was submitted.';
+COMMENT ON COLUMN ops.cuisine_suggestion.created_by IS
+    'FK to core.user_info. Matches suggested_by for supplier-submitted entries; may differ for admin-created stubs.';
+COMMENT ON COLUMN ops.cuisine_suggestion.modified_by IS
+    'FK to core.user_info. Last user to update this suggestion (typically the reviewer).';
+COMMENT ON COLUMN ops.cuisine_suggestion.modified_date IS
+    'UTC timestamp of the most recent update.';
+
 \echo 'Creating table: core.restaurant_lead_cuisine'
 CREATE TABLE IF NOT EXISTS core.restaurant_lead_cuisine (
     restaurant_lead_id UUID NOT NULL REFERENCES core.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
@@ -2776,6 +2943,35 @@ CREATE TABLE IF NOT EXISTS ops.qr_code (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
+COMMENT ON TABLE ops.qr_code IS
+    'QR codes generated for restaurant pickup kiosks. '
+    'Each QR code encodes a payload used by the kiosk app to identify the restaurant. '
+    'One active QR code per restaurant at a time (older codes archived on regeneration).';
+COMMENT ON COLUMN ops.qr_code.qr_code_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.qr_code.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant this QR code belongs to.';
+COMMENT ON COLUMN ops.qr_code.qr_code_payload IS
+    'The string encoded in the QR image (e.g. a signed token or restaurant identifier). Scanned by the kiosk app.';
+COMMENT ON COLUMN ops.qr_code.qr_code_image_url IS
+    'CDN URL of the rendered QR code image for download or display.';
+COMMENT ON COLUMN ops.qr_code.image_storage_path IS
+    'Internal storage path of the QR image file (GCS object key or local path).';
+COMMENT ON COLUMN ops.qr_code.qr_code_checksum IS
+    'SHA-256 (or similar) checksum of the QR image file for integrity verification.';
+COMMENT ON COLUMN ops.qr_code.is_archived IS
+    'Soft-delete tombstone. Archived QR codes are superseded by a newer code for the same restaurant.';
+COMMENT ON COLUMN ops.qr_code.status IS
+    'Lifecycle status (status_enum). Only active QR codes are accepted by the kiosk scanner.';
+COMMENT ON COLUMN ops.qr_code.created_date IS
+    'UTC timestamp when the QR code was generated.';
+COMMENT ON COLUMN ops.qr_code.created_by IS
+    'FK to core.user_info. NULL if generated by a cron job or migration.';
+COMMENT ON COLUMN ops.qr_code.modified_by IS
+    'FK to core.user_info. Last user to update this QR code record.';
+COMMENT ON COLUMN ops.qr_code.modified_date IS
+    'UTC timestamp of the most recent update.';
+
 \echo 'Creating table: ops.product_info'
 CREATE TABLE IF NOT EXISTS ops.product_info (
     product_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -2801,6 +2997,51 @@ CREATE TABLE IF NOT EXISTS ops.product_info (
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+
+COMMENT ON TABLE ops.product_info IS
+    'Supplier-owned meal product (dish) definition. '
+    'A product is a reusable recipe; one product can be offered at multiple restaurants as separate plate_info rows. '
+    'Holds name, ingredient list, dietary flags, description, and image assets.';
+COMMENT ON COLUMN ops.product_info.product_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.product_info.institution_id IS
+    'FK to core.institution_info. The supplier institution that owns this product recipe.';
+COMMENT ON COLUMN ops.product_info.name IS
+    'Display name of the product in the market''s primary language.';
+COMMENT ON COLUMN ops.product_info.name_i18n IS
+    'JSONB map of locale → translated product name. NULL until translations are provided.';
+COMMENT ON COLUMN ops.product_info.ingredients IS
+    'Free-text ingredient list in the primary locale. Displayed on the plate detail screen.';
+COMMENT ON COLUMN ops.product_info.ingredients_i18n IS
+    'JSONB map of locale → translated ingredient list text.';
+COMMENT ON COLUMN ops.product_info.description IS
+    'Short description of the product shown on explore and plate detail screens.';
+COMMENT ON COLUMN ops.product_info.description_i18n IS
+    'JSONB map of locale → translated product description.';
+COMMENT ON COLUMN ops.product_info.dietary IS
+    'Array of dietary attribute slugs (e.g. ''vegan'', ''gluten_free'') for consumer filtering.';
+COMMENT ON COLUMN ops.product_info.is_archived IS
+    'Soft-delete tombstone. Archived products are hidden from supplier product lists and cannot be linked to new plates.';
+COMMENT ON COLUMN ops.product_info.status IS
+    'Lifecycle status (status_enum). Controls whether the product is visible in the platform and app.';
+COMMENT ON COLUMN ops.product_info.image_storage_path IS
+    'Internal storage path of the full-resolution product image.';
+COMMENT ON COLUMN ops.product_info.image_checksum IS
+    'SHA-256 checksum of the image file for deduplication and integrity verification.';
+COMMENT ON COLUMN ops.product_info.image_url IS
+    'CDN URL of the full-resolution product image rendered on plate detail screens.';
+COMMENT ON COLUMN ops.product_info.image_thumbnail_storage_path IS
+    'Internal storage path of the thumbnail image.';
+COMMENT ON COLUMN ops.product_info.image_thumbnail_url IS
+    'CDN URL of the thumbnail image used on explore cards and lists.';
+COMMENT ON COLUMN ops.product_info.created_date IS
+    'UTC timestamp when the product was first created.';
+COMMENT ON COLUMN ops.product_info.created_by IS
+    'FK to core.user_info. NULL if created via migration or seed script.';
+COMMENT ON COLUMN ops.product_info.modified_by IS
+    'FK to core.user_info. Last user to update this product record.';
+COMMENT ON COLUMN ops.product_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.product_history'
 CREATE TABLE IF NOT EXISTS audit.product_history (
@@ -2859,6 +3100,37 @@ CREATE TABLE IF NOT EXISTS ops.plate_info (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
+COMMENT ON TABLE ops.plate_info IS
+    'A specific offering of a product at a restaurant, with its own pricing and credit cost. '
+    'Represents the menu item the consumer sees: one product can be offered as multiple plates '
+    'across different restaurants or price tiers. Linked to plate_kitchen_days for scheduling.';
+COMMENT ON COLUMN ops.plate_info.plate_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.plate_info.product_id IS
+    'FK to ops.product_info. The recipe/product this plate is based on.';
+COMMENT ON COLUMN ops.plate_info.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant offering this plate.';
+COMMENT ON COLUMN ops.plate_info.price IS
+    'Local-currency price charged to subscribers without a benefit plan subsidy (double precision for compatibility with legacy data).';
+COMMENT ON COLUMN ops.plate_info.credit IS
+    'Credit cost deducted from the subscriber''s subscription balance when this plate is selected.';
+COMMENT ON COLUMN ops.plate_info.expected_payout_local_currency IS
+    'Expected payout to the supplier in local currency after platform fees. Used in financial reporting.';
+COMMENT ON COLUMN ops.plate_info.delivery_time_minutes IS
+    'Estimated minutes from order confirmation to plate readiness at the kitchen. Used to set pickup_time_range.';
+COMMENT ON COLUMN ops.plate_info.is_archived IS
+    'Soft-delete tombstone. Archived plates cannot be selected by subscribers.';
+COMMENT ON COLUMN ops.plate_info.status IS
+    'Lifecycle status (status_enum). Controls whether the plate is shown in explore results.';
+COMMENT ON COLUMN ops.plate_info.created_date IS
+    'UTC timestamp when the plate offering was first created.';
+COMMENT ON COLUMN ops.plate_info.created_by IS
+    'FK to core.user_info. NULL if created via migration or seed script.';
+COMMENT ON COLUMN ops.plate_info.modified_by IS
+    'FK to core.user_info. Last user to update this plate record.';
+COMMENT ON COLUMN ops.plate_info.modified_date IS
+    'UTC timestamp of the most recent update.';
+
 \echo 'Creating table: ops.restaurant_holidays'
 CREATE TABLE IF NOT EXISTS ops.restaurant_holidays (
     holiday_id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -2879,6 +3151,41 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_holidays (
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+
+COMMENT ON TABLE ops.restaurant_holidays IS
+    'Dates on which a restaurant does not operate (public holidays, planned closures). '
+    'Supports one-off dates and recurring annual patterns (recurring_month + recurring_day). '
+    'Entries with source=''national_sync'' are populated by a cron job from the national_holidays reference table.';
+COMMENT ON COLUMN ops.restaurant_holidays.holiday_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.restaurant_holidays.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant that is closed on this date.';
+COMMENT ON COLUMN ops.restaurant_holidays.country_code IS
+    'ISO 3166-1 alpha-2 country code of the applicable jurisdiction (e.g. ''MX'', ''AR'').';
+COMMENT ON COLUMN ops.restaurant_holidays.holiday_date IS
+    'The specific calendar date of the closure. For recurring entries, this holds the next or most recent occurrence.';
+COMMENT ON COLUMN ops.restaurant_holidays.holiday_name IS
+    'Human-readable name of the holiday or closure reason (e.g. "Christmas Day", "Staff Training").';
+COMMENT ON COLUMN ops.restaurant_holidays.is_recurring IS
+    'When TRUE, the holiday repeats annually on recurring_month / recurring_day.';
+COMMENT ON COLUMN ops.restaurant_holidays.recurring_month IS
+    'Month (1–12) of the annual recurrence. NULL for one-off closures.';
+COMMENT ON COLUMN ops.restaurant_holidays.recurring_day IS
+    'Day-of-month (1–31) of the annual recurrence. NULL for one-off closures.';
+COMMENT ON COLUMN ops.restaurant_holidays.status IS
+    'Lifecycle status (status_enum). Inactive entries are excluded from closure checks.';
+COMMENT ON COLUMN ops.restaurant_holidays.is_archived IS
+    'Soft-delete tombstone.';
+COMMENT ON COLUMN ops.restaurant_holidays.created_date IS
+    'UTC timestamp when the holiday entry was created.';
+COMMENT ON COLUMN ops.restaurant_holidays.created_by IS
+    'FK to core.user_info. NULL if inserted by a cron job.';
+COMMENT ON COLUMN ops.restaurant_holidays.modified_by IS
+    'FK to core.user_info. Last user (or system account) to update this holiday record.';
+COMMENT ON COLUMN ops.restaurant_holidays.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN ops.restaurant_holidays.source IS
+    'Provenance: ''manual'' (admin-entered) or ''national_sync'' (populated by national holidays cron).';
 
 \echo 'Creating table: audit.restaurant_holidays_history'
 CREATE TABLE IF NOT EXISTS audit.restaurant_holidays_history (
@@ -2929,6 +3236,30 @@ CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
     -- Uniqueness (plate_id, kitchen_day) enforced only for non-archived rows via partial unique index in index.sql
 );
+
+COMMENT ON TABLE ops.plate_kitchen_days IS
+    'Scheduling rows that map a plate to the kitchen days it is available. '
+    'One row per (plate, day) combination. Drives the explore filter ("available today") '
+    'and the subscription selection flow that shows which plates can be ordered on a given kitchen_day.';
+COMMENT ON COLUMN ops.plate_kitchen_days.plate_kitchen_day_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.plate_kitchen_days.plate_id IS
+    'FK to ops.plate_info. The plate this scheduling row belongs to.';
+COMMENT ON COLUMN ops.plate_kitchen_days.kitchen_day IS
+    'The day of the week (kitchen_day_enum) on which this plate is available. '
+    'kitchen_day_enum uses the platform''s operating-day vocabulary (Monday–Friday or market-specific).';
+COMMENT ON COLUMN ops.plate_kitchen_days.status IS
+    'Lifecycle status (status_enum). Inactive rows are excluded from available-day lookups.';
+COMMENT ON COLUMN ops.plate_kitchen_days.is_archived IS
+    'Soft-delete tombstone. Archived scheduling rows are ignored by the explore and selection flows.';
+COMMENT ON COLUMN ops.plate_kitchen_days.created_date IS
+    'UTC timestamp when the scheduling row was first inserted.';
+COMMENT ON COLUMN ops.plate_kitchen_days.created_by IS
+    'FK to core.user_info. NULL if created via migration or seed script.';
+COMMENT ON COLUMN ops.plate_kitchen_days.modified_by IS
+    'FK to core.user_info. Last user to update this scheduling row.';
+COMMENT ON COLUMN ops.plate_kitchen_days.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.plate_kitchen_days_history'
 CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
@@ -5760,6 +6091,55 @@ CREATE INDEX IF NOT EXISTS idx_ingredient_catalog_usda_enrichment
     ON ops.ingredient_catalog (usda_enriched, usda_skipped)
     WHERE usda_enriched = FALSE AND usda_skipped = FALSE;
 
+COMMENT ON TABLE ops.ingredient_catalog IS
+    'Reference catalog of food ingredients, populated from Open Food Facts (OFF) taxonomy and enriched '
+    'with Wikidata images (Phase 5) and USDA FoodData Central nutrition data (Phase 7). '
+    'Used for product ingredient labelling and nutrition display.';
+COMMENT ON COLUMN ops.ingredient_catalog.ingredient_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.ingredient_catalog.name IS
+    'Canonical ingredient name used as the unique lookup key. '
+    'Typically the OFF taxonomy name normalised to lower-case; '
+    'may be a custom name for ingredients not in OFF.';
+COMMENT ON COLUMN ops.ingredient_catalog.name_display IS
+    'Consumer-facing display name (title-cased). Shown on plate ingredient lists.';
+COMMENT ON COLUMN ops.ingredient_catalog.name_es IS
+    'Spanish translation of the ingredient name. NULL until translation pipeline runs.';
+COMMENT ON COLUMN ops.ingredient_catalog.name_en IS
+    'English translation of the ingredient name. NULL until translation pipeline runs.';
+COMMENT ON COLUMN ops.ingredient_catalog.name_pt IS
+    'Portuguese translation of the ingredient name. NULL until translation pipeline runs.';
+COMMENT ON COLUMN ops.ingredient_catalog.off_taxonomy_id IS
+    'Open Food Facts taxonomy identifier (e.g. ''en:tomato''). Unique. NULL for custom ingredients.';
+COMMENT ON COLUMN ops.ingredient_catalog.off_wikidata_id IS
+    'Wikidata entity ID linked from OFF (e.g. ''Q23501''). Used to fetch the CC-licensed image.';
+COMMENT ON COLUMN ops.ingredient_catalog.image_url IS
+    'CDN URL of the ingredient image (CC-licensed, sourced from Wikidata). NULL until Phase 5 enrichment runs.';
+COMMENT ON COLUMN ops.ingredient_catalog.image_source IS
+    'Provenance of the image (e.g. ''wikidata''). NULL until enriched.';
+COMMENT ON COLUMN ops.ingredient_catalog.usda_fdc_id IS
+    'USDA FoodData Central record ID. Unique. NULL until Phase 7 nutrition enrichment matches this ingredient.';
+COMMENT ON COLUMN ops.ingredient_catalog.food_group IS
+    'USDA food group classification (e.g. ''Vegetables and Vegetable Products''). NULL until USDA-enriched.';
+COMMENT ON COLUMN ops.ingredient_catalog.image_enriched IS
+    'Pipeline flag: TRUE once a Wikidata image has been fetched and stored for this ingredient.';
+COMMENT ON COLUMN ops.ingredient_catalog.image_skipped IS
+    'Pipeline flag: TRUE if the image enrichment step was intentionally skipped (e.g. no Wikidata image found).';
+COMMENT ON COLUMN ops.ingredient_catalog.usda_enriched IS
+    'Pipeline flag: TRUE once USDA nutrition data has been fetched and linked.';
+COMMENT ON COLUMN ops.ingredient_catalog.usda_skipped IS
+    'Pipeline flag: TRUE if USDA enrichment was intentionally skipped (e.g. no FDC match found).';
+COMMENT ON COLUMN ops.ingredient_catalog.source IS
+    'Provenance of the ingredient entry: ''off'' (Open Food Facts import) or ''custom'' (manually added).';
+COMMENT ON COLUMN ops.ingredient_catalog.is_verified IS
+    'When TRUE, a human has verified the ingredient data quality. Used to filter unverified entries in admin tooling.';
+COMMENT ON COLUMN ops.ingredient_catalog.created_date IS
+    'UTC timestamp when the ingredient was first imported or created.';
+COMMENT ON COLUMN ops.ingredient_catalog.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN ops.ingredient_catalog.modified_by IS
+    'FK to core.user_info. Last user (or system account) to update this ingredient record.';
+
 \echo 'Creating table: ops.product_ingredient'
 CREATE TABLE IF NOT EXISTS ops.product_ingredient (
     product_ingredient_id UUID     PRIMARY KEY DEFAULT uuidv7(),
@@ -5775,6 +6155,22 @@ CREATE INDEX IF NOT EXISTS idx_product_ingredient_product_id
 CREATE INDEX IF NOT EXISTS idx_product_ingredient_ingredient_id
     ON ops.product_ingredient (ingredient_id);
 
+COMMENT ON TABLE ops.product_ingredient IS
+    'Join table linking products to their ingredients in the catalog. '
+    'Ordered by sort_order to display ingredients in the intended sequence on plate detail screens.';
+COMMENT ON COLUMN ops.product_ingredient.product_ingredient_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.product_ingredient.product_id IS
+    'FK to ops.product_info. The product that contains this ingredient.';
+COMMENT ON COLUMN ops.product_ingredient.ingredient_id IS
+    'FK to ops.ingredient_catalog. The ingredient used in this product.';
+COMMENT ON COLUMN ops.product_ingredient.sort_order IS
+    'Display order of the ingredient within the product''s ingredient list. Lower values appear first.';
+COMMENT ON COLUMN ops.product_ingredient.created_date IS
+    'UTC timestamp when the product–ingredient link was created.';
+COMMENT ON COLUMN ops.product_ingredient.modified_by IS
+    'FK to core.user_info. Last user to update this link (e.g. after reordering ingredients).';
+
 \echo 'Creating table: ops.ingredient_alias'
 CREATE TABLE IF NOT EXISTS ops.ingredient_alias (
     alias_id        UUID         PRIMARY KEY DEFAULT uuidv7(),
@@ -5783,6 +6179,20 @@ CREATE TABLE IF NOT EXISTS ops.ingredient_alias (
     region_code     VARCHAR(10)  NULL,
     UNIQUE (alias)
 );
+
+COMMENT ON TABLE ops.ingredient_alias IS
+    'Alternative names (aliases) for ingredients in ops.ingredient_catalog. '
+    'Used by the ingredient search and matching pipeline to resolve non-canonical ingredient names '
+    'in product ingredient text to catalog entries.';
+COMMENT ON COLUMN ops.ingredient_alias.alias_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.ingredient_alias.ingredient_id IS
+    'FK to ops.ingredient_catalog. The canonical ingredient this alias resolves to.';
+COMMENT ON COLUMN ops.ingredient_alias.alias IS
+    'The alternative name (e.g. a regional spelling or colloquial term). Unique globally.';
+COMMENT ON COLUMN ops.ingredient_alias.region_code IS
+    'Optional ISO 3166-1 alpha-2 region code scoping this alias to a specific market (e.g. ''MX''). '
+    'NULL means the alias applies globally.';
 
 \echo 'Creating table: ops.ingredient_nutrition'
 CREATE TABLE IF NOT EXISTS ops.ingredient_nutrition (
@@ -5803,6 +6213,36 @@ CREATE TABLE IF NOT EXISTS ops.ingredient_nutrition (
 );
 CREATE INDEX IF NOT EXISTS idx_ingredient_nutrition_ingredient_id
     ON ops.ingredient_nutrition (ingredient_id);
+
+COMMENT ON TABLE ops.ingredient_nutrition IS
+    'Nutrition facts for an ingredient, sourced from USDA FoodData Central (Phase 7 enrichment cron). '
+    'One row per (ingredient, source) pair. Values are per per_amount_g grams of the ingredient.';
+COMMENT ON COLUMN ops.ingredient_nutrition.nutrition_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.ingredient_nutrition.ingredient_id IS
+    'FK to ops.ingredient_catalog. The ingredient these nutrition facts describe.';
+COMMENT ON COLUMN ops.ingredient_nutrition.source IS
+    'Data source for these nutrition values (e.g. ''usda''). Allows multiple sources per ingredient in future.';
+COMMENT ON COLUMN ops.ingredient_nutrition.per_amount_g IS
+    'Reference quantity in grams for which the nutrition values apply. Typically 100 g.';
+COMMENT ON COLUMN ops.ingredient_nutrition.energy_kcal IS
+    'Energy content in kilocalories per per_amount_g. NULL if not available from source.';
+COMMENT ON COLUMN ops.ingredient_nutrition.protein_g IS
+    'Protein content in grams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.fat_g IS
+    'Total fat content in grams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.carbohydrates_g IS
+    'Total carbohydrate content in grams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.fiber_g IS
+    'Dietary fiber content in grams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.sugar_g IS
+    'Total sugar content in grams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.sodium_mg IS
+    'Sodium content in milligrams per per_amount_g. NULL if not available.';
+COMMENT ON COLUMN ops.ingredient_nutrition.fetched_date IS
+    'Calendar date when the nutrition data was fetched from the source. Used to detect stale records.';
+COMMENT ON COLUMN ops.ingredient_nutrition.modified_date IS
+    'UTC timestamp of the most recent update to this nutrition record.';
 
 -- =============================================================================
 -- ADS PLATFORM TABLES

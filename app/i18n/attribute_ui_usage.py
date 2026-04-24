@@ -1111,4 +1111,420 @@ INVENTORY: dict[str, InventoryEntry] = {
     # .invoice_hold_days surfaces in SupplierTermsResponseSchema.
     # vianda-platform: types/api.ts — days to hold payout pending invoice submission.
     "billing.supplier_terms.invoice_hold_days": {"surfaces": ["platform"]},
+    # ==========================================================================
+    # ops schema
+    # ==========================================================================
+    # --- ops.institution_entity_info ---
+    #
+    # .institution_entity_id surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts (InstitutionEntityResponseSchema.institution_entity_id).
+    "ops.institution_entity_info.institution_entity_id": {"surfaces": ["platform"]},
+    #
+    # .institution_id surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — institution_id field on entity responses.
+    # vianda-app: api/types.ts (employer entity context).
+    "ops.institution_entity_info.institution_id": {"surfaces": ["platform", "app"]},
+    #
+    # .address_id surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — address_id field on entity responses.
+    # vianda-app: api/types.ts — used in employer address forms.
+    "ops.institution_entity_info.address_id": {"surfaces": ["platform", "app"]},
+    #
+    # .currency_metadata_id surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts (InstitutionEntityResponseSchema.currency_metadata_id).
+    "ops.institution_entity_info.currency_metadata_id": {"surfaces": ["platform"]},
+    #
+    # .tax_id surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — rendered in entity setup and detail forms.
+    "ops.institution_entity_info.tax_id": {"surfaces": ["platform"]},
+    #
+    # .name surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — entity name shown in supplier/employer management.
+    # vianda-app: api/types.ts — employer entity name in enrollment.
+    # vianda-home: forms that reference institution entity names.
+    "ops.institution_entity_info.name": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .payout_onboarding_status surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — payout onboarding status badge in entity management.
+    "ops.institution_entity_info.payout_onboarding_status": {"surfaces": ["platform"]},
+    #
+    # .email_domain surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — email domain field in employer entity detail.
+    "ops.institution_entity_info.email_domain": {"surfaces": ["platform"]},
+    #
+    # .status surfaces in InstitutionEntityResponseSchema.
+    # vianda-platform: types/api.ts — status field in entity management UIs.
+    # vianda-app: api/types.ts — entity status for enrollment eligibility checks.
+    # vianda-home: entity-dependent rendering.
+    "ops.institution_entity_info.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.cuisine ---
+    #
+    # .cuisine_id surfaces in CuisineResponseSchema and restaurant enriched responses.
+    # vianda-home: pages that render cuisine_id for filtering (9 home hits).
+    "ops.cuisine.cuisine_id": {"surfaces": ["home"]},
+    #
+    # .cuisine_name surfaces in CuisineResponseSchema.
+    # vianda-home: cuisine display in restaurant cards and filter chips (6 home hits).
+    # vianda-platform: cuisine selector in restaurant forms (1 hit).
+    "ops.cuisine.cuisine_name": {"surfaces": ["platform", "home"]},
+    #
+    # .slug surfaces in CuisineResponseSchema.
+    # vianda-platform: cuisine slug in admin management (2 hits).
+    # vianda-app: api/types.ts (cuisine slug for filtering).
+    "ops.cuisine.slug": {"surfaces": ["platform", "app"]},
+    #
+    # .description surfaces in CuisineResponseSchema.
+    # vianda-platform: cuisine description in admin detail (18 hits).
+    # vianda-app: cuisine description in explore filter detail (2 hits).
+    # vianda-home: cuisine description on marketing pages (7 hits).
+    "ops.cuisine.description": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .status surfaces in CuisineResponseSchema.
+    # vianda-platform: status column in cuisine management (106 hits).
+    # vianda-app: status for filtering active cuisines (41 hits).
+    # vianda-home: visibility gating (3 hits).
+    "ops.cuisine.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.restaurant_info ---
+    #
+    # .restaurant_id surfaces in RestaurantResponseSchema and all enriched restaurant responses.
+    # vianda-platform: types/api.ts (restaurant_id field on many schemas).
+    # vianda-app: api/types.ts (restaurant_id used in explore, pickup, and review flows).
+    # vianda-home: restaurant pages reference restaurant_id.
+    "ops.restaurant_info.restaurant_id": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .institution_id surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — institution_id on restaurant responses.
+    # vianda-app: api/types.ts — employer/supplier context.
+    "ops.restaurant_info.institution_id": {"surfaces": ["platform", "app"]},
+    #
+    # .institution_entity_id surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — entity-level restaurant grouping in admin UIs.
+    "ops.restaurant_info.institution_entity_id": {"surfaces": ["platform"]},
+    #
+    # .address_id surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — address_id field for map and detail views.
+    # vianda-app: api/types.ts — restaurant address used in pickup navigation.
+    "ops.restaurant_info.address_id": {"surfaces": ["platform", "app"]},
+    #
+    # .name surfaces in RestaurantResponseSchema and all enriched responses.
+    # vianda-platform: types/api.ts — restaurant name shown in admin and explore.
+    # vianda-app: api/types.ts — rendered in restaurant cards and pickup screens.
+    # vianda-home: restaurant name on marketing and detail pages.
+    "ops.restaurant_info.name": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .cuisine_id surfaces in RestaurantResponseSchema.
+    # vianda-home: restaurant cards reference cuisine_id for category display (9 home hits).
+    "ops.restaurant_info.cuisine_id": {"surfaces": ["home"]},
+    #
+    # .pickup_instructions surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts (1 hit).
+    # vianda-app: api/types.ts — rendered on the pickup screen (3 hits).
+    "ops.restaurant_info.pickup_instructions": {"surfaces": ["platform", "app"]},
+    #
+    # .tagline surfaces in RestaurantResponseSchema as "tagline".
+    # vianda-home: restaurant cards and detail pages (6 home hits).
+    "ops.restaurant_info.tagline": {"surfaces": ["home"]},
+    #
+    # .cover_image_url surfaces in RestaurantResponseSchema.
+    # vianda-home: restaurant card images (2 home hits).
+    "ops.restaurant_info.cover_image_url": {"surfaces": ["home"]},
+    #
+    # .average_rating surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — rating column in restaurant list (3 hits).
+    # vianda-app: api/types.ts — star rating on restaurant cards (1 hit).
+    # vianda-home: rating display on restaurant detail page (2 hits).
+    "ops.restaurant_info.average_rating": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .review_count surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts (3 hits).
+    # vianda-app: api/types.ts (1 hit).
+    # vianda-home: review count displayed on restaurant detail page (2 hits).
+    "ops.restaurant_info.review_count": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .verified_badge surfaces in RestaurantResponseSchema.
+    # vianda-home: verified badge icon on restaurant detail (1 hit).
+    "ops.restaurant_info.verified_badge": {"surfaces": ["home"]},
+    #
+    # .spotlight_label surfaces in RestaurantResponseSchema as "spotlight_label".
+    # vianda-home: promotional badge on restaurant cards (1 hit).
+    "ops.restaurant_info.spotlight_label": {"surfaces": ["home"]},
+    #
+    # .member_perks surfaces in RestaurantResponseSchema as "member_perks".
+    # vianda-home: perks list on restaurant detail page (1 hit).
+    "ops.restaurant_info.member_perks": {"surfaces": ["home"]},
+    #
+    # .kitchen_open_time surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — kitchen hours in admin restaurant detail (3 hits).
+    "ops.restaurant_info.kitchen_open_time": {"surfaces": ["platform"]},
+    #
+    # .kitchen_close_time surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — kitchen hours in admin restaurant detail (3 hits).
+    "ops.restaurant_info.kitchen_close_time": {"surfaces": ["platform"]},
+    #
+    # .location surfaces in RestaurantResponseSchema as a GeoJSON or coordinate pair.
+    # vianda-platform: types/api.ts — map rendering in restaurant detail (8 hits).
+    # vianda-app: api/types.ts — restaurant map pin in explore and pickup (5 hits).
+    # vianda-home: restaurant location on marketing map (6 hits).
+    "ops.restaurant_info.location": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .status surfaces in RestaurantResponseSchema.
+    # vianda-platform: types/api.ts — status column in restaurant management (106 hits).
+    # vianda-app: api/types.ts — restaurant status used to show/hide in explore (41 hits).
+    # vianda-home: visibility gating (3 hits).
+    "ops.restaurant_info.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.cuisine_suggestion ---
+    #
+    # .restaurant_id surfaces in CuisineSuggestionResponseSchema.
+    # vianda-platform: types/api.ts — restaurant context in suggestion review (18 hits).
+    # vianda-app: api/types.ts — suggestion list by restaurant (15 hits).
+    # vianda-home: (2 hits).
+    "ops.cuisine_suggestion.restaurant_id": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .status surfaces in CuisineSuggestionResponseSchema.
+    # vianda-platform: types/api.ts — status filter in suggestion management (106 hits).
+    # vianda-app: api/types.ts — suggestion status displayed to supplier (41 hits).
+    # vianda-home: (3 hits).
+    "ops.cuisine_suggestion.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.qr_code ---
+    #
+    # .qr_code_id surfaces in QrCodeResponseSchema.
+    # vianda-platform: types/api.ts — QR code ID in kiosk management (4 hits).
+    # vianda-app: api/types.ts — QR code reference in pickup flow (7 hits).
+    "ops.qr_code.qr_code_id": {"surfaces": ["platform", "app"]},
+    #
+    # .restaurant_id surfaces in QrCodeResponseSchema.
+    # vianda-platform: types/api.ts — restaurant scoping in QR code management (18 hits).
+    # vianda-app: api/types.ts (15 hits).
+    # vianda-home: (2 hits).
+    "ops.qr_code.restaurant_id": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .qr_code_payload surfaces in QrCodeResponseSchema.
+    # vianda-platform: types/api.ts — payload rendered in QR management modal (1 hit).
+    "ops.qr_code.qr_code_payload": {"surfaces": ["platform"]},
+    #
+    # .qr_code_image_url surfaces in QrCodeResponseSchema.
+    # vianda-platform: types/api.ts — QR image URL displayed in admin kiosk management (3 hits).
+    "ops.qr_code.qr_code_image_url": {"surfaces": ["platform"]},
+    #
+    # .status surfaces in QrCodeResponseSchema.
+    # vianda-platform: types/api.ts — status column in QR code management (106 hits).
+    # vianda-app: api/types.ts (41 hits).
+    # vianda-home: (3 hits).
+    "ops.qr_code.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.product_info ---
+    #
+    # .product_id surfaces in ProductResponseSchema and enriched plate responses.
+    # vianda-platform: types/api.ts — product_id in admin product management (4 hits).
+    # vianda-app: api/types.ts (1 hit).
+    "ops.product_info.product_id": {"surfaces": ["platform", "app"]},
+    #
+    # .institution_id surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — institution scoping for product management (28 hits).
+    # vianda-app: api/types.ts (2 hits).
+    "ops.product_info.institution_id": {"surfaces": ["platform", "app"]},
+    #
+    # .name surfaces in ProductResponseSchema and plate enriched responses.
+    # vianda-platform: types/api.ts — product name in admin management (70 hits).
+    # vianda-app: api/types.ts — plate/product name displayed to consumers (34 hits).
+    # vianda-home: product name on marketing pages (23 hits).
+    "ops.product_info.name": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .ingredients surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — ingredient list in product detail (7 hits).
+    # vianda-app: api/types.ts — ingredient text on plate detail screen (3 hits).
+    "ops.product_info.ingredients": {"surfaces": ["platform", "app"]},
+    #
+    # .description surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — product description in admin management (18 hits).
+    # vianda-app: api/types.ts — plate description on explore and detail screens (2 hits).
+    # vianda-home: product description on marketing pages (7 hits).
+    "ops.product_info.description": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .dietary surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — dietary filter chips in admin product list (5 hits).
+    # vianda-app: api/types.ts — dietary badges on plate cards (1 hit).
+    "ops.product_info.dietary": {"surfaces": ["platform", "app"]},
+    #
+    # .image_url surfaces in ProductResponseSchema and plate enriched responses.
+    # vianda-platform: types/api.ts — product image in admin management (3 hits).
+    # vianda-app: api/types.ts — plate image on explore cards and detail screens (7 hits).
+    "ops.product_info.image_url": {"surfaces": ["platform", "app"]},
+    #
+    # .image_thumbnail_url surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — thumbnail in admin product list (2 hits).
+    "ops.product_info.image_thumbnail_url": {"surfaces": ["platform"]},
+    #
+    # .status surfaces in ProductResponseSchema.
+    # vianda-platform: types/api.ts — status column in product management (106 hits).
+    # vianda-app: api/types.ts — product/plate visibility (41 hits).
+    # vianda-home: visibility gating (3 hits).
+    "ops.product_info.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.plate_info ---
+    #
+    # .plate_id surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
+    # vianda-platform: types/api.ts — plate_id in admin plate management and daily orders (7 hits).
+    # vianda-app: api/types.ts — plate_id in selection and pickup flows (13 hits).
+    "ops.plate_info.plate_id": {"surfaces": ["platform", "app"]},
+    #
+    # .product_id surfaces in PlateResponseSchema.
+    # vianda-platform: types/api.ts — product_id for linking plate to product (4 hits).
+    # vianda-app: api/types.ts (1 hit).
+    "ops.plate_info.product_id": {"surfaces": ["platform", "app"]},
+    #
+    # .restaurant_id surfaces in PlateResponseSchema.
+    # vianda-platform: types/api.ts — restaurant context for plate in admin (18 hits).
+    # vianda-app: api/types.ts — restaurant context in plate selection (15 hits).
+    # vianda-home: (2 hits).
+    "ops.plate_info.restaurant_id": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .price surfaces in PlateResponseSchema and enriched plate responses.
+    # vianda-platform: types/api.ts — plate price in admin and billing (9 hits).
+    # vianda-app: api/types.ts — plate price displayed in selection flow (11 hits).
+    # vianda-home: plate price on marketing pages (2 hits).
+    "ops.plate_info.price": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .credit surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
+    # vianda-platform: types/api.ts — credit cost in admin plate management (15 hits).
+    # vianda-app: api/types.ts — credit cost shown in selection and balance flows (7 hits).
+    # vianda-home: (2 hits).
+    "ops.plate_info.credit": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .expected_payout_local_currency surfaces in PlateResponseSchema.
+    # vianda-platform: types/api.ts — payout amount in admin financial reporting (2 hits).
+    # vianda-app: api/types.ts (2 hits).
+    "ops.plate_info.expected_payout_local_currency": {"surfaces": ["platform", "app"]},
+    #
+    # .delivery_time_minutes surfaces in PlateResponseSchema.
+    # vianda-platform: types/api.ts — estimated prep time in admin plate management (2 hits).
+    # vianda-app: api/types.ts — ETA shown in selection flow (1 hit).
+    "ops.plate_info.delivery_time_minutes": {"surfaces": ["platform", "app"]},
+    #
+    # .status surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
+    # vianda-platform: types/api.ts — status in plate management (106 hits).
+    # vianda-app: api/types.ts — plate visibility in explore (41 hits).
+    # vianda-home: visibility gating (3 hits).
+    "ops.plate_info.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.restaurant_holidays ---
+    #
+    # .holiday_id surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — holiday record ID in admin holiday management (3 hits).
+    "ops.restaurant_holidays.holiday_id": {"surfaces": ["platform"]},
+    #
+    # .restaurant_id surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — restaurant context for holiday records (18 hits).
+    # vianda-app: api/types.ts (15 hits).
+    # vianda-home: (2 hits).
+    "ops.restaurant_holidays.restaurant_id": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .country_code surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — country filter for holidays (26 hits).
+    # vianda-app: api/types.ts (20 hits).
+    # vianda-home: (21 hits).
+    "ops.restaurant_holidays.country_code": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .holiday_date surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — holiday date in admin calendar management (4 hits).
+    "ops.restaurant_holidays.holiday_date": {"surfaces": ["platform"]},
+    #
+    # .holiday_name surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — holiday name displayed in admin calendar (4 hits).
+    "ops.restaurant_holidays.holiday_name": {"surfaces": ["platform"]},
+    #
+    # .is_recurring surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — recurring toggle in holiday management form (5 hits).
+    "ops.restaurant_holidays.is_recurring": {"surfaces": ["platform"]},
+    #
+    # .recurring_month surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — recurring month selector in holiday form (5 hits).
+    "ops.restaurant_holidays.recurring_month": {"surfaces": ["platform"]},
+    #
+    # .recurring_day surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — recurring day selector in holiday form (5 hits).
+    "ops.restaurant_holidays.recurring_day": {"surfaces": ["platform"]},
+    #
+    # .status surfaces in RestaurantHolidayResponseSchema.
+    # vianda-platform: types/api.ts — status column in holiday management (106 hits).
+    # vianda-app: api/types.ts (41 hits).
+    # vianda-home: (3 hits).
+    "ops.restaurant_holidays.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.plate_kitchen_days ---
+    #
+    # .plate_kitchen_day_id surfaces in PlateKitchenDayResponseSchema.
+    # vianda-platform: types/api.ts — scheduling row ID in plate scheduling admin (2 hits).
+    "ops.plate_kitchen_days.plate_kitchen_day_id": {"surfaces": ["platform"]},
+    #
+    # .plate_id surfaces in PlateKitchenDayResponseSchema.
+    # vianda-platform: types/api.ts — plate reference in scheduling management (7 hits).
+    # vianda-app: api/types.ts — plate scheduling in selection flow (13 hits).
+    "ops.plate_kitchen_days.plate_id": {"surfaces": ["platform", "app"]},
+    #
+    # .kitchen_day surfaces in PlateKitchenDayResponseSchema and plate enriched responses.
+    # vianda-platform: types/api.ts — kitchen day displayed in scheduling admin (5 hits).
+    # vianda-app: api/types.ts — available day shown in plate selection flow (14 hits).
+    "ops.plate_kitchen_days.kitchen_day": {"surfaces": ["platform", "app"]},
+    #
+    # .status surfaces in PlateKitchenDayResponseSchema.
+    # vianda-platform: types/api.ts — scheduling status in admin (106 hits).
+    # vianda-app: api/types.ts (41 hits).
+    # vianda-home: (3 hits).
+    "ops.plate_kitchen_days.status": {"surfaces": ["platform", "app", "home"]},
+    # --- ops.ingredient_catalog ---
+    #
+    # .ingredient_id surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — ingredient ID in catalog admin (3 hits).
+    "ops.ingredient_catalog.ingredient_id": {"surfaces": ["platform"]},
+    #
+    # .name surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — canonical ingredient name in catalog management (70 hits).
+    # vianda-app: api/types.ts — ingredient name on plate detail screens (34 hits).
+    # vianda-home: ingredient name on marketing pages (23 hits).
+    "ops.ingredient_catalog.name": {"surfaces": ["platform", "app", "home"]},
+    #
+    # .name_display surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — display name in catalog admin (3 hits).
+    "ops.ingredient_catalog.name_display": {"surfaces": ["platform"]},
+    #
+    # .name_en surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — English name in catalog admin translation panel (3 hits).
+    "ops.ingredient_catalog.name_en": {"surfaces": ["platform"]},
+    #
+    # .off_taxonomy_id surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — OFF taxonomy ID in catalog enrichment admin (2 hits).
+    "ops.ingredient_catalog.off_taxonomy_id": {"surfaces": ["platform"]},
+    #
+    # .image_url surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — ingredient image in catalog admin (3 hits).
+    # vianda-app: api/types.ts — ingredient image on plate detail screen (7 hits).
+    "ops.ingredient_catalog.image_url": {"surfaces": ["platform", "app"]},
+    #
+    # .image_enriched surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — enrichment status in catalog admin (2 hits).
+    "ops.ingredient_catalog.image_enriched": {"surfaces": ["platform"]},
+    #
+    # .is_verified surfaces in IngredientCatalogResponseSchema.
+    # vianda-platform: types/api.ts — verified flag in catalog admin (2 hits).
+    "ops.ingredient_catalog.is_verified": {"surfaces": ["platform"]},
+    # --- ops.product_ingredient ---
+    #
+    # .product_ingredient_id surfaces in ProductIngredientResponseSchema.
+    # vianda-platform: types/api.ts — link ID in ingredient-product management (1 hit).
+    "ops.product_ingredient.product_ingredient_id": {"surfaces": ["platform"]},
+    #
+    # .product_id surfaces in ProductIngredientResponseSchema.
+    # vianda-platform: types/api.ts — product reference in ingredient assignment (4 hits).
+    # vianda-app: api/types.ts (1 hit).
+    "ops.product_ingredient.product_id": {"surfaces": ["platform", "app"]},
+    #
+    # .ingredient_id surfaces in ProductIngredientResponseSchema.
+    # vianda-platform: types/api.ts — ingredient reference in product ingredient list (3 hits).
+    "ops.product_ingredient.ingredient_id": {"surfaces": ["platform"]},
+    #
+    # .sort_order surfaces in ProductIngredientResponseSchema.
+    # vianda-platform: types/api.ts — ingredient order in product ingredient management (1 hit).
+    "ops.product_ingredient.sort_order": {"surfaces": ["platform"]},
+    # --- ops.ingredient_alias ---
+    #
+    # .ingredient_id surfaces in IngredientAliasResponseSchema.
+    # vianda-platform: types/api.ts — canonical ingredient reference in alias management (3 hits).
+    "ops.ingredient_alias.ingredient_id": {"surfaces": ["platform"]},
 }
