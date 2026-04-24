@@ -162,7 +162,10 @@ def get_resolved_locale_optional(
     current_user: dict | None = Depends(get_optional_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ) -> str:
-    """Same as get_resolved_locale but for routes that allow anonymous access."""
+    """Same as get_resolved_locale but for routes that allow anonymous access.
+    Always sets request.state.resolved_locale so that exception handlers can
+    use it via getattr(request.state, 'resolved_locale', None) without having
+    to re-resolve from the header (Q-S6 in translation-phase-2-design.md)."""
     accept = request.headers.get("Accept-Language")
     if current_user and current_user.get("user_id") is not None:
         row = db_read(
@@ -172,8 +175,12 @@ def get_resolved_locale_optional(
             fetch_one=True,
         )
         if row and row.get("locale") and row["locale"] in SUPPORTED_LOCALES:
-            return row["locale"]
-    return resolve_locale_from_header(accept)
+            locale = row["locale"]
+            request.state.resolved_locale = locale
+            return locale
+    locale = resolve_locale_from_header(accept)
+    request.state.resolved_locale = locale
+    return locale
 
 
 def get_super_admin_user(current_user: dict = Depends(get_current_user)):
