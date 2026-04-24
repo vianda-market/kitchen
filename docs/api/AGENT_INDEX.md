@@ -62,6 +62,7 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ENUM_SERVICE_API.md` | Enum Service API — endpoints, value/title contract, caching, role filtering, TypeScript types |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/zArchive/ENUM_SERVICE_SPECIFICATION.md` | _(Archived)_ Original frontend request — superseded by ENUM_SERVICE_API.md |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/LANGUAGE_AND_LOCALE_FOR_CLIENTS.md` | i18n scaffolding — locales endpoint, locale-aware market names, BCP 47 locale field, enum labels, JWT locale claim |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ERROR_ENVELOPE_FOR_CLIENTS.md` | Error response envelope (one-page frontend integration guide) — wire shape, `resolveErrorMessage` helper usage, code switch-on examples, per-frontend wiring notes |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_MARKETS.md` | Markets API — multi-currency, multi-timezone, institution scoping |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_INSTITUTIONS.md` | Multinational institution model — `market_ids` array, entity-based employers, `email_domain` |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ZIPCODE_METRICS_LEAD_API.md` | Pre-signup coverage check with restaurant count by zipcode |
