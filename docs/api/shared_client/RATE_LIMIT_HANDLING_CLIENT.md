@@ -49,13 +49,23 @@ When rate-limited (HTTP 429), an additional header is included:
 
 ### Response Shape
 
+Since the error envelope rollout (Phase 2 K3), 429 responses match the shared envelope shape defined in `ERROR_ENVELOPE_FOR_CLIENTS.md`:
+
 ```json
 {
-  "detail": "Too many requests. Please try again later."
+  "detail": {
+    "code": "request.rate_limited",
+    "message": "Too many requests. Please try again later.",
+    "params": {"retry_after_seconds": 60}
+  }
 }
 ```
 
-The `detail` message is localized based on the `Accept-Language` header (en, es, pt).
+- `detail.message` is localized based on `Accept-Language` (en, es, pt) — same behavior as before.
+- `detail.code === "request.rate_limited"` is the stable identifier to switch on. Do not parse `message` for control flow.
+- `detail.params.retry_after_seconds` mirrors the `Retry-After` header (both present). Either is authoritative; prefer the header for consistency with other HTTP clients.
+
+**Migrating from the legacy flat shape**: pre-envelope, the response body was `{"detail": "Too many requests..."}` (a bare string). If your client still checks `detail === "rate_limited"` or parses the message, switch to `detail?.code === "request.rate_limited"`. The `resolveErrorMessage` helper (from `vianda-hooks`) handles both shapes transparently — if you've wired it per `ERROR_ENVELOPE_FOR_CLIENTS.md`, no change is needed for user-facing messaging; only control-flow checks (e.g. "is this a rate-limit error?") need the code-based update.
 
 ### Recommended Client Behavior
 
