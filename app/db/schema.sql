@@ -784,6 +784,17 @@ CREATE TABLE IF NOT EXISTS core.schema_migration (
     applied_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     checksum    TEXT NOT NULL
 );
+COMMENT ON TABLE core.schema_migration IS
+    'Tracks applied incremental migration files. Populated by migrate.sh; one row per migration '
+    'script. Used to determine which migrations are pending on a given DB instance.';
+COMMENT ON COLUMN core.schema_migration.version IS
+    'Integer migration version number. Primary key. Monotonically increasing; assigned by migrate.sh.';
+COMMENT ON COLUMN core.schema_migration.name IS
+    'Human-readable migration name (filename without extension).';
+COMMENT ON COLUMN core.schema_migration.applied_at IS
+    'UTC timestamp when the migration was applied to this DB instance.';
+COMMENT ON COLUMN core.schema_migration.checksum IS
+    'SHA-256 checksum of the migration SQL file. Detects post-apply tampering.';
 
 -- National holidays table to prevent kitchen operations on these days
 CREATE TABLE IF NOT EXISTS core.national_holidays (
@@ -817,6 +828,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_national_holidays_country_date_active
     ON core.national_holidays (country_code, holiday_date)
     WHERE NOT is_archived;
 CREATE INDEX IF NOT EXISTS idx_national_holidays_recurring ON core.national_holidays(country_code, recurring_month, recurring_day) WHERE is_recurring AND NOT is_archived;
+COMMENT ON TABLE core.national_holidays IS
+    'Country-level public holidays used to block kitchen operations (no orders/pickups on these dates). '
+    'Populated via the nager.date API cron (nager_date source) and by manual admin entry. '
+    'Soft-deleted via is_archived; unique active index prevents duplicate (country, date) pairs.';
+COMMENT ON COLUMN core.national_holidays.holiday_id IS
+    'UUIDv7 primary key. Time-ordered for efficient range queries.';
+COMMENT ON COLUMN core.national_holidays.country_code IS
+    'ISO 3166-1 alpha-2 country code identifying which country observes this holiday. '
+    'Constrained to 2 chars despite VARCHAR(3) type — the CHECK enforces 2-char length.';
+COMMENT ON COLUMN core.national_holidays.holiday_name IS
+    'Display name for the holiday (e.g. ''Día de la Independencia'').';
+COMMENT ON COLUMN core.national_holidays.holiday_date IS
+    'Calendar date of the holiday. Used to gate kitchen operations.';
+COMMENT ON COLUMN core.national_holidays.is_recurring IS
+    'TRUE if this holiday recurs on the same month/day every year (e.g. Christmas). '
+    'FALSE for fixed-date entries from nager_date.';
+COMMENT ON COLUMN core.national_holidays.recurring_month IS
+    'Month (1–12) for recurring holidays. NULL when is_recurring=FALSE.';
+COMMENT ON COLUMN core.national_holidays.recurring_day IS
+    'Day-of-month (1–31) for recurring holidays. NULL when is_recurring=FALSE.';
+COMMENT ON COLUMN core.national_holidays.status IS
+    'Lifecycle status (active/inactive). active = currently blocks kitchen operations.';
+COMMENT ON COLUMN core.national_holidays.is_archived IS
+    'Soft-delete tombstone. Archived rows are excluded from kitchen operation checks.';
+COMMENT ON COLUMN core.national_holidays.created_date IS
+    'UTC timestamp when the row was first inserted.';
+COMMENT ON COLUMN core.national_holidays.created_by IS
+    'UUID of the user who created this holiday record. NULL for system-generated (nager_date import).';
+COMMENT ON COLUMN core.national_holidays.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.national_holidays.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.national_holidays.source IS
+    '''manual'' = admin-entered; ''nager_date'' = imported from the nager.date public holiday API. '
+    'nager_date rows are never recurring (CHECK constraint).';
 
 -- National holidays history table
 CREATE TABLE IF NOT EXISTS audit.national_holidays_history (
@@ -861,6 +907,35 @@ CREATE TABLE IF NOT EXISTS core.institution_info (
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+COMMENT ON TABLE core.institution_info IS
+    'Top-level entity for supplier, employer, customer, and internal institutions. '
+    'One institution = one set of admin users, one login. Country-specific concerns '
+    '(legal entities, currencies) live on ops.institution_entity_info. '
+    'Multi-market assignment via core.institution_market junction.';
+COMMENT ON COLUMN core.institution_info.institution_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.institution_info.name IS
+    'Display name for the institution (e.g. restaurant or employer brand name). Max 50 chars.';
+COMMENT ON COLUMN core.institution_info.institution_type IS
+    'Discriminator: ''supplier'' (restaurant operator), ''employer'' (corporate meal program), '
+    '''customer'' (B2C consumer group), or ''internal'' (Vianda staff). Controls permission scoping.';
+COMMENT ON COLUMN core.institution_info.is_archived IS
+    'Soft-delete tombstone. Archived institutions are hidden from all active queries.';
+COMMENT ON COLUMN core.institution_info.status IS
+    'Lifecycle status (active/inactive). Toggled by admin; inactive institutions cannot transact.';
+COMMENT ON COLUMN core.institution_info.created_date IS
+    'UTC timestamp when the institution was registered.';
+COMMENT ON COLUMN core.institution_info.created_by IS
+    'UUID of the user who created the institution. NULL for programmatic creation.';
+COMMENT ON COLUMN core.institution_info.support_email_suppressed_until IS
+    'UTC timestamp until which automated support emails are suppressed for this institution. '
+    'Set by the stall-detection cron to enforce 3-day cooldowns between outreach emails.';
+COMMENT ON COLUMN core.institution_info.last_support_email_date IS
+    'UTC timestamp of the last automated support email sent to this institution.';
+COMMENT ON COLUMN core.institution_info.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.institution_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: core.address_info'
 CREATE TABLE IF NOT EXISTS core.address_info (
@@ -975,6 +1050,63 @@ CREATE TABLE IF NOT EXISTS core.employer_benefits_program (
     -- Note: modified_by FK added via ALTER TABLE after core.user_info is created
     -- Note: institution_entity_id FK to ops.institution_entity_info added via deferred ALTER (entity table created later)
 );
+COMMENT ON TABLE core.employer_benefits_program IS
+    'Employer meal benefit configuration. Supports three-tier cascade: '
+    'institution_entity_id IS NULL = institution-level defaults; NOT NULL = entity-level override. '
+    'Currency-tied fields (benefit_cap, minimum_monthly_fee, stripe_*) exist only at entity level. '
+    'Unique constraint: (institution_id, institution_entity_id).';
+COMMENT ON COLUMN core.employer_benefits_program.program_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.employer_benefits_program.institution_id IS
+    'FK to core.institution_info. The employer institution that owns this program.';
+COMMENT ON COLUMN core.employer_benefits_program.institution_entity_id IS
+    'FK to ops.institution_entity_info. NULL = institution-level defaults; NOT NULL = entity-level override. '
+    'Entity overrides are used for multi-country employers where currency-tied fields differ per country.';
+COMMENT ON COLUMN core.employer_benefits_program.benefit_rate IS
+    'Percentage (0–100) of meal plan cost subsidized by the employer. '
+    '100 = fully employer-paid; 0 = no subsidy (employee pays full price).';
+COMMENT ON COLUMN core.employer_benefits_program.benefit_cap IS
+    'Maximum benefit amount per cap period in the entity''s local currency. NULL = no cap. '
+    'Only meaningful at the entity level where currency is known.';
+COMMENT ON COLUMN core.employer_benefits_program.benefit_cap_period IS
+    'Period over which benefit_cap applies (''monthly''). Used by billing to reset cap tracking.';
+COMMENT ON COLUMN core.employer_benefits_program.price_discount IS
+    'Additional percentage discount (0–100) on the plan price for employer employees. '
+    'Separate from benefit_rate — reduces the base price before subsidy is applied.';
+COMMENT ON COLUMN core.employer_benefits_program.minimum_monthly_fee IS
+    'Minimum monthly employer invoice amount in local currency. NULL = no minimum. '
+    'Enforced at month-end reconciliation in the employer billing cron.';
+COMMENT ON COLUMN core.employer_benefits_program.billing_cycle IS
+    'Billing frequency for employer invoices (''monthly'').';
+COMMENT ON COLUMN core.employer_benefits_program.billing_day IS
+    'Day of month (1–28) on which employer invoices are generated. NULL uses default.';
+COMMENT ON COLUMN core.employer_benefits_program.billing_day_of_week IS
+    'Day of week (0=Sunday … 6=Saturday) for weekly billing cycles. NULL for monthly.';
+COMMENT ON COLUMN core.employer_benefits_program.enrollment_mode IS
+    'How employees are enrolled: ''managed'' (admin-controlled) or ''open'' (self-service by email domain).';
+COMMENT ON COLUMN core.employer_benefits_program.allow_early_renewal IS
+    'Whether employees on this program can trigger early subscription renewal. '
+    'Tied to subscription.early_renewal_threshold logic.';
+COMMENT ON COLUMN core.employer_benefits_program.stripe_customer_id IS
+    'Stripe Customer ID for the employer entity''s billing account. NULL until payment is set up.';
+COMMENT ON COLUMN core.employer_benefits_program.stripe_payment_method_id IS
+    'Stripe PaymentMethod ID for automated employer invoice collection. NULL until configured.';
+COMMENT ON COLUMN core.employer_benefits_program.payment_method_type IS
+    'Descriptor for the payment method type (e.g. ''card'', ''bank_transfer''). Informational.';
+COMMENT ON COLUMN core.employer_benefits_program.is_active IS
+    'Whether this program is currently active. Inactive programs do not process new enrollments.';
+COMMENT ON COLUMN core.employer_benefits_program.is_archived IS
+    'Soft-delete tombstone. Archived programs are hidden from all queries.';
+COMMENT ON COLUMN core.employer_benefits_program.status IS
+    'Lifecycle status enum (active/inactive). Redundant with is_active for pattern consistency.';
+COMMENT ON COLUMN core.employer_benefits_program.created_date IS
+    'UTC timestamp when the program was created.';
+COMMENT ON COLUMN core.employer_benefits_program.created_by IS
+    'UUID of the user who created the program. NULL for programmatic creation.';
+COMMENT ON COLUMN core.employer_benefits_program.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.employer_benefits_program.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.employer_benefits_program_history'
 CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
@@ -1039,6 +1171,44 @@ CREATE TABLE IF NOT EXISTS core.lead_interest (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+COMMENT ON TABLE core.lead_interest IS
+    'Pre-signup interest registrations from prospective customers, employers, and suppliers. '
+    'Collected via the marketing site interest forms before the user has a Vianda account. '
+    'Surfaced in the admin lead interest dashboard.';
+COMMENT ON COLUMN core.lead_interest.lead_interest_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.lead_interest.email IS
+    'Case-insensitive email address of the prospect. citext — uniqueness checks are case-folded.';
+COMMENT ON COLUMN core.lead_interest.country_code IS
+    'ISO 3166-1 alpha-2 country code the prospect selected on the interest form.';
+COMMENT ON COLUMN core.lead_interest.city_name IS
+    'Free-text city name as entered by the prospect. Not normalized — may differ from geonames canonical names.';
+COMMENT ON COLUMN core.lead_interest.zipcode IS
+    'Postal/ZIP code provided by the prospect. NULL if not collected.';
+COMMENT ON COLUMN core.lead_interest.zipcode_only IS
+    'TRUE when the prospect provided a zipcode but no city name (zipcode-only interest mode).';
+COMMENT ON COLUMN core.lead_interest.interest_type IS
+    'Lead type: ''customer'' (consumer), ''employer'' (corporate program buyer), or ''supplier'' (restaurant operator).';
+COMMENT ON COLUMN core.lead_interest.business_name IS
+    'Company or restaurant name. Present for employer and supplier leads; NULL for customer leads.';
+COMMENT ON COLUMN core.lead_interest.message IS
+    'Optional free-text message from the prospect.';
+COMMENT ON COLUMN core.lead_interest.cuisine_id IS
+    'FK to ops.cuisine. Optional cuisine preference for customer leads.';
+COMMENT ON COLUMN core.lead_interest.employee_count_range IS
+    'Company size range for employer leads (e.g. ''51-100'', ''101-500''). NULL for other lead types.';
+COMMENT ON COLUMN core.lead_interest.status IS
+    '''active'' = not yet contacted; ''notified'' = outreach email sent; ''unsubscribed'' = opt-out.';
+COMMENT ON COLUMN core.lead_interest.source IS
+    'Acquisition channel: ''web'' (marketing site form), ''api'' (direct API), etc.';
+COMMENT ON COLUMN core.lead_interest.notified_date IS
+    'UTC timestamp when the outreach notification email was last sent. NULL if not yet contacted.';
+COMMENT ON COLUMN core.lead_interest.is_archived IS
+    'Soft-delete tombstone. Archived leads are excluded from active queries and exports.';
+COMMENT ON COLUMN core.lead_interest.created_date IS
+    'UTC timestamp when the lead interest was registered.';
+COMMENT ON COLUMN core.lead_interest.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: core.restaurant_lead'
 CREATE TABLE IF NOT EXISTS core.restaurant_lead (
@@ -1082,6 +1252,68 @@ CREATE TABLE IF NOT EXISTS core.restaurant_lead (
 CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON core.restaurant_lead(lead_status);
 CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON core.restaurant_lead(country_code);
 CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON core.restaurant_lead(contact_email);
+COMMENT ON TABLE core.restaurant_lead IS
+    'Restaurant supplier application leads submitted via the marketing site. '
+    'Captures contact info, business profile, and vetting answers before a supplier account is created. '
+    'On approval, institution_id is populated and a full supplier institution is provisioned.';
+COMMENT ON COLUMN core.restaurant_lead.restaurant_lead_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.restaurant_lead.business_name IS
+    'Restaurant or business trade name as submitted by the applicant.';
+COMMENT ON COLUMN core.restaurant_lead.contact_name IS
+    'Full name of the primary contact at the restaurant.';
+COMMENT ON COLUMN core.restaurant_lead.contact_email IS
+    'Case-insensitive email address of the applicant. citext — uniqueness checks are case-folded.';
+COMMENT ON COLUMN core.restaurant_lead.contact_phone IS
+    'Phone number of the applicant. Free-form; not validated for E.164 format at this layer.';
+COMMENT ON COLUMN core.restaurant_lead.country_code IS
+    'ISO 3166-1 alpha-2 country code where the restaurant operates.';
+COMMENT ON COLUMN core.restaurant_lead.city_name IS
+    'City name as entered by the applicant. Not normalized against geonames.';
+COMMENT ON COLUMN core.restaurant_lead.years_in_operation IS
+    'Number of years the restaurant has been in operation. Non-negative integer.';
+COMMENT ON COLUMN core.restaurant_lead.employee_count_range IS
+    'Restaurant staff count range (e.g. ''1-5'', ''6-20''). Informational for vetting.';
+COMMENT ON COLUMN core.restaurant_lead.kitchen_capacity_daily IS
+    'Maximum number of meals the kitchen can prepare per day. Used in capacity vetting.';
+COMMENT ON COLUMN core.restaurant_lead.website_url IS
+    'Restaurant website or social media URL. Optional; informational for vetting.';
+COMMENT ON COLUMN core.restaurant_lead.referral_source IS
+    'How the applicant heard about Vianda (enum). Used for acquisition attribution.';
+COMMENT ON COLUMN core.restaurant_lead.message IS
+    'Optional free-text message from the applicant.';
+COMMENT ON COLUMN core.restaurant_lead.vetting_answers IS
+    'JSONB blob of country-specific vetting question answers. Schema is flexible until '
+    'questions are finalized per country. Do not rely on a fixed structure across markets.';
+COMMENT ON COLUMN core.restaurant_lead.lead_status IS
+    'Workflow state: ''submitted'' → ''in_review'' → ''approved'' / ''rejected''.';
+COMMENT ON COLUMN core.restaurant_lead.rejection_reason IS
+    'Admin-entered reason for rejection. NULL when lead_status is not ''rejected''.';
+COMMENT ON COLUMN core.restaurant_lead.reviewed_by IS
+    'FK to core.user_info — internal reviewer who processed this lead. NULL until reviewed.';
+COMMENT ON COLUMN core.restaurant_lead.reviewed_at IS
+    'UTC timestamp when the lead was reviewed (approved or rejected).';
+COMMENT ON COLUMN core.restaurant_lead.institution_id IS
+    'FK to core.institution_info. Populated on approval — links the lead to the provisioned supplier institution. '
+    'NULL while the lead is still pending.';
+COMMENT ON COLUMN core.restaurant_lead.gclid IS
+    'Google Click ID captured at lead submission for conversion attribution.';
+COMMENT ON COLUMN core.restaurant_lead.fbclid IS
+    'Facebook Click ID captured at lead submission.';
+COMMENT ON COLUMN core.restaurant_lead.fbc IS
+    'Facebook browser cookie (_fbc) captured at lead submission. Up to 500 chars.';
+COMMENT ON COLUMN core.restaurant_lead.fbp IS
+    'Facebook pixel cookie (_fbp) captured at lead submission.';
+COMMENT ON COLUMN core.restaurant_lead.event_id IS
+    'Deduplication event ID for server-side Conversions API calls.';
+COMMENT ON COLUMN core.restaurant_lead.source_platform IS
+    'Ad platform that drove the lead (e.g. ''google'', ''meta''). Used to route conversion uploads.';
+COMMENT ON COLUMN core.restaurant_lead.is_archived IS
+    'Soft-delete tombstone. Archived leads are excluded from active queries.';
+COMMENT ON COLUMN core.restaurant_lead.created_date IS
+    'UTC timestamp when the lead was submitted.';
+COMMENT ON COLUMN core.restaurant_lead.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
 -- Deferred: see after cuisine table is created
@@ -1100,6 +1332,30 @@ CREATE TABLE IF NOT EXISTS core.workplace_group (
     modified_date      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_workplace_group_name ON core.workplace_group USING gin (name gin_trgm_ops);
+COMMENT ON TABLE core.workplace_group IS
+    'Groups of coworkers at the same office location, used for coworker pickup coordination in the B2C app. '
+    'Employees join a workplace group to see and coordinate with coworkers who are also ordering lunch.';
+COMMENT ON COLUMN core.workplace_group.workplace_group_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.workplace_group.name IS
+    'Display name for the workplace group (e.g. company or office name). Trigram-indexed for search.';
+COMMENT ON COLUMN core.workplace_group.email_domain IS
+    'Email domain for auto-joining (e.g. ''vianda.market''). NULL = no domain gating. '
+    'Unique partial index prevents two active groups claiming the same domain.';
+COMMENT ON COLUMN core.workplace_group.require_domain_verification IS
+    'When TRUE, users must have a verified email matching email_domain to join this group.';
+COMMENT ON COLUMN core.workplace_group.is_archived IS
+    'Soft-delete tombstone. Archived groups are hidden from discovery and cannot accept new members.';
+COMMENT ON COLUMN core.workplace_group.status IS
+    'Lifecycle status (active/inactive). Inactive groups do not appear in user-facing pickers.';
+COMMENT ON COLUMN core.workplace_group.created_date IS
+    'UTC timestamp when the group was created.';
+COMMENT ON COLUMN core.workplace_group.created_by IS
+    'UUID of the user who created the group. NULL for programmatic creation.';
+COMMENT ON COLUMN core.workplace_group.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.workplace_group.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.workplace_group_history'
 CREATE TABLE IF NOT EXISTS audit.workplace_group_history (
@@ -1221,6 +1477,33 @@ CREATE TABLE IF NOT EXISTS core.address_subpremise (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (address_id, user_id)
 );
+COMMENT ON TABLE core.address_subpremise IS
+    'Per-user subpremise detail for a shared address (floor, apartment unit, default flag). '
+    'Separated from address_info to allow multiple users to share the same base address '
+    'while maintaining their own delivery preferences. One row per (address_id, user_id) pair.';
+COMMENT ON COLUMN core.address_subpremise.subpremise_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.address_subpremise.address_id IS
+    'FK to core.address_info. The base address this subpremise detail belongs to.';
+COMMENT ON COLUMN core.address_subpremise.user_id IS
+    'FK to core.user_info. The user whose subpremise preferences are stored here.';
+COMMENT ON COLUMN core.address_subpremise.floor IS
+    'Floor or storey of the building (e.g. ''3'', ''PB''). Optional; NULL if not applicable.';
+COMMENT ON COLUMN core.address_subpremise.apartment_unit IS
+    'Apartment, suite, or unit number (e.g. ''4A'', ''Suite 200''). Optional.';
+COMMENT ON COLUMN core.address_subpremise.is_default IS
+    'TRUE if this is the user''s default pickup/delivery address. At most one default per user.';
+COMMENT ON COLUMN core.address_subpremise.map_center_label IS
+    'User-selected map center label for pickup location disambiguation: ''home'', ''other'', or NULL (defaults to home). '
+    'Drives map center-of-gravity selection in the B2C app pickup flow.';
+COMMENT ON COLUMN core.address_subpremise.created_date IS
+    'UTC timestamp when the subpremise record was created.';
+COMMENT ON COLUMN core.address_subpremise.created_by IS
+    'UUID of the user who created this record. NULL for programmatic creation.';
+COMMENT ON COLUMN core.address_subpremise.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.address_subpremise.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- core.credit_currency_info retired — replaced by external.iso4217_currency (raw) + core.currency_metadata (Vianda policy).
 -- See docs/plans/country_city_data_structure.md Currency two-tier section.
@@ -1241,6 +1524,30 @@ CREATE TABLE IF NOT EXISTS core.currency_rate_raw (
 
 CREATE INDEX idx_currency_rate_raw_target_fetched
     ON core.currency_rate_raw(target_currency, fetched_at DESC);
+COMMENT ON TABLE core.currency_rate_raw IS
+    'Raw exchange rate snapshots fetched by the currency refresh cron from the open.er-api.com API. '
+    'Append-only log; is_valid=FALSE marks stale or erroneous rows. '
+    'Rates here feed the currency_conversion_usd column on core.currency_metadata via the ops flow.';
+COMMENT ON COLUMN core.currency_rate_raw.currency_rate_raw_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.currency_rate_raw.fetched_at IS
+    'UTC timestamp when this rate was fetched from the API.';
+COMMENT ON COLUMN core.currency_rate_raw.base_currency IS
+    'ISO 4217 code of the base currency (always ''USD'' in current implementation).';
+COMMENT ON COLUMN core.currency_rate_raw.target_currency IS
+    'ISO 4217 code of the target currency being quoted (e.g. ''ARS'', ''BRL'').';
+COMMENT ON COLUMN core.currency_rate_raw.rate IS
+    'Exchange rate: 1 base_currency = rate target_currency units (e.g. 850.0 for 1 USD = 850 ARS).';
+COMMENT ON COLUMN core.currency_rate_raw.api_source IS
+    'Identifier of the data provider (''open.er-api'' default). Future: may support alternative providers.';
+COMMENT ON COLUMN core.currency_rate_raw.api_date IS
+    'Date the API reports for this rate (may differ from fetched_at due to weekend/holiday roll-forward).';
+COMMENT ON COLUMN core.currency_rate_raw.raw_payload IS
+    'Full JSON response body from the API. Stored for auditability and re-processing without refetch.';
+COMMENT ON COLUMN core.currency_rate_raw.is_valid IS
+    'FALSE = this row is stale, erroneous, or superseded. Only valid rows are used for rate promotion.';
+COMMENT ON COLUMN core.currency_rate_raw.notes IS
+    'Optional human-readable annotation (e.g. reason for invalidation). NULL for normal rows.';
 
 -- =============================================================================
 -- CURRENCY METADATA (Vianda pricing policy on top of external.iso4217_currency)
@@ -1268,6 +1575,34 @@ CREATE TABLE IF NOT EXISTS core.currency_metadata (
     modified_date               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE core.currency_metadata IS
+    'Vianda pricing policy layer on top of external.iso4217_currency. One row per currency Vianda '
+    'has enabled for operational use. Stores the credit-to-local-currency conversion rate and the '
+    'operational USD exchange rate (snapshotted by cron; not real-time). FKed by core.market_info.';
+COMMENT ON COLUMN core.currency_metadata.currency_metadata_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.currency_metadata.currency_code IS
+    'ISO 4217 alpha code. Unique FK to external.iso4217_currency.code. '
+    'Display name and minor_unit are always derived via JOIN — not stored redundantly here.';
+COMMENT ON COLUMN core.currency_metadata.credit_value_local_currency IS
+    'Vianda pricing policy: how many local currency units equal one Vianda credit. '
+    'Example: if 1 credit = 500 ARS, this column is 500. Used in plan pricing and invoice calculations.';
+COMMENT ON COLUMN core.currency_metadata.currency_conversion_usd IS
+    'Operational USD exchange rate: how many local currency units equal 1 USD. '
+    'Snapshotted from the currency refresh cron; not real-time. '
+    'Used for cross-currency invoice reporting and plan cost estimates in USD.';
+COMMENT ON COLUMN core.currency_metadata.is_archived IS
+    'Soft-delete tombstone. Archived currencies are not available for new markets or entities.';
+COMMENT ON COLUMN core.currency_metadata.status IS
+    'Lifecycle status (active/inactive). Inactive currencies are hidden from pickers.';
+COMMENT ON COLUMN core.currency_metadata.created_date IS
+    'UTC timestamp when the currency was enabled in Vianda.';
+COMMENT ON COLUMN core.currency_metadata.created_by IS
+    'UUID of the user who enabled this currency. NULL for seed data.';
+COMMENT ON COLUMN core.currency_metadata.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.currency_metadata.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.currency_metadata_history'
 CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
@@ -1322,6 +1657,43 @@ CREATE TABLE IF NOT EXISTS core.market_info (
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE core.market_info IS
+    'Vianda operational markets — one row per country Vianda operates in. '
+    'One market = one country code + one currency + one default language. '
+    'Unique per country_code. Drives subscription scoping, restaurant visibility, and locale defaults. '
+    'Market status (active/inactive) controls whether the country surfaces to customers.';
+COMMENT ON COLUMN core.market_info.market_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.market_info.country_code IS
+    'ISO 3166-1 alpha-2 country code. Unique per market. FK to external.geonames_country.iso_alpha2. '
+    '''XG'' for the synthetic Global pseudo-market.';
+COMMENT ON COLUMN core.market_info.currency_metadata_id IS
+    'FK to core.currency_metadata. The operational currency for this market. '
+    'Drives plan pricing, invoice amounts, and currency display across the market.';
+COMMENT ON COLUMN core.market_info.language IS
+    'Default UI language for this market: ''en'', ''es'', or ''pt''. '
+    'Used as locale default before user preferences are set (signup, pre-auth marketing site).';
+COMMENT ON COLUMN core.market_info.phone_dial_code IS
+    'E.164 international dialing prefix for this market (e.g. ''+54'' for Argentina). '
+    'Surfaced in the /leads/countries response as ''phone_dial_code'' for phone input forms. '
+    'NULL for pseudo-markets (e.g. XG/Global) that have no real dial code.';
+COMMENT ON COLUMN core.market_info.phone_local_digits IS
+    'Maximum number of national digits after the dial code (e.g. 10 for Argentina). '
+    'Used as maxLength hint in phone number input fields. NULL for pseudo-markets.';
+COMMENT ON COLUMN core.market_info.is_archived IS
+    'Soft-delete tombstone. Archived markets are excluded from all active queries.';
+COMMENT ON COLUMN core.market_info.status IS
+    '''active'' = currently serving customers (surfaces in /leads/countries); '
+    '''inactive'' = configured but not serving (surfaces in /leads/supplier-countries only). '
+    'Source of truth for market operational status.';
+COMMENT ON COLUMN core.market_info.created_date IS
+    'UTC timestamp when the market was configured.';
+COMMENT ON COLUMN core.market_info.created_by IS
+    'UUID of the user who created the market. NULL for seed data.';
+COMMENT ON COLUMN core.market_info.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.market_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- Add foreign key constraint from core.address_info to external.geonames_country (deferred until external schema + all tables exist)
 \echo 'Adding foreign key: core.address_info.country_code -> external.geonames_country.iso_alpha2'
@@ -1334,6 +1706,59 @@ ALTER TABLE core.address_info ADD CONSTRAINT fk_address_country_code FOREIGN KEY
 \echo 'Adding core.address_info.city_metadata_id column (NOT NULL; FK deferred to end of schema.sql)'
 ALTER TABLE core.address_info ADD COLUMN city_metadata_id UUID NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_address_info_city_metadata_id ON core.address_info(city_metadata_id);
+COMMENT ON TABLE core.address_info IS
+    'Physical addresses for restaurants (supplier), employer offices, and customer residences. '
+    'Immutable core (street, city, province) — only administrative fields (address_type, is_archived) '
+    'are updated after creation. Subpremise details (floor, apartment) live in core.address_subpremise. '
+    'Timezone is populated at write time from external.geonames_city.timezone via the city_metadata_id FK chain.';
+COMMENT ON COLUMN core.address_info.address_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.address_info.institution_id IS
+    'FK to core.institution_info. Every address belongs to exactly one institution.';
+COMMENT ON COLUMN core.address_info.user_id IS
+    'FK to core.user_info. Required only for Customer Comensal home/other addresses; '
+    'NULL for supplier restaurant and employer office addresses.';
+COMMENT ON COLUMN core.address_info.workplace_group_id IS
+    'FK to core.workplace_group. Links an employer office address to a workplace group '
+    'for coworker pickup coordination. NULL for all non-office addresses.';
+COMMENT ON COLUMN core.address_info.address_type IS
+    'Array of address type enum values. Multiple types allowed (e.g. restaurant + entity_billing). '
+    'Values: restaurant, entity_billing, entity_address, customer_home, customer_employer, customer_other.';
+COMMENT ON COLUMN core.address_info.country_code IS
+    'ISO 3166-1 alpha-2 country code. FK to external.geonames_country.iso_alpha2.';
+COMMENT ON COLUMN core.address_info.province IS
+    'Display-only province/state string. Structural province data lives on '
+    'external.geonames_admin1 via the city_metadata → geonames_city.admin1_code chain.';
+COMMENT ON COLUMN core.address_info.city IS
+    'DEPRECATED (PR2) — use city_metadata_id FK instead. Kept for legacy service queries '
+    'and tests that INSERT raw addresses. Will be removed in a future migration.';
+COMMENT ON COLUMN core.address_info.city_metadata_id IS
+    'FK to core.city_metadata. NOT NULL as of PR4c — every address must resolve to a known city. '
+    'Composite FK also enforces that country_code matches city_metadata.country_iso.';
+COMMENT ON COLUMN core.address_info.postal_code IS
+    'Postal/ZIP code. Format varies by country (e.g. ''1425'' in AR, ''10001'' in US).';
+COMMENT ON COLUMN core.address_info.street_type IS
+    'Street type enum (st, ave, blvd, etc.). Used for address formatting in UI.';
+COMMENT ON COLUMN core.address_info.street_name IS
+    'Street name without the type prefix (e.g. ''Corrientes'', ''5th Avenue'').';
+COMMENT ON COLUMN core.address_info.building_number IS
+    'Street number / building number (e.g. ''1234'', ''42B'').';
+COMMENT ON COLUMN core.address_info.timezone IS
+    'IANA timezone identifier, populated at write time from external.geonames_city.timezone '
+    'via the city_metadata_id → geonames_city FK chain (e.g. ''America/Argentina/Buenos_Aires''). '
+    'Source of truth for restaurant kitchen-day scheduling and pickup window calculations.';
+COMMENT ON COLUMN core.address_info.is_archived IS
+    'Soft-delete tombstone. Archived addresses are excluded from active queries.';
+COMMENT ON COLUMN core.address_info.status IS
+    'Lifecycle status (active/inactive). Inactive addresses are not selectable in new assignments.';
+COMMENT ON COLUMN core.address_info.created_date IS
+    'UTC timestamp when the address was created.';
+COMMENT ON COLUMN core.address_info.created_by IS
+    'UUID of the user who created the address. NULL for programmatic creation.';
+COMMENT ON COLUMN core.address_info.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.address_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.market_history'
 CREATE TABLE IF NOT EXISTS audit.market_history (
@@ -1408,6 +1833,43 @@ CREATE INDEX IF NOT EXISTS idx_country_metadata_supplier_audience
 CREATE INDEX IF NOT EXISTS idx_country_metadata_customer_audience
     ON core.country_metadata(country_iso)
     WHERE is_customer_audience = TRUE AND is_archived = FALSE;
+COMMENT ON TABLE core.country_metadata IS
+    'Vianda audience flags and display overrides on top of external.geonames_country. '
+    'One row per country Vianda has explicitly promoted via the superadmin flow. '
+    'Controls which countries appear in the customer, supplier, and employer audience lists. '
+    'Display name resolver: metadata override → external.geonames_alternate_name → canonical name.';
+COMMENT ON COLUMN core.country_metadata.country_metadata_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.country_metadata.country_iso IS
+    'ISO 3166-1 alpha-2 country code. Unique. FK to external.geonames_country.iso_alpha2.';
+COMMENT ON COLUMN core.country_metadata.market_id IS
+    'FK to core.market_info. NULL = country is in audience lists but has no operational market yet. '
+    'Non-NULL = this country is an active or inactive Vianda market.';
+COMMENT ON COLUMN core.country_metadata.display_name_override IS
+    'Optional Vianda-curated display name override in English. NULL = use GeoNames canonical name. '
+    'Use only when Vianda explicitly disagrees with GeoNames (rare).';
+COMMENT ON COLUMN core.country_metadata.display_name_i18n IS
+    'Optional JSON object of locale-specific display name overrides: {"en": "...", "es": "...", "pt": "..."}. '
+    'NULL = fall back to geonames_alternate_name table for localization.';
+COMMENT ON COLUMN core.country_metadata.is_customer_audience IS
+    'TRUE = country appears in /leads/markets default (customer-facing country selector).';
+COMMENT ON COLUMN core.country_metadata.is_supplier_audience IS
+    'TRUE = country appears in /leads/markets?audience=supplier (supplier application form dropdown).';
+COMMENT ON COLUMN core.country_metadata.is_employer_audience IS
+    'TRUE = country is eligible for employer audience flows. Reserved for future employer lead capture.';
+COMMENT ON COLUMN core.country_metadata.is_archived IS
+    'Soft-delete tombstone. Archived countries are excluded from all audience queries.';
+COMMENT ON COLUMN core.country_metadata.status IS
+    '''pending'' = promoted for interest forms but no active supplier yet; '
+    '''active'' = has real activity. Flipped by service code, not a trigger.';
+COMMENT ON COLUMN core.country_metadata.created_date IS
+    'UTC timestamp when this country was promoted into Vianda metadata.';
+COMMENT ON COLUMN core.country_metadata.created_by IS
+    'UUID of the user who created this record. NULL for seed data.';
+COMMENT ON COLUMN core.country_metadata.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.country_metadata.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.country_metadata_history'
 CREATE TABLE IF NOT EXISTS audit.country_metadata_history (
@@ -1475,6 +1937,48 @@ CREATE INDEX IF NOT EXISTS idx_city_metadata_country_customer
 CREATE INDEX IF NOT EXISTS idx_city_metadata_country_signup
     ON core.city_metadata (country_iso)
     WHERE show_in_signup_picker = TRUE AND is_archived = FALSE;
+COMMENT ON TABLE core.city_metadata IS
+    'Vianda display flags and overrides on top of external.geonames_city. '
+    'One row per city Vianda has explicitly promoted. Controls which cities appear in '
+    'the signup picker, supplier form, and customer interest form. '
+    'is_served is a derived flag set by service code when the first active restaurant lands. '
+    'Display name resolver: metadata override → geonames_alternate_name → canonical name.';
+COMMENT ON COLUMN core.city_metadata.city_metadata_id IS
+    'UUIDv7 primary key. Time-ordered. '
+    'UUID ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'' = synthetic Global city for B2B users.';
+COMMENT ON COLUMN core.city_metadata.geonames_id IS
+    'FK to external.geonames_city.geonames_id. Unique. Connects metadata to the canonical GeoNames city record.';
+COMMENT ON COLUMN core.city_metadata.country_iso IS
+    'ISO 3166-1 alpha-2 country code. FK to external.geonames_country.iso_alpha2. '
+    'Part of the composite UNIQUE (city_metadata_id, country_iso) used for address consistency FKs.';
+COMMENT ON COLUMN core.city_metadata.display_name_override IS
+    'Optional Vianda-curated city display name override in English. NULL = use GeoNames canonical name.';
+COMMENT ON COLUMN core.city_metadata.display_name_i18n IS
+    'Optional JSON object of locale-specific display overrides: {"en": "...", "es": "...", "pt": "..."}. '
+    'NULL = fall back to geonames_alternate_name table for localization.';
+COMMENT ON COLUMN core.city_metadata.show_in_signup_picker IS
+    'TRUE = city appears in the B2C customer signup city picker. '
+    'Replaces the old city_info ''is this a signup-selectable city?'' role.';
+COMMENT ON COLUMN core.city_metadata.show_in_supplier_form IS
+    'TRUE = city appears in the supplier lead capture city dropdown on the marketing site.';
+COMMENT ON COLUMN core.city_metadata.show_in_customer_form IS
+    'TRUE = city appears in the customer interest capture city dropdown.';
+COMMENT ON COLUMN core.city_metadata.is_served IS
+    'Derived flag: TRUE when ≥1 active restaurant with plates + QR code exists in this city. '
+    'Set by service code on restaurant activation; not maintained by a DB trigger.';
+COMMENT ON COLUMN core.city_metadata.is_archived IS
+    'Soft-delete tombstone. Archived cities are excluded from all picker queries.';
+COMMENT ON COLUMN core.city_metadata.status IS
+    '''pending'' = promoted but no active restaurant yet; ''active'' = has at least one active restaurant. '
+    'Flipped by service code on first restaurant activation.';
+COMMENT ON COLUMN core.city_metadata.created_date IS
+    'UTC timestamp when this city was promoted into Vianda metadata.';
+COMMENT ON COLUMN core.city_metadata.created_by IS
+    'UUID of the user who promoted this city. NULL for seed data.';
+COMMENT ON COLUMN core.city_metadata.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.city_metadata.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.city_metadata_history'
 CREATE TABLE IF NOT EXISTS audit.city_metadata_history (
@@ -1525,6 +2029,80 @@ ALTER TABLE core.user_info ADD COLUMN locale VARCHAR(5) NOT NULL DEFAULT 'en' CH
 -- reusing the historic Global city_info UUID for continuity across seed and tests.
 ALTER TABLE core.user_info ADD COLUMN city_metadata_id UUID NOT NULL DEFAULT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' REFERENCES core.city_metadata(city_metadata_id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS idx_user_info_city_metadata_id ON core.user_info(city_metadata_id);
+COMMENT ON TABLE core.user_info IS
+    'All Vianda users: Internal staff, Supplier admins/operators, Customer Comensals, and Employer HR users. '
+    'One user = one login. Role determined by role_type + role_name. '
+    'Customer-specific employer linkage via employer_entity_id.';
+COMMENT ON COLUMN core.user_info.user_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.user_info.institution_id IS
+    'FK to core.institution_info. Every user belongs to exactly one institution.';
+COMMENT ON COLUMN core.user_info.role_type IS
+    'Broad access tier: ''internal'' (global access), ''supplier'', ''employer'', or ''customer''.';
+COMMENT ON COLUMN core.user_info.role_name IS
+    'Operation-level role within role_type: ''super_admin'', ''admin'', ''manager'', ''operator'', ''comensal'', ''global_manager''.';
+COMMENT ON COLUMN core.user_info.username IS
+    'Case-insensitive login username. citext — uniqueness is case-folded.';
+COMMENT ON COLUMN core.user_info.email IS
+    'Case-insensitive email address. citext. Used for login and notifications.';
+COMMENT ON COLUMN core.user_info.hashed_password IS
+    'Bcrypt-hashed password. Never exposed in API responses.';
+COMMENT ON COLUMN core.user_info.first_name IS
+    'User''s given name. Optional; used for display in UI and email greetings.';
+COMMENT ON COLUMN core.user_info.last_name IS
+    'User''s family name. Optional; combined with first_name for display.';
+COMMENT ON COLUMN core.user_info.mobile_number IS
+    'E.164-formatted mobile phone number (e.g. ''+541112345678''). Optional. '
+    'CHECK constraint enforces E.164 format. Used for push notification and support contact.';
+COMMENT ON COLUMN core.user_info.mobile_number_verified IS
+    'Whether the mobile number has been verified via OTP. Unverified numbers cannot receive SMS.';
+COMMENT ON COLUMN core.user_info.mobile_number_verified_at IS
+    'UTC timestamp when the mobile number was verified. NULL if not yet verified.';
+COMMENT ON COLUMN core.user_info.email_verified IS
+    'Whether the email address has been verified. Unverified users may have limited access.';
+COMMENT ON COLUMN core.user_info.email_verified_at IS
+    'UTC timestamp when the email was verified. NULL if not yet verified.';
+COMMENT ON COLUMN core.user_info.employer_entity_id IS
+    'FK to ops.institution_entity_info. For Customer Comensals: links to their employer entity '
+    'for benefit-plan resolution and enrollment gating. NULL for all non-customer users.';
+COMMENT ON COLUMN core.user_info.employer_address_id IS
+    'FK to core.address_info. Customer''s employer office address for pickup coordination. '
+    'Derived from employer entity on enrollment; used as default pickup address.';
+COMMENT ON COLUMN core.user_info.workplace_group_id IS
+    'FK to core.workplace_group. Customer''s coworker group for pickup coordination. '
+    'Used to show which coworkers are also ordering on the same day.';
+COMMENT ON COLUMN core.user_info.support_email_suppressed_until IS
+    'UTC timestamp until which automated support emails are suppressed. '
+    'Used by the customer engagement cron to enforce 3-day cooldowns per user.';
+COMMENT ON COLUMN core.user_info.last_support_email_date IS
+    'UTC timestamp of the last automated support/engagement email sent to this user.';
+COMMENT ON COLUMN core.user_info.referral_code IS
+    'Unique referral code for sharing with friends (e.g. ''JUANM5X''). '
+    'Generated on account creation. Used in /users/me/referral and referral reward flow.';
+COMMENT ON COLUMN core.user_info.referred_by_code IS
+    'Referral code of the user who referred this user. NULL if not referred. '
+    'Stored at signup; triggers reward eligibility check in the referral service.';
+COMMENT ON COLUMN core.user_info.is_archived IS
+    'Soft-delete tombstone. Archived users cannot log in.';
+COMMENT ON COLUMN core.user_info.status IS
+    'Lifecycle status (active/inactive). Inactive users are blocked from login.';
+COMMENT ON COLUMN core.user_info.created_date IS
+    'UTC timestamp when the user account was created.';
+COMMENT ON COLUMN core.user_info.created_by IS
+    'UUID of the user who created this account. NULL for self-registration.';
+COMMENT ON COLUMN core.user_info.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info (self-referential).';
+COMMENT ON COLUMN core.user_info.modified_date IS
+    'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.user_info.market_id IS
+    'FK to core.market_info. Primary market for this user — used for B2C restaurant/plan scoping. '
+    'Added via deferred ALTER after market_info is created.';
+COMMENT ON COLUMN core.user_info.locale IS
+    'Preferred UI locale (''en'', ''es'', ''pt''). Defaults to market language on signup. '
+    'Drives Accept-Language and enum label resolution.';
+COMMENT ON COLUMN core.user_info.city_metadata_id IS
+    'FK to core.city_metadata. User''s primary city for plan/restaurant scoping. '
+    'Default: Global synthetic city (aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa) for B2B users.';
 
 -- institution_info.market_id REMOVED — replaced by core.institution_market junction table.
 -- See docs/plans/MULTINATIONAL_INSTITUTIONS.md
@@ -1538,6 +2116,19 @@ CREATE TABLE IF NOT EXISTS core.institution_market (
     PRIMARY KEY (institution_id, market_id)
 );
 CREATE INDEX IF NOT EXISTS idx_institution_market_market ON core.institution_market(market_id);
+COMMENT ON TABLE core.institution_market IS
+    'Junction table assigning institutions to markets. Replaces the former institution_info.market_id '
+    'single-market column. An institution can operate in multiple markets. '
+    'Entity creation validates that the entity''s address country is in an assigned market.';
+COMMENT ON COLUMN core.institution_market.institution_id IS
+    'FK to core.institution_info. Part of composite primary key.';
+COMMENT ON COLUMN core.institution_market.market_id IS
+    'FK to core.market_info. Part of composite primary key.';
+COMMENT ON COLUMN core.institution_market.is_primary IS
+    'TRUE = this is the institution''s primary market (used for default currency and language). '
+    'At most one primary market per institution is recommended.';
+COMMENT ON COLUMN core.institution_market.created_date IS
+    'UTC timestamp when the institution was assigned to this market.';
 
 \echo 'Creating table: core.user_market_assignment (v2: multi-market per user)'
 CREATE TABLE IF NOT EXISTS core.user_market_assignment (
@@ -1550,6 +2141,20 @@ CREATE TABLE IF NOT EXISTS core.user_market_assignment (
 );
 CREATE INDEX IF NOT EXISTS idx_user_market_assignment_user_id ON core.user_market_assignment(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_market_assignment_market_id ON core.user_market_assignment(market_id);
+COMMENT ON TABLE core.user_market_assignment IS
+    'Multi-market assignment for internal users (v2). One row per (user, market) pair. '
+    'Internal users can be assigned to multiple markets for cross-market admin access. '
+    'B2C customers use user_info.market_id (single primary market); this table is for internal.';
+COMMENT ON COLUMN core.user_market_assignment.assignment_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.user_market_assignment.user_id IS
+    'FK to core.user_info. The user being assigned to the market.';
+COMMENT ON COLUMN core.user_market_assignment.market_id IS
+    'FK to core.market_info. The market being assigned.';
+COMMENT ON COLUMN core.user_market_assignment.is_primary IS
+    'TRUE = this is the user''s primary market (default scope for reports and dashboards).';
+COMMENT ON COLUMN core.user_market_assignment.created_at IS
+    'UTC timestamp when the assignment was created.';
 
 \echo 'Creating table: core.user_messaging_preferences'
 CREATE TABLE IF NOT EXISTS core.user_messaging_preferences (
@@ -1563,6 +2168,30 @@ CREATE TABLE IF NOT EXISTS core.user_messaging_preferences (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+COMMENT ON TABLE core.user_messaging_preferences IS
+    'Per-user notification and social visibility preferences for the B2C mobile app. '
+    'One row per user; auto-created with defaults on first access. '
+    'Drives push notification routing and coworker pickup coordination visibility.';
+COMMENT ON COLUMN core.user_messaging_preferences.user_id IS
+    'PK + FK to core.user_info. One row per user.';
+COMMENT ON COLUMN core.user_messaging_preferences.notify_coworker_pickup_alert IS
+    'Whether to send push notifications when a coworker offers to pick up the user''s plate.';
+COMMENT ON COLUMN core.user_messaging_preferences.notify_plate_readiness_alert IS
+    'Whether to send push notifications when the user''s plate is ready for pickup (handed-out state).';
+COMMENT ON COLUMN core.user_messaging_preferences.notify_promotions_push IS
+    'Whether to send promotional push notifications.';
+COMMENT ON COLUMN core.user_messaging_preferences.notify_promotions_email IS
+    'Whether to send promotional emails.';
+COMMENT ON COLUMN core.user_messaging_preferences.coworkers_can_see_my_orders IS
+    'Whether coworkers in the same workplace group can see that the user has an active order. '
+    'FALSE = the user is invisible to coworker pickup coordination.';
+COMMENT ON COLUMN core.user_messaging_preferences.can_participate_in_plate_pickups IS
+    'Whether the user can offer to pick up coworkers'' plates. '
+    'FALSE = user is excluded from the coworker pickup offer flow.';
+COMMENT ON COLUMN core.user_messaging_preferences.created_date IS
+    'UTC timestamp when the preferences row was created.';
+COMMENT ON COLUMN core.user_messaging_preferences.modified_date IS
+    'UTC timestamp of the most recent preferences update.';
 
 \echo 'Creating table: core.user_fcm_token'
 CREATE TABLE IF NOT EXISTS core.user_fcm_token (
@@ -1577,6 +2206,23 @@ CREATE TABLE IF NOT EXISTS core.user_fcm_token (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_fcm_token_user_id ON core.user_fcm_token(user_id);
+COMMENT ON TABLE core.user_fcm_token IS
+    'Firebase Cloud Messaging (FCM) device tokens for push notifications. '
+    'One row per device token; a user may have multiple tokens (one per device). '
+    'Tokens are unique — the UNIQUE constraint prevents duplicate registrations.';
+COMMENT ON COLUMN core.user_fcm_token.fcm_token_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.user_fcm_token.user_id IS
+    'FK to core.user_info. The user who registered this device token.';
+COMMENT ON COLUMN core.user_fcm_token.token IS
+    'FCM registration token for the device (up to 500 chars). '
+    'Unique — one row per device. Token rotation is handled by DELETE + re-register.';
+COMMENT ON COLUMN core.user_fcm_token.platform IS
+    'Device platform: ''ios'', ''android'', or ''web''. Used to select the correct FCM notification channel.';
+COMMENT ON COLUMN core.user_fcm_token.created_date IS
+    'UTC timestamp when the token was first registered.';
+COMMENT ON COLUMN core.user_fcm_token.updated_date IS
+    'UTC timestamp of the most recent token update (e.g. re-registration on app launch).';
 
 \echo 'Creating table: audit.institution_history'
 CREATE TABLE IF NOT EXISTS audit.institution_history (
@@ -1723,6 +2369,41 @@ CREATE TABLE IF NOT EXISTS core.geolocation_info (
     FOREIGN KEY (address_id) REFERENCES core.address_info(address_id) ON DELETE CASCADE,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
+COMMENT ON TABLE core.geolocation_info IS
+    'Geographic coordinates and place metadata for a physical address. '
+    'One row per address; coordinates obtained via the Mapbox or Google Maps geocoding gateway. '
+    'Used for restaurant map rendering, proximity search, and ad zone matching.';
+COMMENT ON COLUMN core.geolocation_info.geolocation_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.geolocation_info.address_id IS
+    'FK to core.address_info. The address this geolocation record belongs to.';
+COMMENT ON COLUMN core.geolocation_info.latitude IS
+    'Geographic latitude in decimal degrees (DOUBLE PRECISION, ~15 significant digits). '
+    'Used for map rendering and haversine distance calculations.';
+COMMENT ON COLUMN core.geolocation_info.longitude IS
+    'Geographic longitude in decimal degrees (DOUBLE PRECISION, ~15 significant digits).';
+COMMENT ON COLUMN core.geolocation_info.place_id IS
+    'Provider place ID from the geocoding gateway. Mapbox mapbox_id can exceed 255 chars — hence VARCHAR(500). '
+    'Used to retrieve full place details on subsequent lookups.';
+COMMENT ON COLUMN core.geolocation_info.viewport IS
+    'JSONB bounding box returned by the geocoding provider (e.g. {northeast: {lat, lng}, southwest: {lat, lng}}). '
+    'Used to set map zoom level on initial render.';
+COMMENT ON COLUMN core.geolocation_info.formatted_address_google IS
+    'Human-readable formatted address string from the geocoding provider '
+    '(e.g. ''Av. Corrientes 1234, Buenos Aires, Argentina''). '
+    'Surfaced in API responses as ''formatted_address''; used in QR code views and address pickers.';
+COMMENT ON COLUMN core.geolocation_info.is_archived IS
+    'Soft-delete tombstone. Archived geolocation records are excluded from active queries.';
+COMMENT ON COLUMN core.geolocation_info.status IS
+    'Lifecycle status (active/inactive).';
+COMMENT ON COLUMN core.geolocation_info.created_date IS
+    'UTC timestamp when the geolocation was geocoded. Note: TIMESTAMP (without time zone) — treat as UTC.';
+COMMENT ON COLUMN core.geolocation_info.created_by IS
+    'UUID of the user who triggered the geocoding. NULL for programmatic creation.';
+COMMENT ON COLUMN core.geolocation_info.modified_by IS
+    'UUID of the last user to modify this row. FK to core.user_info.';
+COMMENT ON COLUMN core.geolocation_info.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: audit.geolocation_history'
 CREATE TABLE IF NOT EXISTS audit.geolocation_history (
@@ -1991,6 +2672,14 @@ CREATE TABLE IF NOT EXISTS core.restaurant_lead_cuisine (
     cuisine_id UUID NOT NULL REFERENCES ops.cuisine(cuisine_id) ON DELETE CASCADE,
     PRIMARY KEY (restaurant_lead_id, cuisine_id)
 );
+COMMENT ON TABLE core.restaurant_lead_cuisine IS
+    'Junction table linking restaurant leads to their cuisine tags. '
+    'A lead can be tagged with multiple cuisines from ops.cuisine. '
+    'Cascades deletes from both restaurant_lead and cuisine.';
+COMMENT ON COLUMN core.restaurant_lead_cuisine.restaurant_lead_id IS
+    'FK to core.restaurant_lead. Part of composite primary key.';
+COMMENT ON COLUMN core.restaurant_lead_cuisine.cuisine_id IS
+    'FK to ops.cuisine. Part of composite primary key.';
 
 \echo 'Creating table: ops.qr_code'
 CREATE TABLE IF NOT EXISTS ops.qr_code (
@@ -3947,6 +4636,49 @@ CREATE INDEX IF NOT EXISTS idx_ad_click_tracking_user
 CREATE INDEX IF NOT EXISTS idx_ad_click_tracking_pending
     ON core.ad_click_tracking(google_upload_status)
     WHERE google_upload_status = 'pending' OR meta_upload_status = 'pending';
+COMMENT ON TABLE core.ad_click_tracking IS
+    'Records ad click identifiers (Google gclid, Meta fbclid/fbc/fbp) captured on the frontend '
+    'and associated to a user after login. Used for server-side conversion attribution via '
+    'the ARQ worker queue. One row per attribution event; upload status tracked per platform.';
+COMMENT ON COLUMN core.ad_click_tracking.id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.ad_click_tracking.user_id IS
+    'FK to core.user_info. The user whose click is being tracked.';
+COMMENT ON COLUMN core.ad_click_tracking.subscription_id IS
+    'FK to the subscription that converted from this click. NULL until conversion confirmed.';
+COMMENT ON COLUMN core.ad_click_tracking.gclid IS
+    'Google Click ID (gclid) captured from the landing URL at click time.';
+COMMENT ON COLUMN core.ad_click_tracking.wbraid IS
+    'Google web-to-app click ID (wbraid). Alternative to gclid for iOS privacy-constrained clicks.';
+COMMENT ON COLUMN core.ad_click_tracking.gbraid IS
+    'Google app-to-web click ID (gbraid). Alternative to gclid for app-originated traffic.';
+COMMENT ON COLUMN core.ad_click_tracking.fbclid IS
+    'Facebook Click ID (fbclid) captured from the landing URL.';
+COMMENT ON COLUMN core.ad_click_tracking.fbc IS
+    'Facebook browser cookie value (_fbc). Longer than fbclid — up to 500 chars.';
+COMMENT ON COLUMN core.ad_click_tracking.fbp IS
+    'Facebook pixel cookie value (_fbp). Stable user identifier across sessions.';
+COMMENT ON COLUMN core.ad_click_tracking.event_id IS
+    'Deduplication event ID for server-side Conversions API. Prevents double-counting '
+    'when both browser pixel and server-side events are sent.';
+COMMENT ON COLUMN core.ad_click_tracking.landing_url IS
+    'Full landing URL at the time of the click, including query string. Used for debugging.';
+COMMENT ON COLUMN core.ad_click_tracking.source_platform IS
+    'Ad platform that drove the click (e.g. ''google'', ''meta''). Routes conversion uploads.';
+COMMENT ON COLUMN core.ad_click_tracking.captured_at IS
+    'UTC timestamp when the click identifiers were captured (frontend POST time).';
+COMMENT ON COLUMN core.ad_click_tracking.google_upload_status IS
+    'Google Ads upload state: ''pending'' → ''uploaded'' / ''failed''. Partial index covers pending rows.';
+COMMENT ON COLUMN core.ad_click_tracking.google_uploaded_at IS
+    'UTC timestamp when the Google Ads conversion was successfully uploaded. NULL until uploaded.';
+COMMENT ON COLUMN core.ad_click_tracking.meta_upload_status IS
+    'Meta CAPI upload state: ''pending'' → ''uploaded'' / ''failed''.';
+COMMENT ON COLUMN core.ad_click_tracking.meta_uploaded_at IS
+    'UTC timestamp when the Meta CAPI event was successfully uploaded. NULL until uploaded.';
+COMMENT ON COLUMN core.ad_click_tracking.created_date IS
+    'UTC timestamp when the tracking row was created.';
+COMMENT ON COLUMN core.ad_click_tracking.modified_date IS
+    'UTC timestamp of the most recent update (e.g. status change on upload).';
 
 \echo 'Creating table: core.ad_zone'
 CREATE TABLE IF NOT EXISTS core.ad_zone (
@@ -3985,6 +4717,67 @@ CREATE TABLE IF NOT EXISTS core.ad_zone (
 );
 CREATE INDEX IF NOT EXISTS idx_ad_zone_state ON core.ad_zone(flywheel_state);
 CREATE INDEX IF NOT EXISTS idx_ad_zone_country ON core.ad_zone(country_code);
+COMMENT ON TABLE core.ad_zone IS
+    'Geographic ad zones defining Vianda''s market-expansion flywheel. Each zone is a '
+    'center-point + radius covering a neighborhood or district. Flywheel state drives '
+    'which campaign strategies are active for that zone. Metrics and budget allocation '
+    'are updated by the zone_metrics_service cron.';
+COMMENT ON COLUMN core.ad_zone.id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN core.ad_zone.name IS
+    'Display name for the zone (e.g. ''Palermo'', ''Miraflores''). Shown in the admin zone list.';
+COMMENT ON COLUMN core.ad_zone.country_code IS
+    'ISO 3166-1 alpha-2 country code where this zone is located.';
+COMMENT ON COLUMN core.ad_zone.city_name IS
+    'City name for this zone (e.g. ''Buenos Aires''). Not a FK — free text for flexibility.';
+COMMENT ON COLUMN core.ad_zone.neighborhood IS
+    'Neighborhood or sub-district name (e.g. ''Palermo Soho''). Optional; NULL for city-level zones.';
+COMMENT ON COLUMN core.ad_zone.latitude IS
+    'Latitude of the zone center in decimal degrees (7 decimal places).';
+COMMENT ON COLUMN core.ad_zone.longitude IS
+    'Longitude of the zone center in decimal degrees (7 decimal places).';
+COMMENT ON COLUMN core.ad_zone.radius_km IS
+    'Radius of the zone in kilometres. Default 2.0 km. Used in haversine distance queries '
+    'for restaurant/subscriber/lead counting and audience matching.';
+COMMENT ON COLUMN core.ad_zone.flywheel_state IS
+    'Current flywheel state: monitoring → supply_acquisition → demand_activation → growth → mature → paused. '
+    'Drives which campaign strategies are active. Operators can force any transition.';
+COMMENT ON COLUMN core.ad_zone.state_changed_at IS
+    'UTC timestamp when the flywheel state last changed.';
+COMMENT ON COLUMN core.ad_zone.state_changed_by IS
+    'FK to core.user_info — the operator who triggered the last state transition. NULL for system transitions.';
+COMMENT ON COLUMN core.ad_zone.notify_me_lead_count IS
+    'Count of notify-me leads whose city_name matches this zone. Updated by zone_metrics_service cron.';
+COMMENT ON COLUMN core.ad_zone.active_restaurant_count IS
+    'Count of active restaurants within the zone radius. Updated by zone_metrics_service cron.';
+COMMENT ON COLUMN core.ad_zone.active_subscriber_count IS
+    'Count of active subscribers within the zone radius. Updated by zone_metrics_service cron.';
+COMMENT ON COLUMN core.ad_zone.estimated_mau IS
+    'Estimated Monthly Active Users for this zone. Populated by the Gemini advisor (Phase 22). NULL until estimated.';
+COMMENT ON COLUMN core.ad_zone.mau_estimated_at IS
+    'UTC timestamp when estimated_mau was last computed.';
+COMMENT ON COLUMN core.ad_zone.budget_allocation IS
+    'JSONB budget split across campaign strategies as percentages summing to 100. '
+    'Default: {"b2c_subscriber": 0, "b2b_employer": 0, "b2b_restaurant": 100}. '
+    'Used by the campaign manager to allocate daily_budget_cents across strategies.';
+COMMENT ON COLUMN core.ad_zone.daily_budget_cents IS
+    'Total daily ad budget for this zone in the smallest currency unit (cents). '
+    'Split across strategies per budget_allocation. NULL = no active budget.';
+COMMENT ON COLUMN core.ad_zone.meta_ad_set_ids IS
+    'JSONB map of strategy → Meta Ad Set ID for this zone. '
+    'Empty until Meta campaigns are created for the zone.';
+COMMENT ON COLUMN core.ad_zone.google_campaign_ids IS
+    'JSONB map of strategy → Google Campaign ID for this zone. '
+    'Empty until Google campaigns are created for the zone.';
+COMMENT ON COLUMN core.ad_zone.created_by IS
+    'How the zone was created: ''operator'' (manual) or ''advisor'' (Gemini-proposed). '
+    'VARCHAR — not a user FK because ''advisor'' is a system actor, not a user.';
+COMMENT ON COLUMN core.ad_zone.approved_by IS
+    'FK to core.user_info — the operator who approved an advisor-proposed zone. NULL for operator-created zones.';
+COMMENT ON COLUMN core.ad_zone.created_date IS
+    'UTC timestamp when the zone was created.';
+COMMENT ON COLUMN core.ad_zone.modified_date IS
+    'UTC timestamp of the most recent update.';
 
 -- ─────────────────────────────────────────────────────────────
 -- DEFERRED FK: core.address_info.city_metadata_id → core.city_metadata
