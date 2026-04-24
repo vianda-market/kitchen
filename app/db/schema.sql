@@ -469,6 +469,27 @@ CREATE TABLE IF NOT EXISTS external.iso4217_currency (
     minor_unit        SMALLINT    NOT NULL,             -- decimal places used by the currency (2 for most, 0 for JPY/CLP, 3 for some dinars)
     imported_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+COMMENT ON TABLE external.iso4217_currency IS
+    'Read-only raw mirror of the ISO 4217 currency list. Seeded from datasets/currency-codes (TSV). '
+    'The app never writes here. Vianda operational config (enabled currencies, exchange rates) lives in '
+    'core.currency_metadata, which FKs to this table via currency_code. Source of truth for currency '
+    'display names and minor-unit precision used in money formatting.';
+COMMENT ON COLUMN external.iso4217_currency.code IS
+    'ISO 4217 alphabetic code (e.g. ''USD'', ''ARS'', ''BRL''). Primary key. '
+    'Referenced as currency_code FK in core.currency_metadata. '
+    'Surfaces in API responses as ''currency_code'' (renamed at the JOIN layer).';
+COMMENT ON COLUMN external.iso4217_currency.name IS
+    'ISO 4217 official display name in English (e.g. ''US Dollar'', ''Argentine Peso''). '
+    'Surfaces in API responses as ''currency_name'' (renamed at the JOIN layer). '
+    'Not stored redundantly in core.currency_metadata — always derived via JOIN.';
+COMMENT ON COLUMN external.iso4217_currency.numeric_code IS
+    'ISO 4217 numeric code (e.g. 840 for USD, 32 for ARS). Stored as INTEGER; '
+    'leading-zero padding (e.g. ''032'') is a display concern, not a storage one.';
+COMMENT ON COLUMN external.iso4217_currency.minor_unit IS
+    'Decimal places the currency uses (e.g. 2 for USD/ARS/BRL, 0 for JPY/CLP, 3 for KWD). '
+    'Use for money formatting — determines how many cents/centavos to display.';
+COMMENT ON COLUMN external.iso4217_currency.imported_at IS
+    'UTC timestamp of the most recent TSV import into this row. Not a business timestamp.';
 
 \echo 'Creating table: external.geonames_country'
 CREATE TABLE IF NOT EXISTS external.geonames_country (
@@ -495,6 +516,62 @@ CREATE TABLE IF NOT EXISTS external.geonames_country (
     equivalent_fips   VARCHAR(5),
     imported_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+COMMENT ON TABLE external.geonames_country IS
+    'Read-only raw mirror of GeoNames countryInfo.txt. Seeded by import_geonames.py; the app never writes here. '
+    'Column order matches the source TSV for direct COPY. Includes a synthetic row for ''XG'' (Vianda''s Global '
+    'pseudo-market, ISO 3166-1 user-assigned X-series). FK parent for geonames_admin1, geonames_city, '
+    'core.country_metadata, and core.address_info.';
+COMMENT ON COLUMN external.geonames_country.iso_alpha2 IS
+    'ISO 3166-1 alpha-2 country code (e.g. ''US'', ''AR''). Primary key. '
+    '''XG'' is Vianda''s synthetic Global pseudo-country (ISO user-assigned X-series). '
+    'Referenced as country_code/country_iso FK throughout core.*, ops.*, billing.*.';
+COMMENT ON COLUMN external.geonames_country.iso_alpha3 IS
+    'ISO 3166-1 alpha-3 country code (e.g. ''USA'', ''ARG''). Included from source file; not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.iso_numeric IS
+    'ISO 3166-1 numeric country code (e.g. 840 for US). Included from source file; not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.fips IS
+    'FIPS 10-4 country code. Legacy standard; included from source file but not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.name IS
+    'Canonical English country name from GeoNames (e.g. ''United States''). '
+    'Vianda localizes country names at runtime via pycountry (see app/i18n/locale_names.py), '
+    'not by querying this column. Used in the superadmin external-data picker.';
+COMMENT ON COLUMN external.geonames_country.capital IS
+    'Capital city name from GeoNames source file. Included as-is; not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.area_sq_km IS
+    'Country area in square kilometres from GeoNames source file. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.population IS
+    'Country population from GeoNames source file. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.continent IS
+    'Two-letter continent code (''NA'', ''SA'', ''EU'', ''AS'', ''AF'', ''OC'', ''AN''). Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.tld IS
+    'Country-code top-level domain (e.g. ''.us'', ''.ar''). Included from source; not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.currency_code IS
+    'ISO 4217 alphabetic currency code for this country from the GeoNames source file. '
+    'NULL for some territories. Not used as a FK here — Vianda currency config lives in '
+    'core.currency_metadata. Joinable to external.iso4217_currency.code for reference.';
+COMMENT ON COLUMN external.geonames_country.currency_name IS
+    'Currency display name from GeoNames source file (e.g. ''Dollar''). '
+    'Informational only — authoritative currency names come from external.iso4217_currency.name.';
+COMMENT ON COLUMN external.geonames_country.phone_prefix IS
+    'Dialing prefix digits from GeoNames source (e.g. ''1'', ''54'', ''54-9''). NULL for some territories. '
+    'Note: the API response field ''phone_prefix'' on /leads/countries comes from '
+    'core.market_info.phone_dial_code, not this column. This column is the raw GeoNames value.';
+COMMENT ON COLUMN external.geonames_country.postal_format IS
+    'Postal code format string from GeoNames source file. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.postal_regex IS
+    'Postal code validation regex from GeoNames source file. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.languages IS
+    'Comma-separated ISO 639 language codes with country variants (e.g. ''en-US,es-US''). '
+    'Included from source; not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.geonames_id IS
+    'GeoNames own entity ID for the country record. Used by geonames_alternate_name lookups '
+    'to resolve localized country names. Not a local PK — iso_alpha2 is the PK here.';
+COMMENT ON COLUMN external.geonames_country.neighbours IS
+    'Comma-separated alpha-2 codes of bordering countries from GeoNames. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.equivalent_fips IS
+    'Equivalent FIPS code from GeoNames source file. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_country.imported_at IS
+    'UTC timestamp of the most recent TSV import into this row. Not a business timestamp.';
 
 \echo 'Creating table: external.geonames_admin1'
 CREATE TABLE IF NOT EXISTS external.geonames_admin1 (
@@ -515,6 +592,30 @@ CREATE INDEX IF NOT EXISTS idx_geonames_admin1_country
     ON external.geonames_admin1 (country_iso);
 CREATE INDEX IF NOT EXISTS idx_geonames_admin1_country_code
     ON external.geonames_admin1 (country_iso, admin1_code);
+COMMENT ON TABLE external.geonames_admin1 IS
+    'Read-only raw mirror of GeoNames admin1CodesASCII.txt (first-level administrative divisions: '
+    'states, provinces, regions). Seeded by import_geonames.py; the app never writes here. '
+    'Used by the superadmin city picker to present province filters and by the address layer '
+    'to resolve province names for display.';
+COMMENT ON COLUMN external.geonames_admin1.admin1_full_code IS
+    'Composite primary key in GeoNames format: country_iso + ''.'' + admin1_code '
+    '(e.g. ''US.CA'', ''AR.06''). Unique across all rows.';
+COMMENT ON COLUMN external.geonames_admin1.country_iso IS
+    'ISO 3166-1 alpha-2 country code. FK to external.geonames_country.iso_alpha2.';
+COMMENT ON COLUMN external.geonames_admin1.admin1_code IS
+    'GeoNames admin1 subdivision code within the country (e.g. ''CA'' for California). '
+    'Join key to geonames_city.admin1_code. Not a FK constraint — geonames_city has '
+    'some rows with non-canonical admin1 codes.';
+COMMENT ON COLUMN external.geonames_admin1.name IS
+    'Admin1 name, may contain diacritics (e.g. ''Río Negro''). Used for display.';
+COMMENT ON COLUMN external.geonames_admin1.ascii_name IS
+    'ASCII-folded version of name (e.g. ''Rio Negro''). Used for case-insensitive search '
+    'in the superadmin picker.';
+COMMENT ON COLUMN external.geonames_admin1.geonames_id IS
+    'GeoNames entity ID for this admin1 region. Used by geonames_alternate_name lookups '
+    'to resolve localized province names. Not a local PK.';
+COMMENT ON COLUMN external.geonames_admin1.imported_at IS
+    'UTC timestamp of the most recent TSV import into this row. Not a business timestamp.';
 
 \echo 'Creating table: external.geonames_city'
 CREATE TABLE IF NOT EXISTS external.geonames_city (
@@ -552,6 +653,65 @@ CREATE INDEX IF NOT EXISTS idx_geonames_city_country_admin1
 -- Trigram index for superadmin type-ahead city picker — matches substrings in ~68k cities cheaply.
 CREATE INDEX IF NOT EXISTS idx_geonames_city_ascii_trgm
     ON external.geonames_city USING GIN (ascii_name gin_trgm_ops);
+COMMENT ON TABLE external.geonames_city IS
+    'Read-only raw mirror of GeoNames cities5000.txt (populated places ≥ 5000 inhabitants, ~68k rows). '
+    'Seeded by import_geonames.py; the app never writes here. Column order mirrors the 19-column source '
+    'file verbatim (field rename: source ''country_code'' → ''country_iso'' to avoid ambiguity). '
+    'FK parent for core.city_metadata (Vianda operational layer). '
+    'Timezone column is the source of truth for address_info.timezone — copied at address write time.';
+COMMENT ON COLUMN external.geonames_city.geonames_id IS
+    'GeoNames integer entity ID for this city. Primary key. Not a UUID — raw upstream ID. '
+    'Referenced as FK from core.city_metadata.geonames_id. Synthetic row geonames_id=-1 '
+    'exists for the XG/Global pseudo-city.';
+COMMENT ON COLUMN external.geonames_city.name IS
+    'Canonical city name with diacritics from GeoNames (e.g. ''São Paulo'', ''Buenos Aires''). '
+    'Used as display name via COALESCE(city_metadata.display_name_override, geonames_city.name) '
+    'in the cities endpoint.';
+COMMENT ON COLUMN external.geonames_city.ascii_name IS
+    'ASCII-folded city name (e.g. ''Sao Paulo''). Powers the superadmin type-ahead city picker '
+    'via the GIN trigram index. Also used for case-insensitive search filters.';
+COMMENT ON COLUMN external.geonames_city.alternate_names IS
+    'Comma-separated short-list of alternate names baked into the source row. '
+    'Informational only — localized names come from external.geonames_alternate_name instead.';
+COMMENT ON COLUMN external.geonames_city.latitude IS
+    'Geographic latitude (decimal degrees, 7 decimal places). Not yet used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.longitude IS
+    'Geographic longitude (decimal degrees, 7 decimal places). Not yet used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.feature_class IS
+    'GeoNames feature class. Expected value: ''P'' (populated place) for all cities5000 rows.';
+COMMENT ON COLUMN external.geonames_city.feature_code IS
+    'GeoNames feature code: ''PPL'' (populated place), ''PPLC'' (country capital), '
+    '''PPLA'' (admin1 capital), ''PPLA2'' (admin2 capital), etc.';
+COMMENT ON COLUMN external.geonames_city.country_iso IS
+    'ISO 3166-1 alpha-2 country code. FK to external.geonames_country.iso_alpha2. '
+    'Renamed from ''country_code'' in the source file to avoid column-name ambiguity.';
+COMMENT ON COLUMN external.geonames_city.cc2 IS
+    'Alternate country codes for disputed or multi-sovereign territory (comma-separated alpha-2). '
+    'NULL for most cities. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.admin1_code IS
+    'GeoNames admin1 subdivision code (e.g. ''CA'' for California). Joinable to '
+    'external.geonames_admin1.admin1_code. Not FK-constrained — some cities carry '
+    'non-canonical codes that have no matching admin1 row.';
+COMMENT ON COLUMN external.geonames_city.admin2_code IS
+    'GeoNames admin2 subdivision code (county/department level). Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.admin3_code IS
+    'GeoNames admin3 subdivision code. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.admin4_code IS
+    'GeoNames admin4 subdivision code. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.population IS
+    'City population from GeoNames. Used for sort order in the city picker (largest cities first).';
+COMMENT ON COLUMN external.geonames_city.elevation IS
+    'Elevation above sea level in metres (srtm3 data). NULL for many rows. Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.dem IS
+    'Digital elevation model value in metres (SRTM3 or GTOPO30). Not used in Vianda business logic.';
+COMMENT ON COLUMN external.geonames_city.timezone IS
+    'IANA timezone identifier (e.g. ''America/Sao_Paulo'', ''America/Argentina/Buenos_Aires''). '
+    'Source of truth for address_info.timezone — copied at address write time via city_metadata_id FK chain. '
+    'Also used by market-level timezone fallback in TimezoneService._MARKET_PRIMARY_TIMEZONE.';
+COMMENT ON COLUMN external.geonames_city.modification_date IS
+    'GeoNames own last-modified date for this row. Not a local write timestamp.';
+COMMENT ON COLUMN external.geonames_city.imported_at IS
+    'UTC timestamp of the most recent TSV import into this row. Not a business timestamp.';
 
 \echo 'Creating table: external.geonames_alternate_name'
 CREATE TABLE IF NOT EXISTS external.geonames_alternate_name (
@@ -578,6 +738,40 @@ CREATE TABLE IF NOT EXISTS external.geonames_alternate_name (
 CREATE INDEX IF NOT EXISTS idx_geonames_alt_name_lookup
     ON external.geonames_alternate_name (geonames_id, iso_language)
     WHERE is_historic = FALSE AND is_colloquial = FALSE;
+COMMENT ON TABLE external.geonames_alternate_name IS
+    'Read-only raw mirror of GeoNames alternateNamesV2.txt, pre-filtered to iso_language IN '
+    '(''en'', ''es'', ''pt'') and only geonames_ids present in geonames_country / geonames_admin1 / '
+    'geonames_city (~50k rows after filter, down from ~13M globally). Seeded by import_geonames.py; '
+    'the app never writes here. geonames_id is polymorphic — may reference a country, admin1, or city '
+    'depending on call site. No FK constraint by design (resolver handles entity-type dispatch).';
+COMMENT ON COLUMN external.geonames_alternate_name.alternate_name_id IS
+    'GeoNames own alternateNameId. Primary key. Not a UUID — raw upstream integer ID.';
+COMMENT ON COLUMN external.geonames_alternate_name.geonames_id IS
+    'Polymorphic FK: references a country, admin1, or city entity in GeoNames. '
+    'No DB-level FK constraint — entity type is resolved by the caller '
+    '(place_name_resolver service). Join against geonames_country.geonames_id, '
+    'geonames_admin1.geonames_id, or geonames_city.geonames_id as appropriate.';
+COMMENT ON COLUMN external.geonames_alternate_name.iso_language IS
+    'ISO 639 language code, possibly with region suffix (e.g. ''en'', ''es'', ''pt'', ''pt-BR''). '
+    'Pre-filtered to {en, es, pt} at import time to match Vianda''s supported locales.';
+COMMENT ON COLUMN external.geonames_alternate_name.alternate_name IS
+    'The localized name itself (e.g. ''Brasil'', ''São Paulo'', ''Ciudad de México''). '
+    'Used by the place_name_resolver service to render locale-aware place names.';
+COMMENT ON COLUMN external.geonames_alternate_name.is_preferred IS
+    'GeoNames flag: this is the official/preferred name for the language. '
+    'Resolver prefers rows where is_preferred=TRUE when multiple alternates exist.';
+COMMENT ON COLUMN external.geonames_alternate_name.is_short IS
+    'GeoNames flag: this is a short-form name (e.g. ''California'' vs ''State of California''). '
+    'Resolver may prefer short forms for compact UI labels.';
+COMMENT ON COLUMN external.geonames_alternate_name.is_colloquial IS
+    'GeoNames flag: slang or colloquial name (e.g. ''Big Apple'' for New York). '
+    'Resolver skips colloquial names — they are not suitable for formal UI labels.';
+COMMENT ON COLUMN external.geonames_alternate_name.is_historic IS
+    'GeoNames flag: historic or former name (e.g. ''Bombay'' for Mumbai). '
+    'Resolver skips historic names. Partial index idx_geonames_alt_name_lookup '
+    'excludes rows where is_historic=TRUE or is_colloquial=TRUE.';
+COMMENT ON COLUMN external.geonames_alternate_name.imported_at IS
+    'UTC timestamp of the most recent TSV import into this row. Not a business timestamp.';
 
 -- =============================================================================
 -- CREATE TABLES (enum types now exist)
