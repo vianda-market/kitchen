@@ -1788,8 +1788,12 @@ def create_plate_routes() -> APIRouter:
             status: str | None = Query(None, description="Filter by plate status (e.g. active, inactive)"),
             market_id: UUID | None = Query(None, description="Filter by market ID"),
             restaurant_id: UUID | None = Query(None, description="Filter by restaurant ID"),
-            plate_date_from: str | None = Query(None, description="Filter plates created on or after this date (YYYY-MM-DD)"),
-            plate_date_to: str | None = Query(None, description="Filter plates created on or before this date (YYYY-MM-DD)"),
+            plate_date_from: str | None = Query(
+                None, description="Filter plates created on or after this date (YYYY-MM-DD)"
+            ),
+            plate_date_to: str | None = Query(
+                None, description="Filter plates created on or before this date (YYYY-MM-DD)"
+            ),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),

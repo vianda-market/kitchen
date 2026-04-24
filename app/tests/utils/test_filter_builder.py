@@ -590,8 +590,6 @@ def test_geo_bbox_and_existing_filter_combined(patch_geo_registry):
         }
     }
     with patch("app.utils.filter_builder.FILTER_REGISTRY", registry_with_city):
-        result = build_filter_conditions(
-            "geo_entity", {"bbox": [-74.05, 40.68, -73.91, 40.83], "city": "New York"}
-        )
+        result = build_filter_conditions("geo_entity", {"bbox": [-74.05, 40.68, -73.91, 40.83], "city": "New York"})
     assert result is not None
     assert len(result) == 2
