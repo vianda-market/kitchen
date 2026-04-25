@@ -398,3 +398,44 @@ git add docs/api/filters.json
 **Exempt:** 101 fields annotated with `# filter-registry:exempt reason="..."`. See `docs/api/filters_inventory.md` for the full table.
 
 **Result:** 0 unfiltered fields across all 5 entities. Strict-mode flip (fail on any unfiltered) is now viable.
+
+---
+
+## Inventory lint — strict mode (Pass 5b, 2026-04-25)
+
+`scripts/lint_filter_inventory.py` runs as a CI test (`app/tests/lint/test_filter_inventory.py`) and **fails the build** if any enriched-response field is exposed but neither registered as filterable nor explicitly exempted.
+
+### How it works
+
+1. Walks the Pydantic response models for the 5 enriched endpoints (`plans`, `restaurants`, `plates`, `pickups`, `national_holidays`).
+2. For each field, checks whether it appears in `FILTER_REGISTRY[entity]` (filterable) or carries a `# filter-registry:exempt reason="..."` comment in the model source.
+3. Writes `docs/api/filters_inventory.{json,md}` with one row per field, status `filterable` / `exempt` / `unfiltered`.
+4. Exits 0 if `unfiltered` count is 0; exits 1 otherwise.
+
+### What to do when it fails
+
+Two options for the offending field:
+
+- **Register it** in `app/config/filter_registry.py` if it's a sensible filter dimension, then run `python3 scripts/generate_filter_schema.py` to refresh `docs/api/filters.json`.
+- **Exempt it** by adding a comment immediately above the Pydantic field:
+
+  ```python
+  class PlanEnrichedResponseSchema(BaseModel):
+      # filter-registry:exempt reason="primary key; route param not filter param"
+      plan_id: UUID
+  ```
+
+  Common exempt reasons:
+  - `"primary key"` / `"FK; not a filter dimension"` — identifiers
+  - `"free-text label"` / `"free-text marketing copy"` — non-enumerated strings
+  - `"translation payload"` — `*_i18n` objects
+  - `"computed display value"` / `"computed projection"` — derived fields
+  - `"display label for <other_field>"` — names paired with IDs already filterable
+  - `"soft-delete flag; server filters by default"` — `is_archived` family
+  - `"address; <parent> scope handles location filtering"` — duplicated address fields
+
+### History
+
+- **Pass 1** (2026-04-23): lint shipped in informational-only mode (always exits 0). Initial inventory: 131 unfiltered fields.
+- **Pass 5** (2026-04-25): disposition pass — 25 fields registered, 101 exempted, 14 audit columns dropped. Inventory: 0 unfiltered.
+- **Pass 5b** (2026-04-25): strict mode flipped on. Lint now blocks merge on regressions.

@@ -14,7 +14,16 @@ Artifacts produced (always):
     kitchen/docs/api/filters_inventory.json  — structured rows
     kitchen/docs/api/filters_inventory.md    — human-readable table per entity
 
-Always exits 0 (informational-only mode; strict flip is Pass 5).
+Strict mode (since Pass 5b, 2026-04-25):
+    - Exits 0 when every enriched-response field is either filterable or exempt.
+    - Exits 1 when any field is unfiltered (i.e. exposed but neither registered
+      nor explicitly exempted via `# filter-registry:exempt reason="..."`).
+
+The previous informational-only mode was retired once Pass 5 brought the
+unfiltered count to 0 across all 5 entities. From now on, any new enriched
+field added to a Pydantic response model must be either registered as a
+filter in `app/config/filter_registry.py` or carry an exempt comment, or
+this lint fails CI.
 
 Usage:
     python3 scripts/lint_filter_inventory.py            # run from repo root
@@ -236,7 +245,10 @@ def _summary_line(rows: list[dict[str, Any]], entity_models: dict) -> str:
 
 
 def main() -> None:
-    """Run the inventory, write artifacts, print summary. Always exits 0."""
+    """Run the inventory, write artifacts, print summary.
+
+    Exits 0 when no fields are unfiltered; exits 1 otherwise.
+    """
     rows = build_inventory()
     entity_models = _load_entity_models()
 
@@ -261,7 +273,19 @@ def main() -> None:
         covered = total - unfiltered - exempt
         print(f"  {entity}: {total} fields total, {covered} filterable, {unfiltered} unfiltered, {exempt} exempt")
 
-    # Always exits 0 (informational mode; strict flip is Pass 5).
+    # Strict mode (Pass 5b): fail CI if any field is exposed but neither
+    # filterable nor exempt. Pass 5 brought the count to 0; the gate now
+    # ratchets that and prevents drift.
+    n_unfiltered = sum(1 for r in rows if r["status"] == "unfiltered")
+    if n_unfiltered > 0:
+        print(
+            f"\n✘ {n_unfiltered} enriched field(s) exposed but not filterable.\n"
+            "  Either register the field in app/config/filter_registry.py, or\n"
+            '  add `# filter-registry:exempt reason="..."` next to the field\n'
+            "  in its Pydantic response schema.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     sys.exit(0)
 
 
