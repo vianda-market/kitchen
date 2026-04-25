@@ -120,6 +120,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "auth.captcha_required": "CAPTCHA verification is required.",
         # subscription.*
         "subscription.already_active": "This subscription is already active.",
+        # push.* — FCM notification copy (K4)
+        "push.pickup_ready_title": "Plate ready",
+        "push.pickup_ready_body": "Did you receive your plate from {restaurant_name}?",
     },
     "es": {
         # Auth / user errors
@@ -235,6 +238,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "auth.captcha_required": "Se requiere verificación CAPTCHA.",
         # subscription.*
         "subscription.already_active": "Esta suscripción ya está activa.",
+        # push.* — FCM notification copy (K4)
+        "push.pickup_ready_title": "Plato listo",
+        "push.pickup_ready_body": "¿Recibiste tu plato de {restaurant_name}?",
     },
     "pt": {
         # Auth / user errors
@@ -350,6 +356,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "auth.captcha_required": "Verificação CAPTCHA é necessária.",
         # subscription.*
         "subscription.already_active": "Esta assinatura já está ativa.",
+        # push.* — FCM notification copy (K4)
+        "push.pickup_ready_title": "Prato pronto",
+        "push.pickup_ready_body": "Você recebeu seu prato de {restaurant_name}?",
     },
 }
 
