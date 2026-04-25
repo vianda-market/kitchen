@@ -89,3 +89,41 @@ class ErrorCode(StrEnum):
     # ── subscription.* ─────────────────────────────────────────────────────
     # Seeded to prove parity tooling; fully wired in a later sweep PR.
     SUBSCRIPTION_ALREADY_ACTIVE = "subscription.already_active"  # migrated from ad-hoc dict-detail
+
+    # ── entity.* ───────────────────────────────────────────────────────────
+    # Generic entity CRUD errors. All entity-specific factories (user_not_found,
+    # employer_not_found, etc.) delegate to entity_not_found which uses these
+    # codes. The `entity` param carries the entity name; `id` carries the UUID.
+    # Wired in K6 (factory envelopification).
+    ENTITY_NOT_FOUND = "entity.not_found"
+    ENTITY_NOT_FOUND_OR_OPERATION_FAILED = "entity.not_found_or_operation_failed"
+    ENTITY_CREATION_FAILED = "entity.creation_failed"
+    ENTITY_UPDATE_FAILED = "entity.update_failed"
+    ENTITY_DELETION_FAILED = "entity.deletion_failed"
+
+    # ── database.* ─────────────────────────────────────────────────────────
+    # Database constraint violation errors. Wired in K6 via handle_database_exception.
+    DATABASE_DUPLICATE_KEY = "database.duplicate_key"
+    DATABASE_DUPLICATE_EMAIL = "database.duplicate_email"
+    DATABASE_DUPLICATE_USERNAME = "database.duplicate_username"
+    DATABASE_DUPLICATE_MARKET = "database.duplicate_market"
+    DATABASE_DUPLICATE_CURRENCY = "database.duplicate_currency"
+    DATABASE_DUPLICATE_INSTITUTION = "database.duplicate_institution"
+    DATABASE_DUPLICATE_RESTAURANT = "database.duplicate_restaurant"
+    DATABASE_FOREIGN_KEY_USER = "database.foreign_key_user"
+    DATABASE_FOREIGN_KEY_INSTITUTION = "database.foreign_key_institution"
+    DATABASE_FOREIGN_KEY_CURRENCY = "database.foreign_key_currency"
+    DATABASE_FOREIGN_KEY_SUBSCRIPTION = "database.foreign_key_subscription"
+    DATABASE_FOREIGN_KEY_PLAN = "database.foreign_key_plan"
+    DATABASE_FOREIGN_KEY_PAYMENT = "database.foreign_key_payment"
+    DATABASE_FOREIGN_KEY_VIOLATION = "database.foreign_key_violation"
+    DATABASE_NOT_NULL_MODIFIED_BY = "database.not_null_modified_by"
+    DATABASE_NOT_NULL_CURRENCY_CODE = "database.not_null_currency_code"
+    DATABASE_NOT_NULL_CURRENCY_NAME = "database.not_null_currency_name"
+    DATABASE_NOT_NULL_USERNAME = "database.not_null_username"
+    DATABASE_NOT_NULL_EMAIL = "database.not_null_email"
+    DATABASE_NOT_NULL_VIOLATION = "database.not_null_violation"
+    DATABASE_CHECK_VIOLATION = "database.check_violation"
+    DATABASE_INVALID_UUID = "database.invalid_uuid"
+    DATABASE_INVALID_FORMAT = "database.invalid_format"
+    DATABASE_ERROR = "database.error"

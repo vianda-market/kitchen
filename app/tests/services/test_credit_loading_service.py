@@ -7,6 +7,7 @@ that feed into the existing balance management system.
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
@@ -365,7 +366,9 @@ class TestCreditLoadingService:
                 )
 
             assert exc_info.value.status_code == 404
-            assert "Restaurant" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Restaurant" in detail["params"]["entity"]
 
     def test_create_restaurant_credit_transaction_service_error(
         self,

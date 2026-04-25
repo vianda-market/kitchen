@@ -7,6 +7,7 @@ including creation, approval, rejection, and validation.
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
@@ -281,7 +282,9 @@ class TestDiscretionaryService:
 
             # User validation happens after category validation, so 404 is correct
             assert exc_info.value.status_code == 404
-            assert "User" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "User" in detail["params"]["entity"]
 
     def test_create_discretionary_request_restaurant_not_found(
         self, discretionary_service, sample_admin_user, sample_user_dto, mock_db
@@ -304,7 +307,9 @@ class TestDiscretionaryService:
 
             # Restaurant validation happens after category validation, so 404 is correct
             assert exc_info.value.status_code == 404
-            assert "Restaurant" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Restaurant" in detail["params"]["entity"]
 
     def test_create_discretionary_request_optional_institution_market_matching_success(
         self,
@@ -482,7 +487,9 @@ class TestDiscretionaryService:
                 discretionary_service.approve_discretionary_request(discretionary_id, sample_super_admin, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "Discretionary request" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Discretionary request" in detail["params"]["entity"]
 
     def test_approve_discretionary_request_not_pending(
         self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
@@ -575,7 +582,9 @@ class TestDiscretionaryService:
                 )
 
             assert exc_info.value.status_code == 404
-            assert "Discretionary request" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Discretionary request" in detail["params"]["entity"]
 
     def test_reject_discretionary_request_not_pending(
         self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db

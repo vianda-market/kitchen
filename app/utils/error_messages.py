@@ -3,7 +3,7 @@ Centralized Error Messages and Database Exception Handling
 
 This module provides standardized error messages and database exception handling
 to eliminate duplication and ensure consistency across the application.
-All detail strings are resolved via the i18n message catalog for locale support.
+All detail dicts are resolved via the i18n envelope factory for locale support.
 
 This module handles:
 1. High-level business logic errors (404 Not Found, 500 Internal Server Error)
@@ -17,41 +17,65 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.messages import get_message
 from app.utils.log import log_warning
 
 
 def entity_not_found(entity_name: str, entity_id: UUID | None = None, locale: str = "en") -> HTTPException:
     if entity_id:
-        message = get_message("error.entity_not_found_by_id", locale, entity=entity_name, id=entity_id)
-    else:
-        message = get_message("error.entity_not_found", locale, entity=entity_name)
-    return HTTPException(status_code=404, detail=message)
+        return envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=404,
+            locale=locale,
+            entity=entity_name,
+            id=str(entity_id),
+        )
+    return envelope_exception(
+        ErrorCode.ENTITY_NOT_FOUND,
+        status=404,
+        locale=locale,
+        entity=entity_name,
+    )
 
 
 def entity_not_found_or_operation_failed(
     entity_name: str, operation: str | None = None, locale: str = "en"
 ) -> HTTPException:
-    if operation:
-        message = get_message("error.entity_operation_failed", locale, entity=entity_name, operation=operation)
-    else:
-        message = get_message("error.entity_operation_failed", locale, entity=entity_name, operation="operation")
-    return HTTPException(status_code=404, detail=message)
+    return envelope_exception(
+        ErrorCode.ENTITY_NOT_FOUND_OR_OPERATION_FAILED,
+        status=404,
+        locale=locale,
+        entity=entity_name,
+        operation=operation or "operation",
+    )
 
 
 def entity_creation_failed(entity_name: str, locale: str = "en") -> HTTPException:
-    return HTTPException(
-        status_code=500, detail=get_message("error.entity_creation_failed", locale, entity=entity_name)
+    return envelope_exception(
+        ErrorCode.ENTITY_CREATION_FAILED,
+        status=500,
+        locale=locale,
+        entity=entity_name,
     )
 
 
 def entity_update_failed(entity_name: str, locale: str = "en") -> HTTPException:
-    return HTTPException(status_code=500, detail=get_message("error.entity_update_failed", locale, entity=entity_name))
+    return envelope_exception(
+        ErrorCode.ENTITY_UPDATE_FAILED,
+        status=500,
+        locale=locale,
+        entity=entity_name,
+    )
 
 
 def entity_deletion_failed(entity_name: str, locale: str = "en") -> HTTPException:
-    return HTTPException(
-        status_code=500, detail=get_message("error.entity_deletion_failed", locale, entity=entity_name)
+    return envelope_exception(
+        ErrorCode.ENTITY_DELETION_FAILED,
+        status=500,
+        locale=locale,
+        entity=entity_name,
     )
 
 
@@ -101,39 +125,39 @@ def plate_not_found(plate_id: UUID | None = None, locale: str = "en") -> HTTPExc
 # =============================================================================
 
 
-_DUPLICATE_KEY_RULES: list[tuple[list[str], str]] = [
-    (["market_info_country_name"], "error.db_duplicate_market"),
-    (["market_info", "country_name"], "error.db_duplicate_market"),
-    (["currency_code"], "error.db_duplicate_currency"),
-    (["email"], "error.db_duplicate_email"),
-    (["username"], "error.db_duplicate_username"),
-    (["institution_id", "name"], "error.db_duplicate_institution"),
-    (["restaurant_id", "name"], "error.db_duplicate_restaurant"),
+_DUPLICATE_KEY_RULES: list[tuple[list[str], ErrorCode]] = [
+    (["market_info_country_name"], ErrorCode.DATABASE_DUPLICATE_MARKET),
+    (["market_info", "country_name"], ErrorCode.DATABASE_DUPLICATE_MARKET),
+    (["currency_code"], ErrorCode.DATABASE_DUPLICATE_CURRENCY),
+    (["email"], ErrorCode.DATABASE_DUPLICATE_EMAIL),
+    (["username"], ErrorCode.DATABASE_DUPLICATE_USERNAME),
+    (["institution_id", "name"], ErrorCode.DATABASE_DUPLICATE_INSTITUTION),
+    (["restaurant_id", "name"], ErrorCode.DATABASE_DUPLICATE_RESTAURANT),
 ]
 
-_FK_FIELD_TO_MESSAGE: dict[str, str] = {
-    "modified_by": "error.db_fk_user",
-    "institution_id": "error.db_fk_institution",
-    "currency_metadata_id": "error.db_fk_currency",
-    "payment_id": "error.db_fk_payment",
-    "subscription_id": "error.db_fk_subscription",
-    "plan_id": "error.db_fk_plan",
-    "user_id": "error.db_fk_user",
+_FK_FIELD_TO_CODE: dict[str, ErrorCode] = {
+    "modified_by": ErrorCode.DATABASE_FOREIGN_KEY_USER,
+    "institution_id": ErrorCode.DATABASE_FOREIGN_KEY_INSTITUTION,
+    "currency_metadata_id": ErrorCode.DATABASE_FOREIGN_KEY_CURRENCY,
+    "payment_id": ErrorCode.DATABASE_FOREIGN_KEY_PAYMENT,
+    "subscription_id": ErrorCode.DATABASE_FOREIGN_KEY_SUBSCRIPTION,
+    "plan_id": ErrorCode.DATABASE_FOREIGN_KEY_PLAN,
+    "user_id": ErrorCode.DATABASE_FOREIGN_KEY_USER,
 }
 
-_NOTNULL_FIELD_TO_MESSAGE: dict[str, str] = {
-    "modified_by": "error.db_notnull_modified_by",
-    "currency_code": "error.db_notnull_currency_code",
-    "currency_name": "error.db_notnull_currency_name",
-    "username": "error.db_notnull_username",
-    "email": "error.db_notnull_email",
+_NOTNULL_FIELD_TO_CODE: dict[str, ErrorCode] = {
+    "modified_by": ErrorCode.DATABASE_NOT_NULL_MODIFIED_BY,
+    "currency_code": ErrorCode.DATABASE_NOT_NULL_CURRENCY_CODE,
+    "currency_name": ErrorCode.DATABASE_NOT_NULL_CURRENCY_NAME,
+    "username": ErrorCode.DATABASE_NOT_NULL_USERNAME,
+    "email": ErrorCode.DATABASE_NOT_NULL_EMAIL,
 }
 
 
-def _match_field(error_message: str, field_map: dict[str, str], default: str) -> str:
-    for field, msg_key in field_map.items():
+def _match_field(error_message: str, field_map: dict[str, ErrorCode], default: ErrorCode) -> ErrorCode:
+    for field, code in field_map.items():
         if field in error_message:
-            return msg_key
+            return code
     return default
 
 
@@ -142,35 +166,39 @@ def handle_database_exception(
 ) -> HTTPException:
     """
     Convert database exceptions into appropriate HTTP exceptions.
-    All detail strings resolved via i18n message catalog.
+    All detail dicts resolved via i18n envelope factory.
     """
     error_message = str(error).lower()
     log_warning(f"Database {operation_type} error: {error}")
 
     if "duplicate key value violates unique constraint" in error_message:
-        for keywords, msg_key in _DUPLICATE_KEY_RULES:
+        for keywords, code in _DUPLICATE_KEY_RULES:
             if all(kw in error_message for kw in keywords):
-                return HTTPException(status_code=409, detail=get_message(msg_key, locale))
-        return HTTPException(status_code=409, detail=get_message("error.db_duplicate_key", locale))
+                return envelope_exception(code, status=409, locale=locale)
+        return envelope_exception(ErrorCode.DATABASE_DUPLICATE_KEY, status=409, locale=locale)
 
     if "foreign key constraint" in error_message:
-        msg_key = _match_field(error_message, _FK_FIELD_TO_MESSAGE, "error.db_fk_generic")
-        return HTTPException(status_code=400, detail=get_message(msg_key, locale))
+        code = _match_field(error_message, _FK_FIELD_TO_CODE, ErrorCode.DATABASE_FOREIGN_KEY_VIOLATION)
+        return envelope_exception(code, status=400, locale=locale)
 
     if "not null constraint" in error_message:
-        msg_key = _match_field(error_message, _NOTNULL_FIELD_TO_MESSAGE, "error.db_notnull_generic")
-        return HTTPException(status_code=400, detail=get_message(msg_key, locale))
+        code = _match_field(error_message, _NOTNULL_FIELD_TO_CODE, ErrorCode.DATABASE_NOT_NULL_VIOLATION)
+        return envelope_exception(code, status=400, locale=locale)
 
     if "check constraint" in error_message:
-        return HTTPException(status_code=400, detail=get_message("error.db_check_violation", locale))
+        return envelope_exception(ErrorCode.DATABASE_CHECK_VIOLATION, status=400, locale=locale)
 
     if "invalid input syntax" in error_message:
         if "uuid" in error_message:
-            return HTTPException(status_code=400, detail=get_message("error.db_invalid_uuid", locale))
-        return HTTPException(status_code=400, detail=get_message("error.db_invalid_format", locale))
+            return envelope_exception(ErrorCode.DATABASE_INVALID_UUID, status=400, locale=locale)
+        return envelope_exception(ErrorCode.DATABASE_INVALID_FORMAT, status=400, locale=locale)
 
-    return HTTPException(
-        status_code=500, detail=get_message("error.db_generic", locale, operation=operation_type, detail=str(error))
+    return envelope_exception(
+        ErrorCode.DATABASE_ERROR,
+        status=500,
+        locale=locale,
+        operation=operation_type,
+        detail=str(error),
     )
 
 
