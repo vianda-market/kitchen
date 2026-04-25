@@ -14,6 +14,8 @@ from fastapi import HTTPException
 from app.config import DiscretionaryReason
 from app.config.enums import DiscretionaryStatus, Status
 from app.dto.models import DiscretionaryDTO, DiscretionaryResolutionDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     discretionary_resolution_service,
     discretionary_service,
@@ -32,7 +34,11 @@ class DiscretionaryService:
         pass
 
     def create_discretionary_request(
-        self, request_data: dict[str, Any], admin_user: dict[str, Any], db: psycopg2.extensions.connection
+        self,
+        request_data: dict[str, Any],
+        admin_user: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> DiscretionaryDTO:
         """
         Create a discretionary credit request.
@@ -41,6 +47,7 @@ class DiscretionaryService:
             request_data: Request data including user_id, restaurant_id, category, reason, amount, comment
             admin_user: Admin user creating the request
             db: Database connection
+            locale: Locale for error messages
 
         Returns:
             Created discretionary request DTO
@@ -50,7 +57,7 @@ class DiscretionaryService:
         """
         try:
             # Validate request data
-            self._validate_discretionary_request_data(request_data)
+            self._validate_discretionary_request_data(request_data, locale)
 
             target_user = None
             restaurant = None
@@ -71,32 +78,36 @@ class DiscretionaryService:
             req_market_id = request_data.get("market_id")
             if request_data.get("user_id") and target_user:
                 if req_institution_id is not None and str(target_user.institution_id) != str(req_institution_id):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Selected user is not in the specified institution",
+                    raise envelope_exception(
+                        ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
+                        status=400,
+                        locale=locale,
                     )
                 if req_market_id is not None and str(target_user.market_id) != str(req_market_id):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Selected user is not in the specified market",
+                    raise envelope_exception(
+                        ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
+                        status=400,
+                        locale=locale,
                     )
             if request_data.get("restaurant_id") and restaurant:
                 if req_institution_id is not None and str(restaurant.institution_id) != str(req_institution_id):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Selected restaurant is not in the specified institution",
+                    raise envelope_exception(
+                        ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
+                        status=400,
+                        locale=locale,
                     )
                 if req_market_id is not None:
                     market = market_service.get_by_id(req_market_id)
                     if not market:
-                        raise HTTPException(status_code=400, detail="Market not found")
+                        raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=400, locale=locale)
                     from app.services.entity_service import get_currency_metadata_id_for_restaurant
 
                     entity_currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
                     if str(entity_currency_metadata_id) != str(market.get("currency_metadata_id")):
-                        raise HTTPException(
-                            status_code=400,
-                            detail="Selected restaurant is not in the specified market",
+                        raise envelope_exception(
+                            ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
+                            status=400,
+                            locale=locale,
                         )
 
             # Remove validation-only fields before persisting
@@ -123,7 +134,11 @@ class DiscretionaryService:
             raise HTTPException(status_code=500, detail=f"Failed to create discretionary request: {str(e)}") from None
 
     def approve_discretionary_request(
-        self, discretionary_id: UUID, super_admin: dict[str, Any], db: psycopg2.extensions.connection
+        self,
+        discretionary_id: UUID,
+        super_admin: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> DiscretionaryResolutionDTO:
         """
         Approve a discretionary request and create the appropriate transaction.
@@ -132,6 +147,7 @@ class DiscretionaryService:
             discretionary_id: ID of the discretionary request
             super_admin: Super-admin user approving the request
             db: Database connection
+            locale: Locale for error messages
 
         Returns:
             Discretionary resolution DTO
@@ -147,9 +163,12 @@ class DiscretionaryService:
 
             # Validate request is pending
             if discretionary_request.status != DiscretionaryStatus.PENDING:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot approve request with status: {getattr(discretionary_request.status, 'value', discretionary_request.status)}",
+                request_status = getattr(discretionary_request.status, "value", discretionary_request.status)
+                raise envelope_exception(
+                    ErrorCode.DISCRETIONARY_NOT_PENDING,
+                    status=400,
+                    locale=locale,
+                    request_status=str(request_status),
                 )
 
             # Create resolution record
@@ -180,7 +199,12 @@ class DiscretionaryService:
             raise HTTPException(status_code=500, detail="Failed to approve discretionary request") from None
 
     def reject_discretionary_request(
-        self, discretionary_id: UUID, super_admin: dict[str, Any], reason: str, db: psycopg2.extensions.connection
+        self,
+        discretionary_id: UUID,
+        super_admin: dict[str, Any],
+        reason: str,
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> DiscretionaryResolutionDTO:
         """
         Reject a discretionary request.
@@ -190,6 +214,7 @@ class DiscretionaryService:
             super_admin: Super-admin user rejecting the request
             reason: Reason for rejection
             db: Database connection
+            locale: Locale for error messages
 
         Returns:
             Discretionary resolution DTO
@@ -205,9 +230,12 @@ class DiscretionaryService:
 
             # Validate request is pending
             if discretionary_request.status != DiscretionaryStatus.PENDING:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot reject request with status: {getattr(discretionary_request.status, 'value', discretionary_request.status)}",
+                request_status = getattr(discretionary_request.status, "value", discretionary_request.status)
+                raise envelope_exception(
+                    ErrorCode.DISCRETIONARY_NOT_PENDING,
+                    status=400,
+                    locale=locale,
+                    request_status=str(request_status),
                 )
 
             # Create resolution record
@@ -286,12 +314,13 @@ class DiscretionaryService:
             log_error(f"Error retrieving discretionary requests for admin {admin_user_id}: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve admin requests") from None
 
-    def _validate_discretionary_request_data(self, request_data: dict[str, Any]) -> None:
+    def _validate_discretionary_request_data(self, request_data: dict[str, Any], locale: str = "en") -> None:
         """
         Validate discretionary request data.
 
         Args:
             request_data: Request data to validate
+            locale: Locale for error messages
 
         Raises:
             HTTPException: For validation errors
@@ -301,21 +330,33 @@ class DiscretionaryService:
         missing_fields = [field for field in required_fields if field not in request_data]
 
         if missing_fields:
-            raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing_fields)}")
+            raise envelope_exception(
+                ErrorCode.VALIDATION_FIELD_REQUIRED,
+                status=400,
+                locale=locale,
+            )
 
         # Validate that either user_id or restaurant_id is provided (mutually exclusive)
         user_id = request_data.get("user_id")
         restaurant_id = request_data.get("restaurant_id")
 
         if not user_id and not restaurant_id:
-            raise HTTPException(status_code=400, detail="Either user_id or restaurant_id must be provided")
+            raise envelope_exception(
+                ErrorCode.VALIDATION_DISCRETIONARY_RECIPIENT_REQUIRED,
+                status=400,
+                locale=locale,
+            )
 
         if user_id and restaurant_id:
-            raise HTTPException(status_code=400, detail="Cannot specify both user_id and restaurant_id")
+            raise envelope_exception(
+                ErrorCode.VALIDATION_DISCRETIONARY_CONFLICTING_RECIPIENTS,
+                status=400,
+                locale=locale,
+            )
 
         # Validate amount is positive
         if request_data["amount"] <= 0:
-            raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+            raise envelope_exception(ErrorCode.DISCRETIONARY_INVALID_AMOUNT, status=400, locale=locale)
 
         # Validate category is a valid DiscretionaryReason enum
         category = request_data["category"]
@@ -323,21 +364,31 @@ class DiscretionaryService:
         # Convert to enum if it's a string
         if isinstance(category, str):
             if not DiscretionaryReason.is_valid(category):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid category. Must be one of: {', '.join(DiscretionaryReason.values())}",
+                raise envelope_exception(
+                    ErrorCode.DISCRETIONARY_INVALID_CATEGORY,
+                    status=400,
+                    locale=locale,
+                    category=category,
                 )
             # Convert string to enum for further validation
             try:
                 category = DiscretionaryReason(category)
                 request_data["category"] = category
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid category value: {category}") from None
+                raise envelope_exception(
+                    ErrorCode.DISCRETIONARY_INVALID_CATEGORY,
+                    status=400,
+                    locale=locale,
+                    category=category,
+                ) from None
 
         # Validate restaurant_id is provided for restaurant-specific categories
         if DiscretionaryReason.requires_restaurant(category) and not restaurant_id:
-            raise HTTPException(
-                status_code=400, detail=f"Category '{category.value}' requires restaurant_id to be specified"
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_CATEGORY_REQUIRES_RESTAURANT,
+                status=400,
+                locale=locale,
+                category=category.value if hasattr(category, "value") else str(category),
             )
 
     def _create_discretionary_transaction(

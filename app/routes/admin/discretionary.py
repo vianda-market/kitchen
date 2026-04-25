@@ -31,6 +31,7 @@ discretionary_service = DiscretionaryService()
 def create_discretionary_request(
     request: DiscretionaryCreateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -45,7 +46,7 @@ def create_discretionary_request(
     request_data = request.model_dump()
 
     # Delegate to service layer
-    discretionary_request = discretionary_service.create_discretionary_request(request_data, current_user, db)
+    discretionary_request = discretionary_service.create_discretionary_request(request_data, current_user, db, locale)
 
     return discretionary_request
 

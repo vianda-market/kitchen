@@ -323,6 +323,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         # discretionary.* — K12
         "discretionary.not_found": "Discretionary request not found.",
         "discretionary.not_pending": "Cannot update request with status: {request_status}.",
+        # discretionary.* — K13
+        "discretionary.recipient_institution_mismatch": "Selected recipient is not in the specified institution.",
+        "discretionary.recipient_market_mismatch": "Selected recipient is not in the specified market.",
+        "discretionary.invalid_amount": "Amount must be greater than 0.",
+        "discretionary.invalid_category": "Invalid category value: {category}.",
+        "discretionary.category_requires_restaurant": "Category '{category}' requires restaurant_id to be specified.",
+        # enrollment.* — K13
+        "enrollment.no_active_program": "No active benefits program for this institution.",
+        "enrollment.email_already_registered": "Email already registered in the system.",
+        "enrollment.city_no_market": "City not found or has no active market.",
+        "enrollment.employer_institution_id_required": "Internal users must provide institution_id query parameter to specify which Employer institution to operate on.",
+        # employer.program.* — K13
+        "employer.program_already_exists": "A benefits program already exists for this {scope}.",
     },
     "es": {
         # Auth / user errors
@@ -641,6 +654,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         # discretionary.* — K12
         "discretionary.not_found": "Solicitud discrecional no encontrada.",
         "discretionary.not_pending": "No se puede actualizar la solicitud con estado: {request_status}.",
+        # discretionary.* — K13
+        "discretionary.recipient_institution_mismatch": "El destinatario seleccionado no pertenece a la institución especificada.",
+        "discretionary.recipient_market_mismatch": "El destinatario seleccionado no pertenece al mercado especificado.",
+        "discretionary.invalid_amount": "El monto debe ser mayor que 0.",
+        "discretionary.invalid_category": "Valor de categoría inválido: {category}.",
+        "discretionary.category_requires_restaurant": "La categoría '{category}' requiere que se especifique restaurant_id.",
+        # enrollment.* — K13
+        "enrollment.no_active_program": "No hay un programa de beneficios activo para esta institución.",
+        "enrollment.email_already_registered": "El correo electrónico ya está registrado en el sistema.",
+        "enrollment.city_no_market": "Ciudad no encontrada o sin mercado activo.",
+        "enrollment.employer_institution_id_required": "Los usuarios internos deben proporcionar el parámetro institution_id para especificar en qué institución Empleador operar.",
+        # employer.program.* — K13
+        "employer.program_already_exists": "Ya existe un programa de beneficios para este {scope}.",
     },
     "pt": {
         # Auth / user errors
@@ -959,6 +985,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         # discretionary.* — K12
         "discretionary.not_found": "Solicitação discricionária não encontrada.",
         "discretionary.not_pending": "Não é possível atualizar a solicitação com status: {request_status}.",
+        # discretionary.* — K13
+        "discretionary.recipient_institution_mismatch": "O destinatário selecionado não pertence à instituição especificada.",
+        "discretionary.recipient_market_mismatch": "O destinatário selecionado não pertence ao mercado especificado.",
+        "discretionary.invalid_amount": "O valor deve ser maior que 0.",
+        "discretionary.invalid_category": "Valor de categoria inválido: {category}.",
+        "discretionary.category_requires_restaurant": "A categoria '{category}' requer que restaurant_id seja especificado.",
+        # enrollment.* — K13
+        "enrollment.no_active_program": "Nenhum programa de benefícios ativo para esta instituição.",
+        "enrollment.email_already_registered": "E-mail já registrado no sistema.",
+        "enrollment.city_no_market": "Cidade não encontrada ou sem mercado ativo.",
+        "enrollment.employer_institution_id_required": "Usuários internos devem fornecer o parâmetro institution_id para especificar qual instituição Empregador operar.",
+        # employer.program.* — K13
+        "employer.program_already_exists": "Já existe um programa de benefícios para este {scope}.",
     },
 }
 

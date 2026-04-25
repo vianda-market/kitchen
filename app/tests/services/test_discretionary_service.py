@@ -212,7 +212,8 @@ class TestDiscretionaryService:
             discretionary_service.create_discretionary_request(incomplete_request_data, sample_admin_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "Missing required fields" in exc_info.value.detail
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["code"] == "validation.field_required"
 
     def test_create_discretionary_request_invalid_amount(self, discretionary_service, sample_admin_user, mock_db):
         """Test discretionary request creation with invalid amount"""
@@ -229,7 +230,8 @@ class TestDiscretionaryService:
             discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "Amount must be greater than 0" in exc_info.value.detail
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["code"] == "discretionary.invalid_amount"
 
     def test_create_discretionary_request_invalid_category(self, discretionary_service, sample_admin_user, mock_db):
         """Test discretionary request creation with invalid category"""
@@ -246,7 +248,8 @@ class TestDiscretionaryService:
             discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "Invalid category" in exc_info.value.detail
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["code"] == "discretionary.invalid_category"
 
     def test_create_discretionary_request_requires_restaurant(self, discretionary_service, sample_admin_user, mock_db):
         """Test discretionary request creation with restaurant-required category but user_id provided"""
@@ -263,7 +266,8 @@ class TestDiscretionaryService:
             discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "requires restaurant_id" in exc_info.value.detail
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["code"] == "discretionary.category_requires_restaurant"
 
     def test_create_discretionary_request_user_not_found(
         self, discretionary_service, sample_admin_user, sample_request_data, mock_db
@@ -356,7 +360,8 @@ class TestDiscretionaryService:
             with pytest.raises(HTTPException) as exc_info:
                 discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
             assert exc_info.value.status_code == 400
-            assert "not in the specified institution" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.recipient_institution_mismatch"
 
     def test_create_discretionary_request_market_mismatch_returns_400(
         self, discretionary_service, sample_admin_user, sample_request_data, sample_user_dto, mock_db
@@ -372,7 +377,8 @@ class TestDiscretionaryService:
             with pytest.raises(HTTPException) as exc_info:
                 discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
             assert exc_info.value.status_code == 400
-            assert "not in the specified market" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.recipient_market_mismatch"
 
     def test_create_discretionary_request_restaurant_institution_mismatch_returns_400(
         self, discretionary_service, sample_admin_user, sample_restaurant_dto, sample_discretionary_dto, mock_db
@@ -394,7 +400,8 @@ class TestDiscretionaryService:
             with pytest.raises(HTTPException) as exc_info:
                 discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
             assert exc_info.value.status_code == 400
-            assert "not in the specified institution" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.recipient_institution_mismatch"
 
     def test_create_discretionary_request_restaurant_market_mismatch_returns_400(
         self, discretionary_service, sample_admin_user, sample_restaurant_dto, mock_db
@@ -418,7 +425,8 @@ class TestDiscretionaryService:
             with pytest.raises(HTTPException) as exc_info:
                 discretionary_service.create_discretionary_request(request_data, sample_admin_user, mock_db)
             assert exc_info.value.status_code == 400
-            assert "not in the specified market" in exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.recipient_market_mismatch"
 
     # =============================================================================
     # APPROVE DISCRETIONARY REQUEST TESTS
@@ -508,7 +516,8 @@ class TestDiscretionaryService:
                 discretionary_service.approve_discretionary_request(discretionary_id, sample_super_admin, mock_db)
 
             assert exc_info.value.status_code == 400
-            assert "Cannot approve request with status: approved" in str(exc_info.value.detail)
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.not_pending"
 
     # =============================================================================
     # REJECT DISCRETIONARY REQUEST TESTS
@@ -605,7 +614,8 @@ class TestDiscretionaryService:
                 )
 
             assert exc_info.value.status_code == 400
-            assert "Cannot reject request with status: rejected" in str(exc_info.value.detail)
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "discretionary.not_pending"
 
     # =============================================================================
     # GET PENDING REQUESTS TESTS
@@ -848,7 +858,8 @@ class TestDiscretionaryService:
             discretionary_service._validate_discretionary_request_data(invalid_data)
 
         assert exc_info.value.status_code == 400
-        assert "greater than 0" in exc_info.value.detail
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["code"] == "discretionary.invalid_amount"
 
     # =============================================================================
     # GENERIC-EXCEPTION (500) PATH TESTS
