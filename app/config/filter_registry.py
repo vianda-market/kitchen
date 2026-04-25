@@ -100,4 +100,13 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "window_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
         "window_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
     },
+    "national_holidays": {
+        # country_code is on national_holidays table, alias "nh".
+        # Registered as select (single-value eq) rather than free-text search — the frontend
+        # drives this from the markets/countries reference endpoint, not a text input.
+        # No Python enum exists for country codes; values come from the DB reference table.
+        # The current frontend already passes ?country_code=AR; this entry registers the param
+        # so it flows through filter_builder.py rather than being handled ad-hoc in the route.
+        "country_code": {"col": "country_code", "alias": "nh", "op": "eq", "cast": "upper"},
+    },
 }

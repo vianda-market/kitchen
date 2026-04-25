@@ -9,7 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 
 from app.auth.dependencies import get_employee_user
 from app.dependencies.database import get_db
@@ -24,7 +24,9 @@ from app.services.cron.holiday_refresh import run_holiday_refresh
 from app.services.crud_service import national_holiday_service
 from app.services.error_handling import handle_business_operation
 from app.utils.db import db_batch_insert, db_read
+from app.utils.filter_builder import build_filter_conditions
 from app.utils.log import log_info
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/national-holidays", tags=["National Holidays"])
 
@@ -55,49 +57,83 @@ def sync_national_holidays_from_provider(
 
 @router.get("", response_model=list[NationalHolidayResponseSchema])
 def list_national_holidays(
-    country_code: str | None = Query(None, description="Filter by country code"),
+    response: Response,
+    country_code: str | None = Query(None, description="Filter by country code (ISO alpha-2, e.g. AR)"),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     List all national holidays.
 
-    Internal-only endpoint. Supports filtering by country code and archived status.
+    Internal-only endpoint. Supports filtering by country_code (via filter registry)
+    and optional pagination (page + page_size query params). When paginated, the
+    X-Total-Count response header carries the total filtered row count.
     """
 
     def get_operation(connection: psycopg2.extensions.connection):
-        conditions = ["is_archived = FALSE"]
-        params = []
+        base_conditions = ["nh.is_archived = FALSE"]
+        base_params: list = []
 
-        if country_code:
-            conditions.append("country_code = %s")
-            params.append(country_code)
+        # Build filter conditions from registry (country_code is the only registered field).
+        try:
+            extra = build_filter_conditions("national_holidays", {"country_code": country_code})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
 
-        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+        if extra:
+            for cond, cond_params in extra:
+                base_conditions.append(cond)
+                base_params.extend(cond_params)
+
+        where_clause = " WHERE " + " AND ".join(base_conditions)
+
+        # Count query for X-Total-Count header.
+        count_query = f"SELECT COUNT(*) AS total FROM national_holidays nh{where_clause}"
+        count_row = db_read(
+            count_query, tuple(base_params) if base_params else None, connection=connection, fetch_one=True
+        )
+        total_count: int = count_row["total"] if count_row else 0
+
+        # Data query with optional pagination.
+        limit_clause = ""
+        offset_clause = ""
+        if pagination is not None:
+            limit_clause = f" LIMIT {pagination.page_size}"
+            offset_clause = f" OFFSET {pagination.offset}"
+
         query = f"""
             SELECT
-                holiday_id,
-                country_code,
-                holiday_name,
-                holiday_date,
-                is_recurring,
-                recurring_month,
-                recurring_day,
-                COALESCE(status, 'active') as status,
-                is_archived,
-                created_date,
-                modified_by,
-                modified_date,
-                source
-            FROM national_holidays
+                nh.holiday_id,
+                nh.country_code,
+                nh.holiday_name,
+                nh.holiday_date,
+                nh.is_recurring,
+                nh.recurring_month,
+                nh.recurring_day,
+                COALESCE(nh.status, 'active') as status,
+                nh.is_archived,
+                nh.created_date,
+                nh.modified_by,
+                nh.modified_date,
+                nh.source
+            FROM national_holidays nh
             {where_clause}
-            ORDER BY country_code, holiday_date
+            ORDER BY nh.country_code, nh.holiday_date
+            {limit_clause}{offset_clause}
         """
 
-        results = db_read(query, tuple(params) if params else None, connection=connection)
-        return [national_holiday_service.dto_class(**row) for row in results] if results else []
+        results = db_read(query, tuple(base_params) if base_params else None, connection=connection)
+        items = [national_holiday_service.dto_class(**row) for row in results] if results else []
 
-    return handle_business_operation(get_operation, "national holidays retrieval", None, db)
+        # Attach pagination metadata so set_pagination_headers can set X-Total-Count.
+        from app.utils.pagination import PaginatedList  # noqa: PLC0415
+
+        return PaginatedList(items, total_count=total_count)
+
+    result = handle_business_operation(get_operation, "national holidays retrieval", None, db)
+    set_pagination_headers(response, result)
+    return result
 
 
 @router.get("/{holiday_id}", response_model=NationalHolidayResponseSchema)

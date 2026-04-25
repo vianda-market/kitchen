@@ -1,0 +1,919 @@
+[
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "created_date",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "holiday_date",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "holiday_id",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "holiday_name",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "is_archived",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "is_recurring",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "modified_by",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "modified_date",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "recurring_day",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "recurring_month",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "source",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/national-holidays",
+    "entity": "national_holidays",
+    "field": "status",
+    "model": "NationalHolidayResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "address_display",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "arrival_time",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "city",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "completion_time",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "confirmation_code",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "country",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "created_date",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "credit",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "expected_completion_time",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "is_archived",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "modified_by",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "modified_date",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "plate_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "plate_pickup_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "plate_selection_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "postal_code",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "product_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "product_name",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "province",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "qr_code_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "qr_code_payload",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "restaurant_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "restaurant_name",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "user_id",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "field": "was_collected",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "country_code",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "created_date",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "credit",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "credit_cost_local_currency",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "credit_cost_usd",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "cta_label",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "cta_label_i18n",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "currency_name",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "features",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "features_i18n",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "is_archived",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "market_name",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "marketing_description",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "marketing_description_i18n",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "modified_date",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "name",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "name_i18n",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "plan_id",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "price",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "rollover",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plans/enriched",
+    "entity": "plans",
+    "field": "rollover_cap",
+    "model": "PlanEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "address_display",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "average_portion_size",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "average_stars",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "building_number",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "city",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "country_code",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "country_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "created_date",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "credit",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "cuisine_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "cuisine_name_i18n",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "delivery_time_minutes",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "description",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "description_i18n",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "dietary",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "expected_payout_local_currency",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "has_coworker_offer",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "has_coworker_request",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "has_image",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "ingredients",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "ingredients_i18n",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "institution_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "is_archived",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "latitude",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "longitude",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "modified_date",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "no_show_discount",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "pickup_instructions",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "plate_id",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "portion_size",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "price",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "product_id",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "product_image_storage_path",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "product_image_url",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "product_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "product_name_i18n",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "province",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "restaurant_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "review_count",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "street_name",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/plates/enriched",
+    "entity": "plates",
+    "field": "street_type",
+    "model": "PlateEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "address_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "average_rating",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "country_code",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "country_name",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "cover_image_url",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "created_date",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "cuisine_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "cuisine_name",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "cuisine_name_i18n",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "currency_metadata_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "institution_entity_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "institution_entity_name",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "institution_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "institution_name",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "is_archived",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "is_featured",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "location",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "market_credit_value_local_currency",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "member_perks",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "member_perks_i18n",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "modified_date",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "name",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "postal_code",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "province",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "restaurant_id",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "review_count",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "spotlight_label",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "spotlight_label_i18n",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "status",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "tagline",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "tagline_i18n",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "field": "verified_badge",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "unfiltered"
+  }
+]
