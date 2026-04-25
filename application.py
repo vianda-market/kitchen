@@ -190,6 +190,7 @@ OPENAPI_TAGS = [
     {"name": "Webhooks", "description": "Webhook handlers (e.g. Stripe)"},
     {"name": "Customer", "description": "B2C customer payment methods"},
     {"name": "Enums", "description": "Enum reference values"},
+    {"name": "Attribute Labels", "description": "DB column display labels per locale and schema"},
     {"name": "Admin Discretionary", "description": "Admin discretionary credit management"},
     {"name": "Super-Admin Discretionary", "description": "Super-admin discretionary credits"},
     {"name": "Admin Archival", "description": "Archival statistics and operations"},
@@ -599,6 +600,13 @@ def create_app() -> FastAPI:
     v1_enums_router = create_versioned_router("api", ["Enums"], APIVersion.V1)
     v1_enums_router.include_router(enums_router)
     app.include_router(v1_enums_router)
+
+    # Attribute Labels router (versioned; K-attr1)
+    from app.routes.attribute_labels import router as attribute_labels_router
+
+    v1_attribute_labels_router = create_versioned_router("api", ["Attribute Labels"], APIVersion.V1)
+    v1_attribute_labels_router.include_router(attribute_labels_router)
+    app.include_router(v1_attribute_labels_router)
 
     # Ingredients router (versioned; OFF-backed search + custom creation)
     from app.routes.ingredients import router as ingredients_router
