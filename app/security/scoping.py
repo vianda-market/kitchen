@@ -15,7 +15,10 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from fastapi import HTTPException
+from fastapi import HTTPException  # noqa: F401 — used in raise HTTPException(**error) patterns below
+
+from app.i18n.envelope import build_envelope, envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 
 def _normalize(value: Any) -> str | None:
@@ -90,7 +93,8 @@ class InstitutionScope:
         """Raises HTTPException if the resource doesn't match this scope."""
         if self.matches(resource_institution_id):
             return
-        raise HTTPException(status_code=403, detail="Forbidden: institution mismatch")
+        # locale not available in scope helper; default to "en" (decision C)
+        raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
 
 
 def resolve_institution_filter(request_institution_id: UUID | None, scope: InstitutionScope | None) -> UUID | None:
@@ -109,7 +113,7 @@ def resolve_institution_filter(request_institution_id: UUID | None, scope: Insti
         return request_institution_id
     if scope.matches(request_institution_id):
         return request_institution_id
-    raise HTTPException(status_code=403, detail="Forbidden: institution mismatch")
+    raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
 
 
 @dataclass
@@ -218,13 +222,11 @@ class UserScope:
         # Internal Operator: self-scope only
         if self.role_type == "internal" and self.role_name == "operator":
             if _normalize(resource_user_id) != self.user_id:
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: Internal Operators can only access their own records"
-                )
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale="en")
             return
 
         if self.is_customer and _normalize(resource_user_id) != self.user_id:
-            raise HTTPException(status_code=403, detail="Forbidden: customers can only access their own records")
+            raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale="en")
         # For Suppliers, Internal Management, and Internal Admin/Super Admin,
         # additional validation happens in route/service layer
 
@@ -266,17 +268,7 @@ class UserScope:
         Raises HTTPException if the current user cannot assign user_id to the target user.
         """
         if not self.can_assign_user_id(target_user_id, target_user_institution_id):
-            if self.is_customer:
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: customers can only assign addresses to themselves"
-                )
-            if self.role_type == "internal" and self.role_name == "operator":
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: Internal Operators can only assign addresses to themselves"
-                )
-            raise HTTPException(
-                status_code=403, detail="Forbidden: cannot assign address to user outside your institution"
-            )
+            raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale="en")
 
 
 def get_institution_scope(current_user: dict) -> InstitutionScope:
@@ -364,19 +356,28 @@ class EmployeeCustomerAccessControl:
 
         # Block Suppliers
         if role_type == "supplier":
-            return None, {"status_code": 403, "detail": "Forbidden: Suppliers cannot access this resource"}
+            return None, {
+                "status_code": 403,
+                "detail": build_envelope(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, "en"),
+            }
 
         # Customers: self-scope (filter by their own user_id)
         if role_type == "customer":
             user_id = current_user.get("user_id")
             if not user_id:
-                return None, {"status_code": 401, "detail": "User ID not found in token"}
+                return None, {
+                    "status_code": 401,
+                    "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, "en"),
+                }
             # Convert to UUID if it's a string
             if isinstance(user_id, str):
                 try:
                     user_id = UUID(user_id)
                 except ValueError:
-                    return None, {"status_code": 401, "detail": "Invalid user ID format in token"}
+                    return None, {
+                        "status_code": 401,
+                        "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_INVALID, "en"),
+                    }
             return user_id, None
 
         # Internal: check role_name for access level
@@ -391,18 +392,24 @@ class EmployeeCustomerAccessControl:
                 # Internal Operator: self-scope only (same as Customer)
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    return None, {"status_code": 401, "detail": "User ID not found in token"}
+                    return None, {
+                        "status_code": 401,
+                        "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, "en"),
+                    }
                 if isinstance(user_id, str):
                     try:
                         user_id = UUID(user_id)
                     except ValueError:
-                        return None, {"status_code": 401, "detail": "Invalid user ID format in token"}
+                        return None, {
+                            "status_code": 401,
+                            "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_INVALID, "en"),
+                        }
                 return user_id, None
             # Unknown Internal role_name
-            return None, {"status_code": 403, "detail": "Access denied: unknown Internal role"}
+            return None, {"status_code": 403, "detail": build_envelope(ErrorCode.SECURITY_FORBIDDEN, "en")}
 
         # Unknown role type
-        return None, {"status_code": 403, "detail": "Access denied"}
+        return None, {"status_code": 403, "detail": build_envelope(ErrorCode.SECURITY_FORBIDDEN, "en")}
 
     @staticmethod
     def verify_ownership(record_user_id: UUID, current_user: dict) -> dict[str, Any] | None:
@@ -445,40 +452,50 @@ class EmployeeCustomerAccessControl:
                 # Internal Operator: self-scope only (same as Customer)
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    return {"status_code": 401, "detail": "User ID not found in token"}
+                    return {
+                        "status_code": 401,
+                        "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, "en"),
+                    }
                 if isinstance(user_id, str):
                     try:
                         user_id = UUID(user_id)
                     except ValueError:
-                        return {"status_code": 401, "detail": "Invalid user ID format in token"}
+                        return {
+                            "status_code": 401,
+                            "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_INVALID, "en"),
+                        }
                 if record_user_id != user_id:
+                    # Return 404 to avoid revealing existence of other records
                     return {
                         "status_code": 404,
-                        "detail": "Resource not found",  # Don't reveal existence of other records
+                        "detail": build_envelope(ErrorCode.ENTITY_NOT_FOUND, "en", entity="Resource"),
                     }
             else:
                 # Unknown Internal role_name
-                return {"status_code": 403, "detail": "Access denied: unknown Internal role"}
+                return {"status_code": 403, "detail": build_envelope(ErrorCode.SECURITY_FORBIDDEN, "en")}
             return None
 
         # Customers can only access their own records
         if role_type == "customer":
             user_id = current_user.get("user_id")
             if not user_id:
-                return {"status_code": 401, "detail": "User ID not found in token"}
+                return {"status_code": 401, "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, "en")}
 
             # Convert to UUID if needed
             if isinstance(user_id, str):
                 try:
                     user_id = UUID(user_id)
                 except ValueError:
-                    return {"status_code": 401, "detail": "Invalid user ID format in token"}
+                    return {
+                        "status_code": 401,
+                        "detail": build_envelope(ErrorCode.SECURITY_TOKEN_USER_ID_INVALID, "en"),
+                    }
 
-            # Verify ownership
+            # Verify ownership — return 404 to avoid revealing existence of other records
             if record_user_id != user_id:
                 return {
                     "status_code": 404,
-                    "detail": "Resource not found",  # Don't reveal existence of other records
+                    "detail": build_envelope(ErrorCode.ENTITY_NOT_FOUND, "en", entity="Resource"),
                 }
 
         return None

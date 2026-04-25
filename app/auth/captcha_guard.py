@@ -9,11 +9,13 @@ Both exempt B2C mobile clients and are disabled when RECAPTCHA_SECRET_KEY is emp
 
 from collections.abc import Callable
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 
 from app.auth.ip_attempt_tracker import ip_tracker
 from app.auth.recaptcha import verify_recaptcha_token
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 
 def require_captcha_after_threshold(
@@ -56,13 +58,8 @@ def require_captcha_after_threshold(
 
         token = request.headers.get("x-recaptcha-token", "").strip()
         if not token:
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "code": "captcha_required",
-                    "message": "Too many attempts. Please verify you are human.",
-                },
-            )
+            # locale not available pre-auth; default to "en" (decision C)
+            raise envelope_exception(ErrorCode.AUTH_CAPTCHA_REQUIRED, status=429, locale="en")
 
         await verify_recaptcha_token(token, action=action)
 
@@ -85,13 +82,8 @@ def always_require_captcha_for_web(action: str) -> Callable:
 
         token = request.headers.get("x-recaptcha-token", "").strip()
         if not token:
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "code": "captcha_required",
-                    "message": "Verification required.",
-                },
-            )
+            # locale not available pre-auth; default to "en" (decision C)
+            raise envelope_exception(ErrorCode.AUTH_CAPTCHA_REQUIRED, status=403, locale="en")
 
         await verify_recaptcha_token(token, action=action)
 

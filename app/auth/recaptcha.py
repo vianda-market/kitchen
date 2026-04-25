@@ -13,9 +13,11 @@ Fails open if Google's verify API is unreachable.
 import logging
 
 import requests
-from fastapi import HTTPException, Request
+from fastapi import Request
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 logger = logging.getLogger("my_app")
 
@@ -41,14 +43,15 @@ async def verify_recaptcha_token(token: str, action: str | None = None) -> None:
         return
 
     if not data.get("success"):
-        raise HTTPException(status_code=403, detail="reCAPTCHA verification failed")
+        # locale not available in low-level verifier; default to "en" (decision C)
+        raise envelope_exception(ErrorCode.AUTH_CAPTCHA_VERIFICATION_FAILED, status=403, locale="en")
 
     if action and data.get("action") != action:
-        raise HTTPException(status_code=403, detail="reCAPTCHA action mismatch")
+        raise envelope_exception(ErrorCode.AUTH_CAPTCHA_ACTION_MISMATCH, status=403, locale="en")
 
     score = data.get("score", 0.0)
     if score < settings.RECAPTCHA_SCORE_THRESHOLD:
-        raise HTTPException(status_code=403, detail="reCAPTCHA score too low")
+        raise envelope_exception(ErrorCode.AUTH_CAPTCHA_SCORE_TOO_LOW, status=403, locale="en")
 
 
 async def verify_recaptcha(request: Request) -> None:
@@ -62,6 +65,6 @@ async def verify_recaptcha(request: Request) -> None:
 
     token = request.headers.get("x-recaptcha-token", "").strip()
     if not token:
-        raise HTTPException(status_code=403, detail="Missing reCAPTCHA token")
+        raise envelope_exception(ErrorCode.AUTH_CAPTCHA_TOKEN_MISSING, status=403, locale="en")
 
     await verify_recaptcha_token(token)

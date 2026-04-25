@@ -12,8 +12,10 @@ Usage:
     # Use scope for both base and enriched endpoints
 """
 
-from fastapi import HTTPException, status
+from fastapi import status
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.scoping import InstitutionScope, get_institution_scope
 
 # Entity Type Constants
@@ -114,8 +116,8 @@ class EntityScopingService:
 
         # Block Customers
         if role_type == "customer":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Customers cannot access plate kitchen days"
+            raise envelope_exception(
+                ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
 
         # Employer: institution-scoped (like Supplier)
@@ -400,8 +402,8 @@ class EntityScopingService:
 
         # Block Customers
         if role_type == "customer":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Customers cannot access restaurant holidays"
+            raise envelope_exception(
+                ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
 
         # Internal, Suppliers, Employer: standard institution scoping

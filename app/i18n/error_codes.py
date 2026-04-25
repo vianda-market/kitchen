@@ -82,9 +82,46 @@ class ErrorCode(StrEnum):
     VALIDATION_PAYMENT_UNSUPPORTED_BRAND = "validation.payment.unsupported_brand"
 
     # ── auth.* ─────────────────────────────────────────────────────────────
-    # Seeded to prove parity tooling; fully wired in K6 (auth sweep).
+    # Seeded in K2; fully wired in K7 (auth + security sweep).
     AUTH_INVALID_TOKEN = "auth.invalid_token"
     AUTH_CAPTCHA_REQUIRED = "auth.captcha_required"  # migrated from ad-hoc dict-detail
+    AUTH_CAPTCHA_VERIFICATION_FAILED = "auth.captcha_verification_failed"
+    AUTH_CAPTCHA_ACTION_MISMATCH = "auth.captcha_action_mismatch"
+    AUTH_CAPTCHA_SCORE_TOO_LOW = "auth.captcha_score_too_low"
+    AUTH_CAPTCHA_TOKEN_MISSING = "auth.captcha_token_missing"
+    AUTH_CREDENTIALS_INVALID = "auth.credentials_invalid"
+    AUTH_ACCOUNT_INACTIVE = "auth.account_inactive"
+    AUTH_CUSTOMER_APP_ONLY = "auth.customer_app_only"  # migrated from ad-hoc dict-detail
+    AUTH_DUMMY_ADMIN_NOT_CONFIGURED = "auth.dummy_admin_not_configured"
+    AUTH_TOKEN_USER_ID_INVALID = "auth.token_user_id_invalid"
+    AUTH_TOKEN_INSTITUTION_ID_INVALID = "auth.token_institution_id_invalid"
+    AUTH_TOKEN_MISSING_FIELDS = "auth.token_missing_fields"
+
+    # ── security.* ─────────────────────────────────────────────────────────
+    # Wired in K7 (auth + security sweep).
+    SECURITY_INSTITUTION_MISMATCH = "security.institution_mismatch"
+    SECURITY_INSUFFICIENT_PERMISSIONS = "security.insufficient_permissions"
+    SECURITY_FORBIDDEN = "security.forbidden"
+    SECURITY_TOKEN_USER_ID_MISSING = "security.token_user_id_missing"
+    SECURITY_TOKEN_USER_ID_INVALID = "security.token_user_id_invalid"
+    SECURITY_ADDRESS_TYPE_NOT_ALLOWED = "security.address_type_not_allowed"
+    SECURITY_ADDRESS_TYPE_INSTITUTION_MISMATCH = "security.address_type_institution_mismatch"
+    SECURITY_USER_ROLE_TYPE_NOT_ALLOWED = "security.user_role_type_not_allowed"
+    SECURITY_USER_ROLE_NAME_NOT_ALLOWED = "security.user_role_name_not_allowed"
+    SECURITY_OPERATOR_CANNOT_CREATE_USERS = "security.operator_cannot_create_users"
+    SECURITY_CANNOT_ASSIGN_ROLE = "security.cannot_assign_role"
+    SECURITY_CANNOT_EDIT_USER = "security.cannot_edit_user"
+    SECURITY_CUSTOMER_CANNOT_EDIT_EMPLOYER_ADDRESS = "security.customer_cannot_edit_employer_address"
+    SECURITY_SUPPLIER_ADDRESS_MUTATION_DENIED = "security.supplier_address_mutation_denied"
+    SECURITY_SUPPLIER_USER_MUTATION_DENIED = "security.supplier_user_mutation_denied"
+    SECURITY_SUPPLIER_MANAGEMENT_DENIED = "security.supplier_management_denied"
+    SECURITY_SUPPLIER_ADMIN_ONLY = "security.supplier_admin_only"
+    SECURITY_SUPPLIER_PASSWORD_RESET_DENIED = "security.supplier_password_reset_denied"
+    SECURITY_INSTITUTION_TYPE_MISMATCH = "security.institution_type_mismatch"
+    SECURITY_SUPPLIER_INSTITUTION_ONLY = "security.supplier_institution_only"
+    SECURITY_SUPPLIER_INSTITUTION_REQUIRED = "security.supplier_institution_required"
+    SECURITY_EMPLOYER_NOT_FOR_SUPPLIER = "security.employer_not_for_supplier"
+    SECURITY_SUPPLIER_TERMS_EDIT_DENIED = "security.supplier_terms_edit_denied"
 
     # ── subscription.* ─────────────────────────────────────────────────────
     # Seeded to prove parity tooling; fully wired in a later sweep PR.

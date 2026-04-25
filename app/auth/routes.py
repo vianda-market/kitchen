@@ -1,17 +1,20 @@
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.auth.captcha_guard import require_captcha_after_threshold
-from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_resolved_locale_optional, oauth2_scheme
 from app.auth.ip_attempt_tracker import ip_tracker
 from app.auth.security import create_access_token, verify_password, verify_token
 from app.auth.utils import build_token_data, merge_onboarding_token_claims, merge_subscription_token_claims
 from app.config import Status
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import user_service
 from app.services.entity_service import get_user_by_username
+from app.utils.locale import resolve_locale_from_header
 from app.utils.log import log_info, log_warning
 from app.utils.rate_limit import limiter
 
@@ -33,6 +36,8 @@ async def login(
     _captcha=Depends(_login_captcha),
 ):
     ip = request.client.host
+    # Resolve locale from Accept-Language header (pre-auth; no user record yet)
+    locale = resolve_locale_from_header(request.headers.get("Accept-Language"))
 
     # Retrieve an active user record by username using simple auth method
     try:
@@ -40,13 +45,15 @@ async def login(
         if not user:
             log_warning(f"Authentication failed: username '{form_data.username}' not found")
             ip_tracker.increment(ip, "login")
-            raise HTTPException(status_code=400, detail="Username does not exist")
-    except HTTPException:
-        raise
+            raise envelope_exception(ErrorCode.AUTH_CREDENTIALS_INVALID, status=400, locale=locale)
     except Exception as e:
+        from fastapi import HTTPException as _HTTPException
+
+        if isinstance(e, _HTTPException):
+            raise
         log_warning(f"Authentication failed for username: {form_data.username} - {str(e)}")
         ip_tracker.increment(ip, "login")
-        raise HTTPException(status_code=400, detail="Username does not exist") from None
+        raise envelope_exception(ErrorCode.AUTH_CREDENTIALS_INVALID, status=400, locale=locale) from None
 
     # Debug logging for password verification
     log_info("🔐 Password verification debug:")
@@ -76,29 +83,24 @@ async def login(
     if not password_verified:
         log_warning(f"Invalid password for username: {form_data.username}")
         ip_tracker.increment(ip, "login")
-        raise HTTPException(status_code=400, detail="Incorrect password")
+        raise envelope_exception(ErrorCode.AUTH_CREDENTIALS_INVALID, status=400, locale=locale)
 
     # Block Inactive users (invite-flow users before password set, or admin-deactivated)
     if user.status == Status.INACTIVE:
-        raise HTTPException(
-            status_code=403,
-            detail="Account not activated. Please set your password using the link from your invite email.",
-        )
+        raise envelope_exception(ErrorCode.AUTH_ACCOUNT_INACTIVE, status=403, locale=locale)
 
     # Block Customer Comensal login on B2B platform (x-client-type: b2b)
     client_type = request.headers.get("x-client-type", "").strip().lower()
     if client_type == "b2b" and role_type == "customer" and role_name == "comensal":
         from app.config.settings import get_settings
 
-        settings = get_settings()
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "customer_app_only",
-                "message": "Customer accounts must use the Vianda mobile app.",
-                "app_store_url": settings.APP_STORE_URL,
-                "play_store_url": settings.PLAY_STORE_URL,
-            },
+        _settings = get_settings()
+        raise envelope_exception(
+            ErrorCode.AUTH_CUSTOMER_APP_ONLY,
+            status=403,
+            locale=locale,
+            app_store_url=_settings.APP_STORE_URL,
+            play_store_url=_settings.PLAY_STORE_URL,
         )
 
     # Successful auth — reset CAPTCHA counter for this IP
@@ -119,16 +121,14 @@ async def refresh_token(
     request: Request,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
+    locale: str = Depends(get_resolved_locale_optional),
 ):
     user = user_service.get_by_id(current_user["user_id"], db)
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise envelope_exception(ErrorCode.AUTH_INVALID_TOKEN, status=401, locale=locale)
 
     if user.status == Status.INACTIVE:
-        raise HTTPException(
-            status_code=403,
-            detail="Account is inactive. Please contact support.",
-        )
+        raise envelope_exception(ErrorCode.AUTH_ACCOUNT_INACTIVE, status=403, locale=locale)
 
     token_data = build_token_data(user)
     merge_subscription_token_claims(token_data, user.user_id, db)
@@ -139,12 +139,16 @@ async def refresh_token(
 
 
 @router.get("/users/me")
-async def read_users_me(token: str = Depends(oauth2_scheme), db: psycopg2.extensions.connection = Depends(get_db)):
+async def read_users_me(
+    token: str = Depends(oauth2_scheme),
+    db: psycopg2.extensions.connection = Depends(get_db),
+):
     log_info(f"[get_current_user] raw token: {token}")
     user_data = verify_token(token)
     log_info(f"[get_current_user] decoded user_data: {user_data}")
     if not user_data:
         log_warning("Could not validate credentials")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+        # locale not resolved pre-token-validation; default to "en" (decision C)
+        raise envelope_exception(ErrorCode.AUTH_INVALID_TOKEN, status=status.HTTP_401_UNAUTHORIZED, locale="en")
     log_info(f"Token validated successfully for user_id: {user_data.get('sub')}")
     return user_data
