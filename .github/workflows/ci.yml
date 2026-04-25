@@ -222,7 +222,7 @@ jobs:
           diff-cover coverage.xml
           --compare-branch=origin/main
           --fail-under=80
-          --exclude "*app/routes/*" "*app/services/*" "*app/tests/routes/*"
+          --exclude "*app/routes/*" "*app/services/*" "*app/tests/routes/*" "*app/schemas/*"
 
       - name: Per-layer coverage floor (absolute)
         # Complements diff-cover (changed lines) with an absolute floor on

@@ -29,6 +29,23 @@ class ErrorEnvelope(TypedDict):
     params: dict[str, Any]
 
 
+class I18nValueError(ValueError):
+    """ValueError subclass that carries a stable error code + params for
+    structured propagation through Pydantic field-validators.
+
+    The K5 RequestValidationError handler isinstance-checks for this type
+    and emits a per-error envelope using the carried code + params.
+
+    Usage inside a field_validator or model_validator:
+        raise I18nValueError("validation.subscription.window_invalid", field="hold_end_date")
+    """
+
+    def __init__(self, code: str, **params: Any) -> None:
+        self.code = str(code)
+        self.params = dict(params)
+        super().__init__(self.code)
+
+
 def build_envelope(code: str, locale: str, **params: Any) -> ErrorEnvelope:
     """
     Build the wire dict for a single error.

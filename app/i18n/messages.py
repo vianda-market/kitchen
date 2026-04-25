@@ -86,6 +86,35 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.value_too_short": "The value is too short.",
         "validation.value_too_long": "The value is too long.",
         "validation.custom": "{msg}",
+        # validation.user.*
+        "validation.user.invalid_role_combination": "Invalid role combination: {role_type} + {role_name}.",
+        "validation.user.unsupported_locale": "Unsupported locale '{requested}'. Must be one of: {allowed}.",
+        "validation.user.passwords_do_not_match": "New password and confirmation do not match.",
+        "validation.user.new_password_same_as_current": "New password must differ from current password.",
+        # validation.address.*
+        "validation.address.city_required": "Either city_metadata_id or city_name is required.",
+        "validation.address.invalid_address_type": "Invalid address type '{address_type}'.",
+        "validation.address.duplicate_address_type": "Address type cannot contain duplicate values.",
+        "validation.address.invalid_street_type": "Invalid street type '{street_type}'.",
+        "validation.address.country_required": "Either country_code or country name must be provided, or use place_id.",
+        "validation.address.field_required": "Field '{address_field}' is required when place_id is not provided.",
+        "validation.address.city_metadata_id_required": "city_metadata_id is required when place_id is not provided.",
+        # validation.plate.*
+        "validation.plate.kitchen_days_empty": "kitchen_days cannot be empty.",
+        "validation.plate.kitchen_days_duplicate": "kitchen_days cannot contain duplicate days.",
+        # validation.discretionary.*
+        "validation.discretionary.recipient_required": "Either user_id or restaurant_id must be provided.",
+        "validation.discretionary.conflicting_recipients": "Cannot specify both user_id and restaurant_id.",
+        "validation.discretionary.restaurant_required": "This category requires restaurant_id.",
+        # validation.holiday.*
+        "validation.holiday.recurring_fields_required": "Both recurring_month and recurring_day are required when is_recurring is True.",
+        "validation.holiday.list_empty": "At least one holiday must be provided.",
+        # validation.subscription.*
+        "validation.subscription.window_invalid": "hold_end_date must be after hold_start_date.",
+        "validation.subscription.window_too_long": "Hold duration cannot exceed 3 months.",
+        # validation.payment.*
+        "validation.payment.conflicting_address_fields": "Cannot provide both address_id and address_data.",
+        "validation.payment.unsupported_brand": "Payment method type is not supported.",
         # auth.*
         "auth.invalid_token": "Authentication token is invalid or expired.",
         "auth.captcha_required": "CAPTCHA verification is required.",
@@ -175,6 +204,35 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.value_too_short": "El valor es demasiado corto.",
         "validation.value_too_long": "El valor es demasiado largo.",
         "validation.custom": "{msg}",
+        # validation.user.*
+        "validation.user.invalid_role_combination": "Combinación de roles inválida: {role_type} + {role_name}.",
+        "validation.user.unsupported_locale": "Idioma no soportado '{requested}'. Debe ser uno de: {allowed}.",
+        "validation.user.passwords_do_not_match": "La nueva contraseña y la confirmación no coinciden.",
+        "validation.user.new_password_same_as_current": "La nueva contraseña debe ser diferente a la actual.",
+        # validation.address.*
+        "validation.address.city_required": "Se requiere city_metadata_id o city_name.",
+        "validation.address.invalid_address_type": "Tipo de dirección inválido '{address_type}'.",
+        "validation.address.duplicate_address_type": "El tipo de dirección no puede contener valores duplicados.",
+        "validation.address.invalid_street_type": "Tipo de calle inválido '{street_type}'.",
+        "validation.address.country_required": "Se debe proporcionar country_code, el nombre del país o place_id.",
+        "validation.address.field_required": "El campo '{address_field}' es obligatorio cuando no se proporciona place_id.",
+        "validation.address.city_metadata_id_required": "city_metadata_id es obligatorio cuando no se proporciona place_id.",
+        # validation.plate.*
+        "validation.plate.kitchen_days_empty": "kitchen_days no puede estar vacío.",
+        "validation.plate.kitchen_days_duplicate": "kitchen_days no puede contener días duplicados.",
+        # validation.discretionary.*
+        "validation.discretionary.recipient_required": "Se debe proporcionar user_id o restaurant_id.",
+        "validation.discretionary.conflicting_recipients": "No se puede especificar user_id y restaurant_id al mismo tiempo.",
+        "validation.discretionary.restaurant_required": "Esta categoría requiere restaurant_id.",
+        # validation.holiday.*
+        "validation.holiday.recurring_fields_required": "Se requieren recurring_month y recurring_day cuando is_recurring es True.",
+        "validation.holiday.list_empty": "Se debe proporcionar al menos un feriado.",
+        # validation.subscription.*
+        "validation.subscription.window_invalid": "hold_end_date debe ser posterior a hold_start_date.",
+        "validation.subscription.window_too_long": "La duración de la pausa no puede superar los 3 meses.",
+        # validation.payment.*
+        "validation.payment.conflicting_address_fields": "No se puede proporcionar address_id y address_data al mismo tiempo.",
+        "validation.payment.unsupported_brand": "El tipo de método de pago no está soportado.",
         # auth.*
         "auth.invalid_token": "El token de autenticación es inválido o expiró.",
         "auth.captcha_required": "Se requiere verificación CAPTCHA.",
@@ -264,6 +322,35 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.value_too_short": "O valor é muito curto.",
         "validation.value_too_long": "O valor é muito longo.",
         "validation.custom": "{msg}",
+        # validation.user.*
+        "validation.user.invalid_role_combination": "Combinação de papéis inválida: {role_type} + {role_name}.",
+        "validation.user.unsupported_locale": "Idioma não suportado '{requested}'. Deve ser um de: {allowed}.",
+        "validation.user.passwords_do_not_match": "A nova senha e a confirmação não coincidem.",
+        "validation.user.new_password_same_as_current": "A nova senha deve ser diferente da senha atual.",
+        # validation.address.*
+        "validation.address.city_required": "city_metadata_id ou city_name é obrigatório.",
+        "validation.address.invalid_address_type": "Tipo de endereço inválido '{address_type}'.",
+        "validation.address.duplicate_address_type": "O tipo de endereço não pode conter valores duplicados.",
+        "validation.address.invalid_street_type": "Tipo de logradouro inválido '{street_type}'.",
+        "validation.address.country_required": "É necessário fornecer country_code, o nome do país ou place_id.",
+        "validation.address.field_required": "O campo '{address_field}' é obrigatório quando place_id não é fornecido.",
+        "validation.address.city_metadata_id_required": "city_metadata_id é obrigatório quando place_id não é fornecido.",
+        # validation.plate.*
+        "validation.plate.kitchen_days_empty": "kitchen_days não pode estar vazio.",
+        "validation.plate.kitchen_days_duplicate": "kitchen_days não pode conter dias duplicados.",
+        # validation.discretionary.*
+        "validation.discretionary.recipient_required": "É necessário fornecer user_id ou restaurant_id.",
+        "validation.discretionary.conflicting_recipients": "Não é possível especificar user_id e restaurant_id ao mesmo tempo.",
+        "validation.discretionary.restaurant_required": "Esta categoria requer restaurant_id.",
+        # validation.holiday.*
+        "validation.holiday.recurring_fields_required": "recurring_month e recurring_day são obrigatórios quando is_recurring é True.",
+        "validation.holiday.list_empty": "É necessário fornecer pelo menos um feriado.",
+        # validation.subscription.*
+        "validation.subscription.window_invalid": "hold_end_date deve ser posterior a hold_start_date.",
+        "validation.subscription.window_too_long": "A duração da pausa não pode exceder 3 meses.",
+        # validation.payment.*
+        "validation.payment.conflicting_address_fields": "Não é possível fornecer address_id e address_data ao mesmo tempo.",
+        "validation.payment.unsupported_brand": "O tipo de método de pagamento não é suportado.",
         # auth.*
         "auth.invalid_token": "O token de autenticação é inválido ou expirou.",
         "auth.captcha_required": "Verificação CAPTCHA é necessária.",

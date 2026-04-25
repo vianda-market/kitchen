@@ -125,6 +125,7 @@ known-first-party = ["app"]
 "app/tests/services/test_user_signup_service.py" = ["PLR0913"]
 "app/utils/address_formatting.py" = ["PLR0913"]
 "app/utils/map_projection.py" = ["PLR0913"]
+"app/tests/i18n/test_envelope_handlers.py" = ["PLR0915"]  # K5: handler-test app builder grew with I18nValueError fixture
 "application.py" = ["PLR0915"]
 "scripts/analyze_performance.py" = ["PLR0915"]
 

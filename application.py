@@ -266,14 +266,46 @@ def create_app() -> FastAPI:
         envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=fallback_msg)
         return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
+    from app.i18n.envelope import I18nValueError
+
+    # Email-format error types (Pydantic v1 naming; kept for forward compat).
+    # In Pydantic v2, EmailStr failures arrive as type="value_error" and are
+    # handled by the value_error branch below.
+    _EMAIL_TYPES: frozenset[str] = frozenset(
+        {
+            "value_error.email",
+            "value_error.email.invalid_domain",
+            "value_error.email.missing_at_sign",
+            "value_error.email.missing_domain",
+            "value_error.email.missing_local",
+            "value_error.email.not_an_email_string",
+        }
+    )
+
+    # Static type→code map — built once at app startup, not per-request.
+    _TYPE_TO_CODE: dict[str, str] = {
+        "missing": ErrorCode.VALIDATION_FIELD_REQUIRED,
+        "string_too_short": ErrorCode.VALIDATION_VALUE_TOO_SHORT,
+        "string_too_long": ErrorCode.VALIDATION_VALUE_TOO_LONG,
+        "string_pattern_mismatch": ErrorCode.VALIDATION_INVALID_FORMAT,
+    }
+
     @app.exception_handler(RequestValidationError)
     async def _envelope_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
         """
         Catch-all handler for Pydantic RequestValidationError (422).
 
         Emits detail as a list of envelopes — one per Pydantic error (Q-S2).
-        All errors map to validation.custom for now; detailed type→code mapping
-        ships with K5 (kitchen#67).
+        Detailed type→code mapping per K5 (kitchen#67).
+
+        Type→code mapping:
+          "missing"                    → validation.field_required
+          "string_too_short"           → validation.value_too_short
+          "string_too_long"            → validation.value_too_long
+          "string_pattern_mismatch"    → validation.invalid_format
+          "value_error.email" variants → validation.invalid_format
+          "value_error" with I18nValueError ctx → domain code from the error
+          anything else               → validation.custom
 
         Wire shape: {"detail": [{code, message, params}, ...]}
         """
@@ -283,13 +315,36 @@ def create_app() -> FastAPI:
             field = ".".join(str(x) for x in error["loc"])
             msg = error.get("msg", "")
             error_type = error.get("type", "")
-            envelope = build_envelope(
-                ErrorCode.VALIDATION_CUSTOM,
-                locale,
-                msg=msg,
-                field=field,
-                type=error_type,
-            )
+            ctx = error.get("ctx", {}) or {}
+
+            # Determine code + extra params
+            if error_type in _TYPE_TO_CODE:
+                code: str = _TYPE_TO_CODE[error_type]
+                extra_params: dict = {}
+            elif error_type in _EMAIL_TYPES or error_type.startswith("value_error.email"):
+                code = ErrorCode.VALIDATION_INVALID_FORMAT
+                extra_params = {}
+            elif error_type == "value_error":
+                # Custom validator — check for I18nValueError in ctx
+                ctx_error = ctx.get("error")
+                if isinstance(ctx_error, I18nValueError):
+                    code = ctx_error.code
+                    extra_params = dict(ctx_error.params)
+                else:
+                    code = ErrorCode.VALIDATION_CUSTOM
+                    extra_params = {}
+            else:
+                code = ErrorCode.VALIDATION_CUSTOM
+                extra_params = {}
+
+            # Build params dict, then remove any keys that would collide with
+            # build_envelope's positional args. I18nValueError instances may
+            # carry kwargs named "code" or "locale" (they're valid message
+            # placeholders), so pop defensively before splatting.
+            params = {"field": field, "msg": msg, "type": error_type, **extra_params}
+            params.pop("code", None)
+            params.pop("locale", None)
+            envelope = build_envelope(code, locale, **params)
             envelopes.append(envelope)
         return JSONResponse(status_code=422, content={"detail": envelopes})
 
