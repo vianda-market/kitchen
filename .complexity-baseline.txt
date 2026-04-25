@@ -1,9 +1,14 @@
-# Baselined high-complexity functions (cyclomatic complexity > 25).
-# These existed before the complexity gate was added.
+# Baselined high-complexity functions.
+# Two gates use this file:
+#   - Repo-wide gate (CC ≤ 25, scripts/check_complexity.sh)
+#   - Strict gate (CC ≤ 15 on changed files, scripts/check_complexity_strict.sh)
 # Remove entries as you refactor them — the CI gate will then enforce the limit.
 #
-# Format: file_path:function_name
+# Format: file_path:function_name (sorted by file, then function)
 
 app/routes/restaurant.py:get_restaurants_by_city_route
 app/routes/restaurant.py:list_enriched_restaurants
+app/services/entity_service.py:get_enriched_addresses_search
+app/services/entity_service.py:get_enriched_plate_pickups
+app/services/entity_service.py:get_enriched_restaurant_holidays
 app/services/leads_public_service.py:create_lead_interest

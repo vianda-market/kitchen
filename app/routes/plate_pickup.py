@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
@@ -14,6 +14,7 @@ from app.services.error_handling import handle_business_operation
 from app.services.plate_pickup_service import plate_pickup_service
 from app.utils.filter_builder import build_filter_conditions
 from app.utils.log import log_warning
+from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/plate-pickup", tags=["Plate Pickup"], dependencies=[Depends(oauth2_scheme)])
 
@@ -125,6 +126,7 @@ def get_pending_order(
 
 @router.get("/enriched", response_model=list[PlatePickupEnrichedResponseSchema])
 def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAPI Query params, not algorithmic args
+    response: Response,
     completed_only: bool = Query(
         False,
         description="When true (Customers only), filter to pickups with was_collected=true for order history page",
@@ -139,6 +141,7 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
     window_to: str | None = Query(
         None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"
     ),
+    pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -190,9 +193,13 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
             include_archived=False,
             completed_only=completed_only if user_id else False,
             additional_conditions=filter_conditions,
+            page=pagination.page if pagination else None,
+            page_size=pagination.page_size if pagination else None,
         )
 
-    return handle_business_operation(_get_enriched_pickups, "enriched plate pickup retrieval")
+    result = handle_business_operation(_get_enriched_pickups, "enriched plate pickup retrieval")
+    set_pagination_headers(response, result)
+    return result
 
 
 @router.post("/scan-qr", response_model=ScanQRResponse)

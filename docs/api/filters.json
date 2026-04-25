@@ -1,5 +1,15 @@
 [
   {
+    "entity": "national_holidays",
+    "fields": [
+      {
+        "cast": "upper",
+        "key": "country_code",
+        "kind": "select"
+      }
+    ]
+  },
+  {
     "entity": "pickups",
     "fields": [
       {

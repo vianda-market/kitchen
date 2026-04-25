@@ -14,7 +14,7 @@ Benefits:
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg2
@@ -3551,6 +3551,8 @@ def get_enriched_plate_pickups(
     include_archived: bool = False,
     completed_only: bool = False,
     additional_conditions: list[tuple[str, list]] | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
 ) -> list[PlatePickupEnrichedResponseSchema]:
     """
     Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
@@ -3607,6 +3609,33 @@ def get_enriched_plate_pickups(
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
+        joins_fragment = """
+            FROM plate_pickup_live ppl
+            LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
+            LEFT JOIN address_info a ON r.address_id = a.address_id
+            LEFT JOIN market_info m ON a.country_code = m.country_code
+            LEFT JOIN external.geonames_country gc_country ON gc_country.iso_alpha2 = m.country_code
+            LEFT JOIN product_info prod ON ppl.product_id = prod.product_id
+            LEFT JOIN plate_info p ON ppl.plate_id = p.plate_id"""
+
+        # Convert all params to strings to avoid UUID issues
+        safe_params = tuple(str(p) if isinstance(p, UUID) else p for p in params)
+
+        # Count query for X-Total-Count header support.
+        count_query = f"SELECT COUNT(*) AS total {joins_fragment} {where_clause}"
+        count_row = db_read(count_query, safe_params, connection=db, fetch_one=True)
+        total_count: int = count_row["total"] if count_row else 0
+
+        paginate = page is not None and page_size is not None
+        limit_clause = ""
+        offset_clause = ""
+        if paginate:
+            assert page is not None and page_size is not None  # narrowed by `paginate` guard above
+            clamped_page_size = max(1, min(page_size, 100))
+            clamped_offset = (page - 1) * clamped_page_size
+            limit_clause = f" LIMIT {clamped_page_size}"
+            offset_clause = f" OFFSET {clamped_offset}"
+
         query = f"""
             SELECT
                 ppl.plate_pickup_id,
@@ -3638,24 +3667,17 @@ def get_enriched_plate_pickups(
                 ppl.created_date,
                 ppl.modified_by,
                 ppl.modified_date
-            FROM plate_pickup_live ppl
-            LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-            LEFT JOIN address_info a ON r.address_id = a.address_id
-            LEFT JOIN market_info m ON a.country_code = m.country_code
-            LEFT JOIN external.geonames_country gc_country ON gc_country.iso_alpha2 = m.country_code
-            LEFT JOIN product_info prod ON ppl.product_id = prod.product_id
-            LEFT JOIN plate_info p ON ppl.plate_id = p.plate_id
+            {joins_fragment}
             {where_clause}
-            ORDER BY ppl.plate_pickup_id DESC
+            ORDER BY ppl.plate_pickup_id DESC{limit_clause}{offset_clause}
         """
-
-        # Convert all params to strings to avoid UUID issues
-        safe_params = tuple(str(p) if isinstance(p, UUID) else p for p in params)
 
         results = db_read(query, safe_params, connection=db, fetch_one=False)
 
         if not results:
-            return []
+            from app.utils.pagination import PaginatedList  # noqa: PLC0415
+
+            return PaginatedList([], total_count=total_count) if paginate else []
 
         enriched_pickups = []
         for row in results:
@@ -3685,7 +3707,9 @@ def get_enriched_plate_pickups(
                 # Skip invalid rows instead of failing completely
                 continue
 
-        return enriched_pickups
+        from app.utils.pagination import PaginatedList  # noqa: PLC0415
+
+        return PaginatedList(enriched_pickups, total_count=total_count) if paginate else enriched_pickups
     except HTTPException:
         raise
     except Exception as e:
@@ -4247,17 +4271,20 @@ def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extens
     """Raise HTTPException if restaurant has active plate pickups that prevent archival."""
     from fastapi import HTTPException
 
-    active_pickups = db_read(
-        """
+    active_pickups: dict[str, Any] | None = cast(
+        dict[str, Any] | None,
+        db_read(
+            """
         SELECT COUNT(*) as cnt
         FROM customer.plate_pickup_live pp
         WHERE pp.restaurant_id = %s
           AND pp.is_archived = FALSE
           AND pp.status IN ('pending', 'active')
         """,
-        (str(restaurant_id),),
-        connection=db,
-        fetch_one=True,
+            (str(restaurant_id),),
+            connection=db,
+            fetch_one=True,
+        ),
     )
     if active_pickups and active_pickups["cnt"] > 0:
         raise HTTPException(

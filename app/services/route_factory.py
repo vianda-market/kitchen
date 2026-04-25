@@ -763,9 +763,11 @@ def create_plan_routes() -> APIRouter:
     # Enriched routes MUST be before /{plan_id} so /enriched is not parsed as plan_id
     @router.get("/enriched", response_model=list[PlanEnrichedResponseSchema])
     def list_enriched_plans(
+        response: Response,
         market_id: UUID | None = market_filter(),
         status: str | None = status_filter(),
         currency_code: str | None = currency_code_filter(),
+        pagination: PaginationParams | None = Depends(get_pagination_params),
         current_user: dict = Depends(get_client_or_employee_user),
         locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
@@ -780,13 +782,20 @@ def create_plan_routes() -> APIRouter:
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from None
             additional_conditions.append(("pl.market_id != %s::uuid", [str(GLOBAL_MARKET_ID)]))
-            enriched_plans = get_enriched_plans(db, include_archived=False, additional_conditions=additional_conditions)
+            enriched_plans = get_enriched_plans(
+                db,
+                include_archived=False,
+                additional_conditions=additional_conditions,
+                page=pagination.page if pagination else None,
+                page_size=pagination.page_size if pagination else None,
+            )
             if locale != "en":
                 for p in enriched_plans:
                     resolve_i18n_field(p, "name", locale)
                     resolve_i18n_field(p, "marketing_description", locale)
                     resolve_i18n_list_field(p, "features", locale)
                     resolve_i18n_field(p, "cta_label", locale)
+            set_pagination_headers(response, enriched_plans)
             return enriched_plans
         except HTTPException:
             raise
@@ -1785,6 +1794,7 @@ def create_plate_routes() -> APIRouter:
         # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
         @router.get("/enriched", response_model=list[PlateEnrichedResponseSchema])
         def list_enriched_plates(
+            response: Response,
             status: str | None = Query(None, description="Filter by plate status (e.g. active, inactive)"),
             market_id: UUID | None = Query(None, description="Filter by market ID"),
             restaurant_id: UUID | None = Query(None, description="Filter by restaurant ID"),
@@ -1794,6 +1804,7 @@ def create_plate_routes() -> APIRouter:
             plate_date_to: str | None = Query(
                 None, description="Filter plates created on or before this date (YYYY-MM-DD)"
             ),
+            pagination: PaginationParams | None = Depends(get_pagination_params),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
@@ -1824,6 +1835,8 @@ def create_plate_routes() -> APIRouter:
                     scope=scope,
                     include_archived=False,
                     additional_conditions=filter_conditions,
+                    page=pagination.page if pagination else None,
+                    page_size=pagination.page_size if pagination else None,
                 )
                 if locale != "en":
                     from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_field_aliased
@@ -1833,6 +1846,7 @@ def create_plate_routes() -> APIRouter:
                         resolve_i18n_field_aliased(p, "product_name", "product_name_i18n", locale)
                         resolve_i18n_field(p, "ingredients", locale)
                         resolve_i18n_field(p, "description", locale)
+                set_pagination_headers(response, plates)
                 return plates
             except HTTPException:
                 raise

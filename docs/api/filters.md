@@ -268,9 +268,25 @@ interface FieldEntry {
 
 ## Pagination interaction
 
-Filters apply before `X-Total-Count` is computed. The count query uses the same `additional_conditions` list as the data query, so pagination and filtering compose correctly: `X-Total-Count` reflects the filtered row count, not the unfiltered total.
+Filters apply before `X-Total-Count` is computed. The count query uses the same `additional_conditions` list as the data query, so pagination and filtering compose correctly: `X-Total-Count` reflects the **filtered** row count, not the unfiltered total.
 
 No special handling is needed at the route layer — `EnrichedService.get_enriched()` and the CRUD pagination utilities handle this transparently.
+
+### Endpoints that set `X-Total-Count`
+
+The following five enriched (or list) endpoints set `X-Total-Count` when `page` + `page_size` are provided:
+
+| Endpoint | Entity key |
+|---|---|
+| `GET /api/v1/plans/enriched` | `plans` |
+| `GET /api/v1/restaurants/enriched` | `restaurants` |
+| `GET /api/v1/plates/enriched` | `plates` |
+| `GET /api/v1/plate-pickup/enriched` | `pickups` |
+| `GET /api/v1/national-holidays` | `national_holidays` |
+
+When `page` and `page_size` are **not** provided (no-pagination mode), the header is **not** set. Frontends that need a count without pagination can pass `page=1&page_size=<large_number>` and read `X-Total-Count`.
+
+`Access-Control-Expose-Headers: X-Total-Count` is set alongside so browser clients can read the header cross-origin.
 
 ---
 

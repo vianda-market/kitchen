@@ -1434,7 +1434,6 @@ app/services/entity_service.py:0: error: No overload variant of "__getitem__" of
 app/services/entity_service.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "str"  [call-overload]
 app/services/entity_service.py:0: error: Invalid index type "str" for "str"; expected type "SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]"  [index]
 app/services/entity_service.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "str"  [call-overload]
-app/services/entity_service.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "str"  [call-overload]
 app/services/employer/enrollment_service.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/services/employer/enrollment_service.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
 app/services/employer/enrollment_service.py:0: error: Function is missing a return type annotation  [no-untyped-def]
