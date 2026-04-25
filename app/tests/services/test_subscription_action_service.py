@@ -6,6 +6,7 @@ Tests cancel, put on hold, resume, and reconcile_hold_subscriptions.
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -80,7 +81,7 @@ class TestCancelSubscription:
                 with pytest.raises(HTTPException) as exc_info:
                     cancel_subscription(sub_id, user_id, mock_db)
         assert exc_info.value.status_code == 400
-        assert "already cancelled" in exc_info.value.detail.lower()
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "subscription.already_cancelled"
         db_up.assert_not_called()
 
     def test_cancel_not_owner_returns_403(self, mock_db):
@@ -140,7 +141,7 @@ class TestPutSubscriptionOnHold:
             with pytest.raises(HTTPException) as exc_info:
                 put_subscription_on_hold(sub_id, user_id, start, end, mock_db)
         assert exc_info.value.status_code == 400
-        assert "3 months" in exc_info.value.detail
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "validation.subscription.window_too_long"
         svc.update.assert_not_called()
 
     def test_hold_end_before_start_returns_400(self, mock_db):
@@ -171,7 +172,7 @@ class TestPutSubscriptionOnHold:
             with pytest.raises(HTTPException) as exc_info:
                 put_subscription_on_hold(sub_id, user_id, start, end, mock_db)
         assert exc_info.value.status_code == 400
-        assert "already on hold" in exc_info.value.detail.lower()
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "subscription.already_on_hold"
 
     def test_hold_not_owner_returns_403(self, mock_db):
         sub_id = uuid4()
@@ -232,7 +233,7 @@ class TestResumeSubscription:
             with pytest.raises(HTTPException) as exc_info:
                 resume_subscription(sub_id, user_id, mock_db)
         assert exc_info.value.status_code == 400
-        assert "not on hold" in exc_info.value.detail.lower()
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "subscription.not_on_hold"
         svc.update.assert_not_called()
 
     def test_resume_not_owner_returns_403(self, mock_db):

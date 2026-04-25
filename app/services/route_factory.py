@@ -1392,7 +1392,9 @@ def create_subscription_routes() -> APIRouter:
             user_id = current_user.get("user_id")
             if not user_id:
                 raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
-            return put_subscription_on_hold(subscription_id, user_id, body.hold_start_date, body.hold_end_date, db)
+            return put_subscription_on_hold(
+                subscription_id, user_id, body.hold_start_date, body.hold_end_date, db, locale=locale
+            )
 
         @router.post("/{subscription_id}/resume", response_model=SubscriptionResponseSchema)
         def resume_subscription_route(
@@ -1407,7 +1409,7 @@ def create_subscription_routes() -> APIRouter:
             user_id = current_user.get("user_id")
             if not user_id:
                 raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
-            return resume_subscription(subscription_id, user_id, db)
+            return resume_subscription(subscription_id, user_id, db, locale=locale)
 
     router = create_crud_routes(
         config=config,

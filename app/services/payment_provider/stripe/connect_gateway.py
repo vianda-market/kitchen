@@ -13,28 +13,28 @@ import stripe
 from fastapi import HTTPException
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_error, log_info
 
 
-def _handle_stripe_error(e: Exception) -> HTTPException:
+def _handle_stripe_error(e: Exception, locale: str = "en") -> HTTPException:
     """Map Stripe exceptions to appropriate HTTP status codes. Never leak raw Stripe messages."""
     if isinstance(e, stripe.error.AuthenticationError):
         log_error(f"Stripe authentication error: {e}")
-        return HTTPException(status_code=500, detail="Payment provider authentication failed")
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_AUTH_FAILED, status=500, locale=locale)
     if isinstance(e, stripe.error.InvalidRequestError):
-        return HTTPException(
-            status_code=400, detail=f"Invalid request: {getattr(e, 'user_message', None) or 'check parameters'}"
-        )
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=400, locale=locale)
     if isinstance(e, stripe.error.PermissionError):
-        return HTTPException(status_code=400, detail="Payment provider account not ready for this operation")
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_NOT_READY, status=400, locale=locale)
     if isinstance(e, stripe.error.APIConnectionError):
-        return HTTPException(status_code=503, detail="Payment provider temporarily unavailable")
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_UNAVAILABLE, status=503, locale=locale)
     if isinstance(e, stripe.error.RateLimitError):
-        return HTTPException(status_code=429, detail="Payment provider rate limit exceeded")
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_RATE_LIMITED, status=429, locale=locale)
     if isinstance(e, stripe.error.StripeError):
         log_error(f"Stripe error: {e}")
-        return HTTPException(status_code=502, detail="Payment provider error")
-    return HTTPException(status_code=502, detail="Payment provider error")
+        return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=502, locale=locale)
+    return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=502, locale=locale)
 
 
 def _ensure_connect_configured() -> None:
@@ -165,6 +165,7 @@ def execute_supplier_payout(
     entity_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> dict:
     """
     Initiate a Stripe payout for an institution bill.
@@ -185,11 +186,13 @@ def execute_supplier_payout(
     # 1. Load bill
     bill = institution_bill_service.get_by_id(str(institution_bill_id), db)
     if not bill:
-        raise HTTPException(status_code=404, detail="Institution bill not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution bill")
     if bill.get("resolution") != "pending":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Bill resolution is '{bill.get('resolution')}'; only pending bills can be paid out",
+        raise envelope_exception(
+            ErrorCode.PAYMENT_PROVIDER_BILL_NOT_PENDING,
+            status=400,
+            locale=locale,
+            resolution=bill.get("resolution"),
         )
 
     # Check for an existing non-Failed payout (idempotency guard)
@@ -204,29 +207,25 @@ def execute_supplier_payout(
         )
         existing = cur.fetchone()
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"A payout for this bill already exists with status '{existing[1]}'",
+        raise envelope_exception(
+            ErrorCode.PAYMENT_PROVIDER_PAYOUT_EXISTS,
+            status=409,
+            locale=locale,
+            payout_status=existing[1],
         )
 
     # 2. Load entity
     entity = institution_entity_service.get_by_id(str(entity_id), db)
     if not entity:
-        raise HTTPException(status_code=404, detail="Institution entity not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution entity")
     connect_id = entity.get("payout_provider_account_id")
     if not connect_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Entity has no payout provider account. Complete onboarding first.",
-        )
+        raise envelope_exception(ErrorCode.PAYMENT_PROVIDER_ONBOARDING_REQUIRED, status=400, locale=locale)
 
     # Verify payouts_enabled via live Stripe check
     status_info = get_account_status(connect_id)
     if not status_info.get("payouts_enabled"):
-        raise HTTPException(
-            status_code=400,
-            detail="Stripe Connect account is not yet enabled for payouts. Supplier must complete onboarding.",
-        )
+        raise envelope_exception(ErrorCode.PAYMENT_PROVIDER_NOT_READY, status=400, locale=locale)
 
     # 3. Compute amount and idempotency_key; INSERT payout row as Pending
     amount = bill.get("amount") or 0
@@ -283,7 +282,7 @@ def execute_supplier_payout(
         raise
     except Exception as e:
         log_error(f"Payout execution failed for bill {institution_bill_id}: {e}")
-        raise _handle_stripe_error(e) from e
+        raise _handle_stripe_error(e, locale=locale) from e
 
     # 6. Return payout row
     with db.cursor() as cur:

@@ -9,9 +9,10 @@ Only customers who have completed a pickup (was_collected=true) can submit revie
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.dto.models import PlateReviewDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_insert, db_read
 from app.utils.log import log_info
 
@@ -25,6 +26,7 @@ def create_review(
     *,
     would_order_again: bool | None = None,
     comment: str | None = None,
+    locale: str = "en",
 ) -> PlateReviewDTO:
     """
     Create a plate review. One review per pickup; immutable after creation.
@@ -37,6 +39,7 @@ def create_review(
         db: Database connection
         would_order_again: Optional boolean — would user order this plate again
         comment: Optional text feedback for the restaurant (max 500 chars)
+        locale: Response locale
 
     Returns:
         PlateReviewDTO of the created review
@@ -56,19 +59,16 @@ def create_review(
         fetch_one=True,
     )
     if not pickup:
-        raise HTTPException(status_code=404, detail="Pickup not found")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_NOT_FOUND, status=404, locale=locale)
 
     if str(pickup["user_id"]) != str(user_id):
-        raise HTTPException(status_code=403, detail="Pickup does not belong to you")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_ACCESS_DENIED, status=403, locale=locale)
 
     if not pickup.get("was_collected"):
-        raise HTTPException(
-            status_code=403,
-            detail="You can only review plates you have picked up. Complete the pickup first.",
-        )
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_NOT_ELIGIBLE, status=403, locale=locale)
 
     if pickup.get("is_archived"):
-        raise HTTPException(status_code=400, detail="Cannot review an archived pickup")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_PICKUP_ARCHIVED, status=400, locale=locale)
 
     # 2. Check no review exists for this pickup
     existing = db_read(
@@ -81,10 +81,7 @@ def create_review(
         fetch_one=True,
     )
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="This pickup has already been reviewed. Reviews are immutable.",
-        )
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_ALREADY_EXISTS, status=400, locale=locale)
 
     # 3. Insert review
     data = {
@@ -270,6 +267,7 @@ def file_portion_complaint(
     complaint_text: str | None,
     photo_storage_path: str | None,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> dict:
     """
     File a portion complaint for a review with portion_size_rating == 1.
@@ -280,6 +278,7 @@ def file_portion_complaint(
         complaint_text: Optional details about the portion issue
         photo_storage_path: Optional GCS path to complaint photo
         db: Database connection
+        locale: Response locale
 
     Returns:
         Dict with complaint details
@@ -299,14 +298,11 @@ def file_portion_complaint(
         fetch_one=True,
     )
     if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_NOT_FOUND, status=404, locale=locale)
     if str(review["user_id"]) != str(user_id):
-        raise HTTPException(status_code=403, detail="Review does not belong to you")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_ACCESS_DENIED, status=403, locale=locale)
     if review["portion_size_rating"] != 1:
-        raise HTTPException(
-            status_code=400,
-            detail="Portion complaints can only be filed for reviews with portion size rating of 1 (small)",
-        )
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_INVALID_PORTION_RATING, status=400, locale=locale)
 
     # Check no existing complaint for this review
     existing = db_read(
@@ -316,7 +312,7 @@ def file_portion_complaint(
         fetch_one=True,
     )
     if existing:
-        raise HTTPException(status_code=400, detail="A portion complaint has already been filed for this review")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_COMPLAINT_EXISTS, status=400, locale=locale)
 
     # Get restaurant_id from the pickup
     pickup = db_read(

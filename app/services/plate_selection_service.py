@@ -11,12 +11,13 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
 from app.dto.models import (
     PlateSelectionDTO,
 )
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.billing import (
     apply_subscription_renewal,
 )
@@ -44,7 +45,7 @@ from .plate_selection_validation import (
 
 
 def create_plate_selection_with_transactions(
-    payload: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
+    payload: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
 ) -> PlateSelectionDTO:
     """
     Create a plate selection with all related transactions.
@@ -55,11 +56,13 @@ def create_plate_selection_with_transactions(
     Raises:
         HTTPException: For validation errors, missing resources, or system failures
     """
+    from fastapi import HTTPException
+
     try:
         # Step 1: Validate and fetch required data
-        context = _fetch_plate_selection_context(payload, db)
+        context = _fetch_plate_selection_context(payload, db, locale)
         if not context:
-            raise HTTPException(status_code=400, detail="Invalid plate selection data or missing required resources")
+            raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=400, locale=locale)
 
         # Step 2: Determine target kitchen day
         timezone_str = (
@@ -135,15 +138,12 @@ def create_plate_selection_with_transactions(
                 cancel_plate_selection(UUID(existing_id), current_user, db, commit=False)
             else:
                 # Duplicate without valid replace: return structured 409 for frontend modal
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "DUPLICATE_KITCHEN_DAY",
-                        "kitchen_day": context["target_day"],
-                        "existing_plate_selection_id": existing_id,
-                        "message": f"You already have a plate reserved for {context['target_day']}. "
-                        "Continue to cancel your meal and reserve this plate?",
-                    },
+                raise envelope_exception(
+                    ErrorCode.PLATE_SELECTION_DUPLICATE_KITCHEN_DAY,
+                    status=409,
+                    locale=locale,
+                    kitchen_day=context["target_day"],
+                    existing_plate_selection_id=existing_id,
                 )
 
         # Step 2.75: Low-balance early renewal (only when renewal_date is in the future and threshold is set)
@@ -193,10 +193,12 @@ def create_plate_selection_with_transactions(
         # Step 4: Create the plate selection (only if credits are sufficient)
         # Client transaction, subscription balance, plate_pickup_live, and restaurant_transaction
         # are all created at kitchen_start by the promotion cron.
-        selection = _create_plate_selection_record(context, current_user, db)
+        selection = _create_plate_selection_record(context, current_user, db, locale)
         if not selection:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to create plate selection record")
+            raise envelope_exception(
+                ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="plate selection"
+            )
 
         # Commit
         db.commit()
@@ -213,10 +215,14 @@ def create_plate_selection_with_transactions(
         # Rollback on any unexpected error
         db.rollback()
         log_error(f"Error creating plate selection: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create plate selection") from None
+        raise envelope_exception(
+            ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="plate selection"
+        ) from None
 
 
-def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensions.connection) -> dict[str, Any]:
+def _fetch_plate_selection_context(
+    payload: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
+) -> dict[str, Any]:
     """
     Fetch all required data for plate selection in one place.
 
@@ -228,17 +234,17 @@ def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensi
     try:
         plate_id = UUID(str(payload["plate_id"]))
     except (ValueError, KeyError):
-        raise HTTPException(status_code=400, detail=f"Invalid plate_id format: {payload.get('plate_id')}") from None
+        raise envelope_exception(ErrorCode.DATABASE_INVALID_UUID, status=400, locale=locale) from None
 
     # Fetch plate
     plate = plate_service.get_by_id(plate_id, db)
     if not plate:
-        raise HTTPException(status_code=404, detail=f"Plate not found for plate_id {plate_id}")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plate")
 
     # Fetch restaurant
     restaurant = restaurant_service.get_by_id(plate.restaurant_id, db)
     if not restaurant:
-        raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {plate.restaurant_id}")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Restaurant")
 
     # Validate restaurant status - must be 'Active' to accept plate selections
     validate_restaurant_status(restaurant)
@@ -248,12 +254,12 @@ def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensi
 
     address = address_service.get_by_id(restaurant.address_id, db)
     if not address:
-        raise HTTPException(status_code=404, detail=f"Address not found for address_id {restaurant.address_id}")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Address")
 
     # Fetch QR code
     qr_code = qr_code_service.get_by_restaurant(plate.restaurant_id, db)
     if not qr_code:
-        raise HTTPException(status_code=404, detail=f"No QR code found for restaurant {plate.restaurant_id}")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="QR code")
 
     # Fetch credit currency (from institution_entity, not restaurant)
     from app.services.entity_service import get_currency_metadata_id_for_restaurant
@@ -261,7 +267,7 @@ def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensi
     currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
     credit_currency = credit_currency_service.get_by_id(currency_metadata_id, db)
     if not credit_currency:
-        raise HTTPException(status_code=404, detail=f"Credit currency not found for restaurant {plate.restaurant_id}")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
 
     # Fetch kitchen days for the plate
     # Note: We pass scope=None to get all kitchen days (not filtered by institution)
@@ -284,7 +290,7 @@ def _fetch_plate_selection_context(payload: dict[str, Any], db: psycopg2.extensi
 
 
 def _create_plate_selection_record(
-    context: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
+    context: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
 ) -> PlateSelectionDTO:
     """
     Create the main plate selection record.
@@ -302,7 +308,7 @@ def _create_plate_selection_record(
 
     target_date = context.get("target_date")
     if not target_date:
-        raise HTTPException(status_code=500, detail="Missing target_date in context for plate selection creation")
+        raise envelope_exception(ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="plate selection")
 
     data = {
         "user_id": current_user["user_id"],
@@ -324,7 +330,7 @@ def _create_plate_selection_record(
     if selection:
         log_info(f"Created plate selection: {selection.plate_selection_id} (commit deferred)")
         return selection
-    raise HTTPException(status_code=500, detail=f"Failed to create plate selection with data: {data}")
+    raise envelope_exception(ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="plate selection")
 
 
 # Fields that may NOT be modified via PATCH. To change plate, user must cancel and create new.
@@ -349,7 +355,11 @@ _PATCH_FORBIDDEN_FIELDS = frozenset(
 
 
 def update_plate_selection(
-    plate_selection_id: UUID, payload: dict[str, Any], current_user: dict[str, Any], db: psycopg2.extensions.connection
+    plate_selection_id: UUID,
+    payload: dict[str, Any],
+    current_user: dict[str, Any],
+    db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> PlateSelectionDTO:
     """
     Update a plate selection. Only pickup_time_range, pickup_intent, flexible_on_time,
@@ -362,25 +372,22 @@ def update_plate_selection(
     # Reject attempts to modify non-editable fields
     forbidden_in_payload = [k for k in payload if k in _PATCH_FORBIDDEN_FIELDS]
     if forbidden_in_payload:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot modify {', '.join(sorted(forbidden_in_payload))}. "
-            "Only pickup_time_range, pickup_intent, and flexible_on_time are editable. "
-            "To change the plate, cancel this selection and create a new one.",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_IMMUTABLE_FIELDS,
+            status=400,
+            locale=locale,
+            fields=", ".join(sorted(forbidden_in_payload)),
         )
 
     selection = plate_selection_service.get_by_id_non_archived(plate_selection_id, db)
     if not selection:
-        raise HTTPException(status_code=404, detail="Plate selection not found")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=404, locale=locale)
 
     if str(selection.user_id) != str(current_user["user_id"]):
-        raise HTTPException(status_code=403, detail="Not authorized to update this plate selection")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_ACCESS_DENIED, status=403, locale=locale)
 
     if not is_plate_selection_editable(plate_selection_id, db):
-        raise HTTPException(
-            status_code=400,
-            detail="Plate selection is no longer editable. Edits are allowed until 1 hour before kitchen day opens.",
-        )
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_EDITABLE, status=400, locale=locale)
 
     updates = {}
     if "pickup_time_range" in payload and payload["pickup_time_range"] is not None:
@@ -388,13 +395,15 @@ def update_plate_selection(
     if "pickup_intent" in payload and payload["pickup_intent"] is not None:
         intent = payload["pickup_intent"]
         if intent not in ("offer", "request", "self"):
+            from fastapi import HTTPException
+
             raise HTTPException(status_code=422, detail="pickup_intent must be offer, request, or self")
         updates["pickup_intent"] = intent
     if "flexible_on_time" in payload:
         updates["flexible_on_time"] = payload["flexible_on_time"] if payload.get("pickup_intent") == "request" else None
 
     if payload.get("cancel") is True:
-        return cancel_plate_selection(plate_selection_id, current_user, db)
+        return cancel_plate_selection(plate_selection_id, current_user, db, locale=locale)
 
     if not updates:
         return selection
@@ -402,7 +411,7 @@ def update_plate_selection(
     updates["modified_by"] = current_user["user_id"]
     updated = plate_selection_service.update(plate_selection_id, updates, db)
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update plate selection")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="plate selection")
     log_info(f"Updated plate selection {plate_selection_id}")
     return updated
 
@@ -412,6 +421,7 @@ def cancel_plate_selection(
     current_user: dict[str, Any],
     db: psycopg2.extensions.connection,
     commit: bool = True,
+    locale: str = "en",
 ) -> PlateSelectionDTO:
     """
     Cancel a plate selection: soft-delete selection and related records.
@@ -423,20 +433,17 @@ def cancel_plate_selection(
 
     selection = plate_selection_service.get_by_id_non_archived(plate_selection_id, db)
     if not selection:
-        raise HTTPException(status_code=404, detail="Plate selection not found")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=404, locale=locale)
 
     if str(selection.user_id) != str(current_user["user_id"]):
-        raise HTTPException(status_code=403, detail="Not authorized to cancel this plate selection")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_ACCESS_DENIED, status=403, locale=locale)
 
     if not is_plate_selection_editable(plate_selection_id, db):
-        raise HTTPException(
-            status_code=400,
-            detail="Plate selection is no longer editable. Cancellation is allowed until 1 hour before kitchen day opens.",
-        )
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_CANCELLABLE, status=400, locale=locale)
 
     plate = plate_service.get_by_id(selection.plate_id, db)
     if not plate:
-        raise HTTPException(status_code=404, detail="Plate not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plate")
 
     try:
         # No refund after lock: credits are forfeited; restaurant keeps no-show discount.
@@ -461,18 +468,22 @@ def cancel_plate_selection(
         selection.is_archived = True
         selection.status = Status.CANCELLED if hasattr(Status, "CANCELLED") else Status.INACTIVE
         return selection
-    except HTTPException:
-        db.rollback()
-        raise
     except Exception as e:
+        from fastapi import HTTPException
+
+        if isinstance(e, HTTPException):
+            db.rollback()
+            raise
         db.rollback()
         log_error(f"Error cancelling plate selection: {e}")
-        raise HTTPException(status_code=500, detail="Failed to cancel plate selection") from None
+        raise envelope_exception(
+            ErrorCode.ENTITY_DELETION_FAILED, status=500, locale=locale, entity="plate selection"
+        ) from None
 
 
 def delete_plate_selection(
-    plate_selection_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection
+    plate_selection_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
 ) -> dict[str, str]:
     """Delete (cancel) a plate selection. Same as cancel - soft-deletes selection and archives."""
-    cancel_plate_selection(plate_selection_id, current_user, db)
+    cancel_plate_selection(plate_selection_id, current_user, db, locale=locale)
     return {"detail": "Plate selection deleted successfully"}

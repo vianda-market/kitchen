@@ -13,6 +13,8 @@ import psycopg2.extensions
 
 from app.config import Status
 from app.dto.models import PaymentMethodDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import payment_method_service
 from app.utils.log import log_info, log_warning
@@ -118,6 +120,7 @@ def create_payment_method_with_address(
     current_user: dict[str, Any],
     db: psycopg2.extensions.connection,
     scope: InstitutionScope | None = None,
+    locale: str = "en",
 ) -> PaymentMethodDTO:
     """
     Create payment method with address (atomic transaction).
@@ -132,6 +135,7 @@ def create_payment_method_with_address(
         current_user: Current user information
         db: Database connection
         scope: Optional institution scope
+        locale: Response locale
 
     Returns:
         Created payment method DTO
@@ -139,7 +143,7 @@ def create_payment_method_with_address(
     Raises:
         HTTPException: For validation or creation failures
     """
-    from fastapi import HTTPException, status
+    from fastapi import HTTPException
 
     from app.services.address_service import address_business_service
 
@@ -148,16 +152,12 @@ def create_payment_method_with_address(
 
     # Validate: cannot provide both address_id and address_data
     if address_id and address_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot provide both address_id and address_data. Provide one or the other.",
-        )
+        raise envelope_exception(ErrorCode.VALIDATION_PAYMENT_CONFLICTING_ADDRESS_FIELDS, status=400, locale=locale)
 
     # Validate: payment methods requiring address must have address_id or address_data
     if requires_address and not address_id and not address_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Payment method type '{method_type}' requires an address. Provide address_id or address_data.",
+        raise envelope_exception(
+            ErrorCode.VALIDATION_PAYMENT_ADDRESS_REQUIRED, status=400, locale=locale, method_type=method_type
         )
 
     try:
@@ -201,8 +201,8 @@ def create_payment_method_with_address(
         )
 
         if not payment_method:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create payment method"
+            raise envelope_exception(
+                ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="payment method"
             )
 
         # Commit once at end (both address and payment_method committed together)
@@ -218,13 +218,11 @@ def create_payment_method_with_address(
         return payment_method
 
     except HTTPException:
-        # Re-raise HTTP exceptions
+        # Re-raise HTTP exceptions (envelope_exception raises HTTPException)
         db.rollback()
         raise
     except Exception as e:
-        # Rollback on any error
+        # Rollback on any error; suppress internal detail per Decision F
         db.rollback()
         log_warning(f"Failed to create payment method with address: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create payment method: {str(e)}"
-        ) from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None

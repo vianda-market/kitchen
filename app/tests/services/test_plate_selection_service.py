@@ -5,6 +5,7 @@ Tests the business logic for plate selection operations including
 validation, transaction creation, and balance management.
 """
 
+from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
@@ -31,7 +32,7 @@ class TestPlateSelectionService:
             create_plate_selection_with_transactions(invalid_payload, sample_current_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "Invalid plate_id format" in str(exc_info.value.detail)
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "database.invalid_uuid"
 
     def test_create_plate_selection_with_transactions_handles_plate_not_found(self, sample_current_user, mock_db):
         """Test that plate selection creation handles plate not found."""
@@ -113,7 +114,9 @@ class TestPlateSelectionService:
                 create_plate_selection_with_transactions(payload, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "No QR code found" in str(exc_info.value.detail)
+            d = cast(dict[str, Any], exc_info.value.detail)
+            assert d["code"] == "entity.not_found"
+            assert d["params"]["entity"] == "QR code"
 
     def test_create_plate_selection_with_transactions_handles_currency_not_found(self, sample_current_user, mock_db):
         """Test that plate selection creation handles credit currency not found."""
@@ -271,7 +274,7 @@ class TestPlateSelectionService:
             create_plate_selection_with_transactions(payload, sample_current_user, mock_db)
 
         assert exc_info.value.status_code == 400
-        assert "Invalid plate_id format" in str(exc_info.value.detail)
+        assert cast(dict[str, Any], exc_info.value.detail)["code"] == "database.invalid_uuid"
 
     def test_create_plate_selection_with_transactions_blocks_insufficient_credits(self, sample_current_user, mock_db):
         """Test that plate selection is blocked when user has insufficient credits."""
@@ -354,7 +357,7 @@ class TestPlateSelectionService:
                 create_plate_selection_with_transactions(payload, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 402  # Payment Required
-            error_detail = exc_info.value.detail
+            error_detail = cast(dict[str, Any], exc_info.value.detail)
             assert error_detail["error_type"] == "insufficient_credits"
             assert error_detail["current_balance"] == 3.0
             assert error_detail["required_credits"] == 5.0
@@ -522,11 +525,11 @@ class TestPlateSelectionService:
                 create_plate_selection_with_transactions(payload, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 409
-            detail = exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
             assert isinstance(detail, dict)
-            assert detail.get("code") == "DUPLICATE_KITCHEN_DAY"
-            assert detail.get("kitchen_day") == "monday"
-            assert detail.get("existing_plate_selection_id") == existing_id
+            assert detail.get("code") == "plate_selection.duplicate_kitchen_day"
+            assert detail["params"].get("kitchen_day") == "monday"
+            assert detail["params"].get("existing_plate_selection_id") == existing_id
             assert "Continue to cancel your meal and reserve this plate" in detail.get("message", "")
 
     def test_create_plate_selection_replace_existing_success(self, sample_current_user, mock_db):
@@ -699,10 +702,10 @@ class TestPlateSelectionService:
                 create_plate_selection_with_transactions(payload, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 409
-            detail = exc_info.value.detail
+            detail = cast(dict[str, Any], exc_info.value.detail)
             assert isinstance(detail, dict)
-            assert detail.get("code") == "DUPLICATE_KITCHEN_DAY"
-            assert detail.get("existing_plate_selection_id") == actual_existing_id
+            assert detail.get("code") == "plate_selection.duplicate_kitchen_day"
+            assert detail["params"].get("existing_plate_selection_id") == actual_existing_id
 
 
 class TestUpdatePlateSelection:
