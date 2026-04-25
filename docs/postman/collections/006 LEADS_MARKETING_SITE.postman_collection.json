@@ -326,7 +326,7 @@
 								"exec": [
 									"pm.test('Status is 422', () => pm.response.to.have.status(422));",
 									"const body = pm.response.json();",
-									"pm.test('detail is validation envelope array for invalid language', () => {\n  pm.expect(body.detail).to.be.an('array').and.have.length.above(0);\n  pm.expect(body.detail[0].message).to.match(/[Uu]nsupported language/);\n});"
+									"pm.test('detail is legacy-uncoded envelope mentioning unsupported language', () => {\n  pm.expect(body.detail).to.be.an('object');\n  pm.expect(body.detail.message).to.match(/[Uu]nsupported language/);\n});"
 								]
 							}
 						}
