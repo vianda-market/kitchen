@@ -110,5 +110,3 @@ def test_allowlist_is_minimal() -> None:
         f"ALLOWLISTED entries do not correspond to any ErrorCode member: {stale}\n"
         "Remove them from the allowlist in this test file."
     )
-
-

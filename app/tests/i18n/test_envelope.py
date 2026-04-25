@@ -41,9 +41,7 @@ def test_envelope_exception_returns_httpexception_with_envelope_detail():
 
 
 def test_envelope_exception_passes_params_through():
-    exc = envelope_exception(
-        ErrorCode.REQUEST_RATE_LIMITED, status=429, locale="en", retry_after_seconds=60
-    )
+    exc = envelope_exception(ErrorCode.REQUEST_RATE_LIMITED, status=429, locale="en", retry_after_seconds=60)
     assert exc.status_code == 429
     assert exc.detail["params"] == {"retry_after_seconds": 60}
 
