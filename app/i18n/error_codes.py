@@ -166,6 +166,34 @@ class ErrorCode(StrEnum):
     # Institution entity management errors. Wired in K8 (route_factory sweep).
     INSTITUTION_ENTITY_MARKET_MISMATCH = "institution_entity.market_mismatch"
 
+    # ── user.signup.* ─────────────────────────────────────────────────────
+    # User signup and account validation errors. Wired in K9 (user identity sweep).
+    USER_CITY_NOT_FOUND = "user.city_not_found"
+    USER_CITY_ARCHIVED = "user.city_archived"
+    USER_CITY_MUST_BE_SPECIFIC = "user.city_must_be_specific"
+    USER_CITY_REQUIRED = "user.city_required"
+    USER_CITY_COUNTRY_MISMATCH = "user.city_country_mismatch"
+    USER_MARKET_NOT_FOUND = "user.market_not_found"
+    USER_MARKET_ARCHIVED = "user.market_archived"
+    USER_MARKET_GLOBAL_NOT_ALLOWED = "user.market_global_not_allowed"
+    USER_MARKET_ID_INVALID = "user.market_id_invalid"
+    USER_SIGNUP_CODE_INVALID = "user.signup_code_invalid"
+    USER_SIGNUP_COUNTRY_REQUIRED = "user.signup_country_required"
+    USER_SIGNUP_INSTITUTION_REQUIRED = "user.signup_institution_required"
+    USER_LOOKUP_PARAM_REQUIRED = "user.lookup_param_required"
+    USER_ADDRESS_NOT_FOUND = "user.address_not_found"
+    USER_ADDRESS_ARCHIVED = "user.address_archived"
+    USER_ADDRESS_INSTITUTION_MISMATCH = "user.address_institution_mismatch"
+    USER_WORKPLACE_GROUP_NOT_FOUND = "user.workplace_group_not_found"
+    USER_WORKPLACE_GROUP_ARCHIVED = "user.workplace_group_archived"
+    USER_INVITE_NO_EMAIL = "user.invite_no_email"
+    USER_ONBOARDING_CUSTOMER_ONLY = "user.onboarding_customer_only"
+
+    # ── server.* ───────────────────────────────────────────────────────────
+    # Generic server-side errors used when suppressing internal-ops jargon
+    # per Decision F (K9 sweep). The original detail is logged server-side.
+    SERVER_INTERNAL_ERROR = "server.internal_error"
+
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
     DATABASE_DUPLICATE_KEY = "database.duplicate_key"

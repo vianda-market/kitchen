@@ -14,7 +14,6 @@ from uuid import UUID
 
 import psycopg2.extensions
 import psycopg2.extras
-from fastapi import HTTPException, status
 
 from app.auth.security import create_access_token
 from app.auth.utils import build_token_data, merge_onboarding_token_claims, merge_subscription_token_claims
@@ -22,6 +21,8 @@ from app.config import RoleName, RoleType, Status
 from app.config.settings import get_vianda_customers_institution_id, get_vianda_enterprises_institution_id
 from app.config.supported_cities import GLOBAL_CITY_ID, is_global_city
 from app.dto.models import UserDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import city_service
 from app.services.email_service import email_service
@@ -103,7 +104,9 @@ class UserSignupService:
             "institution_entity_id": UUID(str(row["institution_entity_id"])),
         }
 
-    def process_customer_signup(self, user_data: dict[str, Any], db: psycopg2.extensions.connection) -> UserDTO:
+    def process_customer_signup(
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
+    ) -> UserDTO:
         """
         Process customer self-registration with business rules.
 
@@ -118,16 +121,16 @@ class UserSignupService:
             HTTPException: For validation or creation failures
         """
         # Validate signup data
-        self._validate_signup_data(user_data)
+        self._validate_signup_data(user_data, locale=locale)
 
         # Resolve country_code to market_id (B2C signup uses country_code)
-        self._resolve_country_code_to_market_id(user_data, db)
+        self._resolve_country_code_to_market_id(user_data, db, locale=locale)
 
         # Process password security
         self._process_password_security(user_data)
 
         # Apply business rules for customer signup (market_id must be in user_data at this point)
-        self._apply_customer_signup_rules(user_data, db)
+        self._apply_customer_signup_rules(user_data, db, locale=locale)
 
         # Create user with validation
         new_user = create_user_with_validation(user_data, db)
@@ -142,6 +145,7 @@ class UserSignupService:
         db: psycopg2.extensions.connection,
         *,
         scope: InstitutionScope | None = None,
+        locale: str = "en",
     ) -> UserDTO:
         """
         Process admin user creation with business rules.
@@ -158,7 +162,7 @@ class UserSignupService:
             HTTPException: For validation or creation failures
         """
         # Validate user data
-        self._validate_user_data(user_data)
+        self._validate_user_data(user_data, locale=locale)
 
         # Process password security
         self._process_password_security(user_data)
@@ -179,10 +183,10 @@ class UserSignupService:
             log_info("Assigned Vianda Enterprises institution for Internal user")
 
         # Enforce institution scope for non-global users
-        self._apply_scope_constraints(user_data, scope)
+        self._apply_scope_constraints(user_data, scope, locale=locale)
 
         # Resolve and validate market_id (default Global for Admin/Super Admin/Supplier Admin; require for Manager/Operator; Managers cannot assign Global)
-        self._resolve_market_id_for_admin_creation(user_data, current_user, db)
+        self._resolve_market_id_for_admin_creation(user_data, current_user, db, locale=locale)
         if not user_data.get("locale"):
             mid = user_data.get("market_id")
             if mid:
@@ -196,7 +200,7 @@ class UserSignupService:
         if market_ids_list:
             user_data["market_id"] = market_ids_list[0]
         # Supplier and Employer: user's market must be within institution's market(s)
-        self._ensure_user_market_within_institution(user_data, db)
+        self._ensure_user_market_within_institution(user_data, db, locale=locale)
         # Internal or Supplier: default city_metadata_id to Global when not provided
         rt_str = (
             (
@@ -222,20 +226,14 @@ class UserSignupService:
         # Customer+Comensal created via B2B: require city_metadata_id, reject Global
         if self._is_customer_comensal(user_data):
             if not user_data.get("city_metadata_id"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="city_metadata_id is required for Customer (Comensal). Use GET /api/v1/cities/?country_code=... (not the Global city).",
-                )
+                raise envelope_exception(ErrorCode.USER_CITY_REQUIRED, status=400, locale=locale)
             cid = (
                 user_data["city_metadata_id"]
                 if isinstance(user_data["city_metadata_id"], UUID)
                 else UUID(str(user_data["city_metadata_id"]))
             )
             if is_global_city(cid):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Global city cannot be assigned to Customer (Comensal).",
-                )
+                raise envelope_exception(ErrorCode.USER_CITY_MUST_BE_SPECIFIC, status=400, locale=locale)
         # Create user with validation
         new_user = create_user_with_validation(user_data, db, scope=scope)
         if market_ids_list:
@@ -247,12 +245,13 @@ class UserSignupService:
             self._send_b2b_invite_email(new_user.user_id, new_user.email, new_user.first_name, db)
         return new_user
 
-    def _validate_signup_data(self, user_data: dict[str, Any]) -> None:
+    def _validate_signup_data(self, user_data: dict[str, Any], locale: str = "en") -> None:
         """
         Validate customer signup data.
 
         Args:
             user_data: User data dictionary
+            locale: Locale for error messages
 
         Raises:
             HTTPException: For validation failures
@@ -261,28 +260,25 @@ class UserSignupService:
         missing_fields = [field for field in required_fields if not user_data.get(field)]
 
         if missing_fields:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required fields: {', '.join(missing_fields)}"
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale=locale)
 
         # Validate email format (basic validation)
         email = user_data.get("email", "").strip().lower()
         if "@" not in email or "." not in email:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email format")
+            raise envelope_exception(ErrorCode.VALIDATION_INVALID_FORMAT, status=400, locale=locale)
 
         # Validate password strength (basic validation)
         password = user_data.get("password", "")
         if len(password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters long"
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_VALUE_TOO_SHORT, status=400, locale=locale)
 
-    def _validate_user_data(self, user_data: dict[str, Any]) -> None:
+    def _validate_user_data(self, user_data: dict[str, Any], locale: str = "en") -> None:
         """
         Validate general user data for admin creation.
 
         Args:
             user_data: User data dictionary
+            locale: Locale for error messages
 
         Raises:
             HTTPException: For validation failures
@@ -291,20 +287,16 @@ class UserSignupService:
         missing_fields = [field for field in required_fields if not user_data.get(field)]
 
         if missing_fields:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required fields: {', '.join(missing_fields)}"
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale=locale)
 
         # Validate email format
         email = user_data.get("email", "").strip().lower()
         if "@" not in email or "." not in email:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email format")
+            raise envelope_exception(ErrorCode.VALIDATION_INVALID_FORMAT, status=400, locale=locale)
 
         # Validate required fields for admin creation (institution_id optional for Customer+Comensal)
         if not user_data.get("role_type") or not user_data.get("role_name"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Role type and role name are required for user creation"
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale=locale)
 
         # Customer+Comensal and Internal get institution_id assigned by the backend
         if (
@@ -312,10 +304,7 @@ class UserSignupService:
             and not self._is_internal(user_data)
             and not user_data.get("institution_id")
         ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institution ID is required for user creation (except Customer+Comensal and Internal)",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_INSTITUTION_REQUIRED, status=400, locale=locale)
 
     def _process_password_security(self, user_data: dict[str, Any]) -> None:
         """
@@ -337,44 +326,31 @@ class UserSignupService:
             log_info(f"   Hash length: {len(hashed_pwd)}")
             log_info(f"   Hash starts with: {hashed_pwd[:20]}...")
 
-    def _resolve_country_code_to_market_id(self, user_data: dict[str, Any], db: psycopg2.extensions.connection) -> None:
+    def _resolve_country_code_to_market_id(
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
+    ) -> None:
         """
         Resolve country_code to market_id for B2C signup. Requires active, non-archived, non-Global market.
         Raises HTTPException 400 if missing, invalid, archived, or Global.
         """
         country_code_raw = user_data.get("country_code")
         if not country_code_raw or not str(country_code_raw).strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="country_code is required. Use GET /api/v1/leads/markets for valid country codes.",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_COUNTRY_REQUIRED, status=400, locale=locale)
         country_code = normalize_country_code(country_code_raw)
         if not country_code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid country_code. Use GET /api/v1/leads/markets for valid country codes.",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_COUNTRY_REQUIRED, status=400, locale=locale)
         market = market_service.get_by_country_code(country_code)
         if not market:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No market found for country {country_code}. Use GET /api/v1/leads/markets for supported countries.",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         if market.get("is_archived"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Market for {country_code} is archived. Use GET /api/v1/leads/markets for active countries.",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_ARCHIVED, status=400, locale=locale)
         market_id = market["market_id"] if isinstance(market["market_id"], UUID) else UUID(str(market["market_id"]))
         if is_global_market(market_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Global Marketplace cannot be assigned to B2C customers. Use a country from GET /api/v1/leads/markets.",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_GLOBAL_NOT_ALLOWED, status=400, locale=locale)
         user_data["market_id"] = market_id
 
     def _validate_and_resolve_city_metadata_id(
-        self, user_data: dict[str, Any], db: psycopg2.extensions.connection
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
     ) -> None:
         """
         Require and validate city for B2C signup. Accepts city_metadata_id or city_name.
@@ -393,16 +369,10 @@ class UserSignupService:
         elif city_name_raw:
             market_id = user_data.get("market_id")
             if not market_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="market_id is required before resolving city_name.",
-                )
+                raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
             market = market_service.get_by_id(market_id if isinstance(market_id, UUID) else UUID(str(market_id)))
             if not market:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid market_id. Use GET /api/v1/leads/markets.",
-                )
+                raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
             market_country = (market.get("country_code") or "").strip().upper()
             # Resolve city_name → city_metadata_id via JOIN to external.geonames_city (display name source).
             # Matches case-insensitively against the display override (if set) or the canonical GeoNames name.
@@ -423,33 +393,18 @@ class UserSignupService:
                 fetch_one=True,
             )
             if not matched_row:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"City '{city_name_raw}' not found for country {market_country}. Use GET /api/v1/leads/cities?country_code={market_country}.",
-                )
+                raise envelope_exception(ErrorCode.USER_CITY_NOT_FOUND, status=400, locale=locale)
             city_metadata_id = matched_row["city_metadata_id"]
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either city_metadata_id or city_name is required. Use GET /api/v1/leads/cities?country_code=... for city names.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_REQUIRED, status=400, locale=locale)
 
         if is_global_city(city_metadata_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Global city cannot be assigned to B2C customers. Use a city from GET /api/v1/cities/?country_code=... for your market.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_MUST_BE_SPECIFIC, status=400, locale=locale)
         city = city_service.get_by_id(city_metadata_id, db, scope=None)
         if not city:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived city_metadata_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_NOT_FOUND, status=400, locale=locale)
         if city.is_archived:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or archived city_metadata_id. Use GET /api/v1/cities/?country_code=... to get valid city UUIDs.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_ARCHIVED, status=400, locale=locale)
         market_id = user_data.get("market_id")
         if market_id:
             market = market_service.get_by_id(market_id if isinstance(market_id, UUID) else UUID(str(market_id)))
@@ -457,14 +412,11 @@ class UserSignupService:
                 market_country = (market.get("country_code") or "").strip().upper()
                 city_country = (city.country_iso or "").strip().upper()
                 if market_country != city_country:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"City must be in the same country as your market. City country: {city_country}, market country: {market_country}.",
-                    )
+                    raise envelope_exception(ErrorCode.USER_CITY_COUNTRY_MISMATCH, status=400, locale=locale)
         user_data["city_metadata_id"] = city_metadata_id
 
     def _apply_customer_signup_rules(
-        self, user_data: dict[str, Any], db: psycopg2.extensions.connection | None = None
+        self, user_data: dict[str, Any], db: psycopg2.extensions.connection | None = None, locale: str = "en"
     ) -> None:
         """
         Apply business rules for customer self-registration.
@@ -501,20 +453,14 @@ class UserSignupService:
 
         # market_id is required; must come from client (request) or pending row (verify)
         if user_data.get("market_id") is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required for customer signup.",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         market_id = (
             user_data["market_id"] if isinstance(user_data["market_id"], UUID) else UUID(str(user_data["market_id"]))
         )
         if db:
             market = market_service.get_by_id(market_id)
             if not market or market.get("is_archived"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or archived market_id from signup. Please request a new verification code.",
-                )
+                raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         user_data["market_id"] = market_id
 
         mkt_lang = market_service.get_by_id(market_id)
@@ -522,26 +468,17 @@ class UserSignupService:
 
         # city_metadata_id is required; must come from client (request) or pending row (verify)
         if user_data.get("city_metadata_id") is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="city_metadata_id is required for customer signup.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_REQUIRED, status=400, locale=locale)
         city_metadata_id_raw = user_data["city_metadata_id"]
         city_metadata_id = (
             city_metadata_id_raw if isinstance(city_metadata_id_raw, UUID) else UUID(str(city_metadata_id_raw))
         )
         if is_global_city(city_metadata_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Global city cannot be assigned to B2C customers.",
-            )
+            raise envelope_exception(ErrorCode.USER_CITY_MUST_BE_SPECIFIC, status=400, locale=locale)
         if db:
             city = city_service.get_by_id(city_metadata_id, db, scope=None)
             if not city or city.is_archived:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or archived city_metadata_id from signup. Please request a new verification code.",
-                )
+                raise envelope_exception(ErrorCode.USER_CITY_NOT_FOUND, status=400, locale=locale)
         user_data["city_metadata_id"] = city_metadata_id
 
         log_info(
@@ -665,6 +602,7 @@ class UserSignupService:
         rt_str: str,
         rn_str: str,
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """Default market_id from institution's primary market for Supplier Admin and Employer."""
         is_supplier_admin = rt_str == "supplier" and rn_str == "admin"
@@ -674,10 +612,7 @@ class UserSignupService:
             return
         inst_id = user_data.get("institution_id")
         if not inst_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="institution_id is required for Supplier and Employer",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_INSTITUTION_REQUIRED, status=400, locale=locale)
         inst_id = inst_id if isinstance(inst_id, UUID) else UUID(str(inst_id))
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
@@ -686,28 +621,21 @@ class UserSignupService:
             )
             row = cursor.fetchone()
         if not row or not row.get("market_id"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="institution_id is required for Supplier and Employer; institution must have assigned markets",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_INSTITUTION_REQUIRED, status=400, locale=locale)
         user_data["market_id"] = row["market_id"] if isinstance(row["market_id"], UUID) else UUID(str(row["market_id"]))
         log_info(f"Defaulted market_id to institution's primary market for {rt_str}/{rn_str}")
 
     @staticmethod
-    def _validate_manager_operator_market(market_id: UUID | None, creator_is_super_admin: bool) -> None:
+    def _validate_manager_operator_market(
+        market_id: UUID | None, creator_is_super_admin: bool, locale: str = "en"
+    ) -> None:
         """Validate market_id for Manager/Operator: required, Global only for Super Admin."""
         from app.services.market_service import is_global_market
 
         if not market_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required for Manager and Operator",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         if is_global_market(market_id) and not creator_is_super_admin:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only super_admin can assign Global market to manager or operator",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_GLOBAL_NOT_ALLOWED, status=400, locale=locale)
 
     @staticmethod
     def _ensure_market_id_as_uuid(user_data: dict[str, Any]) -> UUID | None:
@@ -719,19 +647,20 @@ class UserSignupService:
         return market_id
 
     @staticmethod
-    def _validate_market_exists(market_id: UUID) -> None:
+    def _validate_market_exists(market_id: UUID, locale: str = "en") -> None:
         """Validate market exists and is not archived."""
         market = market_service.get_by_id(market_id)
         if not market:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Market not found: {market_id}")
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         if market.get("is_archived"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Market is archived: {market_id}")
+            raise envelope_exception(ErrorCode.USER_MARKET_ARCHIVED, status=400, locale=locale)
 
     def _resolve_market_id_for_admin_creation(
         self,
         user_data: dict[str, Any],
         current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """
         Resolve and validate market_id for admin-created users. Default Global for Admin/Super Admin/Supplier Admin.
@@ -742,12 +671,12 @@ class UserSignupService:
         creator_is_super_admin = self._enum_to_str(current_user.get("role_name")) == "super_admin"
 
         self._default_market_for_internal_admin(user_data, rt_str, rn_str)
-        self._default_market_from_institution(user_data, rt_str, rn_str, db)
+        self._default_market_from_institution(user_data, rt_str, rn_str, db, locale=locale)
 
         market_id = self._ensure_market_id_as_uuid(user_data)
 
         if rt_str == "internal" and rn_str in ("manager", "operator"):
-            self._validate_manager_operator_market(market_id, creator_is_super_admin)
+            self._validate_manager_operator_market(market_id, creator_is_super_admin, locale=locale)
 
         if rt_str == "customer" and not market_id:
             user_data["market_id"] = self.DEFAULT_CUSTOMER_MARKET_ID
@@ -755,14 +684,15 @@ class UserSignupService:
 
         market_id = self._ensure_market_id_as_uuid(user_data)
         if not market_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="market_id is required")
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
 
-        self._validate_market_exists(market_id)
+        self._validate_market_exists(market_id, locale=locale)
 
     def _ensure_user_market_within_institution(
         self,
         user_data: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """
         For Supplier and Employer, ensure user's market_id is within the institution's assigned market(s).
@@ -778,17 +708,11 @@ class UserSignupService:
             return
         institution_id = user_data.get("institution_id")
         if not institution_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="institution_id is required for Supplier and Employer",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_INSTITUTION_REQUIRED, status=400, locale=locale)
         institution_id = institution_id if isinstance(institution_id, UUID) else UUID(str(institution_id))
         market_id = user_data.get("market_id")
         if not market_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="market_id is required for Supplier and Employer and must match the institution's market",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
         market_id = market_id if isinstance(market_id, UUID) else UUID(str(market_id))
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
@@ -797,31 +721,27 @@ class UserSignupService:
             )
             rows = cursor.fetchall()
         if not rows:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institution not found or has no assigned markets",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_INSTITUTION_REQUIRED, status=400, locale=locale)
         inst_market_ids = {UUID(str(r["market_id"])) for r in rows}
         if market_id not in inst_market_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Supplier and Employer users must be assigned a market from their institution's assigned markets. "
-                f"User market_id {market_id} is not in institution's markets.",
-            )
+            raise envelope_exception(ErrorCode.USER_MARKET_NOT_FOUND, status=400, locale=locale)
 
-    def _apply_scope_constraints(self, user_data: dict[str, Any], scope: InstitutionScope | None) -> None:
+    def _apply_scope_constraints(
+        self, user_data: dict[str, Any], scope: InstitutionScope | None, locale: str = "en"
+    ) -> None:
         """
         Apply institution scoping constraints for admin-created users.
 
         Args:
             user_data: User data dictionary (modified in place)
             scope: Institution scope for the current admin
+            locale: Locale for error messages
         """
         if not scope or scope.is_global:
             return
 
         if not scope.institution_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: missing institution scope")
+            raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
 
         target_institution = user_data.get("institution_id")
         if target_institution:
@@ -844,7 +764,7 @@ class UserSignupService:
         """
         # Basic permission check - user must be authenticated
         if not current_user or not current_user.get("user_id"):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+            raise envelope_exception(ErrorCode.AUTH_INVALID_TOKEN, status=401, locale="en")
 
         # Additional permission checks can be added here based on role/institution
         # For now, we'll allow any authenticated user to create users
@@ -870,24 +790,22 @@ class UserSignupService:
         self,
         user_data: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> dict[str, Any]:
         """
         Handle signup request: validate, store pending signup, send verification email.
         If email is already registered, return same success message (no email sent) to avoid enumeration.
         If username is already taken, raise 400.
         """
-        self._validate_signup_data(user_data)
-        self._resolve_country_code_to_market_id(user_data, db)
-        self._validate_and_resolve_city_metadata_id(user_data, db)
+        self._validate_signup_data(user_data, locale=locale)
+        self._resolve_country_code_to_market_id(user_data, db, locale=locale)
+        self._validate_and_resolve_city_metadata_id(user_data, db, locale=locale)
         self._process_password_security(user_data)
         email = user_data.get("email", "").strip().lower()
         username = user_data.get("username", "").strip().lower()
 
         if get_user_by_username(username, db):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already exists",
-            )
+            raise envelope_exception(ErrorCode.DATABASE_DUPLICATE_USERNAME, status=400, locale=locale)
         if get_user_by_email(email, db):
             return {
                 "success": True,
@@ -921,10 +839,7 @@ class UserSignupService:
 
             referrer = validate_referral_code(signup_referral_code, db)
             if not referrer:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid referral code",
-                )
+                raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=400, locale=locale, entity="Referral code")
 
         verification_code = str(secrets.randbelow(1_000_000)).zfill(6)
         expiry = datetime.now(UTC) + timedelta(hours=self.SIGNUP_VERIFICATION_CODE_EXPIRY_HOURS)
@@ -987,6 +902,7 @@ class UserSignupService:
         self,
         code: str,
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> tuple[UserDTO, str]:
         """
         Load pending signup by verification code; if valid and not expired, create user and mark code used.
@@ -995,10 +911,7 @@ class UserSignupService:
         """
         raw = (code or "").strip()
         if not raw:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale=locale)
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
             cursor.execute(
                 """
@@ -1012,23 +925,14 @@ class UserSignupService:
             )
             row = cursor.fetchone()
         if not row:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale=locale)
         if row["used"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification code has already been used",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale=locale)
         now = datetime.now(UTC)
         if row["token_expiry"] and row["token_expiry"].tzinfo is None:
             row["token_expiry"] = row["token_expiry"].replace(tzinfo=UTC)
         if (row["token_expiry"] or now) <= now:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification code has expired",
-            )
+            raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale=locale)
 
         signup_referral_code = row.get("referral_code")  # referral code used at signup
         user_data = {

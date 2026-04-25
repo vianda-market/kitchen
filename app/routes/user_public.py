@@ -8,6 +8,8 @@ from app.auth.security import create_access_token
 from app.auth.utils import build_token_data, merge_onboarding_token_claims, merge_subscription_token_claims
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import CustomerSignupSchema, UserEnrichedResponseSchema
 from app.services.entity_service import get_enriched_user_by_id
 from app.services.error_handling import handle_business_operation
@@ -138,10 +140,7 @@ def signup_request(
         "A verification link has been sent to your email.",
     )
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error processing signup request",
-        )
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     if result.get("already_registered"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -178,18 +177,12 @@ def signup_verify(
     )
     if not result:
         ip_tracker.increment(request.client.host, "signup_verify")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification code",
-        )
+        raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale="en")
     user_dto, access_token = result
     # Return enriched user (city_name, market_name, etc.) for B2C search box and profile display
     enriched_user = get_enriched_user_by_id(user_dto.user_id, db, scope=None, include_archived=False)
     if not enriched_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User created but failed to retrieve profile",
-        )
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     return VerifySignupResponse(user=enriched_user, access_token=access_token)
 
 
@@ -216,7 +209,7 @@ def get_dev_pending_token(
     POST /signup/request so you can call POST /signup/verify without reading email.
     """
     if not getattr(settings, "DEV_MODE", False):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not available")
+        raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale="en")
     row = db_read(
         """
         SELECT verification_code FROM pending_customer_signup
@@ -228,10 +221,7 @@ def get_dev_pending_token(
         fetch_one=True,
     )
     if not row or not row.get("verification_code"):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No pending signup found for this email",
-        )
+        raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=404, locale="en")
     return DevPendingTokenResponse(token=row["verification_code"])
 
 
@@ -407,10 +397,7 @@ def reset_password(
 
     if not result["success"]:
         ip_tracker.increment(request.client.host, "reset_password")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result["message"],
-        )
+        raise envelope_exception(ErrorCode.USER_SIGNUP_CODE_INVALID, status=400, locale="en")
 
     user_dto = result.get("user")
     out: dict = {"success": result["success"], "message": result["message"]}

@@ -30,7 +30,7 @@ class TestUserSignupService:
             user_signup_service.process_customer_signup(incomplete_data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Missing required fields" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "validation.field_required"  # type: ignore[index]
 
     def test_process_customer_signup_validates_email_format(self, mock_db):
         """Test that customer signup validates email format."""
@@ -47,7 +47,7 @@ class TestUserSignupService:
             user_signup_service.process_customer_signup(invalid_email_data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid email format" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "validation.invalid_format"  # type: ignore[index]
 
     def test_process_customer_signup_validates_password_strength(self, mock_db):
         """Test that customer signup validates password strength."""
@@ -64,7 +64,7 @@ class TestUserSignupService:
             user_signup_service.process_customer_signup(weak_password_data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Password must be at least 8 characters long" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "validation.value_too_short"  # type: ignore[index]
 
     @patch("app.utils.db.db_read")
     @patch("app.services.user_signup_service.city_service")
@@ -145,8 +145,7 @@ class TestUserSignupService:
             user_signup_service.process_customer_signup(user_data_without_password, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Missing required fields" in str(exc_info.value.detail)
-        assert "password" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "validation.field_required"  # type: ignore[index]
 
     def test_process_admin_user_creation_validates_data(self, mock_db):
         """Test that admin user creation validates required data."""
@@ -159,9 +158,8 @@ class TestUserSignupService:
             user_signup_service.process_admin_user_creation(incomplete_data, current_user, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        # Validation fails on role_type/role_name or institution_id
-        detail = str(exc_info.value.detail)
-        assert "role" in detail.lower() or "institution" in detail.lower()
+        # Validation fails on role_type/role_name (missing fields)
+        assert exc_info.value.detail["code"] == "validation.field_required"  # type: ignore[index]
 
     @patch("app.services.user_signup_service.market_service")
     @patch("app.services.user_signup_service.city_service")
@@ -186,7 +184,7 @@ class TestUserSignupService:
             user_signup_service.process_admin_user_creation(data_without_institution, current_user, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Institution ID is required" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "user.signup_institution_required"  # type: ignore[index]
 
     def test_process_admin_user_creation_validates_role_required(self, mock_db):
         """Test that admin user creation requires role_type and role_name."""
@@ -204,8 +202,8 @@ class TestUserSignupService:
             user_signup_service.process_admin_user_creation(data_without_role, current_user, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        # Error message should mention role_type or role_name
-        assert "role" in str(exc_info.value.detail).lower()
+        # Validation fails on missing role_type/role_name
+        assert exc_info.value.detail["code"] == "validation.field_required"  # type: ignore[index]
 
     @patch("app.services.user_signup_service.market_service")
     @patch("app.services.user_signup_service.create_user_with_validation")
@@ -310,7 +308,7 @@ class TestUserSignupService:
             user_signup_service.validate_user_permissions(no_user)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "Authentication required" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "auth.invalid_token"  # type: ignore[index]
 
     def test_validate_user_permissions_requires_user_id(self, mock_db):
         """Test that user permission validation requires user_id."""
@@ -322,7 +320,7 @@ class TestUserSignupService:
             user_signup_service.validate_user_permissions(user_without_id)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "Authentication required" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "auth.invalid_token"  # type: ignore[index]
 
     def test_validate_user_permissions_allows_authenticated_user(self, sample_current_user):
         """Test that authenticated users pass permission validation."""
@@ -505,7 +503,7 @@ class TestUserSignupService:
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Username already exists" in str(exc_info.value.detail)
+        assert exc_info.value.detail["code"] == "database.duplicate_username"  # type: ignore[index]
 
     @patch("app.services.user_signup_service.city_service")
     @patch("app.services.user_signup_service.market_service")
@@ -586,7 +584,7 @@ class TestUserSignupService:
         with pytest.raises(HTTPException) as exc_info:
             user_signup_service.request_customer_signup(sample_user_data, mock_db)
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "city_metadata_id" in str(exc_info.value.detail).lower()
+        assert exc_info.value.detail["code"] == "user.city_required"  # type: ignore[index]
 
     @patch("app.services.user_signup_service.city_service")
     @patch("app.services.user_signup_service.market_service")
