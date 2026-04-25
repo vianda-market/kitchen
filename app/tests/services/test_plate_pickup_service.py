@@ -4,6 +4,7 @@ Simplified unit tests for Plate Pickup Service.
 Tests the core business logic with focused, isolated tests.
 """
 
+from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -53,7 +54,9 @@ class TestPlatePickupServiceSimple:
                 plate_pickup_service.scan_qr_code(pickup_id, qr_code_id, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "Pickup record with ID" in str(exc_info.value.detail)
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Pickup record" in detail["params"]["entity"]
 
     def test_scan_qr_code_validates_qr_code_not_found(self, sample_current_user, mock_db):
         """Test that QR code scan handles QR code not found."""
@@ -96,7 +99,9 @@ class TestPlatePickupServiceSimple:
                 plate_pickup_service.complete_order(pickup_id, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "Pickup record with ID" in str(exc_info.value.detail)
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Pickup record" in detail["params"]["entity"]
 
     def test_complete_order_validates_user_authorization(self, sample_current_user, mock_db):
         """Test that order completion validates user authorization."""
@@ -153,7 +158,9 @@ class TestPlatePickupServiceSimple:
                 plate_pickup_service.delete_pickup_record(pickup_id, sample_current_user, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "Pickup record with ID" in str(exc_info.value.detail)
+            detail = cast(dict[str, Any], exc_info.value.detail)
+            assert detail["code"] == "entity.not_found"
+            assert "Pickup record" in detail["params"]["entity"]
 
     def test_delete_pickup_record_validates_user_authorization(self, sample_current_user, mock_db):
         """Test that pickup record deletion validates user authorization."""
