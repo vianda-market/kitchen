@@ -216,7 +216,7 @@
                   "pm.test(\"Status 400 when B2B omits institution_id\", function () { pm.response.to.have.status(400); });",
                   "const body = pm.response.json();",
                   "pm.test(\"Detail mentions institution_id or B2B or required\", function () {",
-                  "    const d = (body.detail || \"\").toString();",
+                  "    const d = (typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) ? body.detail.message : Array.isArray(body.detail) ? body.detail.map(e => e.message || e.msg || JSON.stringify(e)).join(' ') : '');",
                   "    pm.expect(d.includes(\"institution_id\") || d.includes(\"B2B\") || d.includes(\"required\")).to.be.true;",
                   "});"
                 ],
@@ -2023,7 +2023,8 @@
                   "});",
                   "const body = pm.response.json();",
                   "pm.test(\"Error mentions plate_kitchen_days\", () => {",
-                  "    pm.expect(body.detail || \"\").to.include(\"plate_kitchen_days\");",
+                  "    const d = (typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) ? body.detail.message : Array.isArray(body.detail) ? body.detail.map(e => e.message || e.msg || JSON.stringify(e)).join(' ') : '');",
+                  "    pm.expect(d).to.include(\"plate_kitchen_days\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3811,7 +3812,8 @@
                 "exec": [
                   "const res = pm.response;",
                   "const body = res.code === 200 ? res.json() : (res.json ? res.json() : {});",
-                  "if (res.code === 400 && body.detail && body.detail.includes(\"PAYMENT_PROVIDER=mock\")) {",
+                  "const detailMsg = (typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) ? body.detail.message : Array.isArray(body.detail) ? body.detail.map(e => e.message || e.msg || JSON.stringify(e)).join(' ') : '');",
+                  "if (res.code === 400 && detailMsg && detailMsg.includes(\"PAYMENT_PROVIDER=mock\")) {",
                   "    pm.test(\"Skipped: confirm-payment requires PAYMENT_PROVIDER=mock for E2E\", () => { pm.expect(true).to.be.true; });",
                   "    console.warn(\"⚠️ Set PAYMENT_PROVIDER=mock in .env to run full Client Setup. With Stripe, use webhook instead.\");",
                   "} else {",
@@ -4777,9 +4779,9 @@
                   "const body = pm.response.json();",
                   "if (pm.response.code === 200) {",
                   "    pm.test(\"Cancel response has detail message\", function () { pm.expect(body).to.have.property(\"detail\"); });",
-                  "    console.log(\"✅ Subscription cancelled (was Pending):\", body.detail);",
+                  "    console.log(\"✅ Subscription cancelled (was Pending):\", (body.detail && body.detail.message) || body.detail);",
                   "} else {",
-                  "    console.log(\"ℹ️ Cancel returned 400 - subscription was not Pending (e.g. already Active or Cancelled).\", body.detail || \"\");",
+                  "    console.log(\"ℹ️ Cancel returned 400 - subscription was not Pending (e.g. already Active or Cancelled).\", (body.detail && body.detail.message) || body.detail);",
                   "}"
                 ],
                 "type": "text/javascript"

@@ -33,8 +33,8 @@
               "script": {
                 "exec": [
                   "const response = pm.response.json();",
-                  "if ((pm.response.code === 400 || pm.response.code === 401) && response.detail && (response.detail + '').toLowerCase().includes('username')) {",
-                  "    pm.expect.fail('Login failed: ' + (response.detail || 'Bad request') + '. Run collection 000 first and complete Supplier Setup (Register Supplier Institution, Register Supplier User). Use the same Postman environment so supplierUsername/supplierPassword from 000 are available.');",
+                  "if ((pm.response.code === 400 || pm.response.code === 401) && response.detail && ((response.detail.message || response.detail) + '').toLowerCase().includes('username')) {",
+                  "    pm.expect.fail('Login failed: ' + ((response.detail && response.detail.message) || response.detail || 'Bad request') + '. Run collection 000 first and complete Supplier Setup (Register Supplier Institution, Register Supplier User). Use the same Postman environment so supplierUsername/supplierPassword from 000 are available.');",
                   "}",
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
@@ -185,8 +185,8 @@
               "script": {
                 "exec": [
                   "const response = pm.response.json();",
-                  "if (pm.response.code === 400 && response.detail && (response.detail + '').toLowerCase().includes('username')) {",
-                  "    pm.expect.fail('Login failed: ' + (response.detail || 'Bad request') + '. Run collection 000 first and complete Client Setup (Customer Signup Request, Get Dev Pending Token, Customer Signup Verify). Use the same Postman environment so customerUsername/customerPassword from 000 are available.');",
+                  "if (pm.response.code === 400 && response.detail && ((response.detail.message || response.detail) + '').toLowerCase().includes('username')) {",
+                  "    pm.expect.fail('Login failed: ' + ((response.detail && response.detail.message) || response.detail || 'Bad request') + '. Run collection 000 first and complete Client Setup (Customer Signup Request, Get Dev Pending Token, Customer Signup Verify). Use the same Postman environment so customerUsername/customerPassword from 000 are available.');",
                   "}",
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
@@ -981,7 +981,7 @@
                   "});",
                   "pm.test(\"Error message indicates access denied\", function () {",
                   "    const response = pm.response.json();",
-                  "    pm.expect(response.detail).to.include('required');",
+                  "    pm.expect((response.detail && response.detail.message) || '').to.include('required');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1773,8 +1773,9 @@
                       "    pm.test(\"Status code is 403\", function () { pm.response.to.have.status(403); });",
                       "    const response = pm.response.json();",
                       "    pm.test(\"Error message indicates Employee Operators cannot manage others\", function () {",
-                      "        pm.expect(response.detail).to.be.a('string');",
-                      "        const detail = response.detail.toLowerCase();",
+                      "        const detailMsg = (response.detail && response.detail.message) || response.detail || '';",
+                      "        pm.expect(detailMsg).to.be.a('string');",
+                      "        const detail = detailMsg.toLowerCase();",
                       "        pm.expect(detail.includes('operator') || detail.includes('forbidden') || detail.includes('access')).to.be.true;",
                       "    });",
                       "}"
@@ -1842,8 +1843,9 @@
                       "    pm.test(\"Status code is 403\", function () { pm.response.to.have.status(403); });",
                       "    const response = pm.response.json();",
                       "    pm.test(\"Error message indicates Employee Operators cannot manage others\", function () {",
-                      "        pm.expect(response.detail).to.be.a('string');",
-                      "        const detail = response.detail.toLowerCase();",
+                      "        const detailMsg = (response.detail && response.detail.message) || response.detail || '';",
+                      "        pm.expect(detailMsg).to.be.a('string');",
+                      "        const detail = detailMsg.toLowerCase();",
                       "        pm.expect(detail.includes('operator') || detail.includes('forbidden') || detail.includes('access')).to.be.true;",
                       "    });",
                       "}"
@@ -1920,8 +1922,9 @@
                       "    pm.test(\"Status code is 403\", function () { pm.response.to.have.status(403); });",
                       "    const response = pm.response.json();",
                       "    pm.test(\"Error message indicates Employee Operators cannot manage others\", function () {",
-                      "        pm.expect(response.detail).to.be.a('string');",
-                      "        const detail = response.detail.toLowerCase();",
+                      "        const detailMsg = (response.detail && response.detail.message) || response.detail || '';",
+                      "        pm.expect(detailMsg).to.be.a('string');",
+                      "        const detail = detailMsg.toLowerCase();",
                       "        pm.expect(detail.includes('operator') || detail.includes('forbidden') || detail.includes('access')).to.be.true;",
                       "    });",
                       "}"
@@ -1989,8 +1992,9 @@
                       "    pm.test(\"Status code is 403\", function () { pm.response.to.have.status(403); });",
                       "    const response = pm.response.json();",
                       "    pm.test(\"Error message indicates Employee Operators cannot manage others\", function () {",
-                      "        pm.expect(response.detail).to.be.a('string');",
-                      "        const detail = response.detail.toLowerCase();",
+                      "        const detailMsg = (response.detail && response.detail.message) || response.detail || '';",
+                      "        pm.expect(detailMsg).to.be.a('string');",
+                      "        const detail = detailMsg.toLowerCase();",
                       "        pm.expect(detail.includes('operator') || detail.includes('forbidden') || detail.includes('access')).to.be.true;",
                       "    });",
                       "}"
@@ -2400,8 +2404,8 @@
                 "exec": [
                   "const response = pm.response.json();",
                   "const detailStr = Array.isArray(response.detail)",
-                  "    ? response.detail.map(d => typeof d === 'object' ? (d.msg || JSON.stringify(d)) : d).join(' ')",
-                  "    : (response.detail || '');",
+                  "    ? response.detail.map(d => typeof d === 'object' ? (d.message || d.msg || JSON.stringify(d)) : d).join(' ')",
+                  "    : ((response.detail && response.detail.message) || response.detail || '');",
                   "",
                   "// Expected: 403 (role check — Vianda Admin lacks super-admin permission for approve).",
                   "// On re-runs the request may already be approved from a prior pass, yielding 400",
