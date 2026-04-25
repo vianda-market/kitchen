@@ -14,7 +14,7 @@ Benefits:
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg2
@@ -3630,8 +3630,9 @@ def get_enriched_plate_pickups(
         limit_clause = ""
         offset_clause = ""
         if paginate:
-            clamped_page_size = max(1, min(page_size, 100))  # type: ignore[arg-type]
-            clamped_offset = (page - 1) * clamped_page_size  # type: ignore[operator]
+            assert page is not None and page_size is not None  # narrowed by `paginate` guard above
+            clamped_page_size = max(1, min(page_size, 100))
+            clamped_offset = (page - 1) * clamped_page_size
             limit_clause = f" LIMIT {clamped_page_size}"
             offset_clause = f" OFFSET {clamped_offset}"
 
@@ -4270,17 +4271,20 @@ def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extens
     """Raise HTTPException if restaurant has active plate pickups that prevent archival."""
     from fastapi import HTTPException
 
-    active_pickups = db_read(
-        """
+    active_pickups: dict[str, Any] | None = cast(
+        dict[str, Any] | None,
+        db_read(
+            """
         SELECT COUNT(*) as cnt
         FROM customer.plate_pickup_live pp
         WHERE pp.restaurant_id = %s
           AND pp.is_archived = FALSE
           AND pp.status IN ('pending', 'active')
         """,
-        (str(restaurant_id),),
-        connection=db,
-        fetch_one=True,
+            (str(restaurant_id),),
+            connection=db,
+            fetch_one=True,
+        ),
     )
     if active_pickups and active_pickups["cnt"] > 0:
         raise HTTPException(

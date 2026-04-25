@@ -5,7 +5,7 @@ Routes for managing national holidays (employee-only access).
 Supports single and bulk operations.
 """
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg2.extensions
@@ -90,8 +90,9 @@ def list_national_holidays(
 
         # Count query for X-Total-Count header.
         count_query = f"SELECT COUNT(*) AS total FROM national_holidays nh{where_clause}"
-        count_row = db_read(
-            count_query, tuple(base_params) if base_params else None, connection=connection, fetch_one=True
+        count_row = cast(
+            dict[str, Any] | None,
+            db_read(count_query, tuple(base_params) if base_params else None, connection=connection, fetch_one=True),
         )
         total_count: int = count_row["total"] if count_row else 0
 
