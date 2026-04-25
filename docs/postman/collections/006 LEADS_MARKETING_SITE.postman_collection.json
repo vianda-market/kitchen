@@ -1,846 +1,1206 @@
 {
-  "info": {
-    "_postman_id": "leads-marketing-site-2026",
-    "name": "006 LEADS_MARKETING_SITE",
-    "description": "All public /leads/* surface consumed by the vianda-home marketing site. Organized by frontend consumer (one collection per consumer), not per endpoint group.\n\nFolders:\n- Zipcode metrics (no auth, no reCAPTCHA) \u2014 navbar coverage probe.\n- Country selectors (no auth, no reCAPTCHA) \u2014 /leads/countries, /leads/supplier-countries with ETag + 304 + long Cache-Control.\n- country_code contract \u2014 /leads/plans, /leads/restaurants, /leads/featured-restaurant (required \u2192 400; unsupported \u2192 [] or null, 200).\n- Admin override on market status (guardrails) \u2014 PUT /admin/markets/{id} activation/deactivation rules. Requires super admin.\n\nContracts:\n- docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md\n- docs/api/b2c_client/feedback_from_client/RESTAURANTS_BY_ZIPCODE.md\n- Cron follow-up: docs/plans/market-status-cron.md\n\nShared auth: Login Super Admin is idempotent \u2014 if `superAdminAuthToken` is already set as a Postman global (e.g. via Newman --globals from a seed run), the login request is skipped. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Zipcode metrics (no auth, no reCAPTCHA)",
-      "item": [
-        {
-          "name": "GET zipcode-metrics (zip + country_code)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
-                  "    const code = pm.response.code;",
-                  "    pm.expect([200, 404]).to.include(code);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 200) {",
-                  "    const body = pm.response.json();",
-                  "    pm.test('Response has requested_zipcode', function () { pm.expect(body).to.have.property('requested_zipcode'); });",
-                  "    pm.test('Response has matched_zipcode', function () { pm.expect(body).to.have.property('matched_zipcode'); });",
-                  "    pm.test('Response has restaurant_count', function () { pm.expect(body).to.have.property('restaurant_count'); });",
-                  "    pm.test('Response has has_coverage', function () { pm.expect(body).to.have.property('has_coverage'); });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip={{sampleZip}}&country_code={{sampleCountryCode}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "zipcode-metrics"],
-              "query": [
-                { "key": "zip", "value": "{{sampleZip}}" },
-                { "key": "country_code", "value": "{{sampleCountryCode}}" }
-              ]
-            },
-            "description": "Lead flow: get metrics for a zipcode. No auth. Rate-limited per IP (e.g. 60/min); 429 when exceeded."
-          }
-        },
-        {
-          "name": "GET zipcode-metrics (zip only, default country)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
-                  "    const code = pm.response.code;",
-                  "    pm.expect([200, 404]).to.include(code);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 200) {",
-                  "    const body = pm.response.json();",
-                  "    pm.test('Response has restaurant_count and has_coverage', function () {",
-                  "        pm.expect(body).to.have.property('restaurant_count');",
-                  "        pm.expect(body).to.have.property('has_coverage');",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=10001",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "zipcode-metrics"],
-              "query": [
-                { "key": "zip", "value": "10001" }
-              ]
-            },
-            "description": "country_code omitted; backend should default to US."
-          }
-        },
-        {
-          "name": "GET zipcode-metrics (AR)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
-                  "    const code = pm.response.code;",
-                  "    pm.expect([200, 404]).to.include(code);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=C1430&country_code=AR",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "zipcode-metrics"],
-              "query": [
-                { "key": "zip", "value": "C1430" },
-                { "key": "country_code", "value": "AR" }
-              ]
-            },
-            "description": "Example for Argentina (country_code=AR)."
-          }
-        }
-      ]
-    },
-    {
-      "name": "Country selectors (no auth, no reCAPTCHA)",
-      "item": [
-        {
-          "name": "GET /leads/countries (en) \u2014 happy path + ETag + Cache-Control",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('No recaptcha token required (token header was not sent)', () => { /* documented */ });",
-                  "",
-                  "const cc = pm.response.headers.get('Cache-Control') || '';",
-                  "pm.test('Cache-Control is public, max-age=86400, stale-while-revalidate=3600', () => {",
-                  "    pm.expect(cc).to.include('public');",
-                  "    pm.expect(cc).to.include('max-age=86400');",
-                  "    pm.expect(cc).to.include('stale-while-revalidate=3600');",
-                  "});",
-                  "",
-                  "const etag = pm.response.headers.get('ETag');",
-                  "pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
-                  "if (etag) {",
-                  "    pm.collectionVariables.set('countriesEtagEn', etag);",
-                  "}",
-                  "",
-                  "const body = pm.response.json();",
-                  "pm.test('Response is a JSON array', () => pm.expect(body).to.be.an('array'));",
-                  "",
-                  "if (body.length > 0) {",
-                  "    const first = body[0];",
-                  "    pm.test('Rows include code/name/currency/phone_prefix/default_locale', () => {",
-                  "        pm.expect(first).to.have.property('code');",
-                  "        pm.expect(first).to.have.property('name');",
-                  "        pm.expect(first).to.have.property('currency');",
-                  "        pm.expect(first).to.have.property('phone_prefix');",
-                  "        pm.expect(first).to.have.property('default_locale');",
-                  "    });",
-                  "    pm.test('default_locale is en|es|pt', () => pm.expect(['en','es','pt']).to.include(first.default_locale));",
-                  "    pm.collectionVariables.set('firstActiveCountryCode', first.code);",
-                  "} else {",
-                  "    console.log('Empty /leads/countries \u2014 frontend contract: hide navbar selector + country-scoped sections');",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/countries?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "countries"],
-              "query": [{ "key": "language", "value": "en" }]
-            },
-            "description": "Customer-facing country selector source. Markets with status='active'. No reCAPTCHA token required \u2014 this is a navbar-load fetch."
-          }
-        },
-        {
-          "name": "GET /leads/countries (es) \u2014 different ETag, localized names",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const etagEs = pm.response.headers.get('ETag');",
-                  "const etagEn = pm.collectionVariables.get('countriesEtagEn');",
-                  "pm.test('ETag differs per locale (en vs es)', () => {",
-                  "    pm.expect(etagEs).to.be.a('string').and.not.empty;",
-                  "    if (etagEn) pm.expect(etagEs).to.not.equal(etagEn);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/countries?language=es",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "countries"],
-              "query": [{ "key": "language", "value": "es" }]
-            },
-            "description": "Same endpoint, different locale \u2192 different ETag + localized country names."
-          }
-        },
-        {
-          "name": "GET /leads/countries with If-None-Match \u2192 304",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 304 Not Modified', () => pm.response.to.have.status(304));",
-                  "pm.test('Body is empty on 304', () => pm.expect(pm.response.text()).to.have.lengthOf(0));",
-                  "const etag = pm.response.headers.get('ETag');",
-                  "const priorEtag = pm.collectionVariables.get('countriesEtagEn');",
-                  "pm.test('ETag preserved on 304', () => pm.expect(etag).to.equal(priorEtag));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "If-None-Match", "value": "{{countriesEtagEn}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/countries?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "countries"],
-              "query": [{ "key": "language", "value": "en" }]
-            },
-            "description": "Revalidation. Requires the prior 'en' request to have populated countriesEtagEn."
-          }
-        },
-        {
-          "name": "GET /leads/countries (invalid language) \u2192 422",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 422', () => pm.response.to.have.status(422));",
-                  "const body = pm.response.json();",
-                  "pm.test('detail mentions Unsupported language', () => pm.expect(body.detail).to.be.an('array').and.have.length.above(0); pm.expect(body.detail[0].message).to.match(/[Uu]nsupported language/));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/countries?language=zz",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "countries"],
-              "query": [{ "key": "language", "value": "zz" }]
-            },
-            "description": "422 for request-schema validation (vs 400 reserved for business rules like missing country_code)."
-          }
-        },
-        {
-          "name": "GET /leads/supplier-countries \u2014 superset, includes inactive markets",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const etag = pm.response.headers.get('ETag');",
-                  "pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
-                  "pm.test('Cache-Control long-cache + SWR', () => {",
-                  "    const cc = pm.response.headers.get('Cache-Control') || '';",
-                  "    pm.expect(cc).to.include('max-age=86400');",
-                  "    pm.expect(cc).to.include('stale-while-revalidate=3600');",
-                  "});",
-                  "",
-                  "const body = pm.response.json();",
-                  "pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
-                  "",
-                  "const firstActive = pm.collectionVariables.get('firstActiveCountryCode');",
-                  "if (firstActive) {",
-                  "    pm.test('Active countries are present in supplier-countries (superset)', () => {",
-                  "        const codes = body.map(r => r.code);",
-                  "        pm.expect(codes).to.include(firstActive);",
-                  "    });",
-                  "}",
-                  "",
-                  "if (body.length === 0) {",
-                  "    console.log('Empty /leads/supplier-countries \u2014 frontend drops dropdown + promotes partners@vianda.market mailto');",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/supplier-countries?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "supplier-countries"],
-              "query": [{ "key": "language", "value": "en" }]
-            },
-            "description": "Supplier form source. status IN ('active','inactive'). No reCAPTCHA."
-          }
-        }
-      ]
-    },
-    {
-      "name": "country_code contract on plans / restaurants / featured-restaurant",
-      "item": [
-        {
-          "name": "GET /leads/plans (no country_code) \u2192 400",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Recaptcha-Token",
-                "value": "{{recaptchaToken}}",
-                "description": "Any non-empty string when RECAPTCHA_SECRET_KEY is unset locally; real token in staging/prod."
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/plans?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "plans"],
-              "query": [{ "key": "language", "value": "en" }]
-            },
-            "description": "Business-rule 400. Contract delta: `country_code` is now required on this endpoint."
-          }
-        },
-        {
-          "name": "GET /leads/plans?country_code=AR \u2014 country-scoped list",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
-                  "if (body.length > 0) {",
-                  "    pm.test('All plans share one currency (country-scoped)', () => {",
-                  "        const currencies = [...new Set(body.map(p => p.currency))];",
-                  "        pm.expect(currencies).to.have.lengthOf(1);",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/plans?language=en&country_code=AR",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "plans"],
-              "query": [
-                { "key": "language", "value": "en" },
-                { "key": "country_code", "value": "AR" }
-              ]
-            },
-            "description": "Scoped to AR. All rows should carry one currency (ARS) \u2014 verifies the mixed-currency flood is resolved."
-          }
-        },
-        {
-          "name": "GET /leads/plans?country_code=ZZ \u2192 [] (unsupported country)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Body is []', () => pm.expect(pm.response.json()).to.eql([]));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/plans?language=en&country_code=ZZ",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "plans"],
-              "query": [
-                { "key": "language", "value": "en" },
-                { "key": "country_code", "value": "ZZ" }
-              ]
-            },
-            "description": "Unsupported country \u2192 empty list, 200, cacheable (not 404)."
-          }
-        },
-        {
-          "name": "GET /leads/restaurants (no country_code) \u2192 400",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/restaurants?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "restaurants"],
-              "query": [{ "key": "language", "value": "en" }]
-            }
-          }
-        },
-        {
-          "name": "GET /leads/restaurants?country_code=AR \u2014 country-scoped",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Body is an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/restaurants?language=en&country_code=AR&limit=5",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "restaurants"],
-              "query": [
-                { "key": "language", "value": "en" },
-                { "key": "country_code", "value": "AR" },
-                { "key": "limit", "value": "5" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "GET /leads/featured-restaurant (no country_code) \u2192 400",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "featured-restaurant"],
-              "query": [{ "key": "language", "value": "en" }]
-            }
-          }
-        },
-        {
-          "name": "GET /leads/featured-restaurant?country_code=ZZ \u2192 null (200)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 (no 404)', () => pm.response.to.have.status(200));",
-                  "pm.test('Content-Type is application/json', () => {",
-                  "    const ct = pm.response.headers.get('Content-Type') || '';",
-                  "    pm.expect(ct).to.include('application/json');",
-                  "});",
-                  "pm.test('Body is the literal JSON null', () => {",
-                  "    pm.expect(pm.response.text().trim()).to.equal('null');",
-                  "    pm.expect(pm.response.json()).to.equal(null);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en&country_code=ZZ",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "featured-restaurant"],
-              "query": [
-                { "key": "language", "value": "en" },
-                { "key": "country_code", "value": "ZZ" }
-              ]
-            },
-            "description": "Contract delta: the legacy 404 is retired. Unsupported country OR supported-but-no-match returns body `null`, HTTP 200."
-          }
-        },
-        {
-          "name": "GET /leads/featured-restaurant?country_code=AR \u2014 match or null",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const text = pm.response.text().trim();",
-                  "pm.test('Body is null or an object with restaurant_id', () => {",
-                  "    if (text === 'null') {",
-                  "        pm.expect(pm.response.json()).to.equal(null);",
-                  "    } else {",
-                  "        const body = pm.response.json();",
-                  "        pm.expect(body).to.be.an('object');",
-                  "        pm.expect(body).to.have.property('restaurant_id');",
-                  "        pm.expect(body).to.have.property('cover_image_url');",
-                  "    }",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Recaptcha-Token", "value": "{{recaptchaToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en&country_code=AR",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "leads", "featured-restaurant"],
-              "query": [
-                { "key": "language", "value": "en" },
-                { "key": "country_code", "value": "AR" }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Admin override on market status (guardrails)",
-      "description": "Exercises the admin override validation added to PUT /admin/markets/{id}. Requires a super admin token and at least one non-global market in the DB.",
-      "item": [
-        {
-          "name": "Login Super Admin (idempotent)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Skip when a token is already provided via Newman --globals or set by a prior run.",
-                  "const existing = pm.globals.get('superAdminAuthToken') || pm.collectionVariables.get('superAdminAuthToken');",
-                  "if (existing && String(existing).length > 0) {",
-                  "    pm.collectionVariables.set('superAdminAuthToken', existing);",
-                  "    console.log('superAdminAuthToken already set \u2014 skipping login.');",
-                  "    postman.setNextRequest('Discover a non-global market + its coverage status');",
-                  "}"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const response = pm.response.json();",
-                  "pm.test('Response has access_token', () => pm.expect(response).to.have.property('access_token'));",
-                  "const token = response.access_token;",
-                  "pm.collectionVariables.set('superAdminAuthToken', token);",
-                  "pm.environment.set('superAdminAuthToken', token);",
-                  "pm.globals.set('superAdminAuthToken', token);"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                { "key": "username", "value": "{{superAdminUsername}}" },
-                { "key": "password", "value": "{{superAdminPassword}}" }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "token"]
-            },
-            "description": "Skipped when superAdminAuthToken already exists as a Postman global. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md for the seed-collection / Newman --globals pattern."
-          }
-        },
-        {
-          "name": "Discover a non-global market + its coverage status",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const markets = pm.response.json();",
-                  "pm.test('Returned list of markets', () => pm.expect(markets).to.be.an('array').and.not.empty);",
-                  "",
-                  "const GLOBAL = '00000000-0000-0000-0000-000000000001';",
-                  "const target = markets.find(m => m.market_id !== GLOBAL);",
-                  "pm.test('Found a non-global market', () => pm.expect(target).to.exist);",
-                  "",
-                  "if (target) {",
-                  "    pm.collectionVariables.set('testMarketId', target.market_id);",
-                  "    pm.collectionVariables.set('testMarketStatus', target.status);",
-                  "    pm.collectionVariables.set('testMarketCountry', target.country_code);",
-                  "    console.log('Target market:', target.country_code, target.market_id, 'status:', target.status);",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{superAdminAuthToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/markets",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "markets"]
-            }
-          }
-        },
-        {
-          "name": "PUT /admin/markets/{id} status=active \u2014 expect 400 when market has no coverage OR 200 if it does",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 or 400', () => pm.expect([200, 400]).to.include(pm.response.code));",
-                  "",
-                  "if (pm.response.code === 400) {",
-                  "    const body = pm.response.json();",
-                  "    pm.test('400 detail mentions Cannot activate', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('Cannot activate'));",
-                  "    pm.test('400 detail explains coverage requirement', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/plate|coverage|kitchen-day/));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{superAdminAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"active\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "markets", "{{testMarketId}}"]
-            },
-            "description": "Admin guardrail: `status='active'` is refused when the market has no active restaurant \u2192 plate \u2192 plate_kitchen_days chain. The 30-day forward window tightening is deferred to the cron (`docs/plans/market-status-cron.md`)."
-          }
-        },
-        {
-          "name": "PUT /admin/markets/{id} status=inactive (no confirm) \u2014 409 if coverage, 200 otherwise",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 or 409', () => pm.expect([200, 409]).to.include(pm.response.code));",
-                  "",
-                  "if (pm.response.code === 409) {",
-                  "    const body = pm.response.json();",
-                  "    pm.test('409 detail mentions active plate coverage', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/active plate coverage|confirm_deactivate/));",
-                  "    pm.test('409 detail names confirm_deactivate as the unlock', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('confirm_deactivate'));",
-                  "    pm.collectionVariables.set('marketHasCoverage', 'true');",
-                  "} else {",
-                  "    pm.collectionVariables.set('marketHasCoverage', 'false');",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{superAdminAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"inactive\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "markets", "{{testMarketId}}"]
-            },
-            "description": "Deactivation warning: when the market has active plate coverage, the backend refuses without `confirm_deactivate: true`."
-          }
-        },
-        {
-          "name": "PUT /admin/markets/{id} status=inactive + confirm_deactivate=true \u2014 200",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "pm.test('Returned market status is inactive', () => pm.expect(body.status).to.eql('inactive'));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{superAdminAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"inactive\",\n  \"confirm_deactivate\": true\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "markets", "{{testMarketId}}"]
-            },
-            "description": "Deactivation succeeds when the second-confirm flag is set."
-          }
-        },
-        {
-          "name": "Restore original market status",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 or 400', () => pm.expect([200, 400]).to.include(pm.response.code));",
-                  "if (pm.response.code === 400) {",
-                  "    console.warn('Could not restore original status \u2014 likely the admin-activation guardrail fired. Market left inactive.');",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{superAdminAuthToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"{{testMarketStatus}}\",\n  \"confirm_deactivate\": true\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "markets", "{{testMarketId}}"]
-            }
-          }
-        }
-      ]
-    }
-  ],
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8000", "type": "string" },
-    { "key": "sampleZip", "value": "10001", "type": "string" },
-    { "key": "sampleCountryCode", "value": "US", "type": "string" },
-    { "key": "superAdminUsername", "value": "superadmin", "type": "string" },
-    { "key": "superAdminPassword", "value": "SuperAdmin1", "type": "string" },
-    { "key": "superAdminAuthToken", "value": "", "type": "string", "description": "Set by Login Super Admin, or pre-seeded via Newman --globals." },
-    { "key": "recaptchaToken", "value": "dev-bypass", "type": "string", "description": "Canonical name across all leads collections. Any non-empty string when RECAPTCHA_SECRET_KEY is empty locally (verify_recaptcha short-circuits); real reCAPTCHA v3 token in staging/prod." },
-    { "key": "countriesEtagEn", "value": "", "type": "string", "description": "Captured from the first /leads/countries?language=en call; reused by the 304 test." },
-    { "key": "firstActiveCountryCode", "value": "", "type": "string", "description": "First country code returned by /leads/countries \u2014 used to assert /leads/supplier-countries is a superset." },
-    { "key": "testMarketId", "value": "", "type": "string", "description": "Non-global market UUID discovered at run time." },
-    { "key": "testMarketStatus", "value": "", "type": "string", "description": "Original status captured before mutation; restored at the end." },
-    { "key": "testMarketCountry", "value": "", "type": "string" },
-    { "key": "marketHasCoverage", "value": "", "type": "string", "description": "'true' | 'false' \u2014 inferred from whether the unconfirmed deactivation returned 409." }
-  ]
+	"info": {
+		"_postman_id": "leads-marketing-site-2026",
+		"name": "006 LEADS_MARKETING_SITE",
+		"description": "All public /leads/* surface consumed by the vianda-home marketing site. Organized by frontend consumer (one collection per consumer), not per endpoint group.\n\nFolders:\n- Zipcode metrics (no auth, no reCAPTCHA) \u2014 navbar coverage probe.\n- Country selectors (no auth, no reCAPTCHA) \u2014 /leads/countries, /leads/supplier-countries with ETag + 304 + long Cache-Control.\n- country_code contract \u2014 /leads/plans, /leads/restaurants, /leads/featured-restaurant (required \u2192 400; unsupported \u2192 [] or null, 200).\n- Admin override on market status (guardrails) \u2014 PUT /admin/markets/{id} activation/deactivation rules. Requires super admin.\n\nContracts:\n- docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md\n- docs/api/b2c_client/feedback_from_client/RESTAURANTS_BY_ZIPCODE.md\n- Cron follow-up: docs/plans/market-status-cron.md\n\nShared auth: Login Super Admin is idempotent \u2014 if `superAdminAuthToken` is already set as a Postman global (e.g. via Newman --globals from a seed run), the login request is skipped. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Zipcode metrics (no auth, no reCAPTCHA)",
+			"item": [
+				{
+					"name": "GET zipcode-metrics (zip + country_code)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has requested_zipcode', function () { pm.expect(body).to.have.property('requested_zipcode'); });",
+									"    pm.test('Response has matched_zipcode', function () { pm.expect(body).to.have.property('matched_zipcode'); });",
+									"    pm.test('Response has restaurant_count', function () { pm.expect(body).to.have.property('restaurant_count'); });",
+									"    pm.test('Response has has_coverage', function () { pm.expect(body).to.have.property('has_coverage'); });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip={{sampleZip}}&country_code={{sampleCountryCode}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"zipcode-metrics"
+							],
+							"query": [
+								{
+									"key": "zip",
+									"value": "{{sampleZip}}"
+								},
+								{
+									"key": "country_code",
+									"value": "{{sampleCountryCode}}"
+								}
+							]
+						},
+						"description": "Lead flow: get metrics for a zipcode. No auth. Rate-limited per IP (e.g. 60/min); 429 when exceeded."
+					}
+				},
+				{
+					"name": "GET zipcode-metrics (zip only, default country)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Response has restaurant_count and has_coverage', function () {",
+									"        pm.expect(body).to.have.property('restaurant_count');",
+									"        pm.expect(body).to.have.property('has_coverage');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=10001",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"zipcode-metrics"
+							],
+							"query": [
+								{
+									"key": "zip",
+									"value": "10001"
+								}
+							]
+						},
+						"description": "country_code omitted; backend should default to US."
+					}
+				},
+				{
+					"name": "GET zipcode-metrics (AR)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200 or 404 if endpoint not implemented', function () {",
+									"    const code = pm.response.code;",
+									"    pm.expect([200, 404]).to.include(code);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/zipcode-metrics?zip=C1430&country_code=AR",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"zipcode-metrics"
+							],
+							"query": [
+								{
+									"key": "zip",
+									"value": "C1430"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						},
+						"description": "Example for Argentina (country_code=AR)."
+					}
+				}
+			]
+		},
+		{
+			"name": "Country selectors (no auth, no reCAPTCHA)",
+			"item": [
+				{
+					"name": "GET /leads/countries (en) \u2014 happy path + ETag + Cache-Control",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"pm.test('No recaptcha token required (token header was not sent)', () => { /* documented */ });",
+									"",
+									"const cc = pm.response.headers.get('Cache-Control') || '';",
+									"pm.test('Cache-Control is public, max-age=86400, stale-while-revalidate=3600', () => {",
+									"    pm.expect(cc).to.include('public');",
+									"    pm.expect(cc).to.include('max-age=86400');",
+									"    pm.expect(cc).to.include('stale-while-revalidate=3600');",
+									"});",
+									"",
+									"const etag = pm.response.headers.get('ETag');",
+									"pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
+									"if (etag) {",
+									"    pm.collectionVariables.set('countriesEtagEn', etag);",
+									"}",
+									"",
+									"const body = pm.response.json();",
+									"pm.test('Response is a JSON array', () => pm.expect(body).to.be.an('array'));",
+									"",
+									"if (body.length > 0) {",
+									"    const first = body[0];",
+									"    pm.test('Rows include code/name/currency/phone_prefix/default_locale', () => {",
+									"        pm.expect(first).to.have.property('code');",
+									"        pm.expect(first).to.have.property('name');",
+									"        pm.expect(first).to.have.property('currency');",
+									"        pm.expect(first).to.have.property('phone_prefix');",
+									"        pm.expect(first).to.have.property('default_locale');",
+									"    });",
+									"    pm.test('default_locale is en|es|pt', () => pm.expect(['en','es','pt']).to.include(first.default_locale));",
+									"    pm.collectionVariables.set('firstActiveCountryCode', first.code);",
+									"} else {",
+									"    console.log('Empty /leads/countries \u2014 frontend contract: hide navbar selector + country-scoped sections');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/countries?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"countries"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						},
+						"description": "Customer-facing country selector source. Markets with status='active'. No reCAPTCHA token required \u2014 this is a navbar-load fetch."
+					}
+				},
+				{
+					"name": "GET /leads/countries (es) \u2014 different ETag, localized names",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const etagEs = pm.response.headers.get('ETag');",
+									"const etagEn = pm.collectionVariables.get('countriesEtagEn');",
+									"pm.test('ETag differs per locale (en vs es)', () => {",
+									"    pm.expect(etagEs).to.be.a('string').and.not.empty;",
+									"    if (etagEn) pm.expect(etagEs).to.not.equal(etagEn);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/countries?language=es",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"countries"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "es"
+								}
+							]
+						},
+						"description": "Same endpoint, different locale \u2192 different ETag + localized country names."
+					}
+				},
+				{
+					"name": "GET /leads/countries with If-None-Match \u2192 304",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 304 Not Modified', () => pm.response.to.have.status(304));",
+									"pm.test('Body is empty on 304', () => pm.expect(pm.response.text()).to.have.lengthOf(0));",
+									"const etag = pm.response.headers.get('ETag');",
+									"const priorEtag = pm.collectionVariables.get('countriesEtagEn');",
+									"pm.test('ETag preserved on 304', () => pm.expect(etag).to.equal(priorEtag));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "If-None-Match",
+								"value": "{{countriesEtagEn}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/countries?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"countries"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						},
+						"description": "Revalidation. Requires the prior 'en' request to have populated countriesEtagEn."
+					}
+				},
+				{
+					"name": "GET /leads/countries (invalid language) \u2192 422",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 422', () => pm.response.to.have.status(422));",
+									"const body = pm.response.json();",
+									"pm.test('detail is validation envelope array for invalid language', () => {\n  pm.expect(body.detail).to.be.an('array').and.have.length.above(0);\n  pm.expect(body.detail[0].message).to.match(/[Uu]nsupported language/);\n});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/countries?language=zz",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"countries"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "zz"
+								}
+							]
+						},
+						"description": "422 for request-schema validation (vs 400 reserved for business rules like missing country_code)."
+					}
+				},
+				{
+					"name": "GET /leads/supplier-countries \u2014 superset, includes inactive markets",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const etag = pm.response.headers.get('ETag');",
+									"pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
+									"pm.test('Cache-Control long-cache + SWR', () => {",
+									"    const cc = pm.response.headers.get('Cache-Control') || '';",
+									"    pm.expect(cc).to.include('max-age=86400');",
+									"    pm.expect(cc).to.include('stale-while-revalidate=3600');",
+									"});",
+									"",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"",
+									"const firstActive = pm.collectionVariables.get('firstActiveCountryCode');",
+									"if (firstActive) {",
+									"    pm.test('Active countries are present in supplier-countries (superset)', () => {",
+									"        const codes = body.map(r => r.code);",
+									"        pm.expect(codes).to.include(firstActive);",
+									"    });",
+									"}",
+									"",
+									"if (body.length === 0) {",
+									"    console.log('Empty /leads/supplier-countries \u2014 frontend drops dropdown + promotes partners@vianda.market mailto');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/supplier-countries?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"supplier-countries"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						},
+						"description": "Supplier form source. status IN ('active','inactive'). No reCAPTCHA."
+					}
+				}
+			]
+		},
+		{
+			"name": "country_code contract on plans / restaurants / featured-restaurant",
+			"item": [
+				{
+					"name": "GET /leads/plans (no country_code) \u2192 400",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 400', () => pm.response.to.have.status(400));",
+									"pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}",
+								"description": "Any non-empty string when RECAPTCHA_SECRET_KEY is unset locally; real token in staging/prod."
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/plans?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"plans"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						},
+						"description": "Business-rule 400. Contract delta: `country_code` is now required on this endpoint."
+					}
+				},
+				{
+					"name": "GET /leads/plans?country_code=AR \u2014 country-scoped list",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"if (body.length > 0) {",
+									"    pm.test('All plans share one currency (country-scoped)', () => {",
+									"        const currencies = [...new Set(body.map(p => p.currency))];",
+									"        pm.expect(currencies).to.have.lengthOf(1);",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/plans?language=en&country_code=AR",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"plans"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						},
+						"description": "Scoped to AR. All rows should carry one currency (ARS) \u2014 verifies the mixed-currency flood is resolved."
+					}
+				},
+				{
+					"name": "GET /leads/plans?country_code=ZZ \u2192 [] (unsupported country)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"pm.test('Body is []', () => pm.expect(pm.response.json()).to.eql([]));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/plans?language=en&country_code=ZZ",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"plans"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								},
+								{
+									"key": "country_code",
+									"value": "ZZ"
+								}
+							]
+						},
+						"description": "Unsupported country \u2192 empty list, 200, cacheable (not 404)."
+					}
+				},
+				{
+					"name": "GET /leads/restaurants (no country_code) \u2192 400",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 400', () => pm.response.to.have.status(400));",
+									"pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/restaurants?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"restaurants"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "GET /leads/restaurants?country_code=AR \u2014 country-scoped",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"pm.test('Body is an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/restaurants?language=en&country_code=AR&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"restaurants"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "GET /leads/featured-restaurant (no country_code) \u2192 400",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 400', () => pm.response.to.have.status(400));",
+									"pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"featured-restaurant"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "GET /leads/featured-restaurant?country_code=ZZ \u2192 null (200)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 (no 404)', () => pm.response.to.have.status(200));",
+									"pm.test('Content-Type is application/json', () => {",
+									"    const ct = pm.response.headers.get('Content-Type') || '';",
+									"    pm.expect(ct).to.include('application/json');",
+									"});",
+									"pm.test('Body is the literal JSON null', () => {",
+									"    pm.expect(pm.response.text().trim()).to.equal('null');",
+									"    pm.expect(pm.response.json()).to.equal(null);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en&country_code=ZZ",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"featured-restaurant"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								},
+								{
+									"key": "country_code",
+									"value": "ZZ"
+								}
+							]
+						},
+						"description": "Contract delta: the legacy 404 is retired. Unsupported country OR supported-but-no-match returns body `null`, HTTP 200."
+					}
+				},
+				{
+					"name": "GET /leads/featured-restaurant?country_code=AR \u2014 match or null",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const text = pm.response.text().trim();",
+									"pm.test('Body is null or an object with restaurant_id', () => {",
+									"    if (text === 'null') {",
+									"        pm.expect(pm.response.json()).to.equal(null);",
+									"    } else {",
+									"        const body = pm.response.json();",
+									"        pm.expect(body).to.be.an('object');",
+									"        pm.expect(body).to.have.property('restaurant_id');",
+									"        pm.expect(body).to.have.property('cover_image_url');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Recaptcha-Token",
+								"value": "{{recaptchaToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/featured-restaurant?language=en&country_code=AR",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"featured-restaurant"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								},
+								{
+									"key": "country_code",
+									"value": "AR"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin override on market status (guardrails)",
+			"description": "Exercises the admin override validation added to PUT /admin/markets/{id}. Requires a super admin token and at least one non-global market in the DB.",
+			"item": [
+				{
+					"name": "Login Super Admin (idempotent)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Skip when a token is already provided via Newman --globals or set by a prior run.",
+									"const existing = pm.globals.get('superAdminAuthToken') || pm.collectionVariables.get('superAdminAuthToken');",
+									"if (existing && String(existing).length > 0) {",
+									"    pm.collectionVariables.set('superAdminAuthToken', existing);",
+									"    console.log('superAdminAuthToken already set \u2014 skipping login.');",
+									"    postman.setNextRequest('Discover a non-global market + its coverage status');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const response = pm.response.json();",
+									"pm.test('Response has access_token', () => pm.expect(response).to.have.property('access_token'));",
+									"const token = response.access_token;",
+									"pm.collectionVariables.set('superAdminAuthToken', token);",
+									"pm.environment.set('superAdminAuthToken', token);",
+									"pm.globals.set('superAdminAuthToken', token);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{superAdminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{superAdminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"token"
+							]
+						},
+						"description": "Skipped when superAdminAuthToken already exists as a Postman global. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md for the seed-collection / Newman --globals pattern."
+					}
+				},
+				{
+					"name": "Discover a non-global market + its coverage status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const markets = pm.response.json();",
+									"pm.test('Returned list of markets', () => pm.expect(markets).to.be.an('array').and.not.empty);",
+									"",
+									"const GLOBAL = '00000000-0000-0000-0000-000000000001';",
+									"const target = markets.find(m => m.market_id !== GLOBAL);",
+									"pm.test('Found a non-global market', () => pm.expect(target).to.exist);",
+									"",
+									"if (target) {",
+									"    pm.collectionVariables.set('testMarketId', target.market_id);",
+									"    pm.collectionVariables.set('testMarketStatus', target.status);",
+									"    pm.collectionVariables.set('testMarketCountry', target.country_code);",
+									"    console.log('Target market:', target.country_code, target.market_id, 'status:', target.status);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets"
+							]
+						}
+					}
+				},
+				{
+					"name": "PUT /admin/markets/{id} status=active \u2014 expect 400 when market has no coverage OR 200 if it does",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 400', () => pm.expect([200, 400]).to.include(pm.response.code));",
+									"",
+									"if (pm.response.code === 400) {",
+									"    const body = pm.response.json();",
+									"    pm.test('400 detail mentions Cannot activate', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('Cannot activate'));",
+									"    pm.test('400 detail explains coverage requirement', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/plate|coverage|kitchen-day/));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"{{testMarketId}}"
+							]
+						},
+						"description": "Admin guardrail: `status='active'` is refused when the market has no active restaurant \u2192 plate \u2192 plate_kitchen_days chain. The 30-day forward window tightening is deferred to the cron (`docs/plans/market-status-cron.md`)."
+					}
+				},
+				{
+					"name": "PUT /admin/markets/{id} status=inactive (no confirm) \u2014 409 if coverage, 200 otherwise",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 409', () => pm.expect([200, 409]).to.include(pm.response.code));",
+									"",
+									"if (pm.response.code === 409) {",
+									"    const body = pm.response.json();",
+									"    pm.test('409 detail mentions active plate coverage', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/active plate coverage|confirm_deactivate/));",
+									"    pm.test('409 detail names confirm_deactivate as the unlock', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('confirm_deactivate'));",
+									"    pm.collectionVariables.set('marketHasCoverage', 'true');",
+									"} else {",
+									"    pm.collectionVariables.set('marketHasCoverage', 'false');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"inactive\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"{{testMarketId}}"
+							]
+						},
+						"description": "Deactivation warning: when the market has active plate coverage, the backend refuses without `confirm_deactivate: true`."
+					}
+				},
+				{
+					"name": "PUT /admin/markets/{id} status=inactive + confirm_deactivate=true \u2014 200",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Returned market status is inactive', () => pm.expect(body.status).to.eql('inactive'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"inactive\",\n  \"confirm_deactivate\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"{{testMarketId}}"
+							]
+						},
+						"description": "Deactivation succeeds when the second-confirm flag is set."
+					}
+				},
+				{
+					"name": "Restore original market status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 400', () => pm.expect([200, 400]).to.include(pm.response.code));",
+									"if (pm.response.code === 400) {",
+									"    console.warn('Could not restore original status \u2014 likely the admin-activation guardrail fired. Market left inactive.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{superAdminAuthToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"{{testMarketStatus}}\",\n  \"confirm_deactivate\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/markets/{{testMarketId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"{{testMarketId}}"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "sampleZip",
+			"value": "10001",
+			"type": "string"
+		},
+		{
+			"key": "sampleCountryCode",
+			"value": "US",
+			"type": "string"
+		},
+		{
+			"key": "superAdminUsername",
+			"value": "superadmin",
+			"type": "string"
+		},
+		{
+			"key": "superAdminPassword",
+			"value": "SuperAdmin1",
+			"type": "string"
+		},
+		{
+			"key": "superAdminAuthToken",
+			"value": "",
+			"type": "string",
+			"description": "Set by Login Super Admin, or pre-seeded via Newman --globals."
+		},
+		{
+			"key": "recaptchaToken",
+			"value": "dev-bypass",
+			"type": "string",
+			"description": "Canonical name across all leads collections. Any non-empty string when RECAPTCHA_SECRET_KEY is empty locally (verify_recaptcha short-circuits); real reCAPTCHA v3 token in staging/prod."
+		},
+		{
+			"key": "countriesEtagEn",
+			"value": "",
+			"type": "string",
+			"description": "Captured from the first /leads/countries?language=en call; reused by the 304 test."
+		},
+		{
+			"key": "firstActiveCountryCode",
+			"value": "",
+			"type": "string",
+			"description": "First country code returned by /leads/countries \u2014 used to assert /leads/supplier-countries is a superset."
+		},
+		{
+			"key": "testMarketId",
+			"value": "",
+			"type": "string",
+			"description": "Non-global market UUID discovered at run time."
+		},
+		{
+			"key": "testMarketStatus",
+			"value": "",
+			"type": "string",
+			"description": "Original status captured before mutation; restored at the end."
+		},
+		{
+			"key": "testMarketCountry",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "marketHasCoverage",
+			"value": "",
+			"type": "string",
+			"description": "'true' | 'false' \u2014 inferred from whether the unconfirmed deactivation returned 409."
+		}
+	]
 }

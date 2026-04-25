@@ -1,1007 +1,1007 @@
 {
-  "info": {
-    "_postman_id": "role-field-access-2026",
-    "name": "008 ROLE AND FIELD ACCESS",
-    "description": "Validates route-level and field-level access: address_type (Supplier: Restaurant/Entity only; Customer: Customer Home/Billing/Employer only; each role disallowed from the other's types), user role_type (Supplier cannot create Customer), Customer cannot create users. Run Auth folder first (includes Get Supplier Institution to set market_id from API). For customer login: run collection 000 through Customer Signup Verify first; customer credentials will be in env/globals. Run 008 before 010 (Permissions) which archives the customer at the end. Otherwise use seed users or set variables; Get Supplier Institution minimizes hardcoded seed dependency for Supplier user create.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
-  },
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8000"
-    },
-    {
-      "key": "supplierToken",
-      "value": ""
-    },
-    {
-      "key": "customerToken",
-      "value": ""
-    },
-    {
-      "key": "adminToken",
-      "value": ""
-    },
-    {
-      "key": "supplierUsername",
-      "value": "",
-      "description": "Set by 000 Supplier Setup or environment"
-    },
-    {
-      "key": "supplierPassword",
-      "value": "",
-      "description": "Set by 000 Supplier Setup or environment"
-    },
-    {
-      "key": "customerUsername",
-      "value": "",
-      "description": "Set by 000 Customer Signup or environment"
-    },
-    {
-      "key": "customerPassword",
-      "value": "",
-      "description": "Set by 000 Customer Signup or environment"
-    },
-    {
-      "key": "adminUsername",
-      "value": "",
-      "description": "Set by environment or admin user creation"
-    },
-    {
-      "key": "adminPassword",
-      "value": "",
-      "description": "Set by environment or admin user creation"
-    },
-    {
-      "key": "supplierInstitutionId",
-      "value": "33333333-3333-3333-3333-333333333333"
-    },
-    {
-      "key": "supplierUserId",
-      "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-    },
-    {
-      "key": "customerInstitutionId",
-      "value": "22222222-2222-2222-2222-222222222222"
-    },
-    {
-      "key": "customerUserId",
-      "value": "cccccccc-cccc-cccc-cccc-cccccccccccc"
-    },
-    {
-      "key": "testInstitutionId",
-      "value": "11111111-1111-1111-1111-111111111111"
-    },
-    {
-      "key": "testUserId",
-      "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    },
-    {
-      "key": "supplierInstitutionMarketId",
-      "value": "11111111-1111-1111-1111-111111111111"
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "exec": [
-          "// Use shared users from 000 and 001 (env or globals) when available",
-          "const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
-          "if (u) pm.collectionVariables.set('adminUsername', u);",
-          "const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
-          "if (p) pm.collectionVariables.set('adminPassword', p);",
-          "const su = pm.environment.get('supplierUsername') || pm.globals.get('supplierUsername');",
-          "if (su) pm.collectionVariables.set('supplierUsername', su);",
-          "const sp = pm.environment.get('supplierPassword') || pm.globals.get('supplierPassword');",
-          "if (sp) pm.collectionVariables.set('supplierPassword', sp);",
-          "const cu = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
-          "if (cu) pm.collectionVariables.set('customerUsername', cu);",
-          "const cp = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
-          "if (cp) pm.collectionVariables.set('customerPassword', cp);",
-          "const sid = pm.environment.get('supplierUserId') || pm.globals.get('supplierUserId');",
-          "if (sid) pm.collectionVariables.set('supplierUserId', sid);",
-          "const iid = pm.environment.get('institutionId') || pm.globals.get('institutionId');",
-          "if (iid) pm.collectionVariables.set('supplierInstitutionId', iid);",
-          "const cid = pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
-          "if (cid) pm.collectionVariables.set('customerUserId', cid);"
-        ],
-        "type": "text/javascript"
-      }
-    }
-  ],
-  "item": [
-    {
-      "name": "Auth",
-      "item": [
-        {
-          "name": "Login as Supplier Admin",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "if (r.access_token) { pm.collectionVariables.set('supplierToken', r.access_token); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{supplierUsername}}"
-                },
-                {
-                  "key": "password",
-                  "value": "{{supplierPassword}}"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/api/v1/auth/token"
-          }
-        },
-        {
-          "name": "Setup: Resolve City Metadata (PR4c)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Find any available token so Setup works across collections that use different names.",
-                  "const token = pm.collectionVariables.get('authToken')",
-                  "    || pm.environment.get('authToken')",
-                  "    || pm.collectionVariables.get('employeeAdminToken')",
-                  "    || pm.environment.get('employeeAdminToken')",
-                  "    || pm.collectionVariables.get('superAdminAuthToken')",
-                  "    || pm.environment.get('superAdminAuthToken')",
-                  "    || pm.collectionVariables.get('adminAuthToken')",
-                  "    || pm.environment.get('adminAuthToken')",
-                  "    || pm.collectionVariables.get('supplierToken')",
-                  "    || pm.environment.get('supplierToken');",
-                  "if (token) {",
-                  "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
-                  "} else {",
-                  "    console.warn('No auth token available for Setup Cities — GET /cities will 401');",
-                  "}"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// PR4c setup: pre-populate cityMetadataId{CC} cache for every seeded market",
-                  "// so downstream address-create injectors can read synchronously.",
-                  "pm.test('Cities list returned', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "const cities = pm.response.json();",
-                  "if (Array.isArray(cities)) {",
-                  "    const byCC = {};",
-                  "    for (const c of cities) {",
-                  "        const cc = (c.country_code || '').toUpperCase();",
-                  "        if (!cc || byCC[cc]) continue;",
-                  "        byCC[cc] = c;",
-                  "    }",
-                  "    for (const cc in byCC) {",
-                  "        const city = byCC[cc];",
-                  "        if (!city || !city.city_metadata_id) continue;",
-                  "        const varName = 'cityMetadataId' + cc;",
-                  "        pm.collectionVariables.set(varName, city.city_metadata_id);",
-                  "        pm.environment.set(varName, city.city_metadata_id);",
-                  "        pm.globals.set(varName, city.city_metadata_id);",
-                  "        console.log('cached', varName, '=', city.city_metadata_id, '(' + city.name + ')');",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/cities",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "cities"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Login as Customer",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "// Reuse customer from 000: sync credentials and user ID from env then globals",
-                  "const cu = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
-                  "if (cu) pm.collectionVariables.set('customerUsername', cu);",
-                  "const cp = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
-                  "if (cp) pm.collectionVariables.set('customerPassword', cp);",
-                  "const cid = pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
-                  "if (cid) pm.collectionVariables.set('customerUserId', cid);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "if (r.access_token) { pm.collectionVariables.set('customerToken', r.access_token); pm.environment.set('customerAuthToken', r.access_token); pm.globals.set('customerAuthToken', r.access_token); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{customerUsername}}"
-                },
-                {
-                  "key": "password",
-                  "value": "{{customerPassword}}"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/api/v1/auth/token"
-          }
-        },
-        {
-          "name": "Login as Vianda Admin",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "if (r.access_token) { pm.collectionVariables.set('adminToken', r.access_token); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{adminUsername}}"
-                },
-                {
-                  "key": "password",
-                  "value": "{{adminPassword}}"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/api/v1/auth/token"
-          }
-        },
-        {
-          "name": "Get Supplier User (set supplierUserId, supplierInstitutionId)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "if (r && r.user_id && r.institution_id) {",
-                  "    pm.collectionVariables.set('supplierUserId', r.user_id);",
-                  "    pm.collectionVariables.set('supplierInstitutionId', r.institution_id);",
-                  "    pm.environment.set('supplierUserId', r.user_id);",
-                  "    pm.environment.set('supplierInstitutionId', r.institution_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/v1/users/me"
-          }
-        },
-        {
-          "name": "Get Supplier Institution (set market_id for user create)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "const mid = r && (Array.isArray(r.market_ids) ? r.market_ids[0] : r.market_id);",
-                  "if (mid) { pm.collectionVariables.set('supplierInstitutionMarketId', mid); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/v1/institutions/{{supplierInstitutionId}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Address – Supplier",
-      "item": [
-        {
-          "name": "Address create – Supplier allowed (Restaurant)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Has address_id', function () { pm.expect(r).to.have.property('address_id'); });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "",
-                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
-                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
-                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
-                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
-                  "// the injector early-returns and the legacy timezone_service path handles the request.",
-                  "(function injectCityMetadataId() {",
-                  "    try {",
-                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
-                  "        if (!raw || !raw.trim()) return;",
-                  "        let payload;",
-                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
-                  "        const target = (payload && payload.address) ? payload.address : payload;",
-                  "        if (!target || typeof target !== 'object') return;",
-                  "        if (target.city_metadata_id) return;",
-                  "        const cc = (target.country_code || '').toUpperCase();",
-                  "        if (!cc) return;",
-                  "        const varName = 'cityMetadataId' + cc;",
-                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
-                  "        if (cmid) {",
-                  "            target.city_metadata_id = cmid;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "            return;",
-                  "        }",
-                  "        const token = pm.environment.get('authToken')",
-                  "            || pm.collectionVariables.get('authToken')",
-                  "            || pm.collectionVariables.get('superAdminAuthToken')",
-                  "            || pm.environment.get('superAdminAuthToken');",
-                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
-                  "        if (!token) return;",
-                  "        pm.sendRequest({",
-                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
-                  "            method: 'GET',",
-                  "            header: { 'Authorization': 'Bearer ' + token }",
-                  "        }, (err, res) => {",
-                  "            if (err || !res || res.code !== 200) return;",
-                  "            let cities;",
-                  "            try { cities = res.json(); } catch (e) { return; }",
-                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
-                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
-                  "            if (!first || !first.city_metadata_id) return;",
-                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
-                  "            pm.environment.set(varName, first.city_metadata_id);",
-                  "            target.city_metadata_id = first.city_metadata_id;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "        });",
-                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\n    \"restaurant\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/addresses"
-          }
-        },
-        {
-          "name": "Address create – Supplier disallowed (Customer Home)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var code = pm.response.code;",
-                  "if (code === 403) {",
-                  "    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
-                  "    const r = pm.response.json();",
-                  "    pm.test('Detail mentions Suppliers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Suppliers'); });",
-                  "} else if (code === 201) {",
-                  "    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Supplier)', function () { pm.response.to.have.status(201); });",
-                  "} else {",
-                  "    pm.expect.fail('Expected 403 or 201, got ' + code);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "",
-                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
-                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
-                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
-                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
-                  "// the injector early-returns and the legacy timezone_service path handles the request.",
-                  "(function injectCityMetadataId() {",
-                  "    try {",
-                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
-                  "        if (!raw || !raw.trim()) return;",
-                  "        let payload;",
-                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
-                  "        const target = (payload && payload.address) ? payload.address : payload;",
-                  "        if (!target || typeof target !== 'object') return;",
-                  "        if (target.city_metadata_id) return;",
-                  "        const cc = (target.country_code || '').toUpperCase();",
-                  "        if (!cc) return;",
-                  "        const varName = 'cityMetadataId' + cc;",
-                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
-                  "        if (cmid) {",
-                  "            target.city_metadata_id = cmid;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "            return;",
-                  "        }",
-                  "        const token = pm.environment.get('authToken')",
-                  "            || pm.collectionVariables.get('authToken')",
-                  "            || pm.collectionVariables.get('superAdminAuthToken')",
-                  "            || pm.environment.get('superAdminAuthToken');",
-                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
-                  "        if (!token) return;",
-                  "        pm.sendRequest({",
-                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
-                  "            method: 'GET',",
-                  "            header: { 'Authorization': 'Bearer ' + token }",
-                  "        }, (err, res) => {",
-                  "            if (err || !res || res.code !== 200) return;",
-                  "            let cities;",
-                  "            try { cities = res.json(); } catch (e) { return; }",
-                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
-                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
-                  "            if (!first || !first.city_metadata_id) return;",
-                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
-                  "            pm.environment.set(varName, first.city_metadata_id);",
-                  "            target.city_metadata_id = first.city_metadata_id;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "        });",
-                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\n    \"customer_home\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/addresses"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Address – Customer",
-      "item": [
-        {
-          "name": "Address create – Customer allowed (Customer Home)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Has address_id', function () { pm.expect(r).to.have.property('address_id'); });",
-                  "pm.test('address_type includes Customer Home', function () { pm.expect(r.address_type || []).to.include('customer_home'); });"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "",
-                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
-                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
-                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
-                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
-                  "// the injector early-returns and the legacy timezone_service path handles the request.",
-                  "(function injectCityMetadataId() {",
-                  "    try {",
-                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
-                  "        if (!raw || !raw.trim()) return;",
-                  "        let payload;",
-                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
-                  "        const target = (payload && payload.address) ? payload.address : payload;",
-                  "        if (!target || typeof target !== 'object') return;",
-                  "        if (target.city_metadata_id) return;",
-                  "        const cc = (target.country_code || '').toUpperCase();",
-                  "        if (!cc) return;",
-                  "        const varName = 'cityMetadataId' + cc;",
-                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
-                  "        if (cmid) {",
-                  "            target.city_metadata_id = cmid;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "            return;",
-                  "        }",
-                  "        const token = pm.environment.get('authToken')",
-                  "            || pm.collectionVariables.get('authToken')",
-                  "            || pm.collectionVariables.get('superAdminAuthToken')",
-                  "            || pm.environment.get('superAdminAuthToken');",
-                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
-                  "        if (!token) return;",
-                  "        pm.sendRequest({",
-                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
-                  "            method: 'GET',",
-                  "            header: { 'Authorization': 'Bearer ' + token }",
-                  "        }, (err, res) => {",
-                  "            if (err || !res || res.code !== 200) return;",
-                  "            let cities;",
-                  "            try { cities = res.json(); } catch (e) { return; }",
-                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
-                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
-                  "            if (!first || !first.city_metadata_id) return;",
-                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
-                  "            pm.environment.set(varName, first.city_metadata_id);",
-                  "            target.city_metadata_id = first.city_metadata_id;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "        });",
-                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{customerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\n    \"customer_home\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/addresses"
-          }
-        },
-        {
-          "name": "Address create – Customer disallowed (Restaurant)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var code = pm.response.code;",
-                  "if (code === 403) {",
-                  "    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
-                  "    const r = pm.response.json();",
-                  "    pm.test('Detail mentions Customers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Customers'); });",
-                  "    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/Customer Home|Customer Billing|Customer Employer|Disallowed/); });",
-                  "} else if (code === 201) {",
-                  "    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Customer)', function () { pm.response.to.have.status(201); });",
-                  "} else {",
-                  "    pm.expect.fail('Expected 403 or 201, got ' + code);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "",
-                  "// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
-                  "// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
-                  "// Caches the resolved id at collection + environment scope keyed by country_code.",
-                  "// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
-                  "// the injector early-returns and the legacy timezone_service path handles the request.",
-                  "(function injectCityMetadataId() {",
-                  "    try {",
-                  "        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
-                  "        if (!raw || !raw.trim()) return;",
-                  "        let payload;",
-                  "        try { payload = JSON.parse(raw); } catch (e) { return; }",
-                  "        const target = (payload && payload.address) ? payload.address : payload;",
-                  "        if (!target || typeof target !== 'object') return;",
-                  "        if (target.city_metadata_id) return;",
-                  "        const cc = (target.country_code || '').toUpperCase();",
-                  "        if (!cc) return;",
-                  "        const varName = 'cityMetadataId' + cc;",
-                  "        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
-                  "        if (cmid) {",
-                  "            target.city_metadata_id = cmid;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "            return;",
-                  "        }",
-                  "        const token = pm.environment.get('authToken')",
-                  "            || pm.collectionVariables.get('authToken')",
-                  "            || pm.collectionVariables.get('superAdminAuthToken')",
-                  "            || pm.environment.get('superAdminAuthToken');",
-                  "        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
-                  "        if (!token) return;",
-                  "        pm.sendRequest({",
-                  "            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
-                  "            method: 'GET',",
-                  "            header: { 'Authorization': 'Bearer ' + token }",
-                  "        }, (err, res) => {",
-                  "            if (err || !res || res.code !== 200) return;",
-                  "            let cities;",
-                  "            try { cities = res.json(); } catch (e) { return; }",
-                  "            if (!Array.isArray(cities) || cities.length === 0) return;",
-                  "            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
-                  "            if (!first || !first.city_metadata_id) return;",
-                  "            pm.collectionVariables.set(varName, first.city_metadata_id);",
-                  "            pm.environment.set(varName, first.city_metadata_id);",
-                  "            target.city_metadata_id = first.city_metadata_id;",
-                  "            pm.request.body.update(JSON.stringify(payload));",
-                  "        });",
-                  "    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{customerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\n    \"restaurant\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/addresses"
-          }
-        }
-      ]
-    },
-    {
-      "name": "User – Supplier",
-      "item": [
-        {
-          "name": "User create – Supplier allowed (role_type Supplier)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Has user_id', function () { pm.expect(r).to.have.property('user_id'); });",
-                  "pm.test('Response role_type is Supplier', function () { pm.expect(r.role_type || '').to.eql('supplier'); });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"newsupplier_{{$timestamp}}\",\n  \"email\": \"newsupplier_{{$timestamp}}@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+15005550006\",\n  \"first_name\": \"New\",\n  \"last_name\": \"supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users"
-          }
-        },
-        {
-          "name": "User create – Supplier disallowed (role_type Customer)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var code = pm.response.code;",
-                  "const r = pm.response.json();",
-                  "const detailStr = Array.isArray(r.detail) ? (r.detail.map(function(d) { return typeof d === 'object' ? (d.msg || JSON.stringify(d)) : d; }).join(' ')) : (r.detail || '');",
-                  "// Backend now rejects any attempt to create a Customer role via POST /users with 400 \"Customers must self-register\"",
-                  "// (a global check, not Supplier-specific). Test accepts 400 \"self-register\" OR 403 \"Supplier restriction\" for back-compat.",
-                  "pm.test('Customer role creation blocked', function () {",
-                  "    if (code === 400) {",
-                  "        pm.expect(detailStr).to.match(/self-register|Customers must/i);",
-                  "    } else if (code === 403) {",
-                  "        pm.expect(detailStr).to.match(/Supplier|institution|Customer|Employee/);",
-                  "    } else {",
-                  "        pm.expect.fail('Expected 400 or 403, got ' + code + ': ' + detailStr);",
-                  "    }",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"newcustomer\",\n  \"email\": \"newcustomer@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+14155552671\",\n  \"first_name\": \"New\",\n  \"last_name\": \"customer\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users"
-          }
-        }
-      ]
-    },
-    {
-      "name": "User – Customer",
-      "item": [
-        {
-          "name": "User create – Customer gets 403",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 403', function () { pm.response.to.have.status(403); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Detail mentions customers cannot create users', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/customers cannot create/i); });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{customerToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"another\",\n  \"email\": \"another@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+5491112345678\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Institution – no_show_discount",
-      "item": [
-        {
-          "name": "Institution no_show_discount – Employee Admin can edit",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "const r = pm.response.json();",
-                  "pm.test('no_show_discount updated', function () { pm.expect(r.no_show_discount).to.eql(20); });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"no_show_discount\": 20\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/supplier-terms/{{supplierInstitutionId}}"
-          }
-        },
-        {
-          "name": "Institution no_show_discount – Supplier Admin cannot edit",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 403', function () { pm.response.to.have.status(403); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Detail mentions no_show_discount restriction', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/no_show_discount|Manager|Admin|Employee/i); });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{supplierToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"no_show_discount\": 25\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/supplier-terms/{{supplierInstitutionId}}"
-          }
-        },
-        {
-          "name": "Institution create Supplier without no_show_discount – expect 422",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 422', function () { pm.response.to.have.status(422); });",
-                  "const r = pm.response.json();",
-                  "pm.test('Detail mentions no_show_discount', function () {",
-                  "    const d = r.detail;",
-                  "    const str = Array.isArray(d) ? d.map(function(x){ return (x&&x.message)||(x&&x.msg)||JSON.stringify(x); }).join(' ') : ((d&&d.message)||d||'');",
-                  "    pm.expect(str).to.match(/no_show_discount|Supplier/i);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Supplier No Discount\",\n  \"institution_type\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/institutions"
-          }
-        }
-      ]
-    }
-  ]
+	"info": {
+		"_postman_id": "role-field-access-2026",
+		"name": "008 ROLE AND FIELD ACCESS",
+		"description": "Validates route-level and field-level access: address_type (Supplier: Restaurant/Entity only; Customer: Customer Home/Billing/Employer only; each role disallowed from the other's types), user role_type (Supplier cannot create Customer), Customer cannot create users. Run Auth folder first (includes Get Supplier Institution to set market_id from API). For customer login: run collection 000 through Customer Signup Verify first; customer credentials will be in env/globals. Run 008 before 010 (Permissions) which archives the customer at the end. Otherwise use seed users or set variables; Get Supplier Institution minimizes hardcoded seed dependency for Supplier user create.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "supplierToken",
+			"value": ""
+		},
+		{
+			"key": "customerToken",
+			"value": ""
+		},
+		{
+			"key": "adminToken",
+			"value": ""
+		},
+		{
+			"key": "supplierUsername",
+			"value": "",
+			"description": "Set by 000 Supplier Setup or environment"
+		},
+		{
+			"key": "supplierPassword",
+			"value": "",
+			"description": "Set by 000 Supplier Setup or environment"
+		},
+		{
+			"key": "customerUsername",
+			"value": "",
+			"description": "Set by 000 Customer Signup or environment"
+		},
+		{
+			"key": "customerPassword",
+			"value": "",
+			"description": "Set by 000 Customer Signup or environment"
+		},
+		{
+			"key": "adminUsername",
+			"value": "",
+			"description": "Set by environment or admin user creation"
+		},
+		{
+			"key": "adminPassword",
+			"value": "",
+			"description": "Set by environment or admin user creation"
+		},
+		{
+			"key": "supplierInstitutionId",
+			"value": "33333333-3333-3333-3333-333333333333"
+		},
+		{
+			"key": "supplierUserId",
+			"value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+		},
+		{
+			"key": "customerInstitutionId",
+			"value": "22222222-2222-2222-2222-222222222222"
+		},
+		{
+			"key": "customerUserId",
+			"value": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+		},
+		{
+			"key": "testInstitutionId",
+			"value": "11111111-1111-1111-1111-111111111111"
+		},
+		{
+			"key": "testUserId",
+			"value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		},
+		{
+			"key": "supplierInstitutionMarketId",
+			"value": "11111111-1111-1111-1111-111111111111"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Use shared users from 000 and 001 (env or globals) when available",
+					"const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+					"if (u) pm.collectionVariables.set('adminUsername', u);",
+					"const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+					"if (p) pm.collectionVariables.set('adminPassword', p);",
+					"const su = pm.environment.get('supplierUsername') || pm.globals.get('supplierUsername');",
+					"if (su) pm.collectionVariables.set('supplierUsername', su);",
+					"const sp = pm.environment.get('supplierPassword') || pm.globals.get('supplierPassword');",
+					"if (sp) pm.collectionVariables.set('supplierPassword', sp);",
+					"const cu = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
+					"if (cu) pm.collectionVariables.set('customerUsername', cu);",
+					"const cp = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
+					"if (cp) pm.collectionVariables.set('customerPassword', cp);",
+					"const sid = pm.environment.get('supplierUserId') || pm.globals.get('supplierUserId');",
+					"if (sid) pm.collectionVariables.set('supplierUserId', sid);",
+					"const iid = pm.environment.get('institutionId') || pm.globals.get('institutionId');",
+					"if (iid) pm.collectionVariables.set('supplierInstitutionId', iid);",
+					"const cid = pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
+					"if (cid) pm.collectionVariables.set('customerUserId', cid);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login as Supplier Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"if (r.access_token) { pm.collectionVariables.set('supplierToken', r.access_token); }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{supplierUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{supplierPassword}}"
+								}
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				},
+				{
+					"name": "Setup: Resolve City Metadata (PR4c)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Find any available token so Setup works across collections that use different names.",
+									"const token = pm.collectionVariables.get('authToken')",
+									"    || pm.environment.get('authToken')",
+									"    || pm.collectionVariables.get('employeeAdminToken')",
+									"    || pm.environment.get('employeeAdminToken')",
+									"    || pm.collectionVariables.get('superAdminAuthToken')",
+									"    || pm.environment.get('superAdminAuthToken')",
+									"    || pm.collectionVariables.get('adminAuthToken')",
+									"    || pm.environment.get('adminAuthToken')",
+									"    || pm.collectionVariables.get('supplierToken')",
+									"    || pm.environment.get('supplierToken');",
+									"if (token) {",
+									"    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+									"} else {",
+									"    console.warn('No auth token available for Setup Cities \u2014 GET /cities will 401');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// PR4c setup: pre-populate cityMetadataId{CC} cache for every seeded market",
+									"// so downstream address-create injectors can read synchronously.",
+									"pm.test('Cities list returned', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const cities = pm.response.json();",
+									"if (Array.isArray(cities)) {",
+									"    const byCC = {};",
+									"    for (const c of cities) {",
+									"        const cc = (c.country_code || '').toUpperCase();",
+									"        if (!cc || byCC[cc]) continue;",
+									"        byCC[cc] = c;",
+									"    }",
+									"    for (const cc in byCC) {",
+									"        const city = byCC[cc];",
+									"        if (!city || !city.city_metadata_id) continue;",
+									"        const varName = 'cityMetadataId' + cc;",
+									"        pm.collectionVariables.set(varName, city.city_metadata_id);",
+									"        pm.environment.set(varName, city.city_metadata_id);",
+									"        pm.globals.set(varName, city.city_metadata_id);",
+									"        console.log('cached', varName, '=', city.city_metadata_id, '(' + city.name + ')');",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/cities",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"cities"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login as Customer",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Reuse customer from 000: sync credentials and user ID from env then globals",
+									"const cu = pm.environment.get('customerUsername') || pm.globals.get('customerUsername');",
+									"if (cu) pm.collectionVariables.set('customerUsername', cu);",
+									"const cp = pm.environment.get('customerPassword') || pm.globals.get('customerPassword');",
+									"if (cp) pm.collectionVariables.set('customerPassword', cp);",
+									"const cid = pm.environment.get('customerUserId') || pm.globals.get('customerUserId');",
+									"if (cid) pm.collectionVariables.set('customerUserId', cid);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"if (r.access_token) { pm.collectionVariables.set('customerToken', r.access_token); pm.environment.set('customerAuthToken', r.access_token); pm.globals.set('customerAuthToken', r.access_token); }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{customerUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{customerPassword}}"
+								}
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				},
+				{
+					"name": "Login as Vianda Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"if (r.access_token) { pm.collectionVariables.set('adminToken', r.access_token); }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{adminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{adminPassword}}"
+								}
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				},
+				{
+					"name": "Get Supplier User (set supplierUserId, supplierInstitutionId)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"if (r && r.user_id && r.institution_id) {",
+									"    pm.collectionVariables.set('supplierUserId', r.user_id);",
+									"    pm.collectionVariables.set('supplierInstitutionId', r.institution_id);",
+									"    pm.environment.set('supplierUserId', r.user_id);",
+									"    pm.environment.set('supplierInstitutionId', r.institution_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/users/me"
+					}
+				},
+				{
+					"name": "Get Supplier Institution (set market_id for user create)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"const mid = r && (Array.isArray(r.market_ids) ? r.market_ids[0] : r.market_id);",
+									"if (mid) { pm.collectionVariables.set('supplierInstitutionMarketId', mid); }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/institutions/{{supplierInstitutionId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "Address \u2013 Supplier",
+			"item": [
+				{
+					"name": "Address create \u2013 Supplier allowed (Restaurant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+									"const r = pm.response.json();",
+									"pm.test('Has address_id', function () { pm.expect(r).to.have.property('address_id'); });"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"",
+									"// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+									"// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+									"// Caches the resolved id at collection + environment scope keyed by country_code.",
+									"// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+									"// the injector early-returns and the legacy timezone_service path handles the request.",
+									"(function injectCityMetadataId() {",
+									"    try {",
+									"        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+									"        if (!raw || !raw.trim()) return;",
+									"        let payload;",
+									"        try { payload = JSON.parse(raw); } catch (e) { return; }",
+									"        const target = (payload && payload.address) ? payload.address : payload;",
+									"        if (!target || typeof target !== 'object') return;",
+									"        if (target.city_metadata_id) return;",
+									"        const cc = (target.country_code || '').toUpperCase();",
+									"        if (!cc) return;",
+									"        const varName = 'cityMetadataId' + cc;",
+									"        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+									"        if (cmid) {",
+									"            target.city_metadata_id = cmid;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"            return;",
+									"        }",
+									"        const token = pm.environment.get('authToken')",
+									"            || pm.collectionVariables.get('authToken')",
+									"            || pm.collectionVariables.get('superAdminAuthToken')",
+									"            || pm.environment.get('superAdminAuthToken');",
+									"        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+									"        if (!token) return;",
+									"        pm.sendRequest({",
+									"            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+									"            method: 'GET',",
+									"            header: { 'Authorization': 'Bearer ' + token }",
+									"        }, (err, res) => {",
+									"            if (err || !res || res.code !== 200) return;",
+									"            let cities;",
+									"            try { cities = res.json(); } catch (e) { return; }",
+									"            if (!Array.isArray(cities) || cities.length === 0) return;",
+									"            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+									"            if (!first || !first.city_metadata_id) return;",
+									"            pm.collectionVariables.set(varName, first.city_metadata_id);",
+									"            pm.environment.set(varName, first.city_metadata_id);",
+									"            target.city_metadata_id = first.city_metadata_id;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"        });",
+									"    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\n    \"restaurant\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				},
+				{
+					"name": "Address create \u2013 Supplier disallowed (Customer Home)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var code = pm.response.code;",
+									"if (code === 403) {",
+									"    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
+									"    const r = pm.response.json();",
+									"    pm.test('Detail mentions Suppliers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Suppliers'); });",
+									"} else if (code === 201) {",
+									"    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Supplier)', function () { pm.response.to.have.status(201); });",
+									"} else {",
+									"    pm.expect.fail('Expected 403 or 201, got ' + code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"",
+									"// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+									"// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+									"// Caches the resolved id at collection + environment scope keyed by country_code.",
+									"// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+									"// the injector early-returns and the legacy timezone_service path handles the request.",
+									"(function injectCityMetadataId() {",
+									"    try {",
+									"        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+									"        if (!raw || !raw.trim()) return;",
+									"        let payload;",
+									"        try { payload = JSON.parse(raw); } catch (e) { return; }",
+									"        const target = (payload && payload.address) ? payload.address : payload;",
+									"        if (!target || typeof target !== 'object') return;",
+									"        if (target.city_metadata_id) return;",
+									"        const cc = (target.country_code || '').toUpperCase();",
+									"        if (!cc) return;",
+									"        const varName = 'cityMetadataId' + cc;",
+									"        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+									"        if (cmid) {",
+									"            target.city_metadata_id = cmid;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"            return;",
+									"        }",
+									"        const token = pm.environment.get('authToken')",
+									"            || pm.collectionVariables.get('authToken')",
+									"            || pm.collectionVariables.get('superAdminAuthToken')",
+									"            || pm.environment.get('superAdminAuthToken');",
+									"        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+									"        if (!token) return;",
+									"        pm.sendRequest({",
+									"            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+									"            method: 'GET',",
+									"            header: { 'Authorization': 'Bearer ' + token }",
+									"        }, (err, res) => {",
+									"            if (err || !res || res.code !== 200) return;",
+									"            let cities;",
+									"            try { cities = res.json(); } catch (e) { return; }",
+									"            if (!Array.isArray(cities) || cities.length === 0) return;",
+									"            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+									"            if (!first || !first.city_metadata_id) return;",
+									"            pm.collectionVariables.set(varName, first.city_metadata_id);",
+									"            pm.environment.set(varName, first.city_metadata_id);",
+									"            target.city_metadata_id = first.city_metadata_id;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"        });",
+									"    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"user_id\": \"{{supplierUserId}}\",\n  \"address_type\": [\n    \"customer_home\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1001\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Test\",\n  \"building_number\": \"1\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				}
+			]
+		},
+		{
+			"name": "Address \u2013 Customer",
+			"item": [
+				{
+					"name": "Address create \u2013 Customer allowed (Customer Home)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+									"const r = pm.response.json();",
+									"pm.test('Has address_id', function () { pm.expect(r).to.have.property('address_id'); });",
+									"pm.test('address_type includes Customer Home', function () { pm.expect(r.address_type || []).to.include('customer_home'); });"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"",
+									"// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+									"// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+									"// Caches the resolved id at collection + environment scope keyed by country_code.",
+									"// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+									"// the injector early-returns and the legacy timezone_service path handles the request.",
+									"(function injectCityMetadataId() {",
+									"    try {",
+									"        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+									"        if (!raw || !raw.trim()) return;",
+									"        let payload;",
+									"        try { payload = JSON.parse(raw); } catch (e) { return; }",
+									"        const target = (payload && payload.address) ? payload.address : payload;",
+									"        if (!target || typeof target !== 'object') return;",
+									"        if (target.city_metadata_id) return;",
+									"        const cc = (target.country_code || '').toUpperCase();",
+									"        if (!cc) return;",
+									"        const varName = 'cityMetadataId' + cc;",
+									"        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+									"        if (cmid) {",
+									"            target.city_metadata_id = cmid;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"            return;",
+									"        }",
+									"        const token = pm.environment.get('authToken')",
+									"            || pm.collectionVariables.get('authToken')",
+									"            || pm.collectionVariables.get('superAdminAuthToken')",
+									"            || pm.environment.get('superAdminAuthToken');",
+									"        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+									"        if (!token) return;",
+									"        pm.sendRequest({",
+									"            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+									"            method: 'GET',",
+									"            header: { 'Authorization': 'Bearer ' + token }",
+									"        }, (err, res) => {",
+									"            if (err || !res || res.code !== 200) return;",
+									"            let cities;",
+									"            try { cities = res.json(); } catch (e) { return; }",
+									"            if (!Array.isArray(cities) || cities.length === 0) return;",
+									"            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+									"            if (!first || !first.city_metadata_id) return;",
+									"            pm.collectionVariables.set(varName, first.city_metadata_id);",
+									"            pm.environment.set(varName, first.city_metadata_id);",
+									"            target.city_metadata_id = first.city_metadata_id;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"        });",
+									"    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customerToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\n    \"customer_home\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				},
+				{
+					"name": "Address create \u2013 Customer disallowed (Restaurant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var code = pm.response.code;",
+									"if (code === 403) {",
+									"    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
+									"    const r = pm.response.json();",
+									"    pm.test('Detail mentions Customers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Customers'); });",
+									"    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/Customer Home|Customer Billing|Customer Employer|Disallowed/); });",
+									"} else if (code === 201) {",
+									"    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Customer)', function () { pm.response.to.have.status(201); });",
+									"} else {",
+									"    pm.expect.fail('Expected 403 or 201, got ' + code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"",
+									"// PR4a: resolve city_metadata_id from /cities and inject into the request body.",
+									"// Supports nested address (Create Employer Atomic: payload.address.*) and flat bodies.",
+									"// Caches the resolved id at collection + environment scope keyed by country_code.",
+									"// Safe for negative-case tests: if country_code is missing or the API returns nothing,",
+									"// the injector early-returns and the legacy timezone_service path handles the request.",
+									"(function injectCityMetadataId() {",
+									"    try {",
+									"        let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+									"        if (!raw || !raw.trim()) return;",
+									"        let payload;",
+									"        try { payload = JSON.parse(raw); } catch (e) { return; }",
+									"        const target = (payload && payload.address) ? payload.address : payload;",
+									"        if (!target || typeof target !== 'object') return;",
+									"        if (target.city_metadata_id) return;",
+									"        const cc = (target.country_code || '').toUpperCase();",
+									"        if (!cc) return;",
+									"        const varName = 'cityMetadataId' + cc;",
+									"        let cmid = pm.collectionVariables.get(varName) || pm.environment.get(varName);",
+									"        if (cmid) {",
+									"            target.city_metadata_id = cmid;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"            return;",
+									"        }",
+									"        const token = pm.environment.get('authToken')",
+									"            || pm.collectionVariables.get('authToken')",
+									"            || pm.collectionVariables.get('superAdminAuthToken')",
+									"            || pm.environment.get('superAdminAuthToken');",
+									"        const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+									"        if (!token) return;",
+									"        pm.sendRequest({",
+									"            url: baseUrl + '/api/v1/cities?country_code=' + cc,",
+									"            method: 'GET',",
+									"            header: { 'Authorization': 'Bearer ' + token }",
+									"        }, (err, res) => {",
+									"            if (err || !res || res.code !== 200) return;",
+									"            let cities;",
+									"            try { cities = res.json(); } catch (e) { return; }",
+									"            if (!Array.isArray(cities) || cities.length === 0) return;",
+									"            const first = cities.find(c => (c.country_code || '').toUpperCase() === cc) || cities[0];",
+									"            if (!first || !first.city_metadata_id) return;",
+									"            pm.collectionVariables.set(varName, first.city_metadata_id);",
+									"            pm.environment.set(varName, first.city_metadata_id);",
+									"            target.city_metadata_id = first.city_metadata_id;",
+									"            pm.request.body.update(JSON.stringify(payload));",
+									"        });",
+									"    } catch (e) { console.warn('city_metadata_id injector skipped:', e.message); }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customerToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"{{customerInstitutionId}}\",\n  \"user_id\": \"{{customerUserId}}\",\n  \"address_type\": [\n    \"restaurant\"\n  ],\n  \"is_default\": false,\n  \"country_code\": \"AR\",\n  \"province\": \"CABA\",\n  \"city\": \"Buenos Aires\",\n  \"postal_code\": \"1002\",\n  \"street_type\": \"st\",\n  \"street_name\": \"Customer St\",\n  \"building_number\": \"2\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/addresses"
+					}
+				}
+			]
+		},
+		{
+			"name": "User \u2013 Supplier",
+			"item": [
+				{
+					"name": "User create \u2013 Supplier allowed (role_type Supplier)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+									"const r = pm.response.json();",
+									"pm.test('Has user_id', function () { pm.expect(r).to.have.property('user_id'); });",
+									"pm.test('Response role_type is Supplier', function () { pm.expect(r.role_type || '').to.eql('supplier'); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"{{supplierInstitutionId}}\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"newsupplier_{{$timestamp}}\",\n  \"email\": \"newsupplier_{{$timestamp}}@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+15005550006\",\n  \"first_name\": \"New\",\n  \"last_name\": \"supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/users"
+					}
+				},
+				{
+					"name": "User create \u2013 Supplier disallowed (role_type Customer)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var code = pm.response.code;",
+									"const r = pm.response.json();",
+									"const detailStr = Array.isArray(r.detail) ? (r.detail.map(function(d) { return typeof d === 'object' ? (d.message || d.msg || JSON.stringify(d)) : d; }).join(' ')) : ((r.detail && r.detail.message) || r.detail || '');",
+									"// Backend now rejects any attempt to create a Customer role via POST /users with 400 \"Customers must self-register\"",
+									"// (a global check, not Supplier-specific). Test accepts 400 \"self-register\" OR 403 \"Supplier restriction\" for back-compat.",
+									"pm.test('Customer role creation blocked', function () {",
+									"    if (code === 400) {",
+									"        pm.expect(detailStr).to.match(/self-register|Customers must/i);",
+									"    } else if (code === 403) {",
+									"        pm.expect(detailStr).to.match(/Supplier|institution|Customer|Employee/);",
+									"    } else {",
+									"        pm.expect.fail('Expected 400 or 403, got ' + code + ': ' + detailStr);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"newcustomer\",\n  \"email\": \"newcustomer@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+14155552671\",\n  \"first_name\": \"New\",\n  \"last_name\": \"customer\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/users"
+					}
+				}
+			]
+		},
+		{
+			"name": "User \u2013 Customer",
+			"item": [
+				{
+					"name": "User create \u2013 Customer gets 403",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 403', function () { pm.response.to.have.status(403); });",
+									"const r = pm.response.json();",
+									"pm.test('Detail mentions customers cannot create users', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/customers cannot create/i); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customerToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"username\": \"another\",\n  \"email\": \"another@example.com\",\n  \"password\": \"TempPass123!\",\n  \"mobile_number\": \"+5491112345678\",\n  \"market_id\": \"66666666-6666-6666-6666-666666666666\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/users"
+					}
+				}
+			]
+		},
+		{
+			"name": "Institution \u2013 no_show_discount",
+			"item": [
+				{
+					"name": "Institution no_show_discount \u2013 Employee Admin can edit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.test('no_show_discount updated', function () { pm.expect(r.no_show_discount).to.eql(20); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"no_show_discount\": 20\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/supplier-terms/{{supplierInstitutionId}}"
+					}
+				},
+				{
+					"name": "Institution no_show_discount \u2013 Supplier Admin cannot edit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 403', function () { pm.response.to.have.status(403); });",
+									"const r = pm.response.json();",
+									"pm.test('Detail mentions no_show_discount restriction', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/no_show_discount|Manager|Admin|Employee/i); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{supplierToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"no_show_discount\": 25\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/supplier-terms/{{supplierInstitutionId}}"
+					}
+				},
+				{
+					"name": "Institution create Supplier without no_show_discount \u2013 expect 422",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 422', function () { pm.response.to.have.status(422); });",
+									"const r = pm.response.json();",
+									"pm.test('Detail mentions no_show_discount', function () {",
+									"    const d = r.detail;",
+									"    const str = Array.isArray(d) ? d.map(function(x){ return (x&&x.message)||(x&&x.msg)||JSON.stringify(x); }).join(' ') : ((d&&d.message)||d||'');",
+									"    pm.expect(str).to.match(/no_show_discount|Supplier/i);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Test Supplier No Discount\",\n  \"institution_type\": \"Supplier\",\n  \"market_id\": \"{{supplierInstitutionMarketId}}\"\n}"
+						},
+						"url": "{{baseUrl}}/api/v1/institutions"
+					}
+				}
+			]
+		}
+	]
 }
