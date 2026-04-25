@@ -13,6 +13,8 @@ from app.dto.models import (
     InstitutionSettlementDTO,
     RestaurantTransactionDTO,
 )
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.billing.supplier_terms_resolution import (
     get_supplier_payment_frequency,
     resolve_effective_invoice_config,
@@ -1030,7 +1032,7 @@ class InstitutionBillingService:
             return []
 
     @staticmethod
-    def cancel_bill(bill_id: UUID, user_id: UUID, connection=None) -> dict:
+    def cancel_bill(bill_id: UUID, user_id: UUID, connection=None, locale: str = "en") -> dict:
         """
         Cancel a bill (MVP - for administrative corrections).
         Cannot cancel already paid bills.
@@ -1049,13 +1051,13 @@ class InstitutionBillingService:
             # 1. Validate bill exists and is not paid
             bill = institution_bill_service.get_by_id(bill_id, connection)
             if not bill:
-                raise HTTPException(status_code=404, detail=f"Bill {bill_id} not found")
+                raise envelope_exception(ErrorCode.BILLING_BILL_NOT_FOUND, status=404, locale=locale)
 
             if bill.status == Status.PROCESSED:
-                raise HTTPException(status_code=400, detail="Cannot cancel a paid bill")
+                raise envelope_exception(ErrorCode.BILLING_BILL_ALREADY_PAID, status=400, locale=locale)
 
             if bill.status == Status.CANCELLED:
-                raise HTTPException(status_code=400, detail="Bill is already cancelled")
+                raise envelope_exception(ErrorCode.BILLING_BILL_ALREADY_CANCELLED, status=400, locale=locale)
 
             # 2. Update bill to cancelled/rejected status
             bill_update_data = {
@@ -1066,7 +1068,8 @@ class InstitutionBillingService:
 
             updated_bill = institution_bill_service.update(bill_id, bill_update_data, connection)
             if not updated_bill:
-                raise HTTPException(status_code=500, detail="Failed to cancel bill")
+                log_error(f"Failed to cancel bill {bill_id}")
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
             log_info(f"Cancelled bill {bill_id}")
 
@@ -1077,11 +1080,9 @@ class InstitutionBillingService:
                 "message": "Bill cancelled successfully",
             }
 
-        except HTTPException:
-            raise
         except Exception as e:
             log_error(f"Error cancelling bill {bill_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to cancel bill: {str(e)}") from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
     @staticmethod
     def get_bill_summary_by_institution(

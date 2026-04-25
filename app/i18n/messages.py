@@ -291,6 +291,38 @@ MESSAGES: dict[str, dict[str, str]] = {
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Plate ready",
         "push.pickup_ready_body": "Did you receive your plate from {restaurant_name}?",
+        # market.* — K12 (admin + billing sweep)
+        "market.not_found": "Market not found.",
+        "market.country_not_supported": "Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
+        "market.super_admin_only": "Only Super Admin can perform this action on the Global Marketplace.",
+        "market.no_coverage_to_activate": "Cannot activate: market has no active restaurant with an active plate on an active weekly kitchen-day. Schedule coverage first, then set status to active.",
+        "market.has_coverage_confirm_deactivate": "This market currently has active plate coverage. Deactivating will hide it from customers immediately. Resubmit with confirm_deactivate=true to proceed.",
+        "market.global_cannot_be_archived": "The Global Marketplace cannot be archived.",
+        "market.billing_config_not_found": "No billing config found for this market.",
+        # ad_zone.* — K12
+        "ad_zone.not_found": "Ad zone not found.",
+        # cuisine.* — K12
+        "cuisine.not_found": "Cuisine not found.",
+        "cuisine.suggestion_not_found": "Suggestion not found or already reviewed.",
+        # archival.* — K12
+        "archival.no_records_provided": "No record IDs provided.",
+        "archival.too_many_records": "Cannot archive more than 1000 records at once.",
+        "archival_config.not_found": "Archival configuration not found.",
+        "archival_config.already_exists": "A configuration already exists for table {table_name}.",
+        # referral_config.* — K12
+        "referral_config.not_found": "Referral config not found for this market.",
+        # supplier_invoice.* — K12
+        "supplier_invoice.not_found": "Supplier invoice not found.",
+        "supplier_invoice.invalid_status": "Cannot review invoice with status '{invoice_status}'. Must be 'pending_review'.",
+        # billing.* — K12
+        "billing.bill_not_found": "Bill not found.",
+        "billing.bill_already_paid": "Cannot cancel a paid bill.",
+        "billing.bill_already_cancelled": "Bill is already cancelled.",
+        "billing.plan_no_credits": "Plan has no credits; cannot process.",
+        "billing.no_data_found": "No billing data found for this institution.",
+        # discretionary.* — K12
+        "discretionary.not_found": "Discretionary request not found.",
+        "discretionary.not_pending": "Cannot update request with status: {request_status}.",
     },
     "es": {
         # Auth / user errors
@@ -577,6 +609,38 @@ MESSAGES: dict[str, dict[str, str]] = {
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Plato listo",
         "push.pickup_ready_body": "¿Recibiste tu plato de {restaurant_name}?",
+        # market.* — K12
+        "market.not_found": "Mercado no encontrado.",
+        "market.country_not_supported": "País no soportado para nuevos mercados. Usa GET /api/v1/countries/ para la lista de países soportados.",
+        "market.super_admin_only": "Solo el Super Admin puede realizar esta acción en el Mercado Global.",
+        "market.no_coverage_to_activate": "No se puede activar: el mercado no tiene un restaurante activo con un plato activo en un día de cocina semanal activo. Programa la cobertura primero y luego establece el estado como activo.",
+        "market.has_coverage_confirm_deactivate": "Este mercado actualmente tiene cobertura activa de platos. Desactivarlo lo ocultará a los clientes inmediatamente. Reenvía con confirm_deactivate=true para continuar.",
+        "market.global_cannot_be_archived": "El Mercado Global no puede ser archivado.",
+        "market.billing_config_not_found": "No se encontró configuración de facturación para este mercado.",
+        # ad_zone.* — K12
+        "ad_zone.not_found": "Zona publicitaria no encontrada.",
+        # cuisine.* — K12
+        "cuisine.not_found": "Tipo de cocina no encontrado.",
+        "cuisine.suggestion_not_found": "Sugerencia no encontrada o ya revisada.",
+        # archival.* — K12
+        "archival.no_records_provided": "No se proporcionaron IDs de registros.",
+        "archival.too_many_records": "No se pueden archivar más de 1000 registros a la vez.",
+        "archival_config.not_found": "Configuración de archivado no encontrada.",
+        "archival_config.already_exists": "Ya existe una configuración para la tabla {table_name}.",
+        # referral_config.* — K12
+        "referral_config.not_found": "Configuración de referidos no encontrada para este mercado.",
+        # supplier_invoice.* — K12
+        "supplier_invoice.not_found": "Factura de proveedor no encontrada.",
+        "supplier_invoice.invalid_status": "No se puede revisar la factura con estado '{invoice_status}'. Debe estar en 'pending_review'.",
+        # billing.* — K12
+        "billing.bill_not_found": "Factura no encontrada.",
+        "billing.bill_already_paid": "No se puede cancelar una factura pagada.",
+        "billing.bill_already_cancelled": "La factura ya está cancelada.",
+        "billing.plan_no_credits": "El plan no tiene créditos; no se puede procesar.",
+        "billing.no_data_found": "No se encontraron datos de facturación para esta institución.",
+        # discretionary.* — K12
+        "discretionary.not_found": "Solicitud discrecional no encontrada.",
+        "discretionary.not_pending": "No se puede actualizar la solicitud con estado: {request_status}.",
     },
     "pt": {
         # Auth / user errors
@@ -863,6 +927,38 @@ MESSAGES: dict[str, dict[str, str]] = {
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Prato pronto",
         "push.pickup_ready_body": "Você recebeu seu prato de {restaurant_name}?",
+        # market.* — K12
+        "market.not_found": "Mercado não encontrado.",
+        "market.country_not_supported": "País não suportado para novos mercados. Use GET /api/v1/countries/ para a lista de países suportados.",
+        "market.super_admin_only": "Somente o Super Admin pode realizar esta ação no Mercado Global.",
+        "market.no_coverage_to_activate": "Não é possível ativar: o mercado não tem restaurante ativo com prato ativo em dia de cozinha semanal ativo. Agende cobertura primeiro e depois defina o status como ativo.",
+        "market.has_coverage_confirm_deactivate": "Este mercado atualmente tem cobertura ativa de pratos. Desativá-lo o ocultará dos clientes imediatamente. Reenvie com confirm_deactivate=true para continuar.",
+        "market.global_cannot_be_archived": "O Mercado Global não pode ser arquivado.",
+        "market.billing_config_not_found": "Nenhuma configuração de faturamento encontrada para este mercado.",
+        # ad_zone.* — K12
+        "ad_zone.not_found": "Zona publicitária não encontrada.",
+        # cuisine.* — K12
+        "cuisine.not_found": "Tipo de culinária não encontrado.",
+        "cuisine.suggestion_not_found": "Sugestão não encontrada ou já revisada.",
+        # archival.* — K12
+        "archival.no_records_provided": "Nenhum ID de registro fornecido.",
+        "archival.too_many_records": "Não é possível arquivar mais de 1000 registros de uma vez.",
+        "archival_config.not_found": "Configuração de arquivamento não encontrada.",
+        "archival_config.already_exists": "Já existe uma configuração para a tabela {table_name}.",
+        # referral_config.* — K12
+        "referral_config.not_found": "Configuração de referral não encontrada para este mercado.",
+        # supplier_invoice.* — K12
+        "supplier_invoice.not_found": "Fatura do fornecedor não encontrada.",
+        "supplier_invoice.invalid_status": "Não é possível revisar a fatura com status '{invoice_status}'. Deve estar em 'pending_review'.",
+        # billing.* — K12
+        "billing.bill_not_found": "Fatura não encontrada.",
+        "billing.bill_already_paid": "Não é possível cancelar uma fatura paga.",
+        "billing.bill_already_cancelled": "A fatura já está cancelada.",
+        "billing.plan_no_credits": "O plano não tem créditos; não é possível processar.",
+        "billing.no_data_found": "Nenhum dado de faturamento encontrado para esta instituição.",
+        # discretionary.* — K12
+        "discretionary.not_found": "Solicitação discricionária não encontrada.",
+        "discretionary.not_pending": "Não é possível atualizar a solicitação com status: {request_status}.",
     },
 }
 

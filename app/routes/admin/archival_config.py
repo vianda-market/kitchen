@@ -2,10 +2,10 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.config.archival_config import (
     ArchivalCategory,
     get_archival_priority_order,
@@ -14,8 +14,11 @@ from app.config.archival_config import (
     refresh_config_cache,
 )
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.error_handling import handle_business_operation
 from app.utils.db import db_insert, db_read, db_update
+from app.utils.log import log_error
 
 router = APIRouter(prefix="/admin/archival-config", tags=["Admin - Archival Configuration"])
 
@@ -112,6 +115,7 @@ async def get_table_config(
 async def create_archival_config(
     config: ArchivalConfigRequest,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create a new archival configuration"""
@@ -124,7 +128,9 @@ async def create_archival_config(
         existing = db_read(existing_query, (config.table_name,), fetch_one=True, connection=db)
 
         if existing:
-            raise HTTPException(status_code=400, detail=f"Configuration already exists for table {config.table_name}")
+            raise envelope_exception(
+                ErrorCode.ARCHIVAL_CONFIG_ALREADY_EXISTS, status=400, locale=locale, table_name=config.table_name
+            )
 
         # Insert new configuration using db_insert
         data = {
@@ -140,7 +146,8 @@ async def create_archival_config(
 
         result = db_insert("archival_config", data, connection=db)
         if not result:
-            raise HTTPException(status_code=500, detail="Failed to create archival configuration")
+            log_error(f"Failed to create archival configuration for table {config.table_name}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
         # Refresh cache after creating new config
         refresh_config_cache()
@@ -159,6 +166,7 @@ async def update_archival_config(
     config_id: UUID,
     config: ArchivalConfigRequest,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update an existing archival configuration"""
@@ -171,7 +179,7 @@ async def update_archival_config(
         existing = db_read(existing_query, (config_id,), fetch_one=True, connection=db)
 
         if not existing:
-            raise HTTPException(status_code=404, detail="Archival configuration not found")
+            raise envelope_exception(ErrorCode.ARCHIVAL_CONFIG_NOT_FOUND, status=404, locale=locale)
 
         # Update configuration using db_update
         data = {
@@ -189,7 +197,8 @@ async def update_archival_config(
         success = db_update("archival_config", data, where_clause, connection=db)
 
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to update archival configuration")
+            log_error(f"Failed to update archival configuration {config_id}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
         # Refresh cache after updating config
         refresh_config_cache()
@@ -207,6 +216,7 @@ async def update_archival_config(
 async def delete_archival_config(
     config_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Delete an archival configuration"""
@@ -219,7 +229,7 @@ async def delete_archival_config(
         existing = db_read(existing_query, (config_id,), fetch_one=True, connection=db)
 
         if not existing:
-            raise HTTPException(status_code=404, detail="Archival configuration not found")
+            raise envelope_exception(ErrorCode.ARCHIVAL_CONFIG_NOT_FOUND, status=404, locale=locale)
 
         # Soft delete by setting is_active to False
         data = {"is_active": False, "modified_by": current_user["user_id"]}
@@ -228,7 +238,8 @@ async def delete_archival_config(
         success = db_update("archival_config", data, where_clause, connection=db)
 
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete archival configuration")
+            log_error(f"Failed to delete archival configuration {config_id}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
         # Refresh cache after deleting config
         refresh_config_cache()

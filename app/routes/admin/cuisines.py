@@ -7,11 +7,13 @@ and reviewing supplier suggestions.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from psycopg2.extensions import connection
 
-from app.auth.dependencies import get_admin_user
+from app.auth.dependencies import get_admin_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     CuisineCreateSchema,
     CuisineDetailResponseSchema,
@@ -33,6 +35,7 @@ router = APIRouter(prefix="/admin/cuisines", tags=["Admin Cuisines"])
 def create_cuisine(
     data: CuisineCreateSchema,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """Create a new cuisine. Auto-generates slug from cuisine_name if not provided."""
@@ -47,7 +50,7 @@ def create_cuisine(
 
     result = cuisine_crud_service.create(create_data, db)
     if not result:
-        raise HTTPException(status_code=500, detail="Failed to create cuisine")
+        raise envelope_exception(ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="Cuisine")
     return result
 
 
@@ -75,12 +78,13 @@ def list_pending_suggestions(
 def get_cuisine(
     cuisine_id: UUID,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """Get a single cuisine with full detail."""
     result = cuisine_crud_service.get_by_id(cuisine_id, db)
     if not result:
-        raise HTTPException(status_code=404, detail="Cuisine not found")
+        raise envelope_exception(ErrorCode.CUISINE_NOT_FOUND, status=404, locale=locale)
     return result
 
 
@@ -89,6 +93,7 @@ def update_cuisine(
     cuisine_id: UUID,
     data: CuisineUpdateSchema,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """Update a cuisine (name, slug, parent, description, i18n, display_order)."""
@@ -96,7 +101,7 @@ def update_cuisine(
     update_data["modified_by"] = current_user["user_id"]
     result = cuisine_crud_service.update(cuisine_id, update_data, db)
     if not result:
-        raise HTTPException(status_code=404, detail="Cuisine not found")
+        raise envelope_exception(ErrorCode.CUISINE_NOT_FOUND, status=404, locale=locale)
     return result
 
 
@@ -104,6 +109,7 @@ def update_cuisine(
 def soft_delete_cuisine(
     cuisine_id: UUID,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """Soft-delete a cuisine (set is_archived=true). Use CRUDService.soft_delete because
@@ -112,10 +118,10 @@ def soft_delete_cuisine(
     # Confirm it exists first so we return 404 cleanly (vs silent success on missing row)
     existing = cuisine_crud_service.get_by_id(cuisine_id, db)
     if not existing:
-        raise HTTPException(status_code=404, detail="Cuisine not found")
+        raise envelope_exception(ErrorCode.CUISINE_NOT_FOUND, status=404, locale=locale)
     ok = cuisine_crud_service.soft_delete(cuisine_id, current_user["user_id"], db)
     if not ok:
-        raise HTTPException(status_code=500, detail="Failed to archive cuisine")
+        raise envelope_exception(ErrorCode.ENTITY_DELETION_FAILED, status=500, locale=locale, entity="Cuisine")
     # Return the pre-archive DTO with the archived flag flipped so the response matches schema.
     existing.is_archived = True
     return existing
@@ -129,6 +135,7 @@ def approve_suggestion(
     suggestion_id: UUID,
     data: CuisineSuggestionApproveSchema,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """
@@ -147,7 +154,7 @@ def approve_suggestion(
         db=db,
     )
     if not result:
-        raise HTTPException(status_code=404, detail="Suggestion not found or already reviewed")
+        raise envelope_exception(ErrorCode.CUISINE_SUGGESTION_NOT_FOUND, status=404, locale=locale)
     return CuisineSuggestionResponseSchema(**result)
 
 
@@ -156,6 +163,7 @@ def reject_suggestion(
     suggestion_id: UUID,
     data: CuisineSuggestionRejectSchema,
     current_user: dict = Depends(get_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
 ):
     """Reject a Pending cuisine suggestion with optional review notes."""
@@ -167,5 +175,5 @@ def reject_suggestion(
         db=db,
     )
     if not result:
-        raise HTTPException(status_code=404, detail="Suggestion not found or already reviewed")
+        raise envelope_exception(ErrorCode.CUISINE_SUGGESTION_NOT_FOUND, status=404, locale=locale)
     return CuisineSuggestionResponseSchema(**result)

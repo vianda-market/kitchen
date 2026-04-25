@@ -8,7 +8,7 @@ import pytest
 from application import app
 from fastapi.testclient import TestClient
 
-from app.auth.dependencies import get_admin_user, oauth2_scheme
+from app.auth.dependencies import get_admin_user, get_current_user, oauth2_scheme
 
 
 @pytest.fixture
@@ -26,17 +26,22 @@ def client_with_admin(mock_admin_user):
     def _override_get_admin_user():
         return mock_admin_user
 
+    def _override_get_current_user():
+        return mock_admin_user
+
     def _override_oauth2_scheme():
         return "test-token"
 
     app.dependency_overrides[oauth2_scheme] = _override_oauth2_scheme
     app.dependency_overrides[get_admin_user] = _override_get_admin_user
+    app.dependency_overrides[get_current_user] = _override_get_current_user
     try:
         with TestClient(app) as c:
             yield c
     finally:
         app.dependency_overrides.pop(oauth2_scheme, None)
         app.dependency_overrides.pop(get_admin_user, None)
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 # ---- Helpers ----

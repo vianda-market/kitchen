@@ -9,9 +9,10 @@ US suppliers must submit a W-9 before payouts. One W-9 per institution entity
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.dto.models import SupplierW9DTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import supplier_w9_service
 from app.utils.db import db_read
 from app.utils.gcs import get_supplier_w9_document_signed_url, upload_supplier_w9_document
@@ -24,6 +25,7 @@ def create_or_update_w9(
     file_content_type: str | None,
     current_user: dict,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SupplierW9DTO:
     """
     Create or update a W-9 record for a US supplier entity.
@@ -48,16 +50,18 @@ def create_or_update_w9(
                 update_data["document_storage_path"] = blob_path
             except Exception as e:
                 log_error(f"Failed to upload W-9 document: {e}")
-                raise HTTPException(status_code=500, detail="Failed to upload W-9 document") from None
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
         updated = supplier_w9_service.update(str(existing.w9_id), update_data, db)
         if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update W-9")
+            log_error(f"Failed to update W-9 for entity {entity_id}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
         return updated
     # Create new W-9
     w9 = supplier_w9_service.create(data, db, commit=False)
     if not w9:
-        raise HTTPException(status_code=500, detail="Failed to create W-9")
+        log_error(f"Failed to create W-9 for entity {entity_id}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
     if file_data and file_content_type:
         try:
@@ -71,7 +75,7 @@ def create_or_update_w9(
         except Exception as e:
             log_error(f"Failed to upload W-9 document: {e}")
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to upload W-9 document") from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
     db.commit()
     return supplier_w9_service.get_by_id(str(w9.w9_id), db)

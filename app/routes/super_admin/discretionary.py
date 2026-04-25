@@ -7,10 +7,12 @@ Routes for super-administrators to approve/reject discretionary credit requests.
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Response
 
-from app.auth.dependencies import get_admin_user, get_super_admin_user
+from app.auth.dependencies import get_admin_user, get_resolved_locale, get_super_admin_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     DiscretionaryApprovalSchema,
     DiscretionaryRejectionSchema,
@@ -32,6 +34,7 @@ discretionary_service = DiscretionaryService()
 def get_discretionary_request_details(
     request_id: UUID,
     current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -47,7 +50,7 @@ def get_discretionary_request_details(
     request = crud_service.get_by_id(request_id, db)
 
     if not request:
-        raise HTTPException(status_code=404, detail="Discretionary request not found")
+        raise envelope_exception(ErrorCode.DISCRETIONARY_NOT_FOUND, status=404, locale=locale)
 
     return request
 
