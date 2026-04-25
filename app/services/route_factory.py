@@ -37,6 +37,8 @@ from app.auth.dependencies import (
 )
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.entity_scoping import (
     ENTITY_INSTITUTION_ENTITY,
     ENTITY_PLATE,
@@ -262,6 +264,7 @@ def create_crud_routes(
             entity_id: UUID,
             update_data: update_schema,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Update an existing entity"""
@@ -283,14 +286,15 @@ def create_crud_routes(
             if getattr(config, "immutable_update_fields", None):
                 existing = service.get_by_id(entity_id, db, scope=scope)
                 if not existing:
-                    raise HTTPException(status_code=404, detail=f"{config.entity_name.title()} not found")
+                    raise envelope_exception(
+                        ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity=config.entity_name.title()
+                    )
                 for field in config.immutable_update_fields:
                     if field in data:
                         existing_val = getattr(existing, field, None)
                         if str(data[field]) != str(existing_val):
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"{field} is immutable after creation.",
+                            raise envelope_exception(
+                                ErrorCode.ENTITY_FIELD_IMMUTABLE, status=400, locale=locale, field=field
                             )
                         data.pop(field, None)
 
@@ -304,6 +308,7 @@ def create_crud_routes(
             entity_id: UUID,
             update_data: update_schema,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Partially update an existing entity"""
@@ -324,14 +329,15 @@ def create_crud_routes(
             if getattr(config, "immutable_update_fields", None):
                 existing = service.get_by_id(entity_id, db, scope=scope)
                 if not existing:
-                    raise HTTPException(status_code=404, detail=f"{config.entity_name.title()} not found")
+                    raise envelope_exception(
+                        ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity=config.entity_name.title()
+                    )
                 for field in config.immutable_update_fields:
                     if field in data:
                         existing_val = getattr(existing, field, None)
                         if str(data[field]) != str(existing_val):
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"{field} is immutable after creation.",
+                            raise envelope_exception(
+                                ErrorCode.ENTITY_FIELD_IMMUTABLE, status=400, locale=locale, field=field
                             )
                         data.pop(field, None)
 
@@ -621,6 +627,7 @@ def create_product_routes() -> APIRouter:
             client_checksum: str = Form(...),
             checksum_algorithm: str = Form(default="sha256"),
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Upload or replace a product image."""
@@ -629,13 +636,10 @@ def create_product_routes() -> APIRouter:
             scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
             product = product_service.get_by_id(product_id, db, scope=scope)
             if not product or product.is_archived:
-                raise entity_not_found("Product", product_id)
+                raise entity_not_found("Product", product_id, locale=locale)
             contents = await file.read()
             if len(contents) > settings.MAX_PRODUCT_IMAGE_BYTES:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Image too large. Maximum size is 5 MB.",
-                )
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_TOO_LARGE, status=400, locale=locale)
             verify_checksum(contents, client_checksum, checksum_algorithm)
             storage_path, url_path, thumb_storage_path, thumb_url_path, checksum = product_image_service.save_image(
                 product_id,
@@ -980,6 +984,7 @@ def create_credit_currency_routes() -> APIRouter:
     def get_credit_currency_enriched(
         currency_id: UUID,
         current_user: dict = Depends(get_employee_user),
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Get a single credit currency by ID with enriched data. Internal-only. Non-archived only."""
@@ -987,7 +992,7 @@ def create_credit_currency_routes() -> APIRouter:
 
         result = get_enriched_credit_currency_by_id(currency_id, db, include_archived=False)
         if not result:
-            raise HTTPException(status_code=404, detail="Credit currency not found")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
         return result
 
     @router.get("/{currency_id}", response_model=CreditCurrencyResponseSchema)
@@ -1010,6 +1015,7 @@ def create_credit_currency_routes() -> APIRouter:
     def create_credit_currency(
         create_data: CreditCurrencyCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Create a new credit currency - Internal-only. Backend assigns currency_code from supported list and fetches currency_conversion_usd from open.er-api.com."""
@@ -1022,16 +1028,12 @@ def create_credit_currency_routes() -> APIRouter:
         currency_name = data.get("currency_name") or ""
         currency_code = get_currency_code_by_name(currency_name)
         if not currency_code:
-            raise HTTPException(
-                status_code=400,
-                detail="Currency name not supported. Use GET /api/v1/currencies/ for the list.",
-            )
+            raise envelope_exception(ErrorCode.CREDIT_CURRENCY_NAME_NOT_SUPPORTED, status=400, locale=locale)
         data["currency_code"] = currency_code
         rate, _ = fetch_usd_rate_for_currency(currency_code)
         if rate is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Currency {currency_code} is not supported by the rate API for automatic exchange rate.",
+            raise envelope_exception(
+                ErrorCode.CREDIT_CURRENCY_RATE_UNAVAILABLE, status=400, locale=locale, currency_code=currency_code
             )
         data["currency_conversion_usd"] = rate
         data["modified_by"] = current_user["user_id"]
@@ -1128,16 +1130,18 @@ def create_subscription_routes() -> APIRouter:
         # Enriched routes MUST be before /{subscription_id} so /enriched is not parsed as subscription_id
         @router.get("/enriched", response_model=list[SubscriptionEnrichedResponseSchema])
         def list_enriched_subscriptions(
-            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """List subscriptions with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
             if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                    raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
 
                 def _get_enriched_subscriptions():
                     return get_enriched_subscriptions(db, scope=None, include_archived=False, user_id=user_id)
@@ -1152,30 +1156,37 @@ def create_subscription_routes() -> APIRouter:
         def get_enriched_subscription_by_id_route(
             subscription_id: UUID,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get subscription by ID with enriched data. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
             if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                    raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
 
                 def _get_enriched_subscription():
                     sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
                     if not sub:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     if sub.user_id != user_id:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     return sub
             else:
 
                 def _get_enriched_subscription():
                     sub = get_enriched_subscription_by_id(subscription_id, db, scope=None, include_archived=False)
                     if not sub:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     return sub
 
             return handle_business_operation(_get_enriched_subscription, "enriched subscription retrieval")
@@ -1184,18 +1195,19 @@ def create_subscription_routes() -> APIRouter:
         def update_my_renewal_preferences(
             body: RenewalPreferencesSchema,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Update early renewal threshold for the current user's active subscription.
             Send an integer (>= 1) to set the threshold, or null to disable early renewal (period-end only)."""
             if current_user.get("role_type") != "customer":
-                raise HTTPException(status_code=403, detail="Only customers can update renewal preferences.")
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
             user_id = current_user.get("user_id")
             if not user_id:
-                raise HTTPException(status_code=401, detail="User ID not found in token")
+                raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
             subscription = subscription_service.get_by_user(user_id, db)
             if not subscription:
-                raise HTTPException(status_code=404, detail="No active subscription found")
+                raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription")
             update_data = {
                 "early_renewal_threshold": body.early_renewal_threshold,
                 "modified_by": user_id,
@@ -1208,6 +1220,7 @@ def create_subscription_routes() -> APIRouter:
         @router.get("/benefit-plans")
         def get_benefit_plans(
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get available plans with employer benefit breakdown for benefit employees.
@@ -1221,19 +1234,19 @@ def create_subscription_routes() -> APIRouter:
 
             user_id = current_user.get("user_id")
             if not user_id:
-                raise HTTPException(status_code=401, detail="User ID not found in token")
+                raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
 
             institution_id = current_user.get("institution_id")
             if not institution_id:
-                raise HTTPException(status_code=404, detail="No employer benefit program found")
+                raise envelope_exception(ErrorCode.EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND, status=404, locale=locale)
 
             inst = institution_service.get_by_id(institution_id, db, scope=None)
             if not inst:
-                raise HTTPException(status_code=404, detail="No employer benefit program found")
+                raise envelope_exception(ErrorCode.EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND, status=404, locale=locale)
             inst_type = getattr(inst, "institution_type", None)
             inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
             if inst_type_str != "employer":
-                raise HTTPException(status_code=404, detail="No employer benefit program found")
+                raise envelope_exception(ErrorCode.EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND, status=404, locale=locale)
 
             # Get user's market and employer_entity_id
             user_row = db_read(
@@ -1243,12 +1256,12 @@ def create_subscription_routes() -> APIRouter:
                 fetch_one=True,
             )
             if not user_row or not user_row.get("market_id"):
-                raise HTTPException(status_code=400, detail="User has no market assigned")
+                raise envelope_exception(ErrorCode.USER_MARKET_NOT_ASSIGNED, status=400, locale=locale)
 
             employer_entity_id = user_row.get("employer_entity_id")
             program = resolve_effective_program(institution_id, employer_entity_id, db)
             if not program or not program.is_active:
-                raise HTTPException(status_code=404, detail="No active employer benefit program found")
+                raise envelope_exception(ErrorCode.EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND, status=404, locale=locale)
 
             # Get plans in market
             plans = _plan_service.get_all_by_field(
@@ -1304,16 +1317,18 @@ def create_subscription_routes() -> APIRouter:
 
         @router.get("", response_model=list[SubscriptionResponseSchema])
         def list_subscriptions_override(
-            current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+            current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
+            db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """List subscriptions. Internal: global. Customers: own. Suppliers: 403. Non-archived only."""
             role_type = current_user.get("role_type")
             if role_type == "supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
             if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                    raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
 
                 def _get_subscriptions():
                     return subscription_service.get_all_by_field("user_id", user_id, db, scope=None)
@@ -1328,30 +1343,37 @@ def create_subscription_routes() -> APIRouter:
         def get_subscription_override(
             subscription_id: UUID,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get a single subscription by ID. Internal: global. Customers: own only. Suppliers: 403."""
             role_type = current_user.get("role_type")
             if role_type == "supplier":
-                raise HTTPException(status_code=403, detail="Forbidden: Suppliers cannot access subscription data")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
             if role_type == "customer":
                 user_id = current_user.get("user_id")
                 if not user_id:
-                    raise HTTPException(status_code=401, detail="User ID not found in token")
+                    raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
 
                 def _get_subscription():
                     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
                     if not subscription:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     if subscription.user_id != user_id:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     return subscription
             else:
 
                 def _get_subscription():
                     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
                     if not subscription:
-                        raise HTTPException(status_code=404, detail="Subscription not found")
+                        raise envelope_exception(
+                            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Subscription"
+                        )
                     return subscription
 
             return handle_business_operation(_get_subscription, "subscription retrieval")
@@ -1361,32 +1383,30 @@ def create_subscription_routes() -> APIRouter:
             subscription_id: UUID,
             body: SubscriptionHoldRequestSchema,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Put a subscription on hold. Only the owning customer. Hold duration max 3 months."""
             if current_user.get("role_type") != "customer":
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: Only customers can put their subscription on hold."
-                )
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
             user_id = current_user.get("user_id")
             if not user_id:
-                raise HTTPException(status_code=401, detail="User ID not found in token")
+                raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
             return put_subscription_on_hold(subscription_id, user_id, body.hold_start_date, body.hold_end_date, db)
 
         @router.post("/{subscription_id}/resume", response_model=SubscriptionResponseSchema)
         def resume_subscription_route(
             subscription_id: UUID,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Resume a subscription from hold. Only the owning customer."""
             if current_user.get("role_type") != "customer":
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: Only customers can resume their own subscription."
-                )
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
             user_id = current_user.get("user_id")
             if not user_id:
-                raise HTTPException(status_code=401, detail="User ID not found in token")
+                raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale=locale)
             return resume_subscription(subscription_id, user_id, db)
 
     router = create_crud_routes(
@@ -1482,6 +1502,7 @@ def create_institution_routes() -> APIRouter:
             entity_id: UUID,
             update_data: InstitutionUpdateSchema,
             current_user: dict = Depends(get_current_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Update institution. Admin/Super Admin only."""
@@ -1494,7 +1515,7 @@ def create_institution_routes() -> APIRouter:
                 "admin",
                 "super_admin",
             ):
-                raise HTTPException(status_code=403, detail="Only Admin or Super Admin can edit institutions.")
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
 
             existing = institution_service.get_by_id(entity_id, db, scope=scope)
             inst_type = getattr(existing, "institution_type", None) if existing else None
@@ -1507,10 +1528,7 @@ def create_institution_routes() -> APIRouter:
                 else inst_type_str
             )
             if effective_type_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only Super Admin can set institution_type to Internal or Customer.",
-                )
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
             # Extract market_ids for junction table handling
             market_ids = data.pop("market_ids", None)
             data.pop("market_id", None)
@@ -1545,6 +1563,7 @@ def create_institution_routes() -> APIRouter:
         def delete_institution(
             entity_id: UUID,
             current_user: dict = Depends(get_admin_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Delete institution (soft delete) - Internal Admin and Super Admin only.
@@ -1553,10 +1572,7 @@ def create_institution_routes() -> APIRouter:
 
             uid = entity_id if isinstance(entity_id, UUID) else UUID(str(entity_id))
             if uid in get_restricted_institution_ids():
-                raise HTTPException(
-                    status_code=400,
-                    detail="System institutions (Vianda Enterprises, Vianda Customers) cannot be archived.",
-                )
+                raise envelope_exception(ErrorCode.INSTITUTION_SYSTEM_PROTECTED, status=400, locale=locale)
             scope = _institution_scope(current_user)
 
             def delete_callable(target_id: UUID, connection: psycopg2.extensions.connection):
@@ -1569,6 +1585,7 @@ def create_institution_routes() -> APIRouter:
         def create_institution(
             create_data: InstitutionCreateSchema,
             current_user: dict = Depends(get_admin_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Create a new institution - Internal Admin and Super Admin only.
@@ -1580,15 +1597,9 @@ def create_institution_routes() -> APIRouter:
             inst_type = data.get("institution_type")
             inst_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type) if inst_type else "supplier"
             if inst_str in ("internal", "customer") and current_user.get("role_name") != "super_admin":
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only Super Admin can create Internal or Customer-type institutions.",
-                )
+                raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale=locale)
             if supplier_terms_data is not None and inst_str != "supplier":
-                raise HTTPException(
-                    status_code=422,
-                    detail="supplier_terms can only be provided when institution_type is Supplier.",
-                )
+                raise envelope_exception(ErrorCode.INSTITUTION_SUPPLIER_TERMS_INVALID, status=422, locale=locale)
             # Treat empty supplier_terms (all defaults) as absent
             if supplier_terms_data is not None and all(
                 v is None or v == field.default
@@ -1738,6 +1749,7 @@ def create_payment_method_routes() -> APIRouter:
         def get_enriched_payment_method_by_id_route(
             payment_method_id: UUID,
             current_user: dict = Depends(get_employee_or_customer_user),
+            locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
             """Get payment method by ID with enriched data. Non-archived only."""
@@ -1745,7 +1757,9 @@ def create_payment_method_routes() -> APIRouter:
             def _get():
                 pm = get_enriched_payment_method_by_id(payment_method_id, db, scope=None, include_archived=False)
                 if not pm:
-                    raise HTTPException(status_code=404, detail="Payment method not found")
+                    raise envelope_exception(
+                        ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Payment method"
+                    )
                 error = EmployeeCustomerAccessControl.verify_ownership(pm.user_id, current_user)
                 if error:
                     raise HTTPException(**error)
@@ -2036,10 +2050,7 @@ def create_institution_entity_routes() -> APIRouter:
             fetch_one=True,
         )
         if not market_check:
-            raise HTTPException(
-                status_code=400,
-                detail="Entity's address country is not in institution's assigned markets",
-            )
+            raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_MARKET_MISMATCH, status=400, locale="en")
         # Validate tax_id format for the entity's country
         if data.get("tax_id"):
             validate_tax_id_for_country(data["tax_id"], market_check["country_code"])

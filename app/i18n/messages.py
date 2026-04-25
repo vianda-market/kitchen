@@ -161,6 +161,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "entity.creation_failed": "Failed to create {entity}",
         "entity.update_failed": "Failed to update {entity}",
         "entity.deletion_failed": "Failed to delete {entity}",
+        # entity.* — additional codes (K8)
+        "entity.field_immutable": "The field '{field}' cannot be changed after creation.",
+        # product.* — K8
+        "product.image_too_large": "Image too large. Maximum size is 5 MB.",
+        # credit_currency.* — K8
+        "credit_currency.name_not_supported": "Currency name not supported. Use GET /api/v1/currencies/ for the list.",
+        "credit_currency.rate_unavailable": "Currency '{currency_code}' is not supported by the exchange rate API.",
+        # employer.* — K8
+        "employer.benefit_program_not_found": "No employer benefit program found.",
+        # user.* — K8
+        "user.market_not_assigned": "User has no market assigned.",
+        # institution.* — K8
+        "institution.system_protected": "System institutions cannot be archived.",
+        "institution.supplier_terms_invalid": "supplier_terms can only be provided when institution_type is Supplier.",
+        # institution_entity.* — K8
+        "institution_entity.market_mismatch": "Entity's address country is not in institution's assigned markets.",
         # database.* — constraint violation errors (K6)
         "database.duplicate_key": "A record with this value already exists.",
         "database.duplicate_email": "A user with this email already exists.",
@@ -345,6 +361,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "entity.creation_failed": "Error al crear {entity}",
         "entity.update_failed": "Error al actualizar {entity}",
         "entity.deletion_failed": "Error al eliminar {entity}",
+        # entity.* — códigos adicionales (K8)
+        "entity.field_immutable": "El campo '{field}' no puede modificarse tras la creación.",
+        # product.* — K8
+        "product.image_too_large": "Imagen demasiado grande. El tamaño máximo es 5 MB.",
+        # credit_currency.* — K8
+        "credit_currency.name_not_supported": "Nombre de moneda no soportado. Usa GET /api/v1/currencies/ para ver la lista.",
+        "credit_currency.rate_unavailable": "La moneda '{currency_code}' no está soportada por la API de tipos de cambio.",
+        # employer.* — K8
+        "employer.benefit_program_not_found": "No se encontró ningún programa de beneficios del empleador.",
+        # user.* — K8
+        "user.market_not_assigned": "El usuario no tiene un mercado asignado.",
+        # institution.* — K8
+        "institution.system_protected": "Las instituciones del sistema no pueden archivarse.",
+        "institution.supplier_terms_invalid": "supplier_terms solo puede proporcionarse cuando institution_type es Proveedor.",
+        # institution_entity.* — K8
+        "institution_entity.market_mismatch": "El país de la dirección de la entidad no pertenece a los mercados asignados a la institución.",
         # database.* — errores de violación de restricciones (K6)
         "database.duplicate_key": "Ya existe un registro con este valor.",
         "database.duplicate_email": "Ya existe un usuario con este correo electrónico.",
@@ -529,6 +561,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "entity.creation_failed": "Falha ao criar {entity}",
         "entity.update_failed": "Falha ao atualizar {entity}",
         "entity.deletion_failed": "Falha ao excluir {entity}",
+        # entity.* — códigos adicionais (K8)
+        "entity.field_immutable": "O campo '{field}' não pode ser alterado após a criação.",
+        # product.* — K8
+        "product.image_too_large": "Imagem muito grande. O tamanho máximo é 5 MB.",
+        # credit_currency.* — K8
+        "credit_currency.name_not_supported": "Nome de moeda não suportado. Use GET /api/v1/currencies/ para ver a lista.",
+        "credit_currency.rate_unavailable": "A moeda '{currency_code}' não é suportada pela API de taxas de câmbio.",
+        # employer.* — K8
+        "employer.benefit_program_not_found": "Nenhum programa de benefícios do empregador encontrado.",
+        # user.* — K8
+        "user.market_not_assigned": "O usuário não tem um mercado atribuído.",
+        # institution.* — K8
+        "institution.system_protected": "As instituições do sistema não podem ser arquivadas.",
+        "institution.supplier_terms_invalid": "supplier_terms só pode ser fornecido quando institution_type é Fornecedor.",
+        # institution_entity.* — K8
+        "institution_entity.market_mismatch": "O país do endereço da entidade não pertence aos mercados atribuídos à instituição.",
         # database.* — erros de violação de restrições (K6)
         "database.duplicate_key": "Já existe um registro com este valor.",
         "database.duplicate_email": "Já existe um usuário com este e-mail.",

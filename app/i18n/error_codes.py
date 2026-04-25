@@ -137,6 +137,34 @@ class ErrorCode(StrEnum):
     ENTITY_CREATION_FAILED = "entity.creation_failed"
     ENTITY_UPDATE_FAILED = "entity.update_failed"
     ENTITY_DELETION_FAILED = "entity.deletion_failed"
+    # Wired in K8 (route_factory sweep).
+    ENTITY_FIELD_IMMUTABLE = "entity.field_immutable"
+
+    # ── product.* ──────────────────────────────────────────────────────────
+    # Product-specific errors. Wired in K8 (route_factory sweep).
+    PRODUCT_IMAGE_TOO_LARGE = "product.image_too_large"
+
+    # ── credit_currency.* ──────────────────────────────────────────────────
+    # Credit-currency management errors. Wired in K8 (route_factory sweep).
+    CREDIT_CURRENCY_NAME_NOT_SUPPORTED = "credit_currency.name_not_supported"
+    CREDIT_CURRENCY_RATE_UNAVAILABLE = "credit_currency.rate_unavailable"
+
+    # ── employer.* ─────────────────────────────────────────────────────────
+    # Employer benefit program errors. Wired in K8 (route_factory sweep).
+    EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND = "employer.benefit_program_not_found"
+
+    # ── user.* (non-auth) ──────────────────────────────────────────────────
+    # User profile / account state errors. Wired in K8 (route_factory sweep).
+    USER_MARKET_NOT_ASSIGNED = "user.market_not_assigned"
+
+    # ── institution.* ──────────────────────────────────────────────────────
+    # Institution management errors. Wired in K8 (route_factory sweep).
+    INSTITUTION_SYSTEM_PROTECTED = "institution.system_protected"
+    INSTITUTION_SUPPLIER_TERMS_INVALID = "institution.supplier_terms_invalid"
+
+    # ── institution_entity.* ───────────────────────────────────────────────
+    # Institution entity management errors. Wired in K8 (route_factory sweep).
+    INSTITUTION_ENTITY_MARKET_MISMATCH = "institution_entity.market_mismatch"
 
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
