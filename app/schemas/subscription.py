@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.config import Status
+from app.i18n.envelope import I18nValueError
 
 
 class SubscriptionCreateSchema(BaseModel):
@@ -74,10 +75,10 @@ class SubscriptionHoldRequestSchema(BaseModel):
         end = self.hold_end_date
         if start and end:
             if end <= start:
-                raise ValueError("hold_end_date must be after hold_start_date")
+                raise I18nValueError("validation.subscription.window_invalid")
             delta = end - start
             if delta.days > 90:
-                raise ValueError("Hold duration cannot exceed 3 months")
+                raise I18nValueError("validation.subscription.window_too_long")
         return self
 
 

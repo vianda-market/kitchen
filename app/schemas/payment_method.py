@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.config import Status
 from app.config.enums.payment_method_types import PaymentMethodProvider
+from app.i18n.envelope import I18nValueError
 
 
 # --- For creating a new payment method (aggregator-only) ---
@@ -25,13 +26,13 @@ class PaymentMethodCreateSchema(BaseModel):
     def validate_address_fields(self):
         """Ensure either address_id or address_data is provided, not both"""
         if self.address_id and self.address_data:
-            raise ValueError("Cannot provide both address_id and address_data. Provide one or the other.")
+            raise I18nValueError("validation.payment.conflicting_address_fields")
         return self
 
     @model_validator(mode="after")
     def validate_method_type(self):
         if self.method_type and not PaymentMethodProvider.is_valid(self.method_type):
-            raise ValueError(f"method_type must be one of: {PaymentMethodProvider.values()}")
+            raise I18nValueError("validation.payment.unsupported_brand")
         return self
 
 
