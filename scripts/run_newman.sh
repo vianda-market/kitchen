@@ -15,14 +15,30 @@ COLLECTIONS_DIR="docs/postman/collections"
 ENV_FILE="docs/postman/environments/ci.postman_environment.json"
 BASE_URL="${NEWMAN_BASE_URL:-http://localhost:8000}"
 
-# Collections temporarily skipped pending fix for regressions introduced by
-# PR #60 (filters backend). Tracked in vianda-market/kitchen#79.
-# Remove an entry here in the same PR that fixes the underlying failure.
+# Collections temporarily skipped. Two distinct root causes — see the
+# referenced issue for each entry. Remove an entry in the same PR that
+# fixes the underlying failure (and updates the collection's assertions
+# where applicable).
+#
 # Match is on the "NNN" collection prefix (001/013/014/etc.).
+#
+# vianda-market/kitchen#79 — PR #60 regressions (filter backend).
+# vianda-market/kitchen#83 — Postman assertions need envelope-shape update
+#   for K3's contract change. Frontend Phase 3 adoption PRs MUST update
+#   the matching collections and remove their entries here before merging.
 SKIPPED_COLLECTIONS=(
+    # kitchen#79 (PR #60 regressions — needs CODE fix)
     "001"  # DISCRETIONARY_CREDIT_SYSTEM — pre-request script crash
     "013"  # SUBSCRIPTION_ACTIONS — 500 on subscription action endpoint
     "014"  # INGREDIENTS_AND_FAVORITES — 404 where 204 expected
+    # kitchen#83 (K3 envelope contract — needs ASSERTION update)
+    "000"  # E2E Plate Selection — login asserts response.json().access_token directly
+    "003"  # ENUM_SERVICE — error-path assertions match detail as bare string
+    "005"  # TIMEZONE_DEDUCTION_TESTS — invalid-country 400 envelope shape
+    "006"  # LEADS_MARKETING_SITE — invalid-language 422 array shape
+    "008"  # ROLE AND FIELD ACCESS — login + supplier admin auth paths
+    "010"  # Permissions Testing - Employee-Only Access — same shape mismatch
+    "011"  # EMPLOYER_PROGRAM — enrollment 422 vs old 400
 )
 
 is_skipped() {

@@ -85,7 +85,9 @@ class TestCreateMarketCountryCodeOnly:
         with patch("app.routes.admin.markets.market_service") as mock_market_service:
             resp = client_with_employee.post("/api/v1/markets", json=payload)
         assert resp.status_code == 400
-        detail = resp.json().get("detail") or resp.json().get("error") or resp.text or ""
+        raw = resp.json().get("detail") or resp.json().get("error") or resp.text or ""
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        detail = raw.get("message", "") if isinstance(raw, dict) else str(raw)
         assert "country" in detail.lower() or "invalid" in detail.lower()
         mock_market_service.create.assert_not_called()
 

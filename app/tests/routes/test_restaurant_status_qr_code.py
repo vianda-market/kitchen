@@ -65,7 +65,10 @@ class TestRestaurantStatusRequiresActiveQRCode:
             json={"status": "active"},
         )
         assert resp.status_code == 400
-        assert "QR code" in resp.json().get("detail", "")
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = resp.json().get("detail", "")
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "QR code" in detail_str
         mock_has_qr.assert_called_once()
 
     @patch("app.routes.restaurant.restaurant_service")
@@ -85,7 +88,10 @@ class TestRestaurantStatusRequiresActiveQRCode:
             json={"status": "active"},
         )
         assert resp.status_code == 400
-        assert "plate_kitchen_days" in resp.json().get("detail", "")
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = resp.json().get("detail", "")
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "plate_kitchen_days" in detail_str
         mock_has_pkd.assert_called_once()
 
     @patch("app.routes.restaurant.restaurant_service")
@@ -103,8 +109,10 @@ class TestRestaurantStatusRequiresActiveQRCode:
             json={"status": "active"},
         )
         assert resp.status_code == 400
-        detail = resp.json().get("detail", "")
-        assert "plate_kitchen_days" in detail or "QR code" in detail
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = resp.json().get("detail", "")
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "plate_kitchen_days" in detail_str or "QR code" in detail_str
 
     @patch("app.routes.restaurant.get_currency_metadata_id_for_restaurant")
     @patch("app.routes.restaurant.restaurant_service")

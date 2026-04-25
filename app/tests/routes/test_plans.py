@@ -68,8 +68,11 @@ class TestPlanGlobalMarketRejection:
         assert resp.status_code == 400
         data = resp.json()
         assert "detail" in data
-        assert "Global Marketplace" in data["detail"]
-        assert "plan" in data["detail"].lower()
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = data["detail"]
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "Global Marketplace" in detail_str
+        assert "plan" in detail_str.lower()
 
     def test_update_plan_with_global_market_returns_400(self, client_with_employee):
         """PUT /api/v1/plans{plan_id} with market_id=Global returns 400."""
@@ -79,8 +82,11 @@ class TestPlanGlobalMarketRejection:
         assert resp.status_code == 400
         data = resp.json()
         assert "detail" in data
-        assert "Global Marketplace" in data["detail"]
-        assert "plan" in data["detail"].lower()
+        # K3+: detail is now an envelope dict; extract message for string checks.
+        raw = data["detail"]
+        detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
+        assert "Global Marketplace" in detail_str
+        assert "plan" in detail_str.lower()
 
 
 # Argentina market (from seed); plans cannot use Global
