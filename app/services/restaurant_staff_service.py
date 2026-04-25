@@ -435,13 +435,14 @@ def hand_out_pickup(
     plate_pickup_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> dict[str, Any]:
     """
     Manual one-tap handoff: transition a single pickup from Arrived to Handed Out.
     Used by Layer 1 kiosk.
     """
-    from fastapi import HTTPException
-
+    from app.i18n.envelope import envelope_exception
+    from app.i18n.error_codes import ErrorCode
     from app.utils.db import db_write
 
     # Verify the pickup exists and is in Arrived status
@@ -455,9 +456,11 @@ def hand_out_pickup(
         fetch_one=True,
     )
     if not row:
-        raise HTTPException(status_code=404, detail="Pickup not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Pickup")
     if row["status"] != "arrived":
-        raise HTTPException(status_code=400, detail=f"Cannot hand out pickup with status {row['status']}")
+        raise envelope_exception(
+            ErrorCode.PLATE_PICKUP_INVALID_STATUS, status=400, locale=locale, pickup_status=row["status"]
+        )
 
     now = datetime.now()
     db_write(
@@ -487,8 +490,12 @@ def hand_out_pickup(
 def _get_institution_entity_for_restaurant(
     restaurant_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> UUID:
     """Get institution_entity_id for a restaurant."""
+    from app.i18n.envelope import envelope_exception
+    from app.i18n.error_codes import ErrorCode
+
     row = db_read(
         "SELECT institution_entity_id FROM restaurant_info WHERE restaurant_id = %s AND is_archived = FALSE",
         (str(restaurant_id),),
@@ -496,7 +503,5 @@ def _get_institution_entity_for_restaurant(
         fetch_one=True,
     )
     if not row:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
     return UUID(str(row["institution_entity_id"]))

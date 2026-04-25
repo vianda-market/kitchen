@@ -12,8 +12,10 @@ import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import HTMLResponse
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     QRCodeCreateSchema,
     QRCodeEnrichedResponseSchema,
@@ -44,6 +46,7 @@ atomic_qr_service = AtomicQRCodeService()
 def create_qr_code_atomic(
     payload: QRCodeCreateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create QR code with automatic image generation"""
@@ -52,10 +55,7 @@ def create_qr_code_atomic(
 
     restaurant = restaurant_service.get_by_id(payload.restaurant_id, db, scope=restaurant_scope)
     if not restaurant:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found for QR code creation. Ensure the restaurant exists and you have access to it (check institution scope).",
-        )
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
     def _create_qr_code():
         return atomic_qr_service.create_qr_code_atomic(payload.restaurant_id, current_user["user_id"], db, scope=scope)
@@ -165,6 +165,7 @@ def print_qr_code_html_by_restaurant(
         description="If 'true' (case-insensitive), open print dialog on load. Use str, not bool—FastAPI bool would accept 1/yes.",
     ),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Same as /{qr_code_id}/print but resolved by restaurant_id."""
@@ -173,11 +174,11 @@ def print_qr_code_html_by_restaurant(
 
     restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=restaurant_scope)
     if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
     qr = qr_code_service.get_by_field("restaurant_id", restaurant_id, db, scope=scope)
     if not qr or qr.is_archived:
-        raise HTTPException(status_code=404, detail="QR code not found for this restaurant")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="QR code")
 
     ctx = get_qr_code_print_context_by_id(qr.qr_code_id, db, scope=scope, include_archived=False)
     if not ctx:
@@ -208,6 +209,7 @@ def update_qr_code(
     qr_code_id: UUID,
     payload: QRCodeUpdateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update QR code information (status changes only)"""
@@ -215,7 +217,7 @@ def update_qr_code(
 
     existing_qr = qr_code_service.get_by_id(qr_code_id, db, scope=scope)
     if not existing_qr:
-        raise HTTPException(status_code=404, detail="QR code not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="QR code")
 
     def _update_qr_code():
         # Only allow status updates for atomic QR codes
@@ -235,6 +237,7 @@ def update_qr_code(
 def delete_qr_code_atomic(
     qr_code_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Delete QR code and its associated image"""
@@ -242,7 +245,7 @@ def delete_qr_code_atomic(
 
     existing_qr = qr_code_service.get_by_id(qr_code_id, db, scope=scope)
     if not existing_qr:
-        raise HTTPException(status_code=404, detail="QR code not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="QR code")
 
     def _delete_qr_code():
         success = atomic_qr_service.delete_qr_code_atomic(qr_code_id, db, scope=scope)
@@ -257,6 +260,7 @@ def delete_qr_code_atomic(
 def get_qr_code_by_restaurant(
     restaurant_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get QR code by restaurant ID"""
@@ -265,7 +269,7 @@ def get_qr_code_by_restaurant(
 
     restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=restaurant_scope)
     if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
     def _get_qr_code_by_restaurant():
         qr = qr_code_service.get_by_field("restaurant_id", restaurant_id, db, scope=scope)

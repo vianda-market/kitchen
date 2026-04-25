@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from app.auth.dependencies import get_client_or_employee_user, get_current_user, get_resolved_locale
 from app.config import Status
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import resolve_cuisine_name, resolve_i18n_field, resolve_i18n_list_field
 from app.schemas.consolidated_schemas import (
     CoworkerPickupWindowsResponseSchema,
@@ -74,6 +76,7 @@ router = APIRouter(
 def create_restaurant(
     restaurant_data: RestaurantCreateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -94,23 +97,23 @@ def create_restaurant(
         if not scope.is_global:
             provided_institution = restaurant_dict.get("institution_id")
             if provided_institution and not scope.matches(provided_institution):
-                raise HTTPException(status_code=403, detail="Forbidden: institution mismatch")
+                raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale=locale)
             if not scope.institution_id:
-                raise HTTPException(status_code=403, detail="Forbidden: missing institution scope")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
             restaurant_dict["institution_id"] = scope.institution_id
 
         # Restricted-institution validation (Vianda Customers / Vianda Enterprises) is enforced in CRUDService.create
 
         entity_id = restaurant_dict.get("institution_entity_id")
         if not entity_id:
-            raise HTTPException(status_code=400, detail="institution_entity_id is required")
+            raise envelope_exception(ErrorCode.RESTAURANT_ENTITY_ID_REQUIRED, status=400, locale=locale)
         entity = institution_entity_service.get_by_id(entity_id, db, scope=scope)
         if not entity:
-            raise HTTPException(status_code=404, detail="Institution entity not found")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution entity")
 
         credit_currency = credit_currency_service.get_by_id(entity.currency_metadata_id, db)
         if not credit_currency:
-            raise HTTPException(status_code=404, detail="Credit currency not found for institution entity")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
 
         restaurant_dict["modified_by"] = current_user["user_id"]
         restaurant_dict["status"] = "pending"
@@ -205,6 +208,7 @@ def search_restaurants_route(
     institution_id: UUID | None = institution_filter(),
     market_id: UUID | None = market_filter(),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -233,10 +237,7 @@ def search_restaurants_route(
                 current_user["user_id"], db, fallback_primary=current_user.get("market_id")
             )
             if not assigned or market_id not in assigned:
-                raise HTTPException(
-                    status_code=403,
-                    detail="market_id must be one of your assigned markets",
-                )
+                raise envelope_exception(ErrorCode.RESTAURANT_MARKET_ACCESS_DENIED, status=403, locale=locale)
 
     def _search():
         rows, total = search_restaurants(
@@ -284,6 +285,7 @@ def get_restaurant_cities(
 def get_explore_kitchen_days(
     market_id: UUID | None = Query(None, description="Market for timezone; if omitted, user's primary market is used"),
     current_user: dict = Depends(get_client_or_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -295,15 +297,12 @@ def get_explore_kitchen_days(
     assigned = get_assigned_market_ids(user_id, db, fallback_primary=current_user.get("market_id")) if user_id else []
     effective_market_id = market_id if market_id is not None else (assigned[0] if assigned else None)
     if effective_market_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="A market is required. Send market_id or ensure the user has a primary market.",
-        )
+        raise envelope_exception(ErrorCode.RESTAURANT_MARKET_REQUIRED, status=400, locale=locale)
     if market_id is not None and effective_market_id not in assigned:
-        raise HTTPException(status_code=403, detail="market_id must be one of your assigned markets")
+        raise envelope_exception(ErrorCode.RESTAURANT_MARKET_ACCESS_DENIED, status=403, locale=locale)
     market = market_service.get_by_id(effective_market_id)
     if not market:
-        raise HTTPException(status_code=404, detail="Market not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
     timezone_str = market.get("timezone") or "UTC"
     country_code = (market.get("country_code") or "").strip().upper()
     items = get_allowed_kitchen_days_sorted_by_date(timezone_str, country_code)
@@ -319,6 +318,7 @@ def get_explore_pickup_windows(
     ),
     market_id: UUID | None = Query(None, description="Market for timezone; if omitted, user's primary market is used"),
     current_user: dict = Depends(get_client_or_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -327,36 +327,37 @@ def get_explore_pickup_windows(
     Requires a market (send market_id or have a primary market).
     """
     if kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
-        raise HTTPException(
-            status_code=400,
-            detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
+        raise envelope_exception(
+            ErrorCode.VALIDATION_CUSTOM,
+            status=400,
+            locale=locale,
+            msg="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
         )
     user_id = current_user.get("user_id")
     assigned = get_assigned_market_ids(user_id, db, fallback_primary=current_user.get("market_id")) if user_id else []
     effective_market_id = market_id if market_id is not None else (assigned[0] if assigned else None)
     if effective_market_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="A market is required. Send market_id or ensure the user has a primary market.",
-        )
+        raise envelope_exception(ErrorCode.RESTAURANT_MARKET_REQUIRED, status=400, locale=locale)
     if market_id is not None and effective_market_id not in assigned:
-        raise HTTPException(status_code=403, detail="market_id must be one of your assigned markets")
+        raise envelope_exception(ErrorCode.RESTAURANT_MARKET_ACCESS_DENIED, status=403, locale=locale)
     market = market_service.get_by_id(effective_market_id)
     if not market:
-        raise HTTPException(status_code=404, detail="Market not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
     timezone_str = market.get("timezone") or "UTC"
     country_code = (market.get("country_code") or "").strip().upper()
     try:
         validate_kitchen_day_in_window(kitchen_day, timezone_str)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
+        raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(e)) from None
     if date_str:
         from datetime import date
 
         try:
             target_date = date.fromisoformat(date_str)
         except ValueError:
-            raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD") from None
+            raise envelope_exception(
+                ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg="date must be YYYY-MM-DD"
+            ) from None
     else:
         target_date = resolve_weekday_to_next_occurrence(kitchen_day, timezone_str)
     windows = get_pickup_windows_for_kitchen_day(country_code, kitchen_day, target_date)
@@ -394,8 +395,11 @@ def get_restaurants_by_city_route(
     City is matched case-insensitively. Customer or Internal only; 403 for Supplier. No institution scope.
     """
     if kitchen_day is not None and kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
-        raise HTTPException(
-            status_code=400, detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday"
+        raise envelope_exception(
+            ErrorCode.VALIDATION_CUSTOM,
+            status=400,
+            locale=locale,
+            msg="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
         )
 
     user_id = current_user.get("user_id")
@@ -406,24 +410,26 @@ def get_restaurants_by_city_route(
 
     if effective_market_id is not None:
         if market_id is not None and effective_market_id not in assigned:
-            raise HTTPException(status_code=403, detail="market_id must be one of your assigned markets")
+            raise envelope_exception(ErrorCode.RESTAURANT_MARKET_ACCESS_DENIED, status=403, locale=locale)
         market = market_service.get_by_id(effective_market_id)
         if not market:
-            raise HTTPException(status_code=404, detail="Market not found")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
         country = (market.get("country_code") or country).upper()
         timezone_str = market.get("timezone") or None
         # Only require kitchen_day when the client explicitly sent market_id (so explore-with-plates works).
         # When market is inferred from user assignment, allow omitting kitchen_day (no plates returned).
         if market_id is not None and not kitchen_day:
-            raise HTTPException(
-                status_code=400,
-                detail="kitchen_day is required when using a market to get restaurant plates. Choose a weekday from this week or next week (through next Friday).",
+            raise envelope_exception(
+                ErrorCode.VALIDATION_CUSTOM,
+                status=400,
+                locale=locale,
+                msg="kitchen_day is required when using a market to get restaurant plates. Choose a weekday from this week or next week (through next Friday).",
             )
         if kitchen_day and timezone_str:
             try:
                 validate_kitchen_day_in_window(kitchen_day, timezone_str)
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from None
+                raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(e)) from None
 
     # Single subscription per user; savings use credit_cost_local_currency only when exploring in the user's subscription market.
     credit_cost_local_currency = None
@@ -481,7 +487,7 @@ def get_restaurants_by_city_route(
             limit=limit,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
+        raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(exc)) from None
     data["restaurants"] = [RestaurantExplorerItemSchema(**r) for r in data["restaurants"]]
     return RestaurantsByCityResponseSchema(**data)
 
@@ -562,14 +568,16 @@ def list_enriched_restaurants(  # noqa: PLR0913 -- declarative FastAPI Query par
                     )
                 bbox_value = [float(p) for p in parts]
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from None
+                raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(exc)) from None
 
         radius_value: list[float] | None = None
         if center is not None or radius_m is not None:
             if center is None or radius_m is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Both center (lat,lng) and radius_m are required for proximity filtering",
+                raise envelope_exception(
+                    ErrorCode.VALIDATION_CUSTOM,
+                    status=400,
+                    locale=locale,
+                    msg="Both center (lat,lng) and radius_m are required for proximity filtering",
                 )
             try:
                 center_parts = [p.strip() for p in center.split(",")]
@@ -579,7 +587,7 @@ def list_enriched_restaurants(  # noqa: PLR0913 -- declarative FastAPI Query par
                 lng = float(center_parts[1])
                 radius_value = [lat, lng, float(radius_m)]
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from None
+                raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(exc)) from None
 
         try:
             filter_conditions = build_filter_conditions(
@@ -599,7 +607,7 @@ def list_enriched_restaurants(  # noqa: PLR0913 -- declarative FastAPI Query par
                 },
             )
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(exc)) from None
         enriched_restaurants = get_enriched_restaurants(
             db,
             scope=scope,
@@ -658,6 +666,7 @@ def get_coworker_pickup_windows_route(
     restaurant_id: UUID,
     kitchen_day: str = Query(..., description="Weekday (Monday–Friday) for pickup windows"),
     current_user: dict = Depends(get_client_or_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -666,18 +675,20 @@ def get_coworker_pickup_windows_route(
     Returns empty when user has no employer.
     """
     if kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
-        raise HTTPException(
-            status_code=400,
-            detail="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
+        raise envelope_exception(
+            ErrorCode.VALIDATION_CUSTOM,
+            status=400,
+            locale=locale,
+            msg="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
         )
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        raise envelope_exception(ErrorCode.AUTH_INVALID_TOKEN, status=401, locale=locale)
     if isinstance(user_id, str):
         try:
             user_id = UUID(user_id)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=401, detail="Invalid user") from None
+            raise envelope_exception(ErrorCode.AUTH_INVALID_TOKEN, status=401, locale=locale) from None
     windows = get_coworker_pickup_windows(restaurant_id, kitchen_day, user_id, db)
     return CoworkerPickupWindowsResponseSchema(pickup_windows=windows)
 
@@ -686,6 +697,7 @@ def get_coworker_pickup_windows_route(
 def get_restaurant(
     restaurant_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a specific restaurant by ID"""
@@ -693,7 +705,7 @@ def get_restaurant(
         scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
         restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=scope)
         if not restaurant:
-            raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {restaurant_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
         return RestaurantResponseSchema(**_restaurant_to_response(restaurant, db))
     except HTTPException:
         raise
@@ -707,6 +719,7 @@ def update_restaurant(
     restaurant_id: UUID,
     restaurant_data: RestaurantUpdateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update a restaurant"""
@@ -715,7 +728,7 @@ def update_restaurant(
         # Check if restaurant exists
         existing_restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=scope)
         if not existing_restaurant:
-            raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {restaurant_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
         # Prepare update data
         update_data = restaurant_data.model_dump(exclude_unset=True)
@@ -724,9 +737,8 @@ def update_restaurant(
         # institution_id is immutable after creation
         if "institution_id" in update_data:
             if str(update_data["institution_id"]) != str(existing_restaurant.institution_id):
-                raise HTTPException(
-                    status_code=400,
-                    detail="institution_id is immutable after creation.",
+                raise envelope_exception(
+                    ErrorCode.ENTITY_FIELD_IMMUTABLE, status=400, locale=locale, field="institution_id"
                 )
             update_data.pop("institution_id", None)
 
@@ -735,20 +747,11 @@ def update_restaurant(
             has_plate_kitchen_days = restaurant_has_active_plate_kitchen_days(restaurant_id, db)
             has_qr_code = restaurant_has_active_qr_code(restaurant_id, db)
             if not has_plate_kitchen_days and not has_qr_code:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days and at least one active QR code. Add plate_kitchen_days and create a QR code via POST /api/v1/qr-codes, then try again.",
-                )
+                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_SETUP, status=400, locale=locale)
             if not has_plate_kitchen_days:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days. Add and activate plate_kitchen_days for the restaurant's plates, then try again.",
-                )
+                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS, status=400, locale=locale)
             if not has_qr_code:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Cannot set restaurant to Active. The restaurant must have at least one active QR code. Create a QR code via POST /api/v1/qr-codes for this restaurant, then try again.",
-                )
+                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_QR, status=400, locale=locale)
 
         # Update the restaurant
         updated_restaurant = restaurant_service.update(restaurant_id, update_data, db, scope=scope)
@@ -775,6 +778,7 @@ def update_restaurant(
 def delete_restaurant(
     restaurant_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Soft delete a restaurant"""
@@ -783,7 +787,7 @@ def delete_restaurant(
         # Check if restaurant exists
         existing_restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=scope)
         if not existing_restaurant:
-            raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {restaurant_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
         from app.services.entity_service import validate_restaurant_can_be_archived
 
@@ -808,6 +812,7 @@ def delete_restaurant(
 def create_balance_for_restaurant(
     restaurant_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Test endpoint to create balance record for a restaurant"""
@@ -816,14 +821,14 @@ def create_balance_for_restaurant(
         # Check if restaurant exists
         restaurant = restaurant_service.get_by_id(restaurant_id, db, scope=scope)
         if not restaurant:
-            raise HTTPException(status_code=404, detail=f"Restaurant not found for restaurant_id {restaurant_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
         entity = institution_entity_service.get_by_id(restaurant.institution_entity_id, db, scope=scope)
         if not entity:
-            raise HTTPException(status_code=404, detail="Institution entity not found for restaurant")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution entity")
         credit_currency = credit_currency_service.get_by_id(entity.currency_metadata_id, db)
         if not credit_currency:
-            raise HTTPException(status_code=404, detail="Credit currency not found")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
 
         # Create balance record
         log_info(f"Creating balance record for restaurant {restaurant_id}")

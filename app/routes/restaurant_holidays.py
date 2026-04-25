@@ -10,8 +10,10 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.restaurant_holidays import (
     RestaurantHolidayBulkCreateSchema,
     RestaurantHolidayCreateSchema,
@@ -28,30 +30,29 @@ from app.utils.db import db_batch_insert, db_read
 from app.utils.log import log_info, log_warning
 
 
-def _derive_restaurant_country_code(restaurant_id: UUID, db: psycopg2.extensions.connection) -> str:
+def _derive_restaurant_country_code(restaurant_id: UUID, db: psycopg2.extensions.connection, locale: str = "en") -> str:
     """ISO alpha-2 from address.country_code (preferred) or country name mapping."""
     restaurant = restaurant_service.get_by_id(restaurant_id, db)
     if not restaurant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Restaurant not found: {restaurant_id}",
-        )
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=status.HTTP_404_NOT_FOUND, locale=locale)
     address = address_service.get_by_id(restaurant.address_id, db)
     if not address:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Restaurant has no address; cannot determine country_code",
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=status.HTTP_400_BAD_REQUEST,
+            locale=locale,
+            entity="Restaurant address",
         )
     cc = (address.country_code or "").strip()
     if len(cc) != 2 and address.country:
         mapped = MarketDetectionService._country_name_to_code(address.country)
         cc = (mapped or "").strip()
     if len(cc) != 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Could not determine ISO country code for the restaurant address; ensure address.country_code is set."
-            ),
+        raise envelope_exception(
+            ErrorCode.VALIDATION_CUSTOM,
+            status=status.HTTP_400_BAD_REQUEST,
+            locale=locale,
+            msg="Could not determine ISO country code for the restaurant address; ensure address.country_code is set.",
         )
     return cc
 
@@ -64,7 +65,9 @@ def _get_scope_for_entity(current_user: dict):
     return EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT_HOLIDAY, current_user)
 
 
-def _validate_not_national_holiday(holiday_date: str, restaurant_id: UUID, db: psycopg2.extensions.connection) -> None:
+def _validate_not_national_holiday(
+    holiday_date: str, restaurant_id: UUID, db: psycopg2.extensions.connection, locale: str = "en"
+) -> None:
     """
     Validate that a holiday date is not already a national holiday.
 
@@ -74,6 +77,7 @@ def _validate_not_national_holiday(holiday_date: str, restaurant_id: UUID, db: p
         holiday_date: Date in YYYY-MM-DD format or date object
         restaurant_id: Restaurant ID to get country code
         db: Database connection
+        locale: Locale for error messages
 
     Raises:
         HTTPException: If date is a national holiday
@@ -85,7 +89,7 @@ def _validate_not_national_holiday(holiday_date: str, restaurant_id: UUID, db: p
         date_str = str(holiday_date)
 
     try:
-        country_code = _derive_restaurant_country_code(restaurant_id, db)
+        country_code = _derive_restaurant_country_code(restaurant_id, db, locale=locale)
     except HTTPException:
         log_warning(
             f"Could not determine country code for restaurant {restaurant_id}, skipping national holiday validation"
@@ -94,9 +98,11 @@ def _validate_not_national_holiday(holiday_date: str, restaurant_id: UUID, db: p
 
     # Check if date is a national holiday
     if _is_date_national_holiday(date_str, country_code, db):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Date {date_str} is already a national holiday. Restaurants cannot register holidays on national holidays.",
+        raise envelope_exception(
+            ErrorCode.RESTAURANT_HOLIDAY_ON_NATIONAL_HOLIDAY,
+            status=status.HTTP_409_CONFLICT,
+            locale=locale,
+            holiday_date=date_str,
         )
 
 
@@ -205,6 +211,7 @@ def get_enriched_restaurant_holidays_by_restaurant(
 def get_restaurant_holiday(
     holiday_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single restaurant holiday by ID. Non-archived only."""
@@ -213,10 +220,10 @@ def get_restaurant_holiday(
     def get_operation(connection: psycopg2.extensions.connection):
         holiday = restaurant_holidays_service.get_by_id(holiday_id, connection, scope=scope)
         if not holiday:
-            raise HTTPException(status_code=404, detail=f"Restaurant holiday not found: {holiday_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         if holiday.is_archived:
-            raise HTTPException(status_code=404, detail=f"Restaurant holiday not found: {holiday_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         return holiday
 
@@ -227,6 +234,7 @@ def get_restaurant_holiday(
 def create_restaurant_holiday(
     payload: RestaurantHolidayCreateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -241,10 +249,10 @@ def create_restaurant_holiday(
         # Validate restaurant exists and belongs to user's institution (via scoping)
         restaurant = restaurant_service.get_by_id(payload.restaurant_id, connection, scope=scope)
         if not restaurant:
-            raise HTTPException(status_code=404, detail=f"Restaurant not found: {payload.restaurant_id}")
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
         # Validate that date is not a national holiday
-        _validate_not_national_holiday(payload.holiday_date, payload.restaurant_id, connection)
+        _validate_not_national_holiday(payload.holiday_date, payload.restaurant_id, connection, locale=locale)
 
         # Check for duplicate restaurant holiday
         existing_query = """
@@ -260,12 +268,14 @@ def create_restaurant_holiday(
             fetch_one=True,
         )
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Restaurant already has a holiday registered for {payload.holiday_date}",
+            raise envelope_exception(
+                ErrorCode.RESTAURANT_HOLIDAY_DUPLICATE,
+                status=status.HTTP_409_CONFLICT,
+                locale=locale,
+                holiday_date=str(payload.holiday_date),
             )
 
-        country_code = _derive_restaurant_country_code(payload.restaurant_id, connection)
+        country_code = _derive_restaurant_country_code(payload.restaurant_id, connection, locale=locale)
 
         holiday_data = {
             "restaurant_id": str(payload.restaurant_id),
@@ -293,6 +303,7 @@ def create_restaurant_holiday(
 def create_restaurant_holidays_bulk(
     payload: RestaurantHolidayBulkCreateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -310,10 +321,10 @@ def create_restaurant_holidays_bulk(
             # Validate restaurant exists and belongs to user's institution
             restaurant = restaurant_service.get_by_id(holiday.restaurant_id, connection, scope=scope)
             if not restaurant:
-                raise HTTPException(status_code=404, detail=f"Restaurant not found: {holiday.restaurant_id}")
+                raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
             # Validate that date is not a national holiday
-            _validate_not_national_holiday(holiday.holiday_date, holiday.restaurant_id, connection)
+            _validate_not_national_holiday(holiday.holiday_date, holiday.restaurant_id, connection, locale=locale)
 
             # Check for duplicate restaurant holiday
             existing_query = """
@@ -329,15 +340,17 @@ def create_restaurant_holidays_bulk(
                 fetch_one=True,
             )
             if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Restaurant {holiday.restaurant_id} already has a holiday registered for {holiday.holiday_date}",
+                raise envelope_exception(
+                    ErrorCode.RESTAURANT_HOLIDAY_DUPLICATE,
+                    status=status.HTTP_409_CONFLICT,
+                    locale=locale,
+                    holiday_date=str(holiday.holiday_date),
                 )
 
         # Prepare data for batch insert
         data_list = []
         for holiday in payload.holidays:
-            cc = _derive_restaurant_country_code(holiday.restaurant_id, connection)
+            cc = _derive_restaurant_country_code(holiday.restaurant_id, connection, locale=locale)
             data_list.append(
                 {
                     "restaurant_id": str(holiday.restaurant_id),
@@ -374,6 +387,7 @@ def update_restaurant_holiday(
     holiday_id: UUID,
     payload: RestaurantHolidayUpdateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -388,7 +402,7 @@ def update_restaurant_holiday(
         # Get existing record (with scoping - will return None if not accessible)
         existing = restaurant_holidays_service.get_by_id(holiday_id, connection, scope=scope)
         if not existing:
-            raise HTTPException(status_code=404, detail="Restaurant holiday not found")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         # Determine restaurant_id to use (existing or updated)
         restaurant_id = payload.restaurant_id if payload.restaurant_id is not None else existing.restaurant_id
@@ -397,11 +411,11 @@ def update_restaurant_holiday(
         if payload.restaurant_id is not None:
             restaurant = restaurant_service.get_by_id(payload.restaurant_id, connection, scope=scope)
             if not restaurant:
-                raise HTTPException(status_code=404, detail=f"Restaurant not found: {payload.restaurant_id}")
+                raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
         # If holiday_date is being updated, validate it's not a national holiday
         if payload.holiday_date is not None:
-            _validate_not_national_holiday(payload.holiday_date, restaurant_id, connection)
+            _validate_not_national_holiday(payload.holiday_date, restaurant_id, connection, locale=locale)
 
             # Check for duplicate restaurant holiday (excluding current record)
             existing_query = """
@@ -418,15 +432,19 @@ def update_restaurant_holiday(
                 fetch_one=True,
             )
             if existing_duplicate:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Restaurant already has a holiday registered for {payload.holiday_date}",
+                raise envelope_exception(
+                    ErrorCode.RESTAURANT_HOLIDAY_DUPLICATE,
+                    status=status.HTTP_409_CONFLICT,
+                    locale=locale,
+                    holiday_date=str(payload.holiday_date),
                 )
 
         update_data: dict = {}
         if payload.restaurant_id is not None:
             update_data["restaurant_id"] = str(payload.restaurant_id)
-            update_data["country_code"] = _derive_restaurant_country_code(payload.restaurant_id, connection)
+            update_data["country_code"] = _derive_restaurant_country_code(
+                payload.restaurant_id, connection, locale=locale
+            )
         if payload.holiday_date is not None:
             update_data["holiday_date"] = payload.holiday_date.isoformat()
         if payload.holiday_name is not None:
@@ -447,7 +465,6 @@ def update_restaurant_holiday(
         updated = restaurant_holidays_service.update(holiday_id, update_data, connection, scope=scope)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update restaurant holiday")
-
         log_info(f"Updated restaurant holiday: {holiday_id}")
         return updated
 
@@ -458,6 +475,7 @@ def update_restaurant_holiday(
 def delete_restaurant_holiday(
     holiday_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Soft delete (archive) a restaurant holiday"""
@@ -467,13 +485,12 @@ def delete_restaurant_holiday(
         # Get existing record (with scoping - will return None if not accessible)
         existing = restaurant_holidays_service.get_by_id(holiday_id, connection, scope=scope)
         if not existing:
-            raise HTTPException(status_code=404, detail="Restaurant holiday not found")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         # Soft delete (archive) - CRUDService handles scoping automatically
         success = restaurant_holidays_service.soft_delete(holiday_id, current_user["user_id"], connection, scope=scope)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete restaurant holiday")
-
         log_info(f"Deleted (archived) restaurant holiday: {holiday_id}")
         return
 
