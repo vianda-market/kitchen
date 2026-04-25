@@ -2,12 +2,14 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.config.enums import TaxClassification
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.billing.supplier_w9 import (
     SupplierW9CreateSchema,
     SupplierW9ResponseSchema,
@@ -35,6 +37,7 @@ async def submit_w9(
     business_name: str | None = Form(None),
     document: UploadFile | None = File(None),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Submit or update a W-9 for a US supplier entity.
@@ -57,10 +60,16 @@ async def submit_w9(
     file_content_type = None
     if document:
         if document.content_type not in W9_ALLOWED_CONTENT_TYPES:
-            raise HTTPException(status_code=400, detail="W-9 document must be a PDF")
+            raise envelope_exception(
+                ErrorCode.VALIDATION_INVALID_FORMAT,
+                status=400,
+                locale=locale,
+                field="document",
+                reason="W-9 document must be a PDF",
+            )
         file_data = await document.read()
         if len(file_data) > settings.MAX_INVOICE_DOCUMENT_BYTES:
-            raise HTTPException(status_code=400, detail="File exceeds 10 MB limit")
+            raise envelope_exception(ErrorCode.VALIDATION_VALUE_TOO_LONG, status=400, locale=locale, field="document")
         file_content_type = document.content_type
 
     # Scope check
@@ -89,6 +98,7 @@ async def submit_w9(
 def get_entity_w9(
     entity_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get the W-9 on file for a supplier entity. Returns 404 if not collected."""
@@ -99,7 +109,7 @@ def get_entity_w9(
     def _get():
         w9 = get_w9_by_entity(entity_id, db)
         if not w9:
-            raise HTTPException(status_code=404, detail="No W-9 on file for this entity")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="W-9")
         w9_dict = w9.model_dump()
         resolve_w9_document_url(w9_dict)
         return SupplierW9ResponseSchema(**w9_dict)

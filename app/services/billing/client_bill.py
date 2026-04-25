@@ -5,9 +5,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     client_bill_service,
     credit_currency_service,
@@ -38,6 +39,7 @@ def apply_subscription_renewal(
     *,
     modified_by: UUID,
     commit: bool = True,
+    locale: str = "en",
 ) -> None:
     """
     Apply renewal logic without a bill: set balance = rolled + plan.credit, renewal_date += 30 days.
@@ -51,10 +53,7 @@ def apply_subscription_renewal(
         raise ValueError("Plan not found")
     plan_credit = getattr(plan, "credit", None)
     if plan_credit is None or int(plan_credit) <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Plan has no credits; cannot renew.",
-        )
+        raise envelope_exception(ErrorCode.BILLING_PLAN_NO_CREDITS, status=400, locale=locale)
     current_balance = float(subscription.balance or 0)
     rolled = _compute_rolled_credits(current_balance, plan)
     new_balance = rolled + float(int(plan_credit))
@@ -85,6 +84,7 @@ def process_client_bill_internal(
     modified_by: UUID,
     *,
     commit: bool = True,
+    locale: str = "en",
 ) -> bool:
     """
     Process a client bill: add credits to subscription balance, set renewal_date, mark bill Processed.
@@ -109,13 +109,10 @@ def process_client_bill_internal(
 
     plan = plan_service.get_by_id(bill.plan_id, db)
     if not plan:
-        raise HTTPException(status_code=400, detail="Plan not found.")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=400, locale=locale, entity="plan")
     plan_credit = getattr(plan, "credit", None)
     if plan_credit is None or int(plan_credit) <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Plan has no credits; subscription cannot be activated or renewed.",
-        )
+        raise envelope_exception(ErrorCode.BILLING_PLAN_NO_CREDITS, status=400, locale=locale)
     credits_to_add = float(int(plan_credit))
     log_info(f"Granting plan.credit={plan_credit} credits for subscription {bill.subscription_id}")
 
@@ -152,7 +149,7 @@ def process_client_bill_internal(
     return True
 
 
-def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
+def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection, locale: str = "en"):
     bill = client_bill_service.get_by_id(bill_id, db)
     if not bill or bill.status != Status.COMPLETED:
         return
@@ -167,13 +164,10 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
 
     plan = plan_service.get_by_id(bill.plan_id, db)
     if not plan:
-        raise HTTPException(status_code=400, detail="Plan not found.")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=400, locale=locale, entity="plan")
     plan_credit = getattr(plan, "credit", None)
     if plan_credit is None or int(plan_credit) <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Plan has no credits; subscription cannot be activated or renewed.",
-        )
+        raise envelope_exception(ErrorCode.BILLING_PLAN_NO_CREDITS, status=400, locale=locale)
     credits_to_add = float(int(plan_credit))
     new_balance = float(subscription.balance) + credits_to_add
 

@@ -10,10 +10,11 @@ from datetime import datetime
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config.enums import SupplierInvoiceStatus
 from app.dto.models import BillInvoiceMatchDTO, SupplierInvoiceDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import (
     bill_invoice_match_service,
@@ -102,6 +103,7 @@ def create_supplier_invoice(
     file_content_type: str | None,
     current_user: dict,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SupplierInvoiceDTO:
     """
     Create a supplier invoice record with country extension and optional document upload.
@@ -127,7 +129,8 @@ def create_supplier_invoice(
     # Create the core invoice record
     invoice = supplier_invoice_service.create(data, db, commit=False)
     if not invoice:
-        raise HTTPException(status_code=500, detail="Failed to create supplier invoice")
+        log_error("Failed to create supplier invoice record")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
     # Create country extension record
     if country_details:
@@ -152,7 +155,7 @@ def create_supplier_invoice(
         except Exception as e:
             log_error(f"Failed to upload invoice document: {e}")
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to upload invoice document") from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
     db.commit()
     return supplier_invoice_service.get_by_id(str(invoice.supplier_invoice_id), db)
@@ -163,6 +166,7 @@ def match_invoice_to_bills(
     bill_matches: list[dict],
     current_user: dict,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> list[BillInvoiceMatchDTO]:
     """
     Create bill_invoice_match records linking an invoice to one or more bills.
@@ -172,7 +176,7 @@ def match_invoice_to_bills(
 
     invoice = supplier_invoice_service.get_by_id(str(supplier_invoice_id), db)
     if not invoice:
-        raise HTTPException(status_code=404, detail="Supplier invoice not found")
+        raise envelope_exception(ErrorCode.SUPPLIER_INVOICE_NOT_FOUND, status=404, locale=locale)
 
     entity_id = str(invoice.institution_entity_id)
     created_matches = []
@@ -188,12 +192,9 @@ def match_invoice_to_bills(
             fetch_one=True,
         )
         if not bill_row:
-            raise HTTPException(status_code=404, detail=f"Bill {bill_id} not found")
+            raise envelope_exception(ErrorCode.BILLING_BILL_NOT_FOUND, status=404, locale=locale)
         if str(bill_row["institution_entity_id"]) != entity_id:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Bill {bill_id} does not belong to the same entity as the invoice",
-            )
+            raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=400, locale=locale)
 
         match_record = bill_invoice_match_service.create(
             {
@@ -216,16 +217,19 @@ def review_supplier_invoice(
     rejection_reason: str | None,
     reviewer_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SupplierInvoiceDTO:
     """Approve or reject a supplier invoice. Only valid from 'pending_review' status."""
     invoice = supplier_invoice_service.get_by_id(str(invoice_id), db)
     if not invoice:
-        raise HTTPException(status_code=404, detail="Supplier invoice not found")
+        raise envelope_exception(ErrorCode.SUPPLIER_INVOICE_NOT_FOUND, status=404, locale=locale)
 
     if invoice.status != SupplierInvoiceStatus.PENDING_REVIEW:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot review invoice with status '{invoice.status.value}'. Must be 'pending_review'.",
+        raise envelope_exception(
+            ErrorCode.SUPPLIER_INVOICE_INVALID_STATUS,
+            status=400,
+            locale=locale,
+            invoice_status=invoice.status.value,
         )
 
     update_data = {
@@ -239,7 +243,8 @@ def review_supplier_invoice(
 
     updated = supplier_invoice_service.update(str(invoice_id), update_data, db)
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update invoice status")
+        log_error(f"Failed to update invoice status for {invoice_id}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
     return updated
 
 

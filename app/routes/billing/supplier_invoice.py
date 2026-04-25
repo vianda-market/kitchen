@@ -5,12 +5,14 @@ from decimal import Decimal
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
-from app.auth.dependencies import get_current_user, get_employee_user
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.config.enums import SupplierInvoiceType
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.billing.supplier_invoice import (
     ARInvoiceDetailsSchema,
     BillInvoiceMatchCreateSchema,
@@ -71,6 +73,7 @@ async def create_invoice(
     bill_matches_json: str | None = Form(None),
     document: UploadFile | None = File(None),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Create a supplier invoice with optional document upload and bill matches.
@@ -120,13 +123,17 @@ async def create_invoice(
     file_content_type = None
     if document:
         if document.content_type not in ALLOWED_CONTENT_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_CONTENT_TYPES)}",
+            allowed = ", ".join(ALLOWED_CONTENT_TYPES)
+            raise envelope_exception(
+                ErrorCode.VALIDATION_INVALID_FORMAT,
+                status=400,
+                locale=locale,
+                field="document",
+                reason=f"Allowed types: {allowed}",
             )
         file_data = await document.read()
         if len(file_data) > settings.MAX_INVOICE_DOCUMENT_BYTES:
-            raise HTTPException(status_code=400, detail="File exceeds 10 MB limit")
+            raise envelope_exception(ErrorCode.VALIDATION_VALUE_TOO_LONG, status=400, locale=locale, field="document")
         file_content_type = document.content_type
 
     # Scope check
@@ -145,7 +152,9 @@ async def create_invoice(
             else data_dict["invoice_type"]
         )
 
-        invoice = create_supplier_invoice(data_dict, country_details, file_data, file_content_type, current_user, db)
+        invoice = create_supplier_invoice(
+            data_dict, country_details, file_data, file_content_type, current_user, db, locale=locale
+        )
 
         # Create bill matches if provided
         if bill_matches_json:
@@ -154,7 +163,7 @@ async def create_invoice(
                 {"institution_bill_id": m["institution_bill_id"], "matched_amount": Decimal(str(m["matched_amount"]))}
                 for m in matches_raw
             ]
-            match_invoice_to_bills(invoice.supplier_invoice_id, bill_matches, current_user, db)
+            match_invoice_to_bills(invoice.supplier_invoice_id, bill_matches, current_user, db, locale=locale)
 
         # Build response with country details and document URL
         invoice_dict = invoice.model_dump()
@@ -230,6 +239,7 @@ def list_enriched_invoices(
 def get_invoice(
     invoice_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single supplier invoice by ID. Scoped to institution."""
@@ -238,7 +248,7 @@ def get_invoice(
     def _get():
         invoice = supplier_invoice_service.get_by_id(str(invoice_id), db, scope=scope)
         if not invoice:
-            raise HTTPException(status_code=404, detail="Supplier invoice not found")
+            raise envelope_exception(ErrorCode.SUPPLIER_INVOICE_NOT_FOUND, status=404, locale=locale)
         inv_dict = invoice.model_dump()
         resolve_document_url(inv_dict)
         enrich_with_country_details(inv_dict, db)
@@ -252,6 +262,7 @@ def review_invoice(
     invoice_id: UUID,
     review_data: SupplierInvoiceReviewSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Approve or reject a supplier invoice. Internal Admin only."""
@@ -263,6 +274,7 @@ def review_invoice(
             review_data.rejection_reason,
             current_user["user_id"],
             db,
+            locale=locale,
         )
         inv_dict = invoice.model_dump()
         resolve_document_url(inv_dict)
@@ -277,6 +289,7 @@ def add_bill_matches(
     invoice_id: UUID,
     bill_matches: list[BillInvoiceMatchCreateSchema],
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Add bill matches to an existing supplier invoice."""
@@ -287,7 +300,7 @@ def add_bill_matches(
         for m in matches_data:
             m["institution_bill_id"] = str(m["institution_bill_id"])
             m["matched_amount"] = str(m["matched_amount"])
-        created = match_invoice_to_bills(invoice_id, matches_data, current_user, db)
+        created = match_invoice_to_bills(invoice_id, matches_data, current_user, db, locale=locale)
         return [BillInvoiceMatchResponseSchema.model_validate(m) for m in created]
 
     return handle_business_operation(_match, "bill invoice matching")

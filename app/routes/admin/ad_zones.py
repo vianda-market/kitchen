@@ -9,10 +9,12 @@ Zones are the targeting unit for the geographic flywheel engine.
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.auth.dependencies import get_employee_user
+from app.auth.dependencies import get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     AdZoneCreateSchema,
     AdZoneResponseSchema,
@@ -36,6 +38,7 @@ async def create_ad_zone(
     body: AdZoneCreateSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Create a new ad zone for the geographic flywheel.
@@ -52,7 +55,7 @@ async def create_ad_zone(
 
     zone = create_zone(body.model_dump(), UUID(str(user_id)) if user_id else None, db)
     if not zone:
-        raise HTTPException(status_code=500, detail="Failed to create zone")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
     # Include overlap warnings in response headers
     if overlaps:
@@ -82,6 +85,7 @@ async def get_ad_zone(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Get a single ad zone by ID.
@@ -90,7 +94,7 @@ async def get_ad_zone(
     """
     zone = get_zone_by_id(zone_id, db)
     if not zone:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
     return zone
 
 
@@ -100,6 +104,7 @@ async def update_ad_zone(
     body: AdZoneUpdateSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Update zone fields (name, neighborhood, budget, radius).
@@ -118,7 +123,7 @@ async def update_ad_zone(
 
     zone = update_zone(zone_id, data, UUID(str(user_id)) if user_id else None, db)
     if not zone:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
     return zone
 
 
@@ -128,6 +133,7 @@ async def transition_ad_zone_state(
     new_state: str = Query(..., description="Target flywheel state"),
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Transition a zone's flywheel state.
@@ -142,7 +148,7 @@ async def transition_ad_zone_state(
     user_id = current_user.get("user_id")
     zone = transition_zone_state(zone_id, new_state, UUID(str(user_id)) if user_id else None, db)
     if not zone:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
     return zone
 
 
@@ -151,6 +157,7 @@ async def check_ad_zone_overlaps(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Check if a zone overlaps with other active zones.
@@ -161,7 +168,7 @@ async def check_ad_zone_overlaps(
     """
     zone = get_zone_by_id(zone_id, db)
     if not zone:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
     overlaps = check_zone_overlap(
         float(zone["latitude"]),
         float(zone["longitude"]),
@@ -177,6 +184,7 @@ async def delete_ad_zone(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Delete an ad zone.
@@ -185,7 +193,7 @@ async def delete_ad_zone(
     """
     deleted = delete_zone(zone_id, db)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
 
 
 # =============================================================================
@@ -217,6 +225,7 @@ async def sync_zone_metrics(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Refresh metrics for a single zone.
@@ -227,7 +236,7 @@ async def sync_zone_metrics(
 
     result = refresh_zone_metrics(zone_id, db)
     if not result:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
     return result
 
 
@@ -236,6 +245,7 @@ async def get_zone_audience(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Export hashed notify-me email list for Custom Audience upload.
@@ -248,7 +258,7 @@ async def get_zone_audience(
     """
     zone = get_zone_by_id(zone_id, db)
     if not zone:
-        raise HTTPException(status_code=404, detail="Ad zone not found")
+        raise envelope_exception(ErrorCode.AD_ZONE_NOT_FOUND, status=404, locale=locale)
 
     from app.services.ads.notify_me_sync import export_hashed_audience_for_zone
 

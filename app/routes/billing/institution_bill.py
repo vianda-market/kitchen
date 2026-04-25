@@ -3,10 +3,12 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.billing.institution_bill import (
     InstitutionBillResponseSchema,
     InstitutionBillUpdateSchema,
@@ -39,6 +41,7 @@ def get_institution_bills(
     start_date: date | None = None,
     end_date: date | None = None,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get institution bills with optional filtering by status and date range
@@ -61,7 +64,9 @@ def get_institution_bills(
         elif restaurant_id:
             # Get bills for specific restaurant (via institution_settlement; bills no longer have restaurant_id)
             if not start_date or not end_date:
-                raise HTTPException(status_code=400, detail="start_date and end_date required for restaurant filter")
+                raise envelope_exception(
+                    ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale=locale, field="start_date and end_date"
+                )
 
             period_start = datetime.combine(start_date, datetime.min.time())
             period_end = datetime.combine(end_date, datetime.max.time())
@@ -119,6 +124,7 @@ def update_institution_bill(
     bill_id: UUID,
     payload: InstitutionBillUpdateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update an institution bill"""
@@ -142,12 +148,18 @@ def update_institution_bill(
 
         success = institution_bill_service.update(bill_id, update_data, db)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to update institution bill")
+            from app.utils.log import log_error as _log_error
+
+            _log_error(f"Failed to update institution bill {bill_id}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
         # Return updated bill
         updated_bill = institution_bill_service.get_by_id(bill_id, db)
         if not updated_bill:
-            raise HTTPException(status_code=500, detail="Failed to retrieve updated bill")
+            from app.utils.log import log_error as _log_error
+
+            _log_error(f"Failed to retrieve updated institution bill {bill_id}")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
 
         log_info(f"Institution bill updated: {bill_id}")
         return updated_bill
@@ -248,6 +260,7 @@ def get_billing_summary(
     start_date: date,
     end_date: date,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get billing summary for an institution"""
@@ -258,7 +271,7 @@ def get_billing_summary(
         )
 
         if not summary:
-            raise HTTPException(status_code=404, detail="No billing data found for institution")
+            raise envelope_exception(ErrorCode.BILLING_NO_DATA_FOUND, status=404, locale=locale)
 
         return summary
 

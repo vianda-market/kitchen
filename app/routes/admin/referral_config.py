@@ -9,10 +9,12 @@ and trigger the referral cron job.
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from app.auth.dependencies import get_employee_user
+from app.auth.dependencies import get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     ReferralConfigEnrichedResponseSchema,
     ReferralConfigResponseSchema,
@@ -67,6 +69,7 @@ def list_referral_configs_enriched(
 def get_referral_config_by_market(
     market_id: UUID,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get referral configuration for a specific market."""
@@ -76,7 +79,7 @@ def get_referral_config_by_market(
         connection=db,
     )
     if not rows:
-        raise HTTPException(status_code=404, detail="Referral config not found for this market")
+        raise envelope_exception(ErrorCode.REFERRAL_CONFIG_NOT_FOUND, status=404, locale=locale)
     return rows[0]
 
 
@@ -85,6 +88,7 @@ def update_referral_config(
     market_id: UUID,
     update: ReferralConfigUpdateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update referral configuration for a market."""
@@ -94,7 +98,7 @@ def update_referral_config(
         connection=db,
     )
     if not rows:
-        raise HTTPException(status_code=404, detail="Referral config not found for this market")
+        raise envelope_exception(ErrorCode.REFERRAL_CONFIG_NOT_FOUND, status=404, locale=locale)
 
     config_id = UUID(str(rows[0]["referral_config_id"]))
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
@@ -103,7 +107,7 @@ def update_referral_config(
     log_info(f"Admin {current_user['user_id']} updating referral config for market {market_id}")
     updated = referral_config_service.update(config_id, update_data, db)
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update referral config")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="Referral config")
     return updated
 
 

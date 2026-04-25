@@ -8,9 +8,11 @@ including manual archival, statistics, and validation.
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.archival import ArchivalService
 from app.services.cron.archival_job import get_archival_dashboard, run_archival_validation, run_daily_archival
 from app.services.error_handling import handle_business_operation
@@ -120,7 +122,10 @@ async def get_eligible_records(entity_type: str, current_user: dict = Depends(ge
 
 @router.post("/archive/{entity_type}", response_model=dict[str, Any])
 async def archive_specific_records(
-    entity_type: str, record_ids: list[UUID], current_user: dict = Depends(get_current_user)
+    entity_type: str,
+    record_ids: list[UUID],
+    current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Archive specific records for an entity type.
@@ -133,10 +138,10 @@ async def archive_specific_records(
     """
     # TODO: Add admin role check
     if not record_ids:
-        raise HTTPException(status_code=400, detail="No record IDs provided")
+        raise envelope_exception(ErrorCode.ARCHIVAL_NO_RECORDS_PROVIDED, status=400, locale=locale)
 
     if len(record_ids) > 1000:
-        raise HTTPException(status_code=400, detail="Cannot archive more than 1000 records at once")
+        raise envelope_exception(ErrorCode.ARCHIVAL_TOO_MANY_RECORDS, status=400, locale=locale)
 
     # Archive specific records for an entity type
     def _archive_specific_records():

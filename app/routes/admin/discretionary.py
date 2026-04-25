@@ -7,10 +7,12 @@ Routes for kitchen administrators to create and manage discretionary credit requ
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from app.auth.dependencies import get_admin_user, get_employee_user
+from app.auth.dependencies import get_admin_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     DiscretionaryCreateSchema,
     DiscretionaryResponseSchema,
@@ -69,6 +71,7 @@ def get_discretionary_requests(
 def get_discretionary_request(
     request_id: UUID,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -83,7 +86,7 @@ def get_discretionary_request(
     request = next((req for req in admin_requests if req.discretionary_id == request_id), None)
 
     if not request:
-        raise HTTPException(status_code=404, detail="Discretionary request not found")
+        raise envelope_exception(ErrorCode.DISCRETIONARY_NOT_FOUND, status=404, locale=locale)
 
     return request
 
@@ -93,6 +96,7 @@ def update_discretionary_request(
     request_id: UUID,
     request_update: DiscretionaryUpdateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -107,10 +111,13 @@ def update_discretionary_request(
     request = next((req for req in admin_requests if req.discretionary_id == request_id), None)
 
     if not request:
-        raise HTTPException(status_code=404, detail="Discretionary request not found")
+        raise envelope_exception(ErrorCode.DISCRETIONARY_NOT_FOUND, status=404, locale=locale)
 
     if request.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Cannot update request with status: {request.status}")
+        request_status = request.status.value if hasattr(request.status, "value") else str(request.status)
+        raise envelope_exception(
+            ErrorCode.DISCRETIONARY_NOT_PENDING, status=400, locale=locale, request_status=request_status
+        )
 
     # Convert Pydantic model to dict for service layer
     update_data = request_update.model_dump(exclude_unset=True)

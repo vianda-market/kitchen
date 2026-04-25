@@ -14,6 +14,8 @@ from app.auth.dependencies import get_current_user, get_employee_user, get_resol
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import localize_country_name, localize_currency_name
 from app.schemas.consolidated_schemas import (
     MarketBillingConfigUpdateSchema,
@@ -26,7 +28,7 @@ from app.services.entity_service import get_enriched_market_by_id, get_enriched_
 from app.services.error_handling import handle_business_operation
 from app.services.market_service import is_global_market, market_has_active_plate_coverage, market_service
 from app.utils.country import resolve_country_name
-from app.utils.error_messages import entity_not_found
+from app.utils.log import log_error
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/markets", tags=["Markets"])
@@ -98,7 +100,8 @@ async def list_enriched_markets(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched markets: {str(e)}") from None
+        log_error(f"Failed to retrieve enriched markets: {e}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
 
 @router.get("/enriched/{market_id}", response_model=MarketResponseSchema)
@@ -127,7 +130,7 @@ async def get_enriched_market(
         enriched_market = get_enriched_market_by_id(market_id, db, include_archived=False)
 
         if not enriched_market:
-            raise entity_not_found("Market", market_id, locale=locale)
+            raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
 
         if locale != "en":
             enriched_market.country_name = localize_country_name(enriched_market.country_code, locale)
@@ -138,11 +141,16 @@ async def get_enriched_market(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve enriched market: {str(e)}") from None
+        log_error(f"Failed to retrieve enriched market: {e}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
 
 @router.get("/{market_id}", response_model=MarketResponseSchema)
-async def get_market(market_id: UUID, current_user: dict = Depends(get_current_user)):
+async def get_market(
+    market_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
+):
     """
     Get a specific market by ID.
 
@@ -159,7 +167,7 @@ async def get_market(market_id: UUID, current_user: dict = Depends(get_current_u
     market = market_service.get_by_id(market_id)
 
     if not market:
-        raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
+        raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
 
     return market
 
@@ -187,10 +195,7 @@ async def create_market(market_data: MarketCreateSchema, current_user: dict = De
     country_name = resolve_country_name(market_data.country_code)
     country_code = market_data.country_code  # already normalized by schema
     if country_code not in SUPPORTED_COUNTRY_CODES:
-        raise HTTPException(
-            status_code=400,
-            detail="Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
-        )
+        raise envelope_exception(ErrorCode.MARKET_COUNTRY_NOT_SUPPORTED, status=400, locale="en")
     billing_config = market_data.billing_config.model_dump() if market_data.billing_config else None
     market = market_service.create(
         country_name=country_name,
@@ -211,6 +216,7 @@ async def update_market(
     market_id: UUID,
     market_data: MarketUpdateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -236,10 +242,7 @@ async def update_market(
     - 404: Market not found
     """
     if is_global_market(market_id) and current_user.get("role_name") != "super_admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only Super Admin can edit the Global Marketplace.",
-        )
+        raise envelope_exception(ErrorCode.MARKET_SUPER_ADMIN_ONLY, status=403, locale=locale)
 
     # Admin status override guardrails (non-global markets only).
     # These keep the `status` field honest in the absence of the auto-flip cron
@@ -247,21 +250,9 @@ async def update_market(
     if market_data.status is not None and not is_global_market(market_id):
         has_coverage = market_has_active_plate_coverage(market_id, db)
         if market_data.status == Status.ACTIVE and not has_coverage:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Cannot activate: market has no active restaurant with an active plate on an "
-                    "active weekly kitchen-day. Schedule coverage first, then set status='active'."
-                ),
-            )
+            raise envelope_exception(ErrorCode.MARKET_NO_COVERAGE_TO_ACTIVATE, status=400, locale=locale)
         if market_data.status == Status.INACTIVE and has_coverage and not market_data.confirm_deactivate:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "This market currently has active plate coverage. Deactivating will hide it "
-                    "from customers immediately. Resubmit with confirm_deactivate=true to proceed."
-                ),
-            )
+            raise envelope_exception(ErrorCode.MARKET_HAS_COVERAGE_CONFIRM_DEACTIVATE, status=409, locale=locale)
 
     country_name = None
     country_code = None
@@ -269,10 +260,7 @@ async def update_market(
         country_name = resolve_country_name(market_data.country_code)
         country_code = market_data.country_code  # already normalized by schema
         if country_code not in SUPPORTED_COUNTRY_CODES:
-            raise HTTPException(
-                status_code=400,
-                detail="Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
-            )
+            raise envelope_exception(ErrorCode.MARKET_COUNTRY_NOT_SUPPORTED, status=400, locale=locale)
     market = market_service.update(
         market_id=market_id,
         modified_by=current_user["user_id"],
@@ -286,13 +274,17 @@ async def update_market(
     )
 
     if not market:
-        raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
+        raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
 
     return market
 
 
 @router.delete("/{market_id}", status_code=204)
-async def archive_market(market_id: UUID, current_user: dict = Depends(get_employee_user)):
+async def archive_market(
+    market_id: UUID,
+    current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
+):
     """
     Archive a market (soft delete).
 
@@ -312,21 +304,15 @@ async def archive_market(market_id: UUID, current_user: dict = Depends(get_emplo
     """
     if is_global_market(market_id):
         if current_user.get("role_name") != "super_admin":
-            raise HTTPException(
-                status_code=403,
-                detail="Only Super Admin can archive the Global Marketplace.",
-            )
+            raise envelope_exception(ErrorCode.MARKET_SUPER_ADMIN_ONLY, status=403, locale=locale)
         # Optionally disallow archiving Global even for Super Admin (keep it always active)
-        raise HTTPException(
-            status_code=400,
-            detail="The Global Marketplace cannot be archived.",
-        )
+        raise envelope_exception(ErrorCode.MARKET_GLOBAL_CANNOT_BE_ARCHIVED, status=400, locale=locale)
     market = market_service.update(
         market_id=market_id, modified_by=current_user["user_id"], is_archived=True, status=Status.INACTIVE
     )
 
     if not market:
-        raise HTTPException(status_code=404, detail=f"Market not found: {market_id}")
+        raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
 
     return
 
@@ -335,12 +321,13 @@ async def archive_market(market_id: UUID, current_user: dict = Depends(get_emplo
 def get_market_billing_config(
     market_id: UUID,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get billing configuration for a market. Internal only."""
     config = market_service.get_billing_config(market_id, db)
     if not config:
-        raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
+        raise envelope_exception(ErrorCode.MARKET_BILLING_CONFIG_NOT_FOUND, status=404, locale=locale)
     return config
 
 
@@ -349,6 +336,7 @@ def update_market_billing_config(
     market_id: UUID,
     data: MarketBillingConfigUpdateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update billing configuration for a market. Internal only."""
@@ -359,7 +347,7 @@ def update_market_billing_config(
         db,
     )
     if not updated:
-        raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
+        raise envelope_exception(ErrorCode.MARKET_BILLING_CONFIG_NOT_FOUND, status=404, locale=locale)
     return updated
 
 

@@ -1,10 +1,12 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.billing.client_bill import (
     ClientBillResponseSchema,
     ClientBillUpdateSchema,
@@ -75,6 +77,7 @@ def update_client_bill(
 def process_client_bill(
     client_bill_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Process a client bill: add credits to subscription, set renewal_date, mark Processed."""
@@ -91,7 +94,7 @@ def process_client_bill(
             modified_by = UUID(modified_by)
         success = process_client_bill_internal(client_bill_id, db, modified_by, commit=True)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to process client bill")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
         processed_bill = client_bill_service.get_by_id_non_archived(client_bill_id, db)
         log_info(f"Processed client bill {client_bill_id}")
         return {"message": "Client bill processed successfully", "client_bill": processed_bill}

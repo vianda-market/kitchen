@@ -275,6 +275,54 @@ class ErrorCode(StrEnum):
     NATIONAL_HOLIDAY_NOT_FOUND = "national_holiday.not_found"
     NATIONAL_HOLIDAY_UPDATE_EMPTY = "national_holiday.update_empty"
 
+    # ── market.* ─────────────────────────────────────────────────────────
+    # Market management errors. Wired in K12 (admin + billing sweep).
+    MARKET_NOT_FOUND = "market.not_found"
+    MARKET_COUNTRY_NOT_SUPPORTED = "market.country_not_supported"
+    MARKET_SUPER_ADMIN_ONLY = "market.super_admin_only"
+    MARKET_NO_COVERAGE_TO_ACTIVATE = "market.no_coverage_to_activate"
+    MARKET_HAS_COVERAGE_CONFIRM_DEACTIVATE = "market.has_coverage_confirm_deactivate"
+    MARKET_GLOBAL_CANNOT_BE_ARCHIVED = "market.global_cannot_be_archived"
+    MARKET_BILLING_CONFIG_NOT_FOUND = "market.billing_config_not_found"
+
+    # ── ad_zone.* ────────────────────────────────────────────────────────
+    # Ad zone management errors. Wired in K12.
+    AD_ZONE_NOT_FOUND = "ad_zone.not_found"
+
+    # ── cuisine.* ────────────────────────────────────────────────────────
+    # Cuisine management errors. Wired in K12.
+    CUISINE_NOT_FOUND = "cuisine.not_found"
+    CUISINE_SUGGESTION_NOT_FOUND = "cuisine.suggestion_not_found"
+
+    # ── archival.* ───────────────────────────────────────────────────────
+    # Archival management errors. Wired in K12.
+    ARCHIVAL_NO_RECORDS_PROVIDED = "archival.no_records_provided"
+    ARCHIVAL_TOO_MANY_RECORDS = "archival.too_many_records"
+    ARCHIVAL_CONFIG_NOT_FOUND = "archival_config.not_found"
+    ARCHIVAL_CONFIG_ALREADY_EXISTS = "archival_config.already_exists"
+
+    # ── referral_config.* ────────────────────────────────────────────────
+    # Referral config management errors. Wired in K12.
+    REFERRAL_CONFIG_NOT_FOUND = "referral_config.not_found"
+
+    # ── supplier_invoice.* ───────────────────────────────────────────────
+    # Supplier invoice errors. Wired in K12.
+    SUPPLIER_INVOICE_NOT_FOUND = "supplier_invoice.not_found"
+    SUPPLIER_INVOICE_INVALID_STATUS = "supplier_invoice.invalid_status"
+
+    # ── billing.* ────────────────────────────────────────────────────────
+    # Billing management errors. Wired in K12.
+    BILLING_BILL_NOT_FOUND = "billing.bill_not_found"
+    BILLING_BILL_ALREADY_PAID = "billing.bill_already_paid"
+    BILLING_BILL_ALREADY_CANCELLED = "billing.bill_already_cancelled"
+    BILLING_PLAN_NO_CREDITS = "billing.plan_no_credits"
+    BILLING_NO_DATA_FOUND = "billing.no_data_found"
+
+    # ── discretionary.* ──────────────────────────────────────────────────
+    # Discretionary request errors. Wired in K12.
+    DISCRETIONARY_NOT_FOUND = "discretionary.not_found"
+    DISCRETIONARY_NOT_PENDING = "discretionary.not_pending"
+
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
     DATABASE_DUPLICATE_KEY = "database.duplicate_key"
