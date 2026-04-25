@@ -31,14 +31,7 @@ SKIPPED_COLLECTIONS=(
     "001"  # DISCRETIONARY_CREDIT_SYSTEM — pre-request script crash
     "013"  # SUBSCRIPTION_ACTIONS — 500 on subscription action endpoint
     "014"  # INGREDIENTS_AND_FAVORITES — 404 where 204 expected
-    # kitchen#83 (K3 envelope contract — needs ASSERTION update)
-    "000"  # E2E Plate Selection — login asserts response.json().access_token directly
-    "003"  # ENUM_SERVICE — error-path assertions match detail as bare string
-    "005"  # TIMEZONE_DEDUCTION_TESTS — invalid-country 400 envelope shape
-    "006"  # LEADS_MARKETING_SITE — invalid-language 422 array shape
-    "008"  # ROLE AND FIELD ACCESS — login + supplier admin auth paths
-    "010"  # Permissions Testing - Employee-Only Access — same shape mismatch
-    "011"  # EMPLOYER_PROGRAM — enrollment 422 vs old 400
+    # kitchen#83 (K3 envelope contract — restored in this PR)
 )
 
 is_skipped() {

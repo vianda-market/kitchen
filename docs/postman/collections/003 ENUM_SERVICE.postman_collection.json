@@ -1,678 +1,678 @@
 {
-  "info": {
-    "_postman_id": "enum-service-api-2026",
-    "name": "003 ENUM_SERVICE",
-    "description": "003 – Run after 000 (customer: customer/Customer123!) and 002 (admin: admin/Admin123!). Uses env customerUsername/customerPassword and adminUsername/adminPassword or collection defaults. Test collection for the Enum Service API.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "🔐 Authentication",
-      "item": [
-        {
-          "name": "Login as Vianda Admin (Employee)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "pm.test('Response has access_token', function () {",
-                  "    pm.expect(response).to.have.property('access_token');",
-                  "});",
-                  "",
-                  "pm.collectionVariables.set('adminAuthToken', response.access_token);",
-                  "pm.environment.set('authToken', response.access_token);",
-                  "pm.environment.set('adminAuthToken', response.access_token);",
-                  "pm.globals.set('adminAuthToken', response.access_token);",
-                  "pm.globals.set('authToken', response.access_token);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{superAdminUsername}}"
-                },
-                {
-                  "key": "password",
-                  "value": "{{superAdminPassword}}"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "token"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Login as Customer",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "pm.test('Response has access_token', function () {",
-                  "    pm.expect(response).to.have.property('access_token');",
-                  "});",
-                  "",
-                  "pm.collectionVariables.set('customerAuthToken', response.access_token);",
-                  "pm.environment.set('customerAuthToken', response.access_token);",
-                  "pm.globals.set('customerAuthToken', response.access_token);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "username",
-                  "value": "{{customerUsername}}"
-                },
-                {
-                  "key": "password",
-                  "value": "{{customerPassword}}"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "token"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "📊 Enum Service Tests",
-      "item": [
-        {
-          "name": "Get All Enums",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "pm.test('Response is an object', function () {",
-                  "    pm.expect(response).to.be.an('object');",
-                  "});",
-                  "",
-                  "function assertLabeled(entry) {",
-                  "    pm.expect(entry).to.have.property('values');",
-                  "    pm.expect(entry).to.have.property('labels');",
-                  "    pm.expect(entry.values).to.be.an('array');",
-                  "    pm.expect(entry.labels).to.be.an('object');",
-                  "    entry.values.forEach(v => pm.expect(entry.labels).to.have.property(v));",
-                  "}",
-                  "",
-                  "// Test that all expected enum types are present (values + labels per key)",
-                  "const expectedEnumTypes = [",
-                  "    'status', 'address_type', 'role_type', 'role_name',",
-                  "    'subscription_status', 'method_type',",
-                  "    'transaction_type', 'street_type', 'kitchen_day',",
-                  "    'pickup_type', 'discretionary_reason', 'bill_resolution'",
-                  "];",
-                  "",
-                  "expectedEnumTypes.forEach(enumType => {",
-                  "    pm.test(`Response has ${enumType} labeled enum`, function () {",
-                  "        pm.expect(response).to.have.property(enumType);",
-                  "        assertLabeled(response[enumType]);",
-                  "        pm.expect(response[enumType].values.length).to.be.greaterThan(0);",
-                  "    });",
-                  "});",
-                  "",
-                  "// Test cache headers",
-                  "pm.test('Response has Cache-Control header', function () {",
-                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('max-age');",
-                  "});",
-                  "",
-                  "pm.test('Response has X-Content-Type-Options header', function () {",
-                  "    pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.equal('nosniff');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enums",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get Status Enum",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "pm.test('Response is an array', function () {",
-                  "    pm.expect(response).to.be.an('array');",
-                  "    pm.expect(response.length).to.be.greaterThan(0);",
-                  "});",
-                  "",
-                  "pm.test('Status enum contains expected values', function () {",
-                  "    pm.expect(response).to.include('active');",
-                  "    pm.expect(response).to.include('inactive');",
-                  "    pm.expect(response).to.include('pending');",
-                  "});",
-                  "",
-                  "pm.test('Response has Cache-Control header', function () {",
-                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('max-age');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enumsstatus",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums",
-                "status"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get Subscription Status Enum",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "pm.test('Response is an array', function () {",
-                  "    pm.expect(response).to.be.an('array');",
-                  "});",
-                  "",
-                  "pm.test('Subscription status enum contains expected values', function () {",
-                  "    pm.expect(response).to.include('active');",
-                  "    pm.expect(response).to.include('on_hold');",
-                  "    pm.expect(response).to.include('pending');",
-                  "    pm.expect(response).to.include('cancelled');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enumssubscription_status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums",
-                "subscription_status"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get Role Type Enum",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "pm.test('Role type enum contains expected values', function () {",
-                  "    pm.expect(response).to.include('internal');",
-                  "    pm.expect(response).to.include('supplier');",
-                  "    pm.expect(response).to.include('customer');",
-                  "    pm.expect(response).to.include('employer');",
-                  "    pm.expect(response.length).to.equal(4);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enumsrole_type",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums",
-                "role_type"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Customer Can Access Enums",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "// Sync customer token: prefer collection (from 003 Login as Customer), else pull from env/globals (000).",
-                  "const collCust = pm.collectionVariables.get('customerAuthToken');",
-                  "if (!collCust) {",
-                  "    const ct = pm.environment.get('customerAuthToken') || pm.globals.get('customerAuthToken') || pm.environment.get('clientUserAuthToken') || pm.globals.get('clientUserAuthToken');",
-                  "    if (ct) pm.collectionVariables.set('customerAuthToken', ct);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Customer can access enums', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "function labeled(entry) {",
-                  "    pm.expect(entry).to.have.property('values');",
-                  "    pm.expect(entry).to.have.property('labels');",
-                  "}",
-                  "pm.test('Response contains labeled core enums', function () {",
-                  "    pm.expect(response).to.have.property('status');",
-                  "    labeled(response.status);",
-                  "    pm.expect(response).to.have.property('subscription_status');",
-                  "    labeled(response.subscription_status);",
-                  "    pm.expect(response).to.have.property('address_type');",
-                  "    labeled(response.address_type);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{customerAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enums",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "❌ Error Scenarios",
-      "item": [
-        {
-          "name": "Get Invalid Enum Name",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 404', function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "",
-                  "pm.test('Error message mentions unknown enum type', function () {",
-                  "    pm.expect(response.detail).to.include('Unknown enum type');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enumsinvalid_enum_name",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums",
-                "invalid_enum_name"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Unauthorized Access - No Token",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 401', function () {",
-                  "    pm.response.to.have.status(401);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enums",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get All Enums - invalid language",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 422', function () {",
-                  "    pm.response.to.have.status(422);",
-                  "});",
-                  "const body = pm.response.json();",
-                  "pm.test('Detail mentions unsupported language', function () {",
-                  "    pm.expect(String(body.detail)).to.include('Unsupported language');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/enums?language=xx",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "enums"
-              ],
-              "query": [
-                {
-                  "key": "language",
-                  "value": "xx"
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Reference Data",
-      "item": [
-        {
-          "name": "Get Supported Cuisines",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const response = pm.response.json();",
-                  "pm.test('Response is array of cuisine objects', function () {",
-                  "    pm.expect(response).to.be.an('array');",
-                  "    pm.expect(response.length).to.be.greaterThan(0);",
-                  "    response.forEach(item => {",
-                  "        pm.expect(item).to.have.property('cuisine_name');",
-                  "    });",
-                  "});",
-                  "pm.test('Contains Italian, French, American', function () {",
-                  "    const names = response.map(r => r.cuisine_name);",
-                  "    pm.expect(names).to.include('Italian');",
-                  "    pm.expect(names).to.include('French');",
-                  "    pm.expect(names).to.include('American');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAuthToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/cuisines",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "cuisines"
-              ]
-            }
-          }
-        }
-      ]
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "exec": [
-          "// Use admin from 001/002 (env or globals) when available",
-          "const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
-          "if (u) pm.collectionVariables.set('adminUsername', u);",
-          "const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
-          "if (p) pm.collectionVariables.set('adminPassword', p);",
-          "const t = pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
-          "if (t) pm.collectionVariables.set('adminAuthToken', t);",
-          "",
-          "// Customer token: prefer 003's Login as Customer (collection) over stale env from 000.",
-          "// Only pull from env/globals when collection has no token (avoids overwriting fresh with expired).",
-          "const collCust = pm.collectionVariables.get('customerAuthToken');",
-          "if (!collCust) {",
-          "    const ct = pm.environment.get('customerAuthToken') || pm.globals.get('customerAuthToken') || pm.environment.get('clientUserAuthToken') || pm.globals.get('clientUserAuthToken');",
-          "    if (ct) pm.collectionVariables.set('customerAuthToken', ct);",
-          "}"
-        ],
-        "type": "text/javascript"
-      }
-    }
-  ],
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8000",
-      "type": "string"
-    },
-    {
-      "key": "superAdminUsername",
-      "value": "",
-      "type": "string",
-      "description": "Set by environment variable"
-    },
-    {
-      "key": "superAdminPassword",
-      "value": "",
-      "type": "string",
-      "description": "Set by environment variable"
-    },
-    {
-      "key": "customerUsername",
-      "value": "",
-      "type": "string",
-      "description": "Set by 000 Customer Signup. Run 000 first with same environment."
-    },
-    {
-      "key": "customerPassword",
-      "value": "",
-      "type": "string",
-      "description": "Set by 000 Customer Signup. Run 000 first with same environment."
-    },
-    {
-      "key": "adminAuthToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customerAuthToken",
-      "value": "",
-      "type": "string"
-    }
-  ]
+	"info": {
+		"_postman_id": "enum-service-api-2026",
+		"name": "003 ENUM_SERVICE",
+		"description": "003 \u2013 Run after 000 (customer: customer/Customer123!) and 002 (admin: admin/Admin123!). Uses env customerUsername/customerPassword and adminUsername/adminPassword or collection defaults. Test collection for the Enum Service API.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "\ud83d\udd10 Authentication",
+			"item": [
+				{
+					"name": "Login as Vianda Admin (Employee)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has access_token', function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set('adminAuthToken', response.access_token);",
+									"pm.environment.set('authToken', response.access_token);",
+									"pm.environment.set('adminAuthToken', response.access_token);",
+									"pm.globals.set('adminAuthToken', response.access_token);",
+									"pm.globals.set('authToken', response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{superAdminUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{superAdminPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"token"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login as Customer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response has access_token', function () {",
+									"    pm.expect(response).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.collectionVariables.set('customerAuthToken', response.access_token);",
+									"pm.environment.set('customerAuthToken', response.access_token);",
+									"pm.globals.set('customerAuthToken', response.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{customerUsername}}"
+								},
+								{
+									"key": "password",
+									"value": "{{customerPassword}}"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/token",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"token"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "\ud83d\udcca Enum Service Tests",
+			"item": [
+				{
+					"name": "Get All Enums",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test('Response is an object', function () {",
+									"    pm.expect(response).to.be.an('object');",
+									"});",
+									"",
+									"function assertLabeled(entry) {",
+									"    pm.expect(entry).to.have.property('values');",
+									"    pm.expect(entry).to.have.property('labels');",
+									"    pm.expect(entry.values).to.be.an('array');",
+									"    pm.expect(entry.labels).to.be.an('object');",
+									"    entry.values.forEach(v => pm.expect(entry.labels).to.have.property(v));",
+									"}",
+									"",
+									"// Test that all expected enum types are present (values + labels per key)",
+									"const expectedEnumTypes = [",
+									"    'status', 'address_type', 'role_type', 'role_name',",
+									"    'subscription_status', 'method_type',",
+									"    'transaction_type', 'street_type', 'kitchen_day',",
+									"    'pickup_type', 'discretionary_reason', 'bill_resolution'",
+									"];",
+									"",
+									"expectedEnumTypes.forEach(enumType => {",
+									"    pm.test(`Response has ${enumType} labeled enum`, function () {",
+									"        pm.expect(response).to.have.property(enumType);",
+									"        assertLabeled(response[enumType]);",
+									"        pm.expect(response[enumType].values.length).to.be.greaterThan(0);",
+									"    });",
+									"});",
+									"",
+									"// Test cache headers",
+									"pm.test('Response has Cache-Control header', function () {",
+									"    pm.expect(pm.response.headers.get('Cache-Control')).to.include('max-age');",
+									"});",
+									"",
+									"pm.test('Response has X-Content-Type-Options header', function () {",
+									"    pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.equal('nosniff');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enums",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Status Enum",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test('Response is an array', function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"    pm.expect(response.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"pm.test('Status enum contains expected values', function () {",
+									"    pm.expect(response).to.include('active');",
+									"    pm.expect(response).to.include('inactive');",
+									"    pm.expect(response).to.include('pending');",
+									"});",
+									"",
+									"pm.test('Response has Cache-Control header', function () {",
+									"    pm.expect(pm.response.headers.get('Cache-Control')).to.include('max-age');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enumsstatus",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums",
+								"status"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Subscription Status Enum",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test('Response is an array', function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Subscription status enum contains expected values', function () {",
+									"    pm.expect(response).to.include('active');",
+									"    pm.expect(response).to.include('on_hold');",
+									"    pm.expect(response).to.include('pending');",
+									"    pm.expect(response).to.include('cancelled');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enumssubscription_status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums",
+								"subscription_status"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Role Type Enum",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test('Role type enum contains expected values', function () {",
+									"    pm.expect(response).to.include('internal');",
+									"    pm.expect(response).to.include('supplier');",
+									"    pm.expect(response).to.include('customer');",
+									"    pm.expect(response).to.include('employer');",
+									"    pm.expect(response.length).to.equal(4);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enumsrole_type",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums",
+								"role_type"
+							]
+						}
+					}
+				},
+				{
+					"name": "Customer Can Access Enums",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Sync customer token: prefer collection (from 003 Login as Customer), else pull from env/globals (000).",
+									"const collCust = pm.collectionVariables.get('customerAuthToken');",
+									"if (!collCust) {",
+									"    const ct = pm.environment.get('customerAuthToken') || pm.globals.get('customerAuthToken') || pm.environment.get('clientUserAuthToken') || pm.globals.get('clientUserAuthToken');",
+									"    if (ct) pm.collectionVariables.set('customerAuthToken', ct);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Customer can access enums', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"function labeled(entry) {",
+									"    pm.expect(entry).to.have.property('values');",
+									"    pm.expect(entry).to.have.property('labels');",
+									"}",
+									"pm.test('Response contains labeled core enums', function () {",
+									"    pm.expect(response).to.have.property('status');",
+									"    labeled(response.status);",
+									"    pm.expect(response).to.have.property('subscription_status');",
+									"    labeled(response.subscription_status);",
+									"    pm.expect(response).to.have.property('address_type');",
+									"    labeled(response.address_type);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customerAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enums",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "\u274c Error Scenarios",
+			"item": [
+				{
+					"name": "Get Invalid Enum Name",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 404', function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test('Error message mentions unknown enum type', function () {",
+									"    pm.expect(response.detail.code).to.eql('request.not_found');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enumsinvalid_enum_name",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums",
+								"invalid_enum_name"
+							]
+						}
+					}
+				},
+				{
+					"name": "Unauthorized Access - No Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 401', function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enums",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get All Enums - invalid language",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 422', function () {",
+									"    pm.response.to.have.status(422);",
+									"});",
+									"const body = pm.response.json();",
+									"pm.test('Detail mentions unsupported language', function () {",
+									"    pm.expect(body.detail.message).to.include('Unsupported language');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/enums?language=xx",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"enums"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "xx"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Reference Data",
+			"item": [
+				{
+					"name": "Get Supported Cuisines",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"pm.test('Response is array of cuisine objects', function () {",
+									"    pm.expect(response).to.be.an('array');",
+									"    pm.expect(response.length).to.be.greaterThan(0);",
+									"    response.forEach(item => {",
+									"        pm.expect(item).to.have.property('cuisine_name');",
+									"    });",
+									"});",
+									"pm.test('Contains Italian, French, American', function () {",
+									"    const names = response.map(r => r.cuisine_name);",
+									"    pm.expect(names).to.include('Italian');",
+									"    pm.expect(names).to.include('French');",
+									"    pm.expect(names).to.include('American');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/cuisines",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"cuisines"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Use admin from 001/002 (env or globals) when available",
+					"const u = pm.environment.get('adminUsername') || pm.globals.get('adminUsername');",
+					"if (u) pm.collectionVariables.set('adminUsername', u);",
+					"const p = pm.environment.get('adminPassword') || pm.globals.get('adminPassword');",
+					"if (p) pm.collectionVariables.set('adminPassword', p);",
+					"const t = pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+					"if (t) pm.collectionVariables.set('adminAuthToken', t);",
+					"",
+					"// Customer token: prefer 003's Login as Customer (collection) over stale env from 000.",
+					"// Only pull from env/globals when collection has no token (avoids overwriting fresh with expired).",
+					"const collCust = pm.collectionVariables.get('customerAuthToken');",
+					"if (!collCust) {",
+					"    const ct = pm.environment.get('customerAuthToken') || pm.globals.get('customerAuthToken') || pm.environment.get('clientUserAuthToken') || pm.globals.get('clientUserAuthToken');",
+					"    if (ct) pm.collectionVariables.set('customerAuthToken', ct);",
+					"}"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "superAdminUsername",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
+		},
+		{
+			"key": "superAdminPassword",
+			"value": "",
+			"type": "string",
+			"description": "Set by environment variable"
+		},
+		{
+			"key": "customerUsername",
+			"value": "",
+			"type": "string",
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
+		},
+		{
+			"key": "customerPassword",
+			"value": "",
+			"type": "string",
+			"description": "Set by 000 Customer Signup. Run 000 first with same environment."
+		},
+		{
+			"key": "adminAuthToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customerAuthToken",
+			"value": "",
+			"type": "string"
+		}
+	]
 }

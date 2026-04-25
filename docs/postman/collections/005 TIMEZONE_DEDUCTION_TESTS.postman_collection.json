@@ -335,7 +335,7 @@
                   "});",
                   "",
                   "const body = pm.response.json();",
-                  "const detail = Array.isArray(body.detail) ? body.detail.map(d => d.msg || JSON.stringify(d)).join(' ') : (body.detail || '');",
+                  "const detail = Array.isArray(body.detail) ? body.detail.map(d => d.message || d.msg || JSON.stringify(d)).join(' ') : ((body.detail && body.detail.message) || body.detail || '');",
                   "pm.test('Error mentions invalid input', function () {",
                   "    pm.expect(detail.toLowerCase()).to.match(/invalid|not found|required|country/i);",
                   "});"
