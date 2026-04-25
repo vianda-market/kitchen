@@ -224,6 +224,14 @@ _Routes: `/ad-tracking`, `/admin/ad-zones/`_
 
 ---
 
+## i18n & Locale
+
+| Audience | File | Description |
+|----------|------|-------------|
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/i18n.md` | Catalog modules, locale resolution precedence, resolver selection guide, code lifecycle, parity tests index. **Start here for any i18n/locale work.** |
+
+---
+
 ## API Patterns & Conventions
 _Applies across all routes_
 
