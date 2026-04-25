@@ -273,6 +273,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         "database.invalid_uuid": "Invalid UUID format.",
         "database.invalid_format": "Invalid data format.",
         "database.error": "Database error during {operation}: {detail}",
+        # restaurant.* — restaurant management errors (K11)
+        "restaurant.not_found": "Restaurant not found.",
+        "restaurant.entity_id_required": "institution_entity_id is required.",
+        "restaurant.market_required": "A market is required. Send market_id or ensure the user has a primary market.",
+        "restaurant.market_access_denied": "market_id must be one of your assigned markets.",
+        "restaurant.active_requires_setup": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days and at least one active QR code. Add plate_kitchen_days and create a QR code via POST /api/v1/qr-codes, then try again.",
+        "restaurant.active_requires_plate_days": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days. Add and activate plate_kitchen_days for the restaurant's plates, then try again.",
+        "restaurant.active_requires_qr": "Cannot set restaurant to Active. The restaurant must have at least one active QR code. Create a QR code via POST /api/v1/qr-codes for this restaurant, then try again.",
+        # restaurant_holiday.* — K11
+        "restaurant_holiday.not_found": "Restaurant holiday not found.",
+        "restaurant_holiday.duplicate": "Restaurant already has a holiday registered for {holiday_date}.",
+        "restaurant_holiday.on_national_holiday": "Date {holiday_date} is already a national holiday. Restaurants cannot register holidays on national holidays.",
+        # national_holiday.* — K11
+        "national_holiday.not_found": "National holiday not found.",
+        "national_holiday.update_empty": "No fields provided for update.",
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Plate ready",
         "push.pickup_ready_body": "Did you receive your plate from {restaurant_name}?",
@@ -544,6 +559,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         "database.invalid_uuid": "Formato de UUID inválido.",
         "database.invalid_format": "Formato de datos inválido.",
         "database.error": "Error de base de datos durante {operation}: {detail}",
+        # restaurant.* — errores de gestión de restaurantes (K11)
+        "restaurant.not_found": "Restaurante no encontrado.",
+        "restaurant.entity_id_required": "Se requiere institution_entity_id.",
+        "restaurant.market_required": "Se requiere un mercado. Envía market_id o asegúrate de que el usuario tenga un mercado principal.",
+        "restaurant.market_access_denied": "market_id debe ser uno de tus mercados asignados.",
+        "restaurant.active_requires_setup": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos y al menos un código QR activo. Agrega plate_kitchen_days y crea un código QR.",
+        "restaurant.active_requires_plate_days": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos.",
+        "restaurant.active_requires_qr": "No se puede activar el restaurante. Debe tener al menos un código QR activo. Crea un código QR para este restaurante.",
+        # restaurant_holiday.* — K11
+        "restaurant_holiday.not_found": "Feriado de restaurante no encontrado.",
+        "restaurant_holiday.duplicate": "El restaurante ya tiene un feriado registrado para {holiday_date}.",
+        "restaurant_holiday.on_national_holiday": "La fecha {holiday_date} ya es un feriado nacional. Los restaurantes no pueden registrar feriados en fechas de feriados nacionales.",
+        # national_holiday.* — K11
+        "national_holiday.not_found": "Feriado nacional no encontrado.",
+        "national_holiday.update_empty": "No se proporcionaron campos para actualizar.",
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Plato listo",
         "push.pickup_ready_body": "¿Recibiste tu plato de {restaurant_name}?",
@@ -815,6 +845,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         "database.invalid_uuid": "Formato de UUID inválido.",
         "database.invalid_format": "Formato de dados inválido.",
         "database.error": "Erro de banco de dados durante {operation}: {detail}",
+        # restaurant.* — erros de gestão de restaurantes (K11)
+        "restaurant.not_found": "Restaurante não encontrado.",
+        "restaurant.entity_id_required": "institution_entity_id é obrigatório.",
+        "restaurant.market_required": "Um mercado é necessário. Envie market_id ou certifique-se de que o usuário tem um mercado principal.",
+        "restaurant.market_access_denied": "market_id deve ser um dos seus mercados atribuídos.",
+        "restaurant.active_requires_setup": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos e pelo menos um código QR ativo.",
+        "restaurant.active_requires_plate_days": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos.",
+        "restaurant.active_requires_qr": "Não é possível ativar o restaurante. Ele deve ter pelo menos um código QR ativo. Crie um código QR para este restaurante.",
+        # restaurant_holiday.* — K11
+        "restaurant_holiday.not_found": "Feriado do restaurante não encontrado.",
+        "restaurant_holiday.duplicate": "O restaurante já tem um feriado registrado para {holiday_date}.",
+        "restaurant_holiday.on_national_holiday": "A data {holiday_date} já é um feriado nacional. Os restaurantes não podem registrar feriados em datas de feriados nacionais.",
+        # national_holiday.* — K11
+        "national_holiday.not_found": "Feriado nacional não encontrado.",
+        "national_holiday.update_empty": "Nenhum campo fornecido para atualização.",
         # push.* — FCM notification copy (K4)
         "push.pickup_ready_title": "Prato pronto",
         "push.pickup_ready_body": "Você recebeu seu prato de {restaurant_name}?",

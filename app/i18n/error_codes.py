@@ -254,6 +254,27 @@ class ErrorCode(StrEnum):
     # per Decision F (K9 sweep). The original detail is logged server-side.
     SERVER_INTERNAL_ERROR = "server.internal_error"
 
+    # ── restaurant.* ─────────────────────────────────────────────────────
+    # Restaurant management errors. Wired in K11 (restaurant + ops sweep).
+    RESTAURANT_NOT_FOUND = "restaurant.not_found"
+    RESTAURANT_ENTITY_ID_REQUIRED = "restaurant.entity_id_required"
+    RESTAURANT_MARKET_REQUIRED = "restaurant.market_required"
+    RESTAURANT_MARKET_ACCESS_DENIED = "restaurant.market_access_denied"
+    RESTAURANT_ACTIVE_REQUIRES_SETUP = "restaurant.active_requires_setup"
+    RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS = "restaurant.active_requires_plate_days"
+    RESTAURANT_ACTIVE_REQUIRES_QR = "restaurant.active_requires_qr"
+
+    # ── restaurant_holiday.* ──────────────────────────────────────────────
+    # Restaurant holiday management errors. Wired in K11.
+    RESTAURANT_HOLIDAY_NOT_FOUND = "restaurant_holiday.not_found"
+    RESTAURANT_HOLIDAY_DUPLICATE = "restaurant_holiday.duplicate"
+    RESTAURANT_HOLIDAY_ON_NATIONAL_HOLIDAY = "restaurant_holiday.on_national_holiday"
+
+    # ── national_holiday.* ────────────────────────────────────────────────
+    # National holiday management errors. Wired in K11.
+    NATIONAL_HOLIDAY_NOT_FOUND = "national_holiday.not_found"
+    NATIONAL_HOLIDAY_UPDATE_EMPTY = "national_holiday.update_empty"
+
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
     DATABASE_DUPLICATE_KEY = "database.duplicate_key"

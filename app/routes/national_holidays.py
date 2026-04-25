@@ -11,8 +11,10 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 
-from app.auth.dependencies import get_employee_user
+from app.auth.dependencies import get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     NationalHolidayBulkCreateSchema,
     NationalHolidayCreateSchema,
@@ -25,7 +27,7 @@ from app.services.crud_service import national_holiday_service
 from app.services.error_handling import handle_business_operation
 from app.utils.db import db_batch_insert, db_read
 from app.utils.filter_builder import build_filter_conditions
-from app.utils.log import log_info, log_warning
+from app.utils.log import log_error, log_info, log_warning
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/national-holidays", tags=["National Holidays"])
@@ -35,6 +37,7 @@ router = APIRouter(prefix="/national-holidays", tags=["National Holidays"])
 def sync_national_holidays_from_provider(
     payload: NationalHolidaySyncFromProviderSchema | None = Body(default=None),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -50,8 +53,13 @@ def sync_national_holidays_from_provider(
     if result.get("status") == "error":
         reason = result.get("reason", "Holiday sync failed")
         if result.get("years") == []:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=reason)
+            raise envelope_exception(
+                ErrorCode.VALIDATION_CUSTOM, status=status.HTTP_400_BAD_REQUEST, locale=locale, msg=reason
+            )
+        log_error(f"Holiday sync failed: {reason}")
+        raise envelope_exception(
+            ErrorCode.SERVER_INTERNAL_ERROR, status=status.HTTP_500_INTERNAL_SERVER_ERROR, locale=locale
+        )
     return result
 
 
@@ -71,6 +79,7 @@ def list_national_holidays(  # noqa: PLR0913
     status: list[str] | None = Query(None, description="Filter by status"),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -102,7 +111,9 @@ def list_national_holidays(  # noqa: PLR0913
             )
         except ValueError as exc:
             log_warning(f"Invalid filter on /national-holidays: {exc}")
-            raise HTTPException(status_code=400, detail="Invalid filter parameter") from None
+            raise envelope_exception(
+                ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg="Invalid filter parameter"
+            ) from None
 
         if extra:
             for cond, cond_params in extra:
@@ -164,6 +175,7 @@ def list_national_holidays(  # noqa: PLR0913
 def get_national_holiday(
     holiday_id: UUID,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -175,7 +187,7 @@ def get_national_holiday(
     def get_operation(connection: psycopg2.extensions.connection):
         holiday = national_holiday_service.get_by_id(holiday_id, connection)
         if not holiday or holiday.is_archived:
-            raise HTTPException(status_code=404, detail=f"National holiday not found: {holiday_id}")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_NOT_FOUND, status=404, locale=locale)
         return holiday
 
     return handle_business_operation(get_operation, "national holiday retrieval", None, db)
@@ -272,6 +284,7 @@ def update_national_holiday(
     holiday_id: UUID,
     payload: NationalHolidayUpdateSchema,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -284,7 +297,7 @@ def update_national_holiday(
         # Get existing holiday
         existing = national_holiday_service.get_by_id(holiday_id, connection)
         if not existing:
-            raise HTTPException(status_code=404, detail=f"National holiday not found: {holiday_id}")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         # Prepare update data (only include fields that are provided)
         update_data = {}
@@ -304,7 +317,7 @@ def update_national_holiday(
             update_data["status"] = payload.status
 
         if not update_data:
-            raise HTTPException(status_code=400, detail="No fields provided for update")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_UPDATE_EMPTY, status=400, locale=locale)
 
         # Update holiday
         updated = national_holiday_service.update(
@@ -313,7 +326,6 @@ def update_national_holiday(
 
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update national holiday")
-
         log_info(f"Updated national holiday: {holiday_id}")
         return updated
 
@@ -324,6 +336,7 @@ def update_national_holiday(
 def delete_national_holiday(
     holiday_id: UUID,
     current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -336,14 +349,13 @@ def delete_national_holiday(
         # Get existing holiday
         existing = national_holiday_service.get_by_id(holiday_id, connection)
         if not existing:
-            raise HTTPException(status_code=404, detail=f"National holiday not found: {holiday_id}")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_NOT_FOUND, status=404, locale=locale)
 
         # Soft delete (archive)
         success = national_holiday_service.soft_delete(holiday_id, current_user["user_id"], connection)
 
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete national holiday")
-
         log_info(f"Deleted (archived) national holiday: {holiday_id}")
         return
 

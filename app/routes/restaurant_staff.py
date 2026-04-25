@@ -9,10 +9,12 @@ from datetime import date as date_type
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     DailyOrdersResponseSchema,
     VerifyAndHandoffRequest,
@@ -32,6 +34,7 @@ def get_restaurant_daily_orders(
     restaurant_id: UUID | None = Query(None, description="Filter to specific restaurant"),
     order_date: date_type | None = Query(None, description="Date to query (defaults to today)"),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -76,7 +79,9 @@ def get_restaurant_daily_orders(
             result = db_read(user_institution_query, [str(current_user["institution_id"])], db)
 
             if not result:
-                raise HTTPException(status_code=404, detail="Institution entity not found for user's institution")
+                raise envelope_exception(
+                    ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution entity"
+                )
 
             institution_entity_id = result[0]["institution_entity_id"]
 
@@ -84,10 +89,10 @@ def get_restaurant_daily_orders(
             if restaurant_id:
                 restaurant = restaurant_service.get_by_id(restaurant_id, db)
                 if not restaurant:
-                    raise HTTPException(status_code=404, detail="Restaurant not found")
+                    raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
                 if restaurant.institution_entity_id != institution_entity_id:
-                    raise HTTPException(status_code=403, detail="Access denied to this restaurant")
+                    raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
 
         elif current_user["role_type"] == "internal":
             # Internal users can access any restaurant
@@ -95,15 +100,20 @@ def get_restaurant_daily_orders(
             if restaurant_id:
                 restaurant = restaurant_service.get_by_id(restaurant_id, db)
                 if not restaurant:
-                    raise HTTPException(status_code=404, detail="Restaurant not found")
+                    raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
                 institution_entity_id = restaurant.institution_entity_id
             else:
                 # For employees without restaurant_id, require it
                 # (Alternative: could return all restaurants across all entities,
                 #  but that could be a very large result set)
-                raise HTTPException(status_code=400, detail="Internal role must specify restaurant_id parameter")
+                raise envelope_exception(
+                    ErrorCode.VALIDATION_CUSTOM,
+                    status=400,
+                    locale=locale,
+                    msg="Internal role must specify restaurant_id parameter",
+                )
         else:
-            raise HTTPException(status_code=403, detail="Access denied: Must be Supplier or Internal role")
+            raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
 
         # 2. Default date to today if not provided
         query_date = order_date or date_type.today()
@@ -125,6 +135,7 @@ def get_restaurant_daily_orders(
 def verify_and_handoff_endpoint(
     request: VerifyAndHandoffRequest,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Verify confirmation code and transition order to Handed Out (Layer 2 kiosk verification).
@@ -137,7 +148,7 @@ def verify_and_handoff_endpoint(
         if current_user["role_type"] == "supplier":
             restaurant = restaurant_service.get_by_id(request.restaurant_id, db)
             if not restaurant:
-                raise HTTPException(status_code=404, detail="Restaurant not found")
+                raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
             user_institution_query = """
                 SELECT ie.institution_entity_id
@@ -148,12 +159,14 @@ def verify_and_handoff_endpoint(
             """
             result = db_read(user_institution_query, [str(current_user["institution_id"])], db)
             if not result:
-                raise HTTPException(status_code=404, detail="Institution entity not found")
+                raise envelope_exception(
+                    ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Institution entity"
+                )
             if restaurant.institution_entity_id != result[0]["institution_entity_id"]:
-                raise HTTPException(status_code=403, detail="Access denied to this restaurant")
+                raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
 
         elif current_user["role_type"] != "internal":
-            raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
+            raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
 
         return verify_and_handoff(request.confirmation_code, request.restaurant_id, current_user["user_id"], db)
 
