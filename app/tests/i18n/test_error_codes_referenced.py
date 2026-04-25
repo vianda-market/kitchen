@@ -21,7 +21,6 @@ ALLOWLIST POLICY:
   verify the allowlist is minimal and not growing indefinitely.
 """
 
-import ast
 from pathlib import Path
 
 import pytest
@@ -111,28 +110,3 @@ def test_allowlist_is_minimal() -> None:
         f"ALLOWLISTED entries do not correspond to any ErrorCode member: {stale}\n"
         "Remove them from the allowlist in this test file."
     )
-
-
-def _count_ast_references(app_root: Path, registry_file: Path) -> dict[str, int]:
-    """
-    Supplementary helper used only when running this test with -v for
-    debugging. Not called during normal test execution.
-    """
-    counts: dict[str, int] = dict.fromkeys(ErrorCode.__members__, 0)
-    for py_file in app_root.rglob("*.py"):
-        if py_file.resolve() == registry_file.resolve():
-            continue
-        try:
-            source = py_file.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(py_file))
-        except (OSError, SyntaxError):
-            continue
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Attribute)
-                and isinstance(node.value, ast.Name)
-                and node.value.id == "ErrorCode"
-                and node.attr in counts
-            ):
-                counts[node.attr] += 1
-    return counts
