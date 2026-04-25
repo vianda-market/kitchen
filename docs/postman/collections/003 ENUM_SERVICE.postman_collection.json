@@ -444,7 +444,7 @@
                   "const response = pm.response.json();",
                   "",
                   "pm.test('Error message mentions unknown enum type', function () {",
-                  "    pm.expect(response.detail).to.include('Unknown enum type');",
+                  "    pm.expect(response.detail.message).to.include('Unknown enum type');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -516,7 +516,7 @@
                   "});",
                   "const body = pm.response.json();",
                   "pm.test('Detail mentions unsupported language', function () {",
-                  "    pm.expect(String(body.detail)).to.include('Unsupported language');",
+                  "    pm.expect(body.detail.message).to.include('Unsupported language');",
                   "});"
                 ],
                 "type": "text/javascript"

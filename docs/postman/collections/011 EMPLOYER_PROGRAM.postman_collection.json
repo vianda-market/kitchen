@@ -735,7 +735,7 @@
                   "    if (status === 201) {",
                   "        console.log('Employee subscribed to plan');",
                   "    } else {",
-                  "        console.log('Subscription result:', pm.response.json().detail);",
+                  "        const d = pm.response.json().detail; console.log('Subscription result:', (d && d.message) || d);",
                   "    }",
                   "});"
                 ],

@@ -251,7 +251,7 @@
                 "exec": [
                   "pm.test('Status is 422', () => pm.response.to.have.status(422));",
                   "const body = pm.response.json();",
-                  "pm.test('detail mentions Unsupported language', () => pm.expect(String(body.detail || '')).to.match(/[Uu]nsupported language/));"
+                  "pm.test('detail mentions Unsupported language', () => pm.expect(body.detail).to.be.an('array').and.have.length.above(0); pm.expect(body.detail[0].message).to.match(/[Uu]nsupported language/));"
                 ]
               }
             }
@@ -329,7 +329,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => pm.expect(pm.response.json().detail).to.eql('country_code is required'));"
+                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
                 ]
               }
             }
@@ -430,7 +430,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => pm.expect(pm.response.json().detail).to.eql('country_code is required'));"
+                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
                 ]
               }
             }
@@ -488,7 +488,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));",
-                  "pm.test('detail is country_code is required', () => pm.expect(pm.response.json().detail).to.eql('country_code is required'));"
+                  "pm.test('detail is country_code is required', () => { const d = pm.response.json().detail; const msg = typeof d === 'string' ? d : (d && d.message) || ''; pm.expect(msg).to.include('country_code is required'); });"
                 ]
               }
             }
@@ -694,8 +694,8 @@
                   "",
                   "if (pm.response.code === 400) {",
                   "    const body = pm.response.json();",
-                  "    pm.test('400 detail mentions Cannot activate', () => pm.expect(String(body.detail || '')).to.include('Cannot activate'));",
-                  "    pm.test('400 detail explains coverage requirement', () => pm.expect(String(body.detail || '')).to.match(/plate|coverage|kitchen-day/));",
+                  "    pm.test('400 detail mentions Cannot activate', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('Cannot activate'));",
+                  "    pm.test('400 detail explains coverage requirement', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/plate|coverage|kitchen-day/));",
                   "}"
                 ]
               }
@@ -731,8 +731,8 @@
                   "",
                   "if (pm.response.code === 409) {",
                   "    const body = pm.response.json();",
-                  "    pm.test('409 detail mentions active plate coverage', () => pm.expect(String(body.detail || '')).to.match(/active plate coverage|confirm_deactivate/));",
-                  "    pm.test('409 detail names confirm_deactivate as the unlock', () => pm.expect(String(body.detail || '')).to.include('confirm_deactivate'));",
+                  "    pm.test('409 detail mentions active plate coverage', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/active plate coverage|confirm_deactivate/));",
+                  "    pm.test('409 detail names confirm_deactivate as the unlock', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('confirm_deactivate'));",
                   "    pm.collectionVariables.set('marketHasCoverage', 'true');",
                   "} else {",
                   "    pm.collectionVariables.set('marketHasCoverage', 'false');",

@@ -486,7 +486,7 @@
                   "if (code === 403) {",
                   "    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
                   "    const r = pm.response.json();",
-                  "    pm.test('Detail mentions Suppliers', function () { pm.expect(r.detail || '').to.include('Suppliers'); });",
+                  "    pm.test('Detail mentions Suppliers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Suppliers'); });",
                   "} else if (code === 201) {",
                   "    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Supplier)', function () { pm.response.to.have.status(201); });",
                   "} else {",
@@ -679,8 +679,8 @@
                   "if (code === 403) {",
                   "    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
                   "    const r = pm.response.json();",
-                  "    pm.test('Detail mentions Customers', function () { pm.expect(r.detail || '').to.include('Customers'); });",
-                  "    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect(r.detail || '').to.match(/Customer Home|Customer Billing|Customer Employer|Disallowed/); });",
+                  "    pm.test('Detail mentions Customers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Customers'); });",
+                  "    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/Customer Home|Customer Billing|Customer Employer|Disallowed/); });",
                   "} else if (code === 201) {",
                   "    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Customer)', function () { pm.response.to.have.status(201); });",
                   "} else {",
@@ -865,7 +865,7 @@
                 "exec": [
                   "pm.test('Status 403', function () { pm.response.to.have.status(403); });",
                   "const r = pm.response.json();",
-                  "pm.test('Detail mentions customers cannot create users', function () { pm.expect(r.detail || '').to.match(/customers cannot create/i); });"
+                  "pm.test('Detail mentions customers cannot create users', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/customers cannot create/i); });"
                 ],
                 "type": "text/javascript"
               }
@@ -938,7 +938,7 @@
                 "exec": [
                   "pm.test('Status 403', function () { pm.response.to.have.status(403); });",
                   "const r = pm.response.json();",
-                  "pm.test('Detail mentions no_show_discount restriction', function () { pm.expect(r.detail || '').to.match(/no_show_discount|Manager|Admin|Employee/i); });"
+                  "pm.test('Detail mentions no_show_discount restriction', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/no_show_discount|Manager|Admin|Employee/i); });"
                 ],
                 "type": "text/javascript"
               }
@@ -974,7 +974,7 @@
                   "const r = pm.response.json();",
                   "pm.test('Detail mentions no_show_discount', function () {",
                   "    const d = r.detail;",
-                  "    const str = Array.isArray(d) ? d.map(function(x){ return (x&&x.msg)||JSON.stringify(x); }).join(' ') : (d||'');",
+                  "    const str = Array.isArray(d) ? d.map(function(x){ return (x&&x.message)||(x&&x.msg)||JSON.stringify(x); }).join(' ') : ((d&&d.message)||d||'');",
                   "    pm.expect(str).to.match(/no_show_discount|Supplier/i);",
                   "});"
                 ],
