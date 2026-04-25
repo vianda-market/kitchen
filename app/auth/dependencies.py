@@ -3,11 +3,13 @@ import uuid
 
 import jwt
 import psycopg2.extensions
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 
 from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. are defined
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.locale import SUPPORTED_LOCALES, resolve_locale_from_header
 
@@ -29,7 +31,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     """
     if ENVIRONMENT == "local" and token is None:
         if not DUMMY_ADMIN_USER_ID:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Dummy admin not configured.")
+            # locale not available pre-auth; default to "en" (decision C)
+            raise envelope_exception(
+                ErrorCode.AUTH_DUMMY_ADMIN_NOT_CONFIGURED, status=status.HTTP_500_INTERNAL_SERVER_ERROR, locale="en"
+            )
         # For local testing, generate a UUID for the dummy admin and static attributes.
         return {
             "user_id": uuid.UUID(DUMMY_ADMIN_USER_ID),
@@ -51,8 +56,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         try:
             user_id = uuid.UUID(payload.get("sub"))
         except (ValueError, TypeError):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user identifier in token"
+            # locale not available pre-auth; default to "en" (decision C)
+            raise envelope_exception(
+                ErrorCode.AUTH_TOKEN_USER_ID_INVALID, status=status.HTTP_401_UNAUTHORIZED, locale="en"
             ) from None
 
         role_type = payload.get("role_type")
@@ -63,13 +69,13 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         try:
             institution_id = uuid.UUID(institution_raw)
         except (ValueError, TypeError):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid institution identifier in token"
+            raise envelope_exception(
+                ErrorCode.AUTH_TOKEN_INSTITUTION_ID_INVALID, status=status.HTTP_401_UNAUTHORIZED, locale="en"
             ) from None
 
         if not role_type:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Token payload is missing required fields."
+            raise envelope_exception(
+                ErrorCode.AUTH_TOKEN_MISSING_FIELDS, status=status.HTTP_401_UNAUTHORIZED, locale="en"
             )
 
         # Return the full user payload including role_name and optional credit_cost_local_currency/subscription_market_id (single subscription per user).
@@ -90,7 +96,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         return out
 
     except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
+        raise envelope_exception(
+            ErrorCode.AUTH_INVALID_TOKEN, status=status.HTTP_401_UNAUTHORIZED, locale="en"
+        ) from None
 
 
 def get_optional_user(
@@ -207,9 +215,8 @@ def get_super_admin_user(current_user: dict = Depends(get_current_user)):
     if role_type == "internal" and role_name == "super_admin":
         return current_user
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Super-admin access required for discretionary credit operations"
-    )
+    # locale not available in auth dependency chain; default to "en" (decision C)
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_employee_user(current_user: dict = Depends(get_current_user)):
@@ -235,9 +242,8 @@ def get_employee_user(current_user: dict = Depends(get_current_user)):
     if role_type == "internal":
         return current_user
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Internal access required for system configuration operations"
-    )
+    # locale not available in auth dependency chain; default to "en" (decision C)
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_client_user(current_user: dict = Depends(get_current_user)):
@@ -262,7 +268,7 @@ def get_client_user(current_user: dict = Depends(get_current_user)):
     if role_type == "customer":
         return current_user
 
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer access required for this operation")
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_client_or_employee_user(current_user: dict = Depends(get_current_user)):
@@ -287,9 +293,7 @@ def get_client_or_employee_user(current_user: dict = Depends(get_current_user)):
     if role_type in ["customer", "internal"]:
         return current_user
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Customer or Internal access required for this operation"
-    )
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_client_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
@@ -311,10 +315,7 @@ def get_client_employee_or_supplier_user(current_user: dict = Depends(get_curren
     role_type = current_user.get("role_type")
     if role_type in ["customer", "internal", "supplier"]:
         return current_user
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Customer, Internal, or Supplier access required for this operation",
-    )
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)):
@@ -343,17 +344,15 @@ def get_employee_or_customer_user(current_user: dict = Depends(get_current_user)
 
     # Explicitly block Suppliers
     if role_type == "supplier":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Suppliers cannot access this resource"
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
     # Allow Internal and Customers
     if role_type in ["internal", "customer"]:
         return current_user
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Internal or Customer access required"
-    )
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_employee_or_supplier_user(current_user: dict = Depends(get_current_user)):
@@ -375,9 +374,7 @@ def get_employee_or_supplier_user(current_user: dict = Depends(get_current_user)
     role_type = current_user.get("role_type")
     if role_type in ["internal", "supplier"]:
         return current_user
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: only Internal and Suppliers can access this resource"
-    )
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def get_admin_user(current_user: dict = Depends(get_current_user)):
@@ -404,9 +401,7 @@ def get_admin_user(current_user: dict = Depends(get_current_user)):
     if role_type == "internal" and role_name in ["admin", "super_admin"]:
         return current_user
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required for discretionary credit operations"
-    )
+    raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def require_supplier_admin(current_user: dict = Depends(get_current_user)):
@@ -430,8 +425,5 @@ def require_supplier_admin_or_employee_admin(current_user: dict = Depends(get_cu
         role_type == "internal" and role_name in ("admin", "super_admin")
     )
     if not allowed:
-        raise HTTPException(
-            status_code=403,
-            detail=("Institution entities are accessible only to Supplier Admin and to Internal Admin or Super Admin."),
-        )
+        raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale="en")
     return current_user

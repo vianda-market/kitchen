@@ -82,10 +82,85 @@ class ErrorCode(StrEnum):
     VALIDATION_PAYMENT_UNSUPPORTED_BRAND = "validation.payment.unsupported_brand"
 
     # ── auth.* ─────────────────────────────────────────────────────────────
-    # Seeded to prove parity tooling; fully wired in K6 (auth sweep).
+    # Seeded in K2; fully wired in K7 (auth + security sweep).
     AUTH_INVALID_TOKEN = "auth.invalid_token"
     AUTH_CAPTCHA_REQUIRED = "auth.captcha_required"  # migrated from ad-hoc dict-detail
+    AUTH_CAPTCHA_VERIFICATION_FAILED = "auth.captcha_verification_failed"
+    AUTH_CAPTCHA_ACTION_MISMATCH = "auth.captcha_action_mismatch"
+    AUTH_CAPTCHA_SCORE_TOO_LOW = "auth.captcha_score_too_low"
+    AUTH_CAPTCHA_TOKEN_MISSING = "auth.captcha_token_missing"
+    AUTH_CREDENTIALS_INVALID = "auth.credentials_invalid"
+    AUTH_ACCOUNT_INACTIVE = "auth.account_inactive"
+    AUTH_CUSTOMER_APP_ONLY = "auth.customer_app_only"  # migrated from ad-hoc dict-detail
+    AUTH_DUMMY_ADMIN_NOT_CONFIGURED = "auth.dummy_admin_not_configured"
+    AUTH_TOKEN_USER_ID_INVALID = "auth.token_user_id_invalid"
+    AUTH_TOKEN_INSTITUTION_ID_INVALID = "auth.token_institution_id_invalid"
+    AUTH_TOKEN_MISSING_FIELDS = "auth.token_missing_fields"
+
+    # ── security.* ─────────────────────────────────────────────────────────
+    # Wired in K7 (auth + security sweep).
+    SECURITY_INSTITUTION_MISMATCH = "security.institution_mismatch"
+    SECURITY_INSUFFICIENT_PERMISSIONS = "security.insufficient_permissions"
+    SECURITY_FORBIDDEN = "security.forbidden"
+    SECURITY_TOKEN_USER_ID_MISSING = "security.token_user_id_missing"
+    SECURITY_TOKEN_USER_ID_INVALID = "security.token_user_id_invalid"
+    SECURITY_ADDRESS_TYPE_NOT_ALLOWED = "security.address_type_not_allowed"
+    SECURITY_ADDRESS_TYPE_INSTITUTION_MISMATCH = "security.address_type_institution_mismatch"
+    SECURITY_USER_ROLE_TYPE_NOT_ALLOWED = "security.user_role_type_not_allowed"
+    SECURITY_USER_ROLE_NAME_NOT_ALLOWED = "security.user_role_name_not_allowed"
+    SECURITY_OPERATOR_CANNOT_CREATE_USERS = "security.operator_cannot_create_users"
+    SECURITY_CANNOT_ASSIGN_ROLE = "security.cannot_assign_role"
+    SECURITY_CANNOT_EDIT_USER = "security.cannot_edit_user"
+    SECURITY_CUSTOMER_CANNOT_EDIT_EMPLOYER_ADDRESS = "security.customer_cannot_edit_employer_address"
+    SECURITY_SUPPLIER_ADDRESS_MUTATION_DENIED = "security.supplier_address_mutation_denied"
+    SECURITY_SUPPLIER_USER_MUTATION_DENIED = "security.supplier_user_mutation_denied"
+    SECURITY_SUPPLIER_MANAGEMENT_DENIED = "security.supplier_management_denied"
+    SECURITY_SUPPLIER_ADMIN_ONLY = "security.supplier_admin_only"
+    SECURITY_SUPPLIER_PASSWORD_RESET_DENIED = "security.supplier_password_reset_denied"
+    SECURITY_INSTITUTION_TYPE_MISMATCH = "security.institution_type_mismatch"
+    SECURITY_SUPPLIER_INSTITUTION_ONLY = "security.supplier_institution_only"
+    SECURITY_SUPPLIER_INSTITUTION_REQUIRED = "security.supplier_institution_required"
+    SECURITY_EMPLOYER_NOT_FOR_SUPPLIER = "security.employer_not_for_supplier"
+    SECURITY_SUPPLIER_TERMS_EDIT_DENIED = "security.supplier_terms_edit_denied"
 
     # ── subscription.* ─────────────────────────────────────────────────────
     # Seeded to prove parity tooling; fully wired in a later sweep PR.
     SUBSCRIPTION_ALREADY_ACTIVE = "subscription.already_active"  # migrated from ad-hoc dict-detail
+
+    # ── entity.* ───────────────────────────────────────────────────────────
+    # Generic entity CRUD errors. All entity-specific factories (user_not_found,
+    # employer_not_found, etc.) delegate to entity_not_found which uses these
+    # codes. The `entity` param carries the entity name; `id` carries the UUID.
+    # Wired in K6 (factory envelopification).
+    ENTITY_NOT_FOUND = "entity.not_found"
+    ENTITY_NOT_FOUND_OR_OPERATION_FAILED = "entity.not_found_or_operation_failed"
+    ENTITY_CREATION_FAILED = "entity.creation_failed"
+    ENTITY_UPDATE_FAILED = "entity.update_failed"
+    ENTITY_DELETION_FAILED = "entity.deletion_failed"
+
+    # ── database.* ─────────────────────────────────────────────────────────
+    # Database constraint violation errors. Wired in K6 via handle_database_exception.
+    DATABASE_DUPLICATE_KEY = "database.duplicate_key"
+    DATABASE_DUPLICATE_EMAIL = "database.duplicate_email"
+    DATABASE_DUPLICATE_USERNAME = "database.duplicate_username"
+    DATABASE_DUPLICATE_MARKET = "database.duplicate_market"
+    DATABASE_DUPLICATE_CURRENCY = "database.duplicate_currency"
+    DATABASE_DUPLICATE_INSTITUTION = "database.duplicate_institution"
+    DATABASE_DUPLICATE_RESTAURANT = "database.duplicate_restaurant"
+    DATABASE_FOREIGN_KEY_USER = "database.foreign_key_user"
+    DATABASE_FOREIGN_KEY_INSTITUTION = "database.foreign_key_institution"
+    DATABASE_FOREIGN_KEY_CURRENCY = "database.foreign_key_currency"
+    DATABASE_FOREIGN_KEY_SUBSCRIPTION = "database.foreign_key_subscription"
+    DATABASE_FOREIGN_KEY_PLAN = "database.foreign_key_plan"
+    DATABASE_FOREIGN_KEY_PAYMENT = "database.foreign_key_payment"
+    DATABASE_FOREIGN_KEY_VIOLATION = "database.foreign_key_violation"
+    DATABASE_NOT_NULL_MODIFIED_BY = "database.not_null_modified_by"
+    DATABASE_NOT_NULL_CURRENCY_CODE = "database.not_null_currency_code"
+    DATABASE_NOT_NULL_CURRENCY_NAME = "database.not_null_currency_name"
+    DATABASE_NOT_NULL_USERNAME = "database.not_null_username"
+    DATABASE_NOT_NULL_EMAIL = "database.not_null_email"
+    DATABASE_NOT_NULL_VIOLATION = "database.not_null_violation"
+    DATABASE_CHECK_VIOLATION = "database.check_violation"
+    DATABASE_INVALID_UUID = "database.invalid_uuid"
+    DATABASE_INVALID_FORMAT = "database.invalid_format"
+    DATABASE_ERROR = "database.error"

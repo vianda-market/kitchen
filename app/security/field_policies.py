@@ -9,7 +9,10 @@ and Supplier role restrictions (e.g. Admin-only vs Manager read-only).
 
 from typing import Any
 
-from fastapi import HTTPException, status
+from fastapi import status
+
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 # Supplier may only use these address types (no customer-facing types on main address API)
 SUPPLIER_ALLOWED_ADDRESS_TYPES = {"restaurant", "entity_billing", "entity_address"}
@@ -53,14 +56,12 @@ def ensure_can_edit_supplier_terms(current_user: dict) -> None:
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     if role_type != "internal":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Internal users with Manager, Global Manager, Admin, or Super Admin role can edit supplier terms.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_TERMS_EDIT_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
     if role_name not in SUPPLIER_TERMS_EDIT_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Manager, Global Manager, Admin, or Super Admin can edit supplier terms.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_TERMS_EDIT_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -90,12 +91,8 @@ def ensure_address_type_allowed(
         types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
         disallowed = types_set - allowed
         if disallowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Suppliers may only use address types: Restaurant, Entity Billing, Entity Address. "
-                    f"Disallowed: {', '.join(sorted(disallowed))}."
-                ),
+            raise envelope_exception(
+                ErrorCode.SECURITY_ADDRESS_TYPE_NOT_ALLOWED, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
         return
     if role_type == "customer":
@@ -103,12 +100,8 @@ def ensure_address_type_allowed(
         types_set = {t if isinstance(t, str) else getattr(t, "value", str(t)) for t in address_type_list}
         disallowed = types_set - allowed
         if disallowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Customers may only use address types: Customer Home, Customer Billing, Customer Employer. "
-                    f"Disallowed: {', '.join(sorted(disallowed))}."
-                ),
+            raise envelope_exception(
+                ErrorCode.SECURITY_ADDRESS_TYPE_NOT_ALLOWED, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
         return
 
@@ -136,20 +129,12 @@ def ensure_address_type_matches_institution_type(
     has_customer_types = bool(types_set & CUSTOMER_INSTITUTION_ADDRESS_TYPES)
     has_entity_types = bool(types_set & ENTITY_INSTITUTION_ADDRESS_TYPES)
     if has_customer_types and inst_type not in ("customer", "employer"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Address types Customer Home, Customer Billing, and Customer Employer are only allowed "
-                "for Customer or Employer institutions. This institution is not a Customer/Employer institution."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_ADDRESS_TYPE_INSTITUTION_MISMATCH, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
     if has_entity_types and inst_type in ("customer", "employer"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Address types Restaurant, Entity Billing, and Entity Address are not allowed "
-                "for Customer or Employer institutions. Use a Supplier or Internal institution for those address types."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_ADDRESS_TYPE_INSTITUTION_MISMATCH, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
 
 
@@ -174,12 +159,8 @@ def ensure_user_role_type_allowed(
     if actor_role == "supplier":
         allowed = set(SUPPLIER_ALLOWED_USER_ROLE_TYPES)
         if role_type_str not in allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Suppliers cannot create or update users to Internal or Customer. "
-                    "Allowed role types: Supplier only."
-                ),
+            raise envelope_exception(
+                ErrorCode.SECURITY_USER_ROLE_TYPE_NOT_ALLOWED, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
 
 
@@ -204,12 +185,8 @@ def ensure_user_role_name_allowed(
         return
     if actor_role == "supplier":
         if role_name_str not in SUPPLIER_ALLOWED_ROLE_NAMES:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Suppliers cannot assign Super Admin or Comensal. "
-                    f"Allowed role names: {', '.join(sorted(SUPPLIER_ALLOWED_ROLE_NAMES))}."
-                ),
+            raise envelope_exception(
+                ErrorCode.SECURITY_USER_ROLE_NAME_NOT_ALLOWED, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
 
 
@@ -224,12 +201,8 @@ def ensure_operator_cannot_create_users(current_user: dict) -> None:
     (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     if role_name == "operator":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Operator does not have permission to create or edit other users. "
-                "Only Admin and Manager can manage user accounts."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_OPERATOR_CANNOT_CREATE_USERS, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -270,40 +243,33 @@ def ensure_can_assign_role_name(
 
     if target_str == "super_admin":
         if not (actor_rt == "internal" and actor_rn == "super_admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Super Admin can assign another user as Super Admin.",
+            raise envelope_exception(
+                ErrorCode.SECURITY_CANNOT_ASSIGN_ROLE, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
         return
 
     if target_str == "admin":
         if actor_rn not in ("admin", "super_admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin (or Super Admin) can assign another user as Admin.",
+            raise envelope_exception(
+                ErrorCode.SECURITY_CANNOT_ASSIGN_ROLE, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
         return
 
     # v2: Global Manager — only Super Admin, Admin, or Global Manager can assign; Global Manager can assign Global Manager only
     if target_str == "global_manager":
         if actor_rn not in ("admin", "super_admin", "global_manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin, Super Admin, or Global Manager can assign Global Manager. Managers and Operators cannot.",
+            raise envelope_exception(
+                ErrorCode.SECURITY_CANNOT_ASSIGN_ROLE, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
         return
     if actor_rn == "global_manager":
         # Global Manager can only assign Global Manager (cannot create/assign Admin, Manager, Operator)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Global Manager can only create or assign Global Manager users.",
-        )
+        raise envelope_exception(ErrorCode.SECURITY_CANNOT_ASSIGN_ROLE, status=status.HTTP_403_FORBIDDEN, locale="en")
 
     if target_str in ("manager", "operator"):
         if actor_rn not in ("admin", "super_admin", "manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin, Super Admin, or Manager can assign Manager or Operator role.",
+            raise envelope_exception(
+                ErrorCode.SECURITY_CANNOT_ASSIGN_ROLE, status=status.HTTP_403_FORBIDDEN, locale="en"
             )
 
 
@@ -342,43 +308,28 @@ def ensure_can_edit_user(
     # Target Super Admin: only Super Admin can edit (Internal only)
     if target_rn == "super_admin":
         if not (actor_rt == "internal" and actor_rn == "super_admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Super Admin can edit a Super Admin user.",
-            )
+            raise envelope_exception(ErrorCode.SECURITY_CANNOT_EDIT_USER, status=status.HTTP_403_FORBIDDEN, locale="en")
         return
 
     # Target Admin: only Admin or Super Admin can edit (Manager cannot)
     if target_rn == "admin":
         if actor_rn not in ("admin", "super_admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin or Super Admin can edit an Admin user.",
-            )
+            raise envelope_exception(ErrorCode.SECURITY_CANNOT_EDIT_USER, status=status.HTTP_403_FORBIDDEN, locale="en")
         return
 
     # v2: Target Global Manager — only Super Admin, Admin, or Global Manager can edit
     if target_rn == "global_manager":
         if actor_rn not in ("admin", "super_admin", "global_manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin, Super Admin, or Global Manager can edit a Global Manager user.",
-            )
+            raise envelope_exception(ErrorCode.SECURITY_CANNOT_EDIT_USER, status=status.HTTP_403_FORBIDDEN, locale="en")
         return
     # Actor is Global Manager: can only edit Global Manager (cannot edit Admin, Manager, Operator)
     if actor_rn == "global_manager":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Global Manager can only edit Global Manager users.",
-        )
+        raise envelope_exception(ErrorCode.SECURITY_CANNOT_EDIT_USER, status=status.HTTP_403_FORBIDDEN, locale="en")
 
     # Target Manager, Operator: Admin, Super Admin, or Manager can edit
     if target_rn in ("manager", "operator"):
         if actor_rn not in ("admin", "super_admin", "manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Admin, Super Admin, or Manager can edit Manager or Operator users.",
-            )
+            raise envelope_exception(ErrorCode.SECURITY_CANNOT_EDIT_USER, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def ensure_customer_cannot_edit_employer_address(
@@ -396,9 +347,8 @@ def ensure_customer_cannot_edit_employer_address(
     if role_type != "customer":
         return
     if existing_address and getattr(existing_address, "employer_id", None) is not None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Customers cannot edit or delete employer addresses. Employer addresses are shared and managed by the employer.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_CUSTOMER_CANNOT_EDIT_EMPLOYER_ADDRESS, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -415,12 +365,8 @@ def ensure_supplier_can_create_edit_addresses(current_user: dict) -> None:
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_ADDRESS_MUTATION_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only Supplier Admin and Manager can create or edit addresses. "
-                "Supplier Operator has read-only access to addresses."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_ADDRESS_MUTATION_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -438,12 +384,8 @@ def ensure_supplier_can_create_edit_users(current_user: dict) -> None:
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_USER_MUTATION_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only Supplier Admin and Manager can create or edit users. "
-                "Supplier Operator has read-only access to users within their institution."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_USER_MUTATION_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -460,12 +402,8 @@ def ensure_supplier_admin_or_manager(current_user: dict) -> None:
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_MANAGEMENT_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Supplier Operators can only access kiosk and field operations. "
-                "Use Admin or Manager role for this action."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_MANAGEMENT_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -477,10 +415,7 @@ def ensure_supplier_admin_only(current_user: dict) -> None:
     role_type = (current_user.get("role_type") or "").strip()
     role_name = (current_user.get("role_name") or "").strip()
     if role_type != "supplier" or role_name not in SUPPLIER_ADMIN_ONLY_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=("Only Supplier Admin can access this resource."),
-        )
+        raise envelope_exception(ErrorCode.SECURITY_SUPPLIER_ADMIN_ONLY, status=status.HTTP_403_FORBIDDEN, locale="en")
 
 
 def ensure_supplier_can_reset_user_password(current_user: dict) -> None:
@@ -496,12 +431,8 @@ def ensure_supplier_can_reset_user_password(current_user: dict) -> None:
         return
     role_name = (current_user.get("role_name") or "").strip()
     if role_name not in SUPPLIER_USER_MUTATION_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only Supplier Admin and Manager can reset user passwords. "
-                "Supplier Operator cannot reset other users' passwords."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_PASSWORD_RESET_DENIED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -531,9 +462,8 @@ def ensure_institution_type_matches_role_type(
     - Call this after resolving institution_id to its institution_type (e.g. from DB).
     """
     if institution_type is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Institution type could not be resolved. The institution_id may be invalid.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSTITUTION_TYPE_MISMATCH, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
     role_str = role_type.value if hasattr(role_type, "value") else str(role_type)
     inst_str = institution_type.value if hasattr(institution_type, "value") else str(institution_type)
@@ -543,13 +473,8 @@ def ensure_institution_type_matches_role_type(
     if role_str == "employer" and inst_str == "employer":
         return
     if role_str != inst_str:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Institution type ({inst_str}) does not match user role type ({role_str}). "
-                "Internal users must be in an Internal institution, Customer users in a Customer or Employer institution, "
-                "Supplier users in a Supplier institution, Employer users in an Employer institution."
-            ),
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSTITUTION_TYPE_MISMATCH, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
 
 
@@ -571,20 +496,17 @@ def ensure_supplier_user_institution_only(
     if role_type != "supplier":
         return
     if not institution_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="institution_id is required when creating a user.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_INSTITUTION_ONLY, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
     current_institution = current_user.get("institution_id")
     if not current_institution:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Suppliers can only add users to their own institution. Your account has no institution.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_INSTITUTION_REQUIRED, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
     if _normalize_uuid(institution_id) != _normalize_uuid(current_institution):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Suppliers can only add users to their own institution. The institution_id must match your institution.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_SUPPLIER_INSTITUTION_ONLY, status=status.HTTP_403_FORBIDDEN, locale="en"
         )
 
 
@@ -605,7 +527,6 @@ def ensure_employer_not_for_supplier_employee(
         return
     role_str = role_type.value if hasattr(role_type, "value") else str(role_type)
     if role_str in ("supplier", "internal", "employer"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Employer is not applicable to Supplier, Internal, or Employer users. Only Customer (Comensal) users can have an employer.",
+        raise envelope_exception(
+            ErrorCode.SECURITY_EMPLOYER_NOT_FOR_SUPPLIER, status=status.HTTP_400_BAD_REQUEST, locale="en"
         )
