@@ -10,11 +10,13 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.subscription import (
     SubscriptionResponseSchema,
     SubscriptionWithPaymentRequestSchema,
@@ -43,14 +45,22 @@ from app.utils.db import db_insert, db_read, db_update
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
 
-def _require_customer_or_employee(current_user: dict) -> UUID:
+def _require_customer_or_employee(current_user: dict, locale: str = "en") -> UUID:
     """Raise 403 if not Customer or Internal; return user_id."""
     role_type = (current_user.get("role_type") or "").strip().lower()
     if role_type not in ("customer", "employee"):
-        raise HTTPException(status_code=403, detail="Only customers or employees can use subscription payment.")
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS,
+            status=403,
+            locale=locale,
+        )
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="User ID not found in token.")
+        raise envelope_exception(
+            ErrorCode.SECURITY_TOKEN_USER_ID_MISSING,
+            status=401,
+            locale=locale,
+        )
     return UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
 
@@ -129,7 +139,7 @@ def _compute_employer_benefit(user_id: UUID, plan, db: psycopg2.extensions.conne
 
 
 def _create_fully_subsidized_subscription(
-    user_id: UUID, plan, market_id, benefit_info: dict, db: psycopg2.extensions.connection
+    user_id: UUID, plan, market_id, benefit_info: dict, db: psycopg2.extensions.connection, locale: str = "en"
 ):
     """Create a subscription that activates immediately with no payment (100% employer subsidy)."""
     from app.utils.log import log_info
@@ -142,13 +152,10 @@ def _create_fully_subsidized_subscription(
     existing = get_subscription_by_user_and_market(user_id, market_id, db)
     if existing:
         if existing.subscription_status == SubscriptionStatus.ACTIVE.value:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "already_active",
-                    "subscription_id": str(existing.subscription_id),
-                    "message": "You already have an active subscription in this market.",
-                },
+            raise envelope_exception(
+                ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE,
+                status=409,
+                locale=locale,
             )
 
     create_data = {
@@ -182,6 +189,7 @@ def create_subscription_with_payment(
     body: SubscriptionWithPaymentRequestSchema,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Create a subscription in Pending status and a payment intent (Stripe or mock).
@@ -190,16 +198,16 @@ def create_subscription_with_payment(
     - Pending: edit in place (update plan, cancel previous payment intent, create new payment); returns 200 with same shape.
     Returns subscription_id, payment_id, client_secret for the client to complete payment.
     """
-    user_id = _require_customer_or_employee(current_user)
+    user_id = _require_customer_or_employee(current_user, locale)
     plan_id = body.plan_id
 
     plan = plan_service.get_by_id(plan_id, db)
     if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found.")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plan")
 
     market = market_service.get_by_id(plan.market_id)
     if not market:
-        raise HTTPException(status_code=404, detail="Market not found.")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
     market_id = plan.market_id
     currency = (market.get("currency_code") or "usd").lower()
     amount_cents = int(round(float(plan.price) * 100))
@@ -209,20 +217,17 @@ def create_subscription_with_payment(
     if employer_benefit_info is not None:
         if employer_benefit_info["employee_share_cents"] == 0:
             # Fully subsidized — activate immediately, no payment
-            return _create_fully_subsidized_subscription(user_id, plan, market_id, employer_benefit_info, db)
+            return _create_fully_subsidized_subscription(user_id, plan, market_id, employer_benefit_info, db, locale)
         # Partial subsidy — charge employee their share only
         amount_cents = employer_benefit_info["employee_share_cents"]
 
     existing = get_subscription_by_user_and_market(user_id, market_id, db)
     if existing:
         if existing.subscription_status == SubscriptionStatus.ACTIVE.value:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "already_active",
-                    "subscription_id": str(existing.subscription_id),
-                    "message": "You already have an active subscription in this market.",
-                },
+            raise envelope_exception(
+                ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE,
+                status=409,
+                locale=locale,
             )
         if existing.subscription_status == SubscriptionStatus.PENDING.value:
             return _edit_pending_subscription_in_place(
@@ -232,6 +237,7 @@ def create_subscription_with_payment(
                 currency=currency,
                 user_id=user_id,
                 db=db,
+                locale=locale,
             )
 
     create_data = {
@@ -284,6 +290,7 @@ def _edit_pending_subscription_in_place(
     currency: str,
     user_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> dict:
     """Update existing Pending subscription (plan, new payment intent); cancel previous intent and payment rows."""
     subscription_id = existing_subscription.subscription_id
@@ -359,23 +366,21 @@ def get_payment_details_for_pending_subscription(
     subscription_id: UUID,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Return payment intent details (client_secret, amount_cents, currency) for a Pending subscription.
     Used when the user is on profile-plan and taps "Complete payment" so the client can open the
     same payment screen as after with-payment without calling with-payment again.
     """
-    user_id = _require_customer_or_employee(current_user)
+    user_id = _require_customer_or_employee(current_user, locale)
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot access this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
     if subscription.subscription_status != SubscriptionStatus.PENDING.value:
-        raise HTTPException(
-            status_code=400,
-            detail="Subscription is not Pending. Only Pending subscriptions have payment details.",
-        )
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_PENDING, status=400, locale=locale)
 
     rows = db_read(
         """
@@ -389,10 +394,7 @@ def get_payment_details_for_pending_subscription(
         connection=db,
     )
     if not rows:
-        raise HTTPException(
-            status_code=404,
-            detail="No pending payment found for this subscription.",
-        )
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_PAYMENT_NOT_FOUND, status=404, locale=locale)
     row = rows[0]
     payment_id = row["subscription_payment_id"]
     external_payment_id = str(row["external_payment_id"])
@@ -401,10 +403,9 @@ def get_payment_details_for_pending_subscription(
 
     try:
         client_secret = get_client_secret_for_pending_payment(external_payment_id, subscription_id)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=501,
-            detail="Payment details not available for this provider. " + str(e),
+    except ValueError:
+        raise envelope_exception(
+            ErrorCode.SUBSCRIPTION_PAYMENT_PROVIDER_UNAVAILABLE, status=501, locale=locale
         ) from None
 
     return {
@@ -422,6 +423,7 @@ def confirm_subscription_payment(
     subscription_id: UUID,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     [Mock only] Simulate successful payment and activate the subscription.
@@ -434,19 +436,16 @@ def confirm_subscription_payment(
     poll GET /subscriptions/{id} until subscription_status is Active.
     """
     if _get_payment_provider_name() != "mock":
-        raise HTTPException(
-            status_code=400,
-            detail="confirm-payment is only available when PAYMENT_PROVIDER=mock. Use Stripe webhook for live.",
-        )
-    user_id = _require_customer_or_employee(current_user)
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_CONFIRM_MOCK_ONLY, status=400, locale=locale)
+    user_id = _require_customer_or_employee(current_user, locale)
 
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.subscription_status != SubscriptionStatus.PENDING.value:
-        raise HTTPException(status_code=400, detail="Subscription is not Pending.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_PENDING, status=400, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot confirm payment for this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
 
     cursor = db.cursor()
     try:
@@ -464,7 +463,7 @@ def confirm_subscription_payment(
     finally:
         cursor.close()
     if not row:
-        raise HTTPException(status_code=400, detail="No subscription payment found for this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_PAYMENT_RECORD_NOT_FOUND, status=400, locale=locale)
 
     _sp_id, external_payment_id, sp_status = row
     if sp_status == "succeeded":
@@ -503,6 +502,7 @@ def cancel_subscription(
     subscription_id: UUID,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
+    locale: str = Depends(get_resolved_locale),
 ):
     """
     Cancel a subscription (Pending, Active, or On Hold). Only the owning customer can cancel.
@@ -510,14 +510,14 @@ def cancel_subscription(
     - Pending: cancels Stripe PaymentIntent(s), marks subscription_payment rows cancelled, archives.
     - Active/On Hold: archives via subscription_action_service.
     """
-    user_id = _require_customer_or_employee(current_user)
+    user_id = _require_customer_or_employee(current_user, locale)
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.subscription_status == SubscriptionStatus.CANCELLED.value:
-        raise HTTPException(status_code=400, detail="Subscription is already cancelled.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ALREADY_CANCELLED, status=400, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot cancel this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
 
     if subscription.subscription_status == SubscriptionStatus.PENDING.value:
         # Pending: cancel PaymentIntent(s), mark subscription_payment cancelled, archive

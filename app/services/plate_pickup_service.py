@@ -11,7 +11,6 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
 from app.dto.models import (
@@ -19,6 +18,8 @@ from app.dto.models import (
     PlatePickupLiveDTO,
     QRCodeDTO,
 )
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     mark_collected_with_balance_update,
     plate_pickup_live_service,
@@ -40,7 +41,12 @@ class PlatePickupService:
         pass
 
     def scan_qr_code(
-        self, pickup_id: UUID, qr_code_payload: str, current_user: dict[str, Any], db: psycopg2.extensions.connection
+        self,
+        pickup_id: UUID,
+        qr_code_payload: str,
+        current_user: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> dict[str, Any]:
         """
         Process QR code scan for customer arrival.
@@ -57,17 +63,19 @@ class PlatePickupService:
         Raises:
             HTTPException: For various validation and authorization errors
         """
+        from fastapi import HTTPException
+
         # 1. Get the pickup record and verify it belongs to the user
-        pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db)
+        pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db, locale)
 
         # 2. Validate QR code exists in our system
-        qr_code = self._validate_qr_code_by_payload(qr_code_payload, db)
+        qr_code = self._validate_qr_code_by_payload(qr_code_payload, db, locale)
 
         # 3. Check if QR code belongs to the correct restaurant
-        self._validate_restaurant_match(pickup_record, qr_code, db)
+        self._validate_restaurant_match(pickup_record, qr_code, db, locale)
 
         # 4. Get plate delivery time for SLA calculation
-        plate = self._get_plate_delivery_info(pickup_record, db)
+        plate = self._get_plate_delivery_info(pickup_record, db, locale)
 
         # 5. Calculate expected completion time
         arrival_time = datetime.now()
@@ -75,11 +83,13 @@ class PlatePickupService:
 
         try:
             # 6. Update plate_pickup_live record (commit=False for atomic transaction)
-            self._update_pickup_record_arrival(pickup_id, arrival_time, expected_completion_time, current_user, db)
+            self._update_pickup_record_arrival(
+                pickup_id, arrival_time, expected_completion_time, current_user, db, locale
+            )
 
             # 7. Update corresponding restaurant_transaction and restaurant balance (commit=False for atomic transaction)
             self._update_restaurant_transaction_arrival(
-                pickup_record, arrival_time, expected_completion_time, plate, current_user, db
+                pickup_record, arrival_time, expected_completion_time, plate, current_user, db, locale
             )
 
             # Commit all operations atomically
@@ -101,7 +111,7 @@ class PlatePickupService:
             # Rollback on any unexpected error
             db.rollback()
             log_error(f"Error processing QR code scan: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process QR code scan") from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
     def complete_order(
         self,
@@ -109,6 +119,7 @@ class PlatePickupService:
         current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
         completion_type: str = "user_confirmed",
+        locale: str = "en",
     ) -> dict[str, Any]:
         """
         Mark order as complete.
@@ -126,12 +137,18 @@ class PlatePickupService:
         Raises:
             HTTPException: For various validation and authorization errors
         """
+        from fastapi import HTTPException
+
         try:
             # Get the pickup record
-            pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db)
+            pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db, locale)
 
             if pickup_record.status not in ["arrived", "pending", "handed_out"]:
-                raise HTTPException(status_code=400, detail=f"Cannot complete order with status {pickup_record.status}")
+                raise envelope_exception(
+                    ErrorCode.PLATE_PICKUP_INVALID_STATUS,
+                    status=400,
+                    locale=locale,
+                )
 
             # Handle disputes: log and auto-complete with was_collected=False (interim until support queue)
             if completion_type == "user_disputed":
@@ -148,10 +165,11 @@ class PlatePickupService:
                 db,
                 completion_type=completion_type,
                 was_collected=(completion_type != "user_disputed"),
+                locale=locale,
             )
 
             # Update restaurant_transaction with balance adjustment if needed
-            self._update_restaurant_transaction_completion(pickup_record, completion_time, current_user, db)
+            self._update_restaurant_transaction_completion(pickup_record, completion_time, current_user, db, locale)
 
             # Commit all operations atomically
             db.commit()
@@ -203,10 +221,10 @@ class PlatePickupService:
             # Rollback on any unexpected error
             db.rollback()
             log_error(f"Error completing order: {e}")
-            raise HTTPException(status_code=500, detail="Failed to complete order") from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale) from None
 
     def delete_pickup_record(
-        self, pickup_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection
+        self, pickup_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
     ) -> dict[str, str]:
         """
         Delete (soft-delete) a plate pickup record.
@@ -223,13 +241,15 @@ class PlatePickupService:
             HTTPException: For various validation and authorization errors
         """
         # Get the pickup record to check authorization
-        pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db)
+        pickup_record = self._get_and_validate_pickup_record(pickup_id, current_user, db, locale)
 
         # Only allow deletion if status is Pending (not arrived or completed)
         if pickup_record.status != Status.PENDING:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cannot delete pickup record with status {pickup_record.status}. Only pending orders can be deleted.",
+            raise envelope_exception(
+                ErrorCode.PLATE_PICKUP_CANNOT_DELETE,
+                status=400,
+                locale=locale,
+                pickup_status=str(pickup_record.status),
             )
 
         # Soft delete the pickup record
@@ -241,7 +261,7 @@ class PlatePickupService:
         return {"detail": "Plate pickup record deleted successfully"}
 
     def _get_and_validate_pickup_record(
-        self, pickup_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection
+        self, pickup_id: UUID, current_user: dict[str, Any], db: psycopg2.extensions.connection, locale: str = "en"
     ) -> PlatePickupLiveDTO:
         """Get pickup record and validate user authorization"""
         pickup_record_result = plate_pickup_live_service.get_by_id(pickup_id, db)
@@ -251,19 +271,21 @@ class PlatePickupService:
         pickup_record = pickup_record_result
 
         if pickup_record.user_id != current_user["user_id"]:
-            raise HTTPException(status_code=403, detail="Not authorized to access this pickup record")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_ACCESS_DENIED, status=403, locale=locale)
 
         return pickup_record
 
-    def _validate_qr_code(self, qr_code_id: UUID, db: psycopg2.extensions.connection) -> QRCodeDTO:
+    def _validate_qr_code(self, qr_code_id: UUID, db: psycopg2.extensions.connection, locale: str = "en") -> QRCodeDTO:
         """Validate QR code exists in system"""
         qr_code_result = qr_code_service.get_by_id(qr_code_id, db)
         if not qr_code_result:
-            raise HTTPException(status_code=400, detail="This QR code is not recognized")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_QR_CODE, status=400, locale=locale)
 
         return qr_code_result
 
-    def _validate_qr_code_by_payload(self, qr_code_payload: str, db: psycopg2.extensions.connection) -> QRCodeDTO:
+    def _validate_qr_code_by_payload(
+        self, qr_code_payload: str, db: psycopg2.extensions.connection, locale: str = "en"
+    ) -> QRCodeDTO:
         """Validate QR code exists in system by payload"""
         from app.utils.db import db_read
 
@@ -277,34 +299,23 @@ class PlatePickupService:
         """
         result = db_read(query, (qr_code_payload,), connection=db, fetch_one=True)
         if not result:
-            raise HTTPException(status_code=400, detail="This QR code is not recognized")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_QR_CODE, status=400, locale=locale)
 
         return QRCodeDTO(**result)
 
     def _validate_restaurant_match(
-        self, pickup_record: PlatePickupLiveDTO, qr_code: QRCodeDTO, db: psycopg2.extensions.connection
+        self,
+        pickup_record: PlatePickupLiveDTO,
+        qr_code: QRCodeDTO,
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """Validate QR code belongs to correct restaurant"""
         if qr_code.restaurant_id != pickup_record.restaurant_id:
-            # Get restaurant names for better error message
-            scanned_restaurant = restaurant_service.get_by_id(qr_code.restaurant_id, db)
-            ordered_restaurant = restaurant_service.get_by_id(pickup_record.restaurant_id, db)
-
-            scanned_name = "Unknown Restaurant"
-            ordered_name = "Unknown Restaurant"
-
-            if scanned_restaurant:
-                scanned_name = scanned_restaurant.name
-
-            if ordered_restaurant:
-                ordered_name = ordered_restaurant.name
-
-            raise HTTPException(
-                status_code=400, detail=f"You're at {scanned_name}, but your order is for {ordered_name}"
-            )
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_WRONG_RESTAURANT, status=400, locale=locale)
 
     def _get_plate_delivery_info(
-        self, pickup_record: PlatePickupLiveDTO, db: psycopg2.extensions.connection
+        self, pickup_record: PlatePickupLiveDTO, db: psycopg2.extensions.connection, locale: str = "en"
     ) -> PlateDTO:
         """Get plate delivery information for SLA calculation"""
         # Get plate_id from the plate_selection since plate_pickup_live stores product_id, not plate_id
@@ -327,6 +338,7 @@ class PlatePickupService:
         expected_completion_time: datetime,
         current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """Update pickup record with arrival information (commit=False for atomic transaction)"""
         update_data = {
@@ -339,7 +351,7 @@ class PlatePickupService:
         success = plate_pickup_live_service.update(pickup_id, update_data, db, commit=False)
         if not success:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update pickup record")
+            raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="pickup record")
 
     def _update_restaurant_transaction_arrival(
         self,
@@ -349,6 +361,7 @@ class PlatePickupService:
         plate: PlateDTO,
         current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """Update restaurant transaction and balance for arrival (commit=False for atomic transaction)"""
         restaurant_transaction = restaurant_transaction_service.get_by_plate_selection(
@@ -356,7 +369,9 @@ class PlatePickupService:
         )
         if not restaurant_transaction:
             db.rollback()
-            raise HTTPException(status_code=404, detail="Restaurant transaction not found")
+            raise envelope_exception(
+                ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Restaurant transaction"
+            )
 
         current_final_amount = restaurant_transaction.final_amount or Decimal("0")
         credit_amount = plate.credit if isinstance(plate.credit, Decimal) else Decimal(str(plate.credit))
@@ -374,7 +389,9 @@ class PlatePickupService:
         )
         if not success:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update restaurant transaction")
+            raise envelope_exception(
+                ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="restaurant transaction"
+            )
 
         # Update restaurant balance - customer actually showed up!
         # This is when the restaurant gets paid the difference to reach full amount
@@ -389,7 +406,9 @@ class PlatePickupService:
 
         if not balance_updated:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update restaurant balance for arrival")
+            raise envelope_exception(
+                ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="restaurant balance"
+            )
 
         log_info(
             f"Restaurant balance updated for customer arrival - transaction {restaurant_transaction.transaction_id} (commit deferred)"
@@ -403,6 +422,7 @@ class PlatePickupService:
         db: psycopg2.extensions.connection,
         completion_type: str = "user_confirmed",
         was_collected: bool = True,
+        locale: str = "en",
     ) -> None:
         """Update pickup record with completion information (commit=False for atomic transaction)"""
         update_data = {
@@ -417,7 +437,7 @@ class PlatePickupService:
         success = plate_pickup_live_service.update(pickup_id, update_data, db, commit=False)
         if not success:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update pickup record")
+            raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="pickup record")
 
     def _update_restaurant_transaction_completion(
         self,
@@ -425,6 +445,7 @@ class PlatePickupService:
         completion_time: datetime,
         current_user: dict[str, Any],
         db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> None:
         """Update restaurant transaction for completion (commit=False for atomic transaction)"""
         restaurant_transaction = restaurant_transaction_service.get_by_plate_selection(
@@ -432,7 +453,9 @@ class PlatePickupService:
         )
         if not restaurant_transaction:
             db.rollback()
-            raise HTTPException(status_code=404, detail="Restaurant transaction not found")
+            raise envelope_exception(
+                ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Restaurant transaction"
+            )
 
         # First update the transaction status and completion time
         rt_update_data = {
@@ -445,7 +468,9 @@ class PlatePickupService:
         )
         if not success:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update restaurant transaction")
+            raise envelope_exception(
+                ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="restaurant transaction"
+            )
 
         # Then mark as collected - no additional balance update needed
         # Since customer showed up, restaurant already got full credit amount on arrival
@@ -459,7 +484,9 @@ class PlatePickupService:
         )
         if not success:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to mark transaction as collected")
+            raise envelope_exception(
+                ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="restaurant transaction"
+            )
 
     def get_pending_orders_with_company_matching(
         self, user_id: UUID, db: psycopg2.extensions.connection
@@ -655,7 +682,12 @@ class PlatePickupService:
         return {"start_time": window_start, "end_time": window_end, "window_minutes": 15}
 
     def scan_qr_code_by_id(
-        self, qr_code_id: UUID, sig: str, current_user: dict[str, Any], db: psycopg2.extensions.connection
+        self,
+        qr_code_id: UUID,
+        sig: str,
+        current_user: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        locale: str = "en",
     ) -> dict[str, Any]:
         """
         Scan QR code using qr_code_id + HMAC signature. Returns rich pickup confirmation.
@@ -678,7 +710,7 @@ class PlatePickupService:
 
         # 1. Verify HMAC signature
         if not verify_qr_signature(str(qr_code_id), sig):
-            raise HTTPException(status_code=400, detail="invalid_signature")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_SIGNATURE, status=400, locale=locale)
 
         # 2. Look up QR code by ID
         qr_row = db_read(
@@ -690,7 +722,7 @@ class PlatePickupService:
             fetch_one=True,
         )
         if not qr_row:
-            raise HTTPException(status_code=400, detail="invalid_signature")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_SIGNATURE, status=400, locale=locale)
 
         restaurant_id = UUID(qr_row["restaurant_id"])
         user_id = current_user["user_id"]
@@ -711,8 +743,8 @@ class PlatePickupService:
                 fetch_one=True,
             )
             if any_orders:
-                raise HTTPException(status_code=400, detail="wrong_restaurant")
-            raise HTTPException(status_code=404, detail="no_active_reservation")
+                raise envelope_exception(ErrorCode.PLATE_PICKUP_WRONG_RESTAURANT, status=400, locale=locale)
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_NO_ACTIVE_RESERVATION, status=404, locale=locale)
 
         # 4. Mark arrival and generate confirmation code
         confirmation_code = self._generate_confirmation_code()

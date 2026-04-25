@@ -13,11 +13,12 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
 from app.dto.models import SubscriptionDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import subscription_service
 from app.utils.db import db_update
 
@@ -26,16 +27,17 @@ def cancel_subscription(
     subscription_id: UUID,
     user_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SubscriptionDTO:
     """Cancel a subscription (Active or On Hold). Only owner can cancel; only non-cancelled can be cancelled.
     Sets subscription_status = Cancelled, status = Cancelled, is_archived = True so the user can re-subscribe."""
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot cancel this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
     if subscription.subscription_status == SubscriptionStatus.CANCELLED.value:
-        raise HTTPException(status_code=400, detail="Subscription is already cancelled.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ALREADY_CANCELLED, status=400, locale=locale)
 
     row_count = db_update(
         "subscription_info",
@@ -51,7 +53,7 @@ def cancel_subscription(
         commit=True,
     )
     if row_count == 0:
-        raise HTTPException(status_code=500, detail="Failed to update subscription")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="subscription")
 
     # Build return DTO (get_by_id excludes archived, so we merge updated fields into existing subscription)
     result = SubscriptionDTO(
@@ -81,24 +83,25 @@ def put_subscription_on_hold(
     hold_start_date: datetime,
     hold_end_date: datetime,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SubscriptionDTO:
     """Put a subscription on hold. Only owner; only Active (or Pending) can be put on hold. Hold max 3 months.
     Archived subscriptions are excluded by get_by_id so we return 404 for them."""
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot update this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
     if subscription.subscription_status == SubscriptionStatus.ON_HOLD.value:
-        raise HTTPException(status_code=400, detail="Subscription is already on hold.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ALREADY_ON_HOLD, status=400, locale=locale)
     if subscription.subscription_status == SubscriptionStatus.CANCELLED.value:
-        raise HTTPException(status_code=400, detail="Cannot put a cancelled subscription on hold.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_CANNOT_HOLD_CANCELLED, status=400, locale=locale)
 
     if hold_end_date <= hold_start_date:
-        raise HTTPException(status_code=400, detail="hold_end_date must be after hold_start_date")
+        raise envelope_exception(ErrorCode.VALIDATION_SUBSCRIPTION_WINDOW_INVALID, status=400, locale=locale)
     delta = hold_end_date - hold_start_date
     if delta.days > 90:
-        raise HTTPException(status_code=400, detail="Hold duration cannot exceed 3 months")
+        raise envelope_exception(ErrorCode.VALIDATION_SUBSCRIPTION_WINDOW_TOO_LONG, status=400, locale=locale)
 
     updated = subscription_service.update(
         subscription_id,
@@ -112,7 +115,7 @@ def put_subscription_on_hold(
         scope=None,
     )
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update subscription")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="subscription")
     return updated
 
 
@@ -120,16 +123,17 @@ def resume_subscription(
     subscription_id: UUID,
     user_id: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> SubscriptionDTO:
     """Resume a subscription from hold. Only owner; only On Hold can be resumed.
     Archived subscriptions are excluded by get_by_id so we return 404 for them."""
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You cannot update this subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_ACCESS_DENIED, status=403, locale=locale)
     if subscription.subscription_status != SubscriptionStatus.ON_HOLD.value:
-        raise HTTPException(status_code=400, detail="Subscription is not on hold.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_ON_HOLD, status=400, locale=locale)
 
     updated = subscription_service.update(
         subscription_id,
@@ -143,7 +147,7 @@ def resume_subscription(
         scope=None,
     )
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update subscription")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="subscription")
     return updated
 
 
@@ -176,6 +180,7 @@ def activate_subscription_after_payment(
     db: psycopg2.extensions.connection,
     *,
     commit: bool = True,
+    locale: str = "en",
 ) -> SubscriptionDTO:
     """
     Set subscription to Active after successful payment (mock confirm or Stripe webhook).
@@ -184,7 +189,7 @@ def activate_subscription_after_payment(
     """
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     if subscription.subscription_status == SubscriptionStatus.ACTIVE.value:
         return subscription
     updated = subscription_service.update(
@@ -199,7 +204,7 @@ def activate_subscription_after_payment(
         commit=commit,
     )
     if not updated:
-        raise HTTPException(status_code=500, detail="Failed to activate subscription")
+        raise envelope_exception(ErrorCode.ENTITY_UPDATE_FAILED, status=500, locale=locale, entity="subscription")
     return updated
 
 
@@ -208,6 +213,7 @@ def create_and_process_bill_for_subscription_payment(
     subscription_payment_id: UUID,
     modified_by: UUID,
     db: psycopg2.extensions.connection,
+    locale: str = "en",
 ) -> None:
     """
     Create a client bill for this subscription payment and process it (credits + renewal, status Processed).
@@ -232,13 +238,13 @@ def create_and_process_bill_for_subscription_payment(
 
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale=locale)
     plan = plan_service.get_by_id(subscription.plan_id, db)
     if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plan")
     market = market_service.get_by_id(plan.market_id)
     if not market:
-        raise HTTPException(status_code=404, detail="Market not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
 
     sp_row = db_read(
         "SELECT amount_cents, currency FROM subscription_payment WHERE subscription_payment_id = %s",
@@ -247,7 +253,7 @@ def create_and_process_bill_for_subscription_payment(
         fetch_one=True,
     )
     if not sp_row:
-        raise HTTPException(status_code=404, detail="Subscription payment not found")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_PAYMENT_NOT_FOUND, status=404, locale=locale)
 
     amount = float(sp_row["amount_cents"]) / 100.0
     currency_metadata_id = market["currency_metadata_id"]
@@ -266,5 +272,5 @@ def create_and_process_bill_for_subscription_payment(
     }
     created = client_bill_service.create(bill_data, db, scope=None, commit=False)
     if not created:
-        raise HTTPException(status_code=500, detail="Failed to create client bill")
+        raise envelope_exception(ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="client bill")
     process_client_bill_internal(created.client_bill_id, db, modified_by, commit=False)

@@ -1,9 +1,11 @@
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.auth.dependencies import oauth2_scheme
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 MERCADOPAGO_CLIENT_ID = os.getenv("MERCADOPAGO_CLIENT_ID")
 MERCADOPAGO_CLIENT_SECRET = os.getenv("MERCADOPAGO_CLIENT_SECRET")
@@ -21,7 +23,7 @@ router = APIRouter(
 async def mercadopago_callback(request: Request):
     code = request.query_params.get("code")
     if not code:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
+        raise envelope_exception(ErrorCode.MERCADO_PAGO_AUTH_CODE_MISSING, status=400, locale="en")
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -37,7 +39,7 @@ async def mercadopago_callback(request: Request):
         )
 
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            raise envelope_exception(ErrorCode.MERCADO_PAGO_AUTH_FAILED, status=502, locale="en")
 
         token_data = response.json()
 

@@ -80,6 +80,7 @@ class ErrorCode(StrEnum):
     # Custom model-validator errors from PaymentMethodCreateSchema
     VALIDATION_PAYMENT_CONFLICTING_ADDRESS_FIELDS = "validation.payment.conflicting_address_fields"
     VALIDATION_PAYMENT_UNSUPPORTED_BRAND = "validation.payment.unsupported_brand"
+    VALIDATION_PAYMENT_ADDRESS_REQUIRED = "validation.payment.address_required"
 
     # ── auth.* ─────────────────────────────────────────────────────────────
     # Seeded in K2; fully wired in K7 (auth + security sweep).
@@ -188,6 +189,65 @@ class ErrorCode(StrEnum):
     USER_WORKPLACE_GROUP_ARCHIVED = "user.workplace_group_archived"
     USER_INVITE_NO_EMAIL = "user.invite_no_email"
     USER_ONBOARDING_CUSTOMER_ONLY = "user.onboarding_customer_only"
+
+    # ── subscription.* (extended) ──────────────────────────────────────────
+    # Subscription lifecycle errors. Wired in K10 (subscription + payment sweep).
+    SUBSCRIPTION_NOT_FOUND = "subscription.not_found"
+    SUBSCRIPTION_NOT_PENDING = "subscription.not_pending"
+    SUBSCRIPTION_NOT_ON_HOLD = "subscription.not_on_hold"
+    SUBSCRIPTION_ALREADY_ON_HOLD = "subscription.already_on_hold"
+    SUBSCRIPTION_ALREADY_CANCELLED = "subscription.already_cancelled"
+    SUBSCRIPTION_CANNOT_HOLD_CANCELLED = "subscription.cannot_hold_cancelled"
+    SUBSCRIPTION_CONFIRM_MOCK_ONLY = "subscription.confirm_mock_only"
+    SUBSCRIPTION_PAYMENT_NOT_FOUND = "subscription.payment_not_found"
+    SUBSCRIPTION_PAYMENT_RECORD_NOT_FOUND = "subscription.payment_record_not_found"
+    SUBSCRIPTION_PAYMENT_PROVIDER_UNAVAILABLE = "subscription.payment_provider_unavailable"
+    SUBSCRIPTION_ACCESS_DENIED = "subscription.access_denied"
+
+    # ── plate_selection.* ─────────────────────────────────────────────────
+    # Plate selection lifecycle errors. Wired in K10.
+    PLATE_SELECTION_NOT_FOUND = "plate_selection.not_found"
+    PLATE_SELECTION_IMMUTABLE_FIELDS = "plate_selection.immutable_fields"
+    PLATE_SELECTION_ACCESS_DENIED = "plate_selection.access_denied"
+    PLATE_SELECTION_NOT_EDITABLE = "plate_selection.not_editable"
+    PLATE_SELECTION_NOT_CANCELLABLE = "plate_selection.not_cancellable"
+    PLATE_SELECTION_DUPLICATE_KITCHEN_DAY = "plate_selection.duplicate_kitchen_day"
+
+    # ── plate_pickup.* ────────────────────────────────────────────────────
+    # Plate pickup errors. Wired in K10.
+    PLATE_PICKUP_ACCESS_DENIED = "plate_pickup.access_denied"
+    PLATE_PICKUP_INVALID_QR_CODE = "plate_pickup.invalid_qr_code"
+    PLATE_PICKUP_WRONG_RESTAURANT = "plate_pickup.wrong_restaurant"
+    PLATE_PICKUP_NO_ACTIVE_RESERVATION = "plate_pickup.no_active_reservation"
+    PLATE_PICKUP_INVALID_STATUS = "plate_pickup.invalid_status"
+    PLATE_PICKUP_INVALID_SIGNATURE = "plate_pickup.invalid_signature"
+    PLATE_PICKUP_CANNOT_DELETE = "plate_pickup.cannot_delete"
+
+    # ── plate_review.* ────────────────────────────────────────────────────
+    # Plate review errors. Wired in K10.
+    PLATE_REVIEW_NOT_FOUND = "plate_review.not_found"
+    PLATE_REVIEW_ACCESS_DENIED = "plate_review.access_denied"
+    PLATE_REVIEW_NOT_ELIGIBLE = "plate_review.not_eligible"
+    PLATE_REVIEW_PICKUP_ARCHIVED = "plate_review.pickup_archived"
+    PLATE_REVIEW_ALREADY_EXISTS = "plate_review.already_exists"
+    PLATE_REVIEW_INVALID_PORTION_RATING = "plate_review.invalid_portion_rating"
+    PLATE_REVIEW_COMPLAINT_EXISTS = "plate_review.complaint_exists"
+
+    # ── payment_provider.* ────────────────────────────────────────────────
+    # Payment provider (Stripe Connect) errors. Wired in K10.
+    PAYMENT_PROVIDER_ONBOARDING_REQUIRED = "payment_provider.onboarding_required"
+    PAYMENT_PROVIDER_NOT_READY = "payment_provider.not_ready"
+    PAYMENT_PROVIDER_PAYOUT_EXISTS = "payment_provider.payout_exists"
+    PAYMENT_PROVIDER_UNAVAILABLE = "payment_provider.unavailable"
+    PAYMENT_PROVIDER_RATE_LIMITED = "payment_provider.rate_limited"
+    PAYMENT_PROVIDER_AUTH_FAILED = "payment_provider.auth_failed"
+    PAYMENT_PROVIDER_ERROR = "payment_provider.error"
+    PAYMENT_PROVIDER_BILL_NOT_PENDING = "payment_provider.bill_not_pending"
+
+    # ── mercado_pago.* ────────────────────────────────────────────────────
+    # Mercado Pago OAuth errors. Wired in K10.
+    MERCADO_PAGO_AUTH_CODE_MISSING = "mercado_pago.auth_code_missing"
+    MERCADO_PAGO_AUTH_FAILED = "mercado_pago.auth_failed"
 
     # ── server.* ───────────────────────────────────────────────────────────
     # Generic server-side errors used when suppressing internal-ops jargon
