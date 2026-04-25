@@ -195,4 +195,18 @@ Frontends should treat `legacy.uncoded` as a temporary code — its `message` fi
 
 ---
 
+## 8. Postman collection assertions
+
+The Postman collections under `docs/postman/collections/` are technically clients of this contract, so their assertions must move with the wire shape. K3 lands the contract change; the matching assertion updates ride with frontend Phase 3 adoption PRs.
+
+Until each collection is updated, it is skipped in `scripts/run_newman.sh` (`SKIPPED_COLLECTIONS`). See **kitchen#83** for the current list and the structural gating rule:
+
+> **No frontend Phase 3 adoption PR may merge until the matching Postman collection(s) for that frontend's flows have assertions updated and removed from the skip list.**
+
+Adopting frontends update their slice's collections in the same PR, so the gate snaps back as adoption ships.
+
+A separate sibling list of skipped collections (kitchen#79) covers PR #60 regressions and is unrelated to the envelope contract — different root cause, different remediation.
+
+---
+
 *Last updated: K3 — catch-all handlers, minimal validation mapping, and this doc. Next updates: K5 (detailed Pydantic type mapping), K6..KN (sweep), K-last (enforcement).*
