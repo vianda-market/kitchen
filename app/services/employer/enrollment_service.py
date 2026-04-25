@@ -14,6 +14,8 @@ from fastapi import HTTPException
 from app.auth.security import hash_password
 from app.config import Status
 from app.config.enums.subscription_status import SubscriptionStatus
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import subscription_service, user_service
 from app.services.employer.program_service import resolve_effective_program
 from app.services.subscription_action_service import cancel_subscription
@@ -119,18 +121,31 @@ def enroll_single_employee(
     employee_data: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    locale: str = "en",
 ):
     """Enroll a single benefit employee. Creates user in employer institution and sends invite."""
     program = resolve_effective_program(institution_id, None, db)
     if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_NO_ACTIVE_PROGRAM,
+            status=400,
+            locale=locale,
+        )
 
     email = employee_data.get("email", "").lower().strip()
     if not email or not EMAIL_REGEX.match(email):
-        raise HTTPException(status_code=400, detail="Invalid email format")
+        raise envelope_exception(
+            ErrorCode.VALIDATION_INVALID_FORMAT,
+            status=400,
+            locale=locale,
+        )
 
     if _email_exists(email, db):
-        raise HTTPException(status_code=409, detail="Email already registered in the system")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_EMAIL_ALREADY_REGISTERED,
+            status=409,
+            locale=locale,
+        )
 
     created = _create_benefit_employee(institution_id, employee_data, program, db, modified_by)
     _send_invite(created.user_id, created.email, created.first_name, institution_id, db)
@@ -150,7 +165,11 @@ def enroll_bulk_employees(
     """Enroll employees from CSV. Never fails the batch on one bad row."""
     program = resolve_effective_program(institution_id, None, db)
     if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_NO_ACTIVE_PROGRAM,
+            status=400,
+            locale=locale,
+        )
 
     reader = csv.DictReader(io.StringIO(csv_content))
     created: list[str] = []
@@ -212,14 +231,24 @@ def deactivate_employee(
     user_id: UUID,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    locale: str = "en",
 ):
     """Deactivate a benefit employee — archive user and cancel active subscription."""
     user = user_service.get_by_id(user_id, db, scope=None)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=404,
+            locale=locale,
+            entity="User",
+        )
     user_inst = str(getattr(user, "institution_id", ""))
     if user_inst != str(institution_id):
-        raise HTTPException(status_code=403, detail="User does not belong to this institution")
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSTITUTION_MISMATCH,
+            status=403,
+            locale=locale,
+        )
 
     subscription = subscription_service.get_by_user(user_id, db)
     if subscription and subscription.subscription_status in (
@@ -282,6 +311,7 @@ def subscribe_employee(
     plan_id: UUID,
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    locale: str = "en",
 ):
     """Subscribe a benefit employee to a plan with no payment (100% subsidy).
     Creates an active subscription immediately."""
@@ -289,25 +319,47 @@ def subscribe_employee(
 
     user = user_service.get_by_id(user_id, db, scope=None)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=404,
+            locale=locale,
+            entity="User",
+        )
     if str(getattr(user, "institution_id", "")) != str(institution_id):
-        raise HTTPException(status_code=403, detail="User does not belong to this institution")
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSTITUTION_MISMATCH,
+            status=403,
+            locale=locale,
+        )
 
     employer_entity_id = getattr(user, "employer_entity_id", None)
     program = resolve_effective_program(institution_id, employer_entity_id, db)
     if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_NO_ACTIVE_PROGRAM,
+            status=400,
+            locale=locale,
+        )
 
     existing = subscription_service.get_by_user(user_id, db)
     if existing and existing.subscription_status in (
         SubscriptionStatus.ACTIVE.value,
         SubscriptionStatus.PENDING.value,
     ):
-        raise HTTPException(status_code=409, detail="User already has an active or pending subscription")
+        raise envelope_exception(
+            ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE,
+            status=409,
+            locale=locale,
+        )
 
     plan = plan_service.get_by_id(plan_id, db)
     if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found")
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=404,
+            locale=locale,
+            entity="Plan",
+        )
 
     plan_price = float(getattr(plan, "price", 0))
     benefit_rate = program.benefit_rate
@@ -320,9 +372,15 @@ def subscribe_employee(
     employee_share = plan_price - employee_benefit
 
     if employee_share > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Employee share is ${employee_share:.2f}. For partial subsidy, the employee must subscribe through the app and pay their share via POST /subscriptions/with-payment.",
+        log_error(
+            f"subscribe_employee: partial subsidy case for user {user_id}, plan {plan_id}, "
+            f"institution {institution_id}. employee_share={employee_share:.2f}. "
+            "Employee must subscribe through the app and pay their share."
+        )
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_PARTIAL_SUBSIDY_REQUIRES_APP,
+            status=400,
+            locale=locale,
         )
 
     plan_credit = int(getattr(plan, "credit", 0))

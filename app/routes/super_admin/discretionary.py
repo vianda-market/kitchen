@@ -60,6 +60,7 @@ def approve_discretionary_request(
     request_id: UUID,
     approval: DiscretionaryApprovalSchema,
     current_user: dict = Depends(get_super_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -74,7 +75,7 @@ def approve_discretionary_request(
     log_info(f"Super-admin {current_user['user_id']} approving discretionary request {request_id}")
 
     # Delegate to service layer
-    resolution = discretionary_service.approve_discretionary_request(request_id, current_user, db)
+    resolution = discretionary_service.approve_discretionary_request(request_id, current_user, db, locale)
 
     return resolution
 
@@ -84,6 +85,7 @@ def reject_discretionary_request(
     request_id: UUID,
     rejection: DiscretionaryRejectionSchema,
     current_user: dict = Depends(get_super_admin_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -98,7 +100,7 @@ def reject_discretionary_request(
 
     # Delegate to service layer
     resolution = discretionary_service.reject_discretionary_request(
-        request_id, current_user, rejection.resolution_comment, db
+        request_id, current_user, rejection.resolution_comment, db, locale
     )
 
     return resolution

@@ -322,6 +322,24 @@ class ErrorCode(StrEnum):
     # Discretionary request errors. Wired in K12.
     DISCRETIONARY_NOT_FOUND = "discretionary.not_found"
     DISCRETIONARY_NOT_PENDING = "discretionary.not_pending"
+    # Additional discretionary errors. Wired in K13.
+    DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH = "discretionary.recipient_institution_mismatch"
+    DISCRETIONARY_RECIPIENT_MARKET_MISMATCH = "discretionary.recipient_market_mismatch"
+    DISCRETIONARY_INVALID_AMOUNT = "discretionary.invalid_amount"
+    DISCRETIONARY_INVALID_CATEGORY = "discretionary.invalid_category"
+    DISCRETIONARY_CATEGORY_REQUIRES_RESTAURANT = "discretionary.category_requires_restaurant"
+
+    # ── enrollment.* ─────────────────────────────────────────────────────
+    # Employer benefits enrollment errors. Wired in K13.
+    ENROLLMENT_NO_ACTIVE_PROGRAM = "enrollment.no_active_program"
+    ENROLLMENT_EMAIL_ALREADY_REGISTERED = "enrollment.email_already_registered"
+    ENROLLMENT_CITY_NO_MARKET = "enrollment.city_no_market"
+    ENROLLMENT_EMPLOYER_INSTITUTION_ID_REQUIRED = "enrollment.employer_institution_id_required"
+    ENROLLMENT_PARTIAL_SUBSIDY_REQUIRES_APP = "enrollment.partial_subsidy_requires_app"
+
+    # ── employer.program.* ───────────────────────────────────────────────
+    # Employer benefits program management errors. Wired in K13.
+    EMPLOYER_PROGRAM_ALREADY_EXISTS = "employer.program_already_exists"
 
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.

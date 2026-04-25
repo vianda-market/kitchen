@@ -9,6 +9,8 @@ import psycopg2.extensions
 from fastapi import HTTPException
 
 from app.config import Status
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     employer_bill_line_service,
     employer_bill_service,
@@ -88,6 +90,7 @@ def generate_employer_bill(
     modified_by: UUID,
     *,
     institution_entity_id: UUID | None = None,
+    locale: str = "en",
 ) -> dict[str, Any]:
     """Generate an employer bill for a billing period. Returns the bill DTO + lines.
 
@@ -96,12 +99,20 @@ def generate_employer_bill(
     from the entity's currency_metadata.
     """
     if not institution_entity_id:
-        raise HTTPException(status_code=400, detail="institution_entity_id is required for employer bills")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_EMPLOYER_INSTITUTION_ID_REQUIRED,
+            status=400,
+            locale=locale,
+        )
     from app.services.employer.program_service import resolve_effective_program
 
     program = resolve_effective_program(institution_id, institution_entity_id, db)
     if not program or not program.is_active:
-        raise HTTPException(status_code=400, detail="No active benefits program for this institution/entity")
+        raise envelope_exception(
+            ErrorCode.ENROLLMENT_NO_ACTIVE_PROGRAM,
+            status=400,
+            locale=locale,
+        )
 
     renewal_events = _get_renewal_events(institution_id, period_start, period_end, db)
 
@@ -197,7 +208,7 @@ def generate_employer_bill(
 
     bill = employer_bill_service.create(bill_data, db, scope=None)
     if not bill:
-        raise HTTPException(status_code=500, detail="Failed to create employer bill")
+        raise HTTPException(status_code=500, detail="Failed to create employer bill")  # 500: skip per sweep rules
 
     created_lines = []
     for line in lines_data:

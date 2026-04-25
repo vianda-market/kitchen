@@ -11,6 +11,8 @@ import psycopg2.extensions
 from fastapi import HTTPException
 
 from app.dto.models import EmployerBenefitsProgramDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     employer_benefits_program_service,
     institution_service,
@@ -23,6 +25,7 @@ def create_program(
     data: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    locale: str = "en",
 ) -> EmployerBenefitsProgramDTO:
     """Create a benefits program for an Employer institution.
 
@@ -31,26 +34,38 @@ def create_program(
     """
     institution_id = data.get("institution_id")
     if not institution_id:
-        raise HTTPException(status_code=400, detail="institution_id is required")
+        raise envelope_exception(
+            ErrorCode.VALIDATION_FIELD_REQUIRED,
+            status=400,
+            locale=locale,
+        )
 
     institution = institution_service.get_by_id(institution_id, db, scope=None)
     if not institution:
-        raise HTTPException(status_code=404, detail="Institution not found")
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=404,
+            locale=locale,
+            entity="Institution",
+        )
     inst_type = getattr(institution, "institution_type", None)
     inst_type_str = inst_type.value if hasattr(inst_type, "value") else str(inst_type)
     if inst_type_str != "employer":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Institution must be of type 'employer', got '{inst_type_str}'",
+        raise envelope_exception(
+            ErrorCode.SECURITY_INSTITUTION_TYPE_MISMATCH,
+            status=400,
+            locale=locale,
         )
 
     entity_id = data.get("institution_entity_id")
     existing = _get_program_row(institution_id, entity_id, db)
     if existing:
         scope_label = f"entity {entity_id}" if entity_id else "institution"
-        raise HTTPException(
-            status_code=409,
-            detail=f"A benefits program already exists for this {scope_label}",
+        raise envelope_exception(
+            ErrorCode.EMPLOYER_PROGRAM_ALREADY_EXISTS,
+            status=409,
+            locale=locale,
+            scope=scope_label,
         )
 
     data["modified_by"] = str(modified_by)
@@ -117,12 +132,17 @@ def update_program(
     updates: dict[str, Any],
     db: psycopg2.extensions.connection,
     modified_by: UUID,
+    locale: str = "en",
 ) -> EmployerBenefitsProgramDTO:
     """Update a benefits program."""
     updates["modified_by"] = str(modified_by)
     updated = employer_benefits_program_service.update(program_id, updates, db, scope=None)
     if not updated:
-        raise HTTPException(status_code=404, detail="Program not found")
+        raise envelope_exception(
+            ErrorCode.EMPLOYER_BENEFIT_PROGRAM_NOT_FOUND,
+            status=404,
+            locale=locale,
+        )
     log_info(f"Updated employer benefits program {program_id}")
     return updated
 
