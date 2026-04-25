@@ -1257,8 +1257,6 @@ def get_enriched_restaurants(
             "r.member_perks_i18n",
             "r.is_archived",
             "r.status",
-            "r.created_date",
-            "r.modified_date",
             # PostGIS: serialise geometry point as GeoJSON. The ::jsonb cast causes
             # psycopg2 to return a parsed Python dict ({"type":"Point","coordinates":[lng,lat]}).
             # ::jsonb (not ::json) is required because this query uses SELECT DISTINCT, and
@@ -1346,8 +1344,6 @@ def get_enriched_restaurant_by_id(
             "r.member_perks_i18n",
             "r.is_archived",
             "r.status",
-            "r.created_date",
-            "r.modified_date",
             # PostGIS: serialise geometry point as GeoJSON. The ::jsonb cast causes
             # psycopg2 to return a parsed Python dict ({"type":"Point","coordinates":[lng,lat]}).
             # ::jsonb (not ::json) is required because this query uses SELECT DISTINCT, and
@@ -1920,8 +1916,6 @@ def get_enriched_plates(
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
-            "p.created_date",
-            "p.modified_date",
             "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_stars",
             "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_portion_size",
             "(SELECT COALESCE(COUNT(*)::int, 0) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as review_count",
@@ -2035,8 +2029,6 @@ def get_enriched_plate_by_id(
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
-            "p.created_date",
-            "p.modified_date",
             "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_stars",
             "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_portion_size",
             "(SELECT COALESCE(COUNT(*)::int, 0) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as review_count",
@@ -2274,8 +2266,6 @@ def get_enriched_plans(
             "pl.rollover_cap",
             "pl.is_archived",
             "pl.status",
-            "pl.created_date",
-            "pl.modified_date",
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
@@ -2339,8 +2329,6 @@ def get_enriched_plan_by_id(
             "pl.rollover_cap",
             "pl.is_archived",
             "pl.status",
-            "pl.created_date",
-            "pl.modified_date",
         ],
         joins=[
             ("INNER", "market_info", "m", "pl.market_id = m.market_id"),
@@ -3652,7 +3640,6 @@ def get_enriched_plate_pickups(
                 COALESCE(a.city, '') as city,
                 COALESCE(a.postal_code, '') as postal_code,
                 ppl.plate_id,
-                ppl.product_id,
                 COALESCE(prod.name, '') as product_name,
                 COALESCE(p.credit, 0) as credit,
                 ppl.qr_code_id,
@@ -3663,10 +3650,7 @@ def get_enriched_plate_pickups(
                 ppl.arrival_time,
                 ppl.completion_time,
                 ppl.expected_completion_time,
-                ppl.confirmation_code,
-                ppl.created_date,
-                ppl.modified_by,
-                ppl.modified_date
+                ppl.confirmation_code
             {joins_fragment}
             {where_clause}
             ORDER BY ppl.plate_pickup_id DESC{limit_clause}{offset_clause}

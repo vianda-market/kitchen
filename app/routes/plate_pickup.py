@@ -141,6 +141,23 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
     window_to: str | None = Query(
         None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"
     ),
+    arrival_time_from: str | None = Query(
+        None, description="Filter pickups with arrival_time on or after this timestamp (ISO 8601)"
+    ),
+    arrival_time_to: str | None = Query(
+        None, description="Filter pickups with arrival_time on or before this timestamp (ISO 8601)"
+    ),
+    completion_time_from: str | None = Query(
+        None, description="Filter pickups with completion_time on or after this timestamp (ISO 8601)"
+    ),
+    completion_time_to: str | None = Query(
+        None, description="Filter pickups with completion_time on or before this timestamp (ISO 8601)"
+    ),
+    was_collected: bool | None = Query(None, description="Filter by was_collected flag"),
+    credit_from: int | None = Query(None, description="Filter pickups with credit >= this value"),
+    credit_to: int | None = Query(None, description="Filter pickups with credit <= this value"),
+    restaurant_id: list[UUID] | None = Query(None, description="Filter by restaurant ID(s) (multi-select)"),
+    plate_id: list[UUID] | None = Query(None, description="Filter by plate ID(s) (multi-select)"),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -148,7 +165,8 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
     """Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
     Returns an array of enriched plate pickup records.
 
-    Optional filters: status, market_id, window_from, window_to (filter by expected_completion_time).
+    Optional filters: status, market_id, window_from, window_to, arrival_time_from, arrival_time_to,
+    completion_time_from, completion_time_to, was_collected, credit_from, credit_to, restaurant_id, plate_id.
     Use completed_only=true for the customer order history page (pickups they have collected).
 
     Scoping:
@@ -182,10 +200,20 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
                     "market_id": market_id,
                     "window_from": window_from,
                     "window_to": window_to,
+                    "arrival_time_from": arrival_time_from,
+                    "arrival_time_to": arrival_time_to,
+                    "completion_time_from": completion_time_from,
+                    "completion_time_to": completion_time_to,
+                    "was_collected": was_collected,
+                    "credit_from": credit_from,
+                    "credit_to": credit_to,
+                    "restaurant_id": [str(r) for r in restaurant_id] if restaurant_id else None,
+                    "plate_id": [str(p) for p in plate_id] if plate_id else None,
                 },
             )
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            log_warning(f"Invalid filter on /plate-pickups/enriched: {exc}")
+            raise HTTPException(status_code=400, detail="Invalid filter parameter") from None
         return get_enriched_plate_pickups(
             db,
             scope=scope,

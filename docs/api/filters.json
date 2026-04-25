@@ -6,6 +6,47 @@
         "cast": "upper",
         "key": "country_code",
         "kind": "select"
+      },
+      {
+        "cast": "date",
+        "key": "holiday_date_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "date",
+        "key": "holiday_date_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "bool",
+        "key": "is_recurring",
+        "kind": "toggle"
+      },
+      {
+        "cast": "int",
+        "key": "recurring_month",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "text",
+        "key": "source",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "multi-select",
+        "values": [
+          "active",
+          "inactive",
+          "pending",
+          "arrived",
+          "handed_out",
+          "completed",
+          "cancelled",
+          "processed"
+        ]
       }
     ]
   },
@@ -40,6 +81,51 @@
         "cast": "timestamptz",
         "key": "window_to",
         "kind": "range-bound"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "arrival_time_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "arrival_time_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "completion_time_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "timestamptz",
+        "key": "completion_time_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "bool",
+        "key": "was_collected",
+        "kind": "toggle"
+      },
+      {
+        "cast": "int",
+        "key": "credit_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "uuid",
+        "key": "restaurant_id",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "uuid",
+        "key": "plate_id",
+        "kind": "multi-select"
       }
     ]
   },
@@ -71,6 +157,36 @@
         "cast": "upper",
         "key": "currency_code",
         "kind": "select"
+      },
+      {
+        "cast": "float",
+        "key": "price_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "float",
+        "key": "price_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "upper",
+        "key": "country_code",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "bool",
+        "key": "rollover",
+        "kind": "toggle"
       }
     ]
   },
@@ -112,6 +228,63 @@
         "cast": "date",
         "key": "plate_date_to",
         "kind": "range-bound"
+      },
+      {
+        "cast": "uuid",
+        "key": "cuisine_id",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "DietaryFlag",
+        "key": "dietary",
+        "kind": "multi-select",
+        "values": [
+          "vegan",
+          "vegetarian",
+          "gluten_free",
+          "dairy_free",
+          "nut_free",
+          "halal",
+          "kosher"
+        ]
+      },
+      {
+        "cast": "int",
+        "key": "price_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "price_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "bool",
+        "key": "has_image",
+        "kind": "toggle"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "PortionSizeDisplay",
+        "key": "portion_size",
+        "kind": "multi-select",
+        "values": [
+          "light",
+          "standard",
+          "large",
+          "insufficient_reviews"
+        ]
       }
     ]
   },
@@ -159,6 +332,37 @@
         "key": "radius",
         "kind": "geo-radius",
         "mode": "radius"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "multi-select",
+        "values": [
+          "active",
+          "inactive",
+          "pending",
+          "arrived",
+          "handed_out",
+          "completed",
+          "cancelled",
+          "processed"
+        ]
+      },
+      {
+        "cast": "upper",
+        "key": "country_code",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "uuid",
+        "key": "institution_id",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "uuid",
+        "key": "institution_entity_id",
+        "kind": "multi-select"
       }
     ]
   }

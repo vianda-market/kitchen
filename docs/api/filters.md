@@ -344,3 +344,98 @@ To re-sync locally:
 python3 scripts/generate_filter_schema.py
 git add docs/api/filters.json
 ```
+
+---
+
+## Disposition history
+
+### Pass 5 — 2026-04-25
+
+**Goal:** reduce unfiltered field count from 131 to 0 (strict-mode ready).
+
+**Method:** `scripts/lint_filter_inventory.py` was run to produce `docs/api/filters_inventory.json` and `docs/api/filters_inventory.md`. Each flagged field was dispositioned as one of: register-add, exempt, or drop (remove from schema and SELECT).
+
+**Register-add (25 new filterable fields across 5 entities):**
+
+| Entity | Param(s) | Kind | Notes |
+|--------|----------|------|-------|
+| `national_holidays` | `holiday_date_from`, `holiday_date_to` | date-range-bound | `holiday_date` on `nh` |
+| `national_holidays` | `is_recurring` | toggle | bool on `nh` |
+| `national_holidays` | `recurring_month` | multi-select (int) | `nh`, values 1–12 |
+| `national_holidays` | `source` | multi-select (text) | `nh`, free-text (no enum) |
+| `national_holidays` | `status` | multi-select | Status enum on `nh` |
+| `pickups` | `arrival_time_from`, `arrival_time_to` | date-range-bound (timestamptz) | `ppl` |
+| `pickups` | `completion_time_from`, `completion_time_to` | date-range-bound (timestamptz) | `ppl` |
+| `pickups` | `was_collected` | toggle | bool on `ppl` |
+| `pickups` | `credit_from`, `credit_to` | range-bound (int) | `plate_info` alias `p` |
+| `pickups` | `restaurant_id` | multi-select (uuid) | `ppl` |
+| `pickups` | `plate_id` | multi-select (uuid) | `ppl` |
+| `plans` | `price_from`, `price_to` | range-bound (float) | DB type is float, not int |
+| `plans` | `credit_from`, `credit_to` | range-bound (int) | `pl` |
+| `plans` | `country_code` | multi-select (upper) | via `market_info` alias `m` |
+| `plans` | `rollover` | toggle | bool on `pl` |
+| `plates` | `cuisine_id` | multi-select (uuid) | cuisine table alias `cu` |
+| `plates` | `dietary` | multi-select (text, DietaryFlag enum) | `TEXT[]` on `pr`; manual SQL (array overlap `&&`) used in route until filter_builder gains `any_in` op — tracked kitchen#87 |
+| `plates` | `price_from`, `price_to` | range-bound (int) | `p` |
+| `plates` | `credit_from`, `credit_to` | range-bound (int) | `p` |
+| `plates` | `has_image` | toggle | CASE expression on `pr.image_storage_path`; schema-published only, SQL wiring deferred kitchen#87 |
+| `plates` | `portion_size` | multi-select (text, PortionSizeDisplay enum) | Python-computed bucket; schema-published only, SQL wiring deferred kitchen#87 |
+| `restaurants` | `status` | multi-select | Status enum on `r` |
+| `restaurants` | `country_code` | multi-select (upper) | address alias `a` |
+| `restaurants` | `institution_id` | multi-select (uuid) | `r`; query param named `institution_id_in` to avoid conflict with scoping param |
+| `restaurants` | `institution_entity_id` | multi-select (uuid) | `r` |
+
+**Drop (fields removed from enriched response schemas and SQL SELECT):**
+
+| Entity | Fields dropped |
+|--------|---------------|
+| `national_holidays` | `created_date`, `modified_by`, `modified_date` (from schema only; DTO layer retains them for DB hydration) |
+| `pickups` | `created_date`, `modified_date`, `modified_by`, `product_id` |
+| `plans` | `created_date`, `modified_date` |
+| `plates` | `created_date`, `modified_date`, `product_image_storage_path` (storage path retained in SELECT to feed `resolve_product_image_urls` transform; excluded from schema) |
+| `restaurants` | `created_date`, `modified_date` |
+
+**Exempt:** 101 fields annotated with `# filter-registry:exempt reason="..."`. See `docs/api/filters_inventory.md` for the full table.
+
+**Result:** 0 unfiltered fields across all 5 entities. Strict-mode flip (fail on any unfiltered) is now viable.
+
+---
+
+## Inventory lint — strict mode (Pass 5b, 2026-04-25)
+
+`scripts/lint_filter_inventory.py` runs as a CI test (`app/tests/lint/test_filter_inventory.py`) and **fails the build** if any enriched-response field is exposed but neither registered as filterable nor explicitly exempted.
+
+### How it works
+
+1. Walks the Pydantic response models for the 5 enriched endpoints (`plans`, `restaurants`, `plates`, `pickups`, `national_holidays`).
+2. For each field, checks whether it appears in `FILTER_REGISTRY[entity]` (filterable) or carries a `# filter-registry:exempt reason="..."` comment in the model source.
+3. Writes `docs/api/filters_inventory.{json,md}` with one row per field, status `filterable` / `exempt` / `unfiltered`.
+4. Exits 0 if `unfiltered` count is 0; exits 1 otherwise.
+
+### What to do when it fails
+
+Two options for the offending field:
+
+- **Register it** in `app/config/filter_registry.py` if it's a sensible filter dimension, then run `python3 scripts/generate_filter_schema.py` to refresh `docs/api/filters.json`.
+- **Exempt it** by adding a comment immediately above the Pydantic field:
+
+  ```python
+  class PlanEnrichedResponseSchema(BaseModel):
+      # filter-registry:exempt reason="primary key; route param not filter param"
+      plan_id: UUID
+  ```
+
+  Common exempt reasons:
+  - `"primary key"` / `"FK; not a filter dimension"` — identifiers
+  - `"free-text label"` / `"free-text marketing copy"` — non-enumerated strings
+  - `"translation payload"` — `*_i18n` objects
+  - `"computed display value"` / `"computed projection"` — derived fields
+  - `"display label for <other_field>"` — names paired with IDs already filterable
+  - `"soft-delete flag; server filters by default"` — `is_archived` family
+  - `"address; <parent> scope handles location filtering"` — duplicated address fields
+
+### History
+
+- **Pass 1** (2026-04-23): lint shipped in informational-only mode (always exits 0). Initial inventory: 131 unfiltered fields.
+- **Pass 5** (2026-04-25): disposition pass — 25 fields registered, 101 exempted, 14 audit columns dropped. Inventory: 0 unfiltered.
+- **Pass 5b** (2026-04-25): strict mode flipped on. Lint now blocks merge on regressions.

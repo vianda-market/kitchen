@@ -2,10 +2,16 @@
 Tests for scripts/lint_filter_inventory.py.
 
 Verifies that:
-1. The inventory script runs without error (exits 0 in informational mode).
+1. The inventory script runs and exits 0 (strict mode — every enriched field
+   is either registered or exempt).
 2. Both artifact files are created and parse correctly.
 3. Every row in the JSON has the required fields.
 4. The Markdown artifact has at least one section header per registered entity.
+
+If this test fails on the exit-code assertion, a new enriched-response field
+was added without a disposition. Either register it in
+`app/config/filter_registry.py` or add a `# filter-registry:exempt
+reason="..."` comment above the field in its Pydantic response schema.
 """
 
 import importlib.util
@@ -43,12 +49,18 @@ def inventory_rows() -> list:
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
 
-    # Call main() — it writes artifacts and exits 0.
-    # We capture the SystemExit to verify exit code.
+    # Call main() — it writes artifacts and exits 0 in strict mode IFF every
+    # enriched field is filterable or exempt (Pass 5b, 2026-04-25).
     with pytest.raises(SystemExit) as exc_info:
         module.main()
 
-    assert exc_info.value.code == 0, f"lint_filter_inventory.main() exited with code {exc_info.value.code}, expected 0"
+    assert exc_info.value.code == 0, (
+        f"lint_filter_inventory.main() exited with code {exc_info.value.code}; "
+        f"expected 0. A new enriched-response field is unfiltered — either "
+        f"register it in app/config/filter_registry.py or add a "
+        f'# filter-registry:exempt reason="..." comment above the field in '
+        f"its Pydantic response schema."
+    )
 
     # Parse and return the JSON artifact.
     assert _JSON_ARTIFACT.exists(), f"JSON artifact not written: {_JSON_ARTIFACT}"

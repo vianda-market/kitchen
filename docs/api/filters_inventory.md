@@ -13,18 +13,11 @@ Status legend:
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
-| `created_date` | unfiltered |  |
-| `holiday_date` | unfiltered |  |
-| `holiday_id` | unfiltered |  |
-| `holiday_name` | unfiltered |  |
-| `is_archived` | unfiltered |  |
-| `is_recurring` | unfiltered |  |
-| `modified_by` | unfiltered |  |
-| `modified_date` | unfiltered |  |
-| `recurring_day` | unfiltered |  |
-| `recurring_month` | unfiltered |  |
-| `source` | unfiltered |  |
-| `status` | unfiltered |  |
+| `holiday_date` | exempt | "range-bound; use holiday_date_from / holiday_date_to filter params" |
+| `holiday_id` | exempt | "primary key; route param not filter param" |
+| `holiday_name` | exempt | "free-text label; covered by search if needed" |
+| `is_archived` | exempt | "soft-delete flag; server filters by default" |
+| `recurring_day` | exempt | "paired with recurring_month; rarely filtered alone" |
 
 ## `pickups`
 
@@ -33,31 +26,24 @@ Status legend:
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
-| `address_display` | unfiltered |  |
-| `arrival_time` | unfiltered |  |
-| `city` | unfiltered |  |
-| `completion_time` | unfiltered |  |
-| `confirmation_code` | unfiltered |  |
-| `country` | unfiltered |  |
-| `created_date` | unfiltered |  |
-| `credit` | unfiltered |  |
-| `expected_completion_time` | unfiltered |  |
-| `is_archived` | unfiltered |  |
-| `modified_by` | unfiltered |  |
-| `modified_date` | unfiltered |  |
-| `plate_id` | unfiltered |  |
-| `plate_pickup_id` | unfiltered |  |
-| `plate_selection_id` | unfiltered |  |
-| `postal_code` | unfiltered |  |
-| `product_id` | unfiltered |  |
-| `product_name` | unfiltered |  |
-| `province` | unfiltered |  |
-| `qr_code_id` | unfiltered |  |
-| `qr_code_payload` | unfiltered |  |
-| `restaurant_id` | unfiltered |  |
-| `restaurant_name` | unfiltered |  |
-| `user_id` | unfiltered |  |
-| `was_collected` | unfiltered |  |
+| `address_display` | exempt | "computed display string" |
+| `arrival_time` | exempt | "range-bound; use arrival_time_from / arrival_time_to filter params" |
+| `city` | exempt | "address; restaurant scope handles location filtering" |
+| `completion_time` | exempt | "range-bound; use completion_time_from / completion_time_to filter params" |
+| `confirmation_code` | exempt | "opaque token; never filtered" |
+| `country` | exempt | "address; restaurant scope handles location filtering" |
+| `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
+| `expected_completion_time` | exempt | "computed projection; clients display only" |
+| `is_archived` | exempt | "soft-delete flag; server filters by default" |
+| `plate_pickup_id` | exempt | "primary key" |
+| `plate_selection_id` | exempt | "FK; not a filter dimension" |
+| `postal_code` | exempt | "address; restaurant scope handles location filtering" |
+| `product_name` | exempt | "free-text label" |
+| `province` | exempt | "address; restaurant scope handles location filtering" |
+| `qr_code_id` | exempt | "kiosk QR data; not a filter dimension" |
+| `qr_code_payload` | exempt | "kiosk QR data; not a filter dimension" |
+| `restaurant_name` | exempt | "free-text label" |
+| `user_id` | exempt | "auth-scoped via JWT; not a user-input filter" |
 
 ## `plans`
 
@@ -66,27 +52,23 @@ Status legend:
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
-| `country_code` | unfiltered |  |
-| `created_date` | unfiltered |  |
-| `credit` | unfiltered |  |
-| `credit_cost_local_currency` | unfiltered |  |
-| `credit_cost_usd` | unfiltered |  |
-| `cta_label` | unfiltered |  |
-| `cta_label_i18n` | unfiltered |  |
-| `currency_name` | unfiltered |  |
-| `features` | unfiltered |  |
-| `features_i18n` | unfiltered |  |
-| `is_archived` | unfiltered |  |
-| `market_name` | unfiltered |  |
-| `marketing_description` | unfiltered |  |
-| `marketing_description_i18n` | unfiltered |  |
-| `modified_date` | unfiltered |  |
-| `name` | unfiltered |  |
-| `name_i18n` | unfiltered |  |
-| `plan_id` | unfiltered |  |
-| `price` | unfiltered |  |
-| `rollover` | unfiltered |  |
-| `rollover_cap` | unfiltered |  |
+| `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
+| `credit_cost_local_currency` | exempt | "computed display value" |
+| `credit_cost_usd` | exempt | "computed display value" |
+| `cta_label` | exempt | "free-text marketing copy" |
+| `cta_label_i18n` | exempt | "translation payload; not filterable" |
+| `currency_name` | exempt | "display label for currency_code" |
+| `features` | exempt | "free-text marketing copy" |
+| `features_i18n` | exempt | "translation payload; not filterable" |
+| `is_archived` | exempt | "soft-delete flag; server filters by default" |
+| `market_name` | exempt | "display label for market_id" |
+| `marketing_description` | exempt | "free-text marketing copy" |
+| `marketing_description_i18n` | exempt | "translation payload; not filterable" |
+| `name` | exempt | "free-text label" |
+| `name_i18n` | exempt | "translation payload; not filterable" |
+| `plan_id` | exempt | "primary key" |
+| `price` | exempt | "range-bound; use price_from / price_to filter params" |
+| `rollover_cap` | exempt | "only meaningful when rollover=true" |
 
 ## `plates`
 
@@ -95,47 +77,41 @@ Status legend:
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
-| `address_display` | unfiltered |  |
-| `average_portion_size` | unfiltered |  |
-| `average_stars` | unfiltered |  |
-| `building_number` | unfiltered |  |
-| `city` | unfiltered |  |
-| `country_code` | unfiltered |  |
-| `country_name` | unfiltered |  |
-| `created_date` | unfiltered |  |
-| `credit` | unfiltered |  |
-| `cuisine_name` | unfiltered |  |
-| `cuisine_name_i18n` | unfiltered |  |
-| `delivery_time_minutes` | unfiltered |  |
-| `description` | unfiltered |  |
-| `description_i18n` | unfiltered |  |
-| `dietary` | unfiltered |  |
-| `expected_payout_local_currency` | unfiltered |  |
-| `has_coworker_offer` | unfiltered |  |
-| `has_coworker_request` | unfiltered |  |
-| `has_image` | unfiltered |  |
-| `ingredients` | unfiltered |  |
-| `ingredients_i18n` | unfiltered |  |
-| `institution_name` | unfiltered |  |
-| `is_archived` | unfiltered |  |
-| `latitude` | unfiltered |  |
-| `longitude` | unfiltered |  |
-| `modified_date` | unfiltered |  |
-| `no_show_discount` | unfiltered |  |
-| `pickup_instructions` | unfiltered |  |
-| `plate_id` | unfiltered |  |
-| `portion_size` | unfiltered |  |
-| `price` | unfiltered |  |
-| `product_id` | unfiltered |  |
-| `product_image_storage_path` | unfiltered |  |
-| `product_image_url` | unfiltered |  |
-| `product_name` | unfiltered |  |
-| `product_name_i18n` | unfiltered |  |
-| `province` | unfiltered |  |
-| `restaurant_name` | unfiltered |  |
-| `review_count` | unfiltered |  |
-| `street_name` | unfiltered |  |
-| `street_type` | unfiltered |  |
+| `address_display` | exempt | "enriched join field; computed display field, not independently filterable" |
+| `average_portion_size` | exempt | "computed aggregate; use portion_size for filtering" |
+| `average_stars` | exempt | "computed aggregate; not independently filterable" |
+| `building_number` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `city` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `country_code` | exempt | "enriched join field; address join country; not registered for plate-level filtering" |
+| `country_name` | exempt | "enriched join field; country_code is registered instead" |
+| `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
+| `cuisine_name` | exempt | "enriched join field; filter by cuisine_id instead" |
+| `cuisine_name_i18n` | exempt | "i18n translation payload; not filterable" |
+| `delivery_time_minutes` | exempt | "enriched join field; not independently filterable" |
+| `description` | exempt | "enriched join field; free-text, not independently filterable" |
+| `description_i18n` | exempt | "i18n translation payload; not filterable" |
+| `expected_payout_local_currency` | exempt | "computed display value; not filterable" |
+| `has_coworker_offer` | exempt | "Python-computed contextual flag; not a DB column" |
+| `has_coworker_request` | exempt | "Python-computed contextual flag; not a DB column" |
+| `ingredients` | exempt | "enriched join field; free-text, not independently filterable" |
+| `ingredients_i18n` | exempt | "i18n translation payload; not filterable" |
+| `institution_name` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `is_archived` | exempt | "status field used in restaurant scoping; not a plate filter dimension" |
+| `latitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
+| `longitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
+| `no_show_discount` | exempt | "enriched join field; supplier_terms field, not independently filterable" |
+| `pickup_instructions` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `plate_id` | exempt | "enriched join field; not a direct column on plate_info" |
+| `price` | exempt | "range-bound; use price_from / price_to filter params" |
+| `product_id` | exempt | "enriched join field; product_id is a join key, not a filterable dimension" |
+| `product_image_url` | exempt | "enriched join field; computed from storage_path; not filterable" |
+| `product_name` | exempt | "enriched join field; filter by plate_id instead" |
+| `product_name_i18n` | exempt | "i18n translation payload; not filterable" |
+| `province` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `restaurant_name` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `review_count` | exempt | "computed aggregate; not independently filterable" |
+| `street_name` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `street_type` | exempt | "enriched join field; address subfield, not independently filterable" |
 
 ## `restaurants`
 
@@ -144,35 +120,29 @@ Status legend:
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
-| `address_id` | unfiltered |  |
-| `average_rating` | unfiltered |  |
-| `country_code` | unfiltered |  |
-| `country_name` | unfiltered |  |
-| `cover_image_url` | unfiltered |  |
-| `created_date` | unfiltered |  |
-| `cuisine_id` | unfiltered |  |
-| `cuisine_name` | unfiltered |  |
-| `cuisine_name_i18n` | unfiltered |  |
-| `currency_metadata_id` | unfiltered |  |
-| `institution_entity_id` | unfiltered |  |
-| `institution_entity_name` | unfiltered |  |
-| `institution_id` | unfiltered |  |
-| `institution_name` | unfiltered |  |
-| `is_archived` | unfiltered |  |
-| `is_featured` | unfiltered |  |
-| `location` | unfiltered |  |
-| `market_credit_value_local_currency` | unfiltered |  |
-| `member_perks` | unfiltered |  |
-| `member_perks_i18n` | unfiltered |  |
-| `modified_date` | unfiltered |  |
-| `name` | unfiltered |  |
-| `postal_code` | unfiltered |  |
-| `province` | unfiltered |  |
-| `restaurant_id` | unfiltered |  |
-| `review_count` | unfiltered |  |
-| `spotlight_label` | unfiltered |  |
-| `spotlight_label_i18n` | unfiltered |  |
-| `status` | unfiltered |  |
-| `tagline` | unfiltered |  |
-| `tagline_i18n` | unfiltered |  |
-| `verified_badge` | unfiltered |  |
+| `address_id` | exempt | "enriched join field; address join key, not independently filterable" |
+| `average_rating` | exempt | "computed aggregate; not independently filterable" |
+| `country_name` | exempt | "enriched join field; country_code is registered instead" |
+| `cover_image_url` | exempt | "computed URL; not independently filterable" |
+| `cuisine_id` | exempt | "enriched join field; cuisine filter uses cuisine op on name, not cuisine_id directly" |
+| `cuisine_name` | exempt | "enriched join field; filter by cuisine_id instead" |
+| `cuisine_name_i18n` | exempt | "i18n translation payload; not filterable" |
+| `currency_metadata_id` | exempt | "enriched join field; market dimension, not a restaurant filter" |
+| `institution_entity_name` | exempt | "enriched join field; filter by institution_entity_id instead" |
+| `institution_name` | exempt | "enriched join field; filter by institution_id instead" |
+| `is_archived` | exempt | "internal archival flag; use status filter instead" |
+| `is_featured` | exempt | "boolean display flag; not a filter dimension" |
+| `location` | exempt | "PostGIS geometry; geo filter op handles spatial queries separately" |
+| `market_credit_value_local_currency` | exempt | "enriched join field; market dimension, not a restaurant filter" |
+| `member_perks` | exempt | "display list; not independently filterable" |
+| `member_perks_i18n` | exempt | "i18n translation payload; not filterable" |
+| `name` | exempt | "free-text label; use search filter instead" |
+| `postal_code` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `province` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `restaurant_id` | exempt | "primary key; route param not filter param" |
+| `review_count` | exempt | "computed aggregate; not independently filterable" |
+| `spotlight_label` | exempt | "display label; not independently filterable" |
+| `spotlight_label_i18n` | exempt | "i18n translation payload; not filterable" |
+| `tagline` | exempt | "free-text display field; not independently filterable" |
+| `tagline_i18n` | exempt | "i18n translation payload; not filterable" |
+| `verified_badge` | exempt | "boolean display flag; not a filter dimension" |
