@@ -334,6 +334,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.email_already_registered": "Email already registered in the system.",
         "enrollment.city_no_market": "City not found or has no active market.",
         "enrollment.employer_institution_id_required": "Internal users must provide institution_id query parameter to specify which Employer institution to operate on.",
+        "enrollment.partial_subsidy_requires_app": "This benefit only covers part of the plan price. The employee must subscribe through the Vianda app to pay their share.",
         # employer.program.* — K13
         "employer.program_already_exists": "A benefits program already exists for this {scope}.",
     },
@@ -665,6 +666,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.email_already_registered": "El correo electrónico ya está registrado en el sistema.",
         "enrollment.city_no_market": "Ciudad no encontrada o sin mercado activo.",
         "enrollment.employer_institution_id_required": "Los usuarios internos deben proporcionar el parámetro institution_id para especificar en qué institución Empleador operar.",
+        "enrollment.partial_subsidy_requires_app": "Este beneficio cubre solo parte del precio del plan. El empleado debe suscribirse a través de la aplicación Vianda para pagar su parte.",
         # employer.program.* — K13
         "employer.program_already_exists": "Ya existe un programa de beneficios para este {scope}.",
     },
@@ -996,6 +998,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.email_already_registered": "E-mail já registrado no sistema.",
         "enrollment.city_no_market": "Cidade não encontrada ou sem mercado ativo.",
         "enrollment.employer_institution_id_required": "Usuários internos devem fornecer o parâmetro institution_id para especificar qual instituição Empregador operar.",
+        "enrollment.partial_subsidy_requires_app": "Este benefício cobre apenas parte do preço do plano. O funcionário deve se inscrever através do aplicativo Vianda para pagar sua parte.",
         # employer.program.* — K13
         "employer.program_already_exists": "Já existe um programa de benefícios para este {scope}.",
     },

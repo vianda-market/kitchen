@@ -372,15 +372,14 @@ def subscribe_employee(
     employee_share = plan_price - employee_benefit
 
     if employee_share > 0:
-        # Decision F: suppress dollar-amount + internal API path leak; log for ops
         log_error(
             f"subscribe_employee: partial subsidy case for user {user_id}, plan {plan_id}, "
             f"institution {institution_id}. employee_share={employee_share:.2f}. "
             "Employee must subscribe through the app and pay their share."
         )
         raise envelope_exception(
-            ErrorCode.SERVER_INTERNAL_ERROR,
-            status=500,
+            ErrorCode.ENROLLMENT_PARTIAL_SUBSIDY_REQUIRES_APP,
+            status=400,
             locale=locale,
         )
 

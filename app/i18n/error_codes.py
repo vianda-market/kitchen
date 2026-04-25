@@ -335,6 +335,7 @@ class ErrorCode(StrEnum):
     ENROLLMENT_EMAIL_ALREADY_REGISTERED = "enrollment.email_already_registered"
     ENROLLMENT_CITY_NO_MARKET = "enrollment.city_no_market"
     ENROLLMENT_EMPLOYER_INSTITUTION_ID_REQUIRED = "enrollment.employer_institution_id_required"
+    ENROLLMENT_PARTIAL_SUBSIDY_REQUIRES_APP = "enrollment.partial_subsidy_requires_app"
 
     # ── employer.program.* ───────────────────────────────────────────────
     # Employer benefits program management errors. Wired in K13.
