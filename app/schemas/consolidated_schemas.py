@@ -990,55 +990,89 @@ class PlateResponseSchema(BaseModel):
 class PlateEnrichedResponseSchema(BaseModel):
     """Schema for enriched plate response data with institution, restaurant, product, and address details"""
 
+    # filter-registry:exempt reason="enriched join field; not a direct column on plate_info"
     plate_id: UUID
+    # filter-registry:exempt reason="enriched join field; product_id is a join key, not a filterable dimension"
     product_id: UUID
     restaurant_id: UUID
+    # filter-registry:exempt reason="enriched join field; filter by restaurant_id instead"
     institution_name: str
+    # filter-registry:exempt reason="enriched join field; filter by restaurant_id instead"
     restaurant_name: str
+    # filter-registry:exempt reason="enriched join field; filter by cuisine_id instead"
     cuisine_name: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     cuisine_name_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="enriched join field; filter by restaurant_id instead"
     pickup_instructions: str | None = None
+    # filter-registry:exempt reason="enriched join field; country_code is registered instead"
     country_name: str
+    # filter-registry:exempt reason="enriched join field; address join country; not registered for plate-level filtering"
     country_code: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     province: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     city: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     street_type: str | None = None
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     street_name: str | None = None
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     building_number: str | None = None
+    # filter-registry:exempt reason="enriched join field; computed display field, not independently filterable"
     address_display: str | None = Field(
         None, description="Pre-formatted street line per market (e.g. 123 Main St or Av Santa Fe 100)"
     )
+    # filter-registry:exempt reason="enriched join field; geo filtering handled by geo op if needed"
     latitude: float | None = None
+    # filter-registry:exempt reason="enriched join field; geo filtering handled by geo op if needed"
     longitude: float | None = None
+    # filter-registry:exempt reason="computed aggregate; not independently filterable"
     average_stars: float | None = None
+    # filter-registry:exempt reason="computed aggregate; use portion_size for filtering"
     average_portion_size: float | None = None
+    # filter-registry:exempt reason="Python-computed from average_portion_size; deferred to kitchen#87"
     portion_size: Literal["light", "standard", "large", "insufficient_reviews"] = Field(
         "insufficient_reviews",
         description="Human-readable portion size; 'insufficient_reviews' when < 5 reviews (client shows 'not enough reviews' message)",
     )
+    # filter-registry:exempt reason="computed aggregate; not independently filterable"
     review_count: int = 0
+    # filter-registry:exempt reason="enriched join field; filter by plate_id instead"
     product_name: str
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     product_name_i18n: dict | None = Field(None, exclude=True)
     dietary: list[DietaryFlag] | None
+    # filter-registry:exempt reason="enriched join field; free-text, not independently filterable"
     ingredients: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     ingredients_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="enriched join field; free-text, not independently filterable"
     description: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     description_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="enriched join field; computed from storage_path; not filterable"
     product_image_url: str | None
-    product_image_storage_path: str  # Product image storage path
+    # filter-registry:exempt reason="internal storage path; not exposed as filter; use has_image toggle instead"
     has_image: bool  # Flag indicating if product has a custom uploaded image (TRUE) or default placeholder (FALSE)
+    # filter-registry:exempt reason="range-bound; use price_from / price_to filter params"
     price: Decimal
+    # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
     credit: int
+    # filter-registry:exempt reason="computed display value; not filterable"
     expected_payout_local_currency: Decimal
+    # filter-registry:exempt reason="enriched join field; supplier_terms field, not independently filterable"
     no_show_discount: int | None = Field(None, description="From supplier_terms; null when no terms configured")
+    # filter-registry:exempt reason="enriched join field; not independently filterable"
     delivery_time_minutes: int
+    # filter-registry:exempt reason="status field used in restaurant scoping; not a plate filter dimension"
     is_archived: bool
     status: Status
-    created_date: datetime
-    modified_date: datetime
+    # filter-registry:exempt reason="Python-computed contextual flag; not a DB column"
     has_coworker_offer: bool | None = Field(
         None, description="When kitchen_day provided and user has employer: True if coworker has pickup_intent=offer"
     )
+    # filter-registry:exempt reason="Python-computed contextual flag; not a DB column"
     has_coworker_request: bool | None = Field(
         None, description="When kitchen_day provided and user has employer: True if coworker has pickup_intent=request"
     )
@@ -1423,30 +1457,45 @@ class PlanResponseSchema(BaseModel):
 class PlanEnrichedResponseSchema(BaseModel):
     """Schema for enriched plan response data with currency name and code"""
 
+    # filter-registry:exempt reason="primary key"
     plan_id: UUID
     market_id: UUID
+    # filter-registry:exempt reason="display label for market_id"
     market_name: str
     country_code: str
+    # filter-registry:exempt reason="display label for currency_code"
     currency_name: str
     currency_code: str
+    # filter-registry:exempt reason="free-text label"
     name: str
+    # filter-registry:exempt reason="translation payload; not filterable"
     name_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="free-text marketing copy"
     marketing_description: str | None = None
+    # filter-registry:exempt reason="translation payload; not filterable"
     marketing_description_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="free-text marketing copy"
     features: list[str] | None = None
+    # filter-registry:exempt reason="translation payload; not filterable"
     features_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="free-text marketing copy"
     cta_label: str | None = None
+    # filter-registry:exempt reason="translation payload; not filterable"
     cta_label_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
     credit: int
+    # filter-registry:exempt reason="range-bound; use price_from / price_to filter params"
     price: float
+    # filter-registry:exempt reason="computed display value"
     credit_cost_local_currency: float
+    # filter-registry:exempt reason="computed display value"
     credit_cost_usd: float
     rollover: bool
+    # filter-registry:exempt reason="only meaningful when rollover=true"
     rollover_cap: Decimal | None
+    # filter-registry:exempt reason="soft-delete flag; server filters by default"
     is_archived: bool
     status: Status
-    created_date: datetime
-    modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1796,45 +1845,72 @@ class CitySnapshotResponseSchema(BaseModel):
 class RestaurantEnrichedResponseSchema(BaseModel):
     """Schema for enriched restaurant response data with institution, entity, and address details"""
 
+    # filter-registry:exempt reason="primary key; route param not filter param"
     restaurant_id: UUID
+    # filter-registry:exempt reason="enriched join field; filter by institution_id instead"
     institution_id: UUID
+    # filter-registry:exempt reason="enriched join field; filter by institution_id instead"
     institution_name: str
+    # filter-registry:exempt reason="enriched join field; filter by institution_entity_id instead"
     institution_entity_id: UUID
+    # filter-registry:exempt reason="enriched join field; filter by institution_entity_id instead"
     institution_entity_name: str
+    # filter-registry:exempt reason="enriched join field; address join key, not independently filterable"
     address_id: UUID
+    # filter-registry:exempt reason="enriched join field; country_code is registered instead"
     country_name: str
     country_code: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     province: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     city: str
+    # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     postal_code: str
+    # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
     currency_metadata_id: UUID
+    # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
     market_credit_value_local_currency: Decimal = Field(
         ...,
         description="Credit value in local currency for this market; use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_local_currency)",
     )
+    # filter-registry:exempt reason="free-text label; use search filter instead"
     name: str
+    # filter-registry:exempt reason="enriched join field; cuisine filter uses cuisine op on name, not cuisine_id directly"
     cuisine_id: UUID | None = None
+    # filter-registry:exempt reason="enriched join field; filter by cuisine_id instead"
     cuisine_name: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     cuisine_name_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="free-text display field; not independently filterable"
     tagline: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     tagline_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="boolean display flag; not a filter dimension"
     is_featured: bool = False
+    # filter-registry:exempt reason="computed URL; not independently filterable"
     cover_image_url: str | None = None
+    # filter-registry:exempt reason="computed aggregate; not independently filterable"
     average_rating: Decimal | None = None
+    # filter-registry:exempt reason="computed aggregate; not independently filterable"
     review_count: int = 0
+    # filter-registry:exempt reason="boolean display flag; not a filter dimension"
     verified_badge: bool = False
+    # filter-registry:exempt reason="display label; not independently filterable"
     spotlight_label: str | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     spotlight_label_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="display list; not independently filterable"
     member_perks: list[str] | None = None
+    # filter-registry:exempt reason="i18n translation payload; not filterable"
     member_perks_i18n: dict | None = Field(None, exclude=True)
+    # filter-registry:exempt reason="internal archival flag; use status filter instead"
     is_archived: bool
     status: Status
-    created_date: datetime
-    modified_date: datetime
     # PostGIS location as GeoJSON dict: {"type": "Point", "coordinates": [lng, lat]}.
     # IMPORTANT: GeoJSON uses [longitude, latitude] ordering — the reverse of conversational
     # "lat/lng". Consumers must read coordinates[0] as longitude and coordinates[1] as latitude.
     # None when the restaurant has not been geocoded yet.
+    # filter-registry:exempt reason="PostGIS geometry; geo filter op handles spatial queries separately"
     location: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -2006,32 +2082,46 @@ class QRCodePrintContextSchema(BaseModel):
 class PlatePickupEnrichedResponseSchema(BaseModel):
     """Schema for enriched plate pickup response data with restaurant, address, product, and credit information"""
 
+    # filter-registry:exempt reason="primary key"
     plate_pickup_id: UUID
+    # filter-registry:exempt reason="FK; not a filter dimension"
     plate_selection_id: UUID
+    # filter-registry:exempt reason="auth-scoped via JWT; not a user-input filter"
     user_id: UUID
     restaurant_id: UUID
+    # filter-registry:exempt reason="free-text label"
     restaurant_name: str
+    # filter-registry:exempt reason="address; restaurant scope handles location filtering"
     country: str
+    # filter-registry:exempt reason="address; restaurant scope handles location filtering"
     province: str
+    # filter-registry:exempt reason="address; restaurant scope handles location filtering"
     city: str
+    # filter-registry:exempt reason="address; restaurant scope handles location filtering"
     postal_code: str
+    # filter-registry:exempt reason="computed display string"
     address_display: str | None = None
     plate_id: UUID
-    product_id: UUID
+    # filter-registry:exempt reason="free-text label"
     product_name: str
+    # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
     credit: int
+    # filter-registry:exempt reason="kiosk QR data; not a filter dimension"
     qr_code_id: UUID
+    # filter-registry:exempt reason="kiosk QR data; not a filter dimension"
     qr_code_payload: str
+    # filter-registry:exempt reason="soft-delete flag; server filters by default"
     is_archived: bool
     status: Status
     was_collected: bool | None = False
+    # filter-registry:exempt reason="range-bound; use arrival_time_from / arrival_time_to filter params"
     arrival_time: datetime | None
+    # filter-registry:exempt reason="range-bound; use completion_time_from / completion_time_to filter params"
     completion_time: datetime | None
+    # filter-registry:exempt reason="computed projection; clients display only"
     expected_completion_time: datetime | None
+    # filter-registry:exempt reason="opaque token; never filtered"
     confirmation_code: str | None
-    created_date: datetime
-    modified_by: UUID
-    modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -2618,19 +2708,21 @@ class NationalHolidayUpdateSchema(BaseModel):
 class NationalHolidayResponseSchema(BaseModel):
     """Schema for national holiday response data"""
 
+    # filter-registry:exempt reason="primary key; route param not filter param"
     holiday_id: UUID
     country_code: str
+    # filter-registry:exempt reason="free-text label; covered by search if needed"
     holiday_name: str
+    # filter-registry:exempt reason="range-bound; use holiday_date_from / holiday_date_to filter params"
     holiday_date: date
     is_recurring: bool
     recurring_month: int | None
+    # filter-registry:exempt reason="paired with recurring_month; rarely filtered alone"
     recurring_day: int | None
     status: Status
+    # filter-registry:exempt reason="soft-delete flag; server filters by default"
     is_archived: bool
     source: str = Field(..., description="'manual' | 'nager_date' — client creates are always manual")
-    created_date: datetime
-    modified_by: UUID
-    modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

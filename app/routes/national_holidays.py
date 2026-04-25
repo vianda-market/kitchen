@@ -56,9 +56,15 @@ def sync_national_holidays_from_provider(
 
 
 @router.get("", response_model=list[NationalHolidayResponseSchema])
-def list_national_holidays(
+def list_national_holidays(  # noqa: PLR0913
     response: Response,
     country_code: str | None = Query(None, description="Filter by country code (ISO alpha-2, e.g. AR)"),
+    holiday_date_from: str | None = Query(None, description="Filter holidays on or after this date (ISO 8601, e.g. 2025-01-01)"),
+    holiday_date_to: str | None = Query(None, description="Filter holidays on or before this date (ISO 8601, e.g. 2025-12-31)"),
+    is_recurring: bool | None = Query(None, description="Filter by recurring flag"),
+    recurring_month: list[int] | None = Query(None, description="Filter by month(s) (1-12)"),
+    source: list[str] | None = Query(None, description="Filter by source (manual, nager_date)"),
+    status: list[str] | None = Query(None, description="Filter by status"),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -66,7 +72,8 @@ def list_national_holidays(
     """
     List all national holidays.
 
-    Internal-only endpoint. Supports filtering by country_code (via filter registry)
+    Internal-only endpoint. Supports filtering via filter registry (country_code, holiday_date range,
+    is_recurring toggle, recurring_month multi-select, source multi-select, status multi-select)
     and optional pagination (page + page_size query params). When paginated, the
     X-Total-Count response header carries the total filtered row count.
     """
@@ -75,9 +82,20 @@ def list_national_holidays(
         base_conditions = ["nh.is_archived = FALSE"]
         base_params: list = []
 
-        # Build filter conditions from registry (country_code is the only registered field).
+        # Build filter conditions from registry.
         try:
-            extra = build_filter_conditions("national_holidays", {"country_code": country_code})
+            extra = build_filter_conditions(
+                "national_holidays",
+                {
+                    "country_code": country_code,
+                    "holiday_date_from": holiday_date_from,
+                    "holiday_date_to": holiday_date_to,
+                    "is_recurring": is_recurring,
+                    "recurring_month": recurring_month,
+                    "source": source,
+                    "status": status,
+                },
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
 

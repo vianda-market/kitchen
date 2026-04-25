@@ -762,21 +762,37 @@ def create_plan_routes() -> APIRouter:
 
     # Enriched routes MUST be before /{plan_id} so /enriched is not parsed as plan_id
     @router.get("/enriched", response_model=list[PlanEnrichedResponseSchema])
-    def list_enriched_plans(
+    def list_enriched_plans(  # noqa: PLR0913
         response: Response,
         market_id: UUID | None = market_filter(),
         status: str | None = status_filter(),
         currency_code: str | None = currency_code_filter(),
+        price_from: float | None = Query(None, description="Filter plans with price >= this value"),
+        price_to: float | None = Query(None, description="Filter plans with price <= this value"),
+        credit_from: int | None = Query(None, description="Filter plans with credit >= this value"),
+        credit_to: int | None = Query(None, description="Filter plans with credit <= this value"),
+        country_code: list[str] | None = Query(None, description="Filter by country code(s) (multi-select)"),
+        rollover: bool | None = Query(None, description="Filter by rollover flag"),
         pagination: PaginationParams | None = Depends(get_pagination_params),
         current_user: dict = Depends(get_client_or_employee_user),
         locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
-        """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code. Excludes plans for Global Marketplace. Non-archived only."""
+        """List all plans with enriched data (currency_name and currency_code). Optional filters: market_id, status, currency_code, price_from/to, credit_from/to, country_code, rollover. Excludes plans for Global Marketplace. Non-archived only."""
         try:
             from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_list_field
 
-            filters = {"market_id": market_id, "status": status, "currency_code": currency_code}
+            filters = {
+                "market_id": market_id,
+                "status": status,
+                "currency_code": currency_code,
+                "price_from": price_from,
+                "price_to": price_to,
+                "credit_from": credit_from,
+                "credit_to": credit_to,
+                "country_code": country_code,
+                "rollover": rollover,
+            }
             try:
                 additional_conditions = list(build_filter_conditions("plans", filters) or [])
             except ValueError as exc:
@@ -1793,7 +1809,7 @@ def create_plate_routes() -> APIRouter:
 
         # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
         @router.get("/enriched", response_model=list[PlateEnrichedResponseSchema])
-        def list_enriched_plates(
+        def list_enriched_plates(  # noqa: PLR0913
             response: Response,
             status: str | None = Query(None, description="Filter by plate status (e.g. active, inactive)"),
             market_id: UUID | None = Query(None, description="Filter by market ID"),
@@ -1804,12 +1820,18 @@ def create_plate_routes() -> APIRouter:
             plate_date_to: str | None = Query(
                 None, description="Filter plates created on or before this date (YYYY-MM-DD)"
             ),
+            cuisine_id: list[UUID] | None = Query(None, description="Filter by cuisine ID(s) (multi-select)"),
+            dietary: list[str] | None = Query(None, description="Filter by dietary flag(s) (multi-select, e.g. vegan, vegetarian)"),
+            price_from: int | None = Query(None, description="Filter plates with price >= this value"),
+            price_to: int | None = Query(None, description="Filter plates with price <= this value"),
+            credit_from: int | None = Query(None, description="Filter plates with credit >= this value"),
+            credit_to: int | None = Query(None, description="Filter plates with credit <= this value"),
             pagination: PaginationParams | None = Depends(get_pagination_params),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """List plates with enriched data. Optional filters: status, market_id, restaurant_id, plate_date_from, plate_date_to. Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
+            """List plates with enriched data. Optional filters: status, market_id, restaurant_id, plate_date_from/to, cuisine_id, dietary, price_from/to, credit_from/to. Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 from app.i18n.locale_names import resolve_cuisine_name
 
@@ -1818,16 +1840,29 @@ def create_plate_routes() -> APIRouter:
                 else:
                     scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
                 try:
-                    filter_conditions = build_filter_conditions(
-                        "plates",
-                        {
-                            "status": status,
-                            "market_id": market_id,
-                            "restaurant_id": restaurant_id,
-                            "plate_date_from": plate_date_from,
-                            "plate_date_to": plate_date_to,
-                        },
+                    filter_conditions = list(
+                        build_filter_conditions(
+                            "plates",
+                            {
+                                "status": status,
+                                "market_id": market_id,
+                                "restaurant_id": restaurant_id,
+                                "plate_date_from": plate_date_from,
+                                "plate_date_to": plate_date_to,
+                                "cuisine_id": [str(c) for c in cuisine_id] if cuisine_id else None,
+                                "price_from": price_from,
+                                "price_to": price_to,
+                                "credit_from": credit_from,
+                                "credit_to": credit_to,
+                            },
+                        )
+                        or []
                     )
+                    # dietary uses array-overlap SQL because dietary is TEXT[] in PostgreSQL.
+                    # filter_builder "in" op emits col = ANY(%s) which checks if the whole array
+                    # equals one value -- NOT element containment. Use && (array overlap) instead.
+                    if dietary:
+                        filter_conditions.append(("pr.dietary && %s::text[]", [dietary]))
                 except ValueError as exc:
                     raise HTTPException(status_code=400, detail=str(exc)) from None
                 plates = get_enriched_plates(

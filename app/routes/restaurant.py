@@ -494,12 +494,12 @@ def get_restaurants_by_city_route(
 
 # GET /restaurants/enriched - List all restaurants with enriched data
 @router.get("/enriched", response_model=list[RestaurantEnrichedResponseSchema])
-def list_enriched_restaurants(
+def list_enriched_restaurants(  # noqa: PLR0913 -- declarative FastAPI Query params, not algorithmic args
     response: Response,
     institution_id: UUID | None = institution_filter(),
     city: str | None = Query(None, description="Filter by city name (case-sensitive)"),
     market_id: UUID | None = Query(None, description="Filter by market ID"),
-    kitchen_day: str | None = Query(None, description="Filter to restaurants serving this kitchen day (monday–friday)"),
+    kitchen_day: str | None = Query(None, description="Filter to restaurants serving this kitchen day (monday-friday)"),
     cuisine: list[str] | None = Query(None, description="Filter by one or more cuisine names (multi-select)"),
     search: str | None = Query(
         None, description="Search across restaurant name and tagline (case-insensitive substring)"
@@ -524,12 +524,22 @@ def list_enriched_restaurants(
         description="Search radius in metres for proximity filter. Must be combined with center.",
         gt=0,
     ),
+    status: list[str] | None = Query(None, description="Filter by restaurant status(es) (multi-select)"),
+    country_code: list[str] | None = Query(None, description="Filter by country code(s) (multi-select)"),
+    institution_id_in: list[UUID] | None = Query(
+        None,
+        alias="institution_id_in",
+        description="Filter by institution ID(s) (multi-select; distinct from scoping institution_id)",
+    ),
+    institution_entity_id: list[UUID] | None = Query(
+        None, description="Filter by institution entity ID(s) (multi-select)"
+    ),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). Optional filters: city, market_id, kitchen_day, cuisine (multi-select), search, bbox (bounding box), center+radius_m (proximity). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
+    """List all restaurants with enriched data (institution_name, entity_name, address details). Optional institution_id filters by institution (B2B Internal dropdown scoping). Optional filters: city, market_id, kitchen_day, cuisine (multi-select), search, bbox (bounding box), center+radius_m (proximity), status, country_code, institution_id_in (multi-select), institution_entity_id (multi-select). When institution has a local market_id (v1), only restaurants in that market are returned. Non-archived only."""
     try:
         scope = EntityScopingService.get_scope_for_entity(ENTITY_RESTAURANT, current_user)
         effective_institution_id = resolve_institution_filter(institution_id, scope)
@@ -582,6 +592,10 @@ def list_enriched_restaurants(
                     "search": search,
                     "bbox": bbox_value,
                     "radius": radius_value,
+                    "status": status,
+                    "country_code": country_code,
+                    "institution_id": [str(i) for i in institution_id_in] if institution_id_in else None,
+                    "institution_entity_id": [str(e) for e in institution_entity_id] if institution_entity_id else None,
                 },
             )
         except ValueError as exc:

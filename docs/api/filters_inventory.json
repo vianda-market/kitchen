@@ -2,918 +2,809 @@
   {
     "endpoint": "/api/v1/national-holidays",
     "entity": "national_holidays",
-    "field": "created_date",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
+    "exempt_reason": "\"range-bound; use holiday_date_from / holiday_date_to filter params\"",
     "field": "holiday_date",
     "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/national-holidays",
     "entity": "national_holidays",
+    "exempt_reason": "\"primary key; route param not filter param\"",
     "field": "holiday_id",
     "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/national-holidays",
     "entity": "national_holidays",
+    "exempt_reason": "\"free-text label; covered by search if needed\"",
     "field": "holiday_name",
     "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/national-holidays",
     "entity": "national_holidays",
+    "exempt_reason": "\"soft-delete flag; server filters by default\"",
     "field": "is_archived",
     "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/national-holidays",
     "entity": "national_holidays",
-    "field": "is_recurring",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
-    "field": "modified_by",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
-    "field": "modified_date",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
+    "exempt_reason": "\"paired with recurring_month; rarely filtered alone\"",
     "field": "recurring_day",
     "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
-    "field": "recurring_month",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
-    "field": "source",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/national-holidays",
-    "entity": "national_holidays",
-    "field": "status",
-    "model": "NationalHolidayResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"computed display string\"",
     "field": "address_display",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"range-bound; use arrival_time_from / arrival_time_to filter params\"",
     "field": "arrival_time",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "city",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"range-bound; use completion_time_from / completion_time_to filter params\"",
     "field": "completion_time",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"opaque token; never filtered\"",
     "field": "confirmation_code",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "country",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
-    "field": "created_date",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
+    "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
     "field": "credit",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"computed projection; clients display only\"",
     "field": "expected_completion_time",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"soft-delete flag; server filters by default\"",
     "field": "is_archived",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
-    "field": "modified_by",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
-    "field": "modified_date",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
-    "field": "plate_id",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
+    "exempt_reason": "\"primary key\"",
     "field": "plate_pickup_id",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"FK; not a filter dimension\"",
     "field": "plate_selection_id",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "postal_code",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
-    "field": "product_id",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
+    "exempt_reason": "\"free-text label\"",
     "field": "product_name",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "province",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"kiosk QR data; not a filter dimension\"",
     "field": "qr_code_id",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"kiosk QR data; not a filter dimension\"",
     "field": "qr_code_payload",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
-    "field": "restaurant_id",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
+    "exempt_reason": "\"free-text label\"",
     "field": "restaurant_name",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plate-pickup/enriched",
     "entity": "pickups",
+    "exempt_reason": "\"auth-scoped via JWT; not a user-input filter\"",
     "field": "user_id",
     "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
-    "field": "was_collected",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
-    "field": "country_code",
-    "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plans/enriched",
-    "entity": "plans",
-    "field": "created_date",
-    "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plans/enriched",
-    "entity": "plans",
+    "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
     "field": "credit",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"computed display value\"",
     "field": "credit_cost_local_currency",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"computed display value\"",
     "field": "credit_cost_usd",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"free-text marketing copy\"",
     "field": "cta_label",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"translation payload; not filterable\"",
     "field": "cta_label_i18n",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"display label for currency_code\"",
     "field": "currency_name",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"free-text marketing copy\"",
     "field": "features",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"translation payload; not filterable\"",
     "field": "features_i18n",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"soft-delete flag; server filters by default\"",
     "field": "is_archived",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"display label for market_id\"",
     "field": "market_name",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"free-text marketing copy\"",
     "field": "marketing_description",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"translation payload; not filterable\"",
     "field": "marketing_description_i18n",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
-    "field": "modified_date",
-    "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plans/enriched",
-    "entity": "plans",
+    "exempt_reason": "\"free-text label\"",
     "field": "name",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"translation payload; not filterable\"",
     "field": "name_i18n",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"primary key\"",
     "field": "plan_id",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
+    "exempt_reason": "\"range-bound; use price_from / price_to filter params\"",
     "field": "price",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
-    "field": "rollover",
-    "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plans/enriched",
-    "entity": "plans",
+    "exempt_reason": "\"only meaningful when rollover=true\"",
     "field": "rollover_cap",
     "model": "PlanEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; computed display field, not independently filterable\"",
     "field": "address_display",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"computed aggregate; use portion_size for filtering\"",
     "field": "average_portion_size",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
     "field": "average_stars",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "building_number",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "city",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address join country; not registered for plate-level filtering\"",
     "field": "country_code",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; country_code is registered instead\"",
     "field": "country_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "created_date",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
     "field": "credit",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; filter by cuisine_id instead\"",
     "field": "cuisine_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "cuisine_name_i18n",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; not independently filterable\"",
     "field": "delivery_time_minutes",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
     "field": "description",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "description_i18n",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "dietary",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"computed display value; not filterable\"",
     "field": "expected_payout_local_currency",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
     "field": "has_coworker_offer",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
     "field": "has_coworker_request",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "has_image",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
     "field": "ingredients",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "ingredients_i18n",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
     "field": "institution_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"status field used in restaurant scoping; not a plate filter dimension\"",
     "field": "is_archived",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
     "field": "latitude",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
     "field": "longitude",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "modified_date",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"enriched join field; supplier_terms field, not independently filterable\"",
     "field": "no_show_discount",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
     "field": "pickup_instructions",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; not a direct column on plate_info\"",
     "field": "plate_id",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "portion_size",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"range-bound; use price_from / price_to filter params\"",
     "field": "price",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; product_id is a join key, not a filterable dimension\"",
     "field": "product_id",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "field": "product_image_storage_path",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
+    "exempt_reason": "\"enriched join field; computed from storage_path; not filterable\"",
     "field": "product_image_url",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; filter by plate_id instead\"",
     "field": "product_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "product_name_i18n",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "province",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
     "field": "restaurant_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
     "field": "review_count",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "street_name",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "street_type",
     "model": "PlateEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; address join key, not independently filterable\"",
     "field": "address_id",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
     "field": "average_rating",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "country_code",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; country_code is registered instead\"",
     "field": "country_name",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"computed URL; not independently filterable\"",
     "field": "cover_image_url",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "created_date",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; cuisine filter uses cuisine op on name, not cuisine_id directly\"",
     "field": "cuisine_id",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; filter by cuisine_id instead\"",
     "field": "cuisine_name",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "cuisine_name_i18n",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; market dimension, not a restaurant filter\"",
     "field": "currency_metadata_id",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "institution_entity_id",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; filter by institution_entity_id instead\"",
     "field": "institution_entity_name",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "institution_id",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; filter by institution_id instead\"",
     "field": "institution_name",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"internal archival flag; use status filter instead\"",
     "field": "is_archived",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"boolean display flag; not a filter dimension\"",
     "field": "is_featured",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"PostGIS geometry; geo filter op handles spatial queries separately\"",
     "field": "location",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; market dimension, not a restaurant filter\"",
     "field": "market_credit_value_local_currency",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"display list; not independently filterable\"",
     "field": "member_perks",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "member_perks_i18n",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "modified_date",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"free-text label; use search filter instead\"",
     "field": "name",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "postal_code",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
     "field": "province",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"primary key; route param not filter param\"",
     "field": "restaurant_id",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
     "field": "review_count",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"display label; not independently filterable\"",
     "field": "spotlight_label",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "spotlight_label_i18n",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
-    "field": "status",
-    "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
-  },
-  {
-    "endpoint": "/api/v1/restaurants/enriched",
-    "entity": "restaurants",
+    "exempt_reason": "\"free-text display field; not independently filterable\"",
     "field": "tagline",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "tagline_i18n",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   },
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"boolean display flag; not a filter dimension\"",
     "field": "verified_badge",
     "model": "RestaurantEnrichedResponseSchema",
-    "status": "unfiltered"
+    "status": "exempt"
   }
 ]
