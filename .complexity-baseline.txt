@@ -7,3 +7,4 @@
 app/routes/restaurant.py:get_restaurants_by_city_route
 app/routes/restaurant.py:list_enriched_restaurants
 app/services/leads_public_service.py:create_lead_interest
+app/services/entity_service.py:get_enriched_plate_pickups
