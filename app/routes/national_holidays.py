@@ -25,7 +25,7 @@ from app.services.crud_service import national_holiday_service
 from app.services.error_handling import handle_business_operation
 from app.utils.db import db_batch_insert, db_read
 from app.utils.filter_builder import build_filter_conditions
-from app.utils.log import log_info
+from app.utils.log import log_info, log_warning
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/national-holidays", tags=["National Holidays"])
@@ -59,8 +59,12 @@ def sync_national_holidays_from_provider(
 def list_national_holidays(  # noqa: PLR0913
     response: Response,
     country_code: str | None = Query(None, description="Filter by country code (ISO alpha-2, e.g. AR)"),
-    holiday_date_from: str | None = Query(None, description="Filter holidays on or after this date (ISO 8601, e.g. 2025-01-01)"),
-    holiday_date_to: str | None = Query(None, description="Filter holidays on or before this date (ISO 8601, e.g. 2025-12-31)"),
+    holiday_date_from: str | None = Query(
+        None, description="Filter holidays on or after this date (ISO 8601, e.g. 2025-01-01)"
+    ),
+    holiday_date_to: str | None = Query(
+        None, description="Filter holidays on or before this date (ISO 8601, e.g. 2025-12-31)"
+    ),
     is_recurring: bool | None = Query(None, description="Filter by recurring flag"),
     recurring_month: list[int] | None = Query(None, description="Filter by month(s) (1-12)"),
     source: list[str] | None = Query(None, description="Filter by source (manual, nager_date)"),
@@ -97,7 +101,8 @@ def list_national_holidays(  # noqa: PLR0913
                 },
             )
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            log_warning(f"Invalid filter on /national-holidays: {exc}")
+            raise HTTPException(status_code=400, detail="Invalid filter parameter") from None
 
         if extra:
             for cond, cond_params in extra:

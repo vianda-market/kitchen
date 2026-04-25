@@ -12,8 +12,10 @@ from uuid import UUID
 import psycopg2.extensions
 
 from app.config.settings import settings
+from app.i18n.messages import get_message
 from app.services.fcm_token_service import delete_fcm_token_by_value, get_user_fcm_tokens
 from app.utils.db import db_read
+from app.utils.locale import get_user_locale
 from app.utils.log import log_error, log_info, log_warning
 
 _firebase_initialized = False
@@ -38,6 +40,14 @@ def _ensure_firebase():
     except Exception as e:
         log_error(f"Failed to initialize Firebase Admin SDK: {e}")
         return False
+
+
+# Pushes are async — locale is the recipient user's profile locale, NOT
+# the request Accept-Language. The request that triggered the handoff
+# may belong to a kitchen operator with a different locale.
+def _get_recipient_locale(user_id: UUID, db: psycopg2.extensions.connection) -> str:
+    """Return the recipient's profile locale; falls back to DEFAULT_LOCALE."""
+    return get_user_locale(user_id, db)
 
 
 def send_handed_out_push(
@@ -81,9 +91,12 @@ def send_handed_out_push(
         # 4. Send to each token
         from firebase_admin import messaging
 
+        locale = _get_recipient_locale(user_id, db)
+        title = get_message("push.pickup_ready_title", locale)
+        body = get_message("push.pickup_ready_body", locale, restaurant_name=restaurant_name)
         notification = messaging.Notification(
-            title="Plate ready",
-            body=f"Did you receive your plate from {restaurant_name}?",
+            title=title,
+            body=body,
         )
         data = {
             "type": "pickup_handed_out",

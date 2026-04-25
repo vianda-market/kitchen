@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import Status
+from app.i18n.envelope import I18nValueError
 
 
 # --- For creating a new restaurant holiday ---
@@ -21,7 +22,7 @@ class RestaurantHolidayCreateSchema(BaseModel):
     @model_validator(mode="after")
     def validate_recurring_complete(self):
         if self.is_recurring and (self.recurring_month is None or self.recurring_day is None):
-            raise ValueError("Both recurring_month and recurring_day are required when is_recurring is True")
+            raise I18nValueError("validation.holiday.recurring_fields_required")
         return self
 
 
@@ -38,7 +39,7 @@ class RestaurantHolidayUpdateSchema(BaseModel):
     @model_validator(mode="after")
     def validate_recurring_complete(self):
         if self.is_recurring is True and (self.recurring_month is None or self.recurring_day is None):
-            raise ValueError("Both recurring_month and recurring_day are required when is_recurring is True")
+            raise I18nValueError("validation.holiday.recurring_fields_required")
         return self
 
 
@@ -72,7 +73,7 @@ class RestaurantHolidayBulkCreateSchema(BaseModel):
     @classmethod
     def validate_holidays_not_empty(cls, v):
         if not v:
-            raise ValueError("At least one holiday must be provided")
+            raise I18nValueError("validation.holiday.list_empty")
         return v
 
 

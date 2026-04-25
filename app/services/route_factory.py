@@ -1821,7 +1821,9 @@ def create_plate_routes() -> APIRouter:
                 None, description="Filter plates created on or before this date (YYYY-MM-DD)"
             ),
             cuisine_id: list[UUID] | None = Query(None, description="Filter by cuisine ID(s) (multi-select)"),
-            dietary: list[str] | None = Query(None, description="Filter by dietary flag(s) (multi-select, e.g. vegan, vegetarian)"),
+            dietary: list[str] | None = Query(
+                None, description="Filter by dietary flag(s) (multi-select, e.g. vegan, vegetarian)"
+            ),
             price_from: int | None = Query(None, description="Filter plates with price >= this value"),
             price_to: int | None = Query(None, description="Filter plates with price <= this value"),
             credit_from: int | None = Query(None, description="Filter plates with credit >= this value"),

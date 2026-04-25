@@ -141,20 +141,68 @@ The `_envelope_validation_error` handler intercepts `RequestValidationError` (42
 ```json
 {
   "detail": [
-    {"code": "validation.custom", "message": "Field required", "params": {"field": "body.name", "msg": "Field required", "type": "missing"}},
+    {"code": "validation.field_required", "message": "This field is required.", "params": {"field": "body.name", "msg": "Field required", "type": "missing"}},
     {"code": "validation.custom", "message": "...", "params": {...}}
   ]
 }
 ```
 
-**K3 mapping**: all Pydantic errors map to `validation.custom`. `params.type` carries the raw Pydantic error type string for debugging.
+All `params` objects include `field` (dot-joined location path), `msg` (raw Pydantic message), and `type` (raw Pydantic error type). Domain-specific params from `I18nValueError` are merged in as additional keys.
 
-**K5 mapping** (kitchen#67): detailed type→code mapping will ship with K5. The handler will be extended to map:
-- `"missing"` → `validation.field_required`
-- `"string_too_short"` → `validation.value_too_short`
-- `"string_too_long"` → `validation.value_too_long`
-- `"string_pattern_mismatch"` / `"value_error.email"` → `validation.invalid_format`
-- `"value_error"` with `I18nValueError` → domain-specific code from the error itself
+### Type → code mapping (K5, kitchen#67)
+
+| Pydantic `type` | Code |
+|---|---|
+| `"missing"` | `validation.field_required` |
+| `"string_too_short"` | `validation.value_too_short` |
+| `"string_too_long"` | `validation.value_too_long` |
+| `"string_pattern_mismatch"` | `validation.invalid_format` |
+| `"value_error.email"` and other email variants | `validation.invalid_format` |
+| `"value_error"` with `I18nValueError` in ctx | code from `I18nValueError.code` (domain-specific) |
+| anything else | `validation.custom` |
+
+### `I18nValueError` — custom validator integration
+
+Custom Pydantic `field_validator` / `model_validator` functions that need a stable code must raise `I18nValueError` instead of plain `ValueError`:
+
+```python
+from app.i18n.envelope import I18nValueError
+
+@model_validator(mode="after")
+def validate_hold_dates(self):
+    if self.hold_end_date <= self.hold_start_date:
+        raise I18nValueError("validation.subscription.window_invalid")
+    return self
+```
+
+The handler `isinstance`-checks `ctx["error"]` for `I18nValueError` and extracts `.code` and `.params`. Plain `ValueError` raises (not `I18nValueError`) still map to `validation.custom`; they should be migrated during the K6..KN sweep.
+
+### Domain-specific validation codes (K5 schema migration)
+
+| Code | Schema | Rule |
+|---|---|---|
+| `validation.user.invalid_role_combination` | `UserCreateSchema` | role_type + role_name combination |
+| `validation.user.unsupported_locale` | `UserUpdateSchema` | locale not in supported list |
+| `validation.user.passwords_do_not_match` | `ChangePasswordSchema`, `AdminResetPasswordSchema` | password confirm mismatch |
+| `validation.user.new_password_same_as_current` | `ChangePasswordSchema` | new == current password |
+| `validation.address.city_required` | `CustomerSignupSchema` | city_metadata_id or city_name required |
+| `validation.address.invalid_address_type` | `AddressCreateSchema` | unknown address_type value |
+| `validation.address.duplicate_address_type` | `AddressCreateSchema` | duplicate address_type values |
+| `validation.address.invalid_street_type` | `AddressCreateSchema` | unknown street_type value |
+| `validation.address.country_required` | `AddressCreateSchema` | country_code or country required when place_id absent |
+| `validation.address.field_required` | `AddressCreateSchema` | address field required when place_id absent; `params.address_field` names the field |
+| `validation.address.city_metadata_id_required` | `AddressCreateSchema` | city_metadata_id required when place_id absent |
+| `validation.plate.kitchen_days_empty` | `PlateKitchenDayCreateSchema` | kitchen_days list is empty |
+| `validation.plate.kitchen_days_duplicate` | `PlateKitchenDayCreateSchema` | duplicate days in kitchen_days |
+| `validation.discretionary.recipient_required` | `DiscretionaryCreateSchema` | user_id or restaurant_id required |
+| `validation.discretionary.conflicting_recipients` | `DiscretionaryCreateSchema` | both user_id and restaurant_id given |
+| `validation.discretionary.restaurant_required` | `DiscretionaryCreateSchema` | category requires restaurant_id |
+| `validation.holiday.recurring_fields_required` | `RestaurantHolidayCreateSchema`, `RestaurantHolidayUpdateSchema`, `NationalHolidayCreateSchema`, `NationalHolidayUpdateSchema` | recurring_month/day required when is_recurring=true |
+| `validation.holiday.list_empty` | `RestaurantHolidayBulkCreateSchema`, `NationalHolidayBulkCreateSchema` | bulk list must not be empty |
+| `validation.subscription.window_invalid` | `SubscriptionHoldRequestSchema` | hold_end_date must be after hold_start_date |
+| `validation.subscription.window_too_long` | `SubscriptionHoldRequestSchema` | hold window exceeds 3 months |
+| `validation.payment.conflicting_address_fields` | `PaymentMethodCreateSchema` | address_id and address_data both provided |
+| `validation.payment.unsupported_brand` | `PaymentMethodCreateSchema` | method_type not in allowed list |
 
 ---
 
@@ -209,4 +257,4 @@ A separate sibling list of skipped collections (kitchen#79) covers PR #60 regres
 
 ---
 
-*Last updated: K3 — catch-all handlers, minimal validation mapping, and this doc. Next updates: K5 (detailed Pydantic type mapping), K6..KN (sweep), K-last (enforcement).*
+*Last updated: K5 — detailed Pydantic type→code mapping, `I18nValueError` subclass, domain-specific validation codes across all schema files. Next updates: K6..KN (HTTPException sweep), K-last (enforcement).*

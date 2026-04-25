@@ -1,10 +1,11 @@
-"""Integration tests for K3 catch-all exception handlers.
+"""Integration tests for K3/K5 catch-all exception handlers.
 
-Uses FastAPI's TestClient to exercise the four main handler paths:
+Uses FastAPI's TestClient to exercise the main handler paths:
   1. Auto-404 (pre-route) → request.not_found envelope.
   2. In-route bare-string raise → legacy.uncoded envelope.
-  3. 422 validation error → list of validation.custom envelopes.
+  3. 422 validation error (missing field) → validation.field_required envelope (K5).
   4. Already-enveloped detail → pass-through unchanged.
+  5. I18nValueError in custom validator → domain code (K5).
 
 Rate-limit (request.rate_limited) is exercised via a dedicated fixture route
 rather than triggering slowapi's real limiter (which is per-process state).
@@ -22,7 +23,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 
-from app.i18n.envelope import build_envelope, envelope_exception
+from app.i18n.envelope import I18nValueError, build_envelope, envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.utils.locale import resolve_locale_from_header
 
@@ -71,6 +72,24 @@ def _make_test_app() -> FastAPI:
         envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=fallback_msg)
         return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
+    # Email-format error types (mirrors application.py K5 handler)
+    _EMAIL_TYPES = frozenset(
+        {
+            "value_error.email",
+            "value_error.email.invalid_domain",
+            "value_error.email.missing_at_sign",
+            "value_error.email.missing_domain",
+            "value_error.email.missing_local",
+            "value_error.email.not_an_email_string",
+        }
+    )
+    _TYPE_TO_CODE: dict[str, str] = {
+        "missing": ErrorCode.VALIDATION_FIELD_REQUIRED,
+        "string_too_short": ErrorCode.VALIDATION_VALUE_TOO_SHORT,
+        "string_too_long": ErrorCode.VALIDATION_VALUE_TOO_LONG,
+        "string_pattern_mismatch": ErrorCode.VALIDATION_INVALID_FORMAT,
+    }
+
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         locale = _resolve_locale(request)
@@ -79,12 +98,33 @@ def _make_test_app() -> FastAPI:
             field = ".".join(str(x) for x in error["loc"])
             msg = error.get("msg", "")
             error_type = error.get("type", "")
+            ctx = error.get("ctx", {}) or {}
+
+            if error_type in _TYPE_TO_CODE:
+                code: str = _TYPE_TO_CODE[error_type]
+                extra_params: dict = {}
+            elif error_type in _EMAIL_TYPES or error_type.startswith("value_error.email"):
+                code = ErrorCode.VALIDATION_INVALID_FORMAT
+                extra_params = {}
+            elif error_type == "value_error":
+                ctx_error = ctx.get("error")
+                if isinstance(ctx_error, I18nValueError):
+                    code = ctx_error.code
+                    extra_params = dict(ctx_error.params)
+                else:
+                    code = ErrorCode.VALIDATION_CUSTOM
+                    extra_params = {}
+            else:
+                code = ErrorCode.VALIDATION_CUSTOM
+                extra_params = {}
+
             envelope = build_envelope(
-                ErrorCode.VALIDATION_CUSTOM,
+                code,
                 locale,
-                msg=msg,
                 field=field,
+                msg=msg,
                 type=error_type,
+                **extra_params,
             )
             envelopes.append(envelope)
         return JSONResponse(status_code=422, content={"detail": envelopes})
@@ -98,9 +138,26 @@ def _make_test_app() -> FastAPI:
     class _Body(BaseModel):
         name: str  # required — sending empty body triggers 422
 
+    from pydantic import model_validator as _mv
+
+    class _HoldBody(BaseModel):
+        """Body with a custom I18nValueError validator for testing K5 domain codes."""
+
+        end_after_start: bool = True
+
+        @_mv(mode="after")
+        def check_field(self):
+            if not self.end_after_start:
+                raise I18nValueError("validation.subscription.window_invalid")
+            return self
+
     @app.post("/validation-target")
     async def validation_target(body: _Body):
         return {"name": body.name}
+
+    @app.post("/i18n-validator-target")
+    async def i18n_validator_target(body: _HoldBody):
+        return {"ok": True}
 
     @app.get("/already-enveloped")
     async def already_enveloped():
@@ -158,7 +215,7 @@ def test_bare_string_raise_returns_legacy_uncoded(client):
 
 
 def test_validation_error_returns_array_of_envelopes(client):
-    """POST with missing required field → 422 with list of validation.custom envelopes."""
+    """POST with missing required field → 422 with validation.field_required envelope (K5)."""
     resp = client.post("/validation-target", json={})
     assert resp.status_code == 422
     body = resp.json()
@@ -166,12 +223,25 @@ def test_validation_error_returns_array_of_envelopes(client):
     assert isinstance(detail, list), f"Expected list for 422, got: {detail!r}"
     assert len(detail) >= 1
     first = detail[0]
-    assert first["code"] == ErrorCode.VALIDATION_CUSTOM
+    # K5: missing field maps to validation.field_required, not validation.custom
+    assert first["code"] == ErrorCode.VALIDATION_FIELD_REQUIRED
     assert "message" in first
     params = first["params"]
     assert "field" in params
     assert "msg" in params
     assert "type" in params
+
+
+def test_i18n_value_error_emits_domain_code(client):
+    """Custom validator raising I18nValueError → domain-specific code in envelope (K5)."""
+    resp = client.post("/i18n-validator-target", json={"end_after_start": False})
+    assert resp.status_code == 422
+    body = resp.json()
+    detail = body["detail"]
+    assert isinstance(detail, list), f"Expected list for 422, got: {detail!r}"
+    assert len(detail) >= 1
+    first = detail[0]
+    assert first["code"] == "validation.subscription.window_invalid", f"Expected domain code, got: {first['code']!r}"
 
 
 def test_already_enveloped_passes_through(client):

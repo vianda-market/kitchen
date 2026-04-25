@@ -212,7 +212,8 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
                 },
             )
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            log_warning(f"Invalid filter on /plate-pickups/enriched: {exc}")
+            raise HTTPException(status_code=400, detail="Invalid filter parameter") from None
         return get_enriched_plate_pickups(
             db,
             scope=scope,
