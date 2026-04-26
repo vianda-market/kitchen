@@ -358,6 +358,51 @@ def create_app() -> FastAPI:
             envelopes.append(envelope)
         return JSONResponse(status_code=422, content={"detail": envelopes})
 
+    from pydantic import ValidationError as PydanticValidationError
+
+    @app.exception_handler(PydanticValidationError)
+    async def _envelope_pydantic_validation_error(request: Request, exc: PydanticValidationError) -> JSONResponse:
+        """
+        Catch pydantic.ValidationError raised inside route handlers (e.g. when
+        a route manually constructs a Pydantic model with a model_validator that
+        raises I18nValueError).  Applies the same envelope logic as the
+        RequestValidationError handler above so that domain codes like
+        validation.supplier_invoice.ar_details_required surface as 422 envelopes
+        instead of 500s.
+        """
+        locale = _resolve_handler_locale(request)
+        envelopes = []
+        for error in exc.errors():
+            field = ".".join(str(x) for x in error["loc"])
+            msg = error.get("msg", "")
+            error_type = error.get("type", "")
+            ctx = error.get("ctx", {}) or {}
+
+            if error_type in _TYPE_TO_CODE:
+                code: str = _TYPE_TO_CODE[error_type]
+                extra_params: dict = {}
+            elif error_type in _EMAIL_TYPES or error_type.startswith("value_error.email"):
+                code = ErrorCode.VALIDATION_INVALID_FORMAT
+                extra_params = {}
+            elif error_type == "value_error":
+                ctx_error = ctx.get("error")
+                if isinstance(ctx_error, I18nValueError):
+                    code = ctx_error.code
+                    extra_params = dict(ctx_error.params)
+                else:
+                    code = ErrorCode.VALIDATION_CUSTOM
+                    extra_params = {}
+            else:
+                code = ErrorCode.VALIDATION_CUSTOM
+                extra_params = {}
+
+            params = {"field": field, "msg": msg, "type": error_type, **extra_params}
+            params.pop("code", None)
+            params.pop("locale", None)
+            envelope = build_envelope(code, locale, **params)
+            envelopes.append(envelope)
+        return JSONResponse(status_code=422, content={"detail": envelopes})
+
     # Rate limiting (slowapi) — emits request.rate_limited envelope (K3).
     # Replaces the previous plain {"detail": "rate_limited", "retry_after_seconds": 60}.
 

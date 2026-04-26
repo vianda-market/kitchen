@@ -96,12 +96,15 @@
       }
     },
     {
-      "name": "422 — Missing required field localised to es",
+      "name": "422 — Missing required field with Accept-Language es (DB locale wins)",
       "event": [
         {
           "listen": "test",
           "script": {
             "exec": [
+              "// Locale-resolution rule: DB user_info.locale > Accept-Language.",
+              "// The superadmin seed user has locale='en', so the 422 message is",
+              "// in English even when the client sends Accept-Language: es.",
               "pm.test(\"Status is 422\", function () {",
               "    pm.response.to.have.status(422);",
               "});",
@@ -111,12 +114,15 @@
               "    pm.expect(body.detail).to.be.an('array');",
               "});",
               "",
-              "pm.test(\"field_required message is in Spanish\", function () {",
+              "pm.test(\"field_required entry is present with code+message+params\", function () {",
               "    var detail = pm.response.json().detail;",
               "    var entry = detail.find(function(e) { return e.code === 'validation.field_required'; });",
               "    pm.expect(entry).to.not.be.undefined;",
-              "    // Spanish message for validation.field_required",
-              "    pm.expect(entry.message).to.equal('Este campo es obligatorio.');",
+              "    pm.expect(entry).to.have.property('code');",
+              "    pm.expect(entry).to.have.property('message');",
+              "    pm.expect(entry).to.have.property('params');",
+              "    // DB locale (en) wins over Accept-Language: es",
+              "    pm.expect(entry.message).to.equal('This field is required.');",
               "});"
             ],
             "type": "text/javascript"
@@ -179,12 +185,18 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "Content-Type", "value": "application/json"},
           {"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}
         ],
         "body": {
-          "mode": "raw",
-          "raw": "{\"institution_entity_id\": \"00000000-0000-0000-0000-000000000001\", \"country_code\": \"AR\", \"invoice_type\": \"factura\", \"issued_date\": \"2026-01-01\", \"amount\": \"100.00\", \"currency_code\": \"ARS\"}"
+          "mode": "formdata",
+          "formdata": [
+            {"key": "institution_entity_id", "value": "00000000-0000-0000-0000-000000000001", "type": "text"},
+            {"key": "country_code", "value": "AR", "type": "text"},
+            {"key": "invoice_type", "value": "factura_electronica", "type": "text"},
+            {"key": "issued_date", "value": "2026-01-01", "type": "text"},
+            {"key": "amount", "value": "100.00", "type": "text"},
+            {"key": "currency_code", "value": "ARS", "type": "text"}
+          ]
         },
         "url": "{{baseUrl}}/api/v1/supplier-invoices"
       }
