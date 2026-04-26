@@ -12,7 +12,7 @@ Business Rules:
 """
 
 from collections import defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Any
 from uuid import UUID
 
@@ -164,6 +164,97 @@ def _get_kitchen_day_for_date(order_date: date, institution_entity_id: UUID, db:
     return get_kitchen_day_for_date(order_date, timezone_str, country_code)
 
 
+def _compute_is_no_show(status_lower: str, arrival_time: Any, pickup_time_range: str | None, now_time: time) -> bool:
+    """
+    Return True when an order is pending and its pickup window end has passed.
+
+    A row is considered pending when its status is 'pending', or when its status
+    is 'active' with no recorded arrival_time (not yet promoted to a live pickup).
+    """
+    is_pending = status_lower == "pending" or (status_lower == "active" and arrival_time is None)
+    if not is_pending:
+        return False
+    ptr = pickup_time_range or ""
+    if "-" not in ptr:
+        return False
+    try:
+        end_str = ptr.split("-")[1].strip()
+        end_h, end_m = int(end_str.split(":")[0]), int(end_str.split(":")[1])
+        return now_time > time(end_h, end_m)
+    except (ValueError, IndexError):
+        return False
+
+
+def _classify_order_status(is_no_show: bool, status_lower: str, arrival_time: Any) -> str:
+    """
+    Map an order's runtime state to its summary-bucket key.
+
+    Returns one of: 'no_show', 'pending', 'arrived', 'handed_out', 'completed'.
+    Falls back to 'pending' for unrecognised statuses.
+    """
+    if is_no_show:
+        return "no_show"
+    if status_lower == "pending":
+        return "pending"
+    if status_lower == "arrived":
+        return "arrived"
+    if status_lower in ("handed_out", "handed out"):
+        return "handed_out"
+    if status_lower in ("complete", "completed"):
+        return "completed"
+    if status_lower == "active" and arrival_time is None:
+        return "pending"
+    if status_lower == "active" and arrival_time is not None:
+        return "arrived"
+    return "pending"
+
+
+def _build_order_row(row: dict[str, Any], is_no_show: bool, countdown_seconds: int) -> dict[str, Any]:
+    """
+    Build a single order dict from a DB row, ready to append to a restaurant's order list.
+
+    Privacy: customer name is formatted as initials only ("M.G.").
+    """
+    customer_name = f"{row['first_initial']}.{row['last_initial']}."
+    return {
+        "plate_pickup_id": row["plate_pickup_id"],
+        "customer_name": customer_name,
+        "plate_name": row["plate_name"],
+        "confirmation_code": row["confirmation_code"],
+        "status": row["status"],
+        "arrival_time": row["arrival_time"],
+        "expected_completion_time": row["expected_completion_time"],
+        "completion_time": row["completion_time"],
+        "countdown_seconds": countdown_seconds,
+        "extensions_used": row.get("extensions_used") or 0,
+        "was_collected": row.get("was_collected") or False,
+        "pickup_time_range": row["pickup_time_range"],
+        "kitchen_day": row["kitchen_day"],
+        "pickup_type": row.get("pickup_type"),
+        "is_no_show": is_no_show,
+    }
+
+
+def _compute_pickup_window_for_restaurant(rest: dict[str, Any]) -> None:
+    """
+    Derive pickup_window_start and pickup_window_end from the restaurant's order list.
+
+    Mutates ``rest`` in place, adding 'pickup_window_start' and 'pickup_window_end'.
+    Both are None when no order has a parseable pickup_time_range.
+    """
+    ranges = [
+        o["pickup_time_range"] for o in rest["orders"] if o.get("pickup_time_range") and "-" in o["pickup_time_range"]
+    ]
+    if ranges:
+        starts = [r.split("-")[0].strip() for r in ranges]
+        ends = [r.split("-")[1].strip() for r in ranges]
+        rest["pickup_window_start"] = min(starts)
+        rest["pickup_window_end"] = max(ends)
+    else:
+        rest["pickup_window_start"] = None
+        rest["pickup_window_end"] = None
+
+
 def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Group orders by restaurant and calculate summary statistics.
@@ -174,14 +265,10 @@ def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, An
     Returns:
         List of restaurant dictionaries with orders and summary
     """
-
-    from datetime import time as time_type
-
     from app.config.settings import settings
 
-    # Group by restaurant_id
     now_time = datetime.now().time()
-    restaurants_dict = defaultdict(
+    restaurants_dict: defaultdict[Any, dict[str, Any]] = defaultdict(
         lambda: {
             "restaurant_id": None,
             "restaurant_name": None,
@@ -194,7 +281,7 @@ def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, An
     for row in rows:
         restaurant_id = row["restaurant_id"]
 
-        # Set restaurant info (first time we see this restaurant)
+        # Seed restaurant header fields on first encounter
         if restaurants_dict[restaurant_id]["restaurant_id"] is None:
             restaurants_dict[restaurant_id]["restaurant_id"] = restaurant_id
             restaurants_dict[restaurant_id]["restaurant_name"] = row["restaurant_name"]
@@ -202,87 +289,21 @@ def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, An
                 "require_kiosk_code_verification", False
             )
 
-        # Format customer name for privacy: initials only "M.G."
-        customer_name = f"{row['first_initial']}.{row['last_initial']}."
-
-        # Add order to restaurant's order list
-        order = {
-            "plate_pickup_id": row["plate_pickup_id"],
-            "customer_name": customer_name,
-            "plate_name": row["plate_name"],
-            "confirmation_code": row["confirmation_code"],
-            "status": row["status"],
-            "arrival_time": row["arrival_time"],
-            "expected_completion_time": row["expected_completion_time"],
-            "completion_time": row["completion_time"],
-            "countdown_seconds": settings.PICKUP_COUNTDOWN_SECONDS,
-            "extensions_used": row.get("extensions_used") or 0,
-            "was_collected": row.get("was_collected") or False,
-            "pickup_time_range": row["pickup_time_range"],
-            "kitchen_day": row["kitchen_day"],
-            "pickup_type": row.get("pickup_type"),
-        }
-
-        # Compute is_no_show: Pending order whose pickup_time_range end has passed
-        is_no_show = False
         status_lower = (row["status"] or "").lower()
-        is_pending = status_lower == "pending" or (status_lower == "active" and row.get("arrival_time") is None)
-        if is_pending:
-            ptr = row.get("pickup_time_range") or ""
-            if "-" in ptr:
-                try:
-                    end_str = ptr.split("-")[1].strip()
-                    end_h, end_m = int(end_str.split(":")[0]), int(end_str.split(":")[1])
-                    if now_time > time_type(end_h, end_m):
-                        is_no_show = True
-                except (ValueError, IndexError):
-                    pass
-        order["is_no_show"] = is_no_show
-
+        is_no_show = _compute_is_no_show(status_lower, row.get("arrival_time"), row.get("pickup_time_range"), now_time)
+        order = _build_order_row(row, is_no_show, settings.PICKUP_COUNTDOWN_SECONDS)
         restaurants_dict[restaurant_id]["orders"].append(order)
 
-        # Update summary statistics
         summary = restaurants_dict[restaurant_id]["summary"]
         summary["total_orders"] += 1
+        bucket = _classify_order_status(is_no_show, status_lower, row.get("arrival_time"))
+        summary[bucket] += 1
 
-        # Categorize by status
-        if is_no_show:
-            summary["no_show"] += 1
-        elif status_lower == "pending":
-            summary["pending"] += 1
-        elif status_lower == "arrived":
-            summary["arrived"] += 1
-        elif status_lower in ("handed_out", "handed out"):
-            summary["handed_out"] += 1
-        elif status_lower in ("complete", "completed"):
-            summary["completed"] += 1
-        elif status_lower == "active" and row["arrival_time"] is None:
-            summary["pending"] += 1
-        elif status_lower == "active" and row["arrival_time"] is not None:
-            summary["arrived"] += 1
-        else:
-            summary["pending"] += 1
-
-    # Compute pickup_window per restaurant from pickup_time_range values
     for rest in restaurants_dict.values():
-        ranges = [
-            o["pickup_time_range"]
-            for o in rest["orders"]
-            if o.get("pickup_time_range") and "-" in o["pickup_time_range"]
-        ]
-        if ranges:
-            starts = [r.split("-")[0].strip() for r in ranges]
-            ends = [r.split("-")[1].strip() for r in ranges]
-            rest["pickup_window_start"] = min(starts)
-            rest["pickup_window_end"] = max(ends)
-        else:
-            rest["pickup_window_start"] = None
-            rest["pickup_window_end"] = None
+        _compute_pickup_window_for_restaurant(rest)
 
-    # Convert to list and maintain alphabetical order by restaurant name
     restaurants_list = list(restaurants_dict.values())
     restaurants_list.sort(key=lambda x: x["restaurant_name"])
-
     return restaurants_list
 
 
