@@ -422,8 +422,6 @@ app/services/enriched_service.py:0: error: Value of type variable "SupportsRichC
 app/services/enriched_service.py:0: error: Value of type variable "SupportsRichComparisonT" of "max" cannot be "int | None"  [type-var]
 app/services/enriched_service.py:0: error: Unsupported operand types for * ("int" and "None")  [operator]
 app/services/enriched_service.py:0: error: Unsupported operand types for - ("None" and "int")  [operator]
-app/services/enriched_service.py:0: error: Argument 1 to "extend" of "list" has incompatible type "list[tuple[str, list[Any]]]"; expected "Iterable[tuple[str, str]]"  [arg-type]
-app/services/enriched_service.py:0: error: Argument "additional_conditions" to "_build_where_clause" of "EnrichedService" has incompatible type "list[tuple[str, str]]"; expected "list[tuple[str, list[Any]]] | None"  [arg-type]
 app/services/enriched_service.py:0: error: "PaginatedList" expects no type arguments, but 1 given  [type-arg]
 app/services/enriched_service.py:0: error: Value of type variable "SupportsRichComparisonT" of "max" cannot be "int | None"  [type-var]
 app/services/enriched_service.py:0: error: Value of type variable "SupportsRichComparisonT" of "min" cannot be "int | None"  [type-var]
