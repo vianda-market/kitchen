@@ -3533,7 +3533,7 @@ def get_enriched_plate_pickups(
         user_id: Optional user ID for user-level filtering (for Customers)
         include_archived: Whether to include archived records (default: False)
         additional_conditions: Optional extra (condition, param_list) tuples from the filter
-            registry (e.g. status, market_id, window_from, window_to).
+            registry (e.g. status, market_id, expected_from, expected_to).
 
     Returns:
         List of PlatePickupEnrichedResponseSchema with restaurant, address, product, and credit information
@@ -3564,7 +3564,7 @@ def get_enriched_plate_pickups(
         if completed_only and user_id is not None:
             conditions.append("ppl.was_collected = TRUE")
 
-        # Apply registry-based filter conditions (e.g. status, market_id, window_from, window_to)
+        # Apply registry-based filter conditions (e.g. status, market_id, expected_from, expected_to)
         if additional_conditions:
             for condition, param_list in additional_conditions:
                 conditions.append(condition)

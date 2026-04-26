@@ -282,15 +282,15 @@ def test_bool_op_coerces_truthy():
 
 FAKE_REGISTRY_TIMESTAMPTZ: dict = {
     "test_ts": {
-        "window_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
-        "window_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
+        "expected_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
+        "expected_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
     }
 }
 
 
 def test_gte_timestamptz():
     with patch("app.utils.filter_builder.FILTER_REGISTRY", FAKE_REGISTRY_TIMESTAMPTZ):
-        result = build_filter_conditions("test_ts", {"window_from": "2025-01-01T09:00:00Z"})
+        result = build_filter_conditions("test_ts", {"expected_from": "2025-01-01T09:00:00Z"})
     assert result is not None
     condition, params = result[0]
     assert condition == "ppl.expected_completion_time >= %s::timestamptz"
@@ -299,7 +299,7 @@ def test_gte_timestamptz():
 
 def test_lte_timestamptz():
     with patch("app.utils.filter_builder.FILTER_REGISTRY", FAKE_REGISTRY_TIMESTAMPTZ):
-        result = build_filter_conditions("test_ts", {"window_to": "2025-01-01T13:30:00Z"})
+        result = build_filter_conditions("test_ts", {"expected_to": "2025-01-01T13:30:00Z"})
     assert result is not None
     condition, params = result[0]
     assert condition == "ppl.expected_completion_time <= %s::timestamptz"
@@ -310,7 +310,7 @@ def test_window_range_both_bounds():
     with patch("app.utils.filter_builder.FILTER_REGISTRY", FAKE_REGISTRY_TIMESTAMPTZ):
         result = build_filter_conditions(
             "test_ts",
-            {"window_from": "2025-01-01T09:00:00Z", "window_to": "2025-01-01T13:30:00Z"},
+            {"expected_from": "2025-01-01T09:00:00Z", "expected_to": "2025-01-01T13:30:00Z"},
         )
     assert result is not None
     assert len(result) == 2

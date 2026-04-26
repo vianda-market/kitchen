@@ -137,10 +137,10 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
         None, description="Filter by pickup status (e.g. pending, arrived, completed, cancelled)"
     ),
     market_id: UUID | None = Query(None, description="Filter by market ID"),
-    window_from: str | None = Query(
+    expected_from: str | None = Query(
         None, description="Filter pickups with expected_completion_time on or after this timestamp (ISO 8601)"
     ),
-    window_to: str | None = Query(
+    expected_to: str | None = Query(
         None, description="Filter pickups with expected_completion_time on or before this timestamp (ISO 8601)"
     ),
     arrival_time_from: str | None = Query(
@@ -168,7 +168,7 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
     """Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
     Returns an array of enriched plate pickup records.
 
-    Optional filters: status, market_id, window_from, window_to, arrival_time_from, arrival_time_to,
+    Optional filters: status, market_id, expected_from, expected_to, arrival_time_from, arrival_time_to,
     completion_time_from, completion_time_to, was_collected, credit_from, credit_to, restaurant_id, plate_id.
     Use completed_only=true for the customer order history page (pickups they have collected).
 
@@ -201,8 +201,8 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
                 {
                     "status": status,
                     "market_id": market_id,
-                    "window_from": window_from,
-                    "window_to": window_to,
+                    "expected_from": expected_from,
+                    "expected_to": expected_to,
                     "arrival_time_from": arrival_time_from,
                     "arrival_time_to": arrival_time_to,
                     "completion_time_from": completion_time_from,

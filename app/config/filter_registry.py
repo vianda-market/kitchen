@@ -147,9 +147,12 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         },
         # market_id is on market_info, alias "m" (joined via restaurant -> address -> market)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
-        # window_from / window_to filter by expected_completion_time (TIMESTAMPTZ)
-        "window_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
-        "window_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
+        # expected_from / expected_to filter by expected_completion_time (TIMESTAMPTZ).
+        # Named after the actual column they bind to — there are no window_start/window_end
+        # columns on plate_pickup_live. If operators need a true pickup-window filter, schema
+        # work is required (deferred; see #58 and the follow-up issue).
+        "expected_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
+        "expected_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
         # Pass 5 register-adds:
         # arrival_time: date-range-bound (timestamptz)
         "arrival_time_from": {"col": "arrival_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
