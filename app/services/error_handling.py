@@ -153,7 +153,9 @@ def handle_get_by_id(
         raise
     except Exception as e:
         log_error(f"Error fetching {entity_name} {entity_id}: {e}")
-        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=entity_name.title()) from None
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=entity_name.title()
+        ) from None
 
 
 def handle_get_all(
