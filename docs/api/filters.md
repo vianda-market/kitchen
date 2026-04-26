@@ -163,7 +163,7 @@ Range fields use a naming convention: `<x>_from` for the lower bound (`gte`) and
 
 ```
 GET /api/v1/plates/enriched?plate_date_from=2025-01-01&plate_date_to=2025-01-31
-GET /api/v1/pickups/enriched?window_from=2025-01-20T08:00:00Z&window_to=2025-01-20T12:00:00Z
+GET /api/v1/pickups/enriched?expected_from=2025-01-20T08:00:00Z&expected_to=2025-01-20T12:00:00Z
 ```
 
 ### ilike (search)
@@ -209,7 +209,7 @@ Error cases → 400:
 
 - `date` cast: ISO 8601 date (`YYYY-MM-DD`). PostgreSQL interprets it in the server's session timezone (UTC on Cloud Run). If market-local semantics are needed, the caller must convert to UTC before sending.
 - `timestamptz` cast: ISO 8601 with timezone offset (`YYYY-MM-DDTHH:MM:SSZ` or `+HH:MM`). PostgreSQL stores and compares in UTC. Always include a timezone offset — bare datetime strings are ambiguous and PostgreSQL will assume the session timezone (UTC on Cloud Run), which may differ from the user's market.
-- Date-range timezone policy: the system does not automatically adjust date range bounds for the user's market timezone. If a frontend needs "show pickups during market business hours", it must convert the market-local window to UTC timestamps before sending `window_from` / `window_to`.
+- Date-range timezone policy: the system does not automatically adjust date range bounds for the user's market timezone. If a frontend needs "show pickups during market business hours", it must convert the market-local window to UTC timestamps before sending `expected_from` / `expected_to`.
 
 ---
 
@@ -344,6 +344,21 @@ To re-sync locally:
 python3 scripts/generate_filter_schema.py
 git add docs/api/filters.json
 ```
+
+---
+
+## Entity notes
+
+### Pickups — `expected_from` / `expected_to`
+
+These two `range-bound (timestamptz)` params filter `plate_pickup_live.expected_completion_time` on the `ppl` alias:
+
+- `expected_from` — lower bound (`>=`): returns pickups whose `expected_completion_time` is on or after the given timestamp.
+- `expected_to` — upper bound (`<=`): returns pickups whose `expected_completion_time` is on or before the given timestamp.
+
+**Column binding:** `expected_completion_time` is the only time-related column currently on `plate_pickup_live` that projects a future window. There are no `window_start` / `window_end` columns on that table. If operators need a true pickup-window filter (separate start and end columns populated from a scheduling model), that requires schema work — deferred. See GitHub issue #58 and its follow-up for context.
+
+**Renamed in #58:** these params were previously called `window_from` / `window_to`. The old names implied a pickup-window semantics that the underlying column does not support. The rename aligns the param names with the actual column. Any caller that was passing `window_from` / `window_to` must update to `expected_from` / `expected_to`.
 
 ---
 

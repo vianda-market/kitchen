@@ -724,7 +724,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched \u2013 filter by window range (gte/lte timestamptz)",
+          "name": "GET /plate-pickup/enriched \u2013 filter by expected range (gte/lte timestamptz)",
           "event": [
             {
               "listen": "test",
@@ -750,7 +750,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?window_from=2024-01-01T00:00:00Z&window_to=2026-12-31T23:59:59Z",
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?expected_from=2024-01-01T00:00:00Z&expected_to=2026-12-31T23:59:59Z",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -762,11 +762,11 @@
               ],
               "query": [
                 {
-                  "key": "window_from",
+                  "key": "expected_from",
                   "value": "2024-01-01T00:00:00Z"
                 },
                 {
-                  "key": "window_to",
+                  "key": "expected_to",
                   "value": "2026-12-31T23:59:59Z"
                 }
               ]

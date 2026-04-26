@@ -79,12 +79,12 @@
       },
       {
         "cast": "timestamptz",
-        "key": "window_from",
+        "key": "expected_from",
         "kind": "range-bound"
       },
       {
         "cast": "timestamptz",
-        "key": "window_to",
+        "key": "expected_to",
         "kind": "range-bound"
       },
       {
