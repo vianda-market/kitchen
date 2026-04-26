@@ -1479,8 +1479,8 @@
                   "});",
                   "",
                   "const response = pm.response.json();",
-                  "pm.test(\"Error envelope has request.not_found code\", function () {",
-                  "    pm.expect(response.detail).to.have.property('code', 'request.not_found');",
+                  "pm.test(\"Error envelope has entity.not_found code\", function () {",
+                  "    pm.expect(response.detail).to.have.property('code', 'entity.not_found');",
                   "});"
                 ],
                 "type": "text/javascript"
