@@ -1,6 +1,7 @@
 # app/services/billing/institution_billing.py
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -90,6 +91,100 @@ def _check_invoice_compliance(
         oldest = oldest.date()
     days_unmatched = (date.today() - oldest).days
     return days_unmatched <= hold_days
+
+
+def _resolve_location_overrides(
+    location_id: str | None,
+    timezone_filter: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve market_override and timezone_filter from a location_id, if provided.
+
+    Returns (market_override, timezone_filter). When location_id is None or the
+    config lookup returns nothing, both output values fall back to the inputs.
+    """
+    from app.config.location_config import get_location_config
+
+    if not location_id:
+        return None, timezone_filter
+    loc_config = get_location_config(location_id)
+    if loc_config:
+        return loc_config["market"], loc_config["timezone"]
+    return None, timezone_filter
+
+
+def _resolve_entity_country(
+    entity_data: dict,
+    market_override: str | None,
+    country_code: str | None,
+    connection: Any,
+) -> str | None:
+    """Resolve the country code for a single entity aggregate.
+
+    Precedence: market_override → country_code → MarketDetectionService lookup.
+    Returns None (with a warning logged) when the country cannot be determined.
+    """
+    entity_country = market_override or country_code
+    if entity_country:
+        return entity_country
+    from app.services.market_detection import MarketDetectionService
+
+    entity_country = MarketDetectionService.get_country_from_entity(entity_data["institution_entity_id"], connection)
+    if not entity_country:
+        log_warning(f"Could not detect country for entity {entity_data['institution_entity_id']}, skipping")
+        return None
+    return entity_country
+
+
+def _resolve_effective_kitchen_day(kitchen_day: str, entity_country: str) -> str | None:
+    """Return the kitchen day to bill for, or None if this entity should be skipped.
+
+    When the nominal day is disabled for the market, falls back to Friday for
+    weekend runs if Friday is enabled. Any other disabled day returns None.
+    """
+    if MarketConfiguration.is_kitchen_day_enabled(entity_country, kitchen_day):
+        return kitchen_day
+    if kitchen_day in ("saturday", "sunday"):
+        if MarketConfiguration.is_kitchen_day_enabled(entity_country, "friday"):
+            log_info(f"Using friday config for {entity_country} weekend billing")
+            return "friday"
+    return None
+
+
+def _settle_entity_restaurants(
+    entity_data: dict,
+    bill_date: date,
+    period_start: datetime,
+    period_end: datetime,
+    day_to_use: str,
+    entity_country: str,
+    settlement_run_id: UUID,
+    system_user_id: UUID,
+    connection: Any,
+) -> tuple[int, Decimal]:
+    """Create settlements for every restaurant belonging to one entity aggregate.
+
+    Returns (count_created, total_amount) for the caller to accumulate.
+    """
+    count = 0
+    total = Decimal("0.00")
+    for restaurant_id in entity_data["restaurant_ids"]:
+        settlement_number = f"SETT-{bill_date.isoformat()}-{str(restaurant_id)[:8]}"
+        settlement = InstitutionBillingService.create_settlement_for_restaurant(
+            restaurant_id,
+            period_start,
+            period_end,
+            day_to_use,
+            entity_country,
+            settlement_number,
+            system_user_id,
+            settlement_run_id=settlement_run_id,
+            connection=connection,
+        )
+        if settlement:
+            count += 1
+            if settlement.amount:
+                total += settlement.amount
+    return count, total
 
 
 class InstitutionBillingService:
@@ -341,15 +436,8 @@ class InstitutionBillingService:
         """
         from uuid import uuid4
 
-        from app.config.location_config import get_location_config
-
         try:
-            market_override = None
-            if location_id:
-                loc_config = get_location_config(location_id)
-                if loc_config:
-                    timezone_filter = loc_config["timezone"]
-                    market_override = loc_config["market"]
+            market_override, timezone_filter = _resolve_location_overrides(location_id, timezone_filter)
             kitchen_day = InstitutionBillingService._get_kitchen_day_for_date(bill_date)
             log_info(f"Phase 1 settlements: kitchen day {kitchen_day}, date {bill_date}")
             restaurants = InstitutionBillingService._get_restaurants_with_balances(
@@ -373,51 +461,31 @@ class InstitutionBillingService:
             period_start, period_end = None, None
             for entity_data in entity_aggregates:
                 try:
-                    entity_country = market_override or country_code
+                    entity_country = _resolve_entity_country(entity_data, market_override, country_code, connection)
                     if not entity_country:
-                        from app.services.market_detection import MarketDetectionService
-
-                        entity_country = MarketDetectionService.get_country_from_entity(
-                            entity_data["institution_entity_id"], connection
-                        )
-                        if not entity_country:
-                            log_warning(
-                                f"Could not detect country for entity {entity_data['institution_entity_id']}, skipping"
-                            )
-                            continue
-                    day_to_use = kitchen_day
-                    if not MarketConfiguration.is_kitchen_day_enabled(entity_country, day_to_use):
-                        if day_to_use in ("saturday", "sunday"):
-                            if MarketConfiguration.is_kitchen_day_enabled(entity_country, "friday"):
-                                day_to_use = "friday"
-                                log_info(f"Using friday config for {entity_country} weekend billing")
-                            else:
-                                continue
-                        else:
-                            continue
+                        continue
+                    day_to_use = _resolve_effective_kitchen_day(kitchen_day, entity_country)
+                    if day_to_use is None:
+                        continue
                     if is_holiday(entity_country, bill_date, connection):
                         log_info(f"National holiday for {entity_country} on {bill_date}, skipping entity")
                         continue
                     period_start, period_end = InstitutionBillingService._get_market_kitchen_day_period(
                         bill_date, day_to_use, entity_country
                     )
-                    for restaurant_id in entity_data["restaurant_ids"]:
-                        settlement_number = f"SETT-{bill_date.isoformat()}-{str(restaurant_id)[:8]}"
-                        settlement = InstitutionBillingService.create_settlement_for_restaurant(
-                            restaurant_id,
-                            period_start,
-                            period_end,
-                            day_to_use,
-                            entity_country,
-                            settlement_number,
-                            system_user_id,
-                            settlement_run_id=settlement_run_id,
-                            connection=connection,
-                        )
-                        if settlement:
-                            settlements_created += 1
-                            if settlement.amount:
-                                total_amount += settlement.amount
+                    count, amount = _settle_entity_restaurants(
+                        entity_data,
+                        bill_date,
+                        period_start,
+                        period_end,
+                        day_to_use,
+                        entity_country,
+                        settlement_run_id,
+                        system_user_id,
+                        connection,
+                    )
+                    settlements_created += count
+                    total_amount += amount
                 except Exception as e:
                     log_error(f"Error creating settlements for entity {entity_data['institution_entity_id']}: {e}")
                     continue
