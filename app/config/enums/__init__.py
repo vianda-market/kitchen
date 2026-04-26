@@ -26,6 +26,7 @@ from app.config.enums.interest_type import InterestType
 from app.config.enums.kitchen_days import KitchenDay
 from app.config.enums.lead_interest_source import LeadInterestSource
 from app.config.enums.lead_interest_status import LeadInterestStatus
+from app.config.enums.national_holiday_source import NationalHolidaySource
 from app.config.enums.payment_frequency import PaymentFrequency
 from app.config.enums.payment_method_types import PaymentMethodType
 from app.config.enums.pickup_types import PickupType
@@ -48,6 +49,7 @@ __all__ = [
     "RoleName",
     "TransactionType",
     "KitchenDay",
+    "NationalHolidaySource",
     "PickupType",
     "AuditOperation",
     "DiscretionaryReason",

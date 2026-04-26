@@ -184,9 +184,8 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "is_recurring": {"col": "is_recurring", "alias": "nh", "op": "bool", "cast": "bool"},
         # recurring_month: multi-select (int, values 1-12)
         "recurring_month": {"col": "recurring_month", "alias": "nh", "op": "in", "cast": "int"},
-        # source: multi-select (text, values: manual, nager_date) -- no Python enum class exists.
-        # Values come from the DB constraint. Leave enum off; accept any string.
-        "source": {"col": "source", "alias": "nh", "op": "in", "cast": "text"},
+        # source: multi-select (NationalHolidaySource enum: manual, nager_date).
+        "source": {"col": "source", "alias": "nh", "op": "in", "cast": "text", "enum": "NationalHolidaySource"},
         # status: multi-select (text, Status enum)
         "status": {"col": "status", "alias": "nh", "op": "in", "cast": "text", "enum": "Status"},
     },
