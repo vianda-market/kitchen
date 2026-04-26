@@ -25,11 +25,13 @@ class ErrorCode(StrEnum):
     REQUEST_RATE_LIMITED = "request.rate_limited"
 
     # ── validation.* ───────────────────────────────────────────────────────
-    # Emitted by the RequestValidationError handler (K3/K5).
+    # Emitted by the RequestValidationError handler (K3/K5/K67).
     VALIDATION_FIELD_REQUIRED = "validation.field_required"
     VALIDATION_INVALID_FORMAT = "validation.invalid_format"
     VALIDATION_VALUE_TOO_SHORT = "validation.value_too_short"
     VALIDATION_VALUE_TOO_LONG = "validation.value_too_long"
+    VALIDATION_INVALID_VALUE = "validation.invalid_value"
+    VALIDATION_INVALID_TYPE = "validation.invalid_type"
     VALIDATION_CUSTOM = "validation.custom"
 
     # ── validation.user.* ──────────────────────────────────────────────────
@@ -75,6 +77,26 @@ class ErrorCode(StrEnum):
     VALIDATION_PAYMENT_CONFLICTING_ADDRESS_FIELDS = "validation.payment.conflicting_address_fields"
     VALIDATION_PAYMENT_UNSUPPORTED_BRAND = "validation.payment.unsupported_brand"
     VALIDATION_PAYMENT_ADDRESS_REQUIRED = "validation.payment.address_required"
+
+    # ── validation.supplier_invoice.* ─────────────────────────────────────
+    # Custom field/model-validator errors from supplier_invoice.py and supplier_w9.py (K67).
+    VALIDATION_SUPPLIER_INVOICE_CAE_FORMAT = "validation.supplier_invoice.cae_format"
+    VALIDATION_SUPPLIER_INVOICE_CUIT_FORMAT = "validation.supplier_invoice.cuit_format"
+    VALIDATION_SUPPLIER_INVOICE_AFIP_DOC_TYPE = "validation.supplier_invoice.afip_doc_type"
+    VALIDATION_SUPPLIER_INVOICE_SUNAT_SERIE_FORMAT = "validation.supplier_invoice.sunat_serie_format"
+    VALIDATION_SUPPLIER_INVOICE_SUNAT_CORRELATIVO_FORMAT = "validation.supplier_invoice.sunat_correlativo_format"
+    VALIDATION_SUPPLIER_INVOICE_RUC_FORMAT = "validation.supplier_invoice.ruc_format"
+    VALIDATION_SUPPLIER_INVOICE_CDR_STATUS = "validation.supplier_invoice.cdr_status"
+    VALIDATION_SUPPLIER_INVOICE_AR_DETAILS_REQUIRED = "validation.supplier_invoice.ar_details_required"
+    VALIDATION_SUPPLIER_INVOICE_PE_DETAILS_REQUIRED = "validation.supplier_invoice.pe_details_required"
+    VALIDATION_SUPPLIER_INVOICE_US_DETAILS_REQUIRED = "validation.supplier_invoice.us_details_required"
+    VALIDATION_SUPPLIER_INVOICE_REJECTION_REASON_REQUIRED = "validation.supplier_invoice.rejection_reason_required"
+    VALIDATION_SUPPLIER_INVOICE_STATUS_CANNOT_RESET = "validation.supplier_invoice.status_cannot_reset"
+    VALIDATION_SUPPLIER_W9_EIN_FORMAT = "validation.supplier_invoice.w9_ein_format"
+
+    # ── validation.market.* ───────────────────────────────────────────────
+    # Custom field-validator errors from MarketCreateSchema / MarketUpdateSchema (K67).
+    VALIDATION_MARKET_LANGUAGE_UNSUPPORTED = "validation.market.language_unsupported"
 
     # ── auth.* ─────────────────────────────────────────────────────────────
     # Seeded in K2; fully wired in K7 (auth + security sweep).

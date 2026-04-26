@@ -1,0 +1,219 @@
+{
+  "info": {
+    "_postman_id": "validation-envelope-k67",
+    "name": "018 VALIDATION_ENVELOPE",
+    "description": "K67 — Validates that Pydantic 422 errors are emitted as the hybrid envelope shape.\nTests: (1) missing required field returns envelope array with code+message+params.field,\n(2) domain ValueError (I18nValueError) returns domain code (validation.supplier_invoice.*),\n(3) Accept-Language: es localizes the message.\nPre-requisite: collection 001 must run first to seed superAdminAuthToken.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Setup — Login Super Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Login succeeds\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var resp = pm.response.json();",
+              "pm.collectionVariables.set(\"superAdminAuthToken\", resp.access_token);",
+              "pm.collectionVariables.set(\"adminAuthToken\", resp.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/x-www-form-urlencoded"}
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {"key": "username", "value": "{{superAdminUsername}}"},
+            {"key": "password", "value": "{{superAdminPassword}}"}
+          ]
+        },
+        "url": "{{baseUrl}}/api/v1/auth/token"
+      }
+    },
+    {
+      "name": "422 — Missing required field returns envelope array (en)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 422\", function () {",
+              "    pm.response.to.have.status(422);",
+              "});",
+              "",
+              "pm.test(\"detail is an array\", function () {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body).to.have.property('detail');",
+              "    pm.expect(body.detail).to.be.an('array');",
+              "    pm.expect(body.detail.length).to.be.at.least(1);",
+              "});",
+              "",
+              "pm.test(\"Each entry has code, message, params\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    detail.forEach(function(entry) {",
+              "        pm.expect(entry).to.have.property('code');",
+              "        pm.expect(entry).to.have.property('message');",
+              "        pm.expect(entry).to.have.property('params');",
+              "    });",
+              "});",
+              "",
+              "pm.test(\"At least one entry has code=validation.field_required\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    var found = detail.some(function(e) { return e.code === 'validation.field_required'; });",
+              "    pm.expect(found).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"field_required entry has params.field\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    var entry = detail.find(function(e) { return e.code === 'validation.field_required'; });",
+              "    pm.expect(entry.params).to.have.property('field');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": "{{baseUrl}}/api/v1/institutions"
+      }
+    },
+    {
+      "name": "422 — Missing required field with Accept-Language es (DB locale wins)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Locale-resolution rule: DB user_info.locale > Accept-Language.",
+              "// The superadmin seed user has locale='en', so the 422 message is",
+              "// in English even when the client sends Accept-Language: es.",
+              "pm.test(\"Status is 422\", function () {",
+              "    pm.response.to.have.status(422);",
+              "});",
+              "",
+              "pm.test(\"detail is an array\", function () {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body.detail).to.be.an('array');",
+              "});",
+              "",
+              "pm.test(\"field_required entry is present with code+message+params\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    var entry = detail.find(function(e) { return e.code === 'validation.field_required'; });",
+              "    pm.expect(entry).to.not.be.undefined;",
+              "    pm.expect(entry).to.have.property('code');",
+              "    pm.expect(entry).to.have.property('message');",
+              "    pm.expect(entry).to.have.property('params');",
+              "    // DB locale (en) wins over Accept-Language: es",
+              "    pm.expect(entry.message).to.equal('This field is required.');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"},
+          {"key": "Accept-Language", "value": "es"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": "{{baseUrl}}/api/v1/institutions"
+      }
+    },
+    {
+      "name": "422 — I18nValueError domain code (AR invoice missing ar_details)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 422\", function () {",
+              "    pm.response.to.have.status(422);",
+              "});",
+              "",
+              "pm.test(\"detail is an array\", function () {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body.detail).to.be.an('array');",
+              "    pm.expect(body.detail.length).to.be.at.least(1);",
+              "});",
+              "",
+              "pm.test(\"At least one entry has the domain code validation.supplier_invoice.ar_details_required\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    var found = detail.some(function(e) {",
+              "        return e.code === 'validation.supplier_invoice.ar_details_required';",
+              "    });",
+              "    pm.expect(found).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"Domain code entry has code+message+params\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    var entry = detail.find(function(e) {",
+              "        return e.code === 'validation.supplier_invoice.ar_details_required';",
+              "    });",
+              "    pm.expect(entry).to.have.property('code');",
+              "    pm.expect(entry).to.have.property('message');",
+              "    pm.expect(entry).to.have.property('params');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "institution_entity_id", "value": "00000000-0000-0000-0000-000000000001", "type": "text"},
+            {"key": "country_code", "value": "AR", "type": "text"},
+            {"key": "invoice_type", "value": "factura_electronica", "type": "text"},
+            {"key": "issued_date", "value": "2026-01-01", "type": "text"},
+            {"key": "amount", "value": "100.00", "type": "text"},
+            {"key": "currency_code", "value": "ARS", "type": "text"}
+          ]
+        },
+        "url": "{{baseUrl}}/api/v1/supplier-invoices"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "superAdminAuthToken",
+      "value": ""
+    },
+    {
+      "key": "adminAuthToken",
+      "value": ""
+    }
+  ]
+}

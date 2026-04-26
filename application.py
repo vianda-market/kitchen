@@ -280,11 +280,21 @@ def create_app() -> FastAPI:
     )
 
     # Static type→code map — built once at app startup, not per-request.
+    # Covers the full Pydantic v2 type vocabulary used in this codebase (K67).
     _TYPE_TO_CODE: dict[str, str] = {
         "missing": ErrorCode.VALIDATION_FIELD_REQUIRED,
         "string_too_short": ErrorCode.VALIDATION_VALUE_TOO_SHORT,
         "string_too_long": ErrorCode.VALIDATION_VALUE_TOO_LONG,
         "string_pattern_mismatch": ErrorCode.VALIDATION_INVALID_FORMAT,
+        # Numeric/boolean parse failures
+        "int_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        "float_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        "bool_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        # Enum membership
+        "enum": ErrorCode.VALIDATION_INVALID_VALUE,
+        # Collection-type mismatches
+        "list_type": ErrorCode.VALIDATION_INVALID_TYPE,
+        "dict_type": ErrorCode.VALIDATION_INVALID_TYPE,
     }
 
     @app.exception_handler(RequestValidationError)
@@ -300,6 +310,9 @@ def create_app() -> FastAPI:
           "string_too_short"           → validation.value_too_short
           "string_too_long"            → validation.value_too_long
           "string_pattern_mismatch"    → validation.invalid_format
+          "int_parsing"/"float_parsing"/"bool_parsing" → validation.invalid_format
+          "enum"                       → validation.invalid_value
+          "list_type"/"dict_type"      → validation.invalid_type
           "value_error.email" variants → validation.invalid_format
           "value_error" with I18nValueError ctx → domain code from the error
           anything else               → validation.custom
@@ -338,6 +351,51 @@ def create_app() -> FastAPI:
             # build_envelope's positional args. I18nValueError instances may
             # carry kwargs named "code" or "locale" (they're valid message
             # placeholders), so pop defensively before splatting.
+            params = {"field": field, "msg": msg, "type": error_type, **extra_params}
+            params.pop("code", None)
+            params.pop("locale", None)
+            envelope = build_envelope(code, locale, **params)
+            envelopes.append(envelope)
+        return JSONResponse(status_code=422, content={"detail": envelopes})
+
+    from pydantic import ValidationError as PydanticValidationError
+
+    @app.exception_handler(PydanticValidationError)
+    async def _envelope_pydantic_validation_error(request: Request, exc: PydanticValidationError) -> JSONResponse:
+        """
+        Catch pydantic.ValidationError raised inside route handlers (e.g. when
+        a route manually constructs a Pydantic model with a model_validator that
+        raises I18nValueError).  Applies the same envelope logic as the
+        RequestValidationError handler above so that domain codes like
+        validation.supplier_invoice.ar_details_required surface as 422 envelopes
+        instead of 500s.
+        """
+        locale = _resolve_handler_locale(request)
+        envelopes = []
+        for error in exc.errors():
+            field = ".".join(str(x) for x in error["loc"])
+            msg = error.get("msg", "")
+            error_type = error.get("type", "")
+            ctx = error.get("ctx", {}) or {}
+
+            if error_type in _TYPE_TO_CODE:
+                code: str = _TYPE_TO_CODE[error_type]
+                extra_params: dict = {}
+            elif error_type in _EMAIL_TYPES or error_type.startswith("value_error.email"):
+                code = ErrorCode.VALIDATION_INVALID_FORMAT
+                extra_params = {}
+            elif error_type == "value_error":
+                ctx_error = ctx.get("error")
+                if isinstance(ctx_error, I18nValueError):
+                    code = ctx_error.code
+                    extra_params = dict(ctx_error.params)
+                else:
+                    code = ErrorCode.VALIDATION_CUSTOM
+                    extra_params = {}
+            else:
+                code = ErrorCode.VALIDATION_CUSTOM
+                extra_params = {}
+
             params = {"field": field, "msg": msg, "type": error_type, **extra_params}
             params.pop("code", None)
             params.pop("locale", None)
