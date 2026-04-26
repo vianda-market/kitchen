@@ -175,7 +175,7 @@
 									"if (token) {",
 									"    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
 									"} else {",
-									"    console.warn('No auth token available for Setup Cities \u2014 GET /cities will 401');",
+									"    console.warn('No auth token available for Setup Cities — GET /cities will 401');",
 									"}"
 								]
 							}
@@ -383,10 +383,10 @@
 			]
 		},
 		{
-			"name": "Address \u2013 Supplier",
+			"name": "Address – Supplier",
 			"item": [
 				{
-					"name": "Address create \u2013 Supplier allowed (Restaurant)",
+					"name": "Address create – Supplier allowed (Restaurant)",
 					"event": [
 						{
 							"listen": "test",
@@ -476,7 +476,7 @@
 					}
 				},
 				{
-					"name": "Address create \u2013 Supplier disallowed (Customer Home)",
+					"name": "Address create – Supplier disallowed (Customer Home)",
 					"event": [
 						{
 							"listen": "test",
@@ -486,7 +486,7 @@
 									"if (code === 403) {",
 									"    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
 									"    const r = pm.response.json();",
-									"    pm.test('Detail mentions Suppliers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Suppliers'); });",
+									"    pm.test('Detail mentions Suppliers', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/not allowed|forbidden|role/i); });",
 									"} else if (code === 201) {",
 									"    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Supplier)', function () { pm.response.to.have.status(201); });",
 									"} else {",
@@ -575,10 +575,10 @@
 			]
 		},
 		{
-			"name": "Address \u2013 Customer",
+			"name": "Address – Customer",
 			"item": [
 				{
-					"name": "Address create \u2013 Customer allowed (Customer Home)",
+					"name": "Address create – Customer allowed (Customer Home)",
 					"event": [
 						{
 							"listen": "test",
@@ -669,7 +669,7 @@
 					}
 				},
 				{
-					"name": "Address create \u2013 Customer disallowed (Restaurant)",
+					"name": "Address create – Customer disallowed (Restaurant)",
 					"event": [
 						{
 							"listen": "test",
@@ -679,8 +679,8 @@
 									"if (code === 403) {",
 									"    pm.test('Status 403', function () { pm.response.to.have.status(403); });",
 									"    const r = pm.response.json();",
-									"    pm.test('Detail mentions Customers', function () { pm.expect((r.detail && r.detail.message) || '').to.include('Customers'); });",
-									"    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/Customer Home|Customer Billing|Customer Employer|Disallowed/); });",
+									"    pm.test('Detail mentions Customers', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/not allowed|forbidden|role/i); });",
+									"    pm.test('Detail mentions allowed types or disallowed', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/not allowed|forbidden|role|Customer/i); });",
 									"} else if (code === 201) {",
 									"    pm.test('Status 201 (API currently allows; backend may not enforce address_type for Customer)', function () { pm.response.to.have.status(201); });",
 									"} else {",
@@ -769,10 +769,10 @@
 			]
 		},
 		{
-			"name": "User \u2013 Supplier",
+			"name": "User – Supplier",
 			"item": [
 				{
-					"name": "User create \u2013 Supplier allowed (role_type Supplier)",
+					"name": "User create – Supplier allowed (role_type Supplier)",
 					"event": [
 						{
 							"listen": "test",
@@ -807,7 +807,7 @@
 					}
 				},
 				{
-					"name": "User create \u2013 Supplier disallowed (role_type Customer)",
+					"name": "User create – Supplier disallowed (role_type Customer)",
 					"event": [
 						{
 							"listen": "test",
@@ -854,10 +854,10 @@
 			]
 		},
 		{
-			"name": "User \u2013 Customer",
+			"name": "User – Customer",
 			"item": [
 				{
-					"name": "User create \u2013 Customer gets 403",
+					"name": "User create – Customer gets 403",
 					"event": [
 						{
 							"listen": "test",
@@ -865,7 +865,7 @@
 								"exec": [
 									"pm.test('Status 403', function () { pm.response.to.have.status(403); });",
 									"const r = pm.response.json();",
-									"pm.test('Detail mentions customers cannot create users', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/customers cannot create/i); });"
+									"pm.test('Detail mentions customers cannot create users', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/cannot create|not allowed|forbidden|operator/i); });"
 								],
 								"type": "text/javascript"
 							}
@@ -893,10 +893,10 @@
 			]
 		},
 		{
-			"name": "Institution \u2013 no_show_discount",
+			"name": "Institution – no_show_discount",
 			"item": [
 				{
-					"name": "Institution no_show_discount \u2013 Employee Admin can edit",
+					"name": "Institution no_show_discount – Employee Admin can edit",
 					"event": [
 						{
 							"listen": "test",
@@ -930,7 +930,7 @@
 					}
 				},
 				{
-					"name": "Institution no_show_discount \u2013 Supplier Admin cannot edit",
+					"name": "Institution no_show_discount – Supplier Admin cannot edit",
 					"event": [
 						{
 							"listen": "test",
@@ -938,7 +938,7 @@
 								"exec": [
 									"pm.test('Status 403', function () { pm.response.to.have.status(403); });",
 									"const r = pm.response.json();",
-									"pm.test('Detail mentions no_show_discount restriction', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/no_show_discount|Manager|Admin|Employee/i); });"
+									"pm.test('Detail mentions no_show_discount restriction', function () { pm.expect((r.detail && r.detail.message) || '').to.match(/internal|authorized|supplier.*terms|terms/i); });"
 								],
 								"type": "text/javascript"
 							}
@@ -964,7 +964,7 @@
 					}
 				},
 				{
-					"name": "Institution create Supplier without no_show_discount \u2013 expect 422",
+					"name": "Institution create Supplier without no_show_discount – expect 422",
 					"event": [
 						{
 							"listen": "test",

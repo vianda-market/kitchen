@@ -15,9 +15,8 @@
 
 gates:
   - name: diff-coverage
-    # Temporarily 50 (was 80) for the K6..KN HTTPException envelope sweep
-    # (kitchen#66). Restore to 80 in K-last. Tracked in kitchen#87.
-    value: 50
+    # Restored to 80 in K-last (kitchen#66 sweep complete, kitchen#87 closed).
+    value: 80
     sources:
       - file: .github/workflows/ci.yml
         # diff-cover invocation is YAML-folded across multiple lines in ci.yml;

@@ -37,7 +37,7 @@ def client_internal_enums():
 def test_get_enums_rejects_invalid_language(client_internal_enums):
     r = client_internal_enums.get("/api/v1/enums", params={"language": "xx"})
     assert r.status_code == 422
-    # K3+: detail is now an envelope dict (bare-string raise wrapped as legacy.uncoded).
+    # K-last: detail is now a typed envelope dict (locale.unsupported code from K15).
     raw = r.json()["detail"]
     detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
     assert "Unsupported language" in detail_str or "unsupported" in detail_str.lower()
