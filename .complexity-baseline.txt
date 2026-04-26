@@ -15,4 +15,3 @@ app/services/crud_service.py:CRUDService.create
 app/services/leads_public_service.py:create_lead_interest
 app/services/plate_selection_service.py:create_plate_selection_with_transactions
 app/services/restaurant_staff_service.py:_group_orders_by_restaurant
-app/services/user_signup_service.py:UserSignupService.process_admin_user_creation
