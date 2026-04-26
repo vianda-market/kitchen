@@ -139,18 +139,13 @@
       },
       {
         "cast": "text",
+        "context": "plan",
         "enum_ref": "Status",
         "key": "status",
         "kind": "select",
         "values": [
           "active",
-          "inactive",
-          "pending",
-          "arrived",
-          "handed_out",
-          "completed",
-          "cancelled",
-          "processed"
+          "inactive"
         ]
       },
       {
@@ -195,18 +190,13 @@
     "fields": [
       {
         "cast": "text",
+        "context": "plate",
         "enum_ref": "Status",
         "key": "status",
         "kind": "select",
         "values": [
           "active",
-          "inactive",
-          "pending",
-          "arrived",
-          "handed_out",
-          "completed",
-          "cancelled",
-          "processed"
+          "inactive"
         ]
       },
       {
