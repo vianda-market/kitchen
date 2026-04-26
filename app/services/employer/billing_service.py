@@ -6,7 +6,6 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
 from app.i18n.envelope import envelope_exception
@@ -208,7 +207,7 @@ def generate_employer_bill(
 
     bill = employer_bill_service.create(bill_data, db, scope=None)
     if not bill:
-        raise HTTPException(status_code=500, detail="Failed to create employer bill")  # 500: skip per sweep rules
+        raise envelope_exception(ErrorCode.EMPLOYER_BILL_CREATION_FAILED, status=500, locale="en")
 
     created_lines = []
     for line in lines_data:

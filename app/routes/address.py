@@ -1,11 +1,13 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.config.address_autocomplete_config import get_address_autocomplete_config
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     AddressCreateSchema,
     AddressEnrichedResponseSchema,
@@ -260,18 +262,12 @@ def create_address(
     # B2B: require institution_id; user_id optional (Supplier/Internal may omit)
     if not user_scope.is_customer:
         if addr_data.get("institution_id") is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="institution_id is required for B2B address creation.",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_INSTITUTION_REQUIRED, status=400, locale="en")
 
     # Auto-set user_id and institution_id for Customers. user_id only for Comensal creating home/other (not employer)
     if user_scope.is_customer:
         if current_user.get("institution_id") is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Customer address requires institution context; missing institution_id on user.",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_CUSTOMER_INSTITUTION_REQUIRED, status=400, locale="en")
         addr_data["institution_id"] = current_user["institution_id"]
         # Comensal always gets user_id set (address type is user-selected: home/work/other)
         if current_user.get("role_name") == "comensal":
@@ -282,15 +278,12 @@ def create_address(
         if target_user_id is not None:
             target_user = user_service.get_by_id(target_user_id, db, scope=None)
             if not target_user:
-                raise HTTPException(status_code=404, detail="Target user not found")
+                raise envelope_exception(ErrorCode.ADDRESS_TARGET_USER_NOT_FOUND, status=404, locale="en")
             user_scope.enforce_user_assignment(target_user_id, target_user.institution_id)
             # User assigned to the address must be of the same institution as the address
             addr_institution_id = addr_data.get("institution_id")
             if addr_institution_id is not None and str(target_user.institution_id) != str(addr_institution_id):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="The user assigned to the address must belong to the same institution as the address.",
-                )
+                raise envelope_exception(ErrorCode.ADDRESS_USER_INSTITUTION_MISMATCH, status=400, locale="en")
 
     # Use institution scope for Suppliers/Internal
     scope = (
@@ -313,7 +306,7 @@ def create_address(
     )
 
     if not result:
-        raise HTTPException(status_code=500, detail="Error creating address")
+        raise envelope_exception(ErrorCode.ADDRESS_CREATION_FAILED, status=500, locale="en")
 
     return result
 

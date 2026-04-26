@@ -109,7 +109,7 @@ def list_enriched_qr_codes(
         raise
     except Exception as e:
         log_error(f"Error getting enriched QR codes: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR codes") from None
+        raise envelope_exception(ErrorCode.QR_CODE_LIST_FAILED, status=500, locale="en") from None
 
 
 # GET /qr-codes/enriched/{qr_code_id} - Get a single QR code with enriched data
@@ -130,7 +130,7 @@ def get_enriched_qr_code_by_id_route(
         raise
     except Exception as e:
         log_error(f"Error getting enriched QR code {qr_code_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched QR code") from None
+        raise envelope_exception(ErrorCode.QR_CODE_GET_FAILED, status=500, locale="en") from None
 
 
 # =============================================================================
@@ -251,7 +251,7 @@ def delete_qr_code_atomic(
         success = atomic_qr_service.delete_qr_code_atomic(qr_code_id, db, scope=scope)
         if success:
             return {"message": "QR code deleted successfully"}
-        raise HTTPException(status_code=500, detail="Failed to delete QR code")
+        raise envelope_exception(ErrorCode.QR_CODE_DELETE_FAILED, status=500, locale="en")
 
     return handle_business_operation(_delete_qr_code, "QR code deletion", "QR code deleted successfully")
 

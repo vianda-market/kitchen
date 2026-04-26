@@ -12,6 +12,8 @@ from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import QRCodePrintContextSchema
 from app.utils.address_formatting import format_street_display
 from app.utils.log import log_error
@@ -66,7 +68,7 @@ def load_qr_png_base64(image_storage_path: str) -> str:
     """Load QR PNG bytes from GCS or local disk; return base64 ASCII (no data URL prefix)."""
     path = (image_storage_path or "").strip()
     if not path:
-        raise HTTPException(status_code=400, detail="QR code has no stored image")
+        raise envelope_exception(ErrorCode.QR_CODE_NO_IMAGE, status=400, locale="en")
 
     try:
         if settings.GCS_INTERNAL_BUCKET and path.startswith("qrcodes/"):

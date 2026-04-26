@@ -1,10 +1,12 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     SupplierTermsCreateSchema,
     SupplierTermsResponseSchema,
@@ -27,11 +29,11 @@ def _resolve_supplier_institution(current_user: dict, institution_id: UUID) -> U
     if role_type == "supplier":
         own_id = current_user.get("institution_id")
         if not own_id or str(own_id) != str(institution_id):
-            raise HTTPException(status_code=403, detail="Suppliers can only view their own terms")
+            raise envelope_exception(ErrorCode.SUPPLIER_TERMS_ACCESS_DENIED, status=403, locale="en")
         return institution_id
     if role_type == "internal":
         return institution_id
-    raise HTTPException(status_code=403, detail="Only Supplier and Internal users can access supplier terms")
+    raise envelope_exception(ErrorCode.SUPPLIER_TERMS_ACCESS_DENIED, status=403, locale="en")
 
 
 def _enrich_with_effective_values(
@@ -79,7 +81,7 @@ def get_supplier_terms(
         row = get_terms_for_scope(institution_id, institution_entity_id, db)
         if not row:
             scope = f"entity {institution_entity_id}" if institution_entity_id else f"institution {institution_id}"
-            raise HTTPException(status_code=404, detail=f"Supplier terms not found for {scope}")
+            raise envelope_exception(ErrorCode.SUPPLIER_TERMS_NOT_FOUND, status=404, locale="en", scope=scope)
         return _enrich_with_effective_values(row, db, institution_entity_id=institution_entity_id)
 
     return handle_business_operation(_get, "supplier terms retrieval")
@@ -93,7 +95,7 @@ def list_supplier_terms(
     """List all supplier terms. Internal only."""
     role_type = (current_user.get("role_type") or "").strip()
     if role_type != "internal":
-        raise HTTPException(status_code=403, detail="Only Internal users can list all supplier terms.")
+        raise envelope_exception(ErrorCode.SUPPLIER_TERMS_INTERNAL_ONLY, status=403, locale="en")
 
     def _list():
         all_terms = supplier_terms_service.get_all(db)
@@ -130,7 +132,7 @@ def upsert_supplier_terms(
         if existing_row:
             updated = supplier_terms_service.update(existing_row["supplier_terms_id"], payload, db)
             if not updated:
-                raise HTTPException(status_code=500, detail="Failed to update supplier terms")
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
             terms_dict = updated.model_dump()
         else:
             payload["institution_id"] = str(institution_id)
@@ -138,7 +140,7 @@ def upsert_supplier_terms(
                 payload["institution_entity_id"] = str(institution_entity_id)
             created = supplier_terms_service.create(payload, db)
             if not created:
-                raise HTTPException(status_code=500, detail="Failed to create supplier terms")
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
             terms_dict = created.model_dump()
 
         return _enrich_with_effective_values(terms_dict, db, institution_entity_id=institution_entity_id)
@@ -160,7 +162,7 @@ def archive_entity_supplier_terms(
     def _archive():
         row = get_terms_for_scope(institution_id, institution_entity_id, db)
         if not row:
-            raise HTTPException(status_code=404, detail="Entity-level supplier terms not found")
+            raise envelope_exception(ErrorCode.SUPPLIER_TERMS_NOT_FOUND, status=404, locale="en", scope=f"entity {institution_entity_id}")
         supplier_terms_service.update(
             row["supplier_terms_id"],
             {"is_archived": True, "modified_by": current_user["user_id"]},

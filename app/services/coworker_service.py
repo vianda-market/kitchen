@@ -11,8 +11,9 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.log import log_info
 
@@ -54,7 +55,7 @@ def get_coworkers_with_eligibility(
         fetch_one=True,
     )
     if not ps_row:
-        raise HTTPException(status_code=404, detail="Plate selection not found")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=404, locale="en")
 
     workplace_group_id = ps_row.get("workplace_group_id")
     employer_entity_id = ps_row.get("employer_entity_id")
@@ -66,10 +67,7 @@ def get_coworkers_with_eligibility(
         match_field = "employer_entity_id"
         match_value = employer_entity_id
     else:
-        raise HTTPException(
-            status_code=403,
-            detail="You must have an employer assigned to list coworkers. Assign an employer in your profile.",
-        )
+        raise envelope_exception(ErrorCode.COWORKER_EMPLOYER_REQUIRED, status=403, locale="en")
 
     kitchen_day = ps_row.get("kitchen_day")
     restaurant_id = ps_row.get("restaurant_id")
@@ -83,7 +81,7 @@ def get_coworkers_with_eligibility(
         fetch_one=True,
     )
     if owner_check and str(owner_check.get("user_id")) != str(current_user_id):
-        raise HTTPException(status_code=403, detail="Not authorized to access this plate selection")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_ACCESS_DENIED, status=403, locale="en")
 
     # Get coworkers (same workplace_group or employer; exclude current user;
     # only include users with can_participate_in_plate_pickups = TRUE)
@@ -221,10 +219,7 @@ def notify_coworkers(
 
     for uid in user_ids:
         if str(uid) not in eligible_ids:
-            raise HTTPException(
-                status_code=400,
-                detail=f"User {uid} is not an eligible coworker for notification. They may have already ordered for a different restaurant or time.",
-            )
+            raise envelope_exception(ErrorCode.COWORKER_USER_INELIGIBLE, status=400, locale="en")
 
     if not user_ids:
         return {"notified_count": 0}

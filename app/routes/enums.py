@@ -5,13 +5,15 @@ API endpoints for retrieving system enum values.
 Provides centralized access to all valid enum values for frontend dropdowns.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import get_current_user, get_employee_or_supplier_user
 from app.config.enums import DiscretionaryReason, Status
 from app.config.settings import settings
 from app.i18n.enum_labels import LABELED_ENUM_TYPES, labels_for_values
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import EnumsResponseSchema
 from app.services.enum_service import enum_service
 from app.utils.log import log_error, log_info
@@ -75,9 +77,9 @@ async def get_all_enums(
     ```
     """
     if language not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported language '{language}'. Supported: {', '.join(settings.SUPPORTED_LOCALES)}.",
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=language, supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     log_info(f"User {current_user.get('user_id')} fetching system enums (language={language})")
 
@@ -97,7 +99,7 @@ async def get_all_enums(
         return body
     except Exception as e:
         log_error(f"Error fetching enums: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enum values") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.get("/institution-types/assignable")
@@ -122,7 +124,7 @@ async def get_assignable_institution_types(current_user: dict = Depends(get_curr
         )
     except Exception as e:
         log_error(f"Error fetching assignable institution types: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve assignable institution types") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.get("/roles/assignable")
@@ -152,7 +154,7 @@ async def get_assignable_roles(current_user: dict = Depends(get_employee_or_supp
         )
     except Exception as e:
         log_error(f"Error fetching assignable roles: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve assignable roles") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.get("/{enum_name}", response_model=list[str])
@@ -204,8 +206,8 @@ async def get_enum_by_name(enum_name: str, context: str | None = None, current_u
     except ValueError as e:
         err_msg = str(e)
         if "cannot read role enums" in err_msg:
-            raise HTTPException(status_code=403, detail=err_msg) from None
-        raise HTTPException(status_code=404, detail=err_msg) from None
+            raise envelope_exception(ErrorCode.SECURITY_INSUFFICIENT_PERMISSIONS, status=403, locale="en") from None
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=enum_name) from None
     except Exception as e:
         log_error(f"Error fetching enum {enum_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enum values") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None

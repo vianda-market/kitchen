@@ -12,12 +12,14 @@ from uuid import UUID
 
 import psycopg2.extensions
 import stripe
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from app.auth.dependencies import get_client_user
 from app.config import Status
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.customer_payment_method import (
     CustomerPaymentMethodItemSchema,
     CustomerPaymentMethodListResponseSchema,
@@ -52,7 +54,7 @@ def _ensure_stripe_customer_for_mock(
         connection=db,
     )
     if not user_rows:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="User")
 
     provider_rows = db_read(
         """
@@ -169,10 +171,7 @@ def create_setup_session(
         default_su = (getattr(settings, "STRIPE_CUSTOMER_SETUP_SUCCESS_URL", None) or "").strip()
         success_url = default_su or None
     if not success_url:
-        raise HTTPException(
-            status_code=400,
-            detail="success_url is required (request body or STRIPE_CUSTOMER_SETUP_SUCCESS_URL).",
-        )
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_SETUP_URL_REQUIRED, status=400, locale="en")
     if not cancel_url:
         cancel_url = success_url
     try:
@@ -181,14 +180,11 @@ def create_setup_session(
     except ValueError as e:
         msg = str(e)
         if "not found" in msg.lower():
-            raise HTTPException(status_code=404, detail=msg) from e
-        raise HTTPException(status_code=400, detail=msg) from e
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=msg) from e
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_SETUP_URL_REQUIRED, status=400, locale="en") from e
     except stripe.error.StripeError as e:
         log_warning(f"Stripe setup-session failed: {e}")
-        raise HTTPException(
-            status_code=502,
-            detail="Payment setup is temporarily unavailable. Please try again.",
-        ) from e
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_PROVIDER_UNAVAILABLE, status=502, locale="en") from e
 
 
 @router.post("/mock-add", response_model=CustomerPaymentMethodItemSchema)
@@ -203,10 +199,7 @@ def mock_add_payment_method(
     Customer only.
     """
     if _get_payment_provider() != "mock":
-        raise HTTPException(
-            status_code=400,
-            detail="mock-add is only available when PAYMENT_PROVIDER=mock.",
-        )
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_MOCK_ONLY, status=400, locale="en")
     user_id = UUID(str(current_user["user_id"]))
     stripe_customer_id = _ensure_stripe_customer_for_mock(user_id, db)
     external_id = f"pm_mock_{uuid_module.uuid4().hex[:24]}"
@@ -262,9 +255,9 @@ def delete_customer_payment_method(
     user_id = UUID(str(current_user["user_id"]))
     owner = _get_payment_method_owner(payment_method_id, db)
     if owner is None:
-        raise HTTPException(status_code=404, detail="Payment method not found.")
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_NOT_FOUND, status=404, locale="en")
     if owner != user_id:
-        raise HTTPException(status_code=403, detail="You cannot remove this payment method.")
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_ACCESS_DENIED, status=403, locale="en")
 
     ext_rows = db_read(
         """
@@ -309,9 +302,9 @@ def set_default_payment_method(
     user_id = UUID(str(current_user["user_id"]))
     owner = _get_payment_method_owner(payment_method_id, db)
     if owner is None:
-        raise HTTPException(status_code=404, detail="Payment method not found.")
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_NOT_FOUND, status=404, locale="en")
     if owner != user_id:
-        raise HTTPException(status_code=403, detail="You cannot update this payment method.")
+        raise envelope_exception(ErrorCode.PAYMENT_METHOD_ACCESS_DENIED, status=403, locale="en")
 
     db_update(
         "payment_method",

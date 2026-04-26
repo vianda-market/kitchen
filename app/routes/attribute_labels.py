@@ -30,11 +30,13 @@ See docs/api/i18n.md §4 (attribute-labels section) and the K-attr1 PR
 description for the full rationale.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user
 from app.config.settings import settings
 from app.i18n.attribute_labels import ATTRIBUTE_LABELS
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_info
 
 router = APIRouter(prefix="/attribute-labels", tags=["Attribute Labels"])
@@ -105,15 +107,15 @@ async def get_attribute_labels(
     - 401: Not authenticated
     """
     if language not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(
-            status_code=400,
-            detail=(f"Unsupported language '{language}'. Supported: {', '.join(settings.SUPPORTED_LOCALES)}."),
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=400, locale="en",
+            lang=language, supported=", ".join(settings.SUPPORTED_LOCALES),
         )
 
     if schema not in _KNOWN_SCHEMAS:
-        raise HTTPException(
-            status_code=400,
-            detail=(f"Unknown schema '{schema}'. Known schemas: {', '.join(sorted(_KNOWN_SCHEMAS))}."),
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND, status=400, locale="en",
+            entity=f"Schema '{schema}'",
         )
 
     log_info(f"User {current_user.get('user_id')} fetching attribute labels (language={language} schema={schema})")

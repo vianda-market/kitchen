@@ -7,8 +7,9 @@ For multi-timezone countries, uses province/state mappings.
 """
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_info, log_warning
 
 
@@ -245,16 +246,14 @@ class TimezoneService:
             HTTPException: 400 if country_code not found in market_info
         """
         if not country_code:
-            raise HTTPException(status_code=400, detail="country_code is required for timezone deduction")
+            raise envelope_exception(ErrorCode.TIMEZONE_COUNTRY_CODE_REQUIRED, status=400, locale="en")
 
         # Callers (route, address_service) pass already-normalized country_code.
 
         # Query market_info for default timezone
         market_data = cls._get_market_timezone(country_code, db)
         if not market_data:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid country_code: {country_code}. Market not found in market_info."
-            )
+            raise envelope_exception(ErrorCode.TIMEZONE_NOT_FOUND, status=400, locale="en")
 
         default_timezone = market_data["timezone"]
         country_name = market_data["country_name"]

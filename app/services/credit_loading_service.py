@@ -15,6 +15,8 @@ from fastapi import HTTPException
 
 from app.config import Status
 from app.dto.models import ClientTransactionDTO, RestaurantTransactionDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import (
     client_transaction_service,
     create_with_conservative_balance_update,
@@ -65,7 +67,7 @@ class CreditLoadingService:
 
             # Validate amount is positive
             if amount <= 0:
-                raise HTTPException(status_code=400, detail="Credit amount must be positive")
+                raise envelope_exception(ErrorCode.CREDIT_AMOUNT_MUST_BE_POSITIVE, status=400, locale="en")
 
             # Create client transaction
             transaction_data = {
@@ -103,7 +105,7 @@ class CreditLoadingService:
             raise
         except Exception as e:
             log_error(f"Error creating client credit transaction for user {user_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create client credit transaction") from None
+            raise envelope_exception(ErrorCode.CREDIT_TRANSACTION_CREATION_FAILED, status=500, locale="en") from None
 
     def create_restaurant_credit_transaction(
         self,
@@ -138,7 +140,7 @@ class CreditLoadingService:
 
             # Validate amount is positive
             if amount <= 0:
-                raise HTTPException(status_code=400, detail="Credit amount must be positive")
+                raise envelope_exception(ErrorCode.CREDIT_AMOUNT_MUST_BE_POSITIVE, status=400, locale="en")
 
             restaurant = restaurant_service.get_by_id(restaurant_id, db)
             if not restaurant:
@@ -148,7 +150,7 @@ class CreditLoadingService:
             currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
             currency = credit_currency_service.get_by_id(currency_metadata_id, db)
             if not currency:
-                raise HTTPException(status_code=404, detail="Credit currency not found for restaurant")
+                raise envelope_exception(ErrorCode.CREDIT_CURRENCY_NOT_FOUND, status=404, locale="en")
 
             now = datetime.now(UTC)
 
@@ -186,4 +188,4 @@ class CreditLoadingService:
             raise
         except Exception as e:
             log_error(f"Error creating restaurant credit transaction for restaurant {restaurant_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create restaurant credit transaction") from None
+            raise envelope_exception(ErrorCode.CREDIT_TRANSACTION_CREATION_FAILED, status=500, locale="en") from None

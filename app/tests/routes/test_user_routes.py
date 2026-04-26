@@ -282,10 +282,9 @@ def test_deprecated_get_user_self_read_returns_410_gone(client_customer, custome
         mock_user.get_by_id.return_value = user_dto
         response = client_customer.get(f"/api/v1/users/{user_id}")
     assert response.status_code == 410
-    # K3+: detail is now an envelope dict; extract message for string checks.
-    raw = response.json().get("detail") or ""
-    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
-    assert "users/me" in detail_str
+    # K15: detail is now a full envelope; assert on code.
+    raw = response.json().get("detail") or {}
+    assert raw.get("code") == "user.use_me_endpoint"
 
 
 def test_deprecated_put_user_self_update_returns_410_gone(client_customer, customer_user, mock_db):
@@ -316,10 +315,9 @@ def test_deprecated_put_user_self_update_returns_410_gone(client_customer, custo
             json={"first_name": "Updated"},
         )
     assert response.status_code == 410
-    # K3+: detail is now an envelope dict; extract message for string checks.
-    raw = response.json().get("detail") or ""
-    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
-    assert "users/me" in detail_str
+    # K15: detail is now a full envelope; assert on code.
+    raw = response.json().get("detail") or {}
+    assert raw.get("code") == "user.use_me_endpoint"
 
 
 def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer, customer_user, mock_db):
@@ -351,10 +349,9 @@ def test_deprecated_get_enriched_user_self_read_returns_410_gone(client_customer
         mock_get.return_value = enriched
         response = client_customer.get(f"/api/v1/users/enriched/{user_id}")
     assert response.status_code == 410
-    # K3+: detail is now an envelope dict; extract message for string checks.
-    raw = response.json().get("detail") or ""
-    detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
-    assert "users/me" in detail_str
+    # K15: detail is now a full envelope; assert on code.
+    raw = response.json().get("detail") or {}
+    assert raw.get("code") == "user.use_me_endpoint"
 
 
 def test_put_me_mobile_change_resets_verification_flags(client_customer, customer_user, mock_db):

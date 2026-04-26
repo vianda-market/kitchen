@@ -872,10 +872,7 @@ def get_enriched_user_by_id_route(
     current_user_id = current_user["user_id"]
 
     if str(user_id) == str(current_user_id):
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Use GET /api/v1/users/me instead",
-        )
+        raise envelope_exception(ErrorCode.USER_USE_ME_ENDPOINT, status=410, locale="en")
 
     # Apply user scoping for Customers and Internal Operators (self-only access)
     if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
@@ -920,10 +917,7 @@ def get_user_by_id(
     current_user_id = current_user["user_id"]
 
     if str(user_id) == str(current_user_id):
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Use GET /api/v1/users/me instead",
-        )
+        raise envelope_exception(ErrorCode.USER_USE_ME_ENDPOINT, status=410, locale="en")
 
     # Apply user scoping for Customers and Internal Operators (self-only access)
     if role_type == "customer" or (role_type == "internal" and role_name == "operator"):
@@ -1027,10 +1021,7 @@ def update(
     current_user_id = current_user["user_id"]
 
     if str(user_id) == str(current_user_id):
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Use PUT /api/v1/users/me instead",
-        )
+        raise envelope_exception(ErrorCode.USER_USE_ME_ENDPOINT, status=410, locale="en")
 
     ensure_supplier_can_create_edit_users(current_user)
     # Apply user scoping for Customers and Internal Operators (self-only access)

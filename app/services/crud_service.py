@@ -27,6 +27,8 @@ from app.config.restricted_institutions import (
     TABLE_CONTEXT_FOR_MESSAGE,
     validate_institution_assignable,
 )
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.utils.db import db_delete, db_insert, db_read, db_update
 from app.utils.log import log_error, log_info, log_warning
@@ -306,11 +308,11 @@ class CRUDService(Generic[T]):
             result = db_read(validation_query, (str(foreign_key_value),), connection=db, fetch_one=True)
 
             if not result:
-                raise HTTPException(status_code=404, detail=f"Resource referenced by {foreign_key_field} not found")
+                raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=foreign_key_field)
 
             institution_id = result.get("institution_id")
             if not scope.matches(institution_id):
-                raise HTTPException(status_code=403, detail="Forbidden: cannot create resource for another institution")
+                raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
 
     def _apply_scope_to_create_data(
         self, data: dict[str, Any], scope: InstitutionScope | None, db: psycopg2.extensions.connection | None = None
@@ -329,10 +331,10 @@ class CRUDService(Generic[T]):
             existing_value = data.get(self.institution_column)
             if existing_value is None:
                 if scope.institution_id is None:
-                    raise HTTPException(status_code=403, detail="Forbidden: missing institution context for creation")
+                    raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale="en")
                 data[self.institution_column] = scope.institution_id
             elif not scope.matches(existing_value):
-                raise HTTPException(status_code=403, detail="Forbidden: cannot create resource for another institution")
+                raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
         # JOIN-based scoping: validate foreign key relationships
         elif self.institution_join_path and db:
             # Determine which foreign key to validate based on entity type
@@ -761,7 +763,7 @@ class CRUDService(Generic[T]):
                     data["market_id"] = plan.market_id
                 else:
                     log_error(f"Plan not found for plan_id={data['plan_id']}, cannot create subscription")
-                    raise HTTPException(status_code=404, detail=f"Plan not found: {data['plan_id']}")
+                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Plan")
             log_info(f"[CRUDService.create] Data keys after scope: {list(data.keys())}")
             # Add timestamps
             data["created_date"] = datetime.now()
@@ -859,9 +861,7 @@ class CRUDService(Generic[T]):
                     )
                 if scope and not scope.is_global:
                     if not scope.matches(data[self.institution_column]):
-                        raise HTTPException(
-                            status_code=403, detail="Forbidden: cannot transfer resource to another institution"
-                        )
+                        raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
             elif scope and not scope.is_global and self.institution_join_path:
                 # JOIN-based scoping: validate foreign key changes
                 if "plate_id" in data:

@@ -9,7 +9,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Query, Response, status
 
 from app.auth.dependencies import get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
@@ -325,7 +325,7 @@ def update_national_holiday(
         )
 
         if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update national holiday")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_UPDATE_FAILED, status=500, locale="en")
         log_info(f"Updated national holiday: {holiday_id}")
         return updated
 
@@ -355,7 +355,7 @@ def delete_national_holiday(
         success = national_holiday_service.soft_delete(holiday_id, current_user["user_id"], connection)
 
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete national holiday")
+            raise envelope_exception(ErrorCode.NATIONAL_HOLIDAY_DELETE_FAILED, status=500, locale="en")
         log_info(f"Deleted (archived) national holiday: {holiday_id}")
         return
 

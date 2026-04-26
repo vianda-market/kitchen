@@ -11,10 +11,12 @@ from uuid import UUID
 
 import psycopg2.extensions
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.stripe_customer_payment_method_sync import (
     handle_payment_method_attached,
     handle_payment_method_detached,
@@ -126,16 +128,16 @@ async def stripe_webhook(
     secret = (settings.STRIPE_WEBHOOK_SECRET or "").strip()
     if not secret:
         log_warning("STRIPE_WEBHOOK_SECRET not set; cannot verify Stripe webhook")
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+        raise envelope_exception(ErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED, status=500, locale="en")
 
     try:
         event = stripe.Webhook.construct_event(payload, signature, secret)
     except ValueError as e:
         log_warning(f"Stripe webhook invalid payload: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload") from None
+        raise envelope_exception(ErrorCode.WEBHOOK_INVALID_PAYLOAD, status=400, locale="en") from None
     except stripe.SignatureVerificationError as e:
         log_warning(f"Stripe webhook signature verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid signature") from None
+        raise envelope_exception(ErrorCode.WEBHOOK_INVALID_SIGNATURE, status=400, locale="en") from None
 
     event_type = event.type
     try:
@@ -359,16 +361,16 @@ async def stripe_connect_webhook(
     secret = (settings.STRIPE_CONNECT_WEBHOOK_SECRET or "").strip()
     if not secret:
         log_warning("STRIPE_CONNECT_WEBHOOK_SECRET not set; cannot verify Connect webhook")
-        raise HTTPException(status_code=500, detail="Connect webhook secret not configured")
+        raise envelope_exception(ErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED, status=500, locale="en")
 
     try:
         event = stripe.Webhook.construct_event(payload, signature, secret)
     except ValueError as e:
         log_warning(f"Connect webhook invalid payload: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload") from None
+        raise envelope_exception(ErrorCode.WEBHOOK_INVALID_PAYLOAD, status=400, locale="en") from None
     except stripe.SignatureVerificationError as e:
         log_warning(f"Connect webhook signature verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid signature") from None
+        raise envelope_exception(ErrorCode.WEBHOOK_INVALID_SIGNATURE, status=400, locale="en") from None
 
     event_type = event.type
     try:

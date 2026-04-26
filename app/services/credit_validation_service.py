@@ -11,6 +11,8 @@ import psycopg2.extensions
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import subscription_service
 from app.utils.log import log_error, log_info, log_warning
 
@@ -66,10 +68,7 @@ def validate_sufficient_credits(
         subscription = subscription_service.get_by_user(user_id, db)
         if not subscription:
             log_error(f"Subscription not found for user {user_id}")
-            raise HTTPException(
-                status_code=404,
-                detail="User subscription not found. Please go to Plan and subscribe before reserving a plate.",
-            )
+            raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale="en")
 
         from decimal import Decimal
 
@@ -106,7 +105,7 @@ def validate_sufficient_credits(
         raise
     except Exception as e:
         log_error(f"Error validating credits for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error validating user credits. Please try again.") from None
+        raise envelope_exception(ErrorCode.CREDIT_VALIDATION_FAILED, status=500, locale="en") from None
 
 
 def handle_insufficient_credits(

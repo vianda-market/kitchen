@@ -1,10 +1,12 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_super_admin_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.onboarding import (
     OnboardingStatusResponseSchema,
     OnboardingSummaryResponseSchema,
@@ -33,7 +35,7 @@ def list_onboarding_summary(
 ):
     """Aggregated onboarding funnel view — Internal Super Admin only."""
     if institution_type not in ("supplier", "employer"):
-        raise HTTPException(status_code=400, detail="institution_type must be Supplier or Employer")
+        raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_TYPE_MISMATCH, status=400, locale="en")
     result = get_onboarding_summary(
         db,
         institution_type=institution_type,
@@ -69,12 +71,12 @@ def get_institution_onboarding_status(
         fetch_one=True,
     )
     if not row:
-        raise HTTPException(status_code=404, detail="Institution not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Institution")
 
     institution_type = row["institution_type"]
     result = get_onboarding_status(institution_id, institution_type, db)
     if not result:
-        raise HTTPException(status_code=404, detail="Institution not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Institution")
 
     # Hide stalled status from non-Internal users
     if result["onboarding_status"] == "stalled" and current_user.get("role_type") != "internal":

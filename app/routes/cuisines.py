@@ -6,7 +6,7 @@ Replaces the static config-based cuisine list with DB-backed queries.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from psycopg2.extensions import connection
 
 from app.auth.dependencies import (
@@ -15,6 +15,8 @@ from app.auth.dependencies import (
 )
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import resolve_cuisine_name_dict
 from app.schemas.consolidated_schemas import (
     CuisineResponseSchema,
@@ -51,7 +53,10 @@ def list_cuisines(
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     rows = cuisine_service.search_cuisines(db, search=search)
     if locale != "en":
         for row in rows:
@@ -82,5 +87,5 @@ def create_cuisine_suggestion(
         db=db,
     )
     if not row:
-        raise HTTPException(status_code=500, detail="Failed to create suggestion")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     return CuisineSuggestionResponseSchema(**row)

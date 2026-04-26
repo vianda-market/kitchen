@@ -8,12 +8,14 @@ City-first so coverage grows faster; zipcode refinement can be added later.
 import time
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.auth.recaptcha import verify_recaptcha
 from app.config import Status
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import localize_country_name
 from app.schemas.consolidated_schemas import (
     CityMetricsResponseSchema,
@@ -69,7 +71,7 @@ def _require_country_code(country_code: str | None) -> str:
     """
     normalized = normalize_country_code(country_code, default=None) if country_code else None
     if not normalized:
-        raise HTTPException(status_code=400, detail="country_code is required")
+        raise envelope_exception(ErrorCode.LEADS_COUNTRY_CODE_REQUIRED, status=400, locale="en")
     return normalized
 
 
@@ -148,7 +150,10 @@ async def list_leads_markets(
     effective_audience = "supplier" if audience == "supplier" else "customer"
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     markets = _get_cached_markets(effective_audience, db)
     if locale == "en":
         return markets
@@ -179,7 +184,10 @@ async def get_featured_restaurant(
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     country = _require_country_code(country_code)
     row = db_read(
         """
@@ -335,7 +343,7 @@ async def get_email_registered(
     """
     normalized = (email or "").strip().lower()
     if not normalized or "@" not in normalized:
-        raise HTTPException(status_code=400, detail="Valid email is required")
+        raise envelope_exception(ErrorCode.LEADS_EMAIL_REQUIRED, status=400, locale="en")
     user = get_user_by_email(normalized, db)
     return EmailRegisteredResponseSchema(registered=user is not None)
 
@@ -382,7 +390,10 @@ async def list_leads_restaurants(  # noqa: PLR0913 — declarative FastAPI Query
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     country = _require_country_code(country_code)
     rows = get_public_restaurants(locale, country, db, featured_only=featured, limit=limit)
     return [LeadsRestaurantSchema(**r) for r in rows]
@@ -410,7 +421,10 @@ async def list_leads_plans(
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     country = _require_country_code(country_code)
     rows = get_public_plans(locale, country, db)
     return [LeadsPlanSchema(**r) for r in rows]
@@ -433,7 +447,10 @@ async def list_leads_cuisines(
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     rows = get_leads_cuisines(locale, db)
     return [LeadsCuisineSchema(**r) for r in rows]
 
@@ -454,7 +471,10 @@ async def list_employee_count_ranges(
     """
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
+            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     ranges = get_employee_count_ranges(locale)
     return [EmployeeCountRangeSchema(**r) for r in ranges]
 
@@ -478,9 +498,9 @@ async def submit_lead_interest(
 
     row = create_lead_interest(data.model_dump(), source, db)
     if not row:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid interest_type '{data.interest_type}'. Must be: customer, employer, or supplier.",
+        raise envelope_exception(
+            ErrorCode.LEADS_INVALID_INTEREST_TYPE, status=422, locale="en",
+            interest_type=data.interest_type,
         )
     return LeadInterestResponseSchema(**row)
 
@@ -501,8 +521,5 @@ async def submit_restaurant_interest(
     """
     row = create_restaurant_lead(data.model_dump(), db)
     if not row:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid restaurant lead data. Check referral_source and cuisine_ids.",
-        )
+        raise envelope_exception(ErrorCode.LEADS_INVALID_RESTAURANT_DATA, status=422, locale="en")
     return RestaurantLeadResponseSchema(**row)

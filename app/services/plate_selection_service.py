@@ -395,9 +395,7 @@ def update_plate_selection(
     if "pickup_intent" in payload and payload["pickup_intent"] is not None:
         intent = payload["pickup_intent"]
         if intent not in ("offer", "request", "self"):
-            from fastapi import HTTPException
-
-            raise HTTPException(status_code=422, detail="pickup_intent must be offer, request, or self")
+            raise envelope_exception(ErrorCode.PLATE_SELECTION_PICKUP_INTENT_INVALID, status=422, locale=locale)
         updates["pickup_intent"] = intent
     if "flexible_on_time" in payload:
         updates["flexible_on_time"] = payload["flexible_on_time"] if payload.get("pickup_intent") == "request" else None

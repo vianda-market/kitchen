@@ -18,6 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_client_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.payment_method import UserPaymentProviderResponseSchema
 from app.utils.db import db_read
 from app.utils.log import log_info, log_warning
@@ -78,10 +80,7 @@ def _archive_provider(
         row = cur.fetchone()
         if not row:
             db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Payment provider not found or already disconnected.",
-            )
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Payment provider")
         provider = row[0]
 
         # Archive all active payment methods for this user+provider
@@ -107,10 +106,7 @@ def _archive_provider(
     except Exception as e:
         db.rollback()
         log_warning(f"provider disconnect error: user={user_id} err={e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to disconnect payment provider.",
-        ) from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
     finally:
         cur.close()
 

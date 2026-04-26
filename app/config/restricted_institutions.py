@@ -9,9 +9,9 @@ validate_institution_assignable() so all such checks share one rule and message.
 
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.config.settings import get_vianda_customers_institution_id, get_vianda_enterprises_institution_id
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 # Tables where institution_id must NOT be Vianda Customers or Vianda Enterprises
 RESTRICTED_INSTITUTION_TABLES = frozenset(
@@ -51,7 +51,4 @@ def validate_institution_assignable(institution_id: UUID | None, context: str = 
     uid = institution_id if isinstance(institution_id, UUID) else UUID(str(institution_id))
     restricted = get_restricted_institution_ids()
     if uid in restricted:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Vianda Customers and Vianda Enterprises cannot be assigned to a {context}. Use a Supplier institution.",
-        )
+        raise envelope_exception(ErrorCode.INSTITUTION_RESTRICTED, status=400, locale="en", context=context)

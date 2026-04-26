@@ -12,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_client_user, get_employee_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     ActiveNotificationsResponseSchema,
     NotificationAcknowledgeSchema,
@@ -63,7 +65,7 @@ def get_active(
         raise
     except Exception as e:
         log_error(f"Error fetching active notifications: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch notifications") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.post("/{notification_id}/acknowledge")
@@ -82,7 +84,7 @@ def acknowledge(
         raise
     except Exception as e:
         log_error(f"Error acknowledging notification {notification_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to acknowledge notification") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.post("/expire")
@@ -98,7 +100,7 @@ def expire_notifications(
         raise
     except Exception as e:
         log_error(f"Error expiring notifications: {e}")
-        raise HTTPException(status_code=500, detail="Failed to expire notifications") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.post("/generate-reminders", status_code=200)

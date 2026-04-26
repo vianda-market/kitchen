@@ -10,7 +10,9 @@ Country code utilities — single source of truth for ISO 3166-1 conversions.
 import logging
 
 import pycountry
-from fastapi import HTTPException
+
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -148,11 +150,11 @@ def resolve_country_name(country_code: str) -> str:
         HTTPException: 400 Bad Request with detail "Invalid country_code" if the code is not found.
     """
     if not country_code or not isinstance(country_code, str):
-        raise HTTPException(status_code=400, detail="Invalid country_code")
+        raise envelope_exception(ErrorCode.COUNTRY_INVALID_CODE, status=400, locale="en")
     normalized = normalize_country_code(country_code) or ""
     if len(normalized) != 2:
-        raise HTTPException(status_code=400, detail="Invalid country_code")
+        raise envelope_exception(ErrorCode.COUNTRY_INVALID_CODE, status=400, locale="en")
     country = pycountry.countries.get(alpha_2=normalized)
     if country is None:
-        raise HTTPException(status_code=400, detail="Invalid country_code")
+        raise envelope_exception(ErrorCode.COUNTRY_INVALID_CODE, status=400, locale="en")
     return country.name

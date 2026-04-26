@@ -112,8 +112,12 @@ class TestClientBillService:
             client_bill_business_service._validate_bill_data(incomplete_data)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Missing required fields" in str(exc_info.value.detail)
-        assert "currency_metadata_id" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "validation.field_required"
+        else:
+            assert "Missing required fields" in str(detail)
+            assert "currency_metadata_id" in str(detail)
 
     def test_validate_bill_data_validates_amount(self, mock_db):
         """Test that bill data validation validates amount is positive."""
@@ -128,7 +132,11 @@ class TestClientBillService:
             client_bill_business_service._validate_bill_data(invalid_amount_data)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Amount must be a positive number" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "credit.amount_must_be_positive"
+        else:
+            assert "Amount must be a positive number" in str(detail)
 
     def test_validate_bill_data_validates_currency_id_format(self, mock_db):
         """Test that bill data validation validates currency ID format."""
@@ -143,7 +151,11 @@ class TestClientBillService:
             client_bill_business_service._validate_bill_data(invalid_currency_data)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid currency_metadata_id format" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "validation.invalid_format"
+        else:
+            assert "Invalid currency_metadata_id format" in str(detail)
 
     def test_validate_bill_amount_validates_positive_amount(self, mock_db):
         """Test that bill amount validation checks for positive amounts."""

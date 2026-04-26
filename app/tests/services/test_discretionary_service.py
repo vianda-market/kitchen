@@ -828,7 +828,11 @@ class TestDiscretionaryService:
                 discretionary_service._create_discretionary_transaction(client_request, sample_super_admin, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to create discretionary transaction" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.transaction_creation_failed"
+            else:
+                assert "Failed to create discretionary transaction" in str(detail)
 
     # =============================================================================
     # _VALIDATE_DISCRETIONARY_REQUEST_DATA BOUNDARY TEST
@@ -883,7 +887,11 @@ class TestDiscretionaryService:
                 discretionary_service.create_discretionary_request(sample_request_data, sample_admin_user, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to create discretionary request" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.request_creation_failed"
+            else:
+                assert "Failed to create discretionary request" in str(detail)
 
     def test_approve_discretionary_request_wraps_downstream_error_as_500(
         self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
@@ -902,7 +910,11 @@ class TestDiscretionaryService:
                 discretionary_service.approve_discretionary_request(discretionary_id, sample_super_admin, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to approve discretionary request" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.request_approval_failed"
+            else:
+                assert "Failed to approve discretionary request" in str(detail)
 
     def test_reject_discretionary_request_wraps_downstream_error_as_500(
         self, discretionary_service, sample_super_admin, sample_discretionary_dto, mock_db
@@ -923,7 +935,11 @@ class TestDiscretionaryService:
                 )
 
             assert exc_info.value.status_code == 500
-            assert "Failed to reject discretionary request" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.request_rejection_failed"
+            else:
+                assert "Failed to reject discretionary request" in str(detail)
 
     def test_get_pending_requests_wraps_downstream_error_as_500(self, discretionary_service, mock_db):
         with patch("app.services.discretionary_service.discretionary_service") as mock_disc_service:
@@ -933,7 +949,11 @@ class TestDiscretionaryService:
                 discretionary_service.get_pending_requests(mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to retrieve pending requests" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.list_failed"
+            else:
+                assert "Failed to retrieve pending requests" in str(detail)
 
     def test_get_requests_by_admin_wraps_downstream_error_as_500(self, discretionary_service, mock_db):
         with patch("app.services.discretionary_service.discretionary_service") as mock_disc_service:
@@ -943,4 +963,8 @@ class TestDiscretionaryService:
                 discretionary_service.get_requests_by_admin(uuid4(), mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to retrieve admin requests" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "discretionary.list_failed"
+            else:
+                assert "Failed to retrieve admin requests" in str(detail)

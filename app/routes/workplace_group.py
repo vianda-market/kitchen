@@ -3,10 +3,12 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     AddressCreateSchema,
     AddressResponseSchema,
@@ -74,7 +76,7 @@ def create_workplace_group(
         data["modified_by"] = current_user["user_id"]
         created = workplace_group_service.create(data, db, scope=None)
         if not created:
-            raise HTTPException(status_code=500, detail="Failed to create workplace group")
+            raise envelope_exception(ErrorCode.WORKPLACE_GROUP_CREATION_FAILED, status=500, locale="en")
         log_info(f"Created workplace group: {created.workplace_group_id}")
         return WorkplaceGroupResponseSchema(**created.model_dump())
 
@@ -90,7 +92,7 @@ def get_workplace_group(
     """Get a workplace group by ID."""
     group = workplace_group_service.get_by_id(group_id, db, scope=None)
     if not group:
-        raise HTTPException(status_code=404, detail=f"Workplace group not found: {group_id}")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_NOT_FOUND, status=404, locale="en")
     return WorkplaceGroupResponseSchema(**group.model_dump())
 
 
@@ -104,7 +106,7 @@ def list_group_addresses(
     # Validate group exists
     group = workplace_group_service.get_by_id(group_id, db, scope=None)
     if not group:
-        raise HTTPException(status_code=404, detail=f"Workplace group not found: {group_id}")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_NOT_FOUND, status=404, locale="en")
 
     rows = db_read(
         """
@@ -134,7 +136,7 @@ def add_group_address(
     # Validate group exists
     group = workplace_group_service.get_by_id(group_id, db, scope=None)
     if not group:
-        raise HTTPException(status_code=404, detail=f"Workplace group not found: {group_id}")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_NOT_FOUND, status=404, locale="en")
 
     def _create_address():
         data = body.model_dump(exclude_unset=True)
@@ -200,14 +202,14 @@ def admin_update_workplace_group(
     """Update a workplace group. Internal only."""
     existing = workplace_group_service.get_by_id(group_id, db, scope=None)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Workplace group not found: {group_id}")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_NOT_FOUND, status=404, locale="en")
 
     def _update():
         data = body.model_dump(exclude_unset=True)
         data["modified_by"] = current_user["user_id"]
         updated = workplace_group_service.update(group_id, data, db, scope=None)
         if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update workplace group")
+            raise envelope_exception(ErrorCode.WORKPLACE_GROUP_UPDATE_FAILED, status=500, locale="en")
         log_info(f"Updated workplace group: {group_id}")
         return WorkplaceGroupResponseSchema(**updated.model_dump())
 
@@ -223,11 +225,11 @@ def admin_archive_workplace_group(
     """Soft-archive a workplace group. Internal only."""
     existing = workplace_group_service.get_by_id(group_id, db, scope=None)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Workplace group not found: {group_id}")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_NOT_FOUND, status=404, locale="en")
 
     success = workplace_group_service.soft_delete(group_id, current_user["user_id"], db, scope=None)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to archive workplace group")
+        raise envelope_exception(ErrorCode.WORKPLACE_GROUP_ARCHIVE_FAILED, status=500, locale="en")
     log_info(f"Archived workplace group: {group_id}")
 
 
@@ -247,7 +249,7 @@ def admin_bulk_create_workplace_groups(
             data["modified_by"] = current_user["user_id"]
             created = workplace_group_service.create(data, db, scope=None, commit=False)
             if not created:
-                raise HTTPException(status_code=500, detail=f"Failed to create workplace group: {body.name}")
+                raise envelope_exception(ErrorCode.WORKPLACE_GROUP_CREATION_FAILED, status=500, locale="en")
             created_groups.append(created)
         db.commit()
         log_info(f"Bulk created {len(created_groups)} workplace groups")

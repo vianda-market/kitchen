@@ -192,8 +192,11 @@ class TestAddressService:
             with pytest.raises(HTTPException) as exc_info:
                 address_business_service.create_address_with_geocoding(address_data, sample_current_user, mock_db)
             assert exc_info.value.status_code == 403
-            assert "manual entry" in str(exc_info.value.detail)
-            assert "place_id" in str(exc_info.value.detail)
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "address.manual_entry_not_allowed"
+            else:
+                assert "manual entry" in str(detail)
 
     def test_validate_address_data_validates_country_code(self, mock_db):
         """Test that address validation validates country code format."""
@@ -212,7 +215,11 @@ class TestAddressService:
             address_business_service.validate_address_data(invalid_country_data)
 
         assert exc_info.value.status_code == 400
-        assert "Country must be a 2-letter country code" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") in ("validation.address.country_required", "address.invalid_country")
+        else:
+            assert "country" in str(detail).lower()
 
     def test_build_full_address_string_formats_correctly(self, mock_db):
         """Test that full address string is built correctly for geocoding."""

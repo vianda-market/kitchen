@@ -20,6 +20,8 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_error, log_info
 
 T = TypeVar("T")
@@ -56,7 +58,7 @@ def handle_service_call(
     except Exception as e:
         log_error(f"{error_message}: {e}")
         if http_status:
-            raise HTTPException(status_code=http_status, detail=error_message) from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=http_status, locale="en") from None
         return None
 
 
@@ -95,7 +97,7 @@ def handle_database_operation(
     except Exception as e:
         log_error(f"{error_message}: {e}")
         if http_status:
-            raise HTTPException(status_code=http_status, detail=error_message) from None
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=http_status, locale="en") from None
         return None
 
 
@@ -143,7 +145,7 @@ def handle_get_by_id(
         log_info(f"Queried non-archived {entity_name} by id: {entity_id}")
 
         if entity is None:
-            raise HTTPException(status_code=404, detail=f"{entity_name.title()} not found")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=entity_name.title())
 
         return entity
     except HTTPException:
@@ -151,7 +153,7 @@ def handle_get_by_id(
         raise
     except Exception as e:
         log_error(f"Error fetching {entity_name} {entity_id}: {e}")
-        raise HTTPException(status_code=404, detail=f"{entity_name.title()} not found") from None
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=entity_name.title()) from None
 
 
 def handle_get_all(
@@ -180,7 +182,7 @@ def handle_get_all(
         return entities
     except Exception as e:
         log_error(f"Error retrieving {entity_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving {entity_name}") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 def handle_create(
@@ -210,13 +212,13 @@ def handle_create(
             log_info(f"Successfully created {entity_name}: {entity}")
             return entity
         log_error(f"Failed to create {entity_name}")
-        raise HTTPException(status_code=500, detail=f"Failed to create {entity_name}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     except HTTPException:
         # Re-raise HTTPExceptions (these are intentional)
         raise
     except Exception as e:
         log_error(f"Error creating {entity_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating {entity_name}") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 def handle_update(
@@ -248,13 +250,13 @@ def handle_update(
             log_info(f"Successfully updated {entity_name}: {entity_id}")
             return entity
         log_error(f"Failed to update {entity_name}: {entity_id}")
-        raise HTTPException(status_code=500, detail=f"Failed to update {entity_name}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     except HTTPException:
         # Re-raise HTTPExceptions (these are intentional)
         raise
     except Exception as e:
         log_error(f"Error updating {entity_name} {entity_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error updating {entity_name}") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 def handle_delete(
@@ -284,13 +286,13 @@ def handle_delete(
             log_info(f"Successfully deleted {entity_name}: {entity_id}")
             return True
         log_error(f"Failed to delete {entity_name}: {entity_id}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete {entity_name}")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     except HTTPException:
         # Re-raise HTTPExceptions (these are intentional)
         raise
     except Exception as e:
         log_error(f"Error deleting {entity_name} {entity_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error deleting {entity_name}") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 # =============================================================================
@@ -341,4 +343,4 @@ def handle_business_operation(
 
         # Log with full traceback
         log_error(f"Error in {operation_name}: {error_msg}\nFull traceback:\n{error_trace}")
-        raise HTTPException(status_code=500, detail=f"Error in {operation_name}: {error_msg}") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None

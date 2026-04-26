@@ -21,6 +21,8 @@ from uuid import UUID
 import psycopg2.extensions
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.log import log_info
 
@@ -103,9 +105,10 @@ def create_zone(
 
     flywheel_state = data.get("flywheel_state", "monitoring")
     if flywheel_state not in VALID_FLYWHEEL_STATES:
-        from fastapi import HTTPException
+        from app.i18n.envelope import envelope_exception
+        from app.i18n.error_codes import ErrorCode
 
-        raise HTTPException(status_code=400, detail=f"Invalid flywheel_state: {flywheel_state}")
+        raise envelope_exception(ErrorCode.AD_ZONE_INVALID_FLYWHEEL_STATE, status=400, locale="en")
 
     budget_allocation = data.get("budget_allocation") or {"b2c_subscriber": 0, "b2b_employer": 0, "b2b_restaurant": 100}
 
@@ -259,9 +262,7 @@ def transition_zone_state(
         Updated zone record, or None if not found.
     """
     if new_state not in VALID_FLYWHEEL_STATES:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=400, detail=f"Invalid flywheel_state: {new_state}")
+        raise envelope_exception(ErrorCode.AD_ZONE_INVALID_FLYWHEEL_STATE, status=400, locale="en")
 
     zone = get_zone_by_id(zone_id, db)
     if not zone:

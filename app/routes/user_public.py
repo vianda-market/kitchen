@@ -1,5 +1,5 @@
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.auth.captcha_guard import always_require_captcha_for_web, require_captcha_after_threshold
@@ -142,10 +142,7 @@ def signup_request(
     if not result:
         raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     if result.get("already_registered"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=result["message"],
-        )
+        raise envelope_exception(ErrorCode.USER_DUPLICATE_EMAIL_IN_SYSTEM, status=409, locale="en")
     return result
 
 

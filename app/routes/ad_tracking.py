@@ -8,10 +8,12 @@ the user subscribes.
 """
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     AdClickTrackingCreateSchema,
     AdClickTrackingResponseSchema,
@@ -41,9 +43,9 @@ async def capture_click_tracking(
     """
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="User ID not found in token")
+        raise envelope_exception(ErrorCode.SECURITY_TOKEN_USER_ID_MISSING, status=401, locale="en")
 
     record = create_click_tracking(user_id, body.model_dump(), db)
     if not record:
-        raise HTTPException(status_code=500, detail="Failed to create click tracking record")
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
     return record

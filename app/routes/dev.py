@@ -7,11 +7,13 @@ Never enable DEV_MODE in production.
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import InstitutionBillPayoutResponseSchema
 
 router = APIRouter(
@@ -23,7 +25,7 @@ router = APIRouter(
 
 def _require_dev_mode() -> None:
     if not settings.DEV_MODE:
-        raise HTTPException(status_code=403, detail="This endpoint is only available in DEV_MODE")
+        raise envelope_exception(ErrorCode.DEV_MODE_ONLY, status=403, locale="en")
 
 
 def _get_connect_gateway():
