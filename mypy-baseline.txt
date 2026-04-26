@@ -1007,7 +1007,6 @@ app/services/payment_provider/stripe/connect_mock.py:0: error: "InstitutionBillD
 app/services/payment_provider/stripe/connect_mock.py:0: error: Argument 1 to "get_by_id" of "CRUDService" has incompatible type "str"; expected "UUID"  [arg-type]
 app/services/payment_provider/stripe/connect_mock.py:0: error: "InstitutionEntityDTO" has no attribute "get"  [attr-defined]
 app/services/payment_provider/stripe/connect_mock.py:0: error: "InstitutionBillDTO" has no attribute "get"  [attr-defined]
-app/services/payment_provider/stripe/connect_mock.py:0: error: "InstitutionBillDTO" has no attribute "get"  [attr-defined]
 app/services/payment_provider/stripe/connect_gateway.py:0: error: Module has no attribute "error"  [attr-defined]
 app/services/payment_provider/stripe/connect_gateway.py:0: error: Module has no attribute "error"  [attr-defined]
 app/services/payment_provider/stripe/connect_gateway.py:0: error: Module has no attribute "error"  [attr-defined]
