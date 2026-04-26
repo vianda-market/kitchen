@@ -162,7 +162,9 @@ def archive_entity_supplier_terms(
     def _archive():
         row = get_terms_for_scope(institution_id, institution_entity_id, db)
         if not row:
-            raise envelope_exception(ErrorCode.SUPPLIER_TERMS_NOT_FOUND, status=404, locale="en", scope=f"entity {institution_entity_id}")
+            raise envelope_exception(
+                ErrorCode.SUPPLIER_TERMS_NOT_FOUND, status=404, locale="en", scope=f"entity {institution_entity_id}"
+            )
         supplier_terms_service.update(
             row["supplier_terms_id"],
             {"is_archived": True, "modified_by": current_user["user_id"]},

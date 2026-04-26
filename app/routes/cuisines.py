@@ -54,8 +54,11 @@ def list_cuisines(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     rows = cuisine_service.search_cuisines(db, search=search)
     if locale != "en":

@@ -40,9 +40,7 @@ def resolve_currency_code(
 
     if not currency_id:
         log_error(f"[resolve_currency_code] Missing required field: {currency_id_field}")
-        raise envelope_exception(
-            ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale="en", field=currency_id_field
-        )
+        raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale="en", field=currency_id_field)
 
     # Get currency from database
     log_info(f"[resolve_currency_code] Looking up currency with ID: {currency_id}")

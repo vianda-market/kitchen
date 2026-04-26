@@ -108,13 +108,18 @@ async def get_attribute_labels(
     """
     if language not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=400, locale="en",
-            lang=language, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=400,
+            locale="en",
+            lang=language,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
 
     if schema not in _KNOWN_SCHEMAS:
         raise envelope_exception(
-            ErrorCode.ENTITY_NOT_FOUND, status=400, locale="en",
+            ErrorCode.ENTITY_NOT_FOUND,
+            status=400,
+            locale="en",
             entity=f"Schema '{schema}'",
         )
 

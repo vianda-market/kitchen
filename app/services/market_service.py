@@ -87,7 +87,9 @@ def reject_global_market_for_entity(market_id: UUID | None, entity_name: str) ->
     it must not be assigned to plans, subscriptions, or other entities.
     """
     if market_id is not None and market_id == GLOBAL_MARKET_ID:
-        raise envelope_exception(ErrorCode.MARKET_GLOBAL_ENTITY_INVALID, status=400, locale="en", entity_name=entity_name)
+        raise envelope_exception(
+            ErrorCode.MARKET_GLOBAL_ENTITY_INVALID, status=400, locale="en", entity_name=entity_name
+        )
 
 
 def _serialize_market(market: dict) -> dict:

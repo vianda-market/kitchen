@@ -660,8 +660,10 @@ class AddressBusinessService:
 
             if missing_fields:
                 raise envelope_exception(
-                    ErrorCode.VALIDATION_ADDRESS_FIELD_REQUIRED, status=400, locale="en",
-                    field=", ".join(missing_fields)
+                    ErrorCode.VALIDATION_ADDRESS_FIELD_REQUIRED,
+                    status=400,
+                    locale="en",
+                    field=", ".join(missing_fields),
                 )
 
         # Validate country code format (alpha-2 after normalization)

@@ -263,7 +263,9 @@ class DiscretionaryService:
             raise
         except Exception as e:
             log_error(f"Error rejecting discretionary request {discretionary_id}: {e}")
-            raise envelope_exception(ErrorCode.DISCRETIONARY_REQUEST_REJECTION_FAILED, status=500, locale="en") from None
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_REQUEST_REJECTION_FAILED, status=500, locale="en"
+            ) from None
 
     def get_pending_requests(self, db: psycopg2.extensions.connection) -> list[DiscretionaryDTO]:
         """
@@ -433,4 +435,6 @@ class DiscretionaryService:
             log_error(
                 f"Error creating discretionary transaction for request {discretionary_request.discretionary_id}: {e}"
             )
-            raise envelope_exception(ErrorCode.DISCRETIONARY_TRANSACTION_CREATION_FAILED, status=500, locale="en") from None
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_TRANSACTION_CREATION_FAILED, status=500, locale="en"
+            ) from None

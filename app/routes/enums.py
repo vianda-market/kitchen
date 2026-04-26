@@ -78,8 +78,11 @@ async def get_all_enums(
     """
     if language not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=language, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=language,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     log_info(f"User {current_user.get('user_id')} fetching system enums (language={language})")
 

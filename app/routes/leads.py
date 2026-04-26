@@ -151,8 +151,11 @@ async def list_leads_markets(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     markets = _get_cached_markets(effective_audience, db)
     if locale == "en":
@@ -185,8 +188,11 @@ async def get_featured_restaurant(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     country = _require_country_code(country_code)
     row = db_read(
@@ -391,8 +397,11 @@ async def list_leads_restaurants(  # noqa: PLR0913 — declarative FastAPI Query
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     country = _require_country_code(country_code)
     rows = get_public_restaurants(locale, country, db, featured_only=featured, limit=limit)
@@ -422,8 +431,11 @@ async def list_leads_plans(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     country = _require_country_code(country_code)
     rows = get_public_plans(locale, country, db)
@@ -448,8 +460,11 @@ async def list_leads_cuisines(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     rows = get_leads_cuisines(locale, db)
     return [LeadsCuisineSchema(**r) for r in rows]
@@ -472,8 +487,11 @@ async def list_employee_count_ranges(
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     ranges = get_employee_count_ranges(locale)
     return [EmployeeCountRangeSchema(**r) for r in ranges]
@@ -499,7 +517,9 @@ async def submit_lead_interest(
     row = create_lead_interest(data.model_dump(), source, db)
     if not row:
         raise envelope_exception(
-            ErrorCode.LEADS_INVALID_INTEREST_TYPE, status=422, locale="en",
+            ErrorCode.LEADS_INVALID_INTEREST_TYPE,
+            status=422,
+            locale="en",
             interest_type=data.interest_type,
         )
     return LeadInterestResponseSchema(**row)

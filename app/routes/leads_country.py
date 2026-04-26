@@ -54,8 +54,11 @@ def _resolve_leads_locale(request: Request, language: str | None) -> str:
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
         raise envelope_exception(
-            ErrorCode.LOCALE_UNSUPPORTED, status=422, locale="en",
-            lang=locale, supported=", ".join(settings.SUPPORTED_LOCALES),
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     return locale
 
