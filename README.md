@@ -45,3 +45,11 @@ Full documentation lives in [docs/](docs/):
 - **PostgreSQL** — Database (psycopg2)
 - **Pydantic** — Validation and settings
 - **JWT** — Authentication
+
+## 💰 Bounty Contribution
+
+- **Task:** Subscription/payment: validate USD-equivalent amount against Stripe minimum befo
+- **Reward:** $100
+- **Source:** GitHub-Paid
+- **Date:** 2026-04-27
+
