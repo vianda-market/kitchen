@@ -98,11 +98,12 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
         # restaurant_id is on plate_info, alias "p"
         "restaurant_id": {"col": "restaurant_id", "alias": "p", "op": "eq", "cast": "uuid"},
-        # plate_info has no plate_date column; created_date is the closest proxy.
-        # plate_selection_info.pickup_date is the actual pickup date but is on a different table.
-        # Using p.created_date for date-range filtering on the plate's creation date.
-        "plate_date_from": {"col": "created_date", "alias": "p", "op": "gte", "cast": "date"},
-        "plate_date_to": {"col": "created_date", "alias": "p", "op": "lte", "cast": "date"},
+        # plate_selection_info.pickup_date is the actual service date (DATE) for a plate reservation.
+        # get_enriched_plates joins customer.plate_selection_info (alias "psi") as a filter-only join
+        # (psi.pickup_date is not in the SELECT list); distinct=True prevents row inflation from the
+        # 1:N plate_info → plate_selection_info relationship.
+        "plate_date_from": {"col": "pickup_date", "alias": "psi", "op": "gte", "cast": "date"},
+        "plate_date_to": {"col": "pickup_date", "alias": "psi", "op": "lte", "cast": "date"},
         # Pass 5 register-adds:
         # cuisine_id: multi-select on cuisine table alias "cu" (joined via r.cuisine_id = cu.cuisine_id)
         "cuisine_id": {"col": "cuisine_id", "alias": "cu", "op": "in", "cast": "uuid"},

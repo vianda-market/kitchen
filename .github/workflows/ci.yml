@@ -349,7 +349,7 @@ jobs:
         # "'NoneType' object has no attribute 'model_dump'" at app/routes/billing/supplier_invoice.py:160.
         # supplier_invoice_service.get_by_id returns None immediately after insert+commit.
         # The rest of 012 runs cleanly; re-enable after this backend bug is fixed.
-        run: bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 010
+        run: bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 017 010
 
       - name: Stop server
         if: always()
