@@ -4,7 +4,6 @@ app/gateways/ads/meta/campaign_gateway.py:30: unused variable 'date_range' (100%
 app/gateways/ads/mock_gateway.py:83: unused variable 'date_range' (100% confidence)
 app/routes/super_admin/discretionary.py:61: unused variable 'approval' (100% confidence)
 app/services/ads/zone_service.py:203: unused variable 'updated_by_user_id' (100% confidence)
-app/services/crud_service.py:2476: unused variable 'preference_id' (100% confidence)
 app/services/onboarding_service.py:411: unused variable 'onboarding_status_filter' (100% confidence)
 app/utils/performance.py:88: unused variable 'exc_tb' (100% confidence)
 app/utils/performance.py:88: unused variable 'exc_type' (100% confidence)
