@@ -42,7 +42,7 @@ through app/i18n/enum_labels.py and are never duplicated here.
 FILTER_REGISTRY: dict[str, dict[str, dict]] = {
     "plans": {
         "market_id": {"col": "market_id", "alias": "pl", "op": "eq", "cast": "uuid"},
-        "status": {"col": "status", "alias": "pl", "op": "eq", "cast": "text", "enum": "Status"},
+        "status": {"col": "status", "alias": "pl", "op": "eq", "cast": "text", "enum": "Status", "context": "plan"},
         "currency_code": {"col": "currency_code", "alias": "cc", "op": "eq", "cast": "upper"},
         # Pass 5 register-adds:
         # price: range-bound (float -- plan price is stored as float in the DB schema)
@@ -91,7 +91,9 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
     },
     "plates": {
         # status is on plate_info, alias "p"
-        "status": {"col": "status", "alias": "p", "op": "eq", "cast": "text", "enum": "Status"},
+        # context="plate" scopes valid values to catalog visibility subset
+        # (active, inactive) -- pickup-lifecycle states do not apply here.
+        "status": {"col": "status", "alias": "p", "op": "eq", "cast": "text", "enum": "Status", "context": "plate"},
         # market_id is on market_info, alias "m" (joined via restaurant -> address -> market)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
         # restaurant_id is on plate_info, alias "p"

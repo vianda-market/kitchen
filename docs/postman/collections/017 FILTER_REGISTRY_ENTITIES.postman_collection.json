@@ -1354,6 +1354,142 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Status Context Guards (plate + plan)",
+      "description": "Verifies that plate and plan status filters are scoped to their context. Out-of-context values (e.g. processed, which is billing-only) must return 400. In-context values (active) must return 200.",
+      "item": [
+        {
+          "name": "GET /plates/enriched – status=processed (out-of-context) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 for out-of-context plate status', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=processed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"],
+              "query": [{"key": "status", "value": "processed"}]
+            }
+          }
+        },
+        {
+          "name": "GET /plates/enriched – status=active (in-context) → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 for in-context plate status', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plates", "enriched"],
+              "query": [{"key": "status", "value": "active"}]
+            }
+          }
+        },
+        {
+          "name": "GET /plans/enriched – status=processed (out-of-context) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 for out-of-context plan status', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plans/enriched?status=processed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plans", "enriched"],
+              "query": [{"key": "status", "value": "processed"}]
+            }
+          }
+        },
+        {
+          "name": "GET /plans/enriched – status=active (in-context) → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 for in-context plan status', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plans/enriched?status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "plans", "enriched"],
+              "query": [{"key": "status", "value": "active"}]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [

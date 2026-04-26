@@ -16,8 +16,10 @@ STATUS_CONTEXTS: dict[str, list["Status"]] = {
     "general": [],  # Active, Pending, Inactive
     "user": [],  # Active, Inactive
     "restaurant": [],  # Active, Pending, Inactive
-    "plate_pickup": [],  # Pending, Arrived, Completed, Cancelled
+    "plate_pickup": [],  # Pending, Arrived, Handed_Out, Completed, Cancelled
     "bill": [],  # Pending, Processed, Cancelled
+    "plate": [],  # Active, Inactive (catalog visibility; no pickup-lifecycle states)
+    "plan": [],  # Active, Inactive (plan offering state; never pending/processed)
 }
 
 
@@ -85,6 +87,13 @@ def _ensure_contexts_filled() -> None:
         Status.CANCELLED,
     ]
     STATUS_CONTEXTS["bill"] = [Status.PENDING, Status.PROCESSED, Status.CANCELLED]
+    # plate_info: catalog visibility only — admins toggle active/inactive.
+    # No pickup-lifecycle states (pending/arrived/completed/cancelled) apply here;
+    # those belong to plate_pickup context. processed is billing-only.
+    STATUS_CONTEXTS["plate"] = [Status.ACTIVE, Status.INACTIVE]
+    # plan_info: offering state only — active (offered) or inactive (withdrawn).
+    # Never pending/processed (no approval or billing workflow on plan itself).
+    STATUS_CONTEXTS["plan"] = [Status.ACTIVE, Status.INACTIVE]
 
 
 _ensure_contexts_filled()
