@@ -6,7 +6,8 @@ Layer 2 (Backend → GCS): pass MD5 to GCS for server-side verification.
 
 import hashlib
 
-from fastapi import HTTPException
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 
 def compute_sha256(data: bytes) -> str:
@@ -33,15 +34,7 @@ def verify_checksum(
     elif algorithm == "md5":
         actual = compute_md5(data)
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported checksum algorithm: {algorithm}")
+        raise envelope_exception(ErrorCode.CHECKSUM_UNSUPPORTED_ALGORITHM, status=400, locale="en", algorithm=algorithm)
 
     if actual.lower() != expected_checksum.strip().lower():
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "checksum_mismatch",
-                "message": "File integrity check failed. Please re-upload the image.",
-                "expected": expected_checksum,
-                "actual": actual,
-            },
-        )
+        raise envelope_exception(ErrorCode.CHECKSUM_MISMATCH, status=400, locale="en")

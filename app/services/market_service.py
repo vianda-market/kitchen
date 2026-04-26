@@ -19,6 +19,8 @@ from fastapi import HTTPException
 from psycopg2.extras import RealDictCursor
 
 from app.config import Status
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.db_pool import get_db_pool
 from app.utils.log import logger
@@ -85,9 +87,8 @@ def reject_global_market_for_entity(market_id: UUID | None, entity_name: str) ->
     it must not be assigned to plans, subscriptions, or other entities.
     """
     if market_id is not None and market_id == GLOBAL_MARKET_ID:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Global Marketplace cannot be assigned to {entity_name}. Use a market from GET /api/v1/leads/markets.",
+        raise envelope_exception(
+            ErrorCode.MARKET_GLOBAL_ENTITY_INVALID, status=400, locale="en", entity_name=entity_name
         )
 
 
@@ -618,7 +619,7 @@ class MarketService:
         Read-only — returns affected suppliers with their effective values."""
         config = self.get_billing_config(market_id, db)
         if not config:
-            raise HTTPException(status_code=404, detail=f"No billing config for market {market_id}")
+            raise envelope_exception(ErrorCode.MARKET_BILLING_CONFIG_NOT_FOUND, status=404, locale="en")
 
         rows = db_read(
             """SELECT i.institution_id, i.name AS institution_name,

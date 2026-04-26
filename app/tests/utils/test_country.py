@@ -24,7 +24,9 @@ class TestResolveCountryName:
         with pytest.raises(HTTPException) as exc_info:
             resolve_country_name("XX")
         assert exc_info.value.status_code == 400
-        assert "Invalid country_code" in (exc_info.value.detail or "")
+        detail = exc_info.value.detail
+        code = detail.get("code") if isinstance(detail, dict) else str(detail)
+        assert code == "country.invalid_code" or "Invalid country_code" in str(detail)
 
         with pytest.raises(HTTPException) as exc_info:
             resolve_country_name("ZZ")  # invalid alpha-2

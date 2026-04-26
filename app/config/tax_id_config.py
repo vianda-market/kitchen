@@ -15,7 +15,8 @@ strip non-digit characters before sending the API payload.
 
 import re
 
-from fastapi import HTTPException
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 TAX_ID_CONFIG = {
     "AR": {
@@ -54,10 +55,12 @@ def validate_tax_id_for_country(tax_id: str, country_code: str) -> None:
     if config is None:
         return  # no rules for this country — accept any format
     if not re.match(config["regex"], tax_id):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Invalid {config['label']} format for {country_code}. "
-                f"Expected {len(config['example'])} digits (e.g. {config['example']})"
-            ),
+        raise envelope_exception(
+            ErrorCode.TAX_ID_FORMAT_INVALID,
+            status=400,
+            locale="en",
+            label=config["label"],
+            country_code=country_code,
+            digit_count=len(config["example"]),
+            example=config["example"],
         )

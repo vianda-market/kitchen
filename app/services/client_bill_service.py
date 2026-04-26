@@ -10,9 +10,10 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException, status
 
 from app.dto.models import ClientBillDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.credit_currency_service import resolve_currency_code
 from app.services.crud_service import client_bill_service, credit_currency_service
 from app.utils.error_messages import client_bill_not_found
@@ -167,22 +168,20 @@ class ClientBillBusinessService:
         missing_fields = [field for field in required_fields if not bill_data.get(field)]
 
         if missing_fields:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required fields: {', '.join(missing_fields)}"
+            raise envelope_exception(
+                ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale="en", field=", ".join(missing_fields)
             )
 
         # Validate amount
         amount = bill_data.get("amount", 0)
         if not isinstance(amount, (int, float)) or amount <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Amount must be a positive number")
+            raise envelope_exception(ErrorCode.CREDIT_AMOUNT_MUST_BE_POSITIVE, status=400, locale="en")
 
         # Validate currency_metadata_id format
         try:
             UUID(str(bill_data["currency_metadata_id"]))
         except (ValueError, TypeError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid currency_metadata_id format"
-            ) from None
+            raise envelope_exception(ErrorCode.VALIDATION_INVALID_FORMAT, status=400, locale="en") from None
 
     def _resolve_currency_code(self, bill_data: dict[str, Any], db: psycopg2.extensions.connection) -> None:
         """

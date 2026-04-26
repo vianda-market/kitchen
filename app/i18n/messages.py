@@ -382,6 +382,157 @@ MESSAGES: dict[str, dict[str, str]] = {
         "plate_pickup.staff_only": "Access restricted to restaurant staff.",
         "plate_pickup.invalid_user_id": "Invalid user ID format.",
         "plate_pickup.invalid_filter": "Invalid filter parameter.",
+        # locale.* — K15
+        "locale.unsupported": "Unsupported language '{lang}'. Supported: {supported}.",
+        # address.* (business-logic) — K15
+        "address.institution_required": "institution_id is required for B2B address creation.",
+        "address.customer_institution_required": "Customer address requires institution context; missing institution_id on user.",
+        "address.target_user_not_found": "Target user not found.",
+        "address.user_institution_mismatch": "The user assigned to the address must belong to the same institution as the address.",
+        "address.creation_failed": "Error creating address.",
+        "address.invalid_country": "Invalid country_code. Market not found.",
+        "address.not_found": "Address not found.",
+        # address.* extended — K15
+        "address.manual_entry_not_allowed": "Address creation via manual entry is only available in development. Use the address search for production.",
+        "address.global_market_invalid": "Addresses cannot be registered to Global Marketplace. Please select a specific country.",
+        "address.city_country_mismatch": "The city does not belong to the specified country. Resolve a city in the same country.",
+        "address.place_details_failed": "Could not fetch address details for the selected place. Please try again or enter the address manually.",
+        "address.outside_service_area": "Address is outside our service area.",
+        "address.city_metadata_unresolvable": "Could not resolve a valid city for the provided location.",
+        # workplace_group.* — K15
+        "workplace_group.not_found": "Workplace group not found.",
+        "workplace_group.creation_failed": "Failed to create workplace group.",
+        "workplace_group.update_failed": "Failed to update workplace group.",
+        "workplace_group.archive_failed": "Failed to archive workplace group.",
+        # supplier_terms.* — K15
+        "supplier_terms.access_denied": "Suppliers can only view their own supplier terms.",
+        "supplier_terms.not_found": "Supplier terms not found for {scope}.",
+        "supplier_terms.internal_only": "Only Internal users can list all supplier terms.",
+        # webhook.* — K15
+        "webhook.secret_not_configured": "Webhook secret not configured.",
+        "webhook.invalid_payload": "Invalid webhook payload.",
+        "webhook.invalid_signature": "Invalid webhook signature.",
+        # payment_method.* — K15
+        "payment_method.not_found": "Payment method not found.",
+        "payment_method.access_denied": "You do not have access to this payment method.",
+        "payment_method.setup_url_required": "success_url is required (request body or STRIPE_CUSTOMER_SETUP_SUCCESS_URL).",
+        "payment_method.mock_only": "This operation is only available when PAYMENT_PROVIDER=mock.",
+        "payment_method.provider_unavailable": "Payment setup is temporarily unavailable. Please try again.",
+        # referral.* — K15
+        "referral.code_invalid": "Invalid referral code.",
+        "referral.code_not_found": "Referral code not found.",
+        "referral.assignment_not_found": "No active referral code assignment found.",
+        # email_change.* — K15
+        "email_change.email_required": "Email is required.",
+        "email_change.same_as_current": "New email must differ from your current email.",
+        "email_change.already_taken": "This email is already registered to another account.",
+        "email_change.pending_for_email": "Another verification is pending for this email address.",
+        "email_change.code_expired": "Verification code has expired. Please request a new one.",
+        "email_change.code_invalid": "Invalid verification code.",
+        "email_change.user_not_found": "User not found.",
+        # credit.* — K15
+        "credit.amount_must_be_positive": "Credit amount must be positive.",
+        "credit.currency_not_found": "Credit currency not found for this restaurant.",
+        # checksum.* — K15
+        "checksum.unsupported_algorithm": "Unsupported checksum algorithm: {algorithm}.",
+        "checksum.mismatch": "Image checksum mismatch. Please re-upload the file.",
+        # country.* — K15
+        "country.invalid_code": "Invalid country_code.",
+        # dev.* — K15
+        "dev.mode_only": "This endpoint is only available in DEV_MODE.",
+        # institution_entity.* (additional) — K15
+        "institution_entity.no_markets": "Institution has no assigned markets.",
+        "institution_entity.no_payout_aggregator": "No payout aggregator configured for this market.",
+        "institution_entity.payout_setup_required": "Payout provider setup is required.",
+        # qr_code.* — K15
+        "qr_code.no_image": "QR code has no stored image.",
+        # product_image.* — K15
+        "product_image.empty": "Uploaded image is empty.",
+        "product_image.format_invalid": "Invalid image format.",
+        "product_image.checksum_mismatch": "Image checksum mismatch. Please re-upload the file.",
+        "product_image.unreadable": "Unable to read image file.",
+        # leads.* — K15
+        "leads.country_code_required": "country_code is required.",
+        "leads.email_required": "Valid email is required.",
+        "leads.invalid_interest_type": "Invalid interest_type '{interest_type}'. Must be: customer, employer, or supplier.",
+        "leads.invalid_restaurant_data": "Invalid restaurant lead data. Check referral_source and cuisine_ids.",
+        # timezone.* — K15
+        "timezone.country_code_required": "country_code is required for timezone deduction.",
+        "timezone.not_found": "Timezone not found for the provided location.",
+        # ad_zone.* extended — K15
+        "ad_zone.invalid_flywheel_state": "Invalid flywheel state.",
+        # coworker.* — K15
+        "coworker.employer_required": "You must have an employer assigned to list coworkers.",
+        "coworker.user_ineligible": "One or more users are not eligible coworkers for this plate selection.",
+        # user.me.* — K15
+        "user.use_me_endpoint": "Use the /me endpoint for your own profile.",
+        # subscription.* — K15
+        "subscription.creation_failed": "Failed to create subscription.",
+        "subscription.payment_record_failed": "Failed to record subscription payment.",
+        # plate_review.operation.* — K15
+        "plate_review.creation_failed": "Failed to create plate review.",
+        "plate_review.complaint_failed": "Failed to file portion complaint.",
+        # plate_kitchen_days.* — K15
+        "plate_kitchen_days.list_failed": "Failed to list plate kitchen days.",
+        "plate_kitchen_days.enriched_list_failed": "Failed to get enriched plate kitchen days.",
+        "plate_kitchen_days.enriched_get_failed": "Failed to get enriched plate kitchen day.",
+        # national_holiday.* — K15
+        "national_holiday.update_failed": "Failed to update national holiday.",
+        "national_holiday.delete_failed": "Failed to delete national holiday.",
+        # qr_code.* — K15
+        "qr_code.list_failed": "Failed to retrieve QR codes.",
+        "qr_code.get_failed": "Failed to retrieve QR code.",
+        "qr_code.delete_failed": "Failed to delete QR code.",
+        # restaurant.* — K15
+        "restaurant.creation_failed": "Failed to create restaurant.",
+        "restaurant.balance_creation_failed": "Failed to create restaurant balance record.",
+        "restaurant.list_failed": "Failed to retrieve restaurants.",
+        "restaurant.cities_list_failed": "Failed to list cities with restaurants.",
+        "restaurant.enriched_list_failed": "Failed to retrieve enriched restaurants.",
+        "restaurant.enriched_get_failed": "Failed to retrieve enriched restaurant.",
+        "restaurant.get_failed": "Failed to retrieve restaurant.",
+        "restaurant.update_failed": "Failed to update restaurant.",
+        "restaurant.delete_failed": "Failed to delete restaurant.",
+        # restaurant_holiday.* — K15
+        "restaurant_holiday.update_failed": "Failed to update restaurant holiday.",
+        "restaurant_holiday.delete_failed": "Failed to delete restaurant holiday.",
+        # plate_selection.* operation — K15
+        "plate_selection.creation_failed": "Failed to create plate selection.",
+        # enrollment.* extended — K15
+        "enrollment.benefit_employee_creation_failed": "Failed to create benefit employee.",
+        "enrollment.subscription_creation_failed": "Failed to create subscription for enrollment.",
+        # employer.* extended — K15
+        "employer.bill_creation_failed": "Failed to create employer bill.",
+        "employer.benefits_program_creation_failed": "Failed to create benefits program.",
+        # discretionary.* — K15
+        "discretionary.request_creation_failed": "Failed to create discretionary request.",
+        "discretionary.request_approval_failed": "Failed to approve discretionary request.",
+        "discretionary.request_rejection_failed": "Failed to reject discretionary request.",
+        "discretionary.list_failed": "Failed to retrieve discretionary requests.",
+        "discretionary.transaction_creation_failed": "Failed to create discretionary transaction.",
+        # credit.* extended — K15
+        "credit.transaction_creation_failed": "Failed to create credit transaction.",
+        "credit.validation_failed": "Error validating user credits. Please try again.",
+        # currency_refresh.* — K15
+        "currency_refresh.rate_unavailable": "Currency exchange rate not available.",
+        # favorite.* — K15
+        "favorite.entity_type_invalid": "Invalid entity type. Must be one of: plate, restaurant.",
+        "favorite.not_found": "Entity not found.",
+        "favorite.already_added": "Already added to favorites.",
+        # notification.* — K15
+        "notification.not_found": "Notification not found.",
+        # billing.payout.* — K15
+        "billing.payout_bill_not_pending": "Only pending bills can be paid out.",
+        # plate_selection.* extended — K15
+        "plate_selection.pickup_intent_invalid": "pickup_intent must be offer, request, or self.",
+        # institution.* — K15
+        "institution.restricted": "This institution cannot be assigned to a {context}. Use a Supplier institution.",
+        # tax_id.* — K15
+        "tax_id.format_invalid": "Invalid {label} format for {country_code}. Expected {digit_count} digits (e.g. {example}).",
+        # api.* — K15
+        "api.version_unsupported": "Unsupported API version: {version}.",
+        # market.* extended — K15
+        "market.global_entity_invalid": "Global Marketplace cannot be assigned to {entity_name}.",
     },
     "es": {
         # Auth / user errors
@@ -759,6 +910,157 @@ MESSAGES: dict[str, dict[str, str]] = {
         "plate_pickup.staff_only": "Acceso restringido al personal del restaurante.",
         "plate_pickup.invalid_user_id": "Formato de ID de usuario inválido.",
         "plate_pickup.invalid_filter": "Parámetro de filtro inválido.",
+        # locale.* — K15
+        "locale.unsupported": "Idioma no soportado '{locale}'. Soportados: {supported}.",
+        # address.* (business-logic) — K15
+        "address.institution_required": "Se requiere institution_id para la creación de direcciones B2B.",
+        "address.customer_institution_required": "La dirección del cliente requiere contexto de institución; falta institution_id en el usuario.",
+        "address.target_user_not_found": "Usuario objetivo no encontrado.",
+        "address.user_institution_mismatch": "El usuario asignado a la dirección debe pertenecer a la misma institución que la dirección.",
+        "address.creation_failed": "Error al crear la dirección.",
+        "address.invalid_country": "Código de país inválido. Mercado no encontrado.",
+        "address.not_found": "Dirección no encontrada.",
+        # address.* extended — K15
+        "address.manual_entry_not_allowed": "La creación de dirección por entrada manual solo está disponible en desarrollo. Use la búsqueda de dirección para producción.",
+        "address.global_market_invalid": "Las direcciones no pueden registrarse en el Marketplace Global. Por favor seleccione un país específico.",
+        "address.city_country_mismatch": "La ciudad no pertenece al país especificado. Resuelva una ciudad del mismo país.",
+        "address.place_details_failed": "No se pudieron obtener los detalles de la dirección seleccionada. Intente nuevamente o ingrese la dirección manualmente.",
+        "address.outside_service_area": "La dirección está fuera de nuestra área de servicio.",
+        "address.city_metadata_unresolvable": "No se pudo resolver una ciudad válida para la ubicación proporcionada.",
+        # workplace_group.* — K15
+        "workplace_group.not_found": "Grupo de trabajo no encontrado.",
+        "workplace_group.creation_failed": "Error al crear el grupo de trabajo.",
+        "workplace_group.update_failed": "Error al actualizar el grupo de trabajo.",
+        "workplace_group.archive_failed": "Error al archivar el grupo de trabajo.",
+        # supplier_terms.* — K15
+        "supplier_terms.access_denied": "Los proveedores solo pueden ver sus propios términos de proveedor.",
+        "supplier_terms.not_found": "Términos de proveedor no encontrados para {scope}.",
+        "supplier_terms.internal_only": "Solo los usuarios internos pueden listar todos los términos de proveedor.",
+        # webhook.* — K15
+        "webhook.secret_not_configured": "El secreto del webhook no está configurado.",
+        "webhook.invalid_payload": "Payload del webhook inválido.",
+        "webhook.invalid_signature": "Firma del webhook inválida.",
+        # payment_method.* — K15
+        "payment_method.not_found": "Método de pago no encontrado.",
+        "payment_method.access_denied": "No tienes acceso a este método de pago.",
+        "payment_method.setup_url_required": "Se requiere success_url (cuerpo de la solicitud o STRIPE_CUSTOMER_SETUP_SUCCESS_URL).",
+        "payment_method.mock_only": "Esta operación solo está disponible cuando PAYMENT_PROVIDER=mock.",
+        "payment_method.provider_unavailable": "La configuración de pagos no está disponible temporalmente. Inténtalo de nuevo.",
+        # referral.* — K15
+        "referral.code_invalid": "Código de referido inválido.",
+        "referral.code_not_found": "Código de referido no encontrado.",
+        "referral.assignment_not_found": "No se encontró ninguna asignación de código de referido activa.",
+        # email_change.* — K15
+        "email_change.email_required": "El correo electrónico es obligatorio.",
+        "email_change.same_as_current": "El nuevo correo debe ser diferente al actual.",
+        "email_change.already_taken": "Este correo ya está registrado en otra cuenta.",
+        "email_change.pending_for_email": "Hay otra verificación pendiente para esta dirección de correo.",
+        "email_change.code_expired": "El código de verificación ha expirado. Solicita uno nuevo.",
+        "email_change.code_invalid": "Código de verificación inválido.",
+        "email_change.user_not_found": "Usuario no encontrado.",
+        # credit.* — K15
+        "credit.amount_must_be_positive": "El monto de crédito debe ser positivo.",
+        "credit.currency_not_found": "Moneda de crédito no encontrada para este restaurante.",
+        # checksum.* — K15
+        "checksum.unsupported_algorithm": "Algoritmo de checksum no soportado: {algorithm}.",
+        "checksum.mismatch": "El checksum de la imagen no coincide. Por favor sube el archivo de nuevo.",
+        # country.* — K15
+        "country.invalid_code": "Código de país inválido.",
+        # dev.* — K15
+        "dev.mode_only": "Este endpoint solo está disponible en modo DEV.",
+        # institution_entity.* (additional) — K15
+        "institution_entity.no_markets": "La institución no tiene mercados asignados.",
+        "institution_entity.no_payout_aggregator": "No hay agregador de pagos configurado para este mercado.",
+        "institution_entity.payout_setup_required": "Se requiere configuración del proveedor de pagos.",
+        # qr_code.* — K15
+        "qr_code.no_image": "El código QR no tiene imagen almacenada.",
+        # product_image.* — K15
+        "product_image.empty": "La imagen subida está vacía.",
+        "product_image.format_invalid": "Formato de imagen inválido.",
+        "product_image.checksum_mismatch": "El checksum de la imagen no coincide. Por favor sube el archivo de nuevo.",
+        "product_image.unreadable": "No se puede leer el archivo de imagen.",
+        # leads.* — K15
+        "leads.country_code_required": "Se requiere country_code.",
+        "leads.email_required": "Se requiere un correo electrónico válido.",
+        "leads.invalid_interest_type": "Tipo de interés inválido '{interest_type}'. Debe ser: customer, employer o supplier.",
+        "leads.invalid_restaurant_data": "Datos de restaurante inválidos. Verifica referral_source y cuisine_ids.",
+        # timezone.* — K15
+        "timezone.country_code_required": "Se requiere country_code para deducir la zona horaria.",
+        "timezone.not_found": "Zona horaria no encontrada para la ubicación proporcionada.",
+        # ad_zone.* extended — K15
+        "ad_zone.invalid_flywheel_state": "Estado de flywheel inválido.",
+        # coworker.* — K15
+        "coworker.employer_required": "Debes tener un empleador asignado para listar compañeros de trabajo.",
+        "coworker.user_ineligible": "Uno o más usuarios no son compañeros de trabajo elegibles para esta selección de plato.",
+        # user.me.* — K15
+        "user.use_me_endpoint": "Usa el endpoint /me para tu propio perfil.",
+        # subscription.* — K15
+        "subscription.creation_failed": "No se pudo crear la suscripción.",
+        "subscription.payment_record_failed": "No se pudo registrar el pago de suscripción.",
+        # plate_review.operation.* — K15
+        "plate_review.creation_failed": "No se pudo crear la reseña del plato.",
+        "plate_review.complaint_failed": "No se pudo registrar la queja de porción.",
+        # plate_kitchen_days.* — K15
+        "plate_kitchen_days.list_failed": "Error al listar los días de cocina.",
+        "plate_kitchen_days.enriched_list_failed": "Error al obtener los días de cocina enriquecidos.",
+        "plate_kitchen_days.enriched_get_failed": "Error al obtener el día de cocina enriquecido.",
+        # national_holiday.* — K15
+        "national_holiday.update_failed": "No se pudo actualizar el feriado nacional.",
+        "national_holiday.delete_failed": "No se pudo eliminar el feriado nacional.",
+        # qr_code.* — K15
+        "qr_code.list_failed": "Error al obtener los códigos QR.",
+        "qr_code.get_failed": "Error al obtener el código QR.",
+        "qr_code.delete_failed": "Error al eliminar el código QR.",
+        # restaurant.* — K15
+        "restaurant.creation_failed": "No se pudo crear el restaurante.",
+        "restaurant.balance_creation_failed": "No se pudo crear el registro de saldo del restaurante.",
+        "restaurant.list_failed": "Error al obtener los restaurantes.",
+        "restaurant.cities_list_failed": "Error al listar las ciudades con restaurantes.",
+        "restaurant.enriched_list_failed": "Error al obtener los restaurantes enriquecidos.",
+        "restaurant.enriched_get_failed": "Error al obtener el restaurante enriquecido.",
+        "restaurant.get_failed": "Error al obtener el restaurante.",
+        "restaurant.update_failed": "No se pudo actualizar el restaurante.",
+        "restaurant.delete_failed": "No se pudo eliminar el restaurante.",
+        # restaurant_holiday.* — K15
+        "restaurant_holiday.update_failed": "No se pudo actualizar el feriado del restaurante.",
+        "restaurant_holiday.delete_failed": "No se pudo eliminar el feriado del restaurante.",
+        # plate_selection.* operation — K15
+        "plate_selection.creation_failed": "No se pudo crear la selección de plato.",
+        # enrollment.* extended — K15
+        "enrollment.benefit_employee_creation_failed": "No se pudo crear el empleado beneficiario.",
+        "enrollment.subscription_creation_failed": "No se pudo crear la suscripción para la inscripción.",
+        # employer.* extended — K15
+        "employer.bill_creation_failed": "No se pudo crear la factura del empleador.",
+        "employer.benefits_program_creation_failed": "No se pudo crear el programa de beneficios.",
+        # discretionary.* — K15
+        "discretionary.request_creation_failed": "No se pudo crear la solicitud discrecional.",
+        "discretionary.request_approval_failed": "No se pudo aprobar la solicitud discrecional.",
+        "discretionary.request_rejection_failed": "No se pudo rechazar la solicitud discrecional.",
+        "discretionary.list_failed": "Error al obtener las solicitudes discrecionales.",
+        "discretionary.transaction_creation_failed": "No se pudo crear la transacción discrecional.",
+        # credit.* extended — K15
+        "credit.transaction_creation_failed": "No se pudo crear la transacción de crédito.",
+        "credit.validation_failed": "Error al validar los créditos del usuario. Por favor intente de nuevo.",
+        # currency_refresh.* — K15
+        "currency_refresh.rate_unavailable": "Tipo de cambio de moneda no disponible.",
+        # favorite.* — K15
+        "favorite.entity_type_invalid": "Tipo de entidad inválido. Debe ser: plate o restaurant.",
+        "favorite.not_found": "Entidad no encontrada.",
+        "favorite.already_added": "Ya está en favoritos.",
+        # notification.* — K15
+        "notification.not_found": "Notificación no encontrada.",
+        # billing.payout.* — K15
+        "billing.payout_bill_not_pending": "Solo las facturas pendientes pueden ser pagadas.",
+        # plate_selection.* extended — K15
+        "plate_selection.pickup_intent_invalid": "pickup_intent debe ser offer, request o self.",
+        # institution.* — K15
+        "institution.restricted": "Esta institución no puede asignarse a un {context}. Usa una institución Supplier.",
+        # tax_id.* — K15
+        "tax_id.format_invalid": "Formato de {label} inválido para {country_code}. Se esperan {digit_count} dígitos (ej. {example}).",
+        # api.* — K15
+        "api.version_unsupported": "Versión de API no soportada: {version}.",
+        # market.* extended — K15
+        "market.global_entity_invalid": "El Mercado Global no puede asignarse a {entity_name}.",
     },
     "pt": {
         # Auth / user errors
@@ -1136,6 +1438,157 @@ MESSAGES: dict[str, dict[str, str]] = {
         "plate_pickup.staff_only": "Acesso restrito à equipe do restaurante.",
         "plate_pickup.invalid_user_id": "Formato de ID de usuário inválido.",
         "plate_pickup.invalid_filter": "Parâmetro de filtro inválido.",
+        # locale.* — K15
+        "locale.unsupported": "Idioma não suportado '{locale}'. Suportados: {supported}.",
+        # address.* (business-logic) — K15
+        "address.institution_required": "institution_id é obrigatório para criação de endereço B2B.",
+        "address.customer_institution_required": "O endereço do cliente requer contexto de instituição; institution_id ausente no usuário.",
+        "address.target_user_not_found": "Usuário alvo não encontrado.",
+        "address.user_institution_mismatch": "O usuário atribuído ao endereço deve pertencer à mesma instituição que o endereço.",
+        "address.creation_failed": "Erro ao criar endereço.",
+        "address.invalid_country": "Código de país inválido. Mercado não encontrado.",
+        "address.not_found": "Endereço não encontrado.",
+        # address.* extended — K15
+        "address.manual_entry_not_allowed": "A criação de endereço por entrada manual só está disponível em desenvolvimento. Use a busca de endereço para produção.",
+        "address.global_market_invalid": "Endereços não podem ser registrados no Marketplace Global. Por favor selecione um país específico.",
+        "address.city_country_mismatch": "A cidade não pertence ao país especificado. Resolva uma cidade do mesmo país.",
+        "address.place_details_failed": "Não foi possível obter os detalhes do endereço selecionado. Tente novamente ou insira o endereço manualmente.",
+        "address.outside_service_area": "Endereço fora da nossa área de atendimento.",
+        "address.city_metadata_unresolvable": "Não foi possível resolver uma cidade válida para a localização fornecida.",
+        # workplace_group.* — K15
+        "workplace_group.not_found": "Grupo de trabalho não encontrado.",
+        "workplace_group.creation_failed": "Falha ao criar grupo de trabalho.",
+        "workplace_group.update_failed": "Falha ao atualizar grupo de trabalho.",
+        "workplace_group.archive_failed": "Falha ao arquivar grupo de trabalho.",
+        # supplier_terms.* — K15
+        "supplier_terms.access_denied": "Fornecedores só podem ver seus próprios termos de fornecedor.",
+        "supplier_terms.not_found": "Termos de fornecedor não encontrados para {scope}.",
+        "supplier_terms.internal_only": "Somente usuários internos podem listar todos os termos de fornecedor.",
+        # webhook.* — K15
+        "webhook.secret_not_configured": "Segredo do webhook não configurado.",
+        "webhook.invalid_payload": "Payload do webhook inválido.",
+        "webhook.invalid_signature": "Assinatura do webhook inválida.",
+        # payment_method.* — K15
+        "payment_method.not_found": "Método de pagamento não encontrado.",
+        "payment_method.access_denied": "Você não tem acesso a este método de pagamento.",
+        "payment_method.setup_url_required": "success_url é obrigatório (corpo da solicitação ou STRIPE_CUSTOMER_SETUP_SUCCESS_URL).",
+        "payment_method.mock_only": "Esta operação só está disponível quando PAYMENT_PROVIDER=mock.",
+        "payment_method.provider_unavailable": "A configuração de pagamento está temporariamente indisponível. Tente novamente.",
+        # referral.* — K15
+        "referral.code_invalid": "Código de indicação inválido.",
+        "referral.code_not_found": "Código de indicação não encontrado.",
+        "referral.assignment_not_found": "Nenhuma atribuição de código de indicação ativa encontrada.",
+        # email_change.* — K15
+        "email_change.email_required": "O e-mail é obrigatório.",
+        "email_change.same_as_current": "O novo e-mail deve ser diferente do atual.",
+        "email_change.already_taken": "Este e-mail já está registrado em outra conta.",
+        "email_change.pending_for_email": "Há outra verificação pendente para este endereço de e-mail.",
+        "email_change.code_expired": "O código de verificação expirou. Solicite um novo.",
+        "email_change.code_invalid": "Código de verificação inválido.",
+        "email_change.user_not_found": "Usuário não encontrado.",
+        # credit.* — K15
+        "credit.amount_must_be_positive": "O valor do crédito deve ser positivo.",
+        "credit.currency_not_found": "Moeda de crédito não encontrada para este restaurante.",
+        # checksum.* — K15
+        "checksum.unsupported_algorithm": "Algoritmo de checksum não suportado: {algorithm}.",
+        "checksum.mismatch": "O checksum da imagem não corresponde. Por favor faça o upload do arquivo novamente.",
+        # country.* — K15
+        "country.invalid_code": "Código de país inválido.",
+        # dev.* — K15
+        "dev.mode_only": "Este endpoint só está disponível no modo DEV.",
+        # institution_entity.* (additional) — K15
+        "institution_entity.no_markets": "A instituição não tem mercados atribuídos.",
+        "institution_entity.no_payout_aggregator": "Nenhum agregador de pagamento configurado para este mercado.",
+        "institution_entity.payout_setup_required": "Configuração do provedor de pagamento é obrigatória.",
+        # qr_code.* — K15
+        "qr_code.no_image": "O código QR não tem imagem armazenada.",
+        # product_image.* — K15
+        "product_image.empty": "A imagem enviada está vazia.",
+        "product_image.format_invalid": "Formato de imagem inválido.",
+        "product_image.checksum_mismatch": "O checksum da imagem não corresponde. Por favor faça o upload do arquivo novamente.",
+        "product_image.unreadable": "Não é possível ler o arquivo de imagem.",
+        # leads.* — K15
+        "leads.country_code_required": "country_code é obrigatório.",
+        "leads.email_required": "Um e-mail válido é obrigatório.",
+        "leads.invalid_interest_type": "Tipo de interesse inválido '{interest_type}'. Deve ser: customer, employer ou supplier.",
+        "leads.invalid_restaurant_data": "Dados de restaurante inválidos. Verifique referral_source e cuisine_ids.",
+        # timezone.* — K15
+        "timezone.country_code_required": "country_code é obrigatório para deduzir o fuso horário.",
+        "timezone.not_found": "Fuso horário não encontrado para a localização fornecida.",
+        # ad_zone.* extended — K15
+        "ad_zone.invalid_flywheel_state": "Estado de flywheel inválido.",
+        # coworker.* — K15
+        "coworker.employer_required": "Você precisa ter um empregador atribuído para listar colegas de trabalho.",
+        "coworker.user_ineligible": "Um ou mais usuários não são colegas de trabalho elegíveis para esta seleção de prato.",
+        # user.me.* — K15
+        "user.use_me_endpoint": "Use o endpoint /me para o seu próprio perfil.",
+        # subscription.* — K15
+        "subscription.creation_failed": "Falha ao criar a assinatura.",
+        "subscription.payment_record_failed": "Falha ao registrar o pagamento da assinatura.",
+        # plate_review.operation.* — K15
+        "plate_review.creation_failed": "Falha ao criar a avaliação do prato.",
+        "plate_review.complaint_failed": "Falha ao registrar a reclamação de porção.",
+        # plate_kitchen_days.* — K15
+        "plate_kitchen_days.list_failed": "Falha ao listar os dias de cozinha.",
+        "plate_kitchen_days.enriched_list_failed": "Falha ao obter os dias de cozinha enriquecidos.",
+        "plate_kitchen_days.enriched_get_failed": "Falha ao obter o dia de cozinha enriquecido.",
+        # national_holiday.* — K15
+        "national_holiday.update_failed": "Falha ao atualizar o feriado nacional.",
+        "national_holiday.delete_failed": "Falha ao excluir o feriado nacional.",
+        # qr_code.* — K15
+        "qr_code.list_failed": "Falha ao recuperar os QR codes.",
+        "qr_code.get_failed": "Falha ao recuperar o QR code.",
+        "qr_code.delete_failed": "Falha ao excluir o QR code.",
+        # restaurant.* — K15
+        "restaurant.creation_failed": "Falha ao criar o restaurante.",
+        "restaurant.balance_creation_failed": "Falha ao criar o registro de saldo do restaurante.",
+        "restaurant.list_failed": "Falha ao recuperar os restaurantes.",
+        "restaurant.cities_list_failed": "Falha ao listar cidades com restaurantes.",
+        "restaurant.enriched_list_failed": "Falha ao recuperar os restaurantes enriquecidos.",
+        "restaurant.enriched_get_failed": "Falha ao recuperar o restaurante enriquecido.",
+        "restaurant.get_failed": "Falha ao recuperar o restaurante.",
+        "restaurant.update_failed": "Falha ao atualizar o restaurante.",
+        "restaurant.delete_failed": "Falha ao excluir o restaurante.",
+        # restaurant_holiday.* — K15
+        "restaurant_holiday.update_failed": "Falha ao atualizar o feriado do restaurante.",
+        "restaurant_holiday.delete_failed": "Falha ao excluir o feriado do restaurante.",
+        # plate_selection.* operation — K15
+        "plate_selection.creation_failed": "Falha ao criar a seleção de prato.",
+        # enrollment.* extended — K15
+        "enrollment.benefit_employee_creation_failed": "Falha ao criar o funcionário beneficiário.",
+        "enrollment.subscription_creation_failed": "Falha ao criar a assinatura para a inscrição.",
+        # employer.* extended — K15
+        "employer.bill_creation_failed": "Falha ao criar a fatura do empregador.",
+        "employer.benefits_program_creation_failed": "Falha ao criar o programa de benefícios.",
+        # discretionary.* — K15
+        "discretionary.request_creation_failed": "Falha ao criar a solicitação discricionária.",
+        "discretionary.request_approval_failed": "Falha ao aprovar a solicitação discricionária.",
+        "discretionary.request_rejection_failed": "Falha ao rejeitar a solicitação discricionária.",
+        "discretionary.list_failed": "Falha ao recuperar as solicitações discricionárias.",
+        "discretionary.transaction_creation_failed": "Falha ao criar a transação discricionária.",
+        # credit.* extended — K15
+        "credit.transaction_creation_failed": "Falha ao criar a transação de crédito.",
+        "credit.validation_failed": "Erro ao validar os créditos do usuário. Por favor tente novamente.",
+        # currency_refresh.* — K15
+        "currency_refresh.rate_unavailable": "Taxa de câmbio de moeda não disponível.",
+        # favorite.* — K15
+        "favorite.entity_type_invalid": "Tipo de entidade inválido. Deve ser: plate ou restaurant.",
+        "favorite.not_found": "Entidade não encontrada.",
+        "favorite.already_added": "Já adicionado aos favoritos.",
+        # notification.* — K15
+        "notification.not_found": "Notificação não encontrada.",
+        # billing.payout.* — K15
+        "billing.payout_bill_not_pending": "Somente faturas pendentes podem ser pagas.",
+        # plate_selection.* extended — K15
+        "plate_selection.pickup_intent_invalid": "pickup_intent deve ser offer, request ou self.",
+        # institution.* — K15
+        "institution.restricted": "Esta instituição não pode ser atribuída a um {context}. Use uma instituição Supplier.",
+        # tax_id.* — K15
+        "tax_id.format_invalid": "Formato de {label} inválido para {country_code}. Esperado {digit_count} dígitos (ex. {example}).",
+        # api.* — K15
+        "api.version_unsupported": "Versão de API não suportada: {version}.",
+        # market.* extended — K15
+        "market.global_entity_invalid": "O Mercado Global não pode ser atribuído a {entity_name}.",
     },
 }
 

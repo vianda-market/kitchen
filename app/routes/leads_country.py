@@ -23,10 +23,12 @@ import hashlib
 import time
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import localize_country_name
 from app.schemas.consolidated_schemas import LeadsCountrySchema
 from app.services.leads_public_service import (
@@ -51,7 +53,13 @@ def _resolve_leads_locale(request: Request, language: str | None) -> str:
     """Common locale resolution for leads endpoints: query param → Accept-Language → 422."""
     locale = language or resolve_locale_from_header(request.headers.get("Accept-Language"))
     if locale not in settings.SUPPORTED_LOCALES:
-        raise HTTPException(status_code=422, detail=f"Unsupported language '{locale}'.")
+        raise envelope_exception(
+            ErrorCode.LOCALE_UNSUPPORTED,
+            status=422,
+            locale="en",
+            lang=locale,
+            supported=", ".join(settings.SUPPORTED_LOCALES),
+        )
     return locale
 
 

@@ -10,8 +10,9 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_insert, db_read, db_update
 from app.utils.db_pool import get_db_connection_context
 from app.utils.log import log_error, log_info, log_warning
@@ -41,15 +42,9 @@ def fetch_usd_rate_for_currency(currency_code: str) -> tuple[float | None, dict 
             return (None, None)
         return (float(rate), data)
     except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=503,
-            detail="Exchange rate service temporarily unavailable. Please try again.",
-        ) from None
+        raise envelope_exception(ErrorCode.CURRENCY_REFRESH_RATE_UNAVAILABLE, status=503, locale="en") from None
     except httpx.HTTPError:
-        raise HTTPException(
-            status_code=503,
-            detail="Could not fetch exchange rate. Please try again.",
-        ) from None
+        raise envelope_exception(ErrorCode.CURRENCY_REFRESH_RATE_UNAVAILABLE, status=503, locale="en") from None
 
 
 def _get_target_currencies(connection) -> list[str]:

@@ -13,11 +13,12 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config import Status
 from app.config.enums.address_types import AddressType
 from app.dto.models import AddressDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import address_service, geolocation_service
 from app.services.geolocation_service import call_geocode_api
@@ -285,10 +286,7 @@ class AddressBusinessService:
             from app.config.settings import get_settings
 
             if not getattr(get_settings(), "DEV_MODE", False):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Address creation via manual entry is only available in development. Use the address search (place_id) for production.",
-                )
+                raise envelope_exception(ErrorCode.ADDRESS_MANUAL_ENTRY_NOT_ALLOWED, status=403, locale="en")
             geoloc_from_place = None
 
         # floor, apartment_unit, is_default go to address_subpremise (not address_info); extract before create
@@ -365,20 +363,14 @@ class AddressBusinessService:
                 country_code = normalize_country_code(alpha2)
                 address_data["country_code"] = country_code
         if not country_code:
-            raise HTTPException(
-                status_code=400,
-                detail="country_code or country (country name) is required. If sending country name, use a supported value (e.g. Argentina, Peru, Chile).",
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_ADDRESS_COUNTRY_REQUIRED, status=400, locale="en")
         address_data["country_code"] = country_code
         address_data.pop("country_name", None)
         market = market_service.get_by_country_code(country_code)
         if not market:
-            raise HTTPException(status_code=400, detail=f"Invalid country_code: {country_code}. Market not found.")
+            raise envelope_exception(ErrorCode.ADDRESS_INVALID_COUNTRY, status=400, locale="en")
         if market.get("country_code") == "XG":
-            raise HTTPException(
-                status_code=400,
-                detail="Addresses cannot be registered to Global Marketplace. Please select a specific country (e.g. Argentina, Peru, Chile).",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_GLOBAL_MARKET_INVALID, status=400, locale="en")
         return country_code, market["country_name"]
 
     @staticmethod
@@ -424,14 +416,7 @@ class AddressBusinessService:
         )
         if fallback_row and fallback_row.get("city_metadata_id"):
             return fallback_row["city_metadata_id"]
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Could not resolve a city_metadata_id for country {country_code}. "
-                "Either send city_metadata_id in the body or ensure core.city_metadata "
-                "has at least one active row for this country."
-            ),
-        )
+        raise envelope_exception(ErrorCode.ADDRESS_CITY_METADATA_UNRESOLVABLE, status=400, locale="en")
 
     def _resolve_city_metadata_and_timezone(
         self,
@@ -461,19 +446,10 @@ class AddressBusinessService:
             fetch_one=True,
         )
         if not row:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid city_metadata_id: {city_metadata_id}. Use GET /api/v1/cities?country_code=... to resolve a valid city.",
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_ADDRESS_CITY_METADATA_ID_REQUIRED, status=400, locale="en")
         resolved_iso = (row.get("country_iso") or "").upper()
         if resolved_iso and resolved_iso != country_code:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"city_metadata_id country ({resolved_iso}) does not match address country_code ({country_code}). "
-                    "Resolve a city in the same country via GET /api/v1/cities?country_code=..."
-                ),
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_CITY_COUNTRY_MISMATCH, status=400, locale="en")
         tz = row.get("tz") or "UTC"
         address_data["timezone"] = tz
         log_info(f"Set timezone '{tz}' from city_metadata_id for address in {country_name_for_log} ({country_code})")
@@ -598,26 +574,17 @@ class AddressBusinessService:
                 details = gateway.place_details(place_id)
         except Exception as e:
             log_warning(f"Address details fetch failed for id={place_id}: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail="Could not fetch address details for the selected place. Please try again or enter the address manually.",
-            ) from e
+            raise envelope_exception(ErrorCode.ADDRESS_PLACE_DETAILS_FAILED, status=400, locale="en") from e
 
         mapped = map_place_details_to_address(details)
         country_code = (mapped.get("country_code") or "").strip().upper()
         (mapped.get("province") or "").strip()
 
         if not country_code:
-            raise HTTPException(
-                status_code=400,
-                detail="Address is outside our service area.",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_OUTSIDE_SERVICE_AREA, status=400, locale="en")
         market = market_service.get_by_country_code(country_code)
         if not market or market.get("country_code") == "XG":
-            raise HTTPException(
-                status_code=400,
-                detail="Address is outside our service area.",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_OUTSIDE_SERVICE_AREA, status=400, locale="en")
 
         # Use first city candidate from Place Details. No city-in-supported-list restriction.
         city_candidates = get_city_candidates_from_place_details(details)
@@ -692,24 +659,20 @@ class AddressBusinessService:
             missing_fields = [field for field in required_fields if not address_data.get(field)]
 
             if missing_fields:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required fields for restaurant address: {', '.join(missing_fields)}",
+                raise envelope_exception(
+                    ErrorCode.VALIDATION_ADDRESS_FIELD_REQUIRED,
+                    status=400,
+                    locale="en",
+                    field=", ".join(missing_fields),
                 )
 
         # Validate country code format (alpha-2 after normalization)
         country_code = address_data.get("country_code", "").strip()
         country_raw = (address_data.get("country") or "").strip()
         if not country_code and country_raw and len(country_raw) == 3 and country_raw.isalpha():
-            raise HTTPException(
-                status_code=400,
-                detail="Country must be a 2-letter country code (e.g. US) or full country name (e.g. United States).",
-            )
+            raise envelope_exception(ErrorCode.VALIDATION_ADDRESS_COUNTRY_REQUIRED, status=400, locale="en")
         if country_code and len(country_code) != 2:
-            raise HTTPException(
-                status_code=400,
-                detail="country_code must be valid ISO 3166-1 alpha-2 or alpha-3; API normalizes to alpha-2. Invalid or unsupported code.",
-            )
+            raise envelope_exception(ErrorCode.ADDRESS_INVALID_COUNTRY, status=400, locale="en")
 
         # No city-in-supported-list check: any city within a supported country is accepted.
         # Structured create is DEV-only (guardrail above); place_id path gets city from Google.
@@ -752,7 +715,7 @@ class AddressBusinessService:
         """
         current_address = address_service.get_by_id(address_id, db, scope=scope)
         if not current_address:
-            raise HTTPException(status_code=404, detail="Address not found")
+            raise envelope_exception(ErrorCode.ADDRESS_NOT_FOUND, status=404, locale="en")
 
         # Only floor, apartment_unit, is_default are updatable (go to address_subpremise)
         floor = address_data.get("floor")

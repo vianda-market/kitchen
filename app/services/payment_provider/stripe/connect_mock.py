@@ -75,18 +75,15 @@ def execute_supplier_payout(
     Mock payout execution. Validates bill and entity the same way as the live gateway,
     but uses fake transfer IDs. No real Stripe calls.
     """
-    from fastapi import HTTPException
-
+    from app.i18n.envelope import envelope_exception
+    from app.i18n.error_codes import ErrorCode
     from app.services.crud_service import institution_bill_service, institution_entity_service
 
     bill = institution_bill_service.get_by_id(str(institution_bill_id), db)
     if not bill:
-        raise HTTPException(status_code=404, detail="Institution bill not found")
+        raise envelope_exception(ErrorCode.BILLING_BILL_NOT_FOUND, status=404, locale="en")
     if bill.get("resolution") != "pending":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Bill resolution is '{bill.get('resolution')}'; only pending bills can be paid out",
-        )
+        raise envelope_exception(ErrorCode.BILLING_PAYOUT_BILL_NOT_PENDING, status=400, locale="en")
 
     with db.cursor() as cur:
         cur.execute(
@@ -99,20 +96,14 @@ def execute_supplier_payout(
         )
         existing = cur.fetchone()
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"A payout for this bill already exists with status '{existing[1]}'",
-        )
+        raise envelope_exception(ErrorCode.PAYMENT_PROVIDER_PAYOUT_EXISTS, status=409, locale="en")
 
     entity = institution_entity_service.get_by_id(str(entity_id), db)
     if not entity:
-        raise HTTPException(status_code=404, detail="Institution entity not found")
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Institution entity")
     connect_id = entity.get("payout_provider_account_id")
     if not connect_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Entity has no payout provider account. Complete onboarding first.",
-        )
+        raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_PAYOUT_SETUP_REQUIRED, status=400, locale="en")
 
     amount = bill.get("amount") or 0
     currency_code = bill.get("currency_code") or "usd"

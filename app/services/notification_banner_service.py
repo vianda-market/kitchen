@@ -13,6 +13,8 @@ import psycopg2.extensions
 import psycopg2.extras
 from fastapi import HTTPException
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.log import log_error, log_info, log_warning
 
@@ -186,7 +188,7 @@ def acknowledge_notification(
         if existing:
             return True
 
-        raise HTTPException(status_code=404, detail="Notification not found")
+        raise envelope_exception(ErrorCode.NOTIFICATION_NOT_FOUND, status=404, locale="en")
     except HTTPException:
         raise
     except Exception as e:

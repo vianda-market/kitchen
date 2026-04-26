@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_client_user
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     FavoriteCreateSchema,
     FavoriteIdsResponseSchema,
@@ -59,7 +61,7 @@ def create_favorite(
         raise
     except Exception as e:
         log_error(f"Error adding favorite: {e}")
-        raise HTTPException(status_code=500, detail="Failed to add favorite") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.delete("/{entity_type}/{entity_id}", status_code=204)
@@ -85,7 +87,7 @@ def delete_favorite(
         raise
     except Exception as e:
         log_error(f"Error removing favorite: {e}")
-        raise HTTPException(status_code=500, detail="Failed to remove favorite") from None
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
 
 
 @router.get("/me", response_model=list[FavoriteResponseSchema])

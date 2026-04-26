@@ -108,7 +108,7 @@ def create_plate_review(
         raise
     except Exception as e:
         log_error(f"Error creating plate review: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create plate review") from None
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_CREATION_FAILED, status=500, locale="en") from None
 
 
 @router.get("/me", response_model=list[PlateReviewResponseSchema])
@@ -211,4 +211,4 @@ def create_portion_complaint(
         raise
     except Exception as e:
         log_error(f"Error filing portion complaint: {e}")
-        raise HTTPException(status_code=500, detail="Failed to file portion complaint") from None
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_COMPLAINT_FAILED, status=500, locale="en") from None

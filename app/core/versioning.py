@@ -18,8 +18,11 @@ Current Implementation:
 
 from enum import Enum
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi.routing import APIRouter
+
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 
 
 class APIVersion(str, Enum):
@@ -123,10 +126,7 @@ def get_version_from_request(request: Request) -> APIVersion:
 
     # Validate version
     if not VERSION_CONFIG.is_version_supported(version):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported API version: {version}. Supported versions: {VERSION_CONFIG.supported_versions}",
-        )
+        raise envelope_exception(ErrorCode.API_VERSION_UNSUPPORTED, status=400, locale="en", version=str(version))
 
     # Check if version is deprecated
     if VERSION_CONFIG.is_version_deprecated(version):

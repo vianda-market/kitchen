@@ -1,11 +1,13 @@
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from fastapi import APIRouter, Body, Depends, Response
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.config.settings import settings
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     InstitutionBillPayoutResponseSchema,
     InstitutionEntityEnrichedResponseSchema,
@@ -125,7 +127,7 @@ def get_payout_aggregator(
         )
         row = cur.fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Institution has no assigned markets")
+        raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_NO_MARKETS, status=404, locale="en")
     market_id = row[0]
 
     from psycopg2.extras import RealDictCursor
@@ -142,7 +144,7 @@ def get_payout_aggregator(
         )
         agg_row = cur.fetchone()
     if not agg_row:
-        raise HTTPException(status_code=404, detail="No payout aggregator configured for this market")
+        raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_NO_PAYOUT_AGGREGATOR, status=404, locale="en")
 
     # Convert time objects to HH:MM strings for schema serialization
     row = dict(agg_row)
@@ -263,10 +265,7 @@ def get_stripe_connect_onboarding_link(
 
     connect_id = entity.payout_provider_account_id
     if not connect_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Entity has no payout provider account. Call POST /stripe-connect/onboarding first.",
-        )
+        raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_PAYOUT_SETUP_REQUIRED, status=400, locale="en")
 
     gw = _get_connect_gateway()
     return gw.create_account_link(
@@ -293,10 +292,7 @@ def get_stripe_connect_status(
 
     connect_id = entity.payout_provider_account_id
     if not connect_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Entity has no payout provider account. Call POST /stripe-connect/onboarding first.",
-        )
+        raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_PAYOUT_SETUP_REQUIRED, status=400, locale="en")
 
     gw = _get_connect_gateway()
     return gw.get_account_status(connect_id)

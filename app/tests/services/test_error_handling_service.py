@@ -51,7 +51,11 @@ class TestErrorHandlingService:
             handle_service_call(mock_service, "Error message")
 
         assert exc_info.value.status_code == 500
-        assert "Error message" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Error message" in str(detail)
 
     def test_handle_service_call_raises_http_exception_when_requested(self, mock_db):
         """Test that handle_service_call raises HTTPException when http_status provided."""
@@ -65,7 +69,11 @@ class TestErrorHandlingService:
             handle_service_call(mock_service, "Error message", http_status=400)
 
         assert exc_info.value.status_code == 400
-        assert "Error message" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Error message" in str(detail)
 
     def test_handle_service_call_passes_arguments_correctly(self, mock_db):
         """Test that handle_service_call passes arguments to service function."""
@@ -105,7 +113,11 @@ class TestErrorHandlingService:
             handle_database_operation(mock_db_operation, "DB error")
 
         assert exc_info.value.status_code == 500
-        assert "Error DB error" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Error DB error" in str(detail)
 
     def test_handle_business_operation_returns_result_on_success(self, mock_db):
         """Test that handle_business_operation returns result when operation succeeds."""
@@ -132,7 +144,11 @@ class TestErrorHandlingService:
             handle_business_operation(mock_business_operation, "Business error")
 
         assert exc_info.value.status_code == 500
-        assert "Error in Business error" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Error in Business error" in str(detail)
 
     def test_handle_get_by_id_returns_result_on_success(self, mock_db):
         """Test that handle_get_by_id returns result when get operation succeeds."""
@@ -162,7 +178,11 @@ class TestErrorHandlingService:
             handle_get_by_id(mock_get_func, entity_id, mock_db, "Entity not found")
 
         assert exc_info.value.status_code == 404
-        assert "Entity Not Found not found" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "entity.not_found"
+        else:
+            assert "Entity Not Found not found" in str(detail)
 
     def test_handle_get_all_returns_result_on_success(self, mock_db):
         """Test that handle_get_all returns result when get all operation succeeds."""
@@ -190,7 +210,11 @@ class TestErrorHandlingService:
             handle_get_all(mock_get_all_func, mock_db, "Failed to get entities")
 
         assert exc_info.value.status_code == 500
-        assert "Error retrieving Failed to get entities" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Error retrieving Failed to get entities" in str(detail)
 
     def test_handle_create_returns_result_on_success(self, mock_db):
         """Test that handle_create returns result when create operation succeeds."""
@@ -220,7 +244,11 @@ class TestErrorHandlingService:
             handle_create(mock_create_func, create_data, mock_db, "Failed to create entity")
 
         assert exc_info.value.status_code == 500
-        assert "Failed to create entity" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Failed to create entity" in str(detail)
 
     def test_handle_update_returns_result_on_success(self, mock_db):
         """Test that handle_update returns result when update operation succeeds."""
@@ -252,7 +280,11 @@ class TestErrorHandlingService:
             handle_update(mock_update_func, entity_id, update_data, mock_db, "Failed to update entity")
 
         assert exc_info.value.status_code == 500
-        assert "Failed to update entity" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Failed to update entity" in str(detail)
 
     def test_handle_delete_returns_success_on_success(self, mock_db):
         """Test that handle_delete returns success when delete operation succeeds."""
@@ -281,7 +313,11 @@ class TestErrorHandlingService:
             handle_delete(mock_delete_func, entity_id, mock_db, "Failed to delete entity")
 
         assert exc_info.value.status_code == 500
-        assert "Failed to delete entity" in str(exc_info.value.detail)
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "server.internal_error"
+        else:
+            assert "Failed to delete entity" in str(detail)
 
     def test_handle_service_call_logs_errors(self, mock_db):
         """Test that handle_service_call logs errors when they occur."""

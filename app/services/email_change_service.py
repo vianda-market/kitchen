@@ -11,9 +11,11 @@ import psycopg2
 import psycopg2.errors
 import psycopg2.extensions
 import psycopg2.extras
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from app.config import Status
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import user_service
 from app.services.email_service import email_service
 from app.services.entity_service import get_user_by_email
@@ -42,28 +44,19 @@ class EmailChangeService:
         """
         normalized = (new_email or "").strip().lower()
         if not normalized:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email is required",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_EMAIL_REQUIRED, status=400, locale="en")
 
         user = user_service.get_by_id(user_id, db, scope=None)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_USER_NOT_FOUND, status=404, locale="en")
 
         current_email = (user.email or "").strip().lower()
         if normalized == current_email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New email must differ from your current email",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_SAME_AS_CURRENT, status=400, locale="en")
 
         other = get_user_by_email(normalized, db)
         if other and str(other.user_id) != str(user_id):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="This email is already registered to another account",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_ALREADY_TAKEN, status=409, locale="en")
 
         user_id_str = str(user_id)
         with db.cursor() as dup_cur:
@@ -78,10 +71,7 @@ class EmailChangeService:
                 (normalized, user_id_str),
             )
             if dup_cur.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This email is already pending verification for another account",
-                )
+                raise envelope_exception(ErrorCode.EMAIL_CHANGE_PENDING_FOR_EMAIL, status=409, locale="en")
         expiry_time = datetime.now(UTC) + timedelta(hours=self.token_expiry_hours)
         last_error: Exception | None = None
 
@@ -131,10 +121,7 @@ class EmailChangeService:
             except Exception as e:
                 db.rollback()
                 log_error(f"request_email_change DB error for user_id={user_id_str}: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Could not start email change request",
-                ) from e
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from e
 
             sent = email_service.send_email_change_verification_email(
                 to_email=normalized,
@@ -161,19 +148,13 @@ class EmailChangeService:
                     db.rollback()
                     log_error(f"request_email_change: failed to rollback row after SMTP failure: {cleanup_err}")
                 log_error(f"request_email_change: failed to send verification email to {normalized}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Could not send verification email. Please try again later.",
-                )
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=503, locale="en")
 
             log_info(f"Email change request created for user_id={user_id_str}, pending new_email={normalized}")
             return
 
         log_error(f"request_email_change: exhausted code retries for user_id={user_id_str}: {last_error}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not generate a unique verification code. Please try again.",
-        )
+        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=503, locale="en")
 
     def verify_email_change(
         self,
@@ -183,10 +164,7 @@ class EmailChangeService:
     ) -> None:
         raw = (code or "").strip()
         if not raw:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_CODE_INVALID, status=400, locale="en")
 
         user_id_str = str(user_id)
         with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -204,26 +182,17 @@ class EmailChangeService:
 
         if not row:
             log_warning(f"verify_email_change: no row for user_id={user_id_str}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_CODE_INVALID, status=400, locale="en")
 
         if row["is_used"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification code has already been used",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_CODE_INVALID, status=400, locale="en")
 
         token_expiry = row["token_expiry"]
         now = datetime.now(UTC)
         if token_expiry and token_expiry.tzinfo is None:
             token_expiry = token_expiry.replace(tzinfo=UTC)
         if (token_expiry or now) <= now:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code",
-            )
+            raise envelope_exception(ErrorCode.EMAIL_CHANGE_CODE_EXPIRED, status=400, locale="en")
 
         new_email = row["new_email"]
         if hasattr(new_email, "lower"):
@@ -241,7 +210,7 @@ class EmailChangeService:
                 )
                 before = cursor.fetchone()
             if not before:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+                raise envelope_exception(ErrorCode.EMAIL_CHANGE_USER_NOT_FOUND, status=404, locale="en")
 
             old_email = before["email"]
             first_name = before["first_name"]
@@ -289,10 +258,7 @@ class EmailChangeService:
         except Exception as e:
             db.rollback()
             log_error(f"verify_email_change failed for user_id={user_id_str}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not update email",
-            ) from e
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from e
 
         if old_email_str.strip():
             sent = email_service.send_email_change_confirmation_email(

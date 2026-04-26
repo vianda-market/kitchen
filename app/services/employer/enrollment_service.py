@@ -9,7 +9,6 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.auth.security import hash_password
 from app.config import Status
@@ -67,7 +66,7 @@ def _create_benefit_employee(
 
     created = user_service.create(user_data, db, scope=None)
     if not created:
-        raise HTTPException(status_code=500, detail="Failed to create benefit employee")
+        raise envelope_exception(ErrorCode.ENROLLMENT_BENEFIT_EMPLOYEE_CREATION_FAILED, status=500, locale="en")
     return created
 
 
@@ -401,7 +400,7 @@ def subscribe_employee(
 
     subscription = subscription_service.create(subscription_data, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=500, detail="Failed to create subscription")
+        raise envelope_exception(ErrorCode.ENROLLMENT_SUBSCRIPTION_CREATION_FAILED, status=500, locale="en")
     log_info(
         f"Created fully-subsidized subscription {subscription.subscription_id} "
         f"for user {user_id} in institution {institution_id} (plan={plan_id}, credits={plan_credit})"

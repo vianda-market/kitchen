@@ -8,7 +8,6 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.dto.models import EmployerBenefitsProgramDTO
 from app.i18n.envelope import envelope_exception
@@ -71,7 +70,7 @@ def create_program(
     data["modified_by"] = str(modified_by)
     program = employer_benefits_program_service.create(data, db, scope=None)
     if not program:
-        raise HTTPException(status_code=500, detail="Failed to create benefits program")
+        raise envelope_exception(ErrorCode.EMPLOYER_BENEFITS_PROGRAM_CREATION_FAILED, status=500, locale="en")
     log_info(
         f"Created employer benefits program {program.program_id} for institution {institution_id}"
         f" (entity={entity_id or 'institution-level'})"

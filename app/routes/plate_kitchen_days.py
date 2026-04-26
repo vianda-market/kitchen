@@ -110,7 +110,7 @@ def list_plate_kitchen_days(
         raise
     except Exception as e:
         log_error(f"Error listing plate kitchen days: {e}")
-        raise HTTPException(status_code=500, detail=f"Error listing plate kitchen days: {str(e)}") from None
+        raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAYS_LIST_FAILED, status=500, locale="en") from None
 
 
 # Enriched routes MUST be before /{kitchen_day_id} so /enriched is not parsed as kitchen_day_id
@@ -141,7 +141,7 @@ def list_enriched_plate_kitchen_days(
         raise
     except Exception as e:
         log_error(f"Error getting enriched plate kitchen days: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen days: {str(e)}") from None
+        raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAYS_ENRICHED_LIST_FAILED, status=500, locale="en") from None
 
 
 @router.get("/enriched/{kitchen_day_id}", response_model=PlateKitchenDayEnrichedResponseSchema)
@@ -163,7 +163,7 @@ def get_enriched_plate_kitchen_day(
         raise
     except Exception as e:
         log_error(f"Error getting enriched plate kitchen day {kitchen_day_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting enriched plate kitchen day: {str(e)}") from None
+        raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAYS_ENRICHED_GET_FAILED, status=500, locale="en") from None
 
 
 @router.get("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)

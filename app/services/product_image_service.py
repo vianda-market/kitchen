@@ -15,6 +15,8 @@ from fastapi import HTTPException
 from PIL import Image
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_error, log_info, log_warning
 
 # Local dev only — in GCS mode (GCS_SUPPLIER_BUCKET set), files go to GCS instead
@@ -59,13 +61,10 @@ class ProductImageService:
             Tuple of (storage_path, url_path, thumbnail_storage_path, thumbnail_url_path, checksum).
         """
         if not image_bytes:
-            raise HTTPException(status_code=400, detail="Uploaded image is empty")
+            raise envelope_exception(ErrorCode.PRODUCT_IMAGE_EMPTY, status=400, locale="en")
 
         if content_type not in self.allowed_content_types:
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported image type. Allowed types: PNG, JPEG, WEBP",
-            )
+            raise envelope_exception(ErrorCode.PRODUCT_IMAGE_FORMAT_INVALID, status=400, locale="en")
 
         # Compute checksum from ORIGINAL bytes FIRST (before any processing)
         original_checksum = hashlib.sha256(image_bytes).hexdigest()
@@ -74,25 +73,19 @@ class ProductImageService:
         if expected_checksum:
             normalized_expected = expected_checksum.strip().lower()
             if len(normalized_expected) != 64:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Provided checksum must be a 64-character SHA-256 hex string",
-                )
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_CHECKSUM_MISMATCH, status=400, locale="en")
             try:
                 int(normalized_expected, 16)
             except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Provided checksum must contain only hexadecimal characters",
-                ) from None
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_CHECKSUM_MISMATCH, status=400, locale="en") from None
             if original_checksum != normalized_expected:
-                raise HTTPException(status_code=400, detail="Image checksum mismatch. Please re-upload the file.")
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_CHECKSUM_MISMATCH, status=400, locale="en")
 
         # Process image AFTER checksum computation
         try:
             image = Image.open(BytesIO(image_bytes))
         except Exception:
-            raise HTTPException(status_code=400, detail="Unable to read image file") from None
+            raise envelope_exception(ErrorCode.PRODUCT_IMAGE_UNREADABLE, status=400, locale="en") from None
 
         image = image.convert("RGB")
         image_full = image.copy()
@@ -264,10 +257,7 @@ class ProductImageService:
                 os.path.abspath(image_storage_path) if not os.path.isabs(image_storage_path) else image_storage_path
             )
             if not os.path.exists(abs_custom_path):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Custom image file not found at {image_storage_path}",
-                )
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_UNREADABLE, status=400, locale="en")
         meta = self.placeholder_metadata()
         return {
             "storage_path": image_storage_path,

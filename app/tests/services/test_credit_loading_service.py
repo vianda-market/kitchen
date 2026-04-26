@@ -214,7 +214,11 @@ class TestCreditLoadingService:
             )
 
         assert exc_info.value.status_code == 400
-        assert "Credit amount must be positive" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "credit.amount_must_be_positive"
+        else:
+            assert "Credit amount must be positive" in str(detail)
 
     def test_create_client_credit_transaction_negative_amount(
         self, credit_loading_service, sample_user_id, sample_discretionary_id, sample_modified_by, mock_db
@@ -230,7 +234,11 @@ class TestCreditLoadingService:
             )
 
         assert exc_info.value.status_code == 400
-        assert "Credit amount must be positive" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "credit.amount_must_be_positive"
+        else:
+            assert "Credit amount must be positive" in str(detail)
 
     def test_create_client_credit_transaction_service_error(
         self,
@@ -253,7 +261,11 @@ class TestCreditLoadingService:
                 )
 
             assert exc_info.value.status_code == 500
-            assert "Failed to create client credit transaction" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "credit.transaction_creation_failed"
+            else:
+                assert "Failed to create client credit transaction" in str(detail)
 
     # =============================================================================
     # CREATE RESTAURANT CREDIT TRANSACTION TESTS
@@ -325,7 +337,11 @@ class TestCreditLoadingService:
             )
 
         assert exc_info.value.status_code == 400
-        assert "Credit amount must be positive" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "credit.amount_must_be_positive"
+        else:
+            assert "Credit amount must be positive" in str(detail)
 
     def test_create_restaurant_credit_transaction_negative_amount(
         self, credit_loading_service, sample_restaurant_id, sample_discretionary_id, sample_modified_by, mock_db
@@ -341,7 +357,11 @@ class TestCreditLoadingService:
             )
 
         assert exc_info.value.status_code == 400
-        assert "Credit amount must be positive" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "credit.amount_must_be_positive"
+        else:
+            assert "Credit amount must be positive" in str(detail)
 
     def test_create_restaurant_credit_transaction_restaurant_not_found(
         self,
@@ -407,7 +427,11 @@ class TestCreditLoadingService:
                 )
 
             assert exc_info.value.status_code == 500
-            assert "Failed to create restaurant credit transaction" in exc_info.value.detail
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "credit.transaction_creation_failed"
+            else:
+                assert "Failed to create restaurant credit transaction" in str(detail)
 
     # =============================================================================
     # DECIMAL PRECISION TESTS

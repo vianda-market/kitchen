@@ -122,7 +122,7 @@ def create_restaurant(
         restaurant = restaurant_service.create(restaurant_dict, db, scope=scope, commit=False)
         if not restaurant:
             db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to create restaurant record")
+            raise envelope_exception(ErrorCode.RESTAURANT_CREATION_FAILED, status=500, locale="en")
 
         log_info(f"Created restaurant record: {restaurant.restaurant_id} (commit deferred)")
 
@@ -147,7 +147,7 @@ def create_restaurant(
             if not balance_created:
                 db.rollback()
                 log_error(f"❌ Failed to create restaurant balance record for restaurant {restaurant.restaurant_id}")
-                raise HTTPException(status_code=500, detail="Failed to create restaurant balance record")
+                raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_CREATION_FAILED, status=500, locale="en")
 
             # Commit both operations atomically
             db.commit()
@@ -165,14 +165,14 @@ def create_restaurant(
         except Exception as e:
             db.rollback()
             log_error(f"❌ Exception during balance creation: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create restaurant: {str(e)}") from None
+            raise envelope_exception(ErrorCode.RESTAURANT_CREATION_FAILED, status=500, locale="en") from None
 
     except HTTPException:
         # Re-raise HTTPExceptions (these are intentional)
         raise
     except Exception as e:
         log_error(f"Error creating restaurant: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create restaurant") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_CREATION_FAILED, status=500, locale="en") from None
 
 
 def _restaurant_to_response(restaurant, db: psycopg2.extensions.connection) -> dict:
@@ -194,7 +194,7 @@ def get_restaurants(
         return [RestaurantResponseSchema(**_restaurant_to_response(r, db)) for r in restaurants]
     except Exception as e:
         log_error(f"Error getting restaurants: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve restaurants") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_LIST_FAILED, status=500, locale="en") from None
 
 
 # GET /restaurants/search/ - Search restaurants by name (e.g. discretionary recipient picker)
@@ -277,7 +277,7 @@ def get_restaurant_cities(
         raise
     except Exception as e:
         log_error(f"Error in GET /restaurants/cities: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list cities with restaurants") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_CITIES_LIST_FAILED, status=500, locale="en") from None
 
 
 # GET /restaurants/explore/kitchen-days — B2C explore: allowed kitchen days for dropdown, ordered by date (closest first)
@@ -630,7 +630,7 @@ def list_enriched_restaurants(  # noqa: PLR0913 -- declarative FastAPI Query par
         raise
     except Exception as e:
         log_error(f"Error getting enriched restaurants: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurants") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_ENRICHED_LIST_FAILED, status=500, locale="en") from None
 
 
 # GET /restaurants/enriched/{restaurant_id} - Get a single restaurant with enriched data
@@ -657,7 +657,7 @@ def get_enriched_restaurant_by_id_route(
         raise
     except Exception as e:
         log_error(f"Error getting enriched restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enriched restaurant") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_ENRICHED_GET_FAILED, status=500, locale="en") from None
 
 
 # GET /restaurants/{restaurant_id}/coworker-pickup-windows — must be before GET /{restaurant_id}
@@ -711,7 +711,7 @@ def get_restaurant(
         raise
     except Exception as e:
         log_error(f"Error getting restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve restaurant") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_GET_FAILED, status=500, locale="en") from None
 
 
 @router.put("/{restaurant_id}", response_model=RestaurantResponseSchema)
@@ -756,7 +756,7 @@ def update_restaurant(
         # Update the restaurant
         updated_restaurant = restaurant_service.update(restaurant_id, update_data, db, scope=scope)
         if not updated_restaurant:
-            raise HTTPException(status_code=500, detail="Failed to update restaurant")
+            raise envelope_exception(ErrorCode.RESTAURANT_UPDATE_FAILED, status=500, locale="en")
 
         # Check onboarding regression when status changes away from Active
         if "status" in update_data and update_data["status"] != Status.ACTIVE:
@@ -771,7 +771,7 @@ def update_restaurant(
         raise
     except Exception as e:
         log_error(f"Error updating restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update restaurant") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_UPDATE_FAILED, status=500, locale="en") from None
 
 
 @router.delete("/{restaurant_id}")
@@ -796,7 +796,7 @@ def delete_restaurant(
         # Soft delete the restaurant
         success = restaurant_service.soft_delete(restaurant_id, current_user["user_id"], db, scope=scope)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete restaurant")
+            raise envelope_exception(ErrorCode.RESTAURANT_DELETE_FAILED, status=500, locale="en")
 
         log_info(f"Successfully deleted restaurant: {restaurant_id}")
         return {"message": f"Restaurant {restaurant_id} deleted successfully"}
@@ -805,7 +805,7 @@ def delete_restaurant(
         raise
     except Exception as e:
         log_error(f"Error deleting restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete restaurant") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_DELETE_FAILED, status=500, locale="en") from None
 
 
 @router.post("/{restaurant_id}/create-balance")
@@ -842,10 +842,10 @@ def create_balance_for_restaurant(
 
         if balance_created:
             return {"message": f"Balance record created successfully for restaurant {restaurant_id}"}
-        raise HTTPException(status_code=500, detail="Failed to create balance record")
+        raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_CREATION_FAILED, status=500, locale="en")
 
     except HTTPException:
         raise
     except Exception as e:
         log_error(f"Error creating balance for restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create balance record") from None
+        raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_CREATION_FAILED, status=500, locale="en") from None

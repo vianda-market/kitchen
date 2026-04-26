@@ -8,7 +8,7 @@ from datetime import UTC
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.config import Status
@@ -170,7 +170,7 @@ def _create_fully_subsidized_subscription(
     }
     subscription = subscription_service.create(create_data, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=500, detail="Failed to create subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_CREATION_FAILED, status=500, locale="en")
     log_info(f"Fully-subsidized subscription {subscription.subscription_id} created for benefit employee {user_id}")
 
     # Return same shape as with-payment but with no-payment indicators
@@ -249,7 +249,7 @@ def create_subscription_with_payment(
     }
     subscription = subscription_service.create(create_data, db, scope=None)
     if not subscription:
-        raise HTTPException(status_code=500, detail="Failed to create subscription.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_CREATION_FAILED, status=500, locale="en")
 
     subscription_id = subscription.subscription_id
     result = create_payment_for_subscription(
@@ -271,7 +271,7 @@ def create_subscription_with_payment(
     }
     payment_id = db_insert("subscription_payment", payment_row, connection=db, commit=True)
     if not payment_id:
-        raise HTTPException(status_code=500, detail="Failed to record subscription payment.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_PAYMENT_RECORD_FAILED, status=500, locale="en")
 
     return {
         "subscription_id": subscription_id,
@@ -348,7 +348,7 @@ def _edit_pending_subscription_in_place(
     payment_id = db_insert("subscription_payment", payment_row, connection=db, commit=False)
     if not payment_id:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to record subscription payment.")
+        raise envelope_exception(ErrorCode.SUBSCRIPTION_PAYMENT_RECORD_FAILED, status=500, locale="en")
     db.commit()
 
     return {

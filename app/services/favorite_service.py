@@ -8,10 +8,11 @@ Users can flag plates and restaurants as favorites; favorites are surfaced at th
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.config.enums import FavoriteEntityType
 from app.dto.models import UserFavoriteDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_insert, db_read
 from app.utils.log import log_info
 
@@ -38,10 +39,7 @@ def add_favorite(
         HTTPException: 400 if invalid entity_type, already favorited, or entity not found
     """
     if not FavoriteEntityType.is_valid(entity_type):
-        raise HTTPException(
-            status_code=400,
-            detail=f"entity_type must be one of: {FavoriteEntityType.values()}",
-        )
+        raise envelope_exception(ErrorCode.FAVORITE_ENTITY_TYPE_INVALID, status=400, locale="en")
 
     # Validate entity exists
     if entity_type == "plate":
@@ -59,10 +57,7 @@ def add_favorite(
             fetch_one=True,
         )
     if not row:
-        raise HTTPException(
-            status_code=404,
-            detail=f"{entity_type.capitalize()} not found",
-        )
+        raise envelope_exception(ErrorCode.FAVORITE_NOT_FOUND, status=404, locale="en")
 
     # Check not already favorited
     existing = db_read(
@@ -75,10 +70,7 @@ def add_favorite(
         fetch_one=True,
     )
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Already favorited",
-        )
+        raise envelope_exception(ErrorCode.FAVORITE_ALREADY_ADDED, status=400, locale="en")
 
     # Insert
     data = {
@@ -118,10 +110,7 @@ def remove_favorite(
         db: Database connection
     """
     if not FavoriteEntityType.is_valid(entity_type):
-        raise HTTPException(
-            status_code=400,
-            detail=f"entity_type must be one of: {FavoriteEntityType.values()}",
-        )
+        raise envelope_exception(ErrorCode.FAVORITE_ENTITY_TYPE_INVALID, status=400, locale="en")
 
     with db.cursor() as cursor:
         cursor.execute(
@@ -187,10 +176,7 @@ def get_favorites_by_user(
         List of UserFavoriteDTO
     """
     if entity_type is not None and not FavoriteEntityType.is_valid(entity_type):
-        raise HTTPException(
-            status_code=400,
-            detail=f"entity_type must be one of: {FavoriteEntityType.values()}",
-        )
+        raise envelope_exception(ErrorCode.FAVORITE_ENTITY_TYPE_INVALID, status=400, locale="en")
 
     if entity_type:
         rows = (

@@ -9,12 +9,14 @@ Public endpoints for pre-auth referral code assignment (deep link lifecycle).
 from decimal import Decimal
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.config.enums import ReferralStatus
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     ReferralInfoResponseSchema,
     ReferralMyCodeResponseSchema,
@@ -65,7 +67,7 @@ def assign_referral_code(
 
     referrer = validate_referral_code(body.referral_code, db)
     if not referrer:
-        raise HTTPException(status_code=400, detail="Invalid referral code")
+        raise envelope_exception(ErrorCode.REFERRAL_CODE_INVALID, status=400, locale="en")
 
     cursor = db.cursor()
     try:
@@ -113,7 +115,7 @@ def get_assigned_code(
         connection=db,
     )
     if not rows:
-        raise HTTPException(status_code=404, detail="No active referral code assignment")
+        raise envelope_exception(ErrorCode.REFERRAL_ASSIGNMENT_NOT_FOUND, status=404, locale="en")
     return {"referral_code": rows[0]["referral_code"]}
 
 
@@ -135,7 +137,7 @@ def get_my_referral_code(
         connection=db,
     )
     if not rows or not rows[0].get("referral_code"):
-        raise HTTPException(status_code=404, detail="Referral code not found")
+        raise envelope_exception(ErrorCode.REFERRAL_CODE_NOT_FOUND, status=404, locale="en")
     return {"referral_code": rows[0]["referral_code"]}
 
 

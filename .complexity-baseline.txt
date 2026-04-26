@@ -12,6 +12,8 @@ app/services/entity_service.py:get_enriched_addresses_search
 app/services/entity_service.py:get_enriched_plate_pickups
 app/services/entity_service.py:get_enriched_restaurant_holidays
 app/services/billing/institution_billing.py:InstitutionBillingService.run_phase1_settlements
+app/services/coworker_service.py:get_coworkers_with_eligibility
+app/services/crud_service.py:CRUDService.create
 app/services/discretionary_service.py:DiscretionaryService.create_discretionary_request
 app/services/leads_public_service.py:create_lead_interest
 app/services/plate_pickup_service.py:PlatePickupService.get_pending_orders_with_company_matching

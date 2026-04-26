@@ -404,6 +404,235 @@ class ErrorCode(StrEnum):
     PLATE_PICKUP_INVALID_USER_ID = "plate_pickup.invalid_user_id"
     PLATE_PICKUP_INVALID_FILTER = "plate_pickup.invalid_filter"
 
+    # ── locale.* ──────────────────────────────────────────────────────────────
+    # Locale/language validation errors. Wired in K15 (misc remainder sweep).
+    LOCALE_UNSUPPORTED = "locale.unsupported"
+
+    # ── address.* (business-logic) ────────────────────────────────────────────
+    # Address business-logic errors (distinct from validation.address.*). Wired in K15.
+    ADDRESS_INSTITUTION_REQUIRED = "address.institution_required"
+    ADDRESS_CUSTOMER_INSTITUTION_REQUIRED = "address.customer_institution_required"
+    ADDRESS_TARGET_USER_NOT_FOUND = "address.target_user_not_found"
+    ADDRESS_USER_INSTITUTION_MISMATCH = "address.user_institution_mismatch"
+    ADDRESS_CREATION_FAILED = "address.creation_failed"
+    ADDRESS_INVALID_COUNTRY = "address.invalid_country"
+    ADDRESS_NOT_FOUND = "address.not_found"
+    ADDRESS_MANUAL_ENTRY_NOT_ALLOWED = "address.manual_entry_not_allowed"
+    ADDRESS_GLOBAL_MARKET_INVALID = "address.global_market_invalid"
+    ADDRESS_CITY_COUNTRY_MISMATCH = "address.city_country_mismatch"
+    ADDRESS_PLACE_DETAILS_FAILED = "address.place_details_failed"
+    ADDRESS_OUTSIDE_SERVICE_AREA = "address.outside_service_area"
+    ADDRESS_CITY_METADATA_UNRESOLVABLE = "address.city_metadata_unresolvable"
+
+    # ── workplace_group.* ─────────────────────────────────────────────────────
+    # Workplace group errors. Wired in K15.
+    WORKPLACE_GROUP_NOT_FOUND = "workplace_group.not_found"
+    WORKPLACE_GROUP_CREATION_FAILED = "workplace_group.creation_failed"
+    WORKPLACE_GROUP_UPDATE_FAILED = "workplace_group.update_failed"
+    WORKPLACE_GROUP_ARCHIVE_FAILED = "workplace_group.archive_failed"
+
+    # ── supplier_terms.* ──────────────────────────────────────────────────────
+    # Supplier terms access errors. Wired in K15.
+    SUPPLIER_TERMS_ACCESS_DENIED = "supplier_terms.access_denied"
+    SUPPLIER_TERMS_NOT_FOUND = "supplier_terms.not_found"
+    SUPPLIER_TERMS_INTERNAL_ONLY = "supplier_terms.internal_only"
+
+    # ── webhook.* ─────────────────────────────────────────────────────────────
+    # Stripe webhook processing errors. Wired in K15.
+    WEBHOOK_SECRET_NOT_CONFIGURED = "webhook.secret_not_configured"
+    WEBHOOK_INVALID_PAYLOAD = "webhook.invalid_payload"
+    WEBHOOK_INVALID_SIGNATURE = "webhook.invalid_signature"
+
+    # ── payment_method.* ──────────────────────────────────────────────────────
+    # Customer payment method errors. Wired in K15.
+    PAYMENT_METHOD_NOT_FOUND = "payment_method.not_found"
+    PAYMENT_METHOD_ACCESS_DENIED = "payment_method.access_denied"
+    PAYMENT_METHOD_SETUP_URL_REQUIRED = "payment_method.setup_url_required"
+    PAYMENT_METHOD_MOCK_ONLY = "payment_method.mock_only"
+    PAYMENT_METHOD_PROVIDER_UNAVAILABLE = "payment_method.provider_unavailable"
+
+    # ── referral.* ───────────────────────────────────────────────────────────
+    # Referral code errors. Wired in K15.
+    REFERRAL_CODE_INVALID = "referral.code_invalid"
+    REFERRAL_CODE_NOT_FOUND = "referral.code_not_found"
+    REFERRAL_ASSIGNMENT_NOT_FOUND = "referral.assignment_not_found"
+
+    # ── email_change.* ───────────────────────────────────────────────────────
+    # Email change service errors. Wired in K15.
+    EMAIL_CHANGE_EMAIL_REQUIRED = "email_change.email_required"
+    EMAIL_CHANGE_SAME_AS_CURRENT = "email_change.same_as_current"
+    EMAIL_CHANGE_ALREADY_TAKEN = "email_change.already_taken"
+    EMAIL_CHANGE_PENDING_FOR_EMAIL = "email_change.pending_for_email"
+    EMAIL_CHANGE_CODE_EXPIRED = "email_change.code_expired"
+    EMAIL_CHANGE_CODE_INVALID = "email_change.code_invalid"
+    EMAIL_CHANGE_USER_NOT_FOUND = "email_change.user_not_found"
+
+    # ── credit.* ─────────────────────────────────────────────────────────────
+    # Credit loading / validation errors. Wired in K15.
+    CREDIT_AMOUNT_MUST_BE_POSITIVE = "credit.amount_must_be_positive"
+    CREDIT_CURRENCY_NOT_FOUND = "credit.currency_not_found"
+
+    # ── checksum.* ───────────────────────────────────────────────────────────
+    # Checksum utility errors. Wired in K15.
+    CHECKSUM_UNSUPPORTED_ALGORITHM = "checksum.unsupported_algorithm"
+    CHECKSUM_MISMATCH = "checksum.mismatch"
+
+    # ── country.* ────────────────────────────────────────────────────────────
+    # Country utility errors. Wired in K15.
+    COUNTRY_INVALID_CODE = "country.invalid_code"
+
+    # ── dev.* ─────────────────────────────────────────────────────────────────
+    # Developer-only endpoint guard. Wired in K15.
+    DEV_MODE_ONLY = "dev.mode_only"
+
+    # ── institution_entity.* (additional) ────────────────────────────────────
+    # Additional institution entity errors. Wired in K15.
+    INSTITUTION_ENTITY_NO_MARKETS = "institution_entity.no_markets"
+    INSTITUTION_ENTITY_NO_PAYOUT_AGGREGATOR = "institution_entity.no_payout_aggregator"
+    INSTITUTION_ENTITY_PAYOUT_SETUP_REQUIRED = "institution_entity.payout_setup_required"
+
+    # ── qr_code.* ────────────────────────────────────────────────────────────
+    # QR code management errors. Wired in K15.
+    QR_CODE_NO_IMAGE = "qr_code.no_image"
+    QR_CODE_LIST_FAILED = "qr_code.list_failed"
+    QR_CODE_GET_FAILED = "qr_code.get_failed"
+    QR_CODE_DELETE_FAILED = "qr_code.delete_failed"
+
+    # ── restaurant.* ─────────────────────────────────────────────────────────
+    # Restaurant operation errors. Wired in K15.
+    RESTAURANT_CREATION_FAILED = "restaurant.creation_failed"
+    RESTAURANT_BALANCE_CREATION_FAILED = "restaurant.balance_creation_failed"
+    RESTAURANT_LIST_FAILED = "restaurant.list_failed"
+    RESTAURANT_CITIES_LIST_FAILED = "restaurant.cities_list_failed"
+    RESTAURANT_ENRICHED_LIST_FAILED = "restaurant.enriched_list_failed"
+    RESTAURANT_ENRICHED_GET_FAILED = "restaurant.enriched_get_failed"
+    RESTAURANT_GET_FAILED = "restaurant.get_failed"
+    RESTAURANT_UPDATE_FAILED = "restaurant.update_failed"
+    RESTAURANT_DELETE_FAILED = "restaurant.delete_failed"
+
+    # ── restaurant_holiday.* ─────────────────────────────────────────────────
+    # Restaurant holiday operation errors. Wired in K15.
+    RESTAURANT_HOLIDAY_UPDATE_FAILED = "restaurant_holiday.update_failed"
+    RESTAURANT_HOLIDAY_DELETE_FAILED = "restaurant_holiday.delete_failed"
+
+    # ── plate_selection.* ─────────────────────────────────────────────────────
+    # Plate selection operation errors. Wired in K15.
+    PLATE_SELECTION_CREATION_FAILED = "plate_selection.creation_failed"
+
+    # ── product_image.* ──────────────────────────────────────────────────────
+    # Product image upload errors. Wired in K15.
+    PRODUCT_IMAGE_EMPTY = "product_image.empty"
+    PRODUCT_IMAGE_FORMAT_INVALID = "product_image.format_invalid"
+    PRODUCT_IMAGE_CHECKSUM_MISMATCH = "product_image.checksum_mismatch"
+    PRODUCT_IMAGE_UNREADABLE = "product_image.unreadable"
+
+    # ── leads.* ──────────────────────────────────────────────────────────────
+    # Leads route errors. Wired in K15.
+    LEADS_COUNTRY_CODE_REQUIRED = "leads.country_code_required"
+    LEADS_EMAIL_REQUIRED = "leads.email_required"
+    LEADS_INVALID_INTEREST_TYPE = "leads.invalid_interest_type"
+    LEADS_INVALID_RESTAURANT_DATA = "leads.invalid_restaurant_data"
+
+    # ── timezone.* ───────────────────────────────────────────────────────────
+    # Timezone service errors. Wired in K15.
+    TIMEZONE_COUNTRY_CODE_REQUIRED = "timezone.country_code_required"
+    TIMEZONE_NOT_FOUND = "timezone.not_found"
+
+    # ── ad_zone.* extended ───────────────────────────────────────────────────
+    # Ads zone service errors. Wired in K15.
+    AD_ZONE_INVALID_FLYWHEEL_STATE = "ad_zone.invalid_flywheel_state"
+
+    # ── coworker.* ───────────────────────────────────────────────────────────
+    # Coworker service errors. Wired in K15.
+    COWORKER_EMPLOYER_REQUIRED = "coworker.employer_required"
+    COWORKER_USER_INELIGIBLE = "coworker.user_ineligible"
+
+    # ── enrollment.* extended ────────────────────────────────────────────────
+    # Enrollment service operation errors. Wired in K15.
+    ENROLLMENT_BENEFIT_EMPLOYEE_CREATION_FAILED = "enrollment.benefit_employee_creation_failed"
+    ENROLLMENT_SUBSCRIPTION_CREATION_FAILED = "enrollment.subscription_creation_failed"
+
+    # ── employer.* extended ──────────────────────────────────────────────────
+    # Employer service operation errors. Wired in K15.
+    EMPLOYER_BILL_CREATION_FAILED = "employer.bill_creation_failed"
+    EMPLOYER_BENEFITS_PROGRAM_CREATION_FAILED = "employer.benefits_program_creation_failed"
+
+    # ── discretionary.* ──────────────────────────────────────────────────────
+    # Discretionary service operation errors. Wired in K15.
+    DISCRETIONARY_REQUEST_CREATION_FAILED = "discretionary.request_creation_failed"
+    DISCRETIONARY_REQUEST_APPROVAL_FAILED = "discretionary.request_approval_failed"
+    DISCRETIONARY_REQUEST_REJECTION_FAILED = "discretionary.request_rejection_failed"
+    DISCRETIONARY_LIST_FAILED = "discretionary.list_failed"
+    DISCRETIONARY_TRANSACTION_CREATION_FAILED = "discretionary.transaction_creation_failed"
+
+    # ── credit.* extended ────────────────────────────────────────────────────
+    # Credit service operation errors. Wired in K15.
+    CREDIT_TRANSACTION_CREATION_FAILED = "credit.transaction_creation_failed"
+    CREDIT_VALIDATION_FAILED = "credit.validation_failed"
+
+    # ── currency_refresh.* ───────────────────────────────────────────────────
+    # Currency refresh cron errors. Wired in K15.
+    CURRENCY_REFRESH_RATE_UNAVAILABLE = "currency_refresh.rate_unavailable"
+
+    # ── user.me.* ────────────────────────────────────────────────────────────
+    # User self-endpoint redirect hint. Wired in K15.
+    USER_USE_ME_ENDPOINT = "user.use_me_endpoint"
+
+    # ── subscription.* ───────────────────────────────────────────────────────
+    # Subscription payment creation/recording errors. Wired in K15.
+    SUBSCRIPTION_CREATION_FAILED = "subscription.creation_failed"
+    SUBSCRIPTION_PAYMENT_RECORD_FAILED = "subscription.payment_record_failed"
+
+    # ── plate_review.operation.* ──────────────────────────────────────────────
+    # Plate review operation failures. Wired in K15.
+    PLATE_REVIEW_CREATION_FAILED = "plate_review.creation_failed"
+    PLATE_REVIEW_COMPLAINT_FAILED = "plate_review.complaint_failed"
+
+    # ── plate_kitchen_days.* ─────────────────────────────────────────────────
+    # Plate kitchen days operation errors. Wired in K15.
+    PLATE_KITCHEN_DAYS_LIST_FAILED = "plate_kitchen_days.list_failed"
+    PLATE_KITCHEN_DAYS_ENRICHED_LIST_FAILED = "plate_kitchen_days.enriched_list_failed"
+    PLATE_KITCHEN_DAYS_ENRICHED_GET_FAILED = "plate_kitchen_days.enriched_get_failed"
+
+    # ── national_holiday.* ───────────────────────────────────────────────────
+    # National holiday operation failures. Wired in K15.
+    NATIONAL_HOLIDAY_UPDATE_FAILED = "national_holiday.update_failed"
+    NATIONAL_HOLIDAY_DELETE_FAILED = "national_holiday.delete_failed"
+
+    # ── favorite.* ───────────────────────────────────────────────────────────
+    # Favorite service errors. Wired in K15.
+    FAVORITE_ENTITY_TYPE_INVALID = "favorite.entity_type_invalid"
+    FAVORITE_NOT_FOUND = "favorite.not_found"
+    FAVORITE_ALREADY_ADDED = "favorite.already_added"
+
+    # ── notification.* ───────────────────────────────────────────────────────
+    # Notification banner service errors. Wired in K15.
+    NOTIFICATION_NOT_FOUND = "notification.not_found"
+
+    # ── billing.payout.* ─────────────────────────────────────────────────────
+    # Billing payout (mock + live) errors. Wired in K15.
+    BILLING_PAYOUT_BILL_NOT_PENDING = "billing.payout_bill_not_pending"
+
+    # ── plate_selection.* extended ───────────────────────────────────────────
+    # Plate selection validation errors. Wired in K15.
+    PLATE_SELECTION_PICKUP_INTENT_INVALID = "plate_selection.pickup_intent_invalid"
+
+    # ── institution.* ────────────────────────────────────────────────────────
+    # Institution constraint errors. Wired in K15.
+    INSTITUTION_RESTRICTED = "institution.restricted"
+
+    # ── tax_id.* ─────────────────────────────────────────────────────────────
+    # Tax ID validation errors. Wired in K15.
+    TAX_ID_FORMAT_INVALID = "tax_id.format_invalid"
+
+    # ── api.* ─────────────────────────────────────────────────────────────────
+    # API versioning errors. Wired in K15.
+    API_VERSION_UNSUPPORTED = "api.version_unsupported"
+
+    # ── market.* extended ────────────────────────────────────────────────────
+    # Market global sentinel errors. Wired in K15.
+    MARKET_GLOBAL_ENTITY_INVALID = "market.global_entity_invalid"
+
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
     DATABASE_DUPLICATE_KEY = "database.duplicate_key"

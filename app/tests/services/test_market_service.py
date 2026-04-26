@@ -30,8 +30,13 @@ class TestRejectGlobalMarketForEntity:
         with pytest.raises(HTTPException) as exc_info:
             reject_global_market_for_entity(GLOBAL_MARKET_ID, "plan")
         assert exc_info.value.status_code == 400
-        assert "Global Marketplace" in exc_info.value.detail
-        assert "plan" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("code") == "market.global_entity_invalid"
+            assert detail.get("params", {}).get("entity_name") == "plan"
+        else:
+            assert "Global Marketplace" in str(detail)
+            assert "plan" in str(detail)
 
     def test_does_not_raise_when_market_id_is_none(self):
         reject_global_market_for_entity(None, "plan")
@@ -42,4 +47,8 @@ class TestRejectGlobalMarketForEntity:
     def test_entity_name_in_detail(self):
         with pytest.raises(HTTPException) as exc_info:
             reject_global_market_for_entity(GLOBAL_MARKET_ID, "subscription")
-        assert "subscription" in exc_info.value.detail
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail.get("params", {}).get("entity_name") == "subscription"
+        else:
+            assert "subscription" in str(detail)

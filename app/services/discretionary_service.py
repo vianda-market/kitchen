@@ -120,7 +120,7 @@ class DiscretionaryService:
             # Create discretionary request
             discretionary_request = discretionary_service.create(request_data, db)
             if not discretionary_request:
-                raise HTTPException(status_code=500, detail="Failed to persist discretionary request in database")
+                raise envelope_exception(ErrorCode.DISCRETIONARY_REQUEST_CREATION_FAILED, status=500, locale="en")
 
             log_info(
                 f"Discretionary request created: {discretionary_request.discretionary_id} by admin {admin_user['user_id']}"
@@ -131,7 +131,7 @@ class DiscretionaryService:
             raise
         except Exception as e:
             log_error(f"Error creating discretionary request: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create discretionary request: {str(e)}") from None
+            raise envelope_exception(ErrorCode.DISCRETIONARY_REQUEST_CREATION_FAILED, status=500, locale="en") from None
 
     def approve_discretionary_request(
         self,
@@ -196,7 +196,7 @@ class DiscretionaryService:
             raise
         except Exception as e:
             log_error(f"Error approving discretionary request {discretionary_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to approve discretionary request") from None
+            raise envelope_exception(ErrorCode.DISCRETIONARY_REQUEST_APPROVAL_FAILED, status=500, locale="en") from None
 
     def reject_discretionary_request(
         self,
@@ -263,7 +263,9 @@ class DiscretionaryService:
             raise
         except Exception as e:
             log_error(f"Error rejecting discretionary request {discretionary_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to reject discretionary request") from None
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_REQUEST_REJECTION_FAILED, status=500, locale="en"
+            ) from None
 
     def get_pending_requests(self, db: psycopg2.extensions.connection) -> list[DiscretionaryDTO]:
         """
@@ -287,7 +289,7 @@ class DiscretionaryService:
 
         except Exception as e:
             log_error(f"Error retrieving pending discretionary requests: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve pending requests") from None
+            raise envelope_exception(ErrorCode.DISCRETIONARY_LIST_FAILED, status=500, locale="en") from None
 
     def get_requests_by_admin(self, admin_user_id: UUID, db: psycopg2.extensions.connection) -> list[DiscretionaryDTO]:
         """
@@ -312,7 +314,7 @@ class DiscretionaryService:
 
         except Exception as e:
             log_error(f"Error retrieving discretionary requests for admin {admin_user_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve admin requests") from None
+            raise envelope_exception(ErrorCode.DISCRETIONARY_LIST_FAILED, status=500, locale="en") from None
 
     def _validate_discretionary_request_data(self, request_data: dict[str, Any], locale: str = "en") -> None:
         """
@@ -433,4 +435,6 @@ class DiscretionaryService:
             log_error(
                 f"Error creating discretionary transaction for request {discretionary_request.discretionary_id}: {e}"
             )
-            raise HTTPException(status_code=500, detail="Failed to create discretionary transaction") from None
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_TRANSACTION_CREATION_FAILED, status=500, locale="en"
+            ) from None

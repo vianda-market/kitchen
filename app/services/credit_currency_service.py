@@ -8,8 +8,9 @@ This ensures consistency across all tables that store both currency_id and curre
 from typing import Any
 
 import psycopg2.extensions
-from fastapi import HTTPException, status
 
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.crud_service import credit_currency_service
 from app.utils.error_messages import credit_currency_not_found
 from app.utils.log import log_error, log_info
@@ -39,9 +40,7 @@ def resolve_currency_code(
 
     if not currency_id:
         log_error(f"[resolve_currency_code] Missing required field: {currency_id_field}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required field: {currency_id_field}"
-        )
+        raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale="en", field=currency_id_field)
 
     # Get currency from database
     log_info(f"[resolve_currency_code] Looking up currency with ID: {currency_id}")

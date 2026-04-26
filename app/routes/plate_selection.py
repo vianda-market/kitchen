@@ -78,7 +78,7 @@ def create_plate_selection(
         raise
     except Exception as e:
         log_info(f"Error creating plate selection: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating plate selection: {str(e)}") from None
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_CREATION_FAILED, status=500, locale="en") from None
 
 
 @router.get("/{plate_selection_id}", response_model=PlateSelectionResponseSchema)

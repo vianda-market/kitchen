@@ -464,7 +464,7 @@ def update_restaurant_holiday(
         # Update holiday
         updated = restaurant_holidays_service.update(holiday_id, update_data, connection, scope=scope)
         if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update restaurant holiday")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_UPDATE_FAILED, status=500, locale="en")
         log_info(f"Updated restaurant holiday: {holiday_id}")
         return updated
 
@@ -490,7 +490,7 @@ def delete_restaurant_holiday(
         # Soft delete (archive) - CRUDService handles scoping automatically
         success = restaurant_holidays_service.soft_delete(holiday_id, current_user["user_id"], connection, scope=scope)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete restaurant holiday")
+            raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_DELETE_FAILED, status=500, locale="en")
         log_info(f"Deleted (archived) restaurant holiday: {holiday_id}")
         return
 

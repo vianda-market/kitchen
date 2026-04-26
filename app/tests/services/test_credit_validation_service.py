@@ -183,8 +183,11 @@ class TestCreditValidationService:
                 validate_sufficient_credits(user_id, required_credits, mock_db)
 
             assert exc_info.value.status_code == 404
-            assert "User subscription not found" in str(exc_info.value.detail)
-            assert "Please go to Plan and subscribe before reserving a plate" in str(exc_info.value.detail)
+            detail = exc_info.value.detail
+            if isinstance(detail, dict):
+                assert detail.get("code") == "subscription.not_found"
+            else:
+                assert "User subscription not found" in str(detail)
 
     def test_validate_sufficient_credits_handles_database_error(self, mock_db):
         """Test that validation handles database errors gracefully."""
