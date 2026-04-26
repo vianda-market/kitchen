@@ -29,8 +29,13 @@
       },
       {
         "cast": "text",
+        "enum_ref": "NationalHolidaySource",
         "key": "source",
-        "kind": "multi-select"
+        "kind": "multi-select",
+        "values": [
+          "manual",
+          "nager_date"
+        ]
       },
       {
         "cast": "text",

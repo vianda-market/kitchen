@@ -47,7 +47,7 @@ from app.config import (
     Status,
     TransactionType,
 )
-from app.config.enums import DietaryFlag, FavoriteEntityType, PaymentFrequency
+from app.config.enums import DietaryFlag, FavoriteEntityType, NationalHolidaySource, PaymentFrequency
 from app.config.settings import settings
 from app.i18n.envelope import I18nValueError
 from app.utils.country import normalize_country_code
@@ -2728,7 +2728,9 @@ class NationalHolidayResponseSchema(BaseModel):
     status: Status
     # filter-registry:exempt reason="soft-delete flag; server filters by default"
     is_archived: bool
-    source: str = Field(..., description="'manual' | 'nager_date' -- client creates are always manual")
+    source: NationalHolidaySource = Field(
+        ..., description="'manual' | 'nager_date' -- client creates are always manual"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
