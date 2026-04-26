@@ -682,7 +682,6 @@ app/services/crud_service.py:0: error: Argument 5 to "_get_all_direct" of "CRUDS
 app/services/crud_service.py:0: error: "PaginatedList" expects no type arguments, but 1 given  [type-arg]
 app/services/crud_service.py:0: error: Argument after ** must be a mapping, not "dict[str, Any] | list[dict[str, Any]]"  [arg-type]
 app/services/crud_service.py:0: error: Argument after ** must be a mapping, not "str | dict[str, Any]"  [arg-type]
-app/services/crud_service.py:0: error: Item "None" of "FrameType | None" has no attribute "f_back"  [union-attr]
 app/services/crud_service.py:0: error: Incompatible return value type (got "Any | dict[str, Any] | int", expected "int")  [return-value]
 app/services/crud_service.py:0: error: Invalid index type "int" for "dict[str, Any]"; expected type "str"  [index]
 app/services/crud_service.py:0: error: Argument after ** must be a mapping, not "dict[str, Any] | list[dict[str, Any]]"  [arg-type]
