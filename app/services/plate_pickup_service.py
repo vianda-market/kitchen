@@ -7,7 +7,7 @@ including QR code scanning, order completion, and pickup management.
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg2.extensions
@@ -32,6 +32,159 @@ from app.services.crud_service import (
 )
 from app.utils.error_messages import pickup_record_not_found, plate_not_found, plate_selection_not_found
 from app.utils.log import log_error, log_info, log_warning
+
+
+def _fetch_pending_orders_row(
+    user_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> dict[str, Any] | None:
+    """Execute the pending-orders query and return a single matching row, or None."""
+    from app.utils.db import db_read
+
+    query = """
+    SELECT
+        ppl.restaurant_id,
+        r.name as restaurant_name,
+        qc.qr_code_id,
+        qc.qr_code_payload,
+        ppl.status,
+        MIN(ppl.created_date) as earliest_order_time,
+        COUNT(*) as total_orders,
+        ARRAY_AGG(DISTINCT ppl.plate_pickup_id) as plate_pickup_ids,
+        STRING_AGG(
+            CONCAT(prod.name, ':',
+                   CASE
+                       WHEN ppl.user_id = %s THEN 'x1'
+                       WHEN pp.user_id = %s THEN 'x2'
+                       ELSE 'x3'
+                   END, ':',
+                   COALESCE(p.delivery_time_minutes::text, '15'), ':',
+                   ppl.plate_pickup_id::text
+            ),
+            '|'
+        ) as orders_data
+    FROM plate_pickup_live ppl
+    LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
+    LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
+    LEFT JOIN qr_code qc ON ppl.restaurant_id = qc.restaurant_id
+    LEFT JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id
+    LEFT JOIN plate_info p ON ps.plate_id = p.plate_id
+    LEFT JOIN product_info prod ON p.product_id = prod.product_id
+    WHERE ppl.status IN ('pending', 'arrived')
+    AND ppl.is_archived = FALSE
+    AND qc.is_archived = FALSE
+    AND qc.status = 'active'
+    AND (
+        ppl.user_id = %s
+        OR pp.user_id = %s
+        OR pp.matched_with_preference_id IN (
+            SELECT preference_id FROM pickup_preferences
+            WHERE user_id = %s
+        )
+    )
+    GROUP BY ppl.restaurant_id, r.name, qc.qr_code_id, qc.qr_code_payload, ppl.status
+    ORDER BY MAX(ppl.created_date) DESC
+    LIMIT 1
+    """
+    return cast(
+        "dict[str, Any] | None",
+        db_read(
+            query,
+            (
+                str(user_id),
+                str(user_id),  # For order_count calculation
+                str(user_id),
+                str(user_id),
+                str(user_id),  # For WHERE clause
+            ),
+            connection=db,
+            fetch_one=True,
+        ),
+    )
+
+
+def _resolve_restaurant_local_time(
+    result: dict[str, Any],
+    db: psycopg2.extensions.connection,
+) -> tuple[Any, Any]:
+    """
+    Look up the restaurant's address timezone and convert earliest_order_time to local time.
+
+    Returns:
+        (earliest_time_utc, earliest_time_local) on success, or (None, None) if
+        the restaurant or its address cannot be found.
+    """
+    import pytz
+
+    restaurant = restaurant_service.get_by_id(UUID(result["restaurant_id"]), db)
+    if not restaurant:
+        log_warning(f"Restaurant {result['restaurant_id']} not found")
+        return None, None
+
+    from app.services.crud_service import address_service
+
+    address = address_service.get_by_id(restaurant.address_id, db)
+    if not address:
+        log_warning(f"Address not found for restaurant {restaurant.restaurant_id}")
+        return None, None
+
+    restaurant_tz = pytz.timezone(address.timezone)
+    earliest_time_utc = result["earliest_order_time"]
+
+    if isinstance(earliest_time_utc, str):
+        from dateutil.parser import parse
+
+        earliest_time_utc = parse(earliest_time_utc)
+
+    return earliest_time_utc, earliest_time_utc.astimezone(restaurant_tz)
+
+
+def _parse_orders_data(orders_data: str) -> list[dict[str, Any]]:
+    """
+    Parse the STRING_AGG orders_data field into a list of order dicts.
+
+    Format per token: ``plate_name:order_count:delivery_time_minutes:plate_pickup_id``
+    """
+    orders: list[dict[str, Any]] = []
+    if not orders_data:
+        return orders
+    for order_str in orders_data.split("|"):
+        if not order_str:
+            continue
+        parts = order_str.split(":")
+        if len(parts) < 2:
+            continue
+        plate_pickup_id = None
+        if len(parts) > 3:
+            try:
+                plate_pickup_id = UUID(parts[3])
+            except (ValueError, TypeError):
+                pass
+        orders.append(
+            {
+                "plate_name": parts[0],
+                "order_count": parts[1],
+                "delivery_time_minutes": int(parts[2]) if len(parts) > 2 else 15,
+                "plate_pickup_id": plate_pickup_id,
+            }
+        )
+    return orders
+
+
+def _build_plate_pickup_ids(
+    result: dict[str, Any],
+    orders: list[dict[str, Any]],
+) -> list[UUID]:
+    """
+    Derive plate_pickup_ids from the ARRAY_AGG column, falling back to the parsed orders list.
+    """
+    ids_raw = result.get("plate_pickup_ids")
+    if ids_raw:
+        if isinstance(ids_raw, (list, tuple)):
+            return [UUID(str(x)) for x in ids_raw if x]
+        if isinstance(ids_raw, str):
+            return [UUID(x.strip()) for x in ids_raw.split(",") if x.strip()]
+    return [o["plate_pickup_id"] for o in orders if o.get("plate_pickup_id")]
 
 
 class PlatePickupService:
@@ -502,139 +655,21 @@ class PlatePickupService:
         Returns:
             Dictionary with pending orders or None if no orders found
         """
-        import pytz
-
-        from app.utils.db import db_read
-
-        # Query for pending orders with company matching
-        query = """
-        SELECT
-            ppl.restaurant_id,
-            r.name as restaurant_name,
-            qc.qr_code_id,
-            qc.qr_code_payload,
-            ppl.status,
-            MIN(ppl.created_date) as earliest_order_time,
-            COUNT(*) as total_orders,
-            ARRAY_AGG(DISTINCT ppl.plate_pickup_id) as plate_pickup_ids,
-            STRING_AGG(
-                CONCAT(prod.name, ':',
-                       CASE
-                           WHEN ppl.user_id = %s THEN 'x1'
-                           WHEN pp.user_id = %s THEN 'x2'
-                           ELSE 'x3'
-                       END, ':',
-                       COALESCE(p.delivery_time_minutes::text, '15'), ':',
-                       ppl.plate_pickup_id::text
-                ),
-                '|'
-            ) as orders_data
-        FROM plate_pickup_live ppl
-        LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
-        LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-        LEFT JOIN qr_code qc ON ppl.restaurant_id = qc.restaurant_id
-        LEFT JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id
-        LEFT JOIN plate_info p ON ps.plate_id = p.plate_id
-        LEFT JOIN product_info prod ON p.product_id = prod.product_id
-        WHERE ppl.status IN ('pending', 'arrived')
-        AND ppl.is_archived = FALSE
-        AND qc.is_archived = FALSE
-        AND qc.status = 'active'
-        AND (
-            ppl.user_id = %s
-            OR pp.user_id = %s
-            OR pp.matched_with_preference_id IN (
-                SELECT preference_id FROM pickup_preferences
-                WHERE user_id = %s
-            )
-        )
-        GROUP BY ppl.restaurant_id, r.name, qc.qr_code_id, qc.qr_code_payload, ppl.status
-        ORDER BY MAX(ppl.created_date) DESC
-        LIMIT 1
-        """
-
-        result = db_read(
-            query,
-            (
-                str(user_id),
-                str(user_id),  # For order_count calculation
-                str(user_id),
-                str(user_id),
-                str(user_id),  # For WHERE clause
-            ),
-            connection=db,
-            fetch_one=True,
-        )
-
+        result = _fetch_pending_orders_row(user_id, db)
         if not result:
             return None
 
-        # Get restaurant timezone for pickup window calculation
-        restaurant = restaurant_service.get_by_id(UUID(result["restaurant_id"]), db)
-        if not restaurant:
-            log_warning(f"Restaurant {result['restaurant_id']} not found")
+        earliest_time_utc, earliest_time_local = _resolve_restaurant_local_time(result, db)
+        if earliest_time_local is None:
             return None
 
-        from app.services.crud_service import address_service
-
-        address = address_service.get_by_id(restaurant.address_id, db)
-        if not address:
-            log_warning(f"Address not found for restaurant {restaurant.restaurant_id}")
-            return None
-
-        # Calculate pickup window in restaurant's local timezone
-        restaurant_tz = pytz.timezone(address.timezone)
-        earliest_time_utc = result["earliest_order_time"]
-
-        # Convert to restaurant's local time
-        if isinstance(earliest_time_utc, str):
-            from dateutil.parser import parse
-
-            earliest_time_utc = parse(earliest_time_utc)
-
-        earliest_time_local = earliest_time_utc.astimezone(restaurant_tz)
-
-        # Calculate pickup window constrained to 11:30-14:30
         pickup_window = self._calculate_pickup_window(earliest_time_local)
+        orders = _parse_orders_data(result.get("orders_data", ""))
+        plate_pickup_ids = _build_plate_pickup_ids(result, orders)
 
-        # Parse orders_data string (format: plate_name:order_count:delivery_time[:plate_pickup_id])
-        orders = []
-        if result["orders_data"]:
-            for order_str in result["orders_data"].split("|"):
-                if order_str:
-                    parts = order_str.split(":")
-                    if len(parts) >= 2:
-                        plate_pickup_id = None
-                        if len(parts) > 3:
-                            try:
-                                plate_pickup_id = UUID(parts[3])
-                            except (ValueError, TypeError):
-                                pass
-                        orders.append(
-                            {
-                                "plate_name": parts[0],
-                                "order_count": parts[1],
-                                "delivery_time_minutes": int(parts[2]) if len(parts) > 2 else 15,
-                                "plate_pickup_id": plate_pickup_id,
-                            }
-                        )
-
-        # Build plate_pickup_ids list (from ARRAY_AGG or fallback to orders)
-        plate_pickup_ids = []
-        if result.get("plate_pickup_ids"):
-            ids = result["plate_pickup_ids"]
-            if isinstance(ids, (list, tuple)):
-                plate_pickup_ids = [UUID(str(x)) for x in ids if x]
-            elif isinstance(ids, str):
-                plate_pickup_ids = [UUID(x.strip()) for x in ids.split(",") if x.strip()]
-        if not plate_pickup_ids and orders:
-            plate_pickup_ids = [o["plate_pickup_id"] for o in orders if o.get("plate_pickup_id")]
-
-        # Compute HMAC signature so clients can build the scan request
         from app.utils.qr_hmac import sign_qr_code_id
 
-        qr_code_id_str = str(result["qr_code_id"])
-        qr_sig = sign_qr_code_id(qr_code_id_str)
+        qr_sig = sign_qr_code_id(str(result["qr_code_id"]))
 
         return {
             "restaurant_id": UUID(result["restaurant_id"]),
