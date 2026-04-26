@@ -5,8 +5,6 @@ Currency conversion utilities.
 
 import requests
 
-from app.config.settings import settings
-
 
 def convert_currency(amount_minor: int, from_currency: str, to_currency: str) -> int:
     """Convert the given amount from one currency to another."""
