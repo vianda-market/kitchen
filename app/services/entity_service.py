@@ -2667,41 +2667,6 @@ def search_products_by_name(
         raise HTTPException(status_code=500, detail="Failed to search products") from None
 
 
-# =============================================================================
-# PLATE BUSINESS LOGIC
-# =============================================================================
-
-
-def get_plates_by_restaurant(restaurant_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
-    """
-    Get all plates for a restaurant - business logic only.
-
-    Args:
-        restaurant_id: Restaurant ID
-        db: Database connection
-
-    Returns:
-        List of PlateDTOs
-
-    Raises:
-        HTTPException: For system errors or database failures
-    """
-    try:
-        # Use service layer instead of direct db_read
-        all_plates = plate_service.get_all(db)
-
-        # Filter by restaurant_id (business logic)
-        restaurant_plates = [plate for plate in all_plates if plate.restaurant_id == restaurant_id]
-
-        # Sort by price (business logic)
-        restaurant_plates.sort(key=lambda p: p.price)
-
-        return restaurant_plates
-    except Exception as e:
-        log_error(f"Error getting plates by restaurant {restaurant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get plates for restaurant") from None
-
-
 def get_plates_by_product(product_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
     """
     Get all plates for a product - business logic only.

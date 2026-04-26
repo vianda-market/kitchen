@@ -14,14 +14,13 @@ import pytest
 from fastapi import HTTPException
 
 from app.config import RoleName, RoleType, Status
-from app.dto.models import InstitutionBillDTO, PlateDTO, ProductDTO, UserDTO
+from app.dto.models import InstitutionBillDTO, ProductDTO, UserDTO
 from app.services.entity_service import (
     get_bills_by_status,
     get_enriched_discretionary_request_by_id,
     get_enriched_discretionary_requests,
     get_enriched_plate_by_id,
     get_enriched_plates,
-    get_plates_by_restaurant,
     get_products_by_institution,
     get_user_by_email,
     get_user_by_username,
@@ -233,84 +232,6 @@ class TestEntityService:
             # Assert
             assert result == []
 
-    def test_get_plates_by_restaurant_filters_correctly(self, mock_db):
-        """Test that get_plates_by_restaurant filters plates by restaurant."""
-        # Arrange
-        restaurant_id = uuid4()
-        other_restaurant_id = uuid4()
-
-        # Create mock PlateDTOs
-        mock_plates = [
-            PlateDTO(
-                plate_id=uuid4(),
-                restaurant_id=restaurant_id,
-                product_id=uuid4(),
-                price=Decimal("10.0"),
-                credit=Decimal("5"),
-                expected_payout_local_currency=Decimal("0"),
-                delivery_time_minutes=15,
-                status="active",
-                modified_by=uuid4(),
-                is_archived=False,
-                created_date=datetime.now(UTC),
-                modified_date=datetime.now(UTC),
-            ),
-            PlateDTO(
-                plate_id=uuid4(),
-                restaurant_id=other_restaurant_id,  # Different restaurant
-                product_id=uuid4(),
-                price=Decimal("15.0"),
-                credit=Decimal("7"),
-                expected_payout_local_currency=Decimal("0"),
-                delivery_time_minutes=20,
-                status="active",
-                modified_by=uuid4(),
-                is_archived=False,
-                created_date=datetime.now(UTC),
-                modified_date=datetime.now(UTC),
-            ),
-            PlateDTO(
-                plate_id=uuid4(),
-                restaurant_id=restaurant_id,
-                product_id=uuid4(),
-                price=Decimal("8.0"),
-                credit=Decimal("4"),
-                expected_payout_local_currency=Decimal("0"),
-                delivery_time_minutes=10,
-                status="active",
-                modified_by=uuid4(),
-                is_archived=False,
-                created_date=datetime.now(UTC),
-                modified_date=datetime.now(UTC),
-            ),
-        ]
-
-        with patch("app.services.entity_service.plate_service") as mock_plate_service:
-            mock_plate_service.get_all.return_value = mock_plates
-
-            # Act
-            result = get_plates_by_restaurant(restaurant_id, mock_db)
-
-            # Assert
-            assert len(result) == 2
-            assert all(plate.restaurant_id == restaurant_id for plate in result)
-            assert result[0].price == 8.0  # Sorted by price (8.0)
-            assert result[1].price == 10.0  # Sorted by price (10.0)
-
-    def test_get_plates_by_restaurant_handles_no_plates(self, mock_db):
-        """Test that get_plates_by_restaurant handles no plates found."""
-        # Arrange
-        restaurant_id = uuid4()
-
-        with patch("app.services.entity_service.plate_service") as mock_plate_service:
-            mock_plate_service.get_all.return_value = []
-
-            # Act
-            result = get_plates_by_restaurant(restaurant_id, mock_db)
-
-            # Assert
-            assert result == []
-
     def test_get_bills_by_status_filters_correctly(self, mock_db):
         """Test that get_bills_by_status filters bills by status."""
         # Arrange
@@ -403,21 +324,6 @@ class TestEntityService:
 
             assert exc_info.value.status_code == 500
             assert "Failed to get products for institution" in str(exc_info.value.detail)
-
-    def test_get_plates_by_restaurant_handles_service_error(self, mock_db):
-        """Test that get_plates_by_restaurant handles service errors gracefully."""
-        # Arrange
-        restaurant_id = uuid4()
-
-        with patch("app.services.entity_service.plate_service") as mock_plate_service:
-            mock_plate_service.get_all.side_effect = Exception("Service error")
-
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                get_plates_by_restaurant(restaurant_id, mock_db)
-
-            assert exc_info.value.status_code == 500
-            assert "Failed to get plates for restaurant" in str(exc_info.value.detail)
 
     def test_get_bills_by_status_handles_service_error(self, mock_db):
         """Test that get_bills_by_status handles service errors gracefully."""
