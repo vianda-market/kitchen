@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.config.enums import SupplierInvoiceStatus, SupplierInvoiceType
+from app.i18n.envelope import I18nValueError
 
 # =============================================================================
 # Country-specific detail schemas (validated per-country)
@@ -27,21 +28,21 @@ class ARInvoiceDetailsSchema(BaseModel):
     @classmethod
     def validate_cae_code(cls, v: str) -> str:
         if not re.fullmatch(r"\d{14}", v):
-            raise ValueError("CAE code must be exactly 14 digits")
+            raise I18nValueError("validation.supplier_invoice.cae_format")
         return v
 
     @field_validator("supplier_cuit", "recipient_cuit")
     @classmethod
     def validate_cuit(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{2}-\d{8}-\d{1}", v):
-            raise ValueError("CUIT must match format XX-XXXXXXXX-X")
+            raise I18nValueError("validation.supplier_invoice.cuit_format")
         return v
 
     @field_validator("afip_document_type")
     @classmethod
     def validate_afip_document_type(cls, v: str | None) -> str | None:
         if v is not None and v not in ("A", "B", "C"):
-            raise ValueError("AFIP document type must be one of: A, B, C")
+            raise I18nValueError("validation.supplier_invoice.afip_doc_type")
         return v
 
 
@@ -58,28 +59,28 @@ class PEInvoiceDetailsSchema(BaseModel):
     @classmethod
     def validate_sunat_serie(cls, v: str) -> str:
         if not re.fullmatch(r"F\d{3}", v):
-            raise ValueError("SUNAT serie must match format F + 3 digits (e.g. F001)")
+            raise I18nValueError("validation.supplier_invoice.sunat_serie_format")
         return v
 
     @field_validator("sunat_correlativo")
     @classmethod
     def validate_sunat_correlativo(cls, v: str) -> str:
         if not re.fullmatch(r"\d{1,8}", v):
-            raise ValueError("SUNAT correlativo must be 1-8 digits")
+            raise I18nValueError("validation.supplier_invoice.sunat_correlativo_format")
         return v
 
     @field_validator("supplier_ruc", "recipient_ruc")
     @classmethod
     def validate_ruc(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{11}", v):
-            raise ValueError("RUC must be exactly 11 digits")
+            raise I18nValueError("validation.supplier_invoice.ruc_format")
         return v
 
     @field_validator("cdr_status")
     @classmethod
     def validate_cdr_status(cls, v: str | None) -> str | None:
         if v is not None and v not in ("accepted", "rejected", "pending"):
-            raise ValueError("CDR status must be one of: accepted, rejected, pending")
+            raise I18nValueError("validation.supplier_invoice.cdr_status")
         return v
 
 
@@ -117,11 +118,11 @@ class SupplierInvoiceCreateSchema(BaseModel):
     @model_validator(mode="after")
     def validate_country_details(self):
         if self.country_code == "AR" and not self.ar_details:
-            raise ValueError("AR invoices require ar_details")
+            raise I18nValueError("validation.supplier_invoice.ar_details_required")
         if self.country_code == "PE" and not self.pe_details:
-            raise ValueError("PE invoices require pe_details")
+            raise I18nValueError("validation.supplier_invoice.pe_details_required")
         if self.country_code == "US" and not self.us_details:
-            raise ValueError("US invoices require us_details")
+            raise I18nValueError("validation.supplier_invoice.us_details_required")
         return self
 
 
@@ -168,9 +169,9 @@ class SupplierInvoiceReviewSchema(BaseModel):
     @model_validator(mode="after")
     def validate_rejection_reason(self):
         if self.status == SupplierInvoiceStatus.REJECTED and not self.rejection_reason:
-            raise ValueError("rejection_reason is required when rejecting an invoice")
+            raise I18nValueError("validation.supplier_invoice.rejection_reason_required")
         if self.status == SupplierInvoiceStatus.PENDING_REVIEW:
-            raise ValueError("Cannot set status back to Pending Review")
+            raise I18nValueError("validation.supplier_invoice.status_cannot_reset")
         return self
 
 

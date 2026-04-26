@@ -78,11 +78,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         "request.malformed_body": "The request body could not be parsed.",
         "request.too_large": "The request payload is too large.",
         "request.rate_limited": "Too many requests. Please try again in {retry_after_seconds} seconds.",
-        # validation.* — emitted by RequestValidationError handler (K3/K5)
+        # validation.* — emitted by RequestValidationError handler (K3/K5/K67)
         "validation.field_required": "This field is required.",
         "validation.invalid_format": "The value has an invalid format.",
         "validation.value_too_short": "The value is too short.",
         "validation.value_too_long": "The value is too long.",
+        "validation.invalid_value": "The value is not one of the allowed options.",
+        "validation.invalid_type": "The value has an invalid type.",
         "validation.custom": "{msg}",
         # validation.user.*
         "validation.user.invalid_role_combination": "Invalid role combination: {role_type} + {role_name}.",
@@ -114,6 +116,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.payment.conflicting_address_fields": "Cannot provide both address_id and address_data.",
         "validation.payment.unsupported_brand": "Payment method type is not supported.",
         "validation.payment.address_required": "Payment method type '{method_type}' requires an address. Provide address_id or address_data.",
+        # validation.supplier_invoice.* — K67
+        "validation.supplier_invoice.cae_format": "CAE code must be exactly 14 digits.",
+        "validation.supplier_invoice.cuit_format": "CUIT must match format XX-XXXXXXXX-X.",
+        "validation.supplier_invoice.afip_doc_type": "AFIP document type must be one of: A, B, C.",
+        "validation.supplier_invoice.sunat_serie_format": "SUNAT serie must match format F + 3 digits (e.g. F001).",
+        "validation.supplier_invoice.sunat_correlativo_format": "SUNAT correlativo must be 1–8 digits.",
+        "validation.supplier_invoice.ruc_format": "RUC must be exactly 11 digits.",
+        "validation.supplier_invoice.cdr_status": "CDR status must be one of: accepted, rejected, pending.",
+        "validation.supplier_invoice.ar_details_required": "AR invoices require ar_details.",
+        "validation.supplier_invoice.pe_details_required": "PE invoices require pe_details.",
+        "validation.supplier_invoice.us_details_required": "US invoices require us_details.",
+        "validation.supplier_invoice.rejection_reason_required": "rejection_reason is required when rejecting an invoice.",
+        "validation.supplier_invoice.status_cannot_reset": "Cannot set invoice status back to Pending Review.",
+        "validation.supplier_invoice.w9_ein_format": "ein_last_four must be exactly 4 digits.",
+        # validation.market.* — K67
+        "validation.market.language_unsupported": "Unsupported language '{language}'. Must be one of: {allowed}.",
         # auth.* — K7
         "auth.invalid_token": "Authentication token is invalid or expired.",
         "auth.captcha_required": "CAPTCHA verification is required.",
@@ -609,6 +627,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.invalid_format": "El valor tiene un formato inválido.",
         "validation.value_too_short": "El valor es demasiado corto.",
         "validation.value_too_long": "El valor es demasiado largo.",
+        "validation.invalid_value": "El valor no es una de las opciones permitidas.",
+        "validation.invalid_type": "El valor tiene un tipo inválido.",
         "validation.custom": "{msg}",
         # validation.user.*
         "validation.user.invalid_role_combination": "Combinación de roles inválida: {role_type} + {role_name}.",
@@ -640,6 +660,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.payment.conflicting_address_fields": "No se puede proporcionar address_id y address_data al mismo tiempo.",
         "validation.payment.unsupported_brand": "El tipo de método de pago no está soportado.",
         "validation.payment.address_required": "El tipo de método de pago '{method_type}' requiere una dirección. Proporciona address_id o address_data.",
+        # validation.supplier_invoice.* — K67
+        "validation.supplier_invoice.cae_format": "El código CAE debe tener exactamente 14 dígitos.",
+        "validation.supplier_invoice.cuit_format": "El CUIT debe tener el formato XX-XXXXXXXX-X.",
+        "validation.supplier_invoice.afip_doc_type": "El tipo de documento AFIP debe ser uno de: A, B, C.",
+        "validation.supplier_invoice.sunat_serie_format": "La serie SUNAT debe tener el formato F + 3 dígitos (p. ej. F001).",
+        "validation.supplier_invoice.sunat_correlativo_format": "El correlativo SUNAT debe tener entre 1 y 8 dígitos.",
+        "validation.supplier_invoice.ruc_format": "El RUC debe tener exactamente 11 dígitos.",
+        "validation.supplier_invoice.cdr_status": "El estado CDR debe ser uno de: accepted, rejected, pending.",
+        "validation.supplier_invoice.ar_details_required": "Las facturas AR requieren ar_details.",
+        "validation.supplier_invoice.pe_details_required": "Las facturas PE requieren pe_details.",
+        "validation.supplier_invoice.us_details_required": "Las facturas US requieren us_details.",
+        "validation.supplier_invoice.rejection_reason_required": "rejection_reason es obligatorio al rechazar una factura.",
+        "validation.supplier_invoice.status_cannot_reset": "No se puede volver a cambiar el estado de la factura a Pendiente de revisión.",
+        "validation.supplier_invoice.w9_ein_format": "ein_last_four debe tener exactamente 4 dígitos.",
+        # validation.market.* — K67
+        "validation.market.language_unsupported": "Idioma no soportado '{language}'. Debe ser uno de: {allowed}.",
         # auth.* — K7
         "auth.invalid_token": "El token de autenticación es inválido o expiró.",
         "auth.captcha_required": "Se requiere verificación CAPTCHA.",
@@ -1135,6 +1171,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.invalid_format": "O valor tem um formato inválido.",
         "validation.value_too_short": "O valor é muito curto.",
         "validation.value_too_long": "O valor é muito longo.",
+        "validation.invalid_value": "O valor não é uma das opções permitidas.",
+        "validation.invalid_type": "O valor tem um tipo inválido.",
         "validation.custom": "{msg}",
         # validation.user.*
         "validation.user.invalid_role_combination": "Combinação de papéis inválida: {role_type} + {role_name}.",
@@ -1166,6 +1204,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.payment.conflicting_address_fields": "Não é possível fornecer address_id e address_data ao mesmo tempo.",
         "validation.payment.unsupported_brand": "O tipo de método de pagamento não é suportado.",
         "validation.payment.address_required": "O tipo de método de pagamento '{method_type}' requer um endereço. Forneça address_id ou address_data.",
+        # validation.supplier_invoice.* — K67
+        "validation.supplier_invoice.cae_format": "O código CAE deve ter exatamente 14 dígitos.",
+        "validation.supplier_invoice.cuit_format": "O CUIT deve ter o formato XX-XXXXXXXX-X.",
+        "validation.supplier_invoice.afip_doc_type": "O tipo de documento AFIP deve ser um de: A, B, C.",
+        "validation.supplier_invoice.sunat_serie_format": "A série SUNAT deve ter o formato F + 3 dígitos (ex.: F001).",
+        "validation.supplier_invoice.sunat_correlativo_format": "O correlativo SUNAT deve ter entre 1 e 8 dígitos.",
+        "validation.supplier_invoice.ruc_format": "O RUC deve ter exatamente 11 dígitos.",
+        "validation.supplier_invoice.cdr_status": "O status CDR deve ser um de: accepted, rejected, pending.",
+        "validation.supplier_invoice.ar_details_required": "Faturas AR requerem ar_details.",
+        "validation.supplier_invoice.pe_details_required": "Faturas PE requerem pe_details.",
+        "validation.supplier_invoice.us_details_required": "Faturas US requerem us_details.",
+        "validation.supplier_invoice.rejection_reason_required": "rejection_reason é obrigatório ao rejeitar uma fatura.",
+        "validation.supplier_invoice.status_cannot_reset": "Não é possível reverter o status da fatura para Pendente de revisão.",
+        "validation.supplier_invoice.w9_ein_format": "ein_last_four deve ter exatamente 4 dígitos.",
+        # validation.market.* — K67
+        "validation.market.language_unsupported": "Idioma não suportado '{language}'. Deve ser um de: {allowed}.",
         # auth.* — K7
         "auth.invalid_token": "O token de autenticação é inválido ou expirou.",
         "auth.captcha_required": "Verificação CAPTCHA é necessária.",
