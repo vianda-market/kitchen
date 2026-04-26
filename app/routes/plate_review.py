@@ -12,8 +12,10 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
-from app.auth.dependencies import get_client_user, get_current_user
+from app.auth.dependencies import get_client_user, get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     PlateReviewCreateSchema,
     PlateReviewEnrichedResponseSchema,
@@ -43,6 +45,7 @@ def get_institution_reviews_enriched(
     plate_id: UUID | None = Query(None, description="Filter by plate"),
     restaurant_id: UUID | None = Query(None, description="Filter by restaurant"),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Enriched plate reviews scoped to the supplier's institution. No customer PII.
@@ -51,14 +54,14 @@ def get_institution_reviews_enriched(
     """
     role_type = current_user.get("role_type")
     if role_type == "customer":
-        raise HTTPException(status_code=403, detail="Customers cannot access institution reviews")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_CUSTOMER_ONLY, status=403, locale=locale)
 
     # Suppliers are scoped to their institution; Internal sees all
     institution_id = None
     if role_type == "supplier":
         inst = current_user.get("institution_id")
         if not inst:
-            raise HTTPException(status_code=403, detail="No institution assigned")
+            raise envelope_exception(ErrorCode.PLATE_REVIEW_NO_INSTITUTION, status=403, locale=locale)
         institution_id = UUID(str(inst))
 
     rows = get_enriched_reviews_by_institution(institution_id, db, plate_id=plate_id, restaurant_id=restaurant_id)
@@ -140,6 +143,7 @@ def list_my_reviews(
 def get_my_review_by_pickup(
     plate_pickup_id: UUID,
     current_user: dict = Depends(get_client_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get current user's review for a specific pickup, if it exists. Customer-only."""
@@ -148,7 +152,7 @@ def get_my_review_by_pickup(
         user_id = UUID(user_id)
     dto = get_review_by_pickup(user_id, plate_pickup_id, db)
     if not dto:
-        raise HTTPException(status_code=404, detail="Review not found for this pickup")
+        raise envelope_exception(ErrorCode.PLATE_REVIEW_BY_PICKUP_NOT_FOUND, status=404, locale=locale)
     return PlateReviewResponseSchema(
         plate_review_id=dto.plate_review_id,
         user_id=dto.user_id,

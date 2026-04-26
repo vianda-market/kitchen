@@ -337,6 +337,51 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.partial_subsidy_requires_app": "This benefit only covers part of the plan price. The employee must subscribe through the Vianda app to pay their share.",
         # employer.program.* — K13
         "employer.program_already_exists": "A benefits program already exists for this {scope}.",
+        # user.market.* — K14
+        "user.market_ids_empty": "market_ids must contain at least one market.",
+        "user.market_ids_invalid": "Invalid or archived market_id(s): {market_ids}.",
+        "user.market_not_in_institution": "Market {market_id} is not assigned to the user's institution.",
+        "user.duplicate_username": "Username already exists.",
+        "user.duplicate_email_in_system": "Email already exists.",
+        # entity.archive.* — K14
+        "entity.search_invalid_param": "search_by must be one of: {allowed}.",
+        "entity.archive_active_pickups": "Cannot archive entity: {count} active plate pickup(s) exist. Complete or cancel them first.",
+        "entity.archive_active_restaurants": "Cannot archive entity: {count} active restaurant(s) must be archived first: {names}.",
+        "restaurant.archive_active_pickups": "Cannot archive restaurant: {count} active plate pickup(s) exist. Complete or cancel them first.",
+        # plate_kitchen_day.* — K14
+        "plate_kitchen_day.not_found": "Plate kitchen day not found.",
+        "plate_kitchen_day.duplicate": "Plate {plate_id} is already assigned to {kitchen_day}.",
+        "plate_kitchen_day.plate_id_immutable": "plate_id cannot be changed on an existing kitchen day; create a new record and archive the old one if needed.",
+        "plate_kitchen_day.archive_failed": "Failed to archive plate kitchen day.",
+        "plate_kitchen_day.update_failed": "Failed to update plate kitchen day.",
+        "plate_kitchen_day.delete_failed": "Failed to delete plate kitchen day.",
+        # restaurant.status.* — K14 (plate selection validation)
+        "restaurant.archived": "Restaurant '{name}' is archived and cannot accept new orders.",
+        "restaurant.entity_archived": "Restaurant '{name}' belongs to an archived entity and cannot accept new orders.",
+        "restaurant.unavailable": "Restaurant '{name}' {status_message} and cannot accept new orders. Please try another restaurant.",
+        "restaurant.national_holiday": "Restaurant '{name}' cannot accept orders on {date} due to a national holiday. Please select another date.",
+        "restaurant.restaurant_holiday": "Restaurant '{name}' is closed on {date} due to a restaurant holiday. Please select another date.",
+        # plate_selection.window.* — K14
+        "plate_selection.pickup_time_required": "pickup_time_range is required and must be in HH:MM-HH:MM format (e.g. 11:30-11:45).",
+        "plate_selection.no_pickup_windows": "No pickup windows available for {kitchen_day} in this market. Please select another day.",
+        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' is not a valid pickup window for {kitchen_day}. Allowed windows: {allowed_windows}.",
+        "plate_selection.kitchen_day_invalid": "Kitchen is not operational on {kitchen_day}. Available days: {available_days}.",
+        "plate_selection.kitchen_day_not_available": "Plate is not available for {kitchen_day}. Available days: {available_days}.",
+        "plate_selection.kitchen_day_too_far": "Cannot order for {kitchen_day} from {current_day}. Orders are only allowed up to 1 week ahead.",
+        "plate_selection.no_kitchen_days": "No available kitchen days found within the next week. Available days: {available_days}.",
+        # plate_selection.create.* — K14
+        "plate_selection.plate_id_required": "plate_id is required.",
+        "plate_selection.plate_id_invalid": "Invalid plate_id format.",
+        # plate_review.access.* — K14
+        "plate_review.customer_only": "Customers cannot access institution reviews.",
+        "plate_review.no_institution": "No institution assigned.",
+        "plate_review.by_pickup_not_found": "Review not found for this pickup.",
+        # ingredient.* — K14
+        "ingredient.not_found": "Ingredient {ingredient_id} not found.",
+        # plate_pickup.staff.* — K14
+        "plate_pickup.staff_only": "Access restricted to restaurant staff.",
+        "plate_pickup.invalid_user_id": "Invalid user ID format.",
+        "plate_pickup.invalid_filter": "Invalid filter parameter.",
     },
     "es": {
         # Auth / user errors
@@ -669,6 +714,51 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.partial_subsidy_requires_app": "Este beneficio cubre solo parte del precio del plan. El empleado debe suscribirse a través de la aplicación Vianda para pagar su parte.",
         # employer.program.* — K13
         "employer.program_already_exists": "Ya existe un programa de beneficios para este {scope}.",
+        # user.market.* — K14
+        "user.market_ids_empty": "market_ids debe contener al menos un mercado.",
+        "user.market_ids_invalid": "market_id(s) inválido(s) o archivado(s): {market_ids}.",
+        "user.market_not_in_institution": "El mercado {market_id} no está asignado a la institución del usuario.",
+        "user.duplicate_username": "El nombre de usuario ya existe.",
+        "user.duplicate_email_in_system": "El correo electrónico ya existe.",
+        # entity.archive.* — K14
+        "entity.search_invalid_param": "search_by debe ser uno de: {allowed}.",
+        "entity.archive_active_pickups": "No se puede archivar la entidad: existen {count} recogida(s) activa(s). Completa o cancélalas primero.",
+        "entity.archive_active_restaurants": "No se puede archivar la entidad: {count} restaurante(s) activo(s) debe(n) archivarse primero: {names}.",
+        "restaurant.archive_active_pickups": "No se puede archivar el restaurante: existen {count} recogida(s) activa(s). Completa o cancélalas primero.",
+        # plate_kitchen_day.* — K14
+        "plate_kitchen_day.not_found": "Día de cocina del plato no encontrado.",
+        "plate_kitchen_day.duplicate": "El plato {plate_id} ya está asignado a {kitchen_day}.",
+        "plate_kitchen_day.plate_id_immutable": "plate_id no puede modificarse en un día de cocina existente; crea un nuevo registro y archiva el anterior.",
+        "plate_kitchen_day.archive_failed": "Error al archivar el día de cocina del plato.",
+        "plate_kitchen_day.update_failed": "Error al actualizar el día de cocina del plato.",
+        "plate_kitchen_day.delete_failed": "Error al eliminar el día de cocina del plato.",
+        # restaurant.status.* — K14
+        "restaurant.archived": "El restaurante '{name}' está archivado y no puede aceptar nuevos pedidos.",
+        "restaurant.entity_archived": "El restaurante '{name}' pertenece a una entidad archivada y no puede aceptar nuevos pedidos.",
+        "restaurant.unavailable": "El restaurante '{name}' {status_message} y no puede aceptar nuevos pedidos. Por favor intenta con otro restaurante.",
+        "restaurant.national_holiday": "El restaurante '{name}' no puede aceptar pedidos el {date} debido a un feriado nacional. Por favor selecciona otra fecha.",
+        "restaurant.restaurant_holiday": "El restaurante '{name}' está cerrado el {date} por feriado del restaurante. Por favor selecciona otra fecha.",
+        # plate_selection.window.* — K14
+        "plate_selection.pickup_time_required": "pickup_time_range es obligatorio y debe estar en formato HH:MM-HH:MM (ej. 11:30-11:45).",
+        "plate_selection.no_pickup_windows": "No hay ventanas de recogida disponibles para {kitchen_day} en este mercado. Por favor selecciona otro día.",
+        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' no es una ventana de recogida válida para {kitchen_day}. Ventanas permitidas: {allowed_windows}.",
+        "plate_selection.kitchen_day_invalid": "La cocina no opera el {kitchen_day}. Días disponibles: {available_days}.",
+        "plate_selection.kitchen_day_not_available": "El plato no está disponible el {kitchen_day}. Días disponibles: {available_days}.",
+        "plate_selection.kitchen_day_too_far": "No se puede pedir para {kitchen_day} desde {current_day}. Los pedidos solo se permiten con hasta 1 semana de anticipación.",
+        "plate_selection.no_kitchen_days": "No se encontraron días de cocina disponibles en la próxima semana. Días disponibles: {available_days}.",
+        # plate_selection.create.* — K14
+        "plate_selection.plate_id_required": "plate_id es obligatorio.",
+        "plate_selection.plate_id_invalid": "Formato de plate_id inválido.",
+        # plate_review.access.* — K14
+        "plate_review.customer_only": "Los clientes no pueden acceder a las reseñas de la institución.",
+        "plate_review.no_institution": "No hay institución asignada.",
+        "plate_review.by_pickup_not_found": "Reseña no encontrada para esta recogida.",
+        # ingredient.* — K14
+        "ingredient.not_found": "Ingrediente {ingredient_id} no encontrado.",
+        # plate_pickup.staff.* — K14
+        "plate_pickup.staff_only": "Acceso restringido al personal del restaurante.",
+        "plate_pickup.invalid_user_id": "Formato de ID de usuario inválido.",
+        "plate_pickup.invalid_filter": "Parámetro de filtro inválido.",
     },
     "pt": {
         # Auth / user errors
@@ -1001,6 +1091,51 @@ MESSAGES: dict[str, dict[str, str]] = {
         "enrollment.partial_subsidy_requires_app": "Este benefício cobre apenas parte do preço do plano. O funcionário deve se inscrever através do aplicativo Vianda para pagar sua parte.",
         # employer.program.* — K13
         "employer.program_already_exists": "Já existe um programa de benefícios para este {scope}.",
+        # user.market.* — K14
+        "user.market_ids_empty": "market_ids deve conter pelo menos um mercado.",
+        "user.market_ids_invalid": "market_id(s) inválido(s) ou arquivado(s): {market_ids}.",
+        "user.market_not_in_institution": "O mercado {market_id} não está atribuído à instituição do usuário.",
+        "user.duplicate_username": "Nome de usuário já existe.",
+        "user.duplicate_email_in_system": "E-mail já existe.",
+        # entity.archive.* — K14
+        "entity.search_invalid_param": "search_by deve ser um de: {allowed}.",
+        "entity.archive_active_pickups": "Não é possível arquivar a entidade: existem {count} retirada(s) ativa(s). Complete ou cancele-as primeiro.",
+        "entity.archive_active_restaurants": "Não é possível arquivar a entidade: {count} restaurante(s) ativo(s) deve(m) ser arquivado(s) primeiro: {names}.",
+        "restaurant.archive_active_pickups": "Não é possível arquivar o restaurante: existem {count} retirada(s) ativa(s). Complete ou cancele-as primeiro.",
+        # plate_kitchen_day.* — K14
+        "plate_kitchen_day.not_found": "Dia de cozinha do prato não encontrado.",
+        "plate_kitchen_day.duplicate": "O prato {plate_id} já está atribuído a {kitchen_day}.",
+        "plate_kitchen_day.plate_id_immutable": "plate_id não pode ser alterado em um dia de cozinha existente; crie um novo registro e arquive o antigo.",
+        "plate_kitchen_day.archive_failed": "Falha ao arquivar o dia de cozinha do prato.",
+        "plate_kitchen_day.update_failed": "Falha ao atualizar o dia de cozinha do prato.",
+        "plate_kitchen_day.delete_failed": "Falha ao excluir o dia de cozinha do prato.",
+        # restaurant.status.* — K14
+        "restaurant.archived": "O restaurante '{name}' está arquivado e não pode aceitar novos pedidos.",
+        "restaurant.entity_archived": "O restaurante '{name}' pertence a uma entidade arquivada e não pode aceitar novos pedidos.",
+        "restaurant.unavailable": "O restaurante '{name}' {status_message} e não pode aceitar novos pedidos. Por favor tente outro restaurante.",
+        "restaurant.national_holiday": "O restaurante '{name}' não pode aceitar pedidos em {date} devido a um feriado nacional. Por favor selecione outra data.",
+        "restaurant.restaurant_holiday": "O restaurante '{name}' está fechado em {date} devido a um feriado do restaurante. Por favor selecione outra data.",
+        # plate_selection.window.* — K14
+        "plate_selection.pickup_time_required": "pickup_time_range é obrigatório e deve estar no formato HH:MM-HH:MM (ex. 11:30-11:45).",
+        "plate_selection.no_pickup_windows": "Não há janelas de retirada disponíveis para {kitchen_day} neste mercado. Por favor selecione outro dia.",
+        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' não é uma janela de retirada válida para {kitchen_day}. Janelas permitidas: {allowed_windows}.",
+        "plate_selection.kitchen_day_invalid": "A cozinha não opera em {kitchen_day}. Dias disponíveis: {available_days}.",
+        "plate_selection.kitchen_day_not_available": "O prato não está disponível em {kitchen_day}. Dias disponíveis: {available_days}.",
+        "plate_selection.kitchen_day_too_far": "Não é possível pedir para {kitchen_day} a partir de {current_day}. Pedidos são permitidos com até 1 semana de antecedência.",
+        "plate_selection.no_kitchen_days": "Nenhum dia de cozinha disponível encontrado na próxima semana. Dias disponíveis: {available_days}.",
+        # plate_selection.create.* — K14
+        "plate_selection.plate_id_required": "plate_id é obrigatório.",
+        "plate_selection.plate_id_invalid": "Formato de plate_id inválido.",
+        # plate_review.access.* — K14
+        "plate_review.customer_only": "Clientes não podem acessar avaliações da instituição.",
+        "plate_review.no_institution": "Nenhuma instituição atribuída.",
+        "plate_review.by_pickup_not_found": "Avaliação não encontrada para esta retirada.",
+        # ingredient.* — K14
+        "ingredient.not_found": "Ingrediente {ingredient_id} não encontrado.",
+        # plate_pickup.staff.* — K14
+        "plate_pickup.staff_only": "Acesso restrito à equipe do restaurante.",
+        "plate_pickup.invalid_user_id": "Formato de ID de usuário inválido.",
+        "plate_pickup.invalid_filter": "Parâmetro de filtro inválido.",
     },
 }
 

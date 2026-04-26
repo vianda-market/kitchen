@@ -4,8 +4,10 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     CoworkerEligibilityItem,
     NotifyCoworkersRequest,
@@ -32,6 +34,7 @@ router = APIRouter(
 def create_plate_selection(
     payload: dict[str, Any],
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -53,10 +56,10 @@ def create_plate_selection(
     try:
         # Validate required fields
         if "plate_id" not in payload:
-            raise HTTPException(status_code=422, detail="plate_id is required")
+            raise envelope_exception(ErrorCode.PLATE_SELECTION_PLATE_ID_REQUIRED, status=422, locale=locale)
 
         if "pickup_time_range" not in payload:
-            raise HTTPException(status_code=422, detail="pickup_time_range is required")
+            raise envelope_exception(ErrorCode.PLATE_SELECTION_PICKUP_TIME_REQUIRED, status=422, locale=locale)
 
         # Create plate selection using business logic service (plate_pickup created at kitchen_start)
         selection, _ = create_plate_selection_with_transactions(payload, current_user, db)
@@ -82,6 +85,7 @@ def create_plate_selection(
 def get_plate_selection(
     plate_selection_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a plate selection by ID. Returns editable_until for client edit UI."""
@@ -96,7 +100,7 @@ def get_plate_selection(
         include_archived=False,
     )
     if str(entity.user_id) != str(current_user["user_id"]):
-        raise HTTPException(status_code=403, detail="Not authorized to access this plate selection")
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_ACCESS_DENIED, status=403, locale=locale)
     data = entity.model_dump()
     editable_until = get_plate_selection_editable_until(plate_selection_id, db)
     plate_pickup_id = get_plate_pickup_id_for_selection(plate_selection_id, db)

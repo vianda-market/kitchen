@@ -12,8 +12,10 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     PlateKitchenDayCreateSchema,
     PlateKitchenDayEnrichedResponseSchema,
@@ -104,6 +106,8 @@ def list_plate_kitchen_days(
         # Use CRUDService with JOIN-based scoping (handles Internal and Suppliers automatically)
         results = plate_kitchen_days_service.get_all(db, scope=effective_scope, include_archived=False)
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         log_error(f"Error listing plate kitchen days: {e}")
         raise HTTPException(status_code=500, detail=f"Error listing plate kitchen days: {str(e)}") from None
@@ -144,6 +148,7 @@ def list_enriched_plate_kitchen_days(
 def get_enriched_plate_kitchen_day(
     kitchen_day_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single plate kitchen day assignment with enriched data"""
@@ -152,7 +157,7 @@ def get_enriched_plate_kitchen_day(
     try:
         enriched_day = get_enriched_plate_kitchen_day_by_id(kitchen_day_id, db, scope=scope, include_archived=False)
         if not enriched_day:
-            raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+            raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale=locale)
         return enriched_day
     except HTTPException:
         raise
@@ -165,6 +170,7 @@ def get_enriched_plate_kitchen_day(
 def get_plate_kitchen_day(
     kitchen_day_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get a single plate kitchen day assignment by ID"""
@@ -173,10 +179,10 @@ def get_plate_kitchen_day(
     # Use CRUDService with JOIN-based scoping (handles Employees and Suppliers automatically)
     kitchen_day = plate_kitchen_days_service.get_by_id(kitchen_day_id, db, scope=scope)
     if not kitchen_day:
-        raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+        raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale=locale)
 
     if kitchen_day.is_archived:
-        raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+        raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale=locale)
 
     return kitchen_day
 
@@ -185,6 +191,7 @@ def get_plate_kitchen_day(
 def create_plate_kitchen_day(
     payload: PlateKitchenDayCreateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
@@ -199,14 +206,19 @@ def create_plate_kitchen_day(
         # Validate plate exists
         plate = plate_service.get_by_id(payload.plate_id, connection)
         if not plate:
-            raise HTTPException(status_code=404, detail=f"Plate not found: {payload.plate_id}")
+            raise envelope_exception(
+                ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plate", id=str(payload.plate_id)
+            )
 
         # Validate all days before creating any (fail fast)
         for day in payload.kitchen_days:
             if _check_unique_constraint(payload.plate_id, day, connection):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Plate {payload.plate_id} is already assigned to {day}",
+                raise envelope_exception(
+                    ErrorCode.PLATE_KITCHEN_DAY_DUPLICATE,
+                    status=409,
+                    locale=locale,
+                    plate_id=str(payload.plate_id),
+                    kitchen_day=day,
                 )
 
         # Prepare data for batch insert
@@ -246,14 +258,16 @@ def update_plate_kitchen_day(
     kitchen_day_id: UUID,
     payload: PlateKitchenDayUpdateSchema,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Update an existing plate kitchen day assignment. plate_id is immutable; use create + archive to change it."""
     # Reject plate_id on update - must create new record and archive old one
     if payload.plate_id is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="plate_id cannot be changed on an existing kitchen day; create a new record and archive the old one if needed.",
+        raise envelope_exception(
+            ErrorCode.PLATE_KITCHEN_DAY_PLATE_ID_IMMUTABLE,
+            status=400,
+            locale=locale,
         )
 
     scope = _get_scope_for_entity(current_user)
@@ -262,16 +276,19 @@ def update_plate_kitchen_day(
         # Get existing record (with scoping - will return None if not accessible)
         existing = plate_kitchen_days_service.get_by_id(kitchen_day_id, connection, scope=scope)
         if not existing:
-            raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+            raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale=locale)
 
         kitchen_day = payload.kitchen_day if payload.kitchen_day is not None else existing.kitchen_day
 
         # If kitchen_day is being changed, validate unique constraint (plate_id unchanged)
         if payload.kitchen_day is not None:
             if _check_unique_constraint(existing.plate_id, kitchen_day, connection, exclude_id=kitchen_day_id):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Plate {existing.plate_id} is already assigned to {kitchen_day}",
+                raise envelope_exception(
+                    ErrorCode.PLATE_KITCHEN_DAY_DUPLICATE,
+                    status=409,
+                    locale=locale,
+                    plate_id=str(existing.plate_id),
+                    kitchen_day=kitchen_day,
                 )
 
         # Build update data - plate_id is immutable, never include it.
@@ -294,7 +311,7 @@ def update_plate_kitchen_day(
                 kitchen_day_id, current_user["user_id"], connection, scope=scope
             )
             if not ok:
-                raise HTTPException(status_code=500, detail="Failed to archive plate kitchen day")
+                raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_ARCHIVE_FAILED, status=500, locale=locale)
             # Return pre-archive DTO with flag flipped
             existing.is_archived = True
             updated = existing
@@ -303,7 +320,7 @@ def update_plate_kitchen_day(
                 update_data["is_archived"] = payload.is_archived  # False (un-archive)
             updated = plate_kitchen_days_service.update(kitchen_day_id, update_data, connection, scope=scope)
             if not updated:
-                raise HTTPException(status_code=500, detail="Failed to update plate kitchen day")
+                raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_UPDATE_FAILED, status=500, locale=locale)
 
         log_info(f"Updated plate kitchen day: {kitchen_day_id}")
         return updated
@@ -315,6 +332,7 @@ def update_plate_kitchen_day(
 def delete_plate_kitchen_day(
     kitchen_day_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Soft delete (archive) a plate kitchen day assignment"""
@@ -324,14 +342,14 @@ def delete_plate_kitchen_day(
         # Get existing record (with scoping - will return None if not accessible)
         existing = plate_kitchen_days_service.get_by_id(kitchen_day_id, connection, scope=scope)
         if not existing:
-            raise HTTPException(status_code=404, detail="Plate kitchen day not found")
+            raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale=locale)
 
         # Soft delete (archive) - CRUDService handles scoping automatically
         success = plate_kitchen_days_service.soft_delete(
             kitchen_day_id, current_user["user_id"], connection, scope=scope
         )
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete plate kitchen day")
+            raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_DELETE_FAILED, status=500, locale=locale)
 
         log_info(f"Deleted (archived) plate kitchen day: {kitchen_day_id}")
         return

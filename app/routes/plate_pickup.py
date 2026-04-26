@@ -3,11 +3,13 @@ from typing import Optional
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_resolved_locale, oauth2_scheme
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import PlatePickupEnrichedResponseSchema
 from app.services.entity_service import get_enriched_plate_pickups
 from app.services.error_handling import handle_business_operation
@@ -160,6 +162,7 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
     plate_id: list[UUID] | None = Query(None, description="Filter by plate ID(s) (multi-select)"),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
@@ -190,7 +193,7 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
                     user_id = UUID(user_id_value)
             except (ValueError, KeyError, TypeError) as e:
                 log_warning(f"Invalid user_id in current_user: {current_user.get('user_id')}. Error: {e}")
-                raise HTTPException(status_code=400, detail=f"Invalid user ID format: {e}") from None
+                raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_USER_ID, status=400, locale=locale) from None
 
         try:
             filter_conditions = build_filter_conditions(
@@ -213,7 +216,7 @@ def get_enriched_plate_pickups_endpoint(  # noqa: PLR0913 — declarative FastAP
             )
         except ValueError as exc:
             log_warning(f"Invalid filter on /plate-pickups/enriched: {exc}")
-            raise HTTPException(status_code=400, detail="Invalid filter parameter") from None
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_INVALID_FILTER, status=400, locale=locale) from None
         return get_enriched_plate_pickups(
             db,
             scope=scope,
@@ -249,6 +252,7 @@ def scan_qr_code(
 def hand_out_order(
     pickup_id: UUID,
     current_user: dict = Depends(get_current_user),
+    locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """Mark order as Handed Out (restaurant gave the plate to customer). One-tap kiosk action.
@@ -260,7 +264,7 @@ def hand_out_order(
     def _hand_out():
         # Validate user is Supplier or Internal
         if current_user["role_type"] not in ("supplier", "internal"):
-            raise HTTPException(status_code=403, detail="Access restricted to restaurant staff")
+            raise envelope_exception(ErrorCode.PLATE_PICKUP_STAFF_ONLY, status=403, locale=locale)
         return hand_out_pickup(pickup_id, current_user["user_id"], db)
 
     return handle_business_operation(_hand_out, "order hand-out")

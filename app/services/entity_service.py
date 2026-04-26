@@ -22,6 +22,8 @@ from fastapi import HTTPException
 
 from app.config import Status
 from app.dto.models import GeolocationDTO, InstitutionBillDTO, PlateDTO, ProductDTO, UserDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     AddressEnrichedResponseSchema,
     CreditCurrencyEnrichedResponseSchema,
@@ -151,10 +153,7 @@ def set_user_market_assignments(
     Validates that all market_ids exist and are not archived.
     """
     if not market_ids:
-        raise HTTPException(
-            status_code=400,
-            detail="market_ids must contain at least one market when provided.",
-        )
+        raise envelope_exception(ErrorCode.USER_MARKET_IDS_EMPTY, status=400, locale="en")
     # Validate all markets exist and are not archived
     ids_str = ",".join("%s" for _ in market_ids)
     rows = db_read(
@@ -168,9 +167,11 @@ def set_user_market_assignments(
     found = {UUID(str(r["market_id"])) for r in rows}
     missing = [m for m in market_ids if m not in found]
     if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid or archived market_id(s): {missing}",
+        raise envelope_exception(
+            ErrorCode.USER_MARKET_IDS_INVALID,
+            status=400,
+            locale="en",
+            market_ids=str(missing),
         )
     # Validate that requested markets are assigned to the user's institution
     # Skip for Internal (global access) and Customer (Vianda Customers institution is Global, users get local markets)
@@ -195,9 +196,11 @@ def set_user_market_assignments(
             inst_market_set = {str(r["market_id"]) for r in (inst_markets or [])}
             for mid in market_ids:
                 if str(mid) not in inst_market_set:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Market {mid} is not assigned to the user's institution",
+                    raise envelope_exception(
+                        ErrorCode.USER_MARKET_NOT_IN_INSTITUTION,
+                        status=400,
+                        locale="en",
+                        market_id=str(mid),
                     )
     cur = db.cursor()
     try:
@@ -222,10 +225,8 @@ def set_user_market_assignments(
         db.rollback()
         err_msg = str(e)
         if "user_market_assignment" in err_msg and "does not exist" in err_msg:
-            raise HTTPException(
-                status_code=503,
-                detail="market_ids (multi-market) is not available: run schema migration to create user_market_assignment table.",
-            ) from None
+            log_error("set_user_market_assignments: user_market_assignment table missing — run schema migration")
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
         log_error(f"set_user_market_assignments failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to update market assignments") from None
     finally:
@@ -363,10 +364,10 @@ def create_user_with_validation(
 
     # Business validation
     if get_user_by_username(user_data["username"], db):
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise envelope_exception(ErrorCode.USER_DUPLICATE_USERNAME, status=400, locale="en")
 
     if user_data.get("email") and get_user_by_email(user_data["email"], db):
-        raise HTTPException(status_code=400, detail="Email already exists")
+        raise envelope_exception(ErrorCode.USER_DUPLICATE_EMAIL_IN_SYSTEM, status=400, locale="en")
 
     # Create user using generic CRUD
     user = user_service.create(user_data, db, scope=scope)
@@ -631,7 +632,12 @@ def search_users(
         (list of dicts with user_id, full_name, username, email; total count)
     """
     if search_by not in ("name", "username", "email"):
-        raise HTTPException(status_code=400, detail="search_by must be one of: name, username, email")
+        raise envelope_exception(
+            ErrorCode.ENTITY_SEARCH_INVALID_PARAM,
+            status=400,
+            locale="en",
+            allowed="name, username, email",
+        )
 
     q_stripped = (q or "").strip()
     if not q_stripped:
@@ -1469,7 +1475,12 @@ def search_restaurants(
         (list of dicts with restaurant_id, name; total count)
     """
     if search_by not in ("name",):
-        raise HTTPException(status_code=400, detail="search_by must be: name")
+        raise envelope_exception(
+            ErrorCode.ENTITY_SEARCH_INVALID_PARAM,
+            status=400,
+            locale="en",
+            allowed="name",
+        )
 
     q_stripped = (q or "").strip()
     if not q_stripped:
@@ -4214,8 +4225,6 @@ def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.con
     1. Active plate pickups via entity's restaurants
     2. Active restaurants
     """
-    from fastapi import HTTPException
-
     active_pickups = db_read(
         """
         SELECT COUNT(*) as cnt
@@ -4230,9 +4239,11 @@ def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.con
         fetch_one=True,
     )
     if active_pickups and active_pickups["cnt"] > 0:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot archive entity: {active_pickups['cnt']} active plate pickup(s) exist. Complete or cancel them first.",
+        raise envelope_exception(
+            ErrorCode.ENTITY_ARCHIVE_ACTIVE_PICKUPS,
+            status=409,
+            locale="en",
+            count=active_pickups["cnt"],
         )
 
     active_restaurants = db_read(
@@ -4245,16 +4256,17 @@ def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.con
     )
     if active_restaurants:
         names = [r["name"] for r in active_restaurants]
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot archive entity: {len(names)} active restaurant(s) must be archived first: {', '.join(names)}",
+        raise envelope_exception(
+            ErrorCode.ENTITY_ARCHIVE_ACTIVE_RESTAURANTS,
+            status=409,
+            locale="en",
+            count=len(names),
+            names=", ".join(names),
         )
 
 
 def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extensions.connection) -> None:
     """Raise HTTPException if restaurant has active plate pickups that prevent archival."""
-    from fastapi import HTTPException
-
     active_pickups: dict[str, Any] | None = cast(
         dict[str, Any] | None,
         db_read(
@@ -4271,7 +4283,9 @@ def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extens
         ),
     )
     if active_pickups and active_pickups["cnt"] > 0:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot archive restaurant: {active_pickups['cnt']} active plate pickup(s) exist. Complete or cancel them first.",
+        raise envelope_exception(
+            ErrorCode.RESTAURANT_ARCHIVE_ACTIVE_PICKUPS,
+            status=409,
+            locale="en",
+            count=active_pickups["cnt"],
         )

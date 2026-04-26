@@ -9,15 +9,15 @@ extracted from the main route to improve testability and maintainability.
 from datetime import date, timedelta
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.config import Status
 from app.dto.models import PlateDTO, RestaurantDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.kitchen_day_service import VALID_KITCHEN_DAYS
 from app.utils.log import log_info, log_warning
 
 
-def validate_plate_selection_data(payload: dict) -> None:
+def validate_plate_selection_data(payload: dict, locale: str = "en") -> None:
     """
     Validate the plate selection payload data.
 
@@ -30,10 +30,10 @@ def validate_plate_selection_data(payload: dict) -> None:
         UUID(str(payload.get("plate_id")))
     except (ValueError, TypeError):
         log_warning(f"Invalid plate_id format: {payload.get('plate_id')}")
-        raise HTTPException(status_code=422, detail="Invalid plate_id format") from None
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_PLATE_ID_INVALID, status=422, locale=locale) from None
 
 
-def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
+def validate_restaurant_status(restaurant: RestaurantDTO, locale: str = "en") -> None:
     """
     Validate that the restaurant is available for plate selection (status only).
 
@@ -42,17 +42,20 @@ def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
 
     Args:
         restaurant: Restaurant DTO to validate
+        locale: Locale for error messages (default: "en")
 
     Raises:
         HTTPException: If restaurant status is not 'Active'
     """
     if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+        raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
     if getattr(restaurant, "is_archived", False) is True:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Restaurant '{restaurant.name}' is archived and cannot accept new orders.",
+        raise envelope_exception(
+            ErrorCode.RESTAURANT_ARCHIVED,
+            status=403,
+            locale=locale,
+            name=restaurant.name,
         )
 
     # Only 'Active' restaurants can accept plate selections
@@ -67,9 +70,12 @@ def validate_restaurant_status(restaurant: RestaurantDTO) -> None:
         log_warning(
             f"Restaurant {restaurant.restaurant_id} ({restaurant.name}) {status_message} - cannot accept plate selections"
         )
-        raise HTTPException(
-            status_code=403,
-            detail=f"Restaurant '{restaurant.name}' {status_message} and cannot accept new orders. Please try another restaurant.",
+        raise envelope_exception(
+            ErrorCode.RESTAURANT_UNAVAILABLE,
+            status=403,
+            locale=locale,
+            name=restaurant.name,
+            status_message=status_message,
         )
 
 
@@ -78,6 +84,7 @@ def validate_pickup_time_range(
     kitchen_day: str,
     target_date: date,
     pickup_time_range: str,
+    locale: str = "en",
 ) -> None:
     """
     Validate that pickup_time_range is within the market's allowed pickup windows
@@ -100,10 +107,7 @@ def validate_pickup_time_range(
     from app.services.restaurant_explorer_service import get_pickup_windows_for_kitchen_day
 
     if not pickup_time_range or not pickup_time_range.strip():
-        raise HTTPException(
-            status_code=422,
-            detail="pickup_time_range is required and must be in HH:MM-HH:MM format (e.g. 11:30-11:45)",
-        )
+        raise envelope_exception(ErrorCode.PLATE_SELECTION_PICKUP_TIME_REQUIRED, status=422, locale=locale)
     date_obj = target_date if isinstance(target_date, date) else date.fromisoformat(str(target_date))
     allowed = get_pickup_windows_for_kitchen_day(
         (country_code or "").strip().upper(),
@@ -111,21 +115,31 @@ def validate_pickup_time_range(
         date_obj,
     )
     if not allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No pickup windows available for {kitchen_day} in this market. Please select another day.",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_NO_PICKUP_WINDOWS,
+            status=400,
+            locale=locale,
+            kitchen_day=kitchen_day,
         )
     normalized = pickup_time_range.strip()
     if normalized not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"pickup_time_range '{pickup_time_range}' is not a valid pickup window for {kitchen_day}. "
-            f"Allowed windows: {', '.join(allowed[:5])}{'...' if len(allowed) > 5 else ''}",
+        allowed_str = ", ".join(allowed[:5]) + ("..." if len(allowed) > 5 else "")
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_INVALID_PICKUP_WINDOW,
+            status=400,
+            locale=locale,
+            pickup_time_range=pickup_time_range,
+            kitchen_day=kitchen_day,
+            allowed_windows=allowed_str,
         )
 
 
 def validate_restaurant(
-    restaurant: RestaurantDTO, target_date: str | None = None, country_code: str | None = None, db=None
+    restaurant: RestaurantDTO,
+    target_date: str | None = None,
+    country_code: str | None = None,
+    db=None,
+    locale: str = "en",
 ) -> None:
     """
     Comprehensive restaurant validation including status and holidays.
@@ -150,7 +164,7 @@ def validate_restaurant(
         - National holidays take precedence (checked first)
     """
     # 1. Status + is_archived validation (always check)
-    validate_restaurant_status(restaurant)
+    validate_restaurant_status(restaurant, locale=locale)
 
     # 1b. Entity archival check (requires db)
     if db and restaurant.institution_entity_id:
@@ -163,25 +177,33 @@ def validate_restaurant(
             fetch_one=True,
         )
         if entity_row and entity_row["is_archived"]:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Restaurant '{restaurant.name}' belongs to an archived entity and cannot accept new orders.",
+            raise envelope_exception(
+                ErrorCode.RESTAURANT_ENTITY_ARCHIVED,
+                status=403,
+                locale=locale,
+                name=restaurant.name,
             )
 
     # 2. Holiday validation (only if target_date provided)
     if target_date and country_code and db:
         # Check national holidays first (takes precedence)
         if _is_date_national_holiday(target_date, country_code, db):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Restaurant '{restaurant.name}' cannot accept orders on {target_date} due to a national holiday. Please select another date.",
+            raise envelope_exception(
+                ErrorCode.RESTAURANT_NATIONAL_HOLIDAY,
+                status=403,
+                locale=locale,
+                name=restaurant.name,
+                date=target_date,
             )
 
         # Check restaurant holidays
         if _is_date_restaurant_holiday(target_date, restaurant.restaurant_id, db):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Restaurant '{restaurant.name}' is closed on {target_date} due to a restaurant holiday. Please select another date.",
+            raise envelope_exception(
+                ErrorCode.RESTAURANT_HOLIDAY,
+                status=403,
+                locale=locale,
+                name=restaurant.name,
+                date=target_date,
             )
 
 
@@ -193,6 +215,7 @@ def determine_target_kitchen_day(
     country_code: str = None,
     db=None,
     timezone_str: str | None = None,
+    locale: str = "en",
 ) -> str:
     """
     Determine the target kitchen day for the plate selection.
@@ -211,9 +234,9 @@ def determine_target_kitchen_day(
     """
     if target_day:
         return _validate_customer_specified_day(
-            target_day, available_kitchen_days, current_day, timezone_str=timezone_str
+            target_day, available_kitchen_days, current_day, timezone_str=timezone_str, locale=locale
         )
-    return _find_next_available_day(available_kitchen_days, current_day, country_code, db, timezone_str)
+    return _find_next_available_day(available_kitchen_days, current_day, country_code, db, timezone_str, locale=locale)
 
 
 def _is_target_day_within_order_window(target_day: str, timezone_str: str | None) -> bool:
@@ -247,37 +270,56 @@ def _is_target_day_within_order_window(target_day: str, timezone_str: str | None
 
 
 def _validate_customer_specified_day(
-    target_day: str, available_kitchen_days: list, current_day: str, *, timezone_str: str | None = None
+    target_day: str,
+    available_kitchen_days: list,
+    current_day: str,
+    *,
+    timezone_str: str | None = None,
+    locale: str = "en",
 ) -> str:
     """
     Validate a customer-specified target day.
     """
     # Check if the target day is valid for kitchen operations (weekdays only)
     if target_day not in VALID_KITCHEN_DAYS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Kitchen is not operational on {target_day}. Available days: {', '.join(VALID_KITCHEN_DAYS)}",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_KITCHEN_DAY_INVALID,
+            status=400,
+            locale=locale,
+            kitchen_day=target_day,
+            available_days=", ".join(VALID_KITCHEN_DAYS),
         )
 
     # Check if the target day is in the plate's available kitchen days
     if target_day not in available_kitchen_days:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Plate is not available for {target_day}. Available days: {', '.join(available_kitchen_days)}",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_KITCHEN_DAY_NOT_AVAILABLE,
+            status=400,
+            locale=locale,
+            kitchen_day=target_day,
+            available_days=", ".join(available_kitchen_days),
         )
 
     # Check if the target day is within the 1-week-ahead order window
     if not _is_target_day_within_order_window(target_day, timezone_str):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot order for {target_day} from {current_day}. Orders are only allowed up to 1 week ahead.",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_KITCHEN_DAY_TOO_FAR,
+            status=400,
+            locale=locale,
+            kitchen_day=target_day,
+            current_day=current_day,
         )
 
     return target_day
 
 
 def _find_next_available_day(
-    available_kitchen_days: list, current_day: str, country_code: str = None, db=None, timezone_str: str | None = None
+    available_kitchen_days: list,
+    current_day: str,
+    country_code: str = None,
+    db=None,
+    timezone_str: str | None = None,
+    locale: str = "en",
 ) -> str:
     """
     Find the next available kitchen day within the next 7 calendar days.
@@ -287,9 +329,11 @@ def _find_next_available_day(
     )
 
     if not target_day:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No available kitchen days found within the next week. Available days: {', '.join(available_kitchen_days)}",
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_NO_KITCHEN_DAYS,
+            status=400,
+            locale=locale,
+            available_days=", ".join(available_kitchen_days),
         )
 
     # Log the decision if it's different from current day

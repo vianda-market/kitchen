@@ -18,6 +18,8 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from app.config.settings import settings  # OFF_ENABLED, OFF_LOCAL_MIN_VERIFIED_RESULTS
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.services.open_food_facts_service import (
     resolve_off_taxonomy,
     search_off_suggestions,
@@ -292,9 +294,11 @@ def set_product_ingredients(
         """
         row = db_read(check_sql, (str(iid),), connection=db, fetch_one=True)
         if not row:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Ingredient {iid} not found",
+            raise envelope_exception(
+                ErrorCode.INGREDIENT_NOT_FOUND,
+                status=404,
+                locale="en",
+                ingredient_id=str(iid),
             )
 
     try:

@@ -329,6 +329,14 @@ class ErrorCode(StrEnum):
     DISCRETIONARY_INVALID_CATEGORY = "discretionary.invalid_category"
     DISCRETIONARY_CATEGORY_REQUIRES_RESTAURANT = "discretionary.category_requires_restaurant"
 
+    # ── user.market.* ─────────────────────────────────────────────────────
+    # User market assignment errors. Wired in K14 (plate-ops + entity sweep).
+    USER_MARKET_IDS_EMPTY = "user.market_ids_empty"
+    USER_MARKET_IDS_INVALID = "user.market_ids_invalid"
+    USER_MARKET_NOT_IN_INSTITUTION = "user.market_not_in_institution"
+    USER_DUPLICATE_USERNAME = "user.duplicate_username"
+    USER_DUPLICATE_EMAIL_IN_SYSTEM = "user.duplicate_email_in_system"
+
     # ── enrollment.* ─────────────────────────────────────────────────────
     # Employer benefits enrollment errors. Wired in K13.
     ENROLLMENT_NO_ACTIVE_PROGRAM = "enrollment.no_active_program"
@@ -340,6 +348,61 @@ class ErrorCode(StrEnum):
     # ── employer.program.* ───────────────────────────────────────────────
     # Employer benefits program management errors. Wired in K13.
     EMPLOYER_PROGRAM_ALREADY_EXISTS = "employer.program_already_exists"
+
+    # ── entity.archive.* ──────────────────────────────────────────────────
+    # Entity / restaurant archival guardrail errors. Wired in K14.
+    ENTITY_SEARCH_INVALID_PARAM = "entity.search_invalid_param"
+    ENTITY_ARCHIVE_ACTIVE_PICKUPS = "entity.archive_active_pickups"
+    ENTITY_ARCHIVE_ACTIVE_RESTAURANTS = "entity.archive_active_restaurants"
+    RESTAURANT_ARCHIVE_ACTIVE_PICKUPS = "restaurant.archive_active_pickups"
+
+    # ── plate_kitchen_day.* ───────────────────────────────────────────────
+    # Plate kitchen day management errors. Wired in K14.
+    PLATE_KITCHEN_DAY_NOT_FOUND = "plate_kitchen_day.not_found"
+    PLATE_KITCHEN_DAY_DUPLICATE = "plate_kitchen_day.duplicate"
+    PLATE_KITCHEN_DAY_PLATE_ID_IMMUTABLE = "plate_kitchen_day.plate_id_immutable"
+    PLATE_KITCHEN_DAY_ARCHIVE_FAILED = "plate_kitchen_day.archive_failed"
+    PLATE_KITCHEN_DAY_UPDATE_FAILED = "plate_kitchen_day.update_failed"
+    PLATE_KITCHEN_DAY_DELETE_FAILED = "plate_kitchen_day.delete_failed"
+
+    # ── restaurant.status.* ───────────────────────────────────────────────
+    # Restaurant availability errors for plate selection. Wired in K14.
+    RESTAURANT_ARCHIVED = "restaurant.archived"
+    RESTAURANT_ENTITY_ARCHIVED = "restaurant.entity_archived"
+    RESTAURANT_UNAVAILABLE = "restaurant.unavailable"
+    RESTAURANT_NATIONAL_HOLIDAY = "restaurant.national_holiday"
+    RESTAURANT_HOLIDAY = "restaurant.restaurant_holiday"
+
+    # ── plate_selection.window.* ──────────────────────────────────────────
+    # Plate selection kitchen-day and pickup-window validation errors. Wired in K14.
+    PLATE_SELECTION_PICKUP_TIME_REQUIRED = "plate_selection.pickup_time_required"
+    PLATE_SELECTION_NO_PICKUP_WINDOWS = "plate_selection.no_pickup_windows"
+    PLATE_SELECTION_INVALID_PICKUP_WINDOW = "plate_selection.invalid_pickup_window"
+    PLATE_SELECTION_KITCHEN_DAY_INVALID = "plate_selection.kitchen_day_invalid"
+    PLATE_SELECTION_KITCHEN_DAY_NOT_AVAILABLE = "plate_selection.kitchen_day_not_available"
+    PLATE_SELECTION_KITCHEN_DAY_TOO_FAR = "plate_selection.kitchen_day_too_far"
+    PLATE_SELECTION_NO_KITCHEN_DAYS = "plate_selection.no_kitchen_days"
+
+    # ── plate_selection.create.* ──────────────────────────────────────────
+    # Plate selection create-route validation errors. Wired in K14.
+    PLATE_SELECTION_PLATE_ID_REQUIRED = "plate_selection.plate_id_required"
+    PLATE_SELECTION_PLATE_ID_INVALID = "plate_selection.plate_id_invalid"
+
+    # ── plate_review.access.* ─────────────────────────────────────────────
+    # Plate review access errors not covered by K10. Wired in K14.
+    PLATE_REVIEW_CUSTOMER_ONLY = "plate_review.customer_only"
+    PLATE_REVIEW_NO_INSTITUTION = "plate_review.no_institution"
+    PLATE_REVIEW_BY_PICKUP_NOT_FOUND = "plate_review.by_pickup_not_found"
+
+    # ── ingredient.* ──────────────────────────────────────────────────────
+    # Ingredient service errors. Wired in K14.
+    INGREDIENT_NOT_FOUND = "ingredient.not_found"
+
+    # ── plate_pickup.staff.* ──────────────────────────────────────────────
+    # Plate pickup staff-only access error. Wired in K14.
+    PLATE_PICKUP_STAFF_ONLY = "plate_pickup.staff_only"
+    PLATE_PICKUP_INVALID_USER_ID = "plate_pickup.invalid_user_id"
+    PLATE_PICKUP_INVALID_FILTER = "plate_pickup.invalid_filter"
 
     # ── database.* ─────────────────────────────────────────────────────────
     # Database constraint violation errors. Wired in K6 via handle_database_exception.
