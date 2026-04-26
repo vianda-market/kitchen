@@ -280,11 +280,21 @@ def create_app() -> FastAPI:
     )
 
     # Static type→code map — built once at app startup, not per-request.
+    # Covers the full Pydantic v2 type vocabulary used in this codebase (K67).
     _TYPE_TO_CODE: dict[str, str] = {
         "missing": ErrorCode.VALIDATION_FIELD_REQUIRED,
         "string_too_short": ErrorCode.VALIDATION_VALUE_TOO_SHORT,
         "string_too_long": ErrorCode.VALIDATION_VALUE_TOO_LONG,
         "string_pattern_mismatch": ErrorCode.VALIDATION_INVALID_FORMAT,
+        # Numeric/boolean parse failures
+        "int_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        "float_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        "bool_parsing": ErrorCode.VALIDATION_INVALID_FORMAT,
+        # Enum membership
+        "enum": ErrorCode.VALIDATION_INVALID_VALUE,
+        # Collection-type mismatches
+        "list_type": ErrorCode.VALIDATION_INVALID_TYPE,
+        "dict_type": ErrorCode.VALIDATION_INVALID_TYPE,
     }
 
     @app.exception_handler(RequestValidationError)
@@ -300,6 +310,9 @@ def create_app() -> FastAPI:
           "string_too_short"           → validation.value_too_short
           "string_too_long"            → validation.value_too_long
           "string_pattern_mismatch"    → validation.invalid_format
+          "int_parsing"/"float_parsing"/"bool_parsing" → validation.invalid_format
+          "enum"                       → validation.invalid_value
+          "list_type"/"dict_type"      → validation.invalid_type
           "value_error.email" variants → validation.invalid_format
           "value_error" with I18nValueError ctx → domain code from the error
           anything else               → validation.custom

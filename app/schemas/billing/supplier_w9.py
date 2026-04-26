@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.config.enums import TaxClassification
+from app.i18n.envelope import I18nValueError
 
 
 class SupplierW9CreateSchema(BaseModel):
@@ -20,7 +21,7 @@ class SupplierW9CreateSchema(BaseModel):
     @classmethod
     def validate_ein_last_four(cls, v: str) -> str:
         if not re.fullmatch(r"\d{4}", v):
-            raise ValueError("ein_last_four must be exactly 4 digits")
+            raise I18nValueError("validation.supplier_invoice.w9_ein_format")
         return v
 
 
@@ -35,7 +36,7 @@ class SupplierW9UpdateSchema(BaseModel):
     @classmethod
     def validate_ein_last_four(cls, v: str | None) -> str | None:
         if v is not None and not re.fullmatch(r"\d{4}", v):
-            raise ValueError("ein_last_four must be exactly 4 digits")
+            raise I18nValueError("validation.supplier_invoice.w9_ein_format")
         return v
 
 

@@ -3206,7 +3206,7 @@ class MarketCreateSchema(BaseModel):
             return v
         allowed = tuple(settings.SUPPORTED_LOCALES)
         if v not in allowed:
-            raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
+            raise I18nValueError("validation.market.language_unsupported", language=v, allowed=", ".join(allowed))
         return v
 
 
@@ -3250,7 +3250,7 @@ class MarketUpdateSchema(BaseModel):
             return v
         allowed = tuple(settings.SUPPORTED_LOCALES)
         if v not in allowed:
-            raise ValueError(f"Unsupported language '{v}'. Must be one of: {', '.join(allowed)}")
+            raise I18nValueError("validation.market.language_unsupported", language=v, allowed=", ".join(allowed))
         return v
 
 
