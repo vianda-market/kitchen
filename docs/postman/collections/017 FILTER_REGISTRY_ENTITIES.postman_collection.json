@@ -1490,6 +1490,83 @@
           }
         }
       ]
+    },
+    {
+      "name": "National Holidays Source Filter",
+      "description": "Verifies the NationalHolidaySource enum filter on GET /national-holidays. Valid values: manual, nager_date. Invalid values must return 400.",
+      "item": [
+        {
+          "name": "GET /national-holidays – source=manual (valid) → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "const holidays = pm.response.json();",
+                  "holidays.forEach(function(h) {",
+                  "    pm.test('Holiday source is manual', function () {",
+                  "        pm.expect(h.source).to.equal('manual');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/national-holidays?source=manual",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "national-holidays"],
+              "query": [{"key": "source", "value": "manual"}]
+            }
+          }
+        },
+        {
+          "name": "GET /national-holidays – source=garbage (invalid enum value) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 for invalid source value', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/national-holidays?source=garbage",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "national-holidays"],
+              "query": [{"key": "source", "value": "garbage"}]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
