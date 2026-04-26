@@ -302,8 +302,11 @@ class EnrichedService(Generic[T]):
             Enriched schema object or None if not found
         """
         try:
-            # Add ID condition
-            id_condition = (f"{self.table_alias}.{self.id_column} = %s", str(record_id))
+            # Add ID condition — use list format matching the new param_list convention
+            # (PR #60 changed additional_conditions to list[tuple[str, list]]). Passing
+            # a bare string here causes params.extend(str) to unpack each character,
+            # injecting 36 params for a single %s placeholder → psycopg2 error → 500.
+            id_condition = (f"{self.table_alias}.{self.id_column} = %s", [str(record_id)])
             conditions = [id_condition]
             if additional_conditions:
                 conditions.extend(additional_conditions)
