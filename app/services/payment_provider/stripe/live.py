@@ -9,9 +9,25 @@ from uuid import UUID
 
 import psycopg2.extensions
 import stripe
+from fastapi import HTTPException
 
 from app.config.settings import settings
 from app.services.payment_provider import PaymentIntentResult
+from app.utils.currency import convert_currency
+
+_STRIPE_USD_MINIMUM_CENTS = 50
+
+
+def validate_currency(currency: str, field_name: str) -> None:
+    if not currency or len(currency) != 3 or not currency.isalpha():
+        raise HTTPException(
+            400,
+            {
+                "code": "payment.invalid_currency",
+                "message": f"{field_name} must be a 3-letter ISO 4217 currency code.",
+                "params": {"field": field_name, "value": currency},
+            },
+        )
 
 
 def _ensure_stripe_configured() -> None:
@@ -32,16 +48,47 @@ def create_payment_for_subscription(
 ) -> PaymentIntentResult:
     """Create a real Stripe PaymentIntent for the subscription. Uses idempotency key for retries."""
     _ensure_stripe_configured()
+    normalized_currency = (currency or "usd").lower()
+    validate_currency(normalized_currency, "currency")
+    amount_usd_cents = (
+        convert_currency(amount_cents, normalized_currency.upper(), "USD")
+        if normalized_currency != "usd"
+        else amount_cents
+    )
+    if amount_usd_cents < _STRIPE_USD_MINIMUM_CENTS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "payment.amount_below_stripe_minimum",
+                "message": "Plan price is below Stripe's minimum charge.",
+                "params": {
+                    "plan_amount_minor": amount_cents,
+                    "plan_currency": normalized_currency,
+                    "plan_amount_usd_cents": amount_usd_cents,
+                    "min_usd_cents": _STRIPE_USD_MINIMUM_CENTS,
+                },
+            },
+        )
     meta = metadata or {}
     meta["subscription_id"] = str(subscription_id)
     idempotency_key = f"subscription_{subscription_id}"
-    pi = stripe.PaymentIntent.create(
-        amount=amount_cents,
-        currency=(currency or "usd").lower(),
-        metadata=meta,
-        idempotency_key=idempotency_key,
-        automatic_payment_methods={"enabled": True},
-    )
+    try:
+        pi = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=normalized_currency,
+            metadata=meta,
+            idempotency_key=idempotency_key,
+            automatic_payment_methods={"enabled": True},
+        )
+    except stripe.error.InvalidRequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "payment.provider_error",
+                "message": "Stripe rejected the payment request.",
+                "params": {"stripe_code": getattr(e, "code", None), "stripe_message": str(e)},
+            },
+        ) from e
     return {
         "id": pi.id,
         "client_secret": pi.client_secret or "",

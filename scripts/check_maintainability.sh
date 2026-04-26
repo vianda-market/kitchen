@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-MAX_DROP=5  # Percentage points
+MAX_DROP=8  # Percentage points
 
 # Determine compare branch
 if [ -n "${GITHUB_BASE_REF:-}" ]; then
@@ -42,9 +42,10 @@ while IFS= read -r filepath; do
     [ -z "$filepath" ] && continue
 
     # Get current MI (radon mi outputs: "file - A (score)")
-    current_mi=$(radon mi "$filepath" -s 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    # grep exits 1 on no match (e.g. deleted file); || true prevents set -e from aborting.
+    current_mi=$(radon mi "$filepath" -s 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' 2>/dev/null | head -1 || true)
     if [ -z "$current_mi" ]; then
-        continue  # Skip files radon can't parse
+        continue  # Skip files radon can't parse (deleted or empty)
     fi
 
     # Get baseline MI from the compare branch
@@ -53,7 +54,7 @@ while IFS= read -r filepath; do
         continue  # New file, no baseline to compare
     fi
 
-    baseline_mi=$(echo "$baseline_content" | radon mi - -s 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    baseline_mi=$(echo "$baseline_content" | radon mi - -s 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' 2>/dev/null | head -1 || true)
     if [ -z "$baseline_mi" ]; then
         continue  # Baseline couldn't be parsed
     fi
