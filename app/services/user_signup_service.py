@@ -187,59 +187,19 @@ class UserSignupService:
 
         # Resolve and validate market_id (default Global for Admin/Super Admin/Supplier Admin; require for Manager/Operator; Managers cannot assign Global)
         self._resolve_market_id_for_admin_creation(user_data, current_user, db, locale=locale)
-        if not user_data.get("locale"):
-            mid = user_data.get("market_id")
-            if mid:
-                mid_uuid = mid if isinstance(mid, UUID) else UUID(str(mid))
-                mk = market_service.get_by_id(mid_uuid)
-                user_data["locale"] = (mk.get("language") if mk else None) or "en"
-            else:
-                user_data["locale"] = "en"
+        self._resolve_locale_for_user(user_data)
         # v2: if market_ids provided, use first as primary and persist assignments after create
-        market_ids_list = user_data.pop("market_ids", None)
-        if market_ids_list:
-            user_data["market_id"] = market_ids_list[0]
+        market_ids_list = self._apply_market_ids_list_to_user(user_data)
         # Supplier and Employer: user's market must be within institution's market(s)
         self._ensure_user_market_within_institution(user_data, db, locale=locale)
-        # Internal or Supplier: default city_metadata_id to Global when not provided
-        rt_str = (
-            (
-                user_data.get("role_type").value
-                if hasattr(user_data.get("role_type"), "value")
-                else str(user_data.get("role_type") or "")
-            )
-            if user_data.get("role_type")
-            else ""
-        )
-        rn_str = (
-            (
-                user_data.get("role_name").value
-                if hasattr(user_data.get("role_name"), "value")
-                else str(user_data.get("role_name") or "")
-            )
-            if user_data.get("role_name")
-            else ""
-        )
-        if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_metadata_id"):
-            user_data["city_metadata_id"] = GLOBAL_CITY_ID
-            log_info(f"Defaulted city_metadata_id to Global for {rt_str}/{rn_str}")
-        # Customer+Comensal created via B2B: require city_metadata_id, reject Global
-        if self._is_customer_comensal(user_data):
-            if not user_data.get("city_metadata_id"):
-                raise envelope_exception(ErrorCode.USER_CITY_REQUIRED, status=400, locale=locale)
-            cid = (
-                user_data["city_metadata_id"]
-                if isinstance(user_data["city_metadata_id"], UUID)
-                else UUID(str(user_data["city_metadata_id"]))
-            )
-            if is_global_city(cid):
-                raise envelope_exception(ErrorCode.USER_CITY_MUST_BE_SPECIFIC, status=400, locale=locale)
+        # Default city_metadata_id and validate for role
+        rt_str = self._enum_to_str(user_data.get("role_type"))
+        rn_str = self._enum_to_str(user_data.get("role_name"))
+        self._default_city_for_role(user_data, rt_str, rn_str, locale=locale)
+        self._validate_city_for_comensal(user_data, locale=locale)
         # Create user with validation
         new_user = create_user_with_validation(user_data, db, scope=scope)
-        if market_ids_list:
-            from app.services.entity_service import set_user_market_assignments
-
-            set_user_market_assignments(new_user.user_id, market_ids_list, db)
+        self._persist_user_market_assignments(new_user.user_id, market_ids_list, db)
         log_info(f"Admin created user: {new_user.user_id}")
         if use_invite_flow:
             self._send_b2b_invite_email(new_user.user_id, new_user.email, new_user.first_name, db)
@@ -522,6 +482,65 @@ class UserSignupService:
 
         log_info(f"Applied admin creation rules: modified_by={current_user['user_id']}")
 
+    @staticmethod
+    def _resolve_locale_for_user(user_data: dict[str, Any]) -> None:
+        """Default locale from the resolved market when the caller did not supply one."""
+        if user_data.get("locale"):
+            return
+        mid = user_data.get("market_id")
+        if mid:
+            mid_uuid = mid if isinstance(mid, UUID) else UUID(str(mid))
+            mk = market_service.get_by_id(mid_uuid)
+            user_data["locale"] = (mk.get("language") if mk else None) or "en"
+        else:
+            user_data["locale"] = "en"
+
+    @staticmethod
+    def _apply_market_ids_list_to_user(user_data: dict[str, Any]) -> list[Any] | None:
+        """Pop market_ids from user_data, set first entry as primary market_id, and return the list."""
+        market_ids_list: list[Any] | None = user_data.pop("market_ids", None)
+        if market_ids_list:
+            user_data["market_id"] = market_ids_list[0]
+        return market_ids_list
+
+    def _default_city_for_role(
+        self,
+        user_data: dict[str, Any],
+        rt_str: str,
+        rn_str: str,
+        *,
+        locale: str = "en",
+    ) -> None:
+        """Default city_metadata_id to Global for Internal/Supplier roles when not provided."""
+        if (rt_str == "internal" or rt_str == "supplier") and not user_data.get("city_metadata_id"):
+            user_data["city_metadata_id"] = GLOBAL_CITY_ID
+            log_info(f"Defaulted city_metadata_id to Global for {rt_str}/{rn_str}")
+
+    def _validate_city_for_comensal(self, user_data: dict[str, Any], *, locale: str = "en") -> None:
+        """For Customer+Comensal users created via B2B: require city_metadata_id and reject Global."""
+        if not self._is_customer_comensal(user_data):
+            return
+        if not user_data.get("city_metadata_id"):
+            raise envelope_exception(ErrorCode.USER_CITY_REQUIRED, status=400, locale=locale)
+        cid = (
+            user_data["city_metadata_id"]
+            if isinstance(user_data["city_metadata_id"], UUID)
+            else UUID(str(user_data["city_metadata_id"]))
+        )
+        if is_global_city(cid):
+            raise envelope_exception(ErrorCode.USER_CITY_MUST_BE_SPECIFIC, status=400, locale=locale)
+
+    @staticmethod
+    def _persist_user_market_assignments(
+        user_id: UUID,
+        market_ids_list: list | None,
+        db: psycopg2.extensions.connection,
+    ) -> None:
+        """Persist multi-market assignments for the newly created user when market_ids were supplied."""
+        if not market_ids_list:
+            return
+        set_user_market_assignments(user_id, market_ids_list, db)
+
     def _send_b2b_invite_email(
         self,
         user_id: UUID,
@@ -749,15 +768,12 @@ class UserSignupService:
         else:
             user_data["institution_id"] = UUID(scope.institution_id)
 
-    def validate_user_permissions(
-        self, current_user: dict[str, Any], target_institution_id: UUID | None = None
-    ) -> None:
+    def validate_user_permissions(self, current_user: dict[str, Any]) -> None:
         """
         Validate user permissions for user creation.
 
         Args:
             current_user: Current user information
-            target_institution_id: Target institution ID (if creating for specific institution)
 
         Raises:
             HTTPException: For permission failures
