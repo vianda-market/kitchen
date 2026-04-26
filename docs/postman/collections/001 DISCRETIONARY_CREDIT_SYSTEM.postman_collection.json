@@ -1479,8 +1479,8 @@
                   "});",
                   "",
                   "const response = pm.response.json();",
-                  "pm.test(\"Error message mentions not found\", function () {",
-                  "    pm.expect(response.detail).to.include('Discretionary request');",
+                  "pm.test(\"Error envelope has entity.not_found code\", function () {",
+                  "    pm.expect(response.detail).to.have.property('code', 'entity.not_found');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1532,8 +1532,8 @@
                   "});",
                   "",
                   "const response = pm.response.json();",
-                  "pm.test(\"Error message mentions status\", function () {",
-                  "    pm.expect(response.detail).to.include('Cannot approve request with status');",
+                  "pm.test(\"Error envelope has discretionary.not_pending code\", function () {",
+                  "    pm.expect(response.detail).to.have.property('code', 'discretionary.not_pending');",
                   "});"
                 ],
                 "type": "text/javascript"

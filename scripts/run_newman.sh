@@ -27,10 +27,7 @@ BASE_URL="${NEWMAN_BASE_URL:-http://localhost:8000}"
 #   for K3's contract change. Frontend Phase 3 adoption PRs MUST update
 #   the matching collections and remove their entries here before merging.
 SKIPPED_COLLECTIONS=(
-    # kitchen#79 (PR #60 regressions — needs CODE fix)
-    "001"  # DISCRETIONARY_CREDIT_SYSTEM — pre-request script crash
-    "013"  # SUBSCRIPTION_ACTIONS — 500 on subscription action endpoint
-    "014"  # INGREDIENTS_AND_FAVORITES — 404 where 204 expected
+    # kitchen#79 resolved — 001/013/014 removed (PR fixes regressions from PR #60).
     # 003 restored in K-last (kitchen#66): enum-not-found assertion updated.
     # 008/010 stay skipped — K7 generalized auth/security messages from
     # specific phrasing ("Customers must self-register", "required permissions")
@@ -84,7 +81,7 @@ else
 fi
 
 if [ ${#skipped_runtime[@]} -gt 0 ]; then
-    echo "Skipping ${#skipped_runtime[@]} collection(s) per SKIPPED_COLLECTIONS (see kitchen#79):"
+    echo "Skipping ${#skipped_runtime[@]} collection(s) per SKIPPED_COLLECTIONS (see kitchen#87):"
     for p in "${skipped_runtime[@]}"; do
         echo "  - $p"
     done
