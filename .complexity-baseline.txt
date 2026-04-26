@@ -11,4 +11,5 @@ app/routes/restaurant.py:list_enriched_restaurants
 app/services/entity_service.py:get_enriched_addresses_search
 app/services/entity_service.py:get_enriched_plate_pickups
 app/services/entity_service.py:get_enriched_restaurant_holidays
+app/services/enriched_service.py:get_distinct_enriched
 app/services/leads_public_service.py:create_lead_interest
