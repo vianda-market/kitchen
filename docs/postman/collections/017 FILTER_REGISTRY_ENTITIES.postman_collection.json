@@ -134,7 +134,7 @@
                   "});",
                   "// All returned restaurants must have the filtered city",
                   "const restaurants = pm.response.json();",
-                  "const city = pm.request.url.query.toObject().city;",
+                  "const city = decodeURIComponent(pm.request.url.query.toObject().city || '');",
                   "restaurants.forEach(function(r) {",
                   "    pm.test('Restaurant city matches filter', function () {",
                   "        pm.expect(r.city).to.equal(city);",
