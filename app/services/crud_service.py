@@ -704,6 +704,116 @@ class CRUDService(Generic[T]):
             log_error(f"Error getting {self.table_name} by {field_name}: {e}")
             return []
 
+    def _warn_if_address_direct_call(self) -> None:
+        """Emit a warning when address_service.create() is called outside the business service.
+
+        address_service.create() should only be invoked from
+        address_business_service.create_address_with_geocoding(), which handles timezone
+        stamping and geolocation record creation. Direct callers bypass those side-effects.
+        """
+        if self.table_name != "address_info":
+            return
+        import inspect
+
+        this_frame = inspect.currentframe()
+        create_frame = this_frame.f_back if this_frame else None
+        caller_frame = create_frame.f_back if create_frame else None
+        caller_file = caller_frame.f_code.co_filename if caller_frame else ""
+        caller_name = caller_frame.f_code.co_name if caller_frame else ""
+        if "address_service.py" not in caller_file or "create_address_with_geocoding" not in caller_name:
+            log_warning(
+                f"[CRUDService] WARNING: address_service.create() called directly from {caller_file}:{caller_name}. "
+                f"This should use address_business_service.create_address_with_geocoding() instead. "
+                f"Direct calls bypass timezone setting and geocoding."
+            )
+
+    def _resolve_subscription_market_id(self, data: dict[str, Any], db: psycopg2.extensions.connection) -> None:
+        """Populate market_id on subscription_info create data from the referenced plan.
+
+        subscription_info requires market_id but callers supply only plan_id; this helper
+        fetches the plan and copies its market_id into data in-place.
+
+        Raises:
+            HTTPException 404: when the referenced plan does not exist.
+        """
+        if self.table_name != "subscription_info":
+            return
+        if "market_id" in data or not data.get("plan_id"):
+            return
+        from app.services.crud_service import plan_service
+
+        plan = plan_service.get_by_id(data["plan_id"], db)
+        if plan:
+            data["market_id"] = plan.market_id
+        else:
+            log_error(f"Plan not found for plan_id={data['plan_id']}, cannot create subscription")
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Plan")
+
+    def _stamp_create_auto_fields(self, data: dict[str, Any]) -> None:
+        """Stamp created_date, modified_date, created_by, status, and remove unsupported fields.
+
+        Applies all automatic field population rules for INSERT in-place on *data*:
+        - created_date: always set to now.
+        - modified_date: set to now unless the table is excluded.
+        - created_by: copied from modified_by when the DTO declares it and it is absent.
+        - status: defaulted to ACTIVE (or PENDING for payment_method) when the DTO has
+          a status column and no value was provided.
+        - modified_by: removed for tables that do not support it.
+        """
+        data["created_date"] = datetime.now()
+
+        if self.table_name not in TABLES_WITHOUT_MODIFIED_DATE:
+            data["modified_date"] = datetime.now()
+
+        # Propagate modified_by → created_by when the DTO supports it
+        dto_fields = getattr(self.dto_class, "model_fields", None)
+        if dto_fields is None:
+            dto_fields = getattr(self.dto_class, "__fields__", {})
+        if (
+            dto_fields
+            and "created_by" in dto_fields
+            and "created_by" not in data
+            and "modified_by" in data
+            and self.table_name not in TABLES_WITHOUT_MODIFIED_BY
+        ):
+            data["created_by"] = data["modified_by"]
+
+        # Default status for entities whose DTO declares a status column
+        dto_annotations = getattr(self.dto_class, "__annotations__", {})
+        if "status" in dto_annotations and data.get("status") is None:
+            # Payment methods start Pending until linked (external_payment_method, etc.)
+            data["status"] = Status.PENDING if self.table_name == "payment_method" else Status.ACTIVE
+
+        # Strip modified_by for tables that have no such column
+        if self.table_name in TABLES_WITHOUT_MODIFIED_BY and "modified_by" in data:
+            del data["modified_by"]
+
+    def _update_entity_address_type_if_needed(
+        self,
+        filtered_data: dict[str, Any],
+        db: psycopg2.extensions.connection,
+        commit: bool,
+    ) -> None:
+        """Update address_type after an institution_entity_info insert.
+
+        When creating an institution entity, the linked address must be re-typed
+        (Entity Address / Entity Billing) so that the settlement pipeline can detect
+        the entity's country from the address. This must run after the main insert
+        commits (or in the same transaction when commit=False).
+        """
+        if self.table_name != "institution_entity_info":
+            return
+        addr_id = filtered_data.get("address_id")
+        if not addr_id:
+            return
+        from app.services.address_service import update_address_type_from_linkages
+
+        update_address_type_from_linkages(
+            addr_id if isinstance(addr_id, UUID) else UUID(str(addr_id)),
+            db,
+            commit=commit,
+        )
+
     def create(
         self,
         data: dict[str, Any],
@@ -730,69 +840,16 @@ class CRUDService(Generic[T]):
         - Automatically sets timezone (required field)
         - Handles geocoding for Restaurant, Customer Employer, and Customer Home addresses
         - Creates geolocation records in geolocation_info table
-        NOTE: For address_service specifically, this method should NOT be called directly.
-        Use address_business_service.create_address_with_geocoding() instead, which:
-        - Automatically sets timezone (required field)
-        - Handles geocoding for Restaurant, Customer Employer, and Customer Home addresses
-        - Creates geolocation records in geolocation_info table
         """
         # Runtime check: Warn if address_service.create() is called directly (outside business service)
-        if self.table_name == "address_info":
-            import inspect
-
-            caller_frame = inspect.currentframe().f_back
-            caller_file = caller_frame.f_code.co_filename if caller_frame else ""
-            caller_name = caller_frame.f_code.co_name if caller_frame else ""
-            # Check if caller is NOT from address_service.py (business service)
-            if "address_service.py" not in caller_file or "create_address_with_geocoding" not in caller_name:
-                log_warning(
-                    f"[CRUDService] WARNING: address_service.create() called directly from {caller_file}:{caller_name}. "
-                    f"This should use address_business_service.create_address_with_geocoding() instead. "
-                    f"Direct calls bypass timezone setting and geocoding."
-                )
+        self._warn_if_address_direct_call()
 
         try:
             log_info(f"[CRUDService.create] Table: {self.table_name}, Data keys before scope: {list(data.keys())}")
             self._apply_scope_to_create_data(data, scope, db)
-            # Subscription create: resolve market_id from plan_id (subscription_info requires market_id, plan has it)
-            if self.table_name == "subscription_info" and "market_id" not in data and data.get("plan_id"):
-                from app.services.crud_service import plan_service
-
-                plan = plan_service.get_by_id(data["plan_id"], db)
-                if plan:
-                    data["market_id"] = plan.market_id
-                else:
-                    log_error(f"Plan not found for plan_id={data['plan_id']}, cannot create subscription")
-                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Plan")
+            self._resolve_subscription_market_id(data, db)
             log_info(f"[CRUDService.create] Data keys after scope: {list(data.keys())}")
-            # Add timestamps
-            data["created_date"] = datetime.now()
-
-            # Only add modified_date if the table supports it
-            if self.table_name not in TABLES_WITHOUT_MODIFIED_DATE:
-                data["modified_date"] = datetime.now()
-
-            # Set created_by from modified_by when DTO supports it (all mutable tables except discretionary_resolution_info)
-            dto_fields = getattr(self.dto_class, "model_fields", None)
-            if dto_fields is None:
-                dto_fields = getattr(self.dto_class, "__fields__", {})
-            if dto_fields and "created_by" in dto_fields and "created_by" not in data and "modified_by" in data:
-                if self.table_name not in TABLES_WITHOUT_MODIFIED_BY:
-                    data["created_by"] = data["modified_by"]
-
-            # Assign default status when the entity has a status column and none was provided (clients may omit status on create)
-            dto_annotations = getattr(self.dto_class, "__annotations__", {})
-            if "status" in dto_annotations and data.get("status") is None:
-                if self.table_name == "payment_method":
-                    data["status"] = (
-                        Status.PENDING
-                    )  # Payment methods start Pending until linked (external_payment_method, etc.)
-                else:
-                    data["status"] = Status.ACTIVE
-
-            # Remove modified_by if the table doesn't support it
-            if self.table_name in TABLES_WITHOUT_MODIFIED_BY and "modified_by" in data:
-                del data["modified_by"]
+            self._stamp_create_auto_fields(data)
 
             log_info(f"[CRUDService.create] Data keys before db_insert: {list(data.keys())}")
             log_info(f"[CRUDService.create] currency_code value: {data.get('currency_code')}")
@@ -806,15 +863,7 @@ class CRUDService(Generic[T]):
             if record_id:
                 # When creating an institution entity, update the address's address_type from linkages
                 # so the address is correctly marked as Entity Address/Entity Billing (used for country detection in settlement pipeline).
-                if self.table_name == "institution_entity_info" and filtered_data.get("address_id"):
-                    from app.services.address_service import update_address_type_from_linkages
-
-                    addr_id = filtered_data["address_id"]
-                    update_address_type_from_linkages(
-                        addr_id if isinstance(addr_id, UUID) else UUID(str(addr_id)),
-                        db,
-                        commit=commit,
-                    )
+                self._update_entity_address_type_if_needed(filtered_data, db, commit)
                 return self.get_by_id(record_id, db, scope=scope)
             return None
         except HTTPException:
@@ -2473,7 +2522,7 @@ def mark_transaction_as_collected(
 
 
 # Additional methods for pickup preferences service
-def find_matching_preferences(preference_id: UUID, db: psycopg2.extensions.connection) -> list[PickupPreferencesDTO]:
+def find_matching_preferences(_preference_id: UUID, db: psycopg2.extensions.connection) -> list[PickupPreferencesDTO]:
     """Find preferences that can be matched with the given preference"""
     # TODO: Implement pickup preferences matching logic
     return []
