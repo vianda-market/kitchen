@@ -11,7 +11,6 @@ app/routes/restaurant.py:list_enriched_restaurants
 app/services/entity_service.py:get_enriched_addresses_search
 app/services/entity_service.py:get_enriched_plate_pickups
 app/services/entity_service.py:get_enriched_restaurant_holidays
-app/services/billing/institution_billing.py:InstitutionBillingService.run_phase1_settlements
 app/services/coworker_service.py:get_coworkers_with_eligibility
 app/services/crud_service.py:CRUDService.create
 app/services/leads_public_service.py:create_lead_interest
