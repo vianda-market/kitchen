@@ -866,7 +866,7 @@ class PlatePickupService:
                 "plates": plates,
             }
         # Check if they have orders elsewhere or no orders at all
-        return self._handle_wrong_restaurant_or_no_orders(user_id, restaurant_id, db)
+        return self._handle_wrong_restaurant_or_no_orders(user_id, db)
 
     def _validate_qr_code_exists(self, qr_code_payload: str, db: psycopg2.extensions.connection) -> bool:
         """Check if QR code payload exists in our system"""
@@ -921,7 +921,7 @@ class PlatePickupService:
         return result["count"] if result else 0
 
     def _handle_wrong_restaurant_or_no_orders(
-        self, user_id: UUID, scanned_restaurant_id: UUID, db: psycopg2.extensions.connection
+        self, user_id: UUID, db: psycopg2.extensions.connection
     ) -> dict[str, Any]:
         """Handle cases where customer scanned wrong restaurant or has no orders"""
         from app.utils.db import db_read
