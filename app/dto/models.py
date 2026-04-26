@@ -266,14 +266,10 @@ class RestaurantDTO(BaseModel):
     member_perks: list[str] | None = None
     member_perks_i18n: dict | None = None
     require_kiosk_code_verification: bool = False
-    # PostGIS geometry(Point, 4326) column. The DTO layer receives this as a parsed
-    # GeoJSON dict ({"type": "Point", "coordinates": [lng, lat]}) because the SELECT
-    # uses ST_AsGeoJSON(location)::jsonb, which causes psycopg2 to deserialize the
-    # column as a Python dict. ::jsonb is required (not ::json) because the enriched
-    # query uses SELECT DISTINCT and json has no equality operator in PostgreSQL.
-    # GeoJSON coordinate order is [longitude, latitude].
-    # None = not yet geocoded.
-    location: dict | None = None
+    # NOTE: location (PostGIS geometry) is intentionally excluded from this DTO.
+    # The CRUD layer uses SELECT * which returns raw WKB bytes — incompatible with
+    # Pydantic's dict type. Location is only served via the enriched endpoints
+    # which explicitly project ST_AsGeoJSON(r.location)::jsonb → dict.
     is_archived: bool = False
     status: Status
     created_date: datetime
