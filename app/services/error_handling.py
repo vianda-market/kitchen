@@ -345,4 +345,8 @@ def handle_business_operation(
 
         # Log with full traceback
         log_error(f"Error in {operation_name}: {error_msg}\nFull traceback:\n{error_trace}")
-        raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
+        # CodeQL: traceback is logged internally; the HTTP response contains no trace text.
+        # See docs/plans/codeql-91-triage.md.
+        raise envelope_exception(  # codeql[py/stack-trace-exposure]
+            ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en"
+        ) from None
