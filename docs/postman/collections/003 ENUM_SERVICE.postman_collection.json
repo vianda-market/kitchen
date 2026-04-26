@@ -2,12 +2,12 @@
 	"info": {
 		"_postman_id": "enum-service-api-2026",
 		"name": "003 ENUM_SERVICE",
-		"description": "003 \u2013 Run after 000 (customer: customer/Customer123!) and 002 (admin: admin/Admin123!). Uses env customerUsername/customerPassword and adminUsername/adminPassword or collection defaults. Test collection for the Enum Service API.",
+		"description": "003 – Run after 000 (customer: customer/Customer123!) and 002 (admin: admin/Admin123!). Uses env customerUsername/customerPassword and adminUsername/adminPassword or collection defaults. Test collection for the Enum Service API.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "\ud83d\udd10 Authentication",
+			"name": "🔐 Authentication",
 			"item": [
 				{
 					"name": "Login as Vianda Admin (Employee)",
@@ -132,7 +132,7 @@
 			]
 		},
 		{
-			"name": "\ud83d\udcca Enum Service Tests",
+			"name": "📊 Enum Service Tests",
 			"item": [
 				{
 					"name": "Get All Enums",
@@ -428,7 +428,7 @@
 			]
 		},
 		{
-			"name": "\u274c Error Scenarios",
+			"name": "❌ Error Scenarios",
 			"item": [
 				{
 					"name": "Get Invalid Enum Name",
@@ -444,7 +444,7 @@
 									"const response = pm.response.json();",
 									"",
 									"pm.test('Error message mentions unknown enum type', function () {",
-									"    pm.expect(response.detail.code).to.eql('request.not_found');",
+									"    pm.expect(response.detail.code).to.eql('entity.not_found');",
 									"});"
 								],
 								"type": "text/javascript"

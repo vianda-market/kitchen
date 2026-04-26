@@ -31,16 +31,14 @@ SKIPPED_COLLECTIONS=(
     "001"  # DISCRETIONARY_CREDIT_SYSTEM — pre-request script crash
     "013"  # SUBSCRIPTION_ACTIONS — 500 on subscription action endpoint
     "014"  # INGREDIENTS_AND_FAVORITES — 404 where 204 expected
-    # kitchen#83 (K3 envelope contract — restored in #84)
-    # kitchen#66 K7 sweep — auth/security messages migrated to envelope catalog,
-    # collection assertions still match the old message text. Re-enable when
-    # frontend Phase 3 follow-up updates the assertions.
-    "008"  # ROLE AND FIELD ACCESS — no_show_discount + role-restriction text changed
-    "010"  # Permissions Testing - Employee-Only Access — access-denied text changed
-    # kitchen#66 K15 sweep — enum-not-found now emits entity.not_found (with
-    # entity=enum_name) instead of falling through K3's status-map to
-    # request.not_found. Test assertion needs update; addressed in K-last sweep.
-    "003"  # ENUM_SERVICE — unknown-enum-type code changed
+    # 003 restored in K-last (kitchen#66): enum-not-found assertion updated.
+    # 008/010 stay skipped — K7 generalized auth/security messages from
+    # specific phrasing ("Customers must self-register", "required permissions")
+    # to security.insufficient_permissions. Test assertions still text-match
+    # the old phrasing; rewriting them to assert on detail.code is tracked
+    # under kitchen#87 (post-sweep quality-debt cleanup).
+    "008"  # ROLE AND FIELD ACCESS — assertion text-matches K7-generalized message
+    "010"  # Permissions Testing - Employee-Only Access — same as 008
 )
 
 is_skipped() {

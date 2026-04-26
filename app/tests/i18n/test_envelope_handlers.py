@@ -2,7 +2,7 @@
 
 Uses FastAPI's TestClient to exercise the main handler paths:
   1. Auto-404 (pre-route) → request.not_found envelope.
-  2. In-route bare-string raise → legacy.uncoded envelope.
+  2. In-route bare-string raise → server.internal_error envelope (K-last: legacy.uncoded removed).
   3. 422 validation error (missing field) → validation.field_required envelope (K5).
   4. Already-enveloped detail → pass-through unchanged.
   5. I18nValueError in custom validator → domain code (K5).
@@ -64,12 +64,11 @@ def _make_test_app() -> FastAPI:
             envelope = build_envelope(code, locale)
             return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
-        if isinstance(detail, str):
-            envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=detail)
-            return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
-
-        fallback_msg = str(detail) if detail else f"HTTP {exc.status_code}"
-        envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=fallback_msg)
+        # Fallback: unclassified raise (typically a 5xx bare-string raise from an
+        # unmigrated service error, or a dict detail without a 'code' key).
+        # Emit server.internal_error so the client always receives a typed envelope.
+        # The original detail is intentionally not forwarded (may contain internal info).
+        envelope = build_envelope(ErrorCode.SERVER_INTERNAL_ERROR, locale)
         return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
     # Email-format error types (mirrors application.py K5 handler)
@@ -202,15 +201,22 @@ def test_auto_404_returns_request_not_found(client):
     assert isinstance(detail["params"], dict)
 
 
-def test_bare_string_raise_returns_legacy_uncoded(client):
-    """In-route raise HTTPException(detail=<str>) → legacy.uncoded envelope."""
+def test_bare_string_raise_returns_server_internal_error(client):
+    """In-route bare-string raise → server.internal_error envelope (K-last: legacy.uncoded removed).
+
+    After the K6..KN sweep all 4xx routes emit typed envelopes via envelope_exception.
+    The only sites still using bare-string detail are 5xx server-error signals
+    (intentionally exempt per Decision 3).  Any such raise hits the catch-all
+    fallback which now emits server.internal_error instead of legacy.uncoded.
+    The original detail string is NOT forwarded to the client.
+    """
     resp = client.get("/bare-string-raise")
     assert resp.status_code == 401
     body = resp.json()
     detail = body["detail"]
     assert isinstance(detail, dict), f"Expected dict envelope, got: {detail!r}"
-    assert detail["code"] == ErrorCode.LEGACY_UNCODED
-    assert detail["message"] == "bad token"
+    assert detail["code"] == ErrorCode.SERVER_INTERNAL_ERROR
+    assert "message" in detail
     assert isinstance(detail["params"], dict)
 
 

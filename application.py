@@ -231,13 +231,15 @@ def create_app() -> FastAPI:
         """
         Catch-all handler for all HTTP exceptions.
 
-        Dispatch order (Q-S1 in design doc):
+        Dispatch order (K-last — legacy.uncoded removed):
         1. dict detail with 'code' key → already enveloped; pass through.
         2. status_code in {404, 405, 413} → emit request.* envelope.
-           (Checked before bare-string branch: FastAPI auto-404/405/413 carries a
+           (Checked before the fallback branch: FastAPI auto-404/405/413 carries a
            plain string detail like "Not Found" that must be upgraded, not wrapped.)
-        3. str detail → wrap as legacy.uncoded (transitional; removed in K-last).
-        4. Fallback → wrap as legacy.uncoded with str(detail).
+        3. Fallback → emit server.internal_error.  All 4xx routes were migrated by
+           K6..KN; reaching this branch means an unmigrated 5xx bare-string raise
+           (intentionally exempt per Decision 3) or a future unclassified raise.
+           The original detail is NOT forwarded to the client — log it server-side.
         """
         locale = _resolve_handler_locale(request)
         detail = exc.detail
@@ -253,17 +255,12 @@ def create_app() -> FastAPI:
             envelope = build_envelope(code, locale)
             return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
-        if isinstance(detail, str):
-            # Transitional wrapping branch. Applies to unmigrated bare-string
-            # raises encountered before the K6..KN sweep completes.
-            # REMOVE this branch in K-last once the sweep is done.
-            envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=detail)
-            return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
-
-        # Fallback: wrap anything else as legacy.uncoded.
-        # REMOVE this branch in K-last once the sweep is done.
-        fallback_msg = str(detail) if detail else f"HTTP {exc.status_code}"
-        envelope = build_envelope(ErrorCode.LEGACY_UNCODED, locale, message=fallback_msg)
+        # Fallback: any unclassified raise (typically a 5xx bare-string raise
+        # from an unmigrated service error, or dict detail without a 'code' key).
+        # Emit server.internal_error so the client always receives a typed envelope.
+        # The original detail is intentionally not forwarded — it may contain
+        # internal ops information not suitable for API consumers.
+        envelope = build_envelope(ErrorCode.SERVER_INTERNAL_ERROR, locale)
         return JSONResponse(status_code=exc.status_code, content={"detail": envelope})
 
     from app.i18n.envelope import I18nValueError

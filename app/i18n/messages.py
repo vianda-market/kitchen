@@ -78,8 +78,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "request.malformed_body": "The request body could not be parsed.",
         "request.too_large": "The request payload is too large.",
         "request.rate_limited": "Too many requests. Please try again in {retry_after_seconds} seconds.",
-        # legacy.* — transitional; wrapping handler maps unmigrated bare-string raises
-        "legacy.uncoded": "{message}",
         # validation.* — emitted by RequestValidationError handler (K3/K5)
         "validation.field_required": "This field is required.",
         "validation.invalid_format": "The value has an invalid format.",
@@ -606,8 +604,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "request.malformed_body": "No se pudo interpretar el cuerpo de la solicitud.",
         "request.too_large": "El cuerpo de la solicitud es demasiado grande.",
         "request.rate_limited": "Demasiadas solicitudes. Intenta de nuevo en {retry_after_seconds} segundos.",
-        # legacy.*
-        "legacy.uncoded": "{message}",
         # validation.*
         "validation.field_required": "Este campo es obligatorio.",
         "validation.invalid_format": "El valor tiene un formato inválido.",
@@ -1134,8 +1130,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "request.malformed_body": "Não foi possível interpretar o corpo da solicitação.",
         "request.too_large": "O corpo da solicitação é muito grande.",
         "request.rate_limited": "Muitas solicitações. Tente novamente em {retry_after_seconds} segundos.",
-        # legacy.*
-        "legacy.uncoded": "{message}",
         # validation.*
         "validation.field_required": "Este campo é obrigatório.",
         "validation.invalid_format": "O valor tem um formato inválido.",

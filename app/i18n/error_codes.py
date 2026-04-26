@@ -24,12 +24,6 @@ class ErrorCode(StrEnum):
     REQUEST_TOO_LARGE = "request.too_large"
     REQUEST_RATE_LIMITED = "request.rate_limited"
 
-    # ── legacy.* ───────────────────────────────────────────────────────────
-    # Transitional. Applied by the wrapping handler to bare-string raises
-    # that have not yet been migrated to typed codes (K6..KN sweep).
-    # Removed from active use in K-last once the sweep is complete.
-    LEGACY_UNCODED = "legacy.uncoded"
-
     # ── validation.* ───────────────────────────────────────────────────────
     # Emitted by the RequestValidationError handler (K3/K5).
     VALIDATION_FIELD_REQUIRED = "validation.field_required"

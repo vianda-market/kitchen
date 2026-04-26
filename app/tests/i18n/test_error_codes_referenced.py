@@ -9,10 +9,11 @@ an unreferenced code is either (a) not yet wired (allowlisted below) or
 ALLOWLIST POLICY:
   All seeds introduced in K2 are allowlisted because their raise sites are
   wired in later PRs:
-    - request.* and legacy.uncoded  → wired by K3 (catch-all handlers)
-    - validation.*                  → wired by K3/K5 (RequestValidationError handler)
-    - auth.*                        → wired by K6 (auth sweep)
-    - subscription.already_active   → wired by a K6..KN sweep PR
+    - request.*    → wired by K3 (catch-all handlers)
+    - legacy.uncoded → removed in K-last (sweep complete)
+    - validation.* → wired by K3/K5 (RequestValidationError handler)
+    - auth.*       → wired by K6 (auth sweep)
+    - subscription.already_active → wired by a K6..KN sweep PR
 
   Remove a code from the allowlist in the same PR that wires its first raise
   site. The allowlist shrinks monotonically toward zero by K-last.
@@ -36,7 +37,6 @@ ALLOWLISTED: dict[str, str] = {
     "REQUEST_MALFORMED_BODY": "K3",
     "REQUEST_TOO_LARGE": "K3",
     "REQUEST_RATE_LIMITED": "K3",
-    "LEGACY_UNCODED": "K3",
     # K3/K5 — RequestValidationError handler + Pydantic 422 refinement
     "VALIDATION_FIELD_REQUIRED": "K5",
     "VALIDATION_INVALID_FORMAT": "K5",

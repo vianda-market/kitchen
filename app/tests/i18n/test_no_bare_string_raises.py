@@ -1,13 +1,12 @@
-"""AST scan: detect bare-string ``detail=`` in HTTPException raises.
+"""AST scan: detect bare-string ``detail=`` in 4xx HTTPException raises.
 
-**Report mode** — this test never fails CI. It collects all violations,
-emits a summary to stderr, then asserts True unconditionally.
+**Enforcing mode** — any ``raise HTTPException(status_code=<4xx>, detail=<str>)``
+in the scanned scope fails this test.  5xx raises remain exempt (they are
+server-error signals for ops logging, not user-facing messages).
 
-Flip to enforcing in K-last (the sweep PR that removes the legacy-wrapping
-handler branch and sets ``assert not violations``).
-
-Initial count at K3: 801 bare-string raises (established on first run 2026-04-24).
-Every K6..KN sweep PR should shrink this number toward zero.
+K-last (this PR) flips from report mode to enforcing after the K6..KN sweep
+completes.  All 4xx bare-string raises have been migrated; only 5xx bare-string
+raises remain (52 sites) and those are intentionally exempt.
 
 Scan scope:
 - All ``*.py`` files under ``app/``.
@@ -15,12 +14,13 @@ Scan scope:
   all paths under ``app/schemas/`` (Pydantic schema validators — K5 scope).
 
 Detection pattern:
-  ``raise HTTPException(... detail=<str_literal_or_fstring> ...)``
+  ``raise HTTPException(status_code=<4xx>, detail=<str_literal_or_fstring> ...)``
 
 Allowed patterns (not flagged):
   ``raise envelope_exception(...)``
   ``raise HTTPException(... detail={...dict...} ...)``
   ``raise HTTPException(... detail=build_envelope(...) ...)``
+  ``raise HTTPException(status_code=5xx, ...)``   ← 5xx always exempt
 """
 
 import ast
@@ -37,6 +37,10 @@ _EXCLUDED_FILES = {
     str(_APP_ROOT / "utils" / "error_messages.py"),
 }
 
+# 5xx status codes are exempt — they are server-error signals for ops, not
+# user-facing messages; leave them as bare strings per Decision 3.
+_5XX_RANGE = range(500, 600)
+
 
 def _is_bare_string_detail(kw: ast.keyword) -> bool:
     """Return True if the keyword is detail=<str literal or f-string>."""
@@ -46,6 +50,18 @@ def _is_bare_string_detail(kw: ast.keyword) -> bool:
     is_bare = isinstance(val, ast.Constant) and isinstance(val.value, str)
     is_fstring = isinstance(val, ast.JoinedStr)
     return is_bare or is_fstring
+
+
+def _extract_status_code(call: ast.Call) -> int | None:
+    """
+    Return the integer status_code from a Call node if it is a plain integer
+    constant, or None if it cannot be determined statically.
+    """
+    for kw in call.keywords:
+        if kw.arg == "status_code":
+            if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, int):
+                return kw.value.value
+    return None
 
 
 def _callable_name(call: ast.Call) -> str:
@@ -59,7 +75,7 @@ def _callable_name(call: ast.Call) -> str:
 
 
 def _scan_file(fpath: str) -> list[tuple[str, int]]:
-    """Scan a single file for bare-string HTTPException detail raises."""
+    """Scan a single file for 4xx bare-string HTTPException detail raises."""
     violations: list[tuple[str, int]] = []
     try:
         with open(fpath, encoding="utf-8") as f:
@@ -76,6 +92,12 @@ def _scan_file(fpath: str) -> list[tuple[str, int]]:
             continue
         if _callable_name(exc) != "HTTPException":
             continue
+
+        # Exempt 5xx raises — leave bare per Decision 3 (server error signals).
+        status_code = _extract_status_code(exc)
+        if status_code is not None and status_code in _5XX_RANGE:
+            continue
+
         for kw in exc.keywords:
             if _is_bare_string_detail(kw):
                 violations.append((fpath, node.lineno))
@@ -83,7 +105,7 @@ def _scan_file(fpath: str) -> list[tuple[str, int]]:
 
 
 def _collect_violations() -> list[tuple[str, int]]:
-    """Return list of (filepath, lineno) for bare-string HTTPException raises."""
+    """Return list of (filepath, lineno) for 4xx bare-string HTTPException raises."""
     violations: list[tuple[str, int]] = []
 
     for dirpath, dirnames, filenames in os.walk(_APP_ROOT):
@@ -102,17 +124,20 @@ def _collect_violations() -> list[tuple[str, int]]:
 
 
 def test_no_bare_string_raises(capfd) -> None:
-    """Report all bare-string HTTPException detail raises (report mode — never fails)."""
+    """All 4xx HTTPException raises must use envelope_exception — enforcing mode (K-last).
+
+    5xx raises are exempt (server-error signals; left as bare strings per Decision 3).
+    The K6..KN sweep migrated all 4xx sites; this test now gates future regressions.
+    """
     violations = _collect_violations()
 
     if violations:
         lines = [f"  {path}:{lineno}" for path, lineno in violations]
         report = (
-            f"\nWARN: {len(violations)} bare-string HTTPException detail raises still present.\n"
-            "These will be migrated in K6..KN and this test will be flipped to enforcing in K-last.\n"
-            + "\n".join(lines)
+            f"\nFAIL: {len(violations)} bare-string 4xx HTTPException detail raise(s) found.\n"
+            "Use envelope_exception(ErrorCode.X, status=4xx, locale=locale, **params) instead.\n" + "\n".join(lines)
         )
         print(report, file=sys.stderr)
 
-    # Report mode: always pass. Flip to ``assert not violations`` in K-last.
-    assert True  # report mode — see module docstring
+    # Enforcing mode (K-last): any 4xx violation fails CI.
+    assert not violations, f"{len(violations)} bare-string 4xx HTTPException raise(s) — see stderr"
