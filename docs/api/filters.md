@@ -349,6 +349,26 @@ git add docs/api/filters.json
 
 ## Disposition history
 
+### Fix: plates.plate_date_from/to rebound to plate_selection_info.pickup_date — 2026-04-26
+
+`plates.plate_date_from` and `plates.plate_date_to` previously filtered by `p.created_date`
+(the plate record's creation timestamp) as a proxy, which is silently wrong — operators filtering
+"plates for week X" were receiving plates created in that calendar window, not plates scheduled for
+service on those dates.
+
+**Resolution (path B):** `get_enriched_plates` in `app/services/entity_service.py` now adds a
+filter-only LEFT JOIN to `customer.plate_selection_info` (alias `psi`) on `psi.plate_id = p.plate_id
+AND psi.is_archived = FALSE`. The filters are rebound to `psi.pickup_date` (a `DATE` column). Because
+`plate_info → plate_selection_info` is 1:N, `distinct=True` is passed to `EnrichedService.get_enriched()`
+to prevent row inflation. This matches the established `restaurants.kitchen_day` filter-only-join pattern.
+
+**Behavior change:** callers using `plate_date_from`/`plate_date_to` now receive plates filtered by
+service date (`pickup_date`), not creation date. Plates with no reservations in the requested window
+are excluded. This is a bug fix, not a semantic extension — the old behavior was never correct.
+
+**Consumer impact:** any frontend or integration test that relied on the old creation-date semantics
+will see different results. The filter semantics are now aligned with operator intent.
+
 ### Pass 5 — 2026-04-25
 
 **Goal:** reduce unfiltered field count from 131 to 0 (strict-mode ready).
