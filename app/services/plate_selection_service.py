@@ -64,18 +64,8 @@ def create_plate_selection_with_transactions(
         if not context:
             raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=400, locale=locale)
 
-        # Step 2: Determine target kitchen day
-        timezone_str = (
-            getattr(context["address"], "timezone", None)
-            or (
-                __import__(
-                    "app.config.market_config", fromlist=["MarketConfiguration"]
-                ).MarketConfiguration.get_market_timezone(context["address"].country_code)
-                if context["address"].country_code
-                else None
-            )
-            or "America/Argentina/Buenos_Aires"
-        )
+        # Step 2: Resolve timezone and determine target kitchen day
+        timezone_str = _resolve_restaurant_timezone(context["address"])
         country_code = context["address"].country_code
         context["target_day"] = determine_target_kitchen_day(
             payload.get("target_kitchen_day"),
@@ -88,107 +78,20 @@ def create_plate_selection_with_transactions(
         )
 
         # Step 2.5: Calculate target date and validate restaurant (status + holidays)
-        try:
-            target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str).strftime("%Y-%m-%d")
-            context["target_date"] = target_date
-
-            # Get country code for holiday validation (already stored in address)
-            country_code = context["address"].country_code
-
-            # Validate restaurant (status + holidays for target date)
-            if country_code:
-                validate_restaurant(
-                    restaurant=context["restaurant"], target_date=target_date, country_code=country_code, db=db
-                )
-            else:
-                # If country code not available, just validate status
-                validate_restaurant_status(context["restaurant"])
-        except (ValueError, IndexError) as e:
-            # If we can't calculate the date, just validate status
-            log_warning(f"Could not calculate target date for holiday validation: {e}")
-            validate_restaurant_status(context["restaurant"])
+        _validate_restaurant_for_day(context, db, locale, timezone_str)
 
         # Step 2.6: Validate pickup_time_range is within market's allowed windows
-        if country_code and context.get("target_day"):
-            target_date = context.get("target_date")
-            if not target_date:
-                target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str)
-            pickup_time_range = payload.get("pickup_time_range")
-            if pickup_time_range:
-                validate_pickup_time_range(country_code, context["target_day"], target_date, pickup_time_range)
+        _validate_pickup_window(context, payload, country_code, timezone_str)
 
         # Step 2.7: Reject if user already has a plate selection for this kitchen_day (or handle replace flow)
-        _existing = db_read(
-            """
-            SELECT plate_selection_id FROM plate_selection_info
-            WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
-            """,
-            (str(current_user["user_id"]), context["target_day"]),
-            connection=db,
-            fetch_one=True,
-        )
-        if _existing:
-            existing_id = str(_existing["plate_selection_id"])
-            replace_existing = payload.get("replace_existing") is True
-            payload_existing_id = payload.get("existing_plate_selection_id")
-            payload_existing_id_str = str(payload_existing_id) if payload_existing_id else None
-
-            if replace_existing and payload_existing_id_str and payload_existing_id_str == existing_id:
-                # User confirmed replace: cancel existing (commit=False), then continue to create
-                cancel_plate_selection(UUID(existing_id), current_user, db, commit=False)
-            else:
-                # Duplicate without valid replace: return structured 409 for frontend modal
-                raise envelope_exception(
-                    ErrorCode.PLATE_SELECTION_DUPLICATE_KITCHEN_DAY,
-                    status=409,
-                    locale=locale,
-                    kitchen_day=context["target_day"],
-                    existing_plate_selection_id=existing_id,
-                )
+        _handle_duplicate_day(payload, current_user, context, db, locale)
 
         # Step 2.75: Low-balance early renewal (only when renewal_date is in the future and threshold is set)
         subscription = subscription_service.get_by_user(current_user["user_id"], db)
-        if subscription:
-            threshold = subscription.early_renewal_threshold
-            if threshold is not None:
-                balance = float(subscription.balance or 0)
-                renewal_date = subscription.renewal_date
-                if renewal_date is not None:
-                    if renewal_date.tzinfo is None:
-                        renewal_date = renewal_date.replace(tzinfo=UTC)
-                    else:
-                        renewal_date = renewal_date.astimezone(UTC)
-                    now_utc = datetime.now(UTC)
-                    if balance < threshold and renewal_date > now_utc:
-                        user_id = current_user.get("user_id")
-                        if isinstance(user_id, str):
-                            user_id = UUID(user_id)
-                        try:
-                            apply_subscription_renewal(
-                                subscription.subscription_id,
-                                db,
-                                modified_by=user_id,
-                                commit=True,
-                            )
-                            log_info(
-                                f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {threshold}, renewal_date in future)"
-                            )
-                        except (HTTPException, ValueError) as e:
-                            log_warning(f"Could not apply early renewal: {e}")
+        _apply_early_renewal_if_needed(current_user, subscription, db)
 
-        # Step 3: NEW - Validate sufficient credits BEFORE creating any records
-        credit_validation = validate_sufficient_credits(current_user["user_id"], context["plate"].credit, db)
-
-        if not credit_validation.has_sufficient_credits:
-            # Return user-friendly insufficient credits response
-            insufficient_credits_response = handle_insufficient_credits(
-                current_user["user_id"], context["plate"].credit, credit_validation.current_balance
-            )
-            # Raise HTTPException with user-friendly response
-            raise HTTPException(
-                status_code=402,  # Payment Required
-                detail=insufficient_credits_response.model_dump(),
-            )
+        # Step 3: Validate sufficient credits BEFORE creating any records
+        _assert_sufficient_credits(current_user, context, db, locale)
 
         # Step 4: Create the plate selection (only if credits are sufficient)
         # Client transaction, subscription balance, plate_pickup_live, and restaurant_transaction
@@ -218,6 +121,181 @@ def create_plate_selection_with_transactions(
         raise envelope_exception(
             ErrorCode.ENTITY_CREATION_FAILED, status=500, locale=locale, entity="plate selection"
         ) from None
+
+
+def _resolve_restaurant_timezone(address: Any) -> str:
+    """
+    Derive the IANA timezone string for a restaurant's address.
+
+    Resolution order: address.timezone → market config lookup by country_code →
+    hardcoded fallback ("America/Argentina/Buenos_Aires").
+    """
+    from app.config.market_config import MarketConfiguration
+
+    return (
+        getattr(address, "timezone", None)
+        or (MarketConfiguration.get_market_timezone(address.country_code) if address.country_code else None)
+        or "America/Argentina/Buenos_Aires"
+    )
+
+
+def _validate_restaurant_for_day(
+    context: dict[str, Any], db: psycopg2.extensions.connection, locale: str, timezone_str: str
+) -> None:
+    """
+    Calculate the calendar date for the target kitchen day and validate the restaurant
+    is open (active status + no holiday) on that date.
+
+    On date calculation failure the function falls back to a status-only check so that
+    a bad timezone config never blocks a valid selection.
+    """
+    try:
+        target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str).strftime("%Y-%m-%d")
+        context["target_date"] = target_date
+        country_code = context["address"].country_code
+        if country_code:
+            validate_restaurant(
+                restaurant=context["restaurant"], target_date=target_date, country_code=country_code, db=db
+            )
+        else:
+            validate_restaurant_status(context["restaurant"])
+    except (ValueError, IndexError) as e:
+        log_warning(f"Could not calculate target date for holiday validation: {e}")
+        validate_restaurant_status(context["restaurant"])
+
+
+def _validate_pickup_window(
+    context: dict[str, Any], payload: dict[str, Any], country_code: str | None, timezone_str: str
+) -> None:
+    """
+    Validate that the requested pickup_time_range falls within the market's allowed
+    pickup windows for the target kitchen day.  No-op when country_code is absent or
+    no pickup_time_range was supplied.
+    """
+    if not (country_code and context.get("target_day")):
+        return
+    target_date = context.get("target_date")
+    if not target_date:
+        target_date = resolve_weekday_to_next_occurrence(context["target_day"], timezone_str)
+    pickup_time_range = payload.get("pickup_time_range")
+    if pickup_time_range:
+        validate_pickup_time_range(country_code, context["target_day"], target_date, pickup_time_range)
+
+
+def _handle_duplicate_day(
+    payload: dict[str, Any],
+    current_user: dict[str, Any],
+    context: dict[str, Any],
+    db: psycopg2.extensions.connection,
+    locale: str,
+) -> None:
+    """
+    Guard against duplicate plate selections on the same kitchen day.
+
+    When an existing selection is found:
+    - If the caller sent replace_existing=True and the correct existing_plate_selection_id,
+      the existing selection is cancelled (commit=False) so creation can proceed atomically.
+    - Otherwise a 409 is raised with structured metadata for the frontend confirm-replace modal.
+    """
+    _existing = db_read(
+        """
+        SELECT plate_selection_id FROM plate_selection_info
+        WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
+        """,
+        (str(current_user["user_id"]), context["target_day"]),
+        connection=db,
+        fetch_one=True,
+    )
+    if not _existing:
+        return
+    existing_id = str(_existing["plate_selection_id"])
+    replace_existing = payload.get("replace_existing") is True
+    payload_existing_id = payload.get("existing_plate_selection_id")
+    payload_existing_id_str = str(payload_existing_id) if payload_existing_id else None
+    if replace_existing and payload_existing_id_str and payload_existing_id_str == existing_id:
+        # User confirmed replace: cancel existing (commit=False), then continue to create
+        cancel_plate_selection(UUID(existing_id), current_user, db, commit=False)
+    else:
+        # Duplicate without valid replace: return structured 409 for frontend modal
+        raise envelope_exception(
+            ErrorCode.PLATE_SELECTION_DUPLICATE_KITCHEN_DAY,
+            status=409,
+            locale=locale,
+            kitchen_day=context["target_day"],
+            existing_plate_selection_id=existing_id,
+        )
+
+
+def _apply_early_renewal_if_needed(
+    current_user: dict[str, Any],
+    subscription: Any,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """
+    Trigger a low-balance early renewal when all conditions are met:
+    - The subscription has an early_renewal_threshold set (not NULL).
+    - The current balance is below that threshold.
+    - The next renewal_date is still in the future (avoids double-renewing at period end).
+
+    Failures are best-effort: any HTTPException or ValueError is logged as a warning and
+    swallowed so the plate selection flow continues.
+    """
+    from fastapi import HTTPException
+
+    if not subscription:
+        return
+    threshold = subscription.early_renewal_threshold
+    if threshold is None:
+        return
+    balance = float(subscription.balance or 0)
+    renewal_date = subscription.renewal_date
+    if renewal_date is None:
+        return
+    if renewal_date.tzinfo is None:
+        renewal_date = renewal_date.replace(tzinfo=UTC)
+    else:
+        renewal_date = renewal_date.astimezone(UTC)
+    now_utc = datetime.now(UTC)
+    if not (balance < threshold and renewal_date > now_utc):
+        return
+    user_id = current_user.get("user_id")
+    if isinstance(user_id, str):
+        user_id = UUID(user_id)
+    try:
+        apply_subscription_renewal(
+            subscription.subscription_id,
+            db,
+            modified_by=user_id,
+            commit=True,
+        )
+        log_info(
+            f"Early renewal applied for user {current_user['user_id']} (balance {balance} < {threshold}, renewal_date in future)"
+        )
+    except (HTTPException, ValueError) as e:
+        log_warning(f"Could not apply early renewal: {e}")
+
+
+def _assert_sufficient_credits(
+    current_user: dict[str, Any],
+    context: dict[str, Any],
+    db: psycopg2.extensions.connection,
+    locale: str,
+) -> None:
+    """
+    Raise HTTP 402 if the user's credit balance is insufficient for the plate's credit cost.
+    Must be called BEFORE any records are inserted.
+    """
+    from fastapi import HTTPException
+
+    credit_validation = validate_sufficient_credits(current_user["user_id"], context["plate"].credit, db)
+    if not credit_validation.has_sufficient_credits:
+        insufficient_credits_response = handle_insufficient_credits(
+            current_user["user_id"], context["plate"].credit, credit_validation.current_balance
+        )
+        raise HTTPException(
+            status_code=402,  # Payment Required
+            detail=insufficient_credits_response.model_dump(),
+        )
 
 
 def _fetch_plate_selection_context(
