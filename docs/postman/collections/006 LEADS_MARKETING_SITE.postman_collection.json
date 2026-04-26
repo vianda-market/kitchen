@@ -811,6 +811,311 @@
 			]
 		},
 		{
+			"name": "Cities endpoint (/leads/cities)",
+			"description": "GET /api/v1/leads/cities — flat city list (default + supplier audience) and coverage mode. No auth, reCAPTCHA bypassed in dev. Ported from app/tests/routes/test_leads.py::TestLeadsCitiesEndpoint.\n\nDivergence note — caching behavior: the original pytest patches time.time() to verify TTL enforcement. End-to-end TTL is unverifiable at the HTTP layer without clock manipulation. The two requests below verify response-shape stability across two sequential calls and that both return the same first city; TTL enforcement itself is not asserted.",
+			"item": [
+				{
+					"name": "GET /leads/cities (default mode) — flat city list",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response has cities key', () => pm.expect(body).to.have.property('cities'));",
+									"pm.test('cities is an array', () => pm.expect(body.cities).to.be.an('array'));",
+									"if (body.cities.length > 0) {",
+									"    pm.test('cities entries are strings', () => {",
+									"        body.cities.forEach(c => pm.expect(c).to.be.a('string'));",
+									"    });",
+									"    pm.collectionVariables.set('citiesFirstCity', body.cities[0]);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/cities?country_code=AR",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "cities"],
+							"query": [{"key": "country_code", "value": "AR"}]
+						},
+						"description": "Default mode (no mode param). Response: LeadsCitiesResponseSchema with a 'cities' array of strings. Port of test_default_mode_returns_flat_city_list."
+					}
+				},
+				{
+					"name": "GET /leads/cities (default mode, 2nd call) — shape stable + same first city",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response has cities key', () => pm.expect(body).to.have.property('cities'));",
+									"pm.test('cities is an array', () => pm.expect(body.cities).to.be.an('array'));",
+									"const firstCity = pm.collectionVariables.get('citiesFirstCity');",
+									"if (firstCity && body.cities.length > 0) {",
+									"    pm.test('First city is consistent across sequential calls (cache stability)', () => {",
+									"        pm.expect(body.cities[0]).to.equal(firstCity);",
+									"    });",
+									"}",
+									"// NOTE: TTL enforcement (time.time() patching) is unverifiable end-to-end.",
+									"// Two sequential calls verifying shape + same first-city is the HTTP-layer proxy."
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/cities?country_code=AR",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "cities"],
+							"query": [{"key": "country_code", "value": "AR"}]
+						},
+						"description": "Second sequential call to /leads/cities. Verifies shape stability and that the first city is the same (cache hit). TTL enforcement itself is not asserted end-to-end. Port of test_caching_behavior (diverged)."
+					}
+				},
+				{
+					"name": "GET /leads/cities?audience=supplier — flat list (backward compat)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response has cities key', () => pm.expect(body).to.have.property('cities'));",
+									"pm.test('cities is an array', () => pm.expect(body.cities).to.be.an('array'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/cities?country_code=AR&audience=supplier",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "cities"],
+							"query": [
+								{"key": "country_code", "value": "AR"},
+								{"key": "audience", "value": "supplier"}
+							]
+						},
+						"description": "audience=supplier still returns flat city list (backward compatibility unchanged). Port of test_supplier_audience_still_returns_flat_list."
+					}
+				},
+				{
+					"name": "GET /leads/cities?mode=coverage — [{city, restaurant_count}] objects",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"if (body.length > 0) {",
+									"    const first = body[0];",
+									"    pm.test('Each entry has city field (string)', () => pm.expect(first).to.have.property('city').that.is.a('string'));",
+									"    pm.test('Each entry has restaurant_count field (number)', () => pm.expect(first).to.have.property('restaurant_count').that.is.a('number'));",
+									"    pm.test('restaurant_count is >= 1 (service excludes zero-count cities)', () => {",
+									"        body.forEach(entry => pm.expect(entry.restaurant_count).to.be.at.least(1));",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/cities?country_code=AR&mode=coverage",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "cities"],
+							"query": [
+								{"key": "country_code", "value": "AR"},
+								{"key": "mode", "value": "coverage"}
+							]
+						},
+						"description": "mode=coverage returns [{city, restaurant_count}] objects. Service excludes cities with zero active plate coverage (restaurant_count >= 1). Port of test_coverage_mode_returns_city_with_count_objects + test_coverage_mode_excludes_zero_count_cities."
+					}
+				},
+				{
+					"name": "GET /leads/cities?mode=coverage (unknown country) — [] empty list",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"pm.test('Body is empty array', () => pm.expect(pm.response.json()).to.eql([]));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/cities?country_code=ZZ&mode=coverage",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "cities"],
+							"query": [
+								{"key": "country_code", "value": "ZZ"},
+								{"key": "mode", "value": "coverage"}
+							]
+						},
+						"description": "mode=coverage with an unknown/unsupported country returns empty array (not an error). Port of test_coverage_mode_empty_country_returns_empty_list."
+					}
+				}
+			]
+		},
+		{
+			"name": "Markets has_active_kitchens field (/leads/markets)",
+			"description": "GET /api/v1/leads/markets — has_active_kitchens field assertions. No auth. Ported from app/tests/routes/test_leads.py::TestLeadsMarketsHasActiveKitchens.\n\nDivergence note — archived-plate false case: the original pytest mocks get_coverage_flags_for_markets to return an empty set and asserts has_active_kitchens=false. End-to-end this depends on live DB state (all plates archived for a specific country). The Postman test instead verifies that has_active_kitchens is present and is a boolean in supplier mode, without asserting a specific true/false for a specific country.",
+			"item": [
+				{
+					"name": "GET /leads/markets (default/customer mode) — has_active_kitchens is true",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"if (body.length > 0) {",
+									"    pm.test('All customer-mode markets have has_active_kitchens=true', () => {",
+									"        body.forEach(m => {",
+									"            pm.expect(m).to.have.property('has_active_kitchens');",
+									"            pm.expect(m.has_active_kitchens).to.be.true;",
+									"        });",
+									"    });",
+									"    pm.test('No market_id in response (private field excluded)', () => {",
+									"        body.forEach(m => pm.expect(m).to.not.have.property('market_id'));",
+									"    });",
+									"} else {",
+									"    console.log('No active markets in DB — skipping has_active_kitchens assertions.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/markets",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "markets"]
+						},
+						"description": "Default (customer) mode: all returned markets have passed the coverage filter, so has_active_kitchens is always true. market_id is excluded from the public response. Port of test_customer_mode_has_active_kitchens_true."
+					}
+				},
+				{
+					"name": "GET /leads/markets?audience=supplier — has_active_kitchens boolean present",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"pm.test('Every market has has_active_kitchens field (boolean)', () => {",
+									"    body.forEach(m => {",
+									"        pm.expect(m).to.have.property('has_active_kitchens');",
+									"        pm.expect(m.has_active_kitchens).to.be.a('boolean');",
+									"    });",
+									"});",
+									"pm.test('Every market has country_code', () => {",
+									"    body.forEach(m => pm.expect(m).to.have.property('country_code'));",
+									"});",
+									"// NOTE: The original pytest test (test_excludes_global_marketplace_supplier_audience)",
+									"// mocks is_global_market to exclude XG. End-to-end, XG exclusion depends on the",
+									"// market_id comparison working correctly with the DB-returned type. We verify the",
+									"// field shape rather than asserting XG exclusion, which is a unit-level concern.",
+									"// NOTE: asserting specific true/false per country is not reliable end-to-end",
+									"// because it depends on live DB state (archived vs active plates).",
+									"// The test verifies the field is present and boolean for all returned markets.",
+									"// Port of test_supplier_mode_has_active_kitchens_reflects_coverage +",
+									"// test_supplier_mode_archived_plate_yields_false (diverged)."
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/markets?audience=supplier",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "markets"],
+							"query": [{"key": "audience", "value": "supplier"}]
+						},
+						"description": "Supplier audience: returns all non-global markets with has_active_kitchens reflecting coverage. Field is true when the market has active restaurant/plate/kitchen-day chain, false otherwise. Global Marketplace (XG) is excluded. Divergence: the specific false-for-archived-plates case is not asserted end-to-end (requires DB state with all plates archived). Port of test_supplier_mode_has_active_kitchens_reflects_coverage + test_supplier_mode_archived_plate_yields_false (diverged)."
+					}
+				},
+				{
+					"name": "GET /leads/markets (batch coverage check) — AR and US each have correct fields",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"pm.test('Every market has expected public fields', () => {",
+									"    body.forEach(m => {",
+									"        pm.expect(m).to.have.property('country_code');",
+									"        pm.expect(m).to.have.property('country_name');",
+									"        pm.expect(m).to.have.property('language');",
+									"        pm.expect(m).to.have.property('locale');",
+									"        pm.expect(m).to.have.property('has_active_kitchens');",
+									"    });",
+									"});",
+									"pm.test('locale is derived from language + country_code (e.g. es-AR)', () => {",
+									"    body.forEach(m => {",
+									"        pm.expect(m.locale).to.match(/^[a-z]{2}-[A-Z]{2}$/);",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/leads/markets?audience=supplier",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "leads", "markets"],
+							"query": [{"key": "audience", "value": "supplier"}]
+						},
+						"description": "Batch check: all markets in the supplier response carry the full set of public fields and locale is correctly derived (language-COUNTRY format). Port of test_supplier_mode_has_active_kitchens_reflects_coverage (batch assertion part)."
+					}
+				}
+			]
+		},
+		{
 			"name": "Admin override on market status (guardrails)",
 			"description": "Exercises the admin override validation added to PUT /admin/markets/{id}. Requires a super admin token and at least one non-global market in the DB.",
 			"item": [
