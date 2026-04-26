@@ -142,6 +142,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────────
   secrets:
     name: Secret Scanning (Gitleaks)
+    needs: fast-checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
