@@ -1941,12 +1941,17 @@ def get_enriched_plates(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
+            # Filter-only join for plate_date_from / plate_date_to. plate_info → plate_selection_info
+            # is 1:N (a plate can have many reservations), so rows are deduplicated via distinct=True
+            # below. psi.pickup_date is not in the SELECT list; it is exposed only for WHERE filtering.
+            ("LEFT", "customer.plate_selection_info", "psi", "psi.plate_id = p.plate_id AND psi.is_archived = FALSE"),
         ],
         scope=scope,
         include_archived=include_archived,
         additional_conditions=additional_conditions,
         page=page,
         page_size=page_size,
+        distinct=True,
     )
     for plate in plates:
         plate.address_display = format_street_display(

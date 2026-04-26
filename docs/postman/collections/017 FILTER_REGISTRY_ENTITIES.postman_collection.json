@@ -134,7 +134,7 @@
                   "});",
                   "// All returned restaurants must have the filtered city",
                   "const restaurants = pm.response.json();",
-                  "const city = pm.request.url.query.toObject().city;",
+                  "const city = decodeURIComponent(pm.request.url.query.toObject().city || '');",
                   "restaurants.forEach(function(r) {",
                   "    pm.test('Restaurant city matches filter', function () {",
                   "        pm.expect(r.city).to.equal(city);",
@@ -382,7 +382,7 @@
       "name": "Plates",
       "item": [
         {
-          "name": "GET /plates/enriched \u2013 no filter (baseline)",
+          "name": "GET /plates/enriched \u2013 no filter (baseline, stores count for row-inflation guard)",
           "event": [
             {
               "listen": "test",
@@ -393,7 +393,9 @@
                   "});",
                   "pm.test('Response is array', function () {",
                   "    pm.expect(pm.response.json()).to.be.an('array');",
-                  "});"
+                  "});",
+                  "// Store baseline count so the row-inflation guard test below can compare.",
+                  "pm.collectionVariables.set('platesBaselineCount', pm.response.json().length);"
                 ],
                 "type": "text/javascript"
               }
@@ -524,7 +526,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched \u2013 filter by date range (gte/lte)",
+          "name": "GET /plates/enriched \u2013 filter by service date range (pickup_date gte/lte via psi join)",
           "event": [
             {
               "listen": "test",
@@ -535,6 +537,14 @@
                   "});",
                   "pm.test('Response is array', function () {",
                   "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Row count does not exceed unfiltered baseline (no row inflation from psi join)', function () {",
+                  "    // A date filter can only reduce (or equal) the unfiltered count — it cannot",
+                  "    // inflate it. If distinct=True is working correctly, the filtered result is a",
+                  "    // subset of the unfiltered result. This guards against the 1:N join inflating",
+                  "    // plate rows when plate_selection_info has multiple reservations per plate.",
+                  "    var baseline = pm.collectionVariables.get('platesBaselineCount');",
+                  "    pm.expect(pm.response.json().length).to.be.at.most(parseInt(baseline));",
                   "});"
                 ],
                 "type": "text/javascript"
