@@ -27,6 +27,89 @@ from app.utils.error_messages import entity_not_found
 from app.utils.log import log_error, log_info
 
 
+def _fetch_user_for_discretionary_request(
+    user_id: Any,
+    db: psycopg2.extensions.connection,
+) -> Any:
+    """Fetch a user by ID for a discretionary request, raising if not found."""
+    target_user = user_service.get_by_id(user_id, db)
+    if not target_user:
+        raise entity_not_found("User", user_id)
+    return target_user
+
+
+def _fetch_restaurant_for_discretionary_request(
+    restaurant_id: Any,
+    db: psycopg2.extensions.connection,
+) -> Any:
+    """Fetch a restaurant by ID for a discretionary request, raising if not found."""
+    restaurant = restaurant_service.get_by_id(restaurant_id, db)
+    if not restaurant:
+        raise entity_not_found("Restaurant", restaurant_id)
+    return restaurant
+
+
+def _validate_user_scope_for_discretionary_request(
+    target_user: Any,
+    req_institution_id: Any,
+    req_market_id: Any,
+    locale: str,
+) -> None:
+    """Validate that a user belongs to the requested institution and market."""
+    if req_institution_id is not None and str(target_user.institution_id) != str(req_institution_id):
+        raise envelope_exception(
+            ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
+            status=400,
+            locale=locale,
+        )
+    if req_market_id is not None and str(target_user.market_id) != str(req_market_id):
+        raise envelope_exception(
+            ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
+            status=400,
+            locale=locale,
+        )
+
+
+def _validate_restaurant_scope_for_discretionary_request(
+    restaurant: Any,
+    req_institution_id: Any,
+    req_market_id: Any,
+    locale: str,
+    db: psycopg2.extensions.connection,
+) -> None:
+    """Validate that a restaurant belongs to the requested institution and market."""
+    if req_institution_id is not None and str(restaurant.institution_id) != str(req_institution_id):
+        raise envelope_exception(
+            ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
+            status=400,
+            locale=locale,
+        )
+    if req_market_id is not None:
+        market = market_service.get_by_id(req_market_id)
+        if not market:
+            raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=400, locale=locale)
+        from app.services.entity_service import get_currency_metadata_id_for_restaurant
+
+        entity_currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+        if str(entity_currency_metadata_id) != str(market.get("currency_metadata_id")):
+            raise envelope_exception(
+                ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
+                status=400,
+                locale=locale,
+            )
+
+
+def _prepare_discretionary_request_payload(
+    request_data: dict[str, Any],
+    admin_user: dict[str, Any],
+) -> dict[str, Any]:
+    """Strip validation-only fields and set status/modified_by before persisting."""
+    request_data = {k: v for k, v in request_data.items() if k not in ("institution_id", "market_id")}
+    request_data["status"] = DiscretionaryStatus.PENDING
+    request_data["modified_by"] = admin_user["user_id"]
+    return request_data
+
+
 class DiscretionaryService:
     """Service for handling discretionary credit business logic"""
 
@@ -56,68 +139,30 @@ class DiscretionaryService:
             HTTPException: For validation errors or creation failures
         """
         try:
-            # Validate request data
             self._validate_discretionary_request_data(request_data, locale)
 
             target_user = None
             restaurant = None
-            # Validate target user exists (only for Client requests)
+
             if request_data.get("user_id"):
-                target_user = user_service.get_by_id(request_data["user_id"], db)
-                if not target_user:
-                    raise entity_not_found("User", request_data["user_id"])
+                target_user = _fetch_user_for_discretionary_request(request_data["user_id"], db)
 
-            # Validate restaurant exists (only for Supplier requests)
             if request_data.get("restaurant_id"):
-                restaurant = restaurant_service.get_by_id(request_data["restaurant_id"], db)
-                if not restaurant:
-                    raise entity_not_found("Restaurant", request_data["restaurant_id"])
+                restaurant = _fetch_restaurant_for_discretionary_request(request_data["restaurant_id"], db)
 
-            # Optional: validate selected user/restaurant belongs to requested institution/market
             req_institution_id = request_data.get("institution_id")
             req_market_id = request_data.get("market_id")
+
             if request_data.get("user_id") and target_user:
-                if req_institution_id is not None and str(target_user.institution_id) != str(req_institution_id):
-                    raise envelope_exception(
-                        ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
-                        status=400,
-                        locale=locale,
-                    )
-                if req_market_id is not None and str(target_user.market_id) != str(req_market_id):
-                    raise envelope_exception(
-                        ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
-                        status=400,
-                        locale=locale,
-                    )
+                _validate_user_scope_for_discretionary_request(target_user, req_institution_id, req_market_id, locale)
+
             if request_data.get("restaurant_id") and restaurant:
-                if req_institution_id is not None and str(restaurant.institution_id) != str(req_institution_id):
-                    raise envelope_exception(
-                        ErrorCode.DISCRETIONARY_RECIPIENT_INSTITUTION_MISMATCH,
-                        status=400,
-                        locale=locale,
-                    )
-                if req_market_id is not None:
-                    market = market_service.get_by_id(req_market_id)
-                    if not market:
-                        raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=400, locale=locale)
-                    from app.services.entity_service import get_currency_metadata_id_for_restaurant
+                _validate_restaurant_scope_for_discretionary_request(
+                    restaurant, req_institution_id, req_market_id, locale, db
+                )
 
-                    entity_currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
-                    if str(entity_currency_metadata_id) != str(market.get("currency_metadata_id")):
-                        raise envelope_exception(
-                            ErrorCode.DISCRETIONARY_RECIPIENT_MARKET_MISMATCH,
-                            status=400,
-                            locale=locale,
-                        )
+            request_data = _prepare_discretionary_request_payload(request_data, admin_user)
 
-            # Remove validation-only fields before persisting
-            request_data = {k: v for k, v in request_data.items() if k not in ("institution_id", "market_id")}
-
-            # Prepare request data
-            request_data["status"] = DiscretionaryStatus.PENDING
-            request_data["modified_by"] = admin_user["user_id"]
-
-            # Create discretionary request
             discretionary_request = discretionary_service.create(request_data, db)
             if not discretionary_request:
                 raise envelope_exception(ErrorCode.DISCRETIONARY_REQUEST_CREATION_FAILED, status=500, locale="en")
