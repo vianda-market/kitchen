@@ -184,6 +184,22 @@
     "status": "exempt"
   },
   {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "exempt_reason": "\"range-bound; use window_from / window_to filter params (deferred to follow-up)\"",
+    "field": "window_end",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/plate-pickup/enriched",
+    "entity": "pickups",
+    "exempt_reason": "\"range-bound; use window_from / window_to filter params (deferred to follow-up)\"",
+    "field": "window_start",
+    "model": "PlatePickupEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
     "endpoint": "/api/v1/plans/enriched",
     "entity": "plans",
     "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",

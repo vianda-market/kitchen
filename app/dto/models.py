@@ -1193,6 +1193,8 @@ class PlatePickupLiveDTO(BaseModel):
     code_verified: bool = False
     code_verified_time: datetime | None = None
     handed_out_time: datetime | None = None
+    window_start: datetime | None = None
+    window_end: datetime | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID

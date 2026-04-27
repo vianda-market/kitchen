@@ -2343,3 +2343,89 @@ CREATE TRIGGER workplace_group_history_trigger
 AFTER INSERT OR UPDATE ON core.workplace_group
 FOR EACH ROW
 EXECUTE FUNCTION workplace_group_history_trigger_func();
+
+-- Trigger function for customer.plate_pickup_live history logging
+CREATE OR REPLACE FUNCTION plate_pickup_live_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.plate_pickup_live_history
+        SET is_current  = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE plate_pickup_id = OLD.plate_pickup_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.plate_pickup_live_history (
+        event_id,
+        plate_pickup_id,
+        plate_selection_id,
+        user_id,
+        restaurant_id,
+        plate_id,
+        product_id,
+        qr_code_id,
+        qr_code_payload,
+        is_archived,
+        status,
+        was_collected,
+        arrival_time,
+        completion_time,
+        expected_completion_time,
+        confirmation_code,
+        completion_type,
+        extensions_used,
+        code_verified,
+        code_verified_time,
+        handed_out_time,
+        window_start,
+        window_end,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.plate_pickup_id,
+        NEW.plate_selection_id,
+        NEW.user_id,
+        NEW.restaurant_id,
+        NEW.plate_id,
+        NEW.product_id,
+        NEW.qr_code_id,
+        NEW.qr_code_payload,
+        NEW.is_archived,
+        NEW.status,
+        NEW.was_collected,
+        NEW.arrival_time,
+        NEW.completion_time,
+        NEW.expected_completion_time,
+        NEW.confirmation_code,
+        NEW.completion_type,
+        NEW.extensions_used,
+        NEW.code_verified,
+        NEW.code_verified_time,
+        NEW.handed_out_time,
+        NEW.window_start,
+        NEW.window_end,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS plate_pickup_live_history_trigger ON customer.plate_pickup_live;
+CREATE TRIGGER plate_pickup_live_history_trigger
+AFTER INSERT OR UPDATE ON customer.plate_pickup_live
+FOR EACH ROW
+EXECUTE FUNCTION plate_pickup_live_history_trigger_func();
