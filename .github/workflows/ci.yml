@@ -3,12 +3,12 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    # Item #8: skip the entire workflow for pure-docs PRs on pull_request.
-    # push: main is intentionally unfiltered — main always carries full signal.
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'README.md'
+    # NOTE: do NOT add `paths-ignore:` here. The `CI` aggregator (`ci-pass` job
+    # below) is a required branch-protection check; if the whole workflow is
+    # skipped via paths-ignore, the check stays "pending" forever and the PR
+    # is unmergeable. The in-workflow `dorny/paths-filter` (`changes` job) is
+    # already responsible for short-circuiting heavy jobs (`test`/`acceptance`)
+    # on docs-only PRs while keeping the aggregator runnable. (Caught on PR #143.)
   push:
     branches: [main]
 
