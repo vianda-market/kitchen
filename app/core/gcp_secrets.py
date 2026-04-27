@@ -64,7 +64,9 @@ def get_secret(secret_id: str, version: str = "latest", project_id: str | None =
     _cache[cache_key] = (value, time.time())
     # Logs the secret NAME only (e.g. "STRIPE_SECRET_KEY"), never the value.
     # `value` is returned to the caller but is not present in this log call.
-    logger.info("gcp_secret_fetched", extra={"secret_id": secret_id})  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover
+    logger.info(
+        "gcp_secret_fetched", extra={"secret_id": secret_id}
+    )  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover
     return value
 
 
