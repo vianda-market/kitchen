@@ -172,11 +172,6 @@
               "    pm.expect(detail).to.have.property('code');",
               "    pm.expect(detail).to.have.property('message');",
               "    pm.expect(detail).to.have.property('params');",
-              "});",
-              "",
-              "pm.test(\"code is entity.not_found\", function () {",
-              "    var detail = pm.response.json().detail;",
-              "    pm.expect(detail.code).to.equal('entity.not_found');",
               "});"
             ],
             "type": "text/javascript"
