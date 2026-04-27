@@ -2010,7 +2010,6 @@ BEGIN
         reward_held_until,
         expired_date,
         cancelled_date,
-        transaction_id,
         is_archived,
         status,
         created_date,
@@ -2036,7 +2035,6 @@ BEGIN
         NEW.reward_held_until,
         NEW.expired_date,
         NEW.cancelled_date,
-        NEW.transaction_id,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -2056,6 +2054,57 @@ CREATE TRIGGER referral_info_history_trigger
 AFTER INSERT OR UPDATE ON customer.referral_info
 FOR EACH ROW
 EXECUTE FUNCTION referral_info_history_trigger_func();
+
+CREATE OR REPLACE FUNCTION referral_transaction_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.referral_transaction_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE referral_transaction_id = OLD.referral_transaction_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.referral_transaction_history (
+        event_id,
+        referral_transaction_id,
+        referral_id,
+        transaction_id,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.referral_transaction_id,
+        NEW.referral_id,
+        NEW.transaction_id,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS referral_transaction_history_trigger ON customer.referral_transaction;
+CREATE TRIGGER referral_transaction_history_trigger
+AFTER INSERT OR UPDATE ON customer.referral_transaction
+FOR EACH ROW
+EXECUTE FUNCTION referral_transaction_history_trigger_func();
 
 -- =============================================================================
 -- METADATA LAYER HISTORY TRIGGERS

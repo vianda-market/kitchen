@@ -349,8 +349,8 @@ def _issue_reward(
     bonus_rate: int,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Issue referral credits: create client_transaction, update balance, mark rewarded."""
-    from app.services.crud_service import client_transaction_service, update_balance
+    """Issue referral credits: create client_transaction, write bridge row, update balance, mark rewarded."""
+    from app.services.crud_service import client_transaction_service, referral_transaction_service, update_balance
 
     if bonus_credits <= 0:
         _update_referral_status(referral_id, ReferralStatus.EXPIRED, db, expired_date=datetime.now(UTC))
@@ -359,21 +359,29 @@ def _issue_reward(
     # System user for modified_by
     system_user_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
-    # Create client transaction
+    # 1. Create client transaction (no referral_id FK — relationship lives in bridge)
     transaction_data = {
         "user_id": referrer_user_id,
         "source": "referral_program",
-        "referral_id": referral_id,
         "credit": float(bonus_credits),
         "status": Status.ACTIVE,
         "modified_by": system_user_id,
     }
     transaction = client_transaction_service.create(transaction_data, db)
 
-    # Update subscription balance
+    # 2. Write bridge row linking referral → transaction
+    bridge_data = {
+        "referral_id": referral_id,
+        "transaction_id": transaction.transaction_id,
+        "status": Status.ACTIVE,
+        "modified_by": system_user_id,
+    }
+    referral_transaction_service.create(bridge_data, db)
+
+    # 3. Update subscription balance
     update_balance(UUID(str(subscription_id)), float(bonus_credits), db, commit=False)
 
-    # Mark referral as rewarded
+    # 4. Mark referral as rewarded
     now = datetime.now(UTC)
     cursor = db.cursor()
     try:
@@ -383,7 +391,7 @@ def _issue_reward(
             SET referral_status = %s, qualified_date = COALESCE(qualified_date, %s),
                 rewarded_date = %s, bonus_credits_awarded = %s,
                 bonus_plan_price = %s, bonus_rate_applied = %s,
-                transaction_id = %s::uuid, reward_held_until = NULL,
+                reward_held_until = NULL,
                 modified_date = CURRENT_TIMESTAMP
             WHERE referral_id = %s::uuid
             """,
@@ -394,7 +402,6 @@ def _issue_reward(
                 float(bonus_credits),
                 float(plan_price),
                 bonus_rate,
-                str(transaction.transaction_id),
                 str(referral_id),
             ),
         )

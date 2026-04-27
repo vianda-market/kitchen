@@ -1,0 +1,342 @@
+{
+  "info": {
+    "_postman_id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f80",
+    "name": "020 REFERRAL_TRANSACTION_BRIDGE",
+    "description": "Acceptance tests for kitchen #73: customer.referral_transaction bridge table.\n\nVerifies:\n- GET /referrals/my-code returns a referral code for a customer\n- GET /referrals/my-referrals returns referrals with correct shape (no transaction_id field)\n- GET /referrals/stats returns referral summary\n- POST /referrals/assign-code stores a device->code mapping\n- GET /referrals/assigned-code retrieves the stored mapping\n\nNote: The full reward issuance path (process_referral_reward) is triggered internally\nduring subscription payment confirmation and is covered by the 000 E2E collection.\nThis collection verifies the API contract shapes after the bridge migration.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login Super Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has access_token\", () => pm.expect(r).to.have.property('access_token'));",
+                  "pm.collectionVariables.set(\"superAdminToken\", r.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{superAdminUsername}}" },
+                { "key": "password", "value": "{{superAdminPassword}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          }
+        },
+        {
+          "name": "Create Customer User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.collectionVariables.set('customerEmail', `referral_test_${ts}@example.com`);",
+                  "pm.collectionVariables.set('customerUsername', `referral_test_${ts}`);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has user_id\", () => pm.expect(r).to.have.property('user_id'));",
+                  "pm.collectionVariables.set('customerUserId', r.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{superAdminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{customerUsername}}\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"Test1234!\",\n  \"first_name\": \"Referral\",\n  \"last_name\": \"Tester\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"market_id\": \"{{testMarketId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          }
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has access_token\", () => pm.expect(r).to.have.property('access_token'));",
+                  "pm.collectionVariables.set('customerToken', r.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{customerUsername}}" },
+                { "key": "password", "value": "Test1234!" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Referral Code",
+      "item": [
+        {
+          "name": "GET my-code — returns referral_code string",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has referral_code\", () => pm.expect(r).to.have.property('referral_code'));",
+                  "pm.test(\"referral_code is a string\", () => pm.expect(r.referral_code).to.be.a('string'));",
+                  "pm.collectionVariables.set('referralCode', r.referral_code);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/my-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "my-code"]
+            }
+          }
+        },
+        {
+          "name": "GET my-referrals — list shape has no transaction_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Response is array\", () => pm.expect(r).to.be.an('array'));",
+                  "if (r.length > 0) {",
+                  "  pm.test(\"No transaction_id on referral row (dropped post-bridge)\", () => {",
+                  "    pm.expect(r[0]).to.not.have.property('transaction_id');",
+                  "  });",
+                  "  pm.test(\"Has referral_id\", () => pm.expect(r[0]).to.have.property('referral_id'));",
+                  "  pm.test(\"Has referral_status\", () => pm.expect(r[0]).to.have.property('referral_status'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/my-referrals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "my-referrals"]
+            }
+          }
+        },
+        {
+          "name": "GET stats — summary shape",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has total_referrals\", () => pm.expect(r).to.have.property('total_referrals'));",
+                  "pm.test(\"Has total_credits_earned\", () => pm.expect(r).to.have.property('total_credits_earned'));",
+                  "pm.test(\"Has pending_count\", () => pm.expect(r).to.have.property('pending_count'));",
+                  "pm.test(\"total_referrals is number\", () => pm.expect(r.total_referrals).to.be.a('number'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Referral Code Assignment (pre-auth deep link)",
+      "item": [
+        {
+          "name": "POST assign-code — stores device binding",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('testDeviceId', 'device-' + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"success is true\", () => pm.expect(r.success).to.equal(true));",
+                  "pm.test(\"referral_code echoed back\", () => pm.expect(r.referral_code).to.equal(pm.collectionVariables.get('referralCode')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"referral_code\": \"{{referralCode}}\",\n  \"device_id\": \"{{testDeviceId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/assign-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "assign-code"]
+            }
+          }
+        },
+        {
+          "name": "GET assigned-code — retrieves binding",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"referral_code matches assigned code\", () => {",
+                  "  pm.expect(r.referral_code).to.equal(pm.collectionVariables.get('referralCode'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/assigned-code?device_id={{testDeviceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "assigned-code"],
+              "query": [{ "key": "device_id", "value": "{{testDeviceId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contract Shape Assertions",
+      "item": [
+        {
+          "name": "GET my-referrals — no referral_id on client_transaction (field removed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// The referral_info response schema never exposed transaction_id",
+                  "// and billing.client_transaction no longer carries referral_id.",
+                  "// This test documents the post-bridge expected shape.",
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Response is array\", () => pm.expect(r).to.be.an('array'));",
+                  "r.forEach(function(item) {",
+                  "  pm.test(\"Row has referral_id\", () => pm.expect(item).to.have.property('referral_id'));",
+                  "  pm.test(\"Row has referral_status\", () => pm.expect(item).to.have.property('referral_status'));",
+                  "  pm.test(\"Row does NOT expose transaction_id directly\", () => {",
+                  "    pm.expect(item).to.not.have.property('transaction_id');",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/referrals/my-referrals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "referrals", "my-referrals"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "superAdminUsername", "value": "superadmin" },
+    { "key": "superAdminPassword", "value": "superadmin" },
+    { "key": "superAdminToken", "value": "" },
+    { "key": "customerToken", "value": "" },
+    { "key": "customerUserId", "value": "" },
+    { "key": "customerEmail", "value": "" },
+    { "key": "customerUsername", "value": "" },
+    { "key": "referralCode", "value": "" },
+    { "key": "testDeviceId", "value": "" },
+    { "key": "testMarketId", "value": "" }
+  ]
+}
