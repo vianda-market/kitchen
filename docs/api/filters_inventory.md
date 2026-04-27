@@ -44,6 +44,8 @@ Status legend:
 | `qr_code_payload` | exempt | "kiosk QR data; not a filter dimension" |
 | `restaurant_name` | exempt | "free-text label" |
 | `user_id` | exempt | "auth-scoped via JWT; not a user-input filter" |
+| `window_end` | exempt | "range-bound; use window_from / window_to filter params (deferred to follow-up)" |
+| `window_start` | exempt | "range-bound; use window_from / window_to filter params (deferred to follow-up)" |
 
 ## `plans`
 

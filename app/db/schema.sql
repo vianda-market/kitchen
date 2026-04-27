@@ -99,6 +99,7 @@ DROP TABLE IF EXISTS billing.discretionary_info CASCADE;
 DROP TABLE IF EXISTS billing.client_transaction CASCADE;
 DROP TABLE IF EXISTS customer.user_favorite_info CASCADE;
 DROP TABLE IF EXISTS customer.plate_review_info CASCADE;
+DROP TABLE IF EXISTS audit.plate_pickup_live_history CASCADE;
 DROP TABLE IF EXISTS customer.plate_pickup_live CASCADE;
 DROP TABLE IF EXISTS fintech_wallet_auth CASCADE;
 
@@ -3538,6 +3539,8 @@ CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
     code_verified BOOLEAN DEFAULT FALSE,
     code_verified_time TIMESTAMPTZ DEFAULT NULL,
     handed_out_time TIMESTAMPTZ DEFAULT NULL,
+    window_start TIMESTAMPTZ,
+    window_end TIMESTAMPTZ,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -3600,6 +3603,14 @@ COMMENT ON COLUMN customer.plate_pickup_live.code_verified_time IS
 COMMENT ON COLUMN customer.plate_pickup_live.handed_out_time IS
     'UTC timestamp when the plate was physically handed out (Handed Out lifecycle step). '
     'Separates "customer is here" (arrival) from "plate given" (handed_out) from "customer confirms" (completion).';
+COMMENT ON COLUMN customer.plate_pickup_live.window_start IS
+    'Start of the scheduled pickup window (wall-clock). Set when the pickup session '
+    'is created from reservation data. NULL for pickups created before this column '
+    'was added, or when no window has been assigned.';
+COMMENT ON COLUMN customer.plate_pickup_live.window_end IS
+    'End of the scheduled pickup window (wall-clock). Paired with window_start. '
+    'NULL for pickups created before this column was added, or when no window has '
+    'been assigned.';
 COMMENT ON COLUMN customer.plate_pickup_live.created_date IS
     'UTC timestamp when the pickup session was created (QR scan moment).';
 COMMENT ON COLUMN customer.plate_pickup_live.created_by IS
@@ -3608,6 +3619,60 @@ COMMENT ON COLUMN customer.plate_pickup_live.modified_by IS
     'FK to core.user_info. UUID of the last user to write this row.';
 COMMENT ON COLUMN customer.plate_pickup_live.modified_date IS
     'UTC timestamp of the most recent update.';
+
+\echo 'Creating table: audit.plate_pickup_live_history'
+CREATE TABLE IF NOT EXISTS audit.plate_pickup_live_history (
+    event_id                 UUID        PRIMARY KEY DEFAULT uuidv7(),
+    plate_pickup_id          UUID        NOT NULL,
+    plate_selection_id       UUID        NOT NULL,
+    user_id                  UUID        NOT NULL,
+    restaurant_id            UUID        NOT NULL,
+    plate_id                 UUID        NOT NULL,
+    product_id               UUID        NOT NULL,
+    qr_code_id               UUID        NOT NULL,
+    qr_code_payload          VARCHAR(255) NOT NULL,
+    is_archived              BOOLEAN     NOT NULL DEFAULT FALSE,
+    status                   status_enum NOT NULL DEFAULT 'active'::status_enum,
+    was_collected            BOOLEAN     DEFAULT FALSE,
+    arrival_time             TIMESTAMPTZ,
+    completion_time          TIMESTAMPTZ,
+    expected_completion_time TIMESTAMPTZ,
+    confirmation_code        VARCHAR(10),
+    completion_type          VARCHAR(20),
+    extensions_used          INTEGER     DEFAULT 0,
+    code_verified            BOOLEAN     DEFAULT FALSE,
+    code_verified_time       TIMESTAMPTZ,
+    handed_out_time          TIMESTAMPTZ,
+    window_start             TIMESTAMPTZ,
+    window_end               TIMESTAMPTZ,
+    created_date             TIMESTAMPTZ NOT NULL,
+    created_by               UUID        NULL,
+    modified_by              UUID        NOT NULL,
+    modified_date            TIMESTAMPTZ NOT NULL,
+    is_current               BOOLEAN     NOT NULL DEFAULT TRUE,
+    valid_until              TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (plate_pickup_id)
+        REFERENCES customer.plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by)
+        REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_plate_pickup_live_history_pickup
+    ON audit.plate_pickup_live_history(plate_pickup_id)
+    WHERE is_current = TRUE;
+
+COMMENT ON TABLE audit.plate_pickup_live_history IS
+    'Trigger-managed history mirror of customer.plate_pickup_live. Never written by application code.';
+COMMENT ON COLUMN audit.plate_pickup_live_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.plate_pickup_live_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.plate_pickup_live_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
+COMMENT ON COLUMN audit.plate_pickup_live_history.window_start IS
+    'Mirror of customer.plate_pickup_live.window_start.';
+COMMENT ON COLUMN audit.plate_pickup_live_history.window_end IS
+    'Mirror of customer.plate_pickup_live.window_end.';
 
 \echo 'Creating table: customer.plate_review_info'
 CREATE TABLE IF NOT EXISTS customer.plate_review_info (

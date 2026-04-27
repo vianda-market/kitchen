@@ -2128,6 +2128,10 @@ class PlatePickupEnrichedResponseSchema(BaseModel):
     expected_completion_time: datetime | None
     # filter-registry:exempt reason="opaque token; never filtered"
     confirmation_code: str | None
+    # filter-registry:exempt reason="range-bound; use window_from / window_to filter params (deferred to follow-up)"
+    window_start: datetime | None = None
+    # filter-registry:exempt reason="range-bound; use window_from / window_to filter params (deferred to follow-up)"
+    window_end: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
