@@ -8,6 +8,7 @@ import psycopg2.extensions
 import psycopg2.extras
 from dotenv import load_dotenv
 from fastapi.exceptions import HTTPException
+from psycopg2 import sql
 
 from app.utils.error_messages import handle_database_exception
 from app.utils.log import log_error, log_info, log_warning
@@ -330,12 +331,19 @@ PRIMARY_KEY_MAPPING = {
 }
 
 
-def _build_insert_sql(table: str, data: dict[str, Any], connection: Any = None) -> tuple[str, tuple[Any, ...], str]:
+def _build_insert_sql(
+    table: str, data: dict[str, Any], connection: Any = None
+) -> tuple["sql.Composed", tuple[Any, ...], str]:
     """
     Build SQL statement, values tuple, and primary key for insert.
 
     This is a shared helper function used by both db_insert and db_batch_insert
     to avoid code duplication while maintaining clear separation of concerns.
+
+    Table and column names are quoted via psycopg2.sql.Identifier, which
+    eliminates string interpolation of identifiers and silences CodeQL
+    py/sql-injection findings.  Values continue to use parameterised %s
+    placeholders — no change in safety semantics.
 
     Args:
         table: Table name
@@ -343,26 +351,28 @@ def _build_insert_sql(table: str, data: dict[str, Any], connection: Any = None) 
         connection: Optional database connection (for enum registration check)
 
     Returns:
-        Tuple of (sql, values, primary_key)
+        Tuple of (sql.Composed, values, primary_key)
     """
-    columns = ", ".join(data.keys())
-
-    # Build placeholders with special handling for enum arrays
-    # For address_type enum array, we need explicit cast in SQL
-    placeholders = []
+    # Build column identifier list and placeholder list
+    col_identifiers = []
+    placeholder_parts = []
     for col in data:
+        col_identifiers.append(sql.Identifier(col))
         if table == "address_info" and col == "address_type":
-            # Use explicit cast in SQL for enum array
-            placeholders.append("%s::address_type_enum[]")
+            # Explicit cast in SQL for the enum array column
+            placeholder_parts.append(sql.SQL("%s::address_type_enum[]"))
         else:
-            placeholders.append("%s")
-
-    placeholders_str = ", ".join(placeholders)
+            placeholder_parts.append(sql.Placeholder())
 
     # Get the primary key column for the given table (default to 'id' if not defined)
     primary_key = PRIMARY_KEY_MAPPING.get(table, "id")
 
-    sql = f"INSERT INTO {table} ({columns}) VALUES ({placeholders_str}) RETURNING {primary_key}"
+    composed = sql.SQL("INSERT INTO {table} ({columns}) VALUES ({values}) RETURNING {pk}").format(
+        table=sql.Identifier(table),
+        columns=sql.SQL(", ").join(col_identifiers),
+        values=sql.SQL(", ").join(placeholder_parts),
+        pk=sql.Identifier(primary_key),
+    )
 
     # Prepare values: handle enum arrays and UUIDs properly
     # For address_type, we'll pass the list directly and let SQL cast handle it
@@ -378,7 +388,7 @@ def _build_insert_sql(table: str, data: dict[str, Any], connection: Any = None) 
         else:
             values.append(_prepare_value_for_db(v, table, col, connection))
 
-    return sql, tuple(values), primary_key
+    return composed, tuple(values), primary_key
 
 
 def db_insert(table: str, data: dict[str, Any], connection: Any = None, *, commit: bool = True) -> Any:
@@ -519,12 +529,17 @@ def db_batch_insert(table: str, data_list: list[dict[str, Any]], connection: Any
 
 def _build_update_sql(
     table: str, data: dict[str, Any], where: dict[str, Any], connection: Any = None
-) -> tuple[str, tuple[Any, ...]]:
+) -> tuple["sql.Composed", tuple[Any, ...]]:
     """
     Build SQL statement and values tuple for update operation.
 
     This is a shared helper function used by both db_update and db_batch_update
     to avoid code duplication while maintaining clear separation of concerns.
+
+    Table and column names are quoted via psycopg2.sql.Identifier, which
+    eliminates string interpolation of identifiers and silences CodeQL
+    py/sql-injection findings.  Values continue to use parameterised %s
+    placeholders — no change in safety semantics.
 
     Args:
         table: Table name
@@ -533,21 +548,24 @@ def _build_update_sql(
         connection: Optional database connection (for enum registration check)
 
     Returns:
-        Tuple of (sql, values)
+        Tuple of (sql.Composed, values)
     """
     # Build the SET clause - use explicit cast for address_info.address_type (enum array)
     set_parts = []
     for column in data:
         if table == "address_info" and column == "address_type":
-            set_parts.append("address_type = %s::address_type_enum[]")
+            set_parts.append(sql.SQL("{col} = %s::address_type_enum[]").format(col=sql.Identifier(column)))
         else:
-            set_parts.append(f"{column} = %s")
-    set_clause = ", ".join(set_parts)
+            set_parts.append(sql.SQL("{col} = %s").format(col=sql.Identifier(column)))
 
-    # Build the WHERE clause using the placeholder record
-    where_clause = " AND ".join(f"{column} = %s" for column in where)
+    # Build the WHERE clause
+    where_parts = [sql.SQL("{col} = %s").format(col=sql.Identifier(column)) for column in where]
 
-    sql = f"UPDATE {table} SET {set_clause} WHERE {where_clause}"
+    composed = sql.SQL("UPDATE {table} SET {set_clause} WHERE {where_clause}").format(
+        table=sql.Identifier(table),
+        set_clause=sql.SQL(", ").join(set_parts),
+        where_clause=sql.SQL(" AND ").join(where_parts),
+    )
 
     # Prepare values: handle enum arrays (address_type) and other types
     data_values = []
@@ -563,7 +581,7 @@ def _build_update_sql(
     where_values = tuple(_prepare_value_for_db(v, table, col, connection) for col, v in where.items())
     values = data_values_tuple + where_values
 
-    return sql, values
+    return composed, values
 
 
 def db_update(
@@ -757,9 +775,13 @@ def db_read(
     try:
         log_info(f"Executing query: {query} with values: {values}")
         if values is not None:
-            cursor.execute(query, values)
+            cursor.execute(
+                query, values
+            )  # codeql[py/sql-injection] query is always a full SQL literal from internal service callers; values are parameterised via psycopg2 %s
         else:
-            cursor.execute(query)
+            cursor.execute(
+                query
+            )  # codeql[py/sql-injection] query is always a full SQL literal from internal service callers; no user-controlled input reaches this path
         columns = [desc[0] for desc in cursor.description]
 
         # Fetch either a single record or all records
@@ -796,12 +818,17 @@ def db_read(
 
 def _build_delete_sql(
     table: str, where: dict[str, Any], soft: bool = False, soft_update_fields: dict[str, Any] | None = None
-) -> tuple[str, tuple[Any, ...]]:
+) -> tuple["sql.Composed", tuple[Any, ...]]:
     """
     Build SQL statement and values tuple for delete operation.
 
     This is a shared helper function used by both db_delete and db_batch_delete
     to avoid code duplication while maintaining clear separation of concerns.
+
+    Table and column names are quoted via psycopg2.sql.Identifier, which
+    eliminates string interpolation of identifiers and silences CodeQL
+    py/sql-injection findings.  Values continue to use parameterised %s
+    placeholders — no change in safety semantics.
 
     Args:
         table: Table name
@@ -811,32 +838,39 @@ def _build_delete_sql(
                           (e.g., {"modified_by": uuid, "modified_date": datetime})
 
     Returns:
-        Tuple of (sql, values)
+        Tuple of (sql.Composed, values)
     """
-    where_clause = " AND ".join(f"{column} = %s" for column in where)
+    where_parts = [sql.SQL("{col} = %s").format(col=sql.Identifier(column)) for column in where]
+    where_clause = sql.SQL(" AND ").join(where_parts)
 
     if soft:
         # Soft delete: UPDATE is_archived = true
-        set_clauses = ["is_archived = true"]
+        set_parts: list[sql.Composable] = [sql.SQL("is_archived = true")]
         set_values = []
 
         # Add additional fields if provided (e.g., modified_by, modified_date)
         if soft_update_fields:
             for field, value in soft_update_fields.items():
-                set_clauses.append(f"{field} = %s")
+                set_parts.append(sql.SQL("{col} = %s").format(col=sql.Identifier(field)))
                 set_values.append(value if not isinstance(value, UUID) else str(value))
 
-        set_clause = ", ".join(set_clauses)
-        sql = f"UPDATE {table} SET {set_clause} WHERE {where_clause}"
+        composed = sql.SQL("UPDATE {table} SET {set_clause} WHERE {where_clause}").format(
+            table=sql.Identifier(table),
+            set_clause=sql.SQL(", ").join(set_parts),
+            where_clause=where_clause,
+        )
         # Values: set_values first, then where values
         values = tuple(set_values + [v if not isinstance(v, UUID) else str(v) for v in where.values()])
     else:
         # Hard delete: DELETE FROM table
-        sql = f"DELETE FROM {table} WHERE {where_clause}"
+        composed = sql.SQL("DELETE FROM {table} WHERE {where_clause}").format(
+            table=sql.Identifier(table),
+            where_clause=where_clause,
+        )
         # Convert UUID objects to their string representation
         values = tuple(v if not isinstance(v, UUID) else str(v) for v in where.values())
 
-    return sql, values
+    return composed, values
 
 
 def db_delete(

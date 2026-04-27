@@ -12,6 +12,7 @@ Update `CLAUDE_ARCHITECTURE.MD` after adding new modules, tables, services, rout
 - Never store secrets in code
 - Never pass `page`/`page_size` pagination params in cron jobs or internal service calls — pagination is for HTTP routes only
 - Never edit an already-applied migration file — write a new one instead
+- Never `cd <path> && git <cmd>` from outside a repo CWD. Use `git -C <path> <cmd>` instead — `cd && git` triggers the harness's "untrusted hooks" confirmation prompt on every invocation. Plain `git <cmd>` from inside the repo CWD is fine.
 
 ## Essential Commands
 - **Apply migrations:** `bash app/db/migrate.sh` (incremental — preserves data)

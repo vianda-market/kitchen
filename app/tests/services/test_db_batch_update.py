@@ -15,25 +15,35 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
+from psycopg2 import sql
 
 from app.utils.db import _build_update_sql, db_batch_update, db_update
+
+
+def _repr_contains_identifier(composed: sql.Composed, name: str) -> bool:
+    """Check that the composed object references an Identifier with the given name."""
+    return f"Identifier('{name}')" in repr(composed)
 
 
 class TestBuildUpdateSql:
     """Tests for _build_update_sql helper function"""
 
     def test_build_update_sql(self):
-        """Test building SQL for update"""
+        """Test building SQL for update — table and column names use sql.Identifier"""
         table = "test_table"
         data = {"status": "active", "modified_by": "user1"}
         where = {"id": "uuid1"}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
 
-        assert "UPDATE test_table" in sql
-        assert "SET status = %s" in sql
-        assert "modified_by = %s" in sql
-        assert "WHERE id = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "test_table")
+        assert _repr_contains_identifier(composed, "status")
+        assert _repr_contains_identifier(composed, "modified_by")
+        assert _repr_contains_identifier(composed, "id")
+        assert "UPDATE" in repr(composed)
+        assert "SET" in repr(composed)
+        assert "WHERE" in repr(composed)
         assert len(values) == 3  # 2 data values + 1 where value
         assert values[0] == "active"
         assert values[1] == "user1"
@@ -45,7 +55,7 @@ class TestBuildUpdateSql:
         data = {"status": "active"}
         where = {"id": UUID("12345678-1234-5678-1234-567812345678")}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
 
         assert str(values[1]) == "12345678-1234-5678-1234-567812345678"
 
@@ -55,9 +65,11 @@ class TestBuildUpdateSql:
         data = {"status": "active"}
         where = {"id": "uuid1", "is_archived": False}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
 
-        assert "WHERE id = %s AND is_archived = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "id")
+        assert _repr_contains_identifier(composed, "is_archived")
         assert len(values) == 3  # 1 data value + 2 where values
 
 

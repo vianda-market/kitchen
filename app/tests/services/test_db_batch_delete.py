@@ -16,34 +16,44 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
+from psycopg2 import sql
 
 from app.utils.db import _build_delete_sql, db_batch_delete, db_delete
+
+
+def _repr_contains_identifier(composed: sql.Composed, name: str) -> bool:
+    """Check that the composed object references an Identifier with the given name."""
+    return f"Identifier('{name}')" in repr(composed)
 
 
 class TestBuildDeleteSql:
     """Tests for _build_delete_sql helper function"""
 
     def test_build_hard_delete_sql(self):
-        """Test building SQL for hard delete"""
+        """Test building SQL for hard delete — uses sql.Identifier for table/column names"""
         table = "test_table"
         where = {"id": "uuid1"}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
 
-        assert "DELETE FROM test_table" in sql
-        assert "WHERE id = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "test_table")
+        assert _repr_contains_identifier(composed, "id")
+        assert "DELETE" in repr(composed)
         assert values == ("uuid1",)
 
     def test_build_soft_delete_sql(self):
-        """Test building SQL for soft delete"""
+        """Test building SQL for soft delete — uses sql.Identifier for table/column names"""
         table = "test_table"
         where = {"id": "uuid1"}
 
-        sql, values = _build_delete_sql(table, where, soft=True)
+        composed, values = _build_delete_sql(table, where, soft=True)
 
-        assert "UPDATE test_table" in sql
-        assert "SET is_archived = true" in sql
-        assert "WHERE id = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "test_table")
+        assert _repr_contains_identifier(composed, "id")
+        assert "UPDATE" in repr(composed)
+        assert "is_archived = true" in repr(composed)
         assert values == ("uuid1",)
 
     def test_build_soft_delete_with_additional_fields(self):
@@ -52,13 +62,13 @@ class TestBuildDeleteSql:
         where = {"id": "uuid1"}
         soft_update_fields = {"modified_by": "user1", "modified_date": datetime.now()}
 
-        sql, values = _build_delete_sql(table, where, soft=True, soft_update_fields=soft_update_fields)
+        composed, values = _build_delete_sql(table, where, soft=True, soft_update_fields=soft_update_fields)
 
-        assert "UPDATE test_table" in sql
-        assert "SET is_archived = true" in sql
-        assert "modified_by = %s" in sql
-        assert "modified_date = %s" in sql
-        assert "WHERE id = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "test_table")
+        assert _repr_contains_identifier(composed, "modified_by")
+        assert _repr_contains_identifier(composed, "modified_date")
+        assert _repr_contains_identifier(composed, "id")
         assert len(values) == 3  # modified_by, modified_date, id
 
     def test_build_delete_sql_with_uuid(self):
@@ -66,7 +76,7 @@ class TestBuildDeleteSql:
         table = "test_table"
         where = {"id": UUID("12345678-1234-5678-1234-567812345678")}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
 
         assert str(values[0]) == "12345678-1234-5678-1234-567812345678"
 
@@ -75,9 +85,11 @@ class TestBuildDeleteSql:
         table = "test_table"
         where = {"id": "uuid1", "status": "active"}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
 
-        assert "WHERE id = %s AND status = %s" in sql
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "id")
+        assert _repr_contains_identifier(composed, "status")
         assert len(values) == 2
 
 
@@ -121,8 +133,9 @@ class TestDbBatchDelete:
 
         assert result == 2
         assert mock_cursor.execute.call_count == 2
-        # Verify UPDATE SQL was used (not DELETE)
-        assert "UPDATE" in mock_cursor.execute.call_args_list[0][0][0]
+        # Verify UPDATE SQL was used (not DELETE) — check the Composed object repr
+        first_call_sql = mock_cursor.execute.call_args_list[0][0][0]
+        assert "UPDATE" in repr(first_call_sql)
         mock_conn.commit.assert_called_once()
 
     @patch("app.utils.db.get_db_connection")
@@ -144,10 +157,10 @@ class TestDbBatchDelete:
         )
 
         assert result == 1
-        # Verify SQL includes additional fields
-        sql = mock_cursor.execute.call_args_list[0][0][0]
-        assert "modified_by = %s" in sql
-        assert "modified_date = %s" in sql
+        # Verify SQL includes additional fields — check via repr of the Composed object
+        composed = mock_cursor.execute.call_args_list[0][0][0]
+        assert _repr_contains_identifier(composed, "modified_by")
+        assert _repr_contains_identifier(composed, "modified_date")
 
     def test_batch_delete_empty_list(self):
         """Test that empty list raises ValueError"""
@@ -243,7 +256,7 @@ class TestDbDelete:
     @patch("app.utils.db.get_db_connection")
     @patch("app.utils.db.close_db_connection")
     def test_single_soft_delete(self, mock_close, mock_get_conn):
-        """Test single soft delete"""
+        """Test single soft delete — UPDATE is used instead of DELETE"""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -253,7 +266,7 @@ class TestDbDelete:
         result = db_delete("test_table", {"id": "uuid1"}, connection=mock_conn, soft=True)
 
         assert result == 1
-        # Verify UPDATE SQL was used
-        sql = mock_cursor.execute.call_args_list[0][0][0]
-        assert "UPDATE" in sql
-        assert "is_archived = true" in sql
+        # Verify UPDATE SQL was used via the repr of the Composed object
+        composed = mock_cursor.execute.call_args_list[0][0][0]
+        assert "UPDATE" in repr(composed)
+        assert "is_archived = true" in repr(composed)
