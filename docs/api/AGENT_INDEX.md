@@ -227,6 +227,7 @@ _Routes: `/plans/`_
 |----------|------|-------------|
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/PLANS_FILTER_CLIENT_INTEGRATION.md` | Filter plans by market, status, and currency |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/PLAN_ROLLOVER_UI_HIDDEN.md` | Rollover is a fixed field — do not expose in plan configuration UI |
+| Internal | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/PLAN_UPSERT_SEED_CONVENTION.md` | **`PUT /plans/by-key` upsert endpoint** — idempotent seed/fixture upsert, canonical_key naming convention, Stripe minimum prices, duplicate cleanup script |
 
 ---
 

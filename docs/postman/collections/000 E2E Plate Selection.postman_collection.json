@@ -718,15 +718,20 @@
           "response": []
         },
         {
-          "name": "Create Subscription Plans",
+          "name": "Upsert Canonical Plan (idempotent)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Created Plan\", () => { ",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test(\"Upsert Plan - Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Upserted Plan has plan_id\", () => { ",
                   "    const body = pm.response.json();",
-                  "    console.log(\"Plan creation response:\", body);",
+                  "    console.log(\"Plan upsert response:\", body);",
                   "",
                   "    if (body.plan_id) {",
                   "        pm.collectionVariables.set(\"planId\", body.plan_id);",
@@ -761,27 +766,19 @@
                   "let raw = pm.request.body.raw;",
                   "let payload = JSON.parse(raw);",
                   "",
-                  "const planCreditCurrencyId = pm.collectionVariables.get(\"planCreditCurrencyId\");",
                   "const planMarketId = pm.collectionVariables.get(\"planMarketId\");",
-                  "",
-                  "// Validate that currency_metadata_id is set",
-                  "if (!planCreditCurrencyId) {",
-                  "    throw new Error(\"❌ planCreditCurrencyId is not set. Please run 'Create Credit Currency' first and ensure it completes successfully.\");",
-                  "}",
                   "",
                   "// Validate that market_id is set",
                   "if (!planMarketId) {",
-                  "    throw new Error(\"❌ planMarketId is not set. Please run 'List Markets' first and ensure it completes successfully.\");",
+                  "    throw new Error(\"planMarketId is not set. Please run 'List Markets' first and ensure it completes successfully.\");",
                   "}",
                   "",
-                  "payload.currency_metadata_id = planCreditCurrencyId;",
                   "payload.market_id = planMarketId;",
                   "",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
                   "pm.request.body.update(JSON.stringify(payload));",
                   "",
-                  "console.log(\"✅ Using currency_metadata_id:\", planCreditCurrencyId);",
-                  "console.log(\"✅ Using market_id:\", planMarketId);"
+                  "console.log(\"Using market_id:\", planMarketId);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -790,11 +787,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"market_id\": \"\",\n  \"currency_metadata_id\": \"\",\n  \"name\": \"Entry Level\",\n  \"credit\": 70,\n  \"price\": 100000.00\n}",
+              "raw": "{\n  \"canonical_key\": \"MARKET_AR_PLAN_STANDARD_100000_ARS\",\n  \"market_id\": \"\",\n  \"name\": \"Standard Plan\",\n  \"credit\": 70,\n  \"price\": 100000.00,\n  \"highlighted\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -802,14 +799,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plans",
+              "raw": "{{baseUrl}}/api/v1/plans/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plans"
+                "plans",
+                "by-key"
               ]
             }
           },
