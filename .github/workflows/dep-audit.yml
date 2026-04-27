@@ -1,0 +1,81 @@
+name: Dependency Audit
+
+# Item #9: pip-audit and license-check run nightly and on dep-bump PRs.
+# Moved out of ci.yml so the typical app-logic PR doesn't pay the ~30-60s
+# cost of these checks (they produce no incremental signal between PRs that
+# don't touch requirements files).
+#
+# Triggers:
+#   - Daily at 04:00 UTC (catches newly published CVEs overnight).
+#   - Manual workflow_dispatch (on-demand re-run, config changes).
+#   - pull_request: paths: requirements*.txt — still gates dep-bump PRs.
+#
+# This workflow is NOT a required branch-protection check.
+# Branch protection requires only: "CI" and "Mutation Tests (Tier 1)".
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'requirements*.txt'
+
+concurrency:
+  group: dep-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # pip-audit: scan production requirements for known CVEs.
+  # Needs only requirements.txt installed — uses pip cache keyed on it.
+  # ──────────────────────────────────────────────────────────────────────────
+  pip-audit:
+    name: Pip Audit (CVE scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install test dependencies (includes pip-audit)
+        run: pip install -r requirements-test.txt
+
+      - name: Audit production dependencies (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # license-check: pip-licenses requires installed packages (reads sys.path,
+  # not a requirements file), so it installs from requirements.txt.
+  # Previously in ci.yml as a standalone job; moved here for #9.
+  # ──────────────────────────────────────────────────────────────────────────
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install production dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install pip-licenses
+        run: pip install pip-licenses>=5.0
+
+      - name: License compliance
+        run: python scripts/check_licenses.py

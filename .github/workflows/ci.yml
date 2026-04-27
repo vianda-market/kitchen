@@ -3,6 +3,12 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # Item #8: skip the entire workflow for pure-docs PRs on pull_request.
+    # push: main is intentionally unfiltered — main always carries full signal.
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'README.md'
   push:
     branches: [main]
 
@@ -52,16 +58,82 @@ jobs:
               - '.github/workflows/ci.yml'
 
   # ──────────────────────────────────────────────────────────────────────────
-  # fast-checks: every cheap gate that only needs Python + the test
-  # requirements. Consolidated from 8 separate jobs (lint, typecheck, layers,
-  # complexity, deadcode, security, bandit, sqllint) so we pay `pip install`
-  # once instead of 8×. Saves ~4 min of pure install time per PR.
-  #
-  # Secret scanning stays separate because it needs full git history and
-  # downloads the gitleaks binary.
+  # Item #1 — lint-job: ruff check + ruff format --check.
+  # Shares pip cache keyed on requirements-test.txt.
   # ──────────────────────────────────────────────────────────────────────────
-  fast-checks:
-    name: Fast Checks (lint, types, layers, complexity, security)
+  lint-job:
+    name: Lint (ruff)
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install test + lint dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Item #1 + #2 — types-job: mypy with bidirectional baseline filter.
+  # Adds .mypy_cache caching keyed on sha for exact restore + requirements
+  # prefix for restore-key fallback.
+  # ──────────────────────────────────────────────────────────────────────────
+  types-job:
+    name: Types (mypy)
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install test + lint dependencies
+        run: pip install -r requirements-test.txt
+
+      # Item #2: cache .mypy_cache independently.
+      - uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-${{ github.sha }}
+          restore-keys: mypy-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-
+
+      - name: Mypy (baseline-filtered)
+        # MUST stay exactly as-is — mypy_baseline is strict in BOTH directions
+        # (refactors that resolve entries also fail the gate). See CLAUDE.md.
+        run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Item #1 / #10 — structure-job: import layers, complexity, maintainability,
+  # strict-complexity, vulture. These scripts diff against origin/main so
+  # fetch-depth: 0 is required.
+  # ──────────────────────────────────────────────────────────────────────────
+  structure-job:
+    name: Structure (imports, complexity, vulture)
+    needs: changes
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
@@ -81,21 +153,7 @@ jobs:
           cache-dependency-path: requirements-test.txt
 
       - name: Install test + lint dependencies
-        # requirements-test.txt pins ruff, mypy, lint-imports, radon, vulture,
-        # pip-audit, bandit, sqlfluff. pip-licenses is installed inline because
-        # it's only used by this gate and not by local development.
-        run: |
-          pip install -r requirements-test.txt
-          pip install pip-licenses>=5.0
-
-      - name: Ruff check
-        run: ruff check .
-
-      - name: Ruff format check
-        run: ruff format --check .
-
-      - name: Mypy (baseline-filtered)
-        run: mypy app/ 2>&1 | python -m mypy_baseline filter --no-colors
+        run: pip install -r requirements-test.txt
 
       - name: Import boundaries
         # Local: lint-imports — contracts in .importlinter
@@ -113,6 +171,31 @@ jobs:
       - name: Dead code (vulture, baselined)
         run: bash scripts/check_vulture.sh
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # Item #1 — security-job: bandit, threshold parity, filter schema,
+  # sqlfluff. pip-audit moved to dep-audit.yml (item #9).
+  # ──────────────────────────────────────────────────────────────────────────
+  security-job:
+    name: Security (bandit, thresholds, filters, sqlfluff)
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install test + lint dependencies
+        run: pip install -r requirements-test.txt
+
       - name: Bandit (high severity, baselined)
         run: bandit -r app/ -lll --exclude app/tests -b .bandit-baseline.json
 
@@ -127,45 +210,15 @@ jobs:
       - name: SQL lint (sqlfluff, baselined)
         run: bash scripts/check_sqlfluff.sh
 
-      - name: Audit production dependencies (pip-audit)
-        run: pip-audit -r requirements.txt
-
-  # ──────────────────────────────────────────────────────────────────────────
-  # license-check: pip-licenses requires installed packages (it reads
-  # sys.path, not a requirements file), so it cannot share the pip cache
-  # with fast-checks which only installs test/lint deps. Splitting into its
-  # own parallel job removes the ~25-40 s `pip install -r requirements.txt`
-  # from fast-checks' critical path.
-  # ──────────────────────────────────────────────────────────────────────────
-  license-check:
-    name: License Compliance
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-          cache: pip
-          cache-dependency-path: requirements.txt
-
-      - name: Install production dependencies
-        run: pip install -r requirements.txt
-
-      - name: Install pip-licenses
-        run: pip install pip-licenses>=5.0
-
-      - name: License compliance
-        run: python scripts/check_licenses.py
-
   # ──────────────────────────────────────────────────────────────────────────
   # secrets: separate job because it needs `fetch-depth: 0` and the gitleaks
   # binary (gitleaks-action requires a paid license for org repos).
+  # Item #4: removed `needs: fast-checks` — gitleaks has no dependency on
+  # lint/types/security and can run truly in parallel from the start.
   # ──────────────────────────────────────────────────────────────────────────
   secrets:
     name: Secret Scanning (Gitleaks)
-    needs: fast-checks
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -183,13 +236,15 @@ jobs:
         run: gitleaks detect --source . --verbose --redact
 
   # ──────────────────────────────────────────────────────────────────────────
-  # test: pytest. Gated behind fast-checks so a syntax error doesn't waste
-  # a Python boot. Skipped on docs-only PRs (changes.app-relevant=false) but
-  # always runs on push to main.
+  # test: pytest. Item #6: dropped `needs: fast-checks` — runs in parallel
+  # with the split lint/types/structure/security jobs. Skipped on docs-only
+  # PRs (changes.app-relevant=false) but always runs on push to main.
+  # Item #3: dropped standalone `pytest --collect-only` step; added
+  # .pytest_cache caching.
   # ──────────────────────────────────────────────────────────────────────────
   test:
     name: Unit Tests
-    needs: [changes, fast-checks]
+    needs: [changes]
     if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     # Needed by the sticky PR coverage comment step at the end. contents:read
@@ -218,8 +273,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-test.txt
 
-      - name: Verify test collection
-        run: pytest --collect-only -q --ignore=app/tests/database
+      # Item #3: cache .pytest_cache so collection is a noop on warm boot.
+      - uses: actions/cache@v4
+        with:
+          path: .pytest_cache
+          key: pytest-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-${{ github.sha }}
+          restore-keys: |
+            pytest-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-
 
       - name: Run unit tests
         # Routes/services tested via Postman (acceptance job). pytest scope:
@@ -259,6 +319,53 @@ jobs:
         # Raise in small steps via scripts/coverage_ratchet.py output.
         run: python scripts/check_coverage_floor.py
 
+      - name: Upload coverage artifact for post-test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-${{ github.run_id }}
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Item #7 — post-test: CRAP analysis + sticky coverage comment moved here
+  # so they run after pytest but off the test job's critical path.
+  # Not in ci-pass.needs — signal-only.
+  # Downloads coverage.xml artifact produced by `test` to avoid re-running
+  # pytest.
+  # ──────────────────────────────────────────────────────────────────────────
+  post-test:
+    name: Post-Test Signal (CRAP + coverage comment)
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      SECRET_KEY: ci-test-secret-key
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Download coverage artifact from test job
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml-${{ github.run_id }}
+        continue-on-error: true
+
       - name: Post sticky PR coverage comment
         # Builds a single markdown comment from coverage.xml and updates it
         # in place on every push via an HTML marker. Non-blocking — if this
@@ -284,12 +391,13 @@ jobs:
 
   # ──────────────────────────────────────────────────────────────────────────
   # acceptance: Newman against a real Postgres + uvicorn. By far the heaviest
-  # job (~5+ min). Gated behind fast-checks so a typo doesn't burn the boot;
-  # skipped on docs-only PRs but always runs on push to main.
+  # job (~5+ min). Item #5 + #6: dropped `needs: fast-checks` — acceptance
+  # launches at t=0 alongside all other jobs. Newman cache preserved from
+  # PR #135. Skipped on docs-only PRs but always runs on push to main.
   # ──────────────────────────────────────────────────────────────────────────
   acceptance:
     name: Acceptance Tests (Newman)
-    needs: [changes, fast-checks]
+    needs: [changes]
     if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     services:
@@ -397,8 +505,12 @@ jobs:
   # protection keeps working without a GitHub settings edit.
   #
   # `if: always()` so the gate evaluates even when upstream jobs are skipped
-  # (e.g. docs-only PR skips test + acceptance). The jq check passes on
-  # `success` or `skipped`; any `failure` / `cancelled` fails the gate.
+  # (e.g. docs-only PR skips test + acceptance, or paths-ignore skips all jobs).
+  # The jq check passes on `success` or `skipped`; any `failure` / `cancelled`
+  # fails the gate.
+  #
+  # post-test is intentionally excluded — it is signal-only and should not
+  # gate merges.
   #
   # Auxiliary workflows (mutation.yml) are NOT covered here — their display
   # names must be added to branch protection individually.
@@ -406,7 +518,7 @@ jobs:
   ci-pass:
     name: CI
     if: always()
-    needs: [changes, fast-checks, license-check, secrets, test, acceptance]
+    needs: [changes, lint-job, types-job, structure-job, security-job, secrets, test, acceptance]
     runs-on: ubuntu-latest
     steps:
       # Required so `./.github/actions/notify-routine` (below) can resolve its
