@@ -201,7 +201,6 @@ also_copy = [
     "app/",
     "application.py",
     ".env",
-    "scripts/cleanup_duplicate_plans.py",
 ]
 pytest_add_cli_args = [
     "--no-header",
