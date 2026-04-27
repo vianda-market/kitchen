@@ -1112,6 +1112,19 @@ class PlateEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RestaurantActivatedSchema(BaseModel):
+    """Embedded in mutation responses when lazy activation fires for a restaurant.
+
+    Included as ``restaurant_activated`` on POST /plate-kitchen-days and POST /qr-codes.
+    Value is ``null`` (field present, value None) when activation did not fire.
+    """
+
+    restaurant_id: UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PlateKitchenDayCreateSchema(BaseModel):
     """Schema for creating plate kitchen day assignments (supports single or multiple days)"""
 
@@ -1163,6 +1176,21 @@ class PlateKitchenDayResponseSchema(BaseModel):
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlateKitchenDayCreateResponseSchema(BaseModel):
+    """Response schema for POST /plate-kitchen-days.
+
+    Wraps the list of created records plus an optional ``restaurant_activated``
+    envelope that is populated when lazy activation fires for the restaurant.
+    ``restaurant_activated`` is always present in the response (null when
+    activation did not fire) so clients can reliably check the field.
+    """
+
+    items: list[PlateKitchenDayResponseSchema]
+    restaurant_activated: RestaurantActivatedSchema | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1348,6 +1376,14 @@ class QRCodeResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
+    restaurant_activated: RestaurantActivatedSchema | None = Field(
+        None,
+        description=(
+            "Populated when the POST /qr-codes call triggers lazy restaurant activation. "
+            "Always present (null when activation did not fire). "
+            "Absent on GET, PUT, DELETE responses."
+        ),
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
