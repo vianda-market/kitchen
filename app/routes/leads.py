@@ -128,6 +128,7 @@ def _get_cached_markets(audience: str, db) -> list[MarketPublicMinimalSchema]:
 @limiter.limit("60/minute")
 async def list_leads_markets(
     request: Request,
+    response: Response,
     language: str = Query(
         None,
         description="Locale for display names (en, es, pt). Falls back to Accept-Language header, then 'en'.",
@@ -158,6 +159,10 @@ async def list_leads_markets(
             supported=", ".join(settings.SUPPORTED_LOCALES),
         )
     markets = _get_cached_markets(effective_audience, db)
+    if not markets:
+        response.headers["Cache-Control"] = "no-store"
+        return []
+    response.headers["Cache-Control"] = "public, max-age=60"
     if locale == "en":
         return markets
     return [m.model_copy(update={"country_name": localize_country_name(m.country_code, locale)}) for m in markets]
@@ -289,7 +294,6 @@ async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query param
     Client sends selected city_name in the lead/signup form body.
     """
     country = normalize_country_code(country_code, default="US")
-    response.headers["Cache-Control"] = "public, max-age=3600"
 
     if mode == "coverage":
         global _cities_coverage_cache
@@ -301,10 +305,19 @@ async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query param
                 _cities_coverage_cache[country] = (data, now + CITIES_CACHE_TTL_SECONDS)
         else:
             data = entry[0]
-        return data or []
+        result = data or []
+        if not result:
+            response.headers["Cache-Control"] = "no-store"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=60"
+        return result
 
     effective_audience = "supplier" if audience == "supplier" else "customer"
     cities = _get_cached_cities(country, effective_audience, db)
+    if not cities:
+        response.headers["Cache-Control"] = "no-store"
+    else:
+        response.headers["Cache-Control"] = "public, max-age=60"
     return LeadsCitiesResponseSchema(cities=cities)
 
 
@@ -339,6 +352,7 @@ async def get_city_metrics_endpoint(
 @limiter.limit("10/minute")
 async def get_email_registered(
     request: Request,
+    response: Response,
     email: str | None = None,
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -347,6 +361,7 @@ async def get_email_registered(
     For lead flow: after city/zipcode, frontend can route to login vs signup without asking for full form.
     No auth; rate-limited to 10 requests per minute per IP (stricter for enumeration protection).
     """
+    response.headers["Cache-Control"] = "no-store"
     normalized = (email or "").strip().lower()
     if not normalized or "@" not in normalized:
         raise envelope_exception(ErrorCode.LEADS_EMAIL_REQUIRED, status=400, locale="en")

@@ -90,6 +90,8 @@ Returns active markets with country name, language, phone prefix. Use for countr
 
 The default (no param) is intentionally restrictive — if the parameter is missing or unrecognized, only served countries are returned.
 
+**Caching:** `Cache-Control: public, max-age=60` when the market list is non-empty. `Cache-Control: no-store` when empty (see [Cache semantics on /leads/markets and /leads/cities](#cache-semantics-on-leadsmarkets-and-leadscities) below).
+
 **Response:** `[{ country_code, country_name, language, phone_dial_code, phone_local_digits, locale }]`
 
 #### 2. City dropdown (after country selected)
@@ -109,7 +111,7 @@ Sort: alphabetical, case-insensitive. Cap: 1000 rows.
 
 **Non-empty guarantee:** For any country returned by `GET /leads/markets?audience=supplier`, the supplier-audience cities response is guaranteed non-empty.
 
-**Caching:** The cities response includes `Cache-Control: public, max-age=3600`.
+**Caching:** `Cache-Control: public, max-age=60` when the city list is non-empty. `Cache-Control: no-store` when the list is empty (see [Cache semantics on /leads/markets and /leads/cities](#cache-semantics-on-leadsmarkets-and-leadscities) below).
 
 **Response:** `{ cities: ["Buenos Aires", "Lima", ...] }`
 
@@ -391,6 +393,26 @@ Applies to `/leads/countries` and `/leads/supplier-countries`.
 - No triggers on `currency_metadata` that bump `market_info.modified_date`. No materialized invalidation columns. The hash input lives entirely at the query/response boundary — a reader can see the full story in one function.
 - Natural invalidation: when an admin flips `status` or edits currency metadata, `modified_date` bumps → ETag bumps → the browser's next `If-None-Match` revalidation gets a `200` with fresh data instead of a `304`.
 - Browser cache: `max-age=86400, stale-while-revalidate=3600`. Users see fresh data within 1h of the stale window on their next navigation.
+
+## Cache semantics on /leads/markets and /leads/cities
+
+These are admin-mutable content endpoints — markets get activated, cities get populated as restaurants onboard. The cache policy is designed so that admin activation propagates to end-users within ~60 seconds, and a clean-state user who hits the endpoint before activation is never trapped behind a stale empty response.
+
+| Endpoint | Populated response | Empty response |
+|---|---|---|
+| `GET /leads/markets` | `Cache-Control: public, max-age=60` | `Cache-Control: no-store` |
+| `GET /leads/cities` (default + coverage modes) | `Cache-Control: public, max-age=60` | `Cache-Control: no-store` |
+| `GET /leads/email-registered` | `Cache-Control: no-store` | `Cache-Control: no-store` |
+
+**Why `max-age=60` (not 3600):** Admin activates a market (marks it active, adds a restaurant, configures a plate, adds a QR). Under the old 1-hour TTL, the customer signup dropdowns would not reflect the activation for up to 60 minutes. Under `max-age=60`, propagation lag is at most ~60 seconds — matching the server-side process-local in-memory cache TTL.
+
+**Why `no-store` on empty:** An empty list means the country has not yet been activated. If a pre-activation user's request returns `[]` and CDN/browser caches it for 60 seconds (or longer), they will see empty dropdowns even after admin completes activation. `no-store` prevents any intermediate cache from holding an empty response, so the next page load fetches fresh data.
+
+**Why `no-store` on email-registered unconditionally:** This is an auth-flow query — whether an email exists changes on every signup. Caching a `registered: false` response could route a newly-signed-up user to the signup form instead of login. No caching semantics apply.
+
+**Note for vianda-home:** Do not add client-side caching for `/leads/markets` or `/leads/cities` beyond what the browser default provides from the `Cache-Control` header. If you add a query-level cache (e.g. React Query `staleTime`), set it to ≤60s for markets/cities. For `email-registered`, set `staleTime: 0` or disable caching entirely.
+
+---
 
 ## Server-Side Cache Semantics
 
