@@ -2574,3 +2574,24 @@ referral_transaction_service = CRUDService("referral_transaction", ReferralTrans
 
 # Workplace group services
 workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")
+
+
+def find_plan_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> PlanDTO | None:
+    """Look up a plan by its canonical_key.
+
+    Returns the matching PlanDTO (including archived) or None if no plan with
+    that key exists.  Used by the PUT /plans/by-key upsert endpoint to decide
+    insert vs update.
+    """
+    query = """
+        SELECT * FROM customer.plan_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return PlanDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding plan by canonical_key '{canonical_key}': {exc}")
+        return None

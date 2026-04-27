@@ -1421,6 +1421,9 @@ class PlanCreateSchema(BaseModel):
     price: float = Field(..., ge=0)
     rollover: bool | None = True
     rollover_cap: Decimal | None = None
+    canonical_key: str | None = Field(
+        None, max_length=200, description="Optional stable identifier for seed/fixture plans"
+    )
 
 
 class PlanUpdateSchema(BaseModel):
@@ -1440,6 +1443,36 @@ class PlanUpdateSchema(BaseModel):
     rollover: bool | None = None
     rollover_cap: Decimal | None = None
     status: Status | None = None
+    canonical_key: str | None = Field(
+        None, max_length=200, description="Optional stable identifier for seed/fixture plans"
+    )
+
+
+class PlanUpsertByKeySchema(BaseModel):
+    """Schema for idempotent plan upsert by canonical_key.
+
+    If a plan with the given canonical_key already exists it is updated in-place;
+    otherwise a new plan is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc plan creation (use POST /plans instead).
+    """
+
+    canonical_key: str = Field(
+        ..., max_length=200, description="Stable human-readable identifier, e.g. 'MARKET_AR_PLAN_STANDARD_50000_ARS'"
+    )
+    market_id: UUID = Field(..., description="Market (country) this plan belongs to")
+    name: str = Field(..., max_length=100)
+    name_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    marketing_description: str | None = Field(None, max_length=1000)
+    marketing_description_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    features: list[str] | None = None
+    features_i18n: dict | None = Field(None, description="Locale map: {en: [...], es: [...]}")
+    cta_label: str | None = Field(None, max_length=200)
+    cta_label_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    credit: int = Field(..., gt=0)
+    price: float = Field(..., ge=0)
+    highlighted: bool = False
+    status: Status = Status.ACTIVE
 
 
 class PlanResponseSchema(BaseModel):
@@ -1462,6 +1495,7 @@ class PlanResponseSchema(BaseModel):
     status: Status
     rollover: bool
     rollover_cap: Decimal | None
+    canonical_key: str | None = None
     is_archived: bool
     created_date: datetime
     modified_date: datetime
