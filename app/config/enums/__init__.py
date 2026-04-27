@@ -27,8 +27,10 @@ from app.config.enums.kitchen_days import KitchenDay
 from app.config.enums.lead_interest_source import LeadInterestSource
 from app.config.enums.lead_interest_status import LeadInterestStatus
 from app.config.enums.national_holiday_source import NationalHolidaySource
+from app.config.enums.payment_attempt_status import PaymentAttemptStatus
 from app.config.enums.payment_frequency import PaymentFrequency
 from app.config.enums.payment_method_types import PaymentMethodType
+from app.config.enums.payment_provider import PaymentProvider
 from app.config.enums.pickup_types import PickupType
 from app.config.enums.portion_size_display import PortionSizeDisplay
 from app.config.enums.referral_status import ReferralStatus
@@ -54,7 +56,9 @@ __all__ = [
     "AuditOperation",
     "DiscretionaryReason",
     "SubscriptionStatus",
+    "PaymentAttemptStatus",
     "PaymentMethodType",
+    "PaymentProvider",
     "StreetType",
     "BillResolution",
     "BillPayoutStatus",

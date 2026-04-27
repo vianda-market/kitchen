@@ -21,7 +21,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import BillPayoutStatus, DiscretionaryReason, RoleName, RoleType, Status
-from app.config.enums import PaymentFrequency, SupplierInvoiceStatus, SupplierInvoiceType
+from app.config.enums import (
+    PaymentAttemptStatus,
+    PaymentFrequency,
+    PaymentProvider,
+    SupplierInvoiceStatus,
+    SupplierInvoiceType,
+)
 
 # =============================================================================
 # CORE ENTITY DTOs
@@ -348,6 +354,31 @@ class ClientBillDTO(BaseModel):
     currency_metadata_id: UUID
     amount: Decimal
     currency_code: str
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: UUID | None = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentAttemptDTO(BaseModel):
+    """Pure DTO for billing.payment_attempt. Financial record for a single payment attempt.
+    Provider-specific: one row per attempt regardless of provider (Stripe, Mercado Pago, etc.).
+    Written by webhook handlers; read by subscription lifecycle services."""
+
+    payment_attempt_id: UUID
+    provider: PaymentProvider
+    provider_payment_id: str | None = None
+    idempotency_key: str | None = None
+    amount_cents: int
+    currency: str
+    payment_status: PaymentAttemptStatus
+    provider_status: str | None = None
+    failure_reason: str | None = None
+    provider_fee_cents: int | None = None
     is_archived: bool = False
     status: Status
     created_date: datetime

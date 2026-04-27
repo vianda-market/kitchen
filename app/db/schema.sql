@@ -119,6 +119,8 @@ DROP TABLE IF EXISTS core.restaurant_lead CASCADE;
 DROP TABLE IF EXISTS core.lead_interest CASCADE;
 -- core.employer_domain REMOVED (replaced by email_domain on institution_entity_info)
 DROP TABLE IF EXISTS core.employer_benefits_program CASCADE;
+DROP TABLE IF EXISTS audit.payment_attempt_history CASCADE;
+DROP TABLE IF EXISTS billing.payment_attempt CASCADE;
 DROP TABLE IF EXISTS billing.client_bill_info CASCADE;
 DROP TABLE IF EXISTS customer.subscription_payment CASCADE;
 DROP TABLE IF EXISTS customer.subscription_info CASCADE;
@@ -449,6 +451,22 @@ CREATE TYPE restaurant_lead_referral_source_enum AS ENUM (
     'referral',
     'search',
     'other'
+);
+
+\echo 'Creating enum type: payment_provider_enum'
+CREATE TYPE payment_provider_enum AS ENUM (
+    'stripe',
+    'mercado_pago'
+);
+
+\echo 'Creating enum type: payment_attempt_status_enum'
+CREATE TYPE payment_attempt_status_enum AS ENUM (
+    'pending',
+    'processing',
+    'succeeded',
+    'failed',
+    'cancelled',
+    'refunded'
 );
 
 -- =============================================================================
@@ -4771,6 +4789,10 @@ COMMENT ON COLUMN audit.subscription_history.valid_until IS
 CREATE TABLE IF NOT EXISTS customer.subscription_payment (
     subscription_payment_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_id UUID NOT NULL,
+    -- Phase 1 new columns: FK to billing.payment_attempt (nullable until Phase 2)
+    payment_attempt_id UUID NULL,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    -- Legacy columns kept for Phase 1 compatibility; will be dropped in Phase 2
     payment_provider VARCHAR(50) NOT NULL DEFAULT 'stripe',
     external_payment_id VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
@@ -4778,6 +4800,7 @@ CREATE TABLE IF NOT EXISTS customer.subscription_payment (
     currency VARCHAR(10) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subscription_id) REFERENCES customer.subscription_info(subscription_id) ON DELETE RESTRICT
+    -- FK to billing.payment_attempt added after that table is created (deferred below)
 );
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_subscription_id ON customer.subscription_payment(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_external_id ON customer.subscription_payment(external_payment_id);
@@ -4804,6 +4827,80 @@ COMMENT ON COLUMN customer.subscription_payment.currency IS
     'Surfaced in SubscriptionWithPaymentResponseSchema.currency.';
 COMMENT ON COLUMN customer.subscription_payment.created_at IS
     'UTC timestamp when the payment record was created.';
+COMMENT ON COLUMN customer.subscription_payment.payment_attempt_id IS
+    'FK to billing.payment_attempt. NULL until the first attempt is linked. '
+    'Phase 1: nullable. Phase 2: NOT NULL after cron + webhook are refactored.';
+COMMENT ON COLUMN customer.subscription_payment.attempt_number IS
+    'Attempt counter (1-based). 1 for the initial attempt; increments on retry.';
+
+\echo 'Creating table: billing.payment_attempt'
+CREATE TABLE IF NOT EXISTS billing.payment_attempt (
+    payment_attempt_id      UUID PRIMARY KEY DEFAULT uuidv7(),
+    provider                payment_provider_enum NOT NULL,
+    provider_payment_id     TEXT NULL,
+    idempotency_key         TEXT NULL,
+    amount_cents            INTEGER NOT NULL,
+    currency                CHAR(3) NOT NULL,
+    payment_status          payment_attempt_status_enum NOT NULL DEFAULT 'pending',
+    provider_status         TEXT NULL,
+    failure_reason          TEXT NULL,
+    provider_fee_cents      INTEGER NULL,
+    is_archived             BOOLEAN NOT NULL DEFAULT FALSE,
+    status                  status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by              UUID NULL,
+    modified_by             UUID NOT NULL,
+    modified_date           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_payment_attempt_provider_payment_id
+    ON billing.payment_attempt(provider_payment_id)
+    WHERE provider_payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_attempt_payment_status
+    ON billing.payment_attempt(payment_status);
+COMMENT ON TABLE billing.payment_attempt IS
+    'Financial record for a single payment attempt. Provider-specific: one row per attempt '
+    'regardless of provider (Stripe, Mercado Pago, etc.). Written by webhook handlers. '
+    'Linked to customer.subscription_payment via payment_attempt_id FK.';
+COMMENT ON COLUMN billing.payment_attempt.payment_attempt_id IS 'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.payment_attempt.provider IS 'Payment provider that processed this attempt.';
+COMMENT ON COLUMN billing.payment_attempt.provider_payment_id IS 'Provider-assigned ID (e.g. Stripe pi_…). Indexed for webhook lookup.';
+COMMENT ON COLUMN billing.payment_attempt.idempotency_key IS 'Idempotency key sent to the provider to prevent duplicate charges.';
+COMMENT ON COLUMN billing.payment_attempt.amount_cents IS 'Charge amount in smallest currency unit.';
+COMMENT ON COLUMN billing.payment_attempt.currency IS 'ISO 4217 3-letter currency code.';
+COMMENT ON COLUMN billing.payment_attempt.payment_status IS 'Financial state of this attempt.';
+COMMENT ON COLUMN billing.payment_attempt.provider_status IS 'Raw status string from the provider (debug/fidelity).';
+COMMENT ON COLUMN billing.payment_attempt.failure_reason IS 'Human-readable failure reason from the provider, if failed.';
+COMMENT ON COLUMN billing.payment_attempt.provider_fee_cents IS 'Provider transaction fee in smallest currency unit, if known.';
+COMMENT ON COLUMN billing.payment_attempt.status IS 'Admin/audit lifecycle status (active/inactive). Separate from payment_status.';
+
+\echo 'Creating table: audit.payment_attempt_history'
+CREATE TABLE IF NOT EXISTS audit.payment_attempt_history (
+    event_id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    payment_attempt_id      UUID NOT NULL,
+    provider                payment_provider_enum NOT NULL,
+    provider_payment_id     TEXT NULL,
+    idempotency_key         TEXT NULL,
+    amount_cents            INTEGER NOT NULL,
+    currency                CHAR(3) NOT NULL,
+    payment_status          payment_attempt_status_enum NOT NULL,
+    provider_status         TEXT NULL,
+    failure_reason          TEXT NULL,
+    provider_fee_cents      INTEGER NULL,
+    is_archived             BOOLEAN NOT NULL,
+    status                  status_enum NOT NULL,
+    created_date            TIMESTAMPTZ NOT NULL,
+    created_by              UUID NULL,
+    modified_by             UUID NOT NULL,
+    modified_date           TIMESTAMPTZ NOT NULL,
+    is_current              BOOLEAN,
+    valid_until             TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (payment_attempt_id) REFERENCES billing.payment_attempt(payment_attempt_id) ON DELETE RESTRICT
+);
+COMMENT ON TABLE audit.payment_attempt_history IS
+    'Trigger-managed history mirror of billing.payment_attempt. Never written by application code.';
+COMMENT ON COLUMN audit.payment_attempt_history.event_id IS 'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.payment_attempt_history.is_current IS 'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.payment_attempt_history.valid_until IS 'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.payment_method'
 CREATE TABLE IF NOT EXISTS customer.payment_method (
@@ -6499,6 +6596,14 @@ COMMENT ON COLUMN core.ad_zone.modified_date IS
 -- as a nullable UUID near the top of schema.sql so the audit history table
 -- could mirror it via the trigger pattern.
 -- ─────────────────────────────────────────────────────────────
+\echo 'Adding deferred FK: customer.subscription_payment.payment_attempt_id → billing.payment_attempt'
+ALTER TABLE customer.subscription_payment
+    ADD CONSTRAINT fk_subscription_payment_payment_attempt_id
+    FOREIGN KEY (payment_attempt_id) REFERENCES billing.payment_attempt(payment_attempt_id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_subscription_payment_attempt_id
+    ON customer.subscription_payment(payment_attempt_id)
+    WHERE payment_attempt_id IS NOT NULL;
+
 \echo 'Adding deferred FKs on core.address_info.city_metadata_id'
 ALTER TABLE core.address_info
     ADD CONSTRAINT fk_address_info_city_metadata_id
