@@ -130,8 +130,31 @@ jobs:
       - name: Audit production dependencies (pip-audit)
         run: pip-audit -r requirements.txt
 
-      - name: Install production dependencies for license inspection
+  # ──────────────────────────────────────────────────────────────────────────
+  # license-check: pip-licenses requires installed packages (it reads
+  # sys.path, not a requirements file), so it cannot share the pip cache
+  # with fast-checks which only installs test/lint deps. Splitting into its
+  # own parallel job removes the ~25-40 s `pip install -r requirements.txt`
+  # from fast-checks' critical path.
+  # ──────────────────────────────────────────────────────────────────────────
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install production dependencies
         run: pip install -r requirements.txt
+
+      - name: Install pip-licenses
+        run: pip install pip-licenses>=5.0
 
       - name: License compliance
         run: python scripts/check_licenses.py
@@ -318,6 +341,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Cache newman global install
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: newman-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            newman-${{ runner.os }}-
+
       - name: Install newman
         run: npm install -g newman
 
@@ -375,7 +406,7 @@ jobs:
   ci-pass:
     name: CI
     if: always()
-    needs: [changes, fast-checks, secrets, test, acceptance]
+    needs: [changes, fast-checks, license-check, secrets, test, acceptance]
     runs-on: ubuntu-latest
     steps:
       # Required so `./.github/actions/notify-routine` (below) can resolve its
