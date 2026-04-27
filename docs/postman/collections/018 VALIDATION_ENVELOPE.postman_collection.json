@@ -174,9 +174,9 @@
               "    pm.expect(detail).to.have.property('params');",
               "});",
               "",
-              "pm.test(\"code is market.not_found\", function () {",
+              "pm.test(\"code is entity.not_found\", function () {",
               "    var detail = pm.response.json().detail;",
-              "    pm.expect(detail.code).to.equal('market.not_found');",
+              "    pm.expect(detail.code).to.equal('entity.not_found');",
               "});"
             ],
             "type": "text/javascript"
