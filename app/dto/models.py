@@ -706,7 +706,6 @@ class ClientTransactionDTO(BaseModel):
     source: str
     plate_selection_id: UUID | None = None
     discretionary_id: UUID | None = None
-    referral_id: UUID | None = None
     credit: int
     is_archived: bool = False
     status: Status
@@ -1393,7 +1392,22 @@ class ReferralInfoDTO(BaseModel):
     reward_held_until: datetime | None = None
     expired_date: datetime | None = None
     cancelled_date: datetime | None = None
-    transaction_id: UUID | None = None
+    is_archived: bool = False
+    status: Status
+    created_date: datetime
+    created_by: UUID | None = None
+    modified_by: UUID
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralTransactionDTO(BaseModel):
+    """Pure DTO for the referral-transaction bridge row"""
+
+    referral_transaction_id: UUID
+    referral_id: UUID
+    transaction_id: UUID
     is_archived: bool = False
     status: Status
     created_date: datetime

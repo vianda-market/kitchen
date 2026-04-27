@@ -3518,6 +3518,26 @@ class ReferralInfoResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ReferralTransactionCreateSchema(BaseModel):
+    """Schema for creating a referral-transaction bridge row"""
+
+    referral_id: UUID
+    transaction_id: UUID
+
+
+class ReferralTransactionResponseSchema(BaseModel):
+    """Schema for referral-transaction bridge row response"""
+
+    referral_transaction_id: UUID
+    referral_id: UUID
+    transaction_id: UUID
+    is_archived: bool
+    status: Status
+    created_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ReferralMyCodeResponseSchema(BaseModel):
     """Schema for the user's own referral code"""
 

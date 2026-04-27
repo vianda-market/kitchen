@@ -1553,6 +1553,7 @@ from app.dto.models import (
     QRCodeDTO,
     ReferralConfigDTO,
     ReferralInfoDTO,
+    ReferralTransactionDTO,
     RestaurantBalanceDTO,
     RestaurantDTO,
     RestaurantHolidaysDTO,
@@ -2569,6 +2570,7 @@ ingredient_catalog_service = CRUDService("ingredient_catalog", IngredientCatalog
 # Referral services
 referral_config_service = CRUDService("referral_config", ReferralConfigDTO, "referral_config_id")
 referral_info_service = CRUDService("referral_info", ReferralInfoDTO, "referral_id")
+referral_transaction_service = CRUDService("referral_transaction", ReferralTransactionDTO, "referral_transaction_id")
 
 # Workplace group services
 workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")
