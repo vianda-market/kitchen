@@ -25,6 +25,7 @@ from app.schemas.consolidated_schemas import (
 from app.security.entity_scoping import ENTITY_PLATE_KITCHEN_DAYS, EntityScopingService
 from app.security.institution_scope import InstitutionScope
 from app.security.scoping import resolve_institution_filter
+from app.services.activation_service import maybe_activate_restaurant
 from app.services.crud_service import plate_kitchen_days_service, plate_service
 from app.services.entity_service import get_enriched_plate_kitchen_day_by_id, get_enriched_plate_kitchen_days
 from app.services.error_handling import handle_business_operation
@@ -199,17 +200,22 @@ def create_plate_kitchen_day(
 
     Accepts a list of kitchen_days and creates all assignments in a single transaction.
     If any assignment fails (e.g., duplicate), all operations are rolled back.
+
+    After successful creation, attempts lazy restaurant activation: if the restaurant
+    is 'pending' and all activation prereqs are now met, it is promoted to 'active'
+    silently (no event, no notification).
     """
     scope = _get_scope_for_entity(current_user)
 
-    def create_operation(connection: psycopg2.extensions.connection):
-        # Validate plate exists
-        plate = plate_service.get_by_id(payload.plate_id, connection)
-        if not plate:
-            raise envelope_exception(
-                ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plate", id=str(payload.plate_id)
-            )
+    # Resolve restaurant_id before the batch insert so we can run lazy activation after.
+    plate = plate_service.get_by_id(payload.plate_id, db)
+    if not plate:
+        raise envelope_exception(
+            ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plate", id=str(payload.plate_id)
+        )
+    restaurant_id = plate.restaurant_id
 
+    def create_operation(connection: psycopg2.extensions.connection):
         # Validate all days before creating any (fail fast)
         for day in payload.kitchen_days:
             if _check_unique_constraint(payload.plate_id, day, connection):
@@ -235,7 +241,7 @@ def create_plate_kitchen_day(
                 }
             )
 
-        # Batch insert all days atomically using db_batch_insert
+        # Batch insert all days atomically using db_batch_insert (commits internally)
         from app.utils.db import db_batch_insert
 
         inserted_ids = db_batch_insert("plate_kitchen_days", data_list, connection)
@@ -250,7 +256,22 @@ def create_plate_kitchen_day(
         log_info(f"Created {len(created_days)} kitchen days for plate {payload.plate_id}")
         return created_days
 
-    return handle_business_operation(create_operation, "create plate kitchen days", None, db)
+    result = handle_business_operation(create_operation, "create plate kitchen days", None, db)
+
+    # Lazy activation: best-effort, must not fail the HTTP response.
+    # db_batch_insert already committed; this runs in a new implicit transaction.
+    try:
+        promoted = maybe_activate_restaurant(restaurant_id, db)
+        if promoted:
+            db.commit()
+    except Exception as _exc:
+        log_error(f"Lazy activation check failed for restaurant {restaurant_id}: {_exc}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    return result
 
 
 @router.put("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)

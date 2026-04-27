@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 from app.dto.models import QRCodeDTO
 from app.security.institution_scope import InstitutionScope
+from app.services.activation_service import maybe_activate_restaurant
 from app.services.crud_service import qr_code_service
 from app.services.qr_code_generation_service import QRCodeGenerationService
 from app.utils.log import log_error, log_info
@@ -93,8 +94,23 @@ class AtomicQRCodeService:
 
                 log_info(f"QR code created atomically: {qr_code_id} for restaurant {restaurant_id}")
 
-                # Return complete QR code
-                return qr_code_service.get_by_id(qr_code_id, db, scope=scope)
+                # Fetch complete QR code before lazy-activation (same connection, after commit)
+                qr_result = qr_code_service.get_by_id(qr_code_id, db, scope=scope)
+
+            # Lazy activation: best-effort after QR commit. Run outside the `with cursor`
+            # block so a failure cannot roll back the already-committed QR insertion.
+            try:
+                promoted = maybe_activate_restaurant(restaurant_id, db)
+                if promoted:
+                    db.commit()
+            except Exception as _act_exc:
+                log_error(f"Lazy activation check failed for restaurant {restaurant_id}: {_act_exc}")
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+
+            return qr_result
 
         except Exception as e:
             # Rollback on any error
