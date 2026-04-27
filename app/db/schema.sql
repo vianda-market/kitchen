@@ -114,8 +114,8 @@ DROP TABLE IF EXISTS audit.employer_bill_history CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill_line CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill CASCADE;
 DROP TABLE IF EXISTS audit.employer_benefits_program_history CASCADE;
-DROP TABLE IF EXISTS core.restaurant_lead_cuisine CASCADE;
-DROP TABLE IF EXISTS core.restaurant_lead CASCADE;
+DROP TABLE IF EXISTS ops.restaurant_lead_cuisine CASCADE;
+DROP TABLE IF EXISTS ops.restaurant_lead CASCADE;
 DROP TABLE IF EXISTS core.lead_interest CASCADE;
 -- core.employer_domain REMOVED (replaced by email_domain on institution_entity_info)
 DROP TABLE IF EXISTS core.employer_benefits_program CASCADE;
@@ -1229,8 +1229,8 @@ COMMENT ON COLUMN core.lead_interest.created_date IS
 COMMENT ON COLUMN core.lead_interest.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: core.restaurant_lead'
-CREATE TABLE IF NOT EXISTS core.restaurant_lead (
+\echo 'Creating table: ops.restaurant_lead'
+CREATE TABLE IF NOT EXISTS ops.restaurant_lead (
     restaurant_lead_id UUID PRIMARY KEY DEFAULT uuidv7(),
     -- Contact
     business_name VARCHAR(200) NOT NULL,
@@ -1268,73 +1268,73 @@ CREATE TABLE IF NOT EXISTS core.restaurant_lead (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE SET NULL
 );
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON core.restaurant_lead(lead_status);
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON core.restaurant_lead(country_code);
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON core.restaurant_lead(contact_email);
-COMMENT ON TABLE core.restaurant_lead IS
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON ops.restaurant_lead(lead_status);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON ops.restaurant_lead(country_code);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON ops.restaurant_lead(contact_email);
+COMMENT ON TABLE ops.restaurant_lead IS
     'Restaurant supplier application leads submitted via the marketing site. '
     'Captures contact info, business profile, and vetting answers before a supplier account is created. '
     'On approval, institution_id is populated and a full supplier institution is provisioned.';
-COMMENT ON COLUMN core.restaurant_lead.restaurant_lead_id IS
+COMMENT ON COLUMN ops.restaurant_lead.restaurant_lead_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN core.restaurant_lead.business_name IS
+COMMENT ON COLUMN ops.restaurant_lead.business_name IS
     'Restaurant or business trade name as submitted by the applicant.';
-COMMENT ON COLUMN core.restaurant_lead.contact_name IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_name IS
     'Full name of the primary contact at the restaurant.';
-COMMENT ON COLUMN core.restaurant_lead.contact_email IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_email IS
     'Case-insensitive email address of the applicant. citext — uniqueness checks are case-folded.';
-COMMENT ON COLUMN core.restaurant_lead.contact_phone IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_phone IS
     'Phone number of the applicant. Free-form; not validated for E.164 format at this layer.';
-COMMENT ON COLUMN core.restaurant_lead.country_code IS
+COMMENT ON COLUMN ops.restaurant_lead.country_code IS
     'ISO 3166-1 alpha-2 country code where the restaurant operates.';
-COMMENT ON COLUMN core.restaurant_lead.city_name IS
+COMMENT ON COLUMN ops.restaurant_lead.city_name IS
     'City name as entered by the applicant. Not normalized against geonames.';
-COMMENT ON COLUMN core.restaurant_lead.years_in_operation IS
+COMMENT ON COLUMN ops.restaurant_lead.years_in_operation IS
     'Number of years the restaurant has been in operation. Non-negative integer.';
-COMMENT ON COLUMN core.restaurant_lead.employee_count_range IS
+COMMENT ON COLUMN ops.restaurant_lead.employee_count_range IS
     'Restaurant staff count range (e.g. ''1-5'', ''6-20''). Informational for vetting.';
-COMMENT ON COLUMN core.restaurant_lead.kitchen_capacity_daily IS
+COMMENT ON COLUMN ops.restaurant_lead.kitchen_capacity_daily IS
     'Maximum number of meals the kitchen can prepare per day. Used in capacity vetting.';
-COMMENT ON COLUMN core.restaurant_lead.website_url IS
+COMMENT ON COLUMN ops.restaurant_lead.website_url IS
     'Restaurant website or social media URL. Optional; informational for vetting.';
-COMMENT ON COLUMN core.restaurant_lead.referral_source IS
+COMMENT ON COLUMN ops.restaurant_lead.referral_source IS
     'How the applicant heard about Vianda (enum). Used for acquisition attribution.';
-COMMENT ON COLUMN core.restaurant_lead.message IS
+COMMENT ON COLUMN ops.restaurant_lead.message IS
     'Optional free-text message from the applicant.';
-COMMENT ON COLUMN core.restaurant_lead.vetting_answers IS
+COMMENT ON COLUMN ops.restaurant_lead.vetting_answers IS
     'JSONB blob of country-specific vetting question answers. Schema is flexible until '
     'questions are finalized per country. Do not rely on a fixed structure across markets.';
-COMMENT ON COLUMN core.restaurant_lead.lead_status IS
+COMMENT ON COLUMN ops.restaurant_lead.lead_status IS
     'Workflow state: ''submitted'' → ''in_review'' → ''approved'' / ''rejected''.';
-COMMENT ON COLUMN core.restaurant_lead.rejection_reason IS
+COMMENT ON COLUMN ops.restaurant_lead.rejection_reason IS
     'Admin-entered reason for rejection. NULL when lead_status is not ''rejected''.';
-COMMENT ON COLUMN core.restaurant_lead.reviewed_by IS
+COMMENT ON COLUMN ops.restaurant_lead.reviewed_by IS
     'FK to core.user_info — internal reviewer who processed this lead. NULL until reviewed.';
-COMMENT ON COLUMN core.restaurant_lead.reviewed_at IS
+COMMENT ON COLUMN ops.restaurant_lead.reviewed_at IS
     'UTC timestamp when the lead was reviewed (approved or rejected).';
-COMMENT ON COLUMN core.restaurant_lead.institution_id IS
+COMMENT ON COLUMN ops.restaurant_lead.institution_id IS
     'FK to core.institution_info. Populated on approval — links the lead to the provisioned supplier institution. '
     'NULL while the lead is still pending.';
-COMMENT ON COLUMN core.restaurant_lead.gclid IS
+COMMENT ON COLUMN ops.restaurant_lead.gclid IS
     'Google Click ID captured at lead submission for conversion attribution.';
-COMMENT ON COLUMN core.restaurant_lead.fbclid IS
+COMMENT ON COLUMN ops.restaurant_lead.fbclid IS
     'Facebook Click ID captured at lead submission.';
-COMMENT ON COLUMN core.restaurant_lead.fbc IS
+COMMENT ON COLUMN ops.restaurant_lead.fbc IS
     'Facebook browser cookie (_fbc) captured at lead submission. Up to 500 chars.';
-COMMENT ON COLUMN core.restaurant_lead.fbp IS
+COMMENT ON COLUMN ops.restaurant_lead.fbp IS
     'Facebook pixel cookie (_fbp) captured at lead submission.';
-COMMENT ON COLUMN core.restaurant_lead.event_id IS
+COMMENT ON COLUMN ops.restaurant_lead.event_id IS
     'Deduplication event ID for server-side Conversions API calls.';
-COMMENT ON COLUMN core.restaurant_lead.source_platform IS
+COMMENT ON COLUMN ops.restaurant_lead.source_platform IS
     'Ad platform that drove the lead (e.g. ''google'', ''meta''). Used to route conversion uploads.';
-COMMENT ON COLUMN core.restaurant_lead.is_archived IS
+COMMENT ON COLUMN ops.restaurant_lead.is_archived IS
     'Soft-delete tombstone. Archived leads are excluded from active queries.';
-COMMENT ON COLUMN core.restaurant_lead.created_date IS
+COMMENT ON COLUMN ops.restaurant_lead.created_date IS
     'UTC timestamp when the lead was submitted.';
-COMMENT ON COLUMN core.restaurant_lead.modified_date IS
+COMMENT ON COLUMN ops.restaurant_lead.modified_date IS
     'UTC timestamp of the most recent update.';
 
--- restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
+-- ops.restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
 -- Deferred: see after cuisine table is created
 
 \echo 'Creating table: core.workplace_group'
@@ -1476,8 +1476,8 @@ ALTER TABLE core.employer_benefits_program
 
 -- core.employer_domain REMOVED — see MULTINATIONAL_INSTITUTIONS.md
 
--- core.restaurant_lead
-ALTER TABLE core.restaurant_lead
+-- ops.restaurant_lead
+ALTER TABLE ops.restaurant_lead
     ADD CONSTRAINT fk_restaurant_lead_reviewed_by
     FOREIGN KEY (reviewed_by) REFERENCES core.user_info(user_id) ON DELETE SET NULL;
 
@@ -2929,19 +2929,19 @@ COMMENT ON COLUMN ops.cuisine_suggestion.modified_by IS
 COMMENT ON COLUMN ops.cuisine_suggestion.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: core.restaurant_lead_cuisine'
-CREATE TABLE IF NOT EXISTS core.restaurant_lead_cuisine (
-    restaurant_lead_id UUID NOT NULL REFERENCES core.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
+\echo 'Creating table: ops.restaurant_lead_cuisine'
+CREATE TABLE IF NOT EXISTS ops.restaurant_lead_cuisine (
+    restaurant_lead_id UUID NOT NULL REFERENCES ops.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
     cuisine_id UUID NOT NULL REFERENCES ops.cuisine(cuisine_id) ON DELETE CASCADE,
     PRIMARY KEY (restaurant_lead_id, cuisine_id)
 );
-COMMENT ON TABLE core.restaurant_lead_cuisine IS
+COMMENT ON TABLE ops.restaurant_lead_cuisine IS
     'Junction table linking restaurant leads to their cuisine tags. '
     'A lead can be tagged with multiple cuisines from ops.cuisine. '
     'Cascades deletes from both restaurant_lead and cuisine.';
-COMMENT ON COLUMN core.restaurant_lead_cuisine.restaurant_lead_id IS
-    'FK to core.restaurant_lead. Part of composite primary key.';
-COMMENT ON COLUMN core.restaurant_lead_cuisine.cuisine_id IS
+COMMENT ON COLUMN ops.restaurant_lead_cuisine.restaurant_lead_id IS
+    'FK to ops.restaurant_lead. Part of composite primary key.';
+COMMENT ON COLUMN ops.restaurant_lead_cuisine.cuisine_id IS
     'FK to ops.cuisine. Part of composite primary key.';
 
 \echo 'Creating table: ops.qr_code'

@@ -379,6 +379,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "restaurant_id": "Restaurant",
                 "status": "Status",
             },
+            "restaurant_lead": {
+                "business_name": "Business Name",
+                "country_code": "Country",
+                "city_name": "City",
+            },
             "qr_code": {
                 "qr_code_id": "QR Code ID",
                 "restaurant_id": "Restaurant",
@@ -812,6 +817,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "restaurant_id": "Restaurante",
                 "status": "Estado",
             },
+            "restaurant_lead": {
+                "business_name": "Nombre del negocio",
+                "country_code": "País",
+                "city_name": "Ciudad",
+            },
             "qr_code": {
                 "qr_code_id": "ID de código QR",
                 "restaurant_id": "Restaurante",
@@ -1244,6 +1254,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             "cuisine_suggestion": {
                 "restaurant_id": "Restaurante",
                 "status": "Status",
+            },
+            "restaurant_lead": {
+                "business_name": "Nome do negócio",
+                "country_code": "País",
+                "city_name": "Cidade",
             },
             "qr_code": {
                 "qr_code_id": "ID do código QR",
