@@ -65,7 +65,7 @@ jobs:
       # level. Keep in sync with [tool.mutmut].paths_to_mutate in pyproject.toml.
       # On `push` events there is no PR base to diff against, so dorny returns
       # true for every key — that's fine, push to main should always run.
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
