@@ -22,8 +22,15 @@ from app.utils.db import _build_update_sql, db_batch_update, db_update
 
 @pytest.fixture(scope="module")
 def db_conn():
-    """Real psycopg2 connection used only to render sql.Composed objects via as_string()."""
-    conn = psycopg2.connect(dbname="kitchen", host="localhost")
+    """Real psycopg2 connection used only to render sql.Composed objects via as_string().
+
+    Tests that require this fixture are automatically skipped when no local PostgreSQL
+    instance is available (e.g., in the mutation-testing CI job which has no DB service).
+    """
+    try:
+        conn = psycopg2.connect(dbname="kitchen", host="localhost", connect_timeout=2)
+    except psycopg2.OperationalError:
+        pytest.skip("PostgreSQL not available — skipping sql.Composed rendering tests")
     yield conn
     conn.close()
 
