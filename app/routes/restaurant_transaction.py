@@ -18,10 +18,12 @@ are handled automatically by the system when:
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     RestaurantTransactionEnrichedResponseSchema,
     RestaurantTransactionResponseSchema,
@@ -39,10 +41,6 @@ from app.utils.pagination import PaginationParams, get_pagination_params, set_pa
 router = APIRouter(
     prefix="/restaurant-transactions", tags=["Restaurant Transactions"], dependencies=[Depends(oauth2_scheme)]
 )
-
-
-def _restaurant_transaction_not_found() -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant transaction not found")
 
 
 # GET /restaurant-transactions/ – Get all restaurant transactions (read-only)
@@ -142,7 +140,7 @@ def get_enriched_restaurant_transaction(
         transaction = get_enriched_restaurant_transaction_by_id(db, transaction_id, scope=scope, include_archived=False)
 
         if not transaction:
-            raise _restaurant_transaction_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_TRANSACTION_NOT_FOUND, status=404, locale="en")
 
         log_info(f"Retrieved enriched restaurant transaction: {transaction_id}")
         return transaction
@@ -177,10 +175,10 @@ def get_restaurant_transaction(
         transaction = restaurant_transaction_service.get_by_id(transaction_id, db, scope=scope)
 
         if not transaction:
-            raise _restaurant_transaction_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_TRANSACTION_NOT_FOUND, status=404, locale="en")
 
         if transaction.is_archived:
-            raise _restaurant_transaction_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_TRANSACTION_NOT_FOUND, status=404, locale="en")
 
         log_info(f"Retrieved restaurant transaction: {transaction_id}")
         return transaction

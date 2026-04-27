@@ -17,10 +17,12 @@ automatically by the system when:
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.dependencies.database import get_db
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     RestaurantBalanceEnrichedResponseSchema,
     RestaurantBalanceResponseSchema,
@@ -36,10 +38,6 @@ from app.utils.log import log_info
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
 
 router = APIRouter(prefix="/restaurant-balances", tags=["Restaurant Balances"], dependencies=[Depends(oauth2_scheme)])
-
-
-def _restaurant_balance_not_found() -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant balance not found")
 
 
 # GET /restaurant-balances/enriched – Get all enriched restaurant balances (read-only)
@@ -108,7 +106,7 @@ def get_enriched_restaurant_balance(
         balance = get_enriched_restaurant_balance_by_id(db, restaurant_id, scope=scope, include_archived=False)
 
         if not balance:
-            raise _restaurant_balance_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_NOT_FOUND, status=404, locale="en")
 
         log_info(f"Retrieved enriched restaurant balance for restaurant: {restaurant_id}")
         return balance
@@ -173,10 +171,10 @@ def get_restaurant_balance(
         balance = restaurant_balance_service.get_by_id(restaurant_id, db, scope=scope)
 
         if not balance:
-            raise _restaurant_balance_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_NOT_FOUND, status=404, locale="en")
 
         if balance.is_archived:
-            raise _restaurant_balance_not_found()
+            raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_NOT_FOUND, status=404, locale="en")
 
         log_info(f"Retrieved restaurant balance for restaurant: {restaurant_id}")
         return balance

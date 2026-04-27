@@ -270,6 +270,14 @@ class ErrorCode(StrEnum):
     # per Decision F (K9 sweep). The original detail is logged server-side.
     SERVER_INTERNAL_ERROR = "server.internal_error"
 
+    # ── restaurant_balance.* ─────────────────────────────────────────────────
+    # Restaurant balance read-only errors. Wired in #87-d (404 hijack sweep).
+    RESTAURANT_BALANCE_NOT_FOUND = "restaurant_balance.not_found"
+
+    # ── restaurant_transaction.* ─────────────────────────────────────────────
+    # Restaurant transaction read-only errors. Wired in #87-d (404 hijack sweep).
+    RESTAURANT_TRANSACTION_NOT_FOUND = "restaurant_transaction.not_found"
+
     # ── restaurant.* ─────────────────────────────────────────────────────
     # Restaurant management errors. Wired in K11 (restaurant + ops sweep).
     RESTAURANT_NOT_FOUND = "restaurant.not_found"
