@@ -141,6 +141,15 @@ ENUM_LABELS: dict[str, dict[str, dict[str, str]]] = {
             "expired": "Expired",
             "cancelled": "Cancelled",
         },
+        "dietary_flag": {
+            "vegan": "Vegan",
+            "vegetarian": "Vegetarian",
+            "gluten_free": "Gluten Free",
+            "dairy_free": "Dairy Free",
+            "nut_free": "Nut Free",
+            "halal": "Halal",
+            "kosher": "Kosher",
+        },
     },
     "es": {
         "bill_resolution": {
@@ -280,6 +289,15 @@ ENUM_LABELS: dict[str, dict[str, dict[str, str]]] = {
             "rewarded": "Recompensado",
             "expired": "Expirado",
             "cancelled": "Cancelado",
+        },
+        "dietary_flag": {
+            "vegan": "Vegano",
+            "vegetarian": "Vegetariano",
+            "gluten_free": "Sin gluten",
+            "dairy_free": "Sin lácteos",
+            "nut_free": "Sin frutos secos",
+            "halal": "Halal",
+            "kosher": "Kosher",
         },
     },
     "pt": {
@@ -421,6 +439,15 @@ ENUM_LABELS: dict[str, dict[str, dict[str, str]]] = {
             "expired": "Expirado",
             "cancelled": "Cancelado",
         },
+        "dietary_flag": {
+            "vegan": "Vegano",
+            "vegetarian": "Vegetariano",
+            "gluten_free": "Sem glúten",
+            "dairy_free": "Sem laticínios",
+            "nut_free": "Sem nozes",
+            "halal": "Halal",
+            "kosher": "Kosher",
+        },
     },
 }
 
@@ -447,6 +474,7 @@ LABELED_ENUM_TYPES = frozenset(
         "audit_operation",
         "discretionary_reason",
         "referral_status",
+        "dietary_flag",
     }
 )
 
