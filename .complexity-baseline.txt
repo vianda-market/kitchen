@@ -13,3 +13,5 @@ app/services/entity_service.py:get_enriched_plate_pickups
 app/services/entity_service.py:get_enriched_restaurant_holidays
 app/services/enriched_service.py:EnrichedService.get_distinct_enriched
 app/services/leads_public_service.py:create_lead_interest
+app/services/restaurant_explorer_service.py:get_coworker_pickup_windows
+app/services/restaurant_explorer_service.py:get_plates_for_restaurants
