@@ -1176,6 +1176,43 @@ def get_enriched_addresses_search(
 # RESTAURANT ENRICHED BUSINESS LOGIC
 # =============================================================================
 
+# Subquery fragments that compute restaurant readiness at read time.
+# Aliased table alias for restaurant is "r" in enriched queries.
+# No DB column, no DB constraint — readiness rules may evolve.
+_RESTAURANT_HAS_PKD = """EXISTS (
+        SELECT 1
+        FROM ops.plate_info p
+        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        WHERE p.restaurant_id = r.restaurant_id
+          AND p.is_archived = FALSE
+          AND pkd.is_archived = FALSE
+          AND pkd.status = 'active'
+    )"""
+
+_RESTAURANT_HAS_QR = """EXISTS (
+        SELECT 1
+        FROM ops.qr_code qc
+        WHERE qc.restaurant_id = r.restaurant_id
+          AND qc.is_archived = FALSE
+          AND qc.status = 'active'
+    )"""
+
+# is_ready_for_signup: True iff all four prereqs satisfied
+_RESTAURANT_READINESS_SUBQUERY = f"""(
+    r.status = 'active'
+    AND r.is_archived = FALSE
+    AND {_RESTAURANT_HAS_PKD}
+    AND {_RESTAURANT_HAS_QR}
+) AS is_ready_for_signup"""
+
+# missing: text[] of unmet prereqs — evaluated even when status != 'active'
+_RESTAURANT_MISSING_SUBQUERY = f"""ARRAY_REMOVE(ARRAY[
+    CASE WHEN r.status != 'active'    THEN 'status_active'    ELSE NULL END,
+    CASE WHEN r.is_archived           THEN 'not_archived'      ELSE NULL END,
+    CASE WHEN NOT {_RESTAURANT_HAS_PKD} THEN 'plate_kitchen_days' ELSE NULL END,
+    CASE WHEN NOT {_RESTAURANT_HAS_QR}  THEN 'qr'              ELSE NULL END
+], NULL)::text[] AS missing"""
+
 # Initialize EnrichedService instance for restaurants
 _restaurant_enriched_service = EnrichedService(
     base_table="restaurant_info",
@@ -1270,6 +1307,8 @@ def get_enriched_restaurants(
             # GeoJSON coordinate order is [longitude, latitude] — the reverse of conversational
             # "lat/lng" ordering. NULL when location is not yet geocoded.
             "ST_AsGeoJSON(r.location)::jsonb as location",
+            _RESTAURANT_READINESS_SUBQUERY,
+            _RESTAURANT_MISSING_SUBQUERY,
         ],
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
@@ -1357,6 +1396,8 @@ def get_enriched_restaurant_by_id(
             # GeoJSON coordinate order is [longitude, latitude] — the reverse of conversational
             # "lat/lng" ordering. NULL when location is not yet geocoded.
             "ST_AsGeoJSON(r.location)::jsonb as location",
+            _RESTAURANT_READINESS_SUBQUERY,
+            _RESTAURANT_MISSING_SUBQUERY,
         ],
         joins=[
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
@@ -2090,9 +2131,7 @@ def get_enriched_plate_by_id(
 # restaurant -> plate -> plate_kitchen_days -> qr_code chain.
 # Mirrors the readiness predicate used by /leads/cities (city_metrics_service.get_cities_with_coverage).
 # No DB column, no DB constraint — readiness rules may evolve.
-_MARKET_READINESS_SUBQUERY = """(
-    m.status = 'active'
-    AND EXISTS (
+_MARKET_READY_RESTAURANT_EXISTS = """EXISTS (
         SELECT 1
         FROM core.institution_market im_sub
         JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
@@ -2106,8 +2145,21 @@ _MARKET_READINESS_SUBQUERY = """(
           AND p.is_archived = FALSE
           AND pkd.status = 'active' AND pkd.is_archived = FALSE
           AND qc.status = 'active' AND qc.is_archived = FALSE
-    )
+    )"""
+
+_MARKET_READINESS_SUBQUERY = f"""(
+    m.status = 'active'
+    AND {_MARKET_READY_RESTAURANT_EXISTS}
 ) AS is_ready_for_signup"""
+
+# missing: ARRAY['ready_restaurant'] when no ready restaurant; ARRAY[]::text[] when ready.
+# Null not needed — enriched endpoint always computes it.
+_MARKET_MISSING_SUBQUERY = f"""(
+    CASE WHEN {_MARKET_READY_RESTAURANT_EXISTS}
+         THEN ARRAY[]::text[]
+         ELSE ARRAY['ready_restaurant']::text[]
+    END
+) AS missing"""
 
 # Initialize EnrichedService instance for markets
 # Note: Markets don't have institution scoping, so we pass None for institution_column
@@ -2174,6 +2226,7 @@ def get_enriched_markets(
             "m.created_date",
             "m.modified_date",
             _MARKET_READINESS_SUBQUERY,
+            _MARKET_MISSING_SUBQUERY,
         ],
         joins=[
             ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),
@@ -2231,6 +2284,7 @@ def get_enriched_market_by_id(
             "m.created_date",
             "m.modified_date",
             _MARKET_READINESS_SUBQUERY,
+            _MARKET_MISSING_SUBQUERY,
         ],
         joins=[
             ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),

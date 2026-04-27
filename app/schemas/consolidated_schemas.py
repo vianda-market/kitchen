@@ -861,6 +861,23 @@ class RestaurantResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
+    is_ready_for_signup: bool | None = Field(
+        None,
+        description=(
+            "Computed at read time. True when the restaurant meets all activation prerequisites: "
+            "status='active', not archived, ≥1 active plate_kitchen_days, active QR code. "
+            "Null when the endpoint does not compute this field (e.g. plain CRUD list). "
+            "No DB column — rules may evolve without a migration."
+        ),
+    )
+    missing: list[str] | None = Field(
+        None,
+        description=(
+            "Subset of ['status_active', 'not_archived', 'plate_kitchen_days', 'qr'] listing "
+            "unmet prerequisites. Empty list when is_ready_for_signup is True. "
+            "Null when the endpoint does not compute this field."
+        ),
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1959,6 +1976,23 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     # None when the restaurant has not been geocoded yet.
     # filter-registry:exempt reason="PostGIS geometry; geo filter op handles spatial queries separately"
     location: dict | None = None
+    # filter-registry:exempt reason="computed readiness flag; not a filter dimension"
+    is_ready_for_signup: bool | None = Field(
+        None,
+        description=(
+            "Computed at read time. True when the restaurant meets all activation prerequisites: "
+            "status='active', not archived, ≥1 active plate_kitchen_days, active QR code. "
+            "Admin-facing endpoints compute this field; public/B2C endpoints do not."
+        ),
+    )
+    # filter-registry:exempt reason="computed readiness detail list; not a filter dimension"
+    missing: list[str] | None = Field(
+        None,
+        description=(
+            "Subset of ['status_active', 'not_archived', 'plate_kitchen_days', 'qr'] listing "
+            "unmet prerequisites. Empty list when is_ready_for_signup is True."
+        ),
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -2979,6 +3013,15 @@ class MarketResponseSchema(BaseModel):
             "active restaurant with active plate_kitchen_days and an active QR code. "
             "Null on plain (non-enriched) endpoints that do not compute this field. "
             "Do not add a DB column or constraint — the readiness rules may evolve."
+        ),
+    )
+    missing: list[str] | None = Field(
+        None,
+        description=(
+            "Subset of ['ready_restaurant'] listing unmet market-level prerequisites. "
+            "['ready_restaurant'] when no ready restaurant exists in this market; "
+            "[] when is_ready_for_signup is True. "
+            "Null on plain (non-enriched) endpoints that do not compute this field."
         ),
     )
 

@@ -714,6 +714,14 @@
   {
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
+    "exempt_reason": "\"computed readiness flag; not a filter dimension\"",
+    "field": "is_ready_for_signup",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
     "exempt_reason": "\"PostGIS geometry; geo filter op handles spatial queries separately\"",
     "field": "location",
     "model": "RestaurantEnrichedResponseSchema",
@@ -740,6 +748,14 @@
     "entity": "restaurants",
     "exempt_reason": "\"i18n translation payload; not filterable\"",
     "field": "member_perks_i18n",
+    "model": "RestaurantEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/restaurants/enriched",
+    "entity": "restaurants",
+    "exempt_reason": "\"computed readiness detail list; not a filter dimension\"",
+    "field": "missing",
     "model": "RestaurantEnrichedResponseSchema",
     "status": "exempt"
   },

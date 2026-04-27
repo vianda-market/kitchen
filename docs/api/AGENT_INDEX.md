@@ -71,19 +71,27 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
 | Infra | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/infrastructure/LEADS_MIGRATION_INFRA.md` | reCAPTCHA and CORS env vars for Cloud Run |
 
-### Market Readiness — `is_ready_for_signup` computed field (kitchen#123, Option B)
+### Activation Readiness — `is_ready_for_signup` + `missing` fields (kitchen#123, Option B)
 
-Admin enriched market endpoints (`GET /api/v1/admin/markets/enriched` and `GET /api/v1/admin/markets/enriched/{market_id}`) expose a computed boolean field `is_ready_for_signup` in every `MarketResponseSchema` response.
+Computed at read time on admin enriched endpoints. No DB column. No DB constraint. Rules may evolve without a migration.
 
-**Definition:** `is_ready_for_signup = true` when ALL of the following hold at read time:
-1. `market.status = 'active'`
-2. At least one active institution → active restaurant → plate → active `plate_kitchen_days` → active `qr_code` chain exists for the market.
+**Restaurant level** (`GET /api/v1/restaurants/enriched`, `GET /api/v1/restaurants/enriched/{id}`):
+- `is_ready_for_signup: bool | null` — `true` when `restaurant.status='active'`, not archived, ≥1 active `plate_kitchen_days`, active QR code.
+- `missing: list[str] | null` — subset of `["status_active", "not_archived", "plate_kitchen_days", "qr"]`.
+- Plain CRUD endpoints (`GET /api/v1/restaurants`, `GET /api/v1/restaurants/{id}`) return `null` for both fields.
 
-**Invariants (do not break):**
-- No DB column. No DB constraint. Computed via EXISTS subquery at read time. The readiness rules may evolve without a migration.
-- Plain endpoints (`GET /api/v1/admin/markets`, `GET /api/v1/admin/markets/{market_id}`) do not compute the field; they return `is_ready_for_signup: null`.
-- `/api/v1/leads/markets` (customer-facing, no auth) continues to FILTER OUT non-ready markets — that is its contract. It does NOT expose the field.
-- Sister issue on `vianda-platform` tracks admin UI display of this field.
+**Market level** (`GET /api/v1/admin/markets/enriched`, `GET /api/v1/admin/markets/enriched/{market_id}`):
+- `is_ready_for_signup: bool | null` — `true` when `market.status='active'` AND ≥1 ready restaurant exists in the market.
+- `missing: list[str] | null` — `["ready_restaurant"]` when no ready restaurant; `[]` when ready.
+- Plain market endpoints return `null` for both fields.
+
+**Lazy restaurant activation (one-way, silent):** When `plate_kitchen_days` is created OR a QR code is provisioned for a `pending` restaurant, and all prereqs are met, the backend auto-promotes `restaurant.status: pending → active`. No event, no email, no audit row. No auto-demotion.
+
+**`market.active = true` does NOT imply readiness.** Use `is_ready_for_signup` for admin UI readiness indicators.
+
+**Leading public endpoints are unaffected:** `/api/v1/leads/markets` and `/api/v1/leads/cities` continue to filter out non-ready records silently. They do not expose the new fields.
+
+**Full contract doc:** `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md`
 
 **Postman coverage:** `docs/postman/collections/019 MARKET_READINESS.postman_collection.json`
 

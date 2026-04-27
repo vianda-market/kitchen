@@ -134,10 +134,12 @@ Status legend:
 | `institution_name` | exempt | "enriched join field; filter by institution_id instead" |
 | `is_archived` | exempt | "internal archival flag; use status filter instead" |
 | `is_featured` | exempt | "boolean display flag; not a filter dimension" |
+| `is_ready_for_signup` | exempt | "computed readiness flag; not a filter dimension" |
 | `location` | exempt | "PostGIS geometry; geo filter op handles spatial queries separately" |
 | `market_credit_value_local_currency` | exempt | "enriched join field; market dimension, not a restaurant filter" |
 | `member_perks` | exempt | "display list; not independently filterable" |
 | `member_perks_i18n` | exempt | "i18n translation payload; not filterable" |
+| `missing` | exempt | "computed readiness detail list; not a filter dimension" |
 | `name` | exempt | "free-text label; use search filter instead" |
 | `postal_code` | exempt | "enriched join field; address subfield, not independently filterable" |
 | `province` | exempt | "enriched join field; address subfield, not independently filterable" |
