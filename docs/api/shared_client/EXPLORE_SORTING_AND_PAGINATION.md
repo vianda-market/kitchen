@@ -50,6 +50,25 @@ The endpoint supports **cursor-based pagination** for infinite scroll. Paginatio
 
 Existing params (`city`, `country_code`, `market_id`, `kitchen_day`) remain unchanged.
 
+### Filter params (all optional, backward-compatible — #147–#151)
+
+| Param | Type | Description | Validation |
+|-------|------|-------------|------------|
+| `cuisine` | `list[str]` | Filter by one or more cuisine names (restaurant-level, OR logic). Omit for all cuisines. Repeat param for multi-select: `?cuisine=Italian&cuisine=Mexican`. | None; mismatches return 0 restaurants. |
+| `max_credits` | `integer ≥ 1` | Show only plates costing at most N credits. Restaurants with no surviving plates after this filter are **dropped from the response** (not returned with `plates: []`). Frontend hardcodes option set (1/2/3/5). | `ge=1`. |
+| `dietary` | `list[str]` | Filter by dietary flags (OR logic). A plate matches if its `dietary` array contains **at least one** of the requested flags. Restaurants with no surviving plates are **dropped**. Repeat param for multi-select: `?dietary=vegan&dietary=gluten_free`. Valid values: `vegan`, `vegetarian`, `gluten_free`, `dairy_free`, `nut_free`, `halal`, `kosher`. | Unknown flag → 400. |
+| `lat` | `float` | Latitude of user's center point for distance filter. Requires `lng` and `radius_km`. | Must appear with `lng` + `radius_km`. Missing partner(s) → 400. |
+| `lng` | `float` | Longitude of user's center point for distance filter. Requires `lat` and `radius_km`. | Must appear with `lat` + `radius_km`. Missing partner(s) → 400. |
+| `radius_km` | `float > 0` | Radius in kilometres for distance filter. Requires `lat` and `lng`. | Must appear with `lat` + `lng`. `gt=0`. Missing partner(s) → 400. |
+
+**`dietary_flag` enum values** are exposed via `GET /api/v1/enums/dietary_flag` (or the full enum dump at `GET /api/v1/enums/`) for filter-drawer population. Labels for `en`/`es`/`pt` are included.
+
+**Drop-on-empty-plates:** When `max_credits` or `dietary` narrows a restaurant's plate list to 0, the restaurant is **removed** from the response entirely. Clients should never receive a restaurant with `plates: []` as a result of these filters.
+
+**Distance semantics:** City filter and radius filter are AND-composed. A restaurant 12 km from the user's home in the selected city is excluded by `radius_km=10`. This is the intended behavior (user opts into both city AND proximity).
+
+**Cursor pagination with distance filter:** The `ST_DWithin` geo-filter is applied inside the SQL `WHERE` clause (before `LIMIT`/cursor slicing), so pagination works correctly — geo-filtered restaurants never appear on a later page.
+
 ### Response fields
 
 | Field | Type | Description |
