@@ -171,3 +171,73 @@ jobs:
             } else {
               await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
             }
+
+  smoke:
+    name: Post-deploy smoke
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Smoke test new revision
+        env:
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+          SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+          REGION: us-central1
+          PUBLIC_URL: https://api.dev.vianda.market
+        run: |
+          set -euo pipefail
+
+          # Wait up to 30s for traffic to settle on the new revision
+          TRAFFIC=0
+          for _attempt in $(seq 1 6); do
+            TRAFFIC=$(gcloud run services describe "$SERVICE" \
+              --region="$REGION" --project="$GCP_PROJECT" \
+              --format='value(status.traffic[0].percent)' 2>/dev/null || echo 0)
+            if [ "$TRAFFIC" = "100" ]; then break; fi
+            echo "Traffic at ${TRAFFIC}%, retrying in 5s..."
+            sleep 5
+          done
+
+          REVISION=$(gcloud run services describe "$SERVICE" \
+            --region="$REGION" --project="$GCP_PROJECT" \
+            --format='value(status.latestReadyRevisionName)')
+
+          # Endpoint checks
+          health_status=$(curl -s -o /tmp/health.json -w "%{http_code}" "$PUBLIC_URL/health")
+          docs_status=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL/docs")
+          openapi_status=$(curl -s -o /tmp/openapi.json -w "%{http_code}" "$PUBLIC_URL/openapi.json")
+          paths_count=$(jq '.paths | length' /tmp/openapi.json 2>/dev/null || echo "?")
+
+          # Write step summary (Markdown table)
+          {
+            echo "## Post-deploy smoke (dev)"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Revision | \`$REVISION\` at ${TRAFFIC}% traffic |"
+            echo "| \`/health\` | HTTP $health_status |"
+            echo "| \`/docs\` | HTTP $docs_status |"
+            echo "| \`/openapi.json\` | HTTP $openapi_status, $paths_count paths registered |"
+            echo ""
+            echo "Reference: \`docs/commands/kitchen_smoketest.md\` (orchestrator-side, see the manual portion for the post-deploy 15-min watch)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Fail the job if any check is bad
+          if [ "$TRAFFIC" != "100" ]; then echo "::error::Traffic not at 100%, got $TRAFFIC"; exit 1; fi
+          if [ "$health_status" != "200" ]; then echo "::error::/health returned $health_status"; exit 1; fi
+          if [ "$docs_status" != "200" ]; then echo "::error::/docs returned $docs_status"; exit 1; fi
+          if [ "$openapi_status" != "200" ]; then echo "::error::/openapi.json returned $openapi_status"; exit 1; fi
+          echo "All smoke checks passed."
