@@ -64,6 +64,7 @@ jobs:
   lint-job:
     name: Lint (ruff)
     needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
@@ -96,6 +97,7 @@ jobs:
   types-job:
     name: Types (mypy)
     needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
@@ -134,6 +136,7 @@ jobs:
   structure-job:
     name: Structure (imports, complexity, vulture)
     needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
@@ -178,6 +181,7 @@ jobs:
   security-job:
     name: Security (bandit, thresholds, filters, sqlfluff)
     needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.app-relevant == 'true' }}
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ci-test-secret-key
