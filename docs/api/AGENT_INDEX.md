@@ -63,13 +63,29 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/zArchive/ENUM_SERVICE_SPECIFICATION.md` | _(Archived)_ Original frontend request — superseded by ENUM_SERVICE_API.md |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/LANGUAGE_AND_LOCALE_FOR_CLIENTS.md` | i18n scaffolding — locales endpoint, locale-aware market names, BCP 47 locale field, enum labels, JWT locale claim |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ERROR_ENVELOPE_FOR_CLIENTS.md` | Error response envelope (one-page frontend integration guide) — wire shape, `resolveErrorMessage` helper usage, code switch-on examples, per-frontend wiring notes |
-| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_MARKETS.md` | Markets API — multi-currency, multi-timezone, institution scoping |
+| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_MARKETS.md` | Markets API — multi-currency, multi-timezone, institution scoping. Enriched endpoints expose `is_ready_for_signup` (computed, no DB column — see Market Readiness below) |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_INSTITUTIONS.md` | Multinational institution model — `market_ids` array, entity-based employers, `email_domain` |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ZIPCODE_METRICS_LEAD_API.md` | Pre-signup coverage check with restaurant count by zipcode |
 | Marketing | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Coverage checker, interest forms, reCAPTCHA, restaurant/plan endpoints for marketing site. **Country selector** via `/leads/countries` + `/leads/supplier-countries` (ETag + 24h cache). `country_code` required on `/leads/plans`, `/leads/restaurants`, `/leads/featured-restaurant`. |
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/LEADS_SIMPLIFICATION.md` | Remove coverage check from app, simplify signup, add "not served" → marketing site link |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_INTEREST_DASHBOARD.md` | Internal read-only dashboard for lead interest data (`GET /admin/leads/interest`) |
 | Infra | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/infrastructure/LEADS_MIGRATION_INFRA.md` | reCAPTCHA and CORS env vars for Cloud Run |
+
+### Market Readiness — `is_ready_for_signup` computed field (kitchen#123, Option B)
+
+Admin enriched market endpoints (`GET /api/v1/admin/markets/enriched` and `GET /api/v1/admin/markets/enriched/{market_id}`) expose a computed boolean field `is_ready_for_signup` in every `MarketResponseSchema` response.
+
+**Definition:** `is_ready_for_signup = true` when ALL of the following hold at read time:
+1. `market.status = 'active'`
+2. At least one active institution → active restaurant → plate → active `plate_kitchen_days` → active `qr_code` chain exists for the market.
+
+**Invariants (do not break):**
+- No DB column. No DB constraint. Computed via EXISTS subquery at read time. The readiness rules may evolve without a migration.
+- Plain endpoints (`GET /api/v1/admin/markets`, `GET /api/v1/admin/markets/{market_id}`) do not compute the field; they return `is_ready_for_signup: null`.
+- `/api/v1/leads/markets` (customer-facing, no auth) continues to FILTER OUT non-ready markets — that is its contract. It does NOT expose the field.
+- Sister issue on `vianda-platform` tracks admin UI display of this field.
+
+**Postman coverage:** `docs/postman/collections/019 MARKET_READINESS.postman_collection.json`
 
 ---
 
