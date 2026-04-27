@@ -1,6 +1,8 @@
 app/utils/filter_builder.py:0: error: Unused "type: ignore" comment  [unused-ignore]
 app/utils/filter_builder.py:0: error: Returning Any from function declared to return "EnumMeta"  [no-any-return]
 app/utils/filter_builder.py:0: error: Unused "type: ignore" comment  [unused-ignore]
+app/utils/country.py:0: error: Returning Any from function declared to return "str"  [no-any-return]
+app/utils/country.py:0: error: Returning Any from function declared to return "str"  [no-any-return]
 app/services/location_validation_service.py:0: error: Returning Any from function declared to return "str | None"  [no-any-return]
 app/services/location_validation_service.py:0: error: Returning Any from function declared to return "str | None"  [no-any-return]
 app/services/location_validation_service.py:0: error: Returning Any from function declared to return "str | None"  [no-any-return]

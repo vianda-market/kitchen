@@ -129,7 +129,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         _cfg_val = "<error>"
     _on = str(_env_val).strip().lower() in ("1", "true", "yes") or str(_cfg_val).strip().lower() in ("1", "true", "yes")
-    logger.info(
+    # Logs a feature-flag toggle value (env var "1"/"0"), not a credential or secret.
+    logger.info(  # codeql[py/clear-text-logging-sensitive-data]
         f"[EmployerAssign] LOG_EMPLOYER_ASSIGN: os.environ={repr(_env_val)} config={_cfg_val} -> debug={'ON' if _on else 'OFF'}"
     )
     # Initialize connection pool
