@@ -26,6 +26,7 @@ from app.config.enums import (
     SubscriptionStatus,
     TransactionType,
 )
+from app.config.enums.dietary_flags import DietaryFlag
 from app.security.field_policies import (
     SUPPLIER_ALLOWED_ROLE_NAMES,
     SUPPLIER_ALLOWED_USER_ROLE_TYPES,
@@ -77,6 +78,7 @@ class EnumService:
             "bill_payout_status": BillPayoutStatus.values(),
             "favorite_entity_type": FavoriteEntityType.values(),
             "portion_size_display": PortionSizeDisplay.values(),
+            "dietary_flag": DietaryFlag.values(),
         }
         if current_user and (current_user.get("role_type") or "").strip().lower() == "customer":
             enums.pop("role_type", None)

@@ -387,16 +387,38 @@ def get_plates_for_restaurants(
     db: psycopg2.extensions.connection,
     *,
     favorite_plate_ids: list[UUID] | None = None,
+    max_credits: int | None = None,
+    dietary_filter: list[str] | None = None,
 ) -> dict:
     """
     Return map restaurant_id -> list of plates (plate_id, product_name, price, credit, kitchen_day,
     image_url from product_info). Savings are NOT read from DB; caller should compute from
     price, credit, and user's credit_cost_local_currency (see get_restaurants_by_city).
     Only non-archived plates with a matching plate_kitchen_day.
+
+    max_credits: when set, only plates with credit <= max_credits are returned.
+    dietary_filter: when set, only plates whose dietary TEXT[] column overlaps the requested flags
+    are returned (PostgreSQL && array overlap operator — a plate matches if it has AT LEAST ONE of
+    the requested flags). Direct SQL, NOT routed through filter_builder (avoids the kitchen#87
+    IN/ANY mismatch bug for TEXT[] columns).
     """
     if not restaurant_ids or kitchen_day not in VALID_KITCHEN_DAYS:
         return {}
     ids_placeholder = ",".join("%s" for _ in restaurant_ids)
+    extra_where = ""
+    params: list = [kitchen_day] + [str(rid) for rid in restaurant_ids]
+
+    if max_credits is not None:
+        extra_where += "\n          AND p.credit <= %s"
+        params.append(max_credits)
+
+    if dietary_filter:
+        # Use PostgreSQL array overlap (&&) to match plates containing ANY of the requested flags.
+        # Do NOT use IN / = ANY(...) — those apply scalar equality against an array column and
+        # produce wrong results (kitchen#87). The && operator correctly checks array intersection.
+        extra_where += "\n          AND pr.dietary && %s::text[]"
+        params.append(dietary_filter)
+
     query = (
         """
         SELECT
@@ -407,7 +429,8 @@ def get_plates_for_restaurants(
             p.credit,
             pkd.kitchen_day,
             COALESCE(pr.image_thumbnail_url, pr.image_url) AS image_url,
-            pr.ingredients
+            pr.ingredients,
+            pr.dietary
         FROM plate_info p
         INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.kitchen_day = %s
           AND pkd.is_archived = FALSE AND pkd.status = 'active'
@@ -415,11 +438,12 @@ def get_plates_for_restaurants(
         WHERE p.restaurant_id IN ("""
         + ids_placeholder
         + """)
-          AND p.is_archived = FALSE
+          AND p.is_archived = FALSE"""
+        + extra_where
+        + """
         ORDER BY p.restaurant_id, pr.name
     """
     )
-    params = [kitchen_day] + [str(rid) for rid in restaurant_ids]
     rows = db_read(query, tuple(params), connection=db) or []
     by_restaurant: dict = {}
     plate_ids: list[Any] = []
@@ -508,9 +532,39 @@ def _query_city_restaurants(
     matched_city: str,
     locale: str,
     db: psycopg2.extensions.connection,
+    *,
+    cuisine_filter: list[str] | None = None,
+    geo_filter: tuple[float, float, float] | None = None,
 ) -> list[dict]:
-    """Query active restaurants with geolocation in the given city/country."""
-    query_restaurants = """
+    """Query active restaurants with geolocation in the given city/country.
+
+    Optional filters (all apply in the WHERE clause, before cursor slicing):
+    - cuisine_filter: list of cuisine_name values; restricts to restaurants whose
+      cuisine matches any of the given names (restaurant-level, NOT plate-level).
+      City vs radius AND-composition: a restaurant must satisfy BOTH city and radius.
+    - geo_filter: (lat, lng, radius_km) tuple; restricts to restaurants within
+      radius_km kilometres via PostGIS ST_DWithin on r.location::geography.
+    """
+    extra_clauses = ""
+    params: list = [locale, locale, country, matched_city]
+
+    if cuisine_filter:
+        extra_clauses += "\n          AND cu.cuisine_name = ANY(%s)"
+        params.append(cuisine_filter)
+
+    if geo_filter:
+        lat, lng, radius_km = geo_filter
+        extra_clauses += (
+            "\n          AND ST_DWithin("
+            "\n              r.location::geography,"
+            "\n              ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,"
+            "\n              %s"
+            "\n          )"
+        )
+        params.extend([lng, lat, radius_km * 1000])
+
+    query_restaurants = (
+        """
         SELECT
             r.restaurant_id,
             r.name,
@@ -541,10 +595,13 @@ def _query_city_restaurants(
           AND EXISTS (
             SELECT 1 FROM qr_code qc
             WHERE qc.restaurant_id = r.restaurant_id AND qc.is_archived = FALSE AND qc.status = 'active'
-          )
+          )"""
+        + extra_clauses
+        + """
         ORDER BY r.name
     """
-    rest_rows = db_read(query_restaurants, (locale, locale, country, matched_city), connection=db) or []
+    )
+    rest_rows = db_read(query_restaurants, tuple(params), connection=db) or []
     return [_build_restaurant_dict(row, country) for row in rest_rows]
 
 
@@ -584,12 +641,30 @@ def _attach_plates_and_savings(
     kitchen_day: str,
     credit_cost_local_currency: float | None,
     db: psycopg2.extensions.connection,
-) -> None:
-    """Attach plates for the kitchen day and compute savings per plate."""
+    *,
+    max_credits: int | None = None,
+    dietary_filter: list[str] | None = None,
+) -> list[dict]:
+    """Attach plates for the kitchen day and compute savings per plate.
+
+    When max_credits or dietary_filter are set, restaurants whose plate list becomes empty
+    after filtering are removed from the response (drop-on-empty-plates rule).
+    Returns the (possibly shorter) restaurants list.
+    """
     rest_ids = [r["restaurant_id"] for r in restaurants]
-    plates_by_restaurant = get_plates_for_restaurants(rest_ids, kitchen_day, db)
+    plates_by_restaurant = get_plates_for_restaurants(
+        rest_ids,
+        kitchen_day,
+        db,
+        max_credits=max_credits,
+        dietary_filter=dietary_filter,
+    )
+    surviving: list[dict] = []
     for r in restaurants:
         plates = plates_by_restaurant.get(r["restaurant_id"]) or []
+        # Drop restaurants with empty plate list when a plate-level filter is active
+        if (max_credits is not None or dietary_filter) and not plates:
+            continue
         for plate in plates:
             plate["savings"] = (
                 _compute_savings_pct(plate["price"], plate["credit"], credit_cost_local_currency)
@@ -597,6 +672,8 @@ def _attach_plates_and_savings(
                 else 0
             )
         r["plates"] = plates
+        surviving.append(r)
+    return surviving
 
 
 def _mark_volunteer_restaurants(
@@ -844,6 +921,10 @@ def get_restaurants_by_city(
     locale: str = "en",
     cursor: str | None = None,
     limit: int | None = None,
+    cuisine_filter: list[str] | None = None,
+    max_credits: int | None = None,
+    dietary_filter: list[str] | None = None,
+    geo_filter: tuple[float, float, float] | None = None,
 ) -> dict[str, Any]:
     """
     Return restaurants in the given city (case-insensitive match) in the given country.
@@ -859,6 +940,15 @@ def get_restaurants_by_city(
     workplace_group_id: optional; takes precedence over employer_entity_id for coworker matching.
     employer_entity_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
     and has_coworker_request are computed per restaurant for coworker-scoped pickup intents.
+    cuisine_filter: optional list of cuisine_name strings (restaurant-level, multi-select OR logic).
+    max_credits: optional integer; plates with credit > max_credits are excluded. Restaurants with no
+    surviving plates after this filter are dropped from the response (drop-on-empty-plates).
+    dietary_filter: optional list of DietaryFlag values; plates whose dietary TEXT[] column does not
+    overlap with the requested flags are excluded (array overlap, NOT IN/ANY). Restaurants with no
+    surviving plates after this filter are dropped (drop-on-empty-plates).
+    geo_filter: optional (lat, lng, radius_km) tuple; restricts to restaurants within radius_km km via
+    PostGIS ST_DWithin. Applied inside the WHERE clause (before cursor slicing) so pagination is correct.
+    City and radius are AND-composed: a restaurant must satisfy both constraints.
     No institution scope; B2C explore by market (country + city).
     """
     country = (country_code or "").strip().upper()
@@ -872,12 +962,26 @@ def get_restaurants_by_city(
         resolved_kitchen_day = resolve_kitchen_day_for_explore(country, timezone_str, db)
 
     matched_city = _match_city_in_country(requested, country, db)
-    restaurants = _query_city_restaurants(country, matched_city, locale, db)
+    restaurants = _query_city_restaurants(
+        country,
+        matched_city,
+        locale,
+        db,
+        cuisine_filter=cuisine_filter,
+        geo_filter=geo_filter,
+    )
 
     # Attach plates, volunteers, coworker flags, and reservations
     if resolved_kitchen_day and restaurants:
+        restaurants = _attach_plates_and_savings(
+            restaurants,
+            resolved_kitchen_day,
+            credit_cost_local_currency,
+            db,
+            max_credits=max_credits,
+            dietary_filter=dietary_filter,
+        )
         rest_ids_str = [str(r["restaurant_id"]) for r in restaurants]
-        _attach_plates_and_savings(restaurants, resolved_kitchen_day, credit_cost_local_currency, db)
         _mark_volunteer_restaurants(restaurants, rest_ids_str, resolved_kitchen_day, db)
         _mark_coworker_restaurants(
             restaurants,

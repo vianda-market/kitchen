@@ -968,3 +968,368 @@ class TestGetPickupWindowsForKitchenDay:
         """Invalid kitchen_day (e.g. Saturday) returns empty (not in business_hours)."""
         windows = get_pickup_windows_for_kitchen_day("AR", "saturday", date(2026, 3, 14))
         assert windows == []
+
+
+# ---------------------------------------------------------------------------
+# K2: cuisine filter
+# ---------------------------------------------------------------------------
+
+
+class TestCuisineFilter:
+    """K2 — cuisine filter on /restaurants/by-city (restaurant-level, multi-select OR logic)."""
+
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_cuisine_filter_passed_to_query(self, mock_db_read):
+        """cuisine_filter param is accepted by get_restaurants_by_city without error."""
+        rid = uuid4()
+        mock_db_read.side_effect = [
+            [{"city": "Buenos Aires"}],
+            [
+                {
+                    "restaurant_id": rid,
+                    "name": "Trattoria Roma",
+                    "cuisine_name": "Italian",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                }
+            ],
+            {"lat": -34.6, "lng": -58.4},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, cuisine_filter=["Italian"])
+
+        assert len(result["restaurants"]) == 1
+        assert result["restaurants"][0]["cuisine_name"] == "Italian"
+
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_no_cuisine_filter_returns_all(self, mock_db_read):
+        """Without cuisine_filter, all restaurants are returned."""
+        rid_a, rid_b = uuid4(), uuid4()
+        mock_db_read.side_effect = [
+            [{"city": "Buenos Aires"}],
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "name": "A",
+                    "cuisine_name": "Italian",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "name": "B",
+                    "cuisine_name": "Mexican",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.7,
+                    "lng": -58.5,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+            ],
+            {"lat": -34.65, "lng": -58.45},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db)
+
+        assert len(result["restaurants"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# K3: max_credits filter (drop-on-empty-plates)
+# ---------------------------------------------------------------------------
+
+
+class TestMaxCreditsFilter:
+    """K3 — max_credits plate-level filter; restaurants with empty plate list are dropped."""
+
+    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_restaurants_with_no_surviving_plates_dropped(self, mock_db_read, mock_aggregates):
+        """When max_credits=3, restaurant A (credit=3) survives; restaurant B (credit=7) is dropped."""
+        rid_a, rid_b = uuid4(), uuid4()
+        pid_a = uuid4()
+        mock_aggregates.return_value = {}
+        mock_db_read.side_effect = [
+            # _match_city_in_country
+            [{"city": "Buenos Aires"}],
+            # _query_city_restaurants returns both restaurants
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "name": "A",
+                    "cuisine_name": "Italian",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "name": "B",
+                    "cuisine_name": "Mexican",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.7,
+                    "lng": -58.5,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+            ],
+            # get_plates_for_restaurants — only A's plate survives max_credits filter (handled in SQL)
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": pid_a,
+                    "product_name": "Cheap Plate",
+                    "price": 5.0,
+                    "credit": 3,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                }
+            ],
+            # vol_query
+            [],
+            # center
+            {"lat": -34.65, "lng": -58.45},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city(
+            "Buenos Aires",
+            "AR",
+            mock_db,
+            kitchen_day="monday",
+            max_credits=3,
+        )
+
+        rids = [r["restaurant_id"] for r in result["restaurants"]]
+        assert rid_a in rids
+        assert rid_b not in rids, "Restaurant B should be dropped: no plates survive max_credits=3"
+
+    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_no_max_credits_returns_both_restaurants(self, mock_db_read, mock_aggregates):
+        """When max_credits is absent, all restaurants are returned (backward compatible)."""
+        rid_a, rid_b = uuid4(), uuid4()
+        mock_aggregates.return_value = {}
+        mock_db_read.side_effect = [
+            [{"city": "Buenos Aires"}],
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "name": "A",
+                    "cuisine_name": "Italian",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "name": "B",
+                    "cuisine_name": "Mexican",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.7,
+                    "lng": -58.5,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+            ],
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": uuid4(),
+                    "product_name": "P1",
+                    "price": 8.0,
+                    "credit": 7,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "plate_id": uuid4(),
+                    "product_name": "P2",
+                    "price": 5.0,
+                    "credit": 3,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
+            ],
+            [],
+            {"lat": -34.65, "lng": -58.45},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city("Buenos Aires", "AR", mock_db, kitchen_day="monday")
+
+        assert len(result["restaurants"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# K4: dietary filter (array overlap, drop-on-empty-plates)
+# ---------------------------------------------------------------------------
+
+
+class TestDietaryFilter:
+    """K4 — dietary filter uses PostgreSQL array overlap (&&); uses direct SQL, not filter_builder."""
+
+    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_dietary_filter_drops_restaurant_with_no_matching_plates(self, mock_db_read, mock_aggregates):
+        """Restaurant with no plates surviving dietary filter is dropped (drop-on-empty-plates)."""
+        rid_a, rid_b = uuid4(), uuid4()
+        pid_a = uuid4()
+        mock_aggregates.return_value = {}
+        # Simulate SQL already applied the && filter: only A's vegan plate comes back
+        mock_db_read.side_effect = [
+            [{"city": "Buenos Aires"}],
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "name": "A-Vegan",
+                    "cuisine_name": "Vegan",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "name": "B-Gluten",
+                    "cuisine_name": "Gluten",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.7,
+                    "lng": -58.5,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                },
+            ],
+            # plate query with && dietary filter: only A's vegan plate
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": pid_a,
+                    "product_name": "VeganPlate",
+                    "price": 8.0,
+                    "credit": 2,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                }
+            ],
+            [],  # vol_query
+            {"lat": -34.65, "lng": -58.45},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city(
+            "Buenos Aires",
+            "AR",
+            mock_db,
+            kitchen_day="monday",
+            dietary_filter=["vegan"],
+        )
+
+        rids = [r["restaurant_id"] for r in result["restaurants"]]
+        assert rid_a in rids
+        assert rid_b not in rids, "Restaurant B has no surviving plates after dietary filter — should be dropped"
+
+    def test_get_plates_for_restaurants_passes_dietary_filter_param(self):
+        """get_plates_for_restaurants accepts dietary_filter without raising errors."""
+        mock_db = MagicMock()
+        mock_db.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
+        with patch("app.services.restaurant_explorer_service.db_read") as mock_db_read:
+            with patch("app.services.restaurant_explorer_service.get_plate_review_aggregates") as mock_agg:
+                mock_db_read.return_value = []
+                mock_agg.return_value = {}
+                result = get_plates_for_restaurants([uuid4()], "monday", mock_db, dietary_filter=["vegan"])
+                assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# K5: distance filter (geo_filter validation)
+# ---------------------------------------------------------------------------
+
+
+class TestDistanceFilter:
+    """K5 — geo_filter (lat/lng/radius_km) validation; SQL applied in _query_city_restaurants."""
+
+    @patch("app.services.restaurant_explorer_service.db_read")
+    def test_geo_filter_accepted_by_get_restaurants_by_city(self, mock_db_read):
+        """geo_filter param accepted without error; service calls _query_city_restaurants with it."""
+        rid = uuid4()
+        mock_db_read.side_effect = [
+            [{"city": "Buenos Aires"}],
+            [
+                {
+                    "restaurant_id": rid,
+                    "name": "Nearby",
+                    "cuisine_name": "Pizza",
+                    "postal_code": None,
+                    "city": "Buenos Aires",
+                    "street_type": None,
+                    "street_name": None,
+                    "building_number": None,
+                    "lat": -34.6,
+                    "lng": -58.4,
+                    "tagline": None,
+                    "pickup_instructions": None,
+                }
+            ],
+            {"lat": -34.6, "lng": -58.4},
+        ]
+        mock_db = MagicMock()
+
+        result = get_restaurants_by_city(
+            "Buenos Aires",
+            "AR",
+            mock_db,
+            geo_filter=(-34.6, -58.4, 5.0),
+        )
+
+        assert len(result["restaurants"]) == 1

@@ -94,6 +94,18 @@ class TestEnumService(unittest.TestCase):
             "portion_size_display should have light, standard, large, insufficient_reviews",
         )
 
+    def test_dietary_flag_values(self):
+        """Test that dietary_flag enum has all 7 dietary restriction values exposed via /enums/ (K1)."""
+        enums = enum_service.get_all_enums()
+        self.assertIn("dietary_flag", enums)
+        dietary_values = enums["dietary_flag"]
+        expected = {"vegan", "vegetarian", "gluten_free", "dairy_free", "nut_free", "halal", "kosher"}
+        self.assertEqual(
+            set(dietary_values),
+            expected,
+            "dietary_flag should expose all 7 DietaryFlag enum values",
+        )
+
     def test_all_enums_keys_match_spec(self):
         """Test that all enum keys match the frontend specification"""
         enums = enum_service.get_all_enums()
@@ -122,6 +134,7 @@ class TestEnumService(unittest.TestCase):
             "bill_resolution",
             "favorite_entity_type",
             "bill_payout_status",
+            "dietary_flag",
         }
 
         actual_keys = set(enums.keys())
