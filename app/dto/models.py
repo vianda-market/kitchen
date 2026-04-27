@@ -845,6 +845,7 @@ class PlanDTO(BaseModel):
     credit_cost_usd: Decimal  # credit_cost_local_currency / currency_conversion_usd, set by DB trigger
     rollover: bool
     rollover_cap: Decimal | None
+    canonical_key: str | None = None
     is_archived: bool = False
     status: Status
     created_date: datetime

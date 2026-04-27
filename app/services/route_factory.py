@@ -725,6 +725,7 @@ def create_plan_routes() -> APIRouter:
         PlanEnrichedResponseSchema,
         PlanResponseSchema,
         PlanUpdateSchema,
+        PlanUpsertByKeySchema,
     )
     from app.services.crud_service import plan_service
     from app.services.entity_service import get_enriched_plan_by_id, get_enriched_plans
@@ -848,6 +849,57 @@ def create_plan_routes() -> APIRouter:
         except Exception as e:
             log_error(f"Error getting enriched plan {plan_id}: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan") from None
+
+    # /by-key MUST be registered before /{plan_id} so the static segment wins
+    # over the UUID path parameter (FastAPI evaluates in registration order).
+    @router.put("/by-key", response_model=PlanResponseSchema, status_code=200)
+    def upsert_plan_by_key(
+        upsert_data: PlanUpsertByKeySchema,
+        current_user: dict = Depends(get_employee_user),  # Internal-only
+        db: psycopg2.extensions.connection = Depends(get_db),
+    ) -> Any:
+        """Idempotent upsert a plan by canonical_key.
+
+        If a plan with this canonical_key already exists it is updated in-place;
+        otherwise a new plan is inserted.  Intended for Postman seed runs and
+        fixture data.  Running twice with the same payload is a no-op.
+
+        Auth: Internal only (same as POST /plans).
+
+        Returns the plan row (insert or update).  HTTP 200 on both insert and
+        update (unlike POST which returns 201) — callers should not depend on
+        distinguishing the two outcomes.
+        """
+        from app.services.crud_service import find_plan_by_canonical_key
+
+        def _upsert() -> Any:
+            key = upsert_data.canonical_key
+            existing = find_plan_by_canonical_key(key, db)
+            payload = upsert_data.model_dump()
+            reject_global_market_for_entity(payload["market_id"], "plan")
+            payload["rollover"] = True
+            payload["rollover_cap"] = None
+            payload["modified_by"] = current_user["user_id"]
+
+            if existing is not None:
+                # Update: strip fields that must not change during update
+                update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+                update_payload.pop("rollover", None)
+                update_payload.pop("rollover_cap", None)
+                result = plan_service.update(existing.plan_id, update_payload, db)
+            else:
+                result = plan_service.create(payload, db)
+
+            if result is None:
+                from app.i18n.envelope import envelope_exception
+                from app.i18n.error_codes import ErrorCode
+
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+            return result
+
+        from app.services.error_handling import handle_business_operation
+
+        return handle_business_operation(_upsert, "plan upsert by canonical key")
 
     @router.get("/{plan_id}", response_model=PlanResponseSchema)
     def get_plan(

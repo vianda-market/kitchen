@@ -56,6 +56,11 @@ CREATE INDEX IF NOT EXISTS idx_product_history_product_id ON audit.product_histo
 
 CREATE INDEX IF NOT EXISTS idx_plan_history_plan_id ON audit.plan_history(plan_id);
 
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc plans)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plan_info_canonical_key
+    ON customer.plan_info (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_history_subscription_id ON audit.subscription_history(subscription_id);
 
 CREATE INDEX IF NOT EXISTS idx_client_bill_history_client_bill_id ON audit.client_bill_history(client_bill_id);
