@@ -499,6 +499,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "qr_code.list_failed": "Failed to retrieve QR codes.",
         "qr_code.get_failed": "Failed to retrieve QR code.",
         "qr_code.delete_failed": "Failed to delete QR code.",
+        # restaurant_balance.* — #87-d (404 hijack sweep)
+        "restaurant_balance.not_found": "Restaurant balance not found.",
+        # restaurant_transaction.* — #87-d (404 hijack sweep)
+        "restaurant_transaction.not_found": "Restaurant transaction not found.",
         # restaurant.* — K15
         "restaurant.creation_failed": "Failed to create restaurant.",
         "restaurant.balance_creation_failed": "Failed to create restaurant balance record.",
@@ -1043,6 +1047,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "qr_code.list_failed": "Error al obtener los códigos QR.",
         "qr_code.get_failed": "Error al obtener el código QR.",
         "qr_code.delete_failed": "Error al eliminar el código QR.",
+        # restaurant_balance.* — #87-d (404 hijack sweep)
+        "restaurant_balance.not_found": "Saldo de restaurante no encontrado.",
+        # restaurant_transaction.* — #87-d (404 hijack sweep)
+        "restaurant_transaction.not_found": "Transacción de restaurante no encontrada.",
         # restaurant.* — K15
         "restaurant.creation_failed": "No se pudo crear el restaurante.",
         "restaurant.balance_creation_failed": "No se pudo crear el registro de saldo del restaurante.",
@@ -1587,6 +1595,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "qr_code.list_failed": "Falha ao recuperar os QR codes.",
         "qr_code.get_failed": "Falha ao recuperar o QR code.",
         "qr_code.delete_failed": "Falha ao excluir o QR code.",
+        # restaurant_balance.* — #87-d (404 hijack sweep)
+        "restaurant_balance.not_found": "Saldo do restaurante não encontrado.",
+        # restaurant_transaction.* — #87-d (404 hijack sweep)
+        "restaurant_transaction.not_found": "Transação do restaurante não encontrada.",
         # restaurant.* — K15
         "restaurant.creation_failed": "Falha ao criar o restaurante.",
         "restaurant.balance_creation_failed": "Falha ao criar o registro de saldo do restaurante.",
