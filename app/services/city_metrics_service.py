@@ -134,7 +134,7 @@ def get_supplier_cities_for_country(
     still benefits from crowd-sourced data:
       1. external.geonames_city (GeoNames, bulk-seeded) — cities in the country with pop >= 5000
       2. core.city_metadata (curated served cities — ensures custom display names appear)
-      3. core.restaurant_lead.city_name (crowd-sourced from prior supplier lead submissions)
+      3. ops.restaurant_lead.city_name (crowd-sourced from prior supplier lead submissions)
 
     Deduped case-insensitively, sorted alphabetically by LOWER(name), capped at 1000.
     """
@@ -155,7 +155,7 @@ def get_supplier_cities_for_country(
               AND cm.city_metadata_id != %(global_city_id)s
             UNION
             SELECT DISTINCT rl.city_name
-            FROM core.restaurant_lead rl
+            FROM ops.restaurant_lead rl
             WHERE rl.country_code = %(country)s
               AND rl.is_archived = FALSE
               AND rl.city_name IS NOT NULL AND rl.city_name <> ''

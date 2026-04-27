@@ -103,7 +103,7 @@ GET /api/v1/leads/cities?country_code={code}&audience=supplier
 **`audience=supplier`:** Returns a broader union of city names from three sources:
 - `external.geonames_city` (GeoNames raw data for the country)
 - `core.city_metadata` (Vianda-curated cities)
-- `core.restaurant_lead.city_name` (cities from supplier interest submissions)
+- `ops.restaurant_lead.city_name` (cities from supplier interest submissions)
 
 Sort: alphabetical, case-insensitive. Cap: 1000 rows.
 
