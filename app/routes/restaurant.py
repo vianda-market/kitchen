@@ -370,7 +370,7 @@ def get_explore_pickup_windows(
 
 # GET /restaurants/by-city — B2C explore: restaurants in a city for list/map; market + kitchen_day required for plates
 @router.get("/by-city", response_model=RestaurantsByCityResponseSchema)
-def get_restaurants_by_city_route(
+def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query params, not algorithmic args
     city: str = Query(..., description="City name (from dropdown)"),
     country_code: str | None = Query("US", description="ISO 3166-1 alpha-2 (e.g. US, AR)"),
     market_id: UUID | None = Query(None, description="User's market; if omitted, primary market is used"),
@@ -384,6 +384,27 @@ def get_restaurants_by_city_route(
     limit: int | None = Query(
         None, ge=1, description="Max plates per page (clamped to 10–50); enables cursor pagination"
     ),
+    cuisine: list[str] | None = Query(
+        None,
+        description="Filter by one or more cuisine names (multi-select OR logic; restaurant-level). Omit for all cuisines.",
+    ),
+    max_credits: int | None = Query(
+        None,
+        ge=1,
+        description="Show only plates costing at most this many credits. Restaurants with no surviving plates are dropped.",
+    ),
+    dietary: list[str] | None = Query(
+        None,
+        description=(
+            "Filter by dietary flags (multi-select OR logic). "
+            "Plates must have AT LEAST ONE of the requested flags in their dietary TEXT[] column. "
+            "Valid values: vegan, vegetarian, gluten_free, dairy_free, nut_free, halal, kosher. "
+            "Restaurants with no surviving plates are dropped."
+        ),
+    ),
+    lat: float | None = Query(None, description="Latitude of user center point for distance filter. Requires lng and radius_km."),
+    lng: float | None = Query(None, description="Longitude of user center point for distance filter. Requires lat and radius_km."),
+    radius_km: float | None = Query(None, gt=0, description="Radius in kilometres for distance filter. Requires lat and lng."),
     current_user: dict = Depends(get_client_or_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -393,6 +414,16 @@ def get_restaurants_by_city_route(
     When a market is used (market_id or user's primary market), kitchen_day is required to return plates.
     kitchen_day must fall within this week and next week (next week ends Friday); otherwise 400.
     City is matched case-insensitively. Customer or Internal only; 403 for Supplier. No institution scope.
+
+    Optional filter params (all backward-compatible; omit for existing behavior):
+    - cuisine: multi-select cuisine names (restaurant-level OR logic).
+    - max_credits: integer threshold; plates with credit > max_credits are excluded.
+      Restaurants with 0 surviving plates after this filter are dropped.
+    - dietary: multi-select DietaryFlag values (vegan/vegetarian/gluten_free/dairy_free/nut_free/halal/kosher).
+      Uses PostgreSQL array overlap (&&); plates match if they have AT LEAST ONE requested flag.
+      Restaurants with 0 surviving plates are dropped. Invalid flag values return 400.
+    - lat/lng/radius_km: distance filter via PostGIS ST_DWithin. All three must be present together
+      or all absent; mixed presence returns 400. City-vs-radius: both constraints apply (AND).
     """
     if kitchen_day is not None and kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
         raise envelope_exception(
@@ -401,6 +432,39 @@ def get_restaurants_by_city_route(
             locale=locale,
             msg="kitchen_day must be Monday, Tuesday, Wednesday, Thursday, or Friday",
         )
+
+    # K4: validate dietary flag values against the DietaryFlag enum
+    if dietary:
+        from app.config.enums.dietary_flags import DietaryFlag
+
+        valid_flags = set(DietaryFlag.values())
+        invalid = [d for d in dietary if d not in valid_flags]
+        if invalid:
+            raise envelope_exception(
+                ErrorCode.VALIDATION_CUSTOM,
+                status=400,
+                locale=locale,
+                msg=f"Unknown dietary flag(s): {', '.join(sorted(invalid))}. Valid values: {', '.join(sorted(valid_flags))}",
+            )
+
+    # K5: validate that lat/lng/radius_km are all-or-nothing
+    geo_params = [lat, lng, radius_km]
+    geo_present = [p is not None for p in geo_params]
+    if any(geo_present) and not all(geo_present):
+        missing = []
+        if lat is None:
+            missing.append("lat")
+        if lng is None:
+            missing.append("lng")
+        if radius_km is None:
+            missing.append("radius_km")
+        raise envelope_exception(
+            ErrorCode.VALIDATION_CUSTOM,
+            status=400,
+            locale=locale,
+            msg=f"Distance filter requires all three params together: lat, lng, radius_km. Missing: {', '.join(missing)}",
+        )
+    geo_filter: tuple[float, float, float] | None = (lat, lng, radius_km) if lat is not None else None
 
     user_id = current_user.get("user_id")
     assigned = get_assigned_market_ids(user_id, db, fallback_primary=current_user.get("market_id")) if user_id else []
@@ -485,6 +549,10 @@ def get_restaurants_by_city_route(
             locale=locale,
             cursor=cursor,
             limit=limit,
+            cuisine_filter=cuisine or None,
+            max_credits=max_credits,
+            dietary_filter=dietary or None,
+            geo_filter=geo_filter,
         )
     except ValueError as exc:
         raise envelope_exception(ErrorCode.VALIDATION_CUSTOM, status=400, locale=locale, msg=str(exc)) from None
