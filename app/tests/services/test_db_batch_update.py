@@ -14,50 +14,68 @@ Tests cover:
 from unittest.mock import Mock, patch
 from uuid import UUID
 
+import psycopg2
 import pytest
 
 from app.utils.db import _build_update_sql, db_batch_update, db_update
 
 
+@pytest.fixture(scope="module")
+def db_conn():
+    """Real psycopg2 connection used only to render sql.Composed objects via as_string()."""
+    conn = psycopg2.connect(dbname="kitchen", host="localhost")
+    yield conn
+    conn.close()
+
+
+def render(composed, conn):
+    """Render a sql.Composed object to a plain SQL string for assertion."""
+    return composed.as_string(conn)
+
+
 class TestBuildUpdateSql:
     """Tests for _build_update_sql helper function"""
 
-    def test_build_update_sql(self):
+    def test_build_update_sql(self, db_conn):
         """Test building SQL for update"""
         table = "test_table"
         data = {"status": "active", "modified_by": "user1"}
         where = {"id": "uuid1"}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
+        sql_str = render(composed, db_conn)
 
-        assert "UPDATE test_table" in sql
-        assert "SET status = %s" in sql
-        assert "modified_by = %s" in sql
-        assert "WHERE id = %s" in sql
+        assert 'UPDATE "test_table"' in sql_str
+        assert '"status" = %s' in sql_str
+        assert '"modified_by" = %s' in sql_str
+        assert '"id" = %s' in sql_str
         assert len(values) == 3  # 2 data values + 1 where value
         assert values[0] == "active"
         assert values[1] == "user1"
         assert values[2] == "uuid1"
 
-    def test_build_update_sql_with_uuid(self):
+    def test_build_update_sql_with_uuid(self, db_conn):
         """Test UUID conversion in update"""
         table = "test_table"
         data = {"status": "active"}
         where = {"id": UUID("12345678-1234-5678-1234-567812345678")}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
 
         assert str(values[1]) == "12345678-1234-5678-1234-567812345678"
 
-    def test_build_update_sql_multiple_where_conditions(self):
+    def test_build_update_sql_multiple_where_conditions(self, db_conn):
         """Test building SQL with multiple WHERE conditions"""
         table = "test_table"
         data = {"status": "active"}
         where = {"id": "uuid1", "is_archived": False}
 
-        sql, values = _build_update_sql(table, data, where)
+        composed, values = _build_update_sql(table, data, where)
+        sql_str = render(composed, db_conn)
 
-        assert "WHERE id = %s AND is_archived = %s" in sql
+        assert '"id" = %s' in sql_str
+        assert '"is_archived" = %s' in sql_str
+        assert " AND " in sql_str
         assert len(values) == 3  # 1 data value + 2 where values
 
 

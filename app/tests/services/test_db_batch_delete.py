@@ -15,69 +15,89 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 from uuid import UUID
 
+import psycopg2
 import pytest
 
 from app.utils.db import _build_delete_sql, db_batch_delete, db_delete
 
 
+@pytest.fixture(scope="module")
+def db_conn():
+    """Real psycopg2 connection used only to render sql.Composed objects via as_string()."""
+    conn = psycopg2.connect(dbname="kitchen", host="localhost")
+    yield conn
+    conn.close()
+
+
+def render(composed, conn):
+    """Render a sql.Composed object to a plain SQL string for assertion."""
+    return composed.as_string(conn)
+
+
 class TestBuildDeleteSql:
     """Tests for _build_delete_sql helper function"""
 
-    def test_build_hard_delete_sql(self):
+    def test_build_hard_delete_sql(self, db_conn):
         """Test building SQL for hard delete"""
         table = "test_table"
         where = {"id": "uuid1"}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
+        sql_str = render(composed, db_conn)
 
-        assert "DELETE FROM test_table" in sql
-        assert "WHERE id = %s" in sql
+        assert 'DELETE FROM "test_table"' in sql_str
+        assert '"id" = %s' in sql_str
         assert values == ("uuid1",)
 
-    def test_build_soft_delete_sql(self):
+    def test_build_soft_delete_sql(self, db_conn):
         """Test building SQL for soft delete"""
         table = "test_table"
         where = {"id": "uuid1"}
 
-        sql, values = _build_delete_sql(table, where, soft=True)
+        composed, values = _build_delete_sql(table, where, soft=True)
+        sql_str = render(composed, db_conn)
 
-        assert "UPDATE test_table" in sql
-        assert "SET is_archived = true" in sql
-        assert "WHERE id = %s" in sql
+        assert 'UPDATE "test_table"' in sql_str
+        assert "is_archived = true" in sql_str
+        assert '"id" = %s' in sql_str
         assert values == ("uuid1",)
 
-    def test_build_soft_delete_with_additional_fields(self):
+    def test_build_soft_delete_with_additional_fields(self, db_conn):
         """Test building SQL for soft delete with additional fields"""
         table = "test_table"
         where = {"id": "uuid1"}
         soft_update_fields = {"modified_by": "user1", "modified_date": datetime.now()}
 
-        sql, values = _build_delete_sql(table, where, soft=True, soft_update_fields=soft_update_fields)
+        composed, values = _build_delete_sql(table, where, soft=True, soft_update_fields=soft_update_fields)
+        sql_str = render(composed, db_conn)
 
-        assert "UPDATE test_table" in sql
-        assert "SET is_archived = true" in sql
-        assert "modified_by = %s" in sql
-        assert "modified_date = %s" in sql
-        assert "WHERE id = %s" in sql
+        assert 'UPDATE "test_table"' in sql_str
+        assert "is_archived = true" in sql_str
+        assert '"modified_by" = %s' in sql_str
+        assert '"modified_date" = %s' in sql_str
+        assert '"id" = %s' in sql_str
         assert len(values) == 3  # modified_by, modified_date, id
 
-    def test_build_delete_sql_with_uuid(self):
+    def test_build_delete_sql_with_uuid(self, db_conn):
         """Test UUID conversion in WHERE clause"""
         table = "test_table"
         where = {"id": UUID("12345678-1234-5678-1234-567812345678")}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
 
         assert str(values[0]) == "12345678-1234-5678-1234-567812345678"
 
-    def test_build_delete_sql_multiple_where_conditions(self):
+    def test_build_delete_sql_multiple_where_conditions(self, db_conn):
         """Test building SQL with multiple WHERE conditions"""
         table = "test_table"
         where = {"id": "uuid1", "status": "active"}
 
-        sql, values = _build_delete_sql(table, where, soft=False)
+        composed, values = _build_delete_sql(table, where, soft=False)
+        sql_str = render(composed, db_conn)
 
-        assert "WHERE id = %s AND status = %s" in sql
+        assert '"id" = %s' in sql_str
+        assert '"status" = %s' in sql_str
+        assert " AND " in sql_str
         assert len(values) == 2
 
 
@@ -121,13 +141,14 @@ class TestDbBatchDelete:
 
         assert result == 2
         assert mock_cursor.execute.call_count == 2
-        # Verify UPDATE SQL was used (not DELETE)
-        assert "UPDATE" in mock_cursor.execute.call_args_list[0][0][0]
+        # Verify UPDATE SQL was used (not DELETE) — check the Composed object repr
+        first_call_sql = mock_cursor.execute.call_args_list[0][0][0]
+        assert "UPDATE" in repr(first_call_sql)
         mock_conn.commit.assert_called_once()
 
     @patch("app.utils.db.get_db_connection")
     @patch("app.utils.db.close_db_connection")
-    def test_batch_soft_delete_with_additional_fields(self, mock_close, mock_get_conn):
+    def test_batch_soft_delete_with_additional_fields(self, mock_close, mock_get_conn, db_conn):
         """Test batch soft delete with additional fields"""
         # Setup mocks
         mock_conn = Mock()
@@ -144,10 +165,11 @@ class TestDbBatchDelete:
         )
 
         assert result == 1
-        # Verify SQL includes additional fields
-        sql = mock_cursor.execute.call_args_list[0][0][0]
-        assert "modified_by = %s" in sql
-        assert "modified_date = %s" in sql
+        # Verify SQL includes additional fields via as_string() on the Composed object
+        composed = mock_cursor.execute.call_args_list[0][0][0]
+        sql_str = render(composed, db_conn)
+        assert '"modified_by" = %s' in sql_str
+        assert '"modified_date" = %s' in sql_str
 
     def test_batch_delete_empty_list(self):
         """Test that empty list raises ValueError"""
@@ -242,7 +264,7 @@ class TestDbDelete:
 
     @patch("app.utils.db.get_db_connection")
     @patch("app.utils.db.close_db_connection")
-    def test_single_soft_delete(self, mock_close, mock_get_conn):
+    def test_single_soft_delete(self, mock_close, mock_get_conn, db_conn):
         """Test single soft delete"""
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -253,7 +275,8 @@ class TestDbDelete:
         result = db_delete("test_table", {"id": "uuid1"}, connection=mock_conn, soft=True)
 
         assert result == 1
-        # Verify UPDATE SQL was used
-        sql = mock_cursor.execute.call_args_list[0][0][0]
-        assert "UPDATE" in sql
-        assert "is_archived = true" in sql
+        # Verify UPDATE SQL was used via as_string() on the Composed object
+        composed = mock_cursor.execute.call_args_list[0][0][0]
+        sql_str = render(composed, db_conn)
+        assert "UPDATE" in sql_str
+        assert "is_archived = true" in sql_str
