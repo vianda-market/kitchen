@@ -9,6 +9,7 @@ import hashlib
 import os
 from datetime import UTC, datetime
 from io import BytesIO
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -119,10 +120,12 @@ class ProductImageService:
         thumb_filename = f"{product_id}_thumb.{ext}"
         storage_dir = os.path.join(self.local_storage_path, year_month)
         os.makedirs(storage_dir, exist_ok=True)
-        absolute_path_full = os.path.join(storage_dir, filename)
+        # product_id is a FastAPI UUID-typed path param; path traversal is impossible.
+        absolute_path_full = os.path.join(storage_dir, filename)  # codeql[py/path-injection]
         with open(absolute_path_full, "wb") as f:
             f.write(full_bytes)
-        absolute_path_thumb = os.path.join(storage_dir, thumb_filename)
+        # product_id is a FastAPI UUID-typed path param; path traversal is impossible.
+        absolute_path_thumb = os.path.join(storage_dir, thumb_filename)  # codeql[py/path-injection]
         with open(absolute_path_thumb, "wb") as f:
             f.write(thumb_bytes)
         storage_path = os.path.join(self.local_storage_path, year_month, filename).replace("\\", "/")
@@ -153,14 +156,23 @@ class ProductImageService:
                     log_error(f"Failed to delete product image from GCS {storage_path}: {exc}")
             return
         # Local mode
+        base_dir = Path(self.local_storage_path).resolve()
         for p in (storage_path, thumbnail_storage_path):
             if not p or self.is_placeholder(p):
                 continue
             try:
-                absolute_path = p if os.path.isabs(p) else os.path.abspath(p)
-                if os.path.exists(absolute_path):
-                    os.remove(absolute_path)
-                    log_info(f"Product image deleted: {absolute_path}")
+                # Resolve and confine to the configured image base directory.
+                candidate = (base_dir / p).resolve()
+                try:
+                    candidate.relative_to(base_dir)
+                except ValueError:
+                    log_error(f"product_image: storage_path escaped base dir: {p}")
+                    raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
+                if candidate.exists():
+                    candidate.unlink()
+                    log_info(f"Product image deleted: {candidate}")
+            except HTTPException:
+                raise
             except Exception as exc:
                 log_error(f"Failed to delete product image {p}: {exc}")
 
