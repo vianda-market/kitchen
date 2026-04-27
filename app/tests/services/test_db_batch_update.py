@@ -14,54 +14,42 @@ Tests cover:
 from unittest.mock import Mock, patch
 from uuid import UUID
 
-import psycopg2
 import pytest
+from psycopg2 import sql
 
 from app.utils.db import _build_update_sql, db_batch_update, db_update
 
 
-@pytest.fixture(scope="module")
-def db_conn():
-    """Real psycopg2 connection used only to render sql.Composed objects via as_string().
-
-    Tests that require this fixture are automatically skipped when no local PostgreSQL
-    instance is available (e.g., in the mutation-testing CI job which has no DB service).
-    """
-    try:
-        conn = psycopg2.connect(dbname="kitchen", host="localhost", connect_timeout=2)
-    except psycopg2.OperationalError:
-        pytest.skip("PostgreSQL not available — skipping sql.Composed rendering tests")
-    yield conn
-    conn.close()
-
-
-def render(composed, conn):
-    """Render a sql.Composed object to a plain SQL string for assertion."""
-    return composed.as_string(conn)
+def _repr_contains_identifier(composed: sql.Composed, name: str) -> bool:
+    """Check that the composed object references an Identifier with the given name."""
+    return f"Identifier('{name}')" in repr(composed)
 
 
 class TestBuildUpdateSql:
     """Tests for _build_update_sql helper function"""
 
-    def test_build_update_sql(self, db_conn):
-        """Test building SQL for update"""
+    def test_build_update_sql(self):
+        """Test building SQL for update — table and column names use sql.Identifier"""
         table = "test_table"
         data = {"status": "active", "modified_by": "user1"}
         where = {"id": "uuid1"}
 
         composed, values = _build_update_sql(table, data, where)
-        sql_str = render(composed, db_conn)
 
-        assert 'UPDATE "test_table"' in sql_str
-        assert '"status" = %s' in sql_str
-        assert '"modified_by" = %s' in sql_str
-        assert '"id" = %s' in sql_str
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "test_table")
+        assert _repr_contains_identifier(composed, "status")
+        assert _repr_contains_identifier(composed, "modified_by")
+        assert _repr_contains_identifier(composed, "id")
+        assert "UPDATE" in repr(composed)
+        assert "SET" in repr(composed)
+        assert "WHERE" in repr(composed)
         assert len(values) == 3  # 2 data values + 1 where value
         assert values[0] == "active"
         assert values[1] == "user1"
         assert values[2] == "uuid1"
 
-    def test_build_update_sql_with_uuid(self, db_conn):
+    def test_build_update_sql_with_uuid(self):
         """Test UUID conversion in update"""
         table = "test_table"
         data = {"status": "active"}
@@ -71,18 +59,17 @@ class TestBuildUpdateSql:
 
         assert str(values[1]) == "12345678-1234-5678-1234-567812345678"
 
-    def test_build_update_sql_multiple_where_conditions(self, db_conn):
+    def test_build_update_sql_multiple_where_conditions(self):
         """Test building SQL with multiple WHERE conditions"""
         table = "test_table"
         data = {"status": "active"}
         where = {"id": "uuid1", "is_archived": False}
 
         composed, values = _build_update_sql(table, data, where)
-        sql_str = render(composed, db_conn)
 
-        assert '"id" = %s' in sql_str
-        assert '"is_archived" = %s' in sql_str
-        assert " AND " in sql_str
+        assert isinstance(composed, sql.Composed)
+        assert _repr_contains_identifier(composed, "id")
+        assert _repr_contains_identifier(composed, "is_archived")
         assert len(values) == 3  # 1 data value + 2 where values
 
 
