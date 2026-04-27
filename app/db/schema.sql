@@ -3885,6 +3885,7 @@ CREATE TABLE IF NOT EXISTS customer.plan_info (
     credit_cost_usd DOUBLE PRECISION NOT NULL,
     rollover BOOLEAN NOT NULL DEFAULT TRUE,
     rollover_cap NUMERIC,
+    canonical_key VARCHAR(200) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -3935,6 +3936,12 @@ COMMENT ON COLUMN customer.plan_info.rollover IS
     'TRUE (default) if unused credits carry over to the next period. FALSE = credits expire on renewal.';
 COMMENT ON COLUMN customer.plan_info.rollover_cap IS
     'Maximum credits that can roll over (NULL = no cap). Only meaningful when rollover = TRUE.';
+COMMENT ON COLUMN customer.plan_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture plans '
+    '(e.g. ''MARKET_AR_PLAN_STANDARD_50000_ARS''). Used by the '
+    'PUT /api/v1/plans/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc plans created via the normal POST endpoint. '
+    'Unique when not null (enforced by partial index uq_plan_info_canonical_key).';
 COMMENT ON COLUMN customer.plan_info.is_archived IS
     'Soft-delete tombstone. Archived plans are hidden from plan selection but retained for subscription history.';
 COMMENT ON COLUMN customer.plan_info.status IS
@@ -3968,6 +3975,7 @@ CREATE TABLE IF NOT EXISTS audit.plan_history (
     credit_cost_usd DOUBLE PRECISION NOT NULL,
     rollover BOOLEAN NOT NULL,
     rollover_cap NUMERIC,
+    canonical_key VARCHAR(200) NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,

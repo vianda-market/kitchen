@@ -172,3 +172,74 @@ INSERT INTO ops.restaurant_info (
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'dddddddd-dddd-dddd-dddd-dddddddddddd'
 );
+
+-- =============================================================================
+-- DEV FIXTURE: Canonical subscription plans
+-- One realistic plan per active test market.  Prices are above Stripe's
+-- USD-equivalent minimum (~$0.50) with comfortable margin.
+--
+-- These rows are idempotent (INSERT ... ON CONFLICT DO UPDATE) so running
+-- build_kitchen_db.sh multiple times never creates duplicates.
+--
+-- canonical_key convention: MARKET_{ISO}_PLAN_{DESCRIPTION}_{PRICE}_{CURRENCY}
+-- market_id reference data UUIDs (from reference_data.sql):
+--   AR: 00000000-0000-0000-0000-000000000002
+--   US: 00000000-0000-0000-0000-000000000004
+-- =============================================================================
+
+-- credit_cost_local_currency and credit_cost_usd are set automatically by the
+-- plan_info_set_credit_cost_trigger before insert; the values below are
+-- placeholder zeros that the trigger overwrites.
+
+INSERT INTO customer.plan_info (
+    market_id,
+    name,
+    credit,
+    price,
+    highlighted,
+    rollover,
+    rollover_cap,
+    canonical_key,
+    status,
+    credit_cost_local_currency,
+    credit_cost_usd,
+    modified_by
+)
+VALUES
+    -- Argentina: 50 000 ARS (~$35 USD at Dec 2024 rates) — well above $0.50 minimum
+    (
+        '00000000-0000-0000-0000-000000000002',
+        'Standard AR',
+        20,
+        50000.00,
+        TRUE,
+        TRUE,
+        NULL,
+        'MARKET_AR_PLAN_STANDARD_50000_ARS',
+        'active'::status_enum,
+        0, 0,
+        'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    ),
+    -- United States: 15 USD — well above $0.50 minimum
+    (
+        '00000000-0000-0000-0000-000000000004',
+        'Standard US',
+        20,
+        15.00,
+        TRUE,
+        TRUE,
+        NULL,
+        'MARKET_US_PLAN_STANDARD_15_USD',
+        'active'::status_enum,
+        0, 0,
+        'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    )
+ON CONFLICT (canonical_key) WHERE canonical_key IS NOT NULL
+DO UPDATE SET
+    name              = EXCLUDED.name,
+    credit            = EXCLUDED.credit,
+    price             = EXCLUDED.price,
+    highlighted       = EXCLUDED.highlighted,
+    status            = EXCLUDED.status,
+    modified_by       = EXCLUDED.modified_by,
+    modified_date     = CURRENT_TIMESTAMP;
