@@ -90,6 +90,8 @@ DROP TABLE IF EXISTS client_payment_attempt CASCADE;
 DROP TABLE IF EXISTS billing.restaurant_transaction CASCADE;
 DROP TABLE IF EXISTS institution_payment_attempt CASCADE;
 DROP TABLE IF EXISTS customer.referral_code_assignment CASCADE;
+DROP TABLE IF EXISTS audit.referral_transaction_history CASCADE;
+DROP TABLE IF EXISTS customer.referral_transaction CASCADE;
 DROP TABLE IF EXISTS audit.referral_info_history CASCADE;
 DROP TABLE IF EXISTS audit.referral_config_history CASCADE;
 DROP TABLE IF EXISTS customer.referral_info CASCADE;
@@ -4385,7 +4387,6 @@ CREATE TABLE IF NOT EXISTS billing.client_transaction (
     source VARCHAR(50) NOT NULL,  -- e.g., 'plate_selection' or 'discretionary_promotion'
     plate_selection_id UUID, -- references a plate_selection record when source = 'order'
     discretionary_id UUID, -- references a discretionary record when source = 'discretionary'
-    referral_id UUID, -- references a referral record when source = 'referral_program'
     credit NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
@@ -4411,8 +4412,6 @@ COMMENT ON COLUMN billing.client_transaction.plate_selection_id IS
     'FK to customer.plate_selection_info. Populated when source = ''plate_selection''; NULL otherwise.';
 COMMENT ON COLUMN billing.client_transaction.discretionary_id IS
     'FK to billing.discretionary_info. Populated when source = ''discretionary''; NULL otherwise.';
-COMMENT ON COLUMN billing.client_transaction.referral_id IS
-    'FK to referral record. Populated when source = ''referral_program''; NULL otherwise.';
 COMMENT ON COLUMN billing.client_transaction.credit IS
     'Amount credited (positive) or debited (negative) to the user wallet in market currency.';
 COMMENT ON COLUMN billing.client_transaction.is_archived IS
@@ -4507,7 +4506,6 @@ CREATE TABLE IF NOT EXISTS customer.referral_info (
     reward_held_until TIMESTAMPTZ NULL,
     expired_date TIMESTAMPTZ NULL,
     cancelled_date TIMESTAMPTZ NULL,
-    transaction_id UUID NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -4517,7 +4515,6 @@ CREATE TABLE IF NOT EXISTS customer.referral_info (
     FOREIGN KEY (referrer_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (referee_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT,
-    FOREIGN KEY (transaction_id) REFERENCES billing.client_transaction(transaction_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_referral_info_referrer ON customer.referral_info(referrer_user_id);
@@ -4556,9 +4553,6 @@ COMMENT ON COLUMN customer.referral_info.expired_date IS
     'UTC timestamp when the referral expired (pending_expiry_days exceeded). NULL if not expired.';
 COMMENT ON COLUMN customer.referral_info.cancelled_date IS
     'UTC timestamp when the referral was manually cancelled. NULL if not cancelled.';
-COMMENT ON COLUMN customer.referral_info.transaction_id IS
-    'FK to billing.client_transaction. The credit transaction created when the bonus was issued. '
-    'NULL until rewarded. Added as a deferred FK to break the circular dependency with billing.client_transaction.';
 COMMENT ON COLUMN customer.referral_info.is_archived IS
     'Soft-delete tombstone. Archived rows are excluded from active referral queries.';
 COMMENT ON COLUMN customer.referral_info.status IS
@@ -4571,11 +4565,6 @@ COMMENT ON COLUMN customer.referral_info.modified_by IS
     'FK to core.user_info. UUID of the last user to write this row.';
 COMMENT ON COLUMN customer.referral_info.modified_date IS
     'UTC timestamp of the most recent update.';
-
--- Deferred FK: client_transaction.referral_id -> referral_info (circular dependency)
-ALTER TABLE billing.client_transaction
-    ADD CONSTRAINT fk_client_transaction_referral
-    FOREIGN KEY (referral_id) REFERENCES customer.referral_info(referral_id) ON DELETE RESTRICT;
 
 \echo 'Creating table: audit.referral_config_history'
 CREATE TABLE IF NOT EXISTS audit.referral_config_history (
@@ -4625,7 +4614,6 @@ CREATE TABLE IF NOT EXISTS audit.referral_info_history (
     qualified_date TIMESTAMPTZ NULL,
     rewarded_date TIMESTAMPTZ NULL,
     reward_held_until TIMESTAMPTZ NULL,
-    transaction_id UUID NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
@@ -4644,6 +4632,74 @@ COMMENT ON COLUMN audit.referral_info_history.event_id IS
 COMMENT ON COLUMN audit.referral_info_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
 COMMENT ON COLUMN audit.referral_info_history.valid_until IS
+    'UTC timestamp until which this row was current. ''infinity'' for the current row.';
+
+\echo 'Creating table: customer.referral_transaction'
+CREATE TABLE IF NOT EXISTS customer.referral_transaction (
+    referral_transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    referral_id UUID NOT NULL,
+    transaction_id UUID NOT NULL,
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referral_id) REFERENCES customer.referral_info(referral_id) ON DELETE RESTRICT,
+    FOREIGN KEY (transaction_id) REFERENCES billing.client_transaction(transaction_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    CONSTRAINT uq_referral_transaction_referral_id UNIQUE (referral_id)
+);
+CREATE INDEX IF NOT EXISTS idx_referral_transaction_referral_id ON customer.referral_transaction(referral_id);
+CREATE INDEX IF NOT EXISTS idx_referral_transaction_transaction_id ON customer.referral_transaction(transaction_id);
+COMMENT ON TABLE customer.referral_transaction IS
+    'Bridge table linking a referral reward to its credit transaction. '
+    'Replaces the former direct FKs on customer.referral_info.transaction_id and '
+    'billing.client_transaction.referral_id that formed a circular dependency. '
+    'One row per rewarded referral (UNIQUE on referral_id).';
+COMMENT ON COLUMN customer.referral_transaction.referral_transaction_id IS
+    'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN customer.referral_transaction.referral_id IS
+    'FK to customer.referral_info. The referral that was rewarded.';
+COMMENT ON COLUMN customer.referral_transaction.transaction_id IS
+    'FK to billing.client_transaction. The credit transaction created for this reward.';
+COMMENT ON COLUMN customer.referral_transaction.is_archived IS
+    'Soft-delete tombstone.';
+COMMENT ON COLUMN customer.referral_transaction.status IS
+    'Row lifecycle from status_enum (active/inactive).';
+COMMENT ON COLUMN customer.referral_transaction.created_date IS
+    'UTC timestamp when the bridge row was created.';
+COMMENT ON COLUMN customer.referral_transaction.created_by IS
+    'FK to core.user_info. Actor who created this row; NULL for system-generated rows.';
+COMMENT ON COLUMN customer.referral_transaction.modified_by IS
+    'FK to core.user_info. UUID of the last actor to write this row.';
+COMMENT ON COLUMN customer.referral_transaction.modified_date IS
+    'UTC timestamp of the most recent update.';
+
+\echo 'Creating table: audit.referral_transaction_history'
+CREATE TABLE IF NOT EXISTS audit.referral_transaction_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    referral_transaction_id UUID NOT NULL,
+    referral_id UUID NOT NULL,
+    transaction_id UUID NOT NULL,
+    is_archived BOOLEAN NOT NULL,
+    status status_enum NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL,
+    created_by UUID NULL,
+    modified_by UUID NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (referral_transaction_id) REFERENCES customer.referral_transaction(referral_transaction_id) ON DELETE RESTRICT,
+    FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
+);
+COMMENT ON TABLE audit.referral_transaction_history IS
+    'Trigger-managed history mirror of customer.referral_transaction. Never written by application code.';
+COMMENT ON COLUMN audit.referral_transaction_history.event_id IS
+    'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.referral_transaction_history.is_current IS
+    'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.referral_transaction_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.referral_code_assignment'

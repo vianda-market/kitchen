@@ -297,6 +297,7 @@ PRIMARY_KEY_MAPPING = {
     "ingredient_catalog": "ingredient_id",
     "referral_config": "referral_config_id",
     "referral_info": "referral_id",
+    "referral_transaction": "referral_transaction_id",
     "restaurant_info": "restaurant_id",
     "qr_code": "qr_code_id",
     "discretionary_info": "discretionary_id",
