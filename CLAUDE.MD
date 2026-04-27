@@ -13,6 +13,7 @@ Update `CLAUDE_ARCHITECTURE.MD` after adding new modules, tables, services, rout
 - Never pass `page`/`page_size` pagination params in cron jobs or internal service calls — pagination is for HTTP routes only
 - Never edit an already-applied migration file — write a new one instead
 - Never `cd <path> && git <cmd>` from outside a repo CWD. Use `git -C <path> <cmd>` instead — `cd && git` triggers the harness's "untrusted hooks" confirmation prompt on every invocation. Plain `git <cmd>` from inside the repo CWD is fine.
+- Never rely on inline `# codeql[<rule-id>]` or `# lgtm[...]` comments to suppress CodeQL alerts. This repo uses **GitHub Default Setup CodeQL**, which does NOT honor inline suppressions. False-positive alerts must be dismissed via the API/UI with `dismissed_reason="false positive"` (with space, max 280 chars in `dismissed_comment`). Real fixes (e.g. structural refactor like `psycopg2.sql.Identifier`) close alerts on the next scan; inline comments do nothing. (Caught 2026-04-26 in PRs #132/#134/#136/#137 — suppressions had no effect; alerts were finally closed via batch API dismissal referencing `docs/plans/codeql-91-triage.md`.)
 
 ## Essential Commands
 - **Apply migrations:** `bash app/db/migrate.sh` (incremental — preserves data)
