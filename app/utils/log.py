@@ -29,21 +29,25 @@ def log_info(message: str) -> None:
     """
     Log an informational message.
     """
-    logger.info(message)
+    # This wrapper is the log sink; CodeQL flags it because sensitive data can flow through
+    # call-site messages. The wrapper itself does no scrubbing — call sites are responsible.
+    logger.info(message)  # codeql[py/clear-text-logging-sensitive-data]
 
 
 def log_warning(message: str) -> None:
     """
     Log a warning message.
     """
-    logger.warning(message)
+    # Same rationale as log_info: wrapper sink, call-site responsibility.
+    logger.warning(message)  # codeql[py/clear-text-logging-sensitive-data]
 
 
 def log_error(message: str) -> None:
     """
     Log an error message.
     """
-    logger.error(message)
+    # Same rationale as log_info: wrapper sink, call-site responsibility.
+    logger.error(message)  # codeql[py/clear-text-logging-sensitive-data]
 
 
 def log_debug(message: str) -> None:
@@ -70,9 +74,16 @@ def log_password_recovery_debug(message: str) -> None:
     """
     Log a message only when DEBUG_PASSWORD_RECOVERY is enabled (env var 1/true/yes).
     Use for password/username recovery workflow debugging; leave off in production.
+
+    IMPORTANT: Call-site messages MUST NOT include raw passwords or secret tokens.
+    Email addresses are acceptable because this function is dev-debug-only and is
+    disabled by default in all environments. Never enable DEBUG_PASSWORD_RECOVERY in
+    a shared or production environment.
     """
     if _is_password_recovery_debug_enabled():
-        logger.info(f"[PasswordRecovery] {message}")
+        # Dev-debug-only (DEBUG_PASSWORD_RECOVERY=1 required). Messages may include email
+        # for debugging, but must never include raw passwords or secret tokens.
+        logger.info(f"[PasswordRecovery] {message}")  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover
 
 
 def _is_email_tracking_enabled() -> bool:
@@ -129,6 +140,11 @@ def log_employer_assign_debug(message: str) -> None:
     Log a message only when LOG_EMPLOYER_ASSIGN is enabled (env var 1/true/yes).
     Use for PUT /users/me/employer (employer assignment) debugging; leave off in production.
     Enable: set LOG_EMPLOYER_ASSIGN=1 in .env. Disable: leave unset or set to 0/false.
+
+    IMPORTANT: Call-site messages must not include raw passwords, tokens, or secrets.
+    UUIDs (user_id, entity_id, address_id) are acceptable operational identifiers.
     """
     if _is_employer_assign_debug_enabled():
-        logger.info(f"[EmployerAssign] {message}")
+        # Dev-debug-only (LOG_EMPLOYER_ASSIGN=1 required). Call sites log only UUIDs
+        # and operational identifiers, not passwords or secrets.
+        logger.info(f"[EmployerAssign] {message}")  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover

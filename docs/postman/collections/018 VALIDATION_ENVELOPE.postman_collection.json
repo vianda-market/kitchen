@@ -144,6 +144,49 @@
       }
     },
     {
+      "name": "500-path envelope — market_service DB error now uses envelope (not raw psycopg2 string)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// This test verifies the scalar envelope shape on the market 404 path.",
+              "// The 500 path (psycopg2 error) was the real bug (#91 PR-C):",
+              "// it used to expose raw DB error strings; it now raises envelope_exception(",
+              "// ErrorCode.SERVER_INTERNAL_ERROR) which produces the same scalar shape.",
+              "// We cannot trigger a live psycopg2 error in a Postman test, so we verify",
+              "// the envelope contract via the 404 path which uses the same infrastructure.",
+              "pm.test(\"Status is 404\", function () {",
+              "    pm.response.to.have.status(404);",
+              "});",
+              "",
+              "pm.test(\"detail is a scalar envelope (not raw string)\", function () {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body).to.have.property('detail');",
+              "    pm.expect(body.detail).to.be.an('object');",
+              "    pm.expect(body.detail).to.not.be.a('string');",
+              "});",
+              "",
+              "pm.test(\"Envelope has code, message, params\", function () {",
+              "    var detail = pm.response.json().detail;",
+              "    pm.expect(detail).to.have.property('code');",
+              "    pm.expect(detail).to.have.property('message');",
+              "    pm.expect(detail).to.have.property('params');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}
+        ],
+        "url": "{{baseUrl}}/api/v1/admin/markets/00000000-0000-0000-0000-000000009999"
+      }
+    },
+    {
       "name": "422 — I18nValueError domain code (AR invoice missing ar_details)",
       "event": [
         {

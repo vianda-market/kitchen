@@ -127,7 +127,10 @@ def normalize_country_code(value: str | None, default: str | None = None) -> str
     if len(s) == 3:
         country = pycountry.countries.get(alpha_3=s)
         if country is not None:
-            logger.info("country_code alpha-3 converted to alpha-2: %s -> %s", s, country.alpha_2)
+            # Logs ISO country codes (e.g. "ARG" -> "AR"), not PII or secrets.
+            logger.info(
+                "country_code alpha-3 converted to alpha-2: %s -> %s", s, country.alpha_2
+            )  # codeql[py/clear-text-logging-sensitive-data]
             return country.alpha_2
         # Invalid alpha-3; return as-is so downstream validation can reject with clear message
         return s

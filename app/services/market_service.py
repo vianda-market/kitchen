@@ -23,7 +23,7 @@ from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.utils.db import db_read
 from app.utils.db_pool import get_db_pool
-from app.utils.log import logger
+from app.utils.log import log_error, logger
 
 # Sentinel market for global scope (Internal Admin, Super Admin, Supplier Admin). Seeded in seed.sql; editable only by Super Admin.
 GLOBAL_MARKET_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -281,14 +281,21 @@ class MarketService:
                 market = cur.fetchone()
 
                 if market:
-                    logger.info(f"Retrieved market: {market['country_name']} ({market_id})")
+                    # Country name and market UUID are operational data, not PII or credentials.
+                    logger.info(
+                        f"Retrieved market: {market['country_name']} ({market_id})"
+                    )  # codeql[py/clear-text-logging-sensitive-data]
                     return _serialize_market(dict(market))
-                logger.warning(f"Market not found: {market_id}")
+                # Market UUID in a WARNING log is operational data, not PII.
+                logger.warning(f"Market not found: {market_id}")  # codeql[py/clear-text-logging-sensitive-data]
                 return None
 
         except Exception as e:
-            logger.error(f"Error retrieving market {market_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error retrieving market: {str(e)}") from None
+            # Log full error internally; do NOT forward raw DB error to HTTP response (CodeQL #91 real bug).
+            log_error(
+                f"Error retrieving market {market_id}: {e}"
+            )  # codeql[py/clear-text-logging-sensitive-data] UUID is operational data, not PII; psycopg2 error logged for ops visibility, never forwarded to HTTP response
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from e
         finally:
             pool.return_connection(conn)
 
@@ -320,14 +327,23 @@ class MarketService:
                 market = cur.fetchone()
 
                 if market:
-                    logger.info(f"Retrieved market by country code: {market['country_name']} ({country_code})")
+                    # Country name and ISO country code are operational data, not PII or credentials.
+                    logger.info(
+                        f"Retrieved market by country code: {market['country_name']} ({country_code})"
+                    )  # codeql[py/clear-text-logging-sensitive-data]
                     return _serialize_market(dict(market))
-                logger.warning(f"Market not found for country code: {country_code}")
+                # ISO country code in a WARNING log is not PII.
+                logger.warning(
+                    f"Market not found for country code: {country_code}"
+                )  # codeql[py/clear-text-logging-sensitive-data]
                 return None
 
         except Exception as e:
-            logger.error(f"Error retrieving market by country code {country_code}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error retrieving market: {str(e)}") from None
+            # Log full error internally; do NOT forward raw DB error to HTTP response (CodeQL #91 real bug).
+            log_error(
+                f"Error retrieving market by country code {country_code}: {e}"
+            )  # codeql[py/clear-text-logging-sensitive-data] ISO country code is not PII; psycopg2 error logged for ops visibility, never forwarded to HTTP response
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from e
         finally:
             pool.return_connection(conn)
 
