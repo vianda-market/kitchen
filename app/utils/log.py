@@ -83,7 +83,7 @@ def log_password_recovery_debug(message: str) -> None:
     if _is_password_recovery_debug_enabled():
         # Dev-debug-only (DEBUG_PASSWORD_RECOVERY=1 required). Messages may include email
         # for debugging, but must never include raw passwords or secret tokens.
-        logger.info(f"[PasswordRecovery] {message}")  # codeql[py/clear-text-logging-sensitive-data]
+        logger.info(f"[PasswordRecovery] {message}")  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover
 
 
 def _is_email_tracking_enabled() -> bool:
@@ -147,4 +147,4 @@ def log_employer_assign_debug(message: str) -> None:
     if _is_employer_assign_debug_enabled():
         # Dev-debug-only (LOG_EMPLOYER_ASSIGN=1 required). Call sites log only UUIDs
         # and operational identifiers, not passwords or secrets.
-        logger.info(f"[EmployerAssign] {message}")  # codeql[py/clear-text-logging-sensitive-data]
+        logger.info(f"[EmployerAssign] {message}")  # codeql[py/clear-text-logging-sensitive-data]  # pragma: no cover
