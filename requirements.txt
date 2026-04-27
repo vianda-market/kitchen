@@ -15,7 +15,7 @@ psycopg2-binary>=2.9.11  # PostgreSQL adapter; 2.9.11+ for Python 3.14
 
 # Data validation and serialization
 pydantic[email]>=1.10   # Data validation with email support
-pydantic-settings>=2.0  # BaseSettings for env config (moved from pydantic in v2)
+pydantic-settings>=2.14.0  # BaseSettings for env config (moved from pydantic in v2)
 python-multipart>=0.0.9 # Form data parsing (fixes import deprecation)
 
 # Rate limiting
