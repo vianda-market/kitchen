@@ -114,11 +114,13 @@ DROP TABLE IF EXISTS audit.employer_bill_history CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill_line CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill CASCADE;
 DROP TABLE IF EXISTS audit.employer_benefits_program_history CASCADE;
-DROP TABLE IF EXISTS core.restaurant_lead_cuisine CASCADE;
-DROP TABLE IF EXISTS core.restaurant_lead CASCADE;
+DROP TABLE IF EXISTS ops.restaurant_lead_cuisine CASCADE;
+DROP TABLE IF EXISTS ops.restaurant_lead CASCADE;
 DROP TABLE IF EXISTS core.lead_interest CASCADE;
 -- core.employer_domain REMOVED (replaced by email_domain on institution_entity_info)
 DROP TABLE IF EXISTS core.employer_benefits_program CASCADE;
+DROP TABLE IF EXISTS audit.payment_attempt_history CASCADE;
+DROP TABLE IF EXISTS billing.payment_attempt CASCADE;
 DROP TABLE IF EXISTS billing.client_bill_info CASCADE;
 DROP TABLE IF EXISTS customer.subscription_payment CASCADE;
 DROP TABLE IF EXISTS customer.subscription_info CASCADE;
@@ -449,6 +451,22 @@ CREATE TYPE restaurant_lead_referral_source_enum AS ENUM (
     'referral',
     'search',
     'other'
+);
+
+\echo 'Creating enum type: payment_provider_enum'
+CREATE TYPE payment_provider_enum AS ENUM (
+    'stripe',
+    'mercado_pago'
+);
+
+\echo 'Creating enum type: payment_attempt_status_enum'
+CREATE TYPE payment_attempt_status_enum AS ENUM (
+    'pending',
+    'processing',
+    'succeeded',
+    'failed',
+    'cancelled',
+    'refunded'
 );
 
 -- =============================================================================
@@ -1211,8 +1229,8 @@ COMMENT ON COLUMN core.lead_interest.created_date IS
 COMMENT ON COLUMN core.lead_interest.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: core.restaurant_lead'
-CREATE TABLE IF NOT EXISTS core.restaurant_lead (
+\echo 'Creating table: ops.restaurant_lead'
+CREATE TABLE IF NOT EXISTS ops.restaurant_lead (
     restaurant_lead_id UUID PRIMARY KEY DEFAULT uuidv7(),
     -- Contact
     business_name VARCHAR(200) NOT NULL,
@@ -1250,73 +1268,73 @@ CREATE TABLE IF NOT EXISTS core.restaurant_lead (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES core.institution_info(institution_id) ON DELETE SET NULL
 );
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON core.restaurant_lead(lead_status);
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON core.restaurant_lead(country_code);
-CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON core.restaurant_lead(contact_email);
-COMMENT ON TABLE core.restaurant_lead IS
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_status ON ops.restaurant_lead(lead_status);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_country ON ops.restaurant_lead(country_code);
+CREATE INDEX IF NOT EXISTS idx_restaurant_lead_email ON ops.restaurant_lead(contact_email);
+COMMENT ON TABLE ops.restaurant_lead IS
     'Restaurant supplier application leads submitted via the marketing site. '
     'Captures contact info, business profile, and vetting answers before a supplier account is created. '
     'On approval, institution_id is populated and a full supplier institution is provisioned.';
-COMMENT ON COLUMN core.restaurant_lead.restaurant_lead_id IS
+COMMENT ON COLUMN ops.restaurant_lead.restaurant_lead_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN core.restaurant_lead.business_name IS
+COMMENT ON COLUMN ops.restaurant_lead.business_name IS
     'Restaurant or business trade name as submitted by the applicant.';
-COMMENT ON COLUMN core.restaurant_lead.contact_name IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_name IS
     'Full name of the primary contact at the restaurant.';
-COMMENT ON COLUMN core.restaurant_lead.contact_email IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_email IS
     'Case-insensitive email address of the applicant. citext — uniqueness checks are case-folded.';
-COMMENT ON COLUMN core.restaurant_lead.contact_phone IS
+COMMENT ON COLUMN ops.restaurant_lead.contact_phone IS
     'Phone number of the applicant. Free-form; not validated for E.164 format at this layer.';
-COMMENT ON COLUMN core.restaurant_lead.country_code IS
+COMMENT ON COLUMN ops.restaurant_lead.country_code IS
     'ISO 3166-1 alpha-2 country code where the restaurant operates.';
-COMMENT ON COLUMN core.restaurant_lead.city_name IS
+COMMENT ON COLUMN ops.restaurant_lead.city_name IS
     'City name as entered by the applicant. Not normalized against geonames.';
-COMMENT ON COLUMN core.restaurant_lead.years_in_operation IS
+COMMENT ON COLUMN ops.restaurant_lead.years_in_operation IS
     'Number of years the restaurant has been in operation. Non-negative integer.';
-COMMENT ON COLUMN core.restaurant_lead.employee_count_range IS
+COMMENT ON COLUMN ops.restaurant_lead.employee_count_range IS
     'Restaurant staff count range (e.g. ''1-5'', ''6-20''). Informational for vetting.';
-COMMENT ON COLUMN core.restaurant_lead.kitchen_capacity_daily IS
+COMMENT ON COLUMN ops.restaurant_lead.kitchen_capacity_daily IS
     'Maximum number of meals the kitchen can prepare per day. Used in capacity vetting.';
-COMMENT ON COLUMN core.restaurant_lead.website_url IS
+COMMENT ON COLUMN ops.restaurant_lead.website_url IS
     'Restaurant website or social media URL. Optional; informational for vetting.';
-COMMENT ON COLUMN core.restaurant_lead.referral_source IS
+COMMENT ON COLUMN ops.restaurant_lead.referral_source IS
     'How the applicant heard about Vianda (enum). Used for acquisition attribution.';
-COMMENT ON COLUMN core.restaurant_lead.message IS
+COMMENT ON COLUMN ops.restaurant_lead.message IS
     'Optional free-text message from the applicant.';
-COMMENT ON COLUMN core.restaurant_lead.vetting_answers IS
+COMMENT ON COLUMN ops.restaurant_lead.vetting_answers IS
     'JSONB blob of country-specific vetting question answers. Schema is flexible until '
     'questions are finalized per country. Do not rely on a fixed structure across markets.';
-COMMENT ON COLUMN core.restaurant_lead.lead_status IS
+COMMENT ON COLUMN ops.restaurant_lead.lead_status IS
     'Workflow state: ''submitted'' → ''in_review'' → ''approved'' / ''rejected''.';
-COMMENT ON COLUMN core.restaurant_lead.rejection_reason IS
+COMMENT ON COLUMN ops.restaurant_lead.rejection_reason IS
     'Admin-entered reason for rejection. NULL when lead_status is not ''rejected''.';
-COMMENT ON COLUMN core.restaurant_lead.reviewed_by IS
+COMMENT ON COLUMN ops.restaurant_lead.reviewed_by IS
     'FK to core.user_info — internal reviewer who processed this lead. NULL until reviewed.';
-COMMENT ON COLUMN core.restaurant_lead.reviewed_at IS
+COMMENT ON COLUMN ops.restaurant_lead.reviewed_at IS
     'UTC timestamp when the lead was reviewed (approved or rejected).';
-COMMENT ON COLUMN core.restaurant_lead.institution_id IS
+COMMENT ON COLUMN ops.restaurant_lead.institution_id IS
     'FK to core.institution_info. Populated on approval — links the lead to the provisioned supplier institution. '
     'NULL while the lead is still pending.';
-COMMENT ON COLUMN core.restaurant_lead.gclid IS
+COMMENT ON COLUMN ops.restaurant_lead.gclid IS
     'Google Click ID captured at lead submission for conversion attribution.';
-COMMENT ON COLUMN core.restaurant_lead.fbclid IS
+COMMENT ON COLUMN ops.restaurant_lead.fbclid IS
     'Facebook Click ID captured at lead submission.';
-COMMENT ON COLUMN core.restaurant_lead.fbc IS
+COMMENT ON COLUMN ops.restaurant_lead.fbc IS
     'Facebook browser cookie (_fbc) captured at lead submission. Up to 500 chars.';
-COMMENT ON COLUMN core.restaurant_lead.fbp IS
+COMMENT ON COLUMN ops.restaurant_lead.fbp IS
     'Facebook pixel cookie (_fbp) captured at lead submission.';
-COMMENT ON COLUMN core.restaurant_lead.event_id IS
+COMMENT ON COLUMN ops.restaurant_lead.event_id IS
     'Deduplication event ID for server-side Conversions API calls.';
-COMMENT ON COLUMN core.restaurant_lead.source_platform IS
+COMMENT ON COLUMN ops.restaurant_lead.source_platform IS
     'Ad platform that drove the lead (e.g. ''google'', ''meta''). Used to route conversion uploads.';
-COMMENT ON COLUMN core.restaurant_lead.is_archived IS
+COMMENT ON COLUMN ops.restaurant_lead.is_archived IS
     'Soft-delete tombstone. Archived leads are excluded from active queries.';
-COMMENT ON COLUMN core.restaurant_lead.created_date IS
+COMMENT ON COLUMN ops.restaurant_lead.created_date IS
     'UTC timestamp when the lead was submitted.';
-COMMENT ON COLUMN core.restaurant_lead.modified_date IS
+COMMENT ON COLUMN ops.restaurant_lead.modified_date IS
     'UTC timestamp of the most recent update.';
 
--- restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
+-- ops.restaurant_lead_cuisine junction (many-to-many with cuisine, created later)
 -- Deferred: see after cuisine table is created
 
 \echo 'Creating table: core.workplace_group'
@@ -1458,8 +1476,8 @@ ALTER TABLE core.employer_benefits_program
 
 -- core.employer_domain REMOVED — see MULTINATIONAL_INSTITUTIONS.md
 
--- core.restaurant_lead
-ALTER TABLE core.restaurant_lead
+-- ops.restaurant_lead
+ALTER TABLE ops.restaurant_lead
     ADD CONSTRAINT fk_restaurant_lead_reviewed_by
     FOREIGN KEY (reviewed_by) REFERENCES core.user_info(user_id) ON DELETE SET NULL;
 
@@ -2911,19 +2929,19 @@ COMMENT ON COLUMN ops.cuisine_suggestion.modified_by IS
 COMMENT ON COLUMN ops.cuisine_suggestion.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: core.restaurant_lead_cuisine'
-CREATE TABLE IF NOT EXISTS core.restaurant_lead_cuisine (
-    restaurant_lead_id UUID NOT NULL REFERENCES core.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
+\echo 'Creating table: ops.restaurant_lead_cuisine'
+CREATE TABLE IF NOT EXISTS ops.restaurant_lead_cuisine (
+    restaurant_lead_id UUID NOT NULL REFERENCES ops.restaurant_lead(restaurant_lead_id) ON DELETE CASCADE,
     cuisine_id UUID NOT NULL REFERENCES ops.cuisine(cuisine_id) ON DELETE CASCADE,
     PRIMARY KEY (restaurant_lead_id, cuisine_id)
 );
-COMMENT ON TABLE core.restaurant_lead_cuisine IS
+COMMENT ON TABLE ops.restaurant_lead_cuisine IS
     'Junction table linking restaurant leads to their cuisine tags. '
     'A lead can be tagged with multiple cuisines from ops.cuisine. '
     'Cascades deletes from both restaurant_lead and cuisine.';
-COMMENT ON COLUMN core.restaurant_lead_cuisine.restaurant_lead_id IS
-    'FK to core.restaurant_lead. Part of composite primary key.';
-COMMENT ON COLUMN core.restaurant_lead_cuisine.cuisine_id IS
+COMMENT ON COLUMN ops.restaurant_lead_cuisine.restaurant_lead_id IS
+    'FK to ops.restaurant_lead. Part of composite primary key.';
+COMMENT ON COLUMN ops.restaurant_lead_cuisine.cuisine_id IS
     'FK to ops.cuisine. Part of composite primary key.';
 
 \echo 'Creating table: ops.qr_code'
@@ -4771,6 +4789,10 @@ COMMENT ON COLUMN audit.subscription_history.valid_until IS
 CREATE TABLE IF NOT EXISTS customer.subscription_payment (
     subscription_payment_id UUID PRIMARY KEY DEFAULT uuidv7(),
     subscription_id UUID NOT NULL,
+    -- Phase 1 new columns: FK to billing.payment_attempt (nullable until Phase 2)
+    payment_attempt_id UUID NULL,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    -- Legacy columns kept for Phase 1 compatibility; will be dropped in Phase 2
     payment_provider VARCHAR(50) NOT NULL DEFAULT 'stripe',
     external_payment_id VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
@@ -4778,6 +4800,7 @@ CREATE TABLE IF NOT EXISTS customer.subscription_payment (
     currency VARCHAR(10) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subscription_id) REFERENCES customer.subscription_info(subscription_id) ON DELETE RESTRICT
+    -- FK to billing.payment_attempt added after that table is created (deferred below)
 );
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_subscription_id ON customer.subscription_payment(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_payment_external_id ON customer.subscription_payment(external_payment_id);
@@ -4804,6 +4827,80 @@ COMMENT ON COLUMN customer.subscription_payment.currency IS
     'Surfaced in SubscriptionWithPaymentResponseSchema.currency.';
 COMMENT ON COLUMN customer.subscription_payment.created_at IS
     'UTC timestamp when the payment record was created.';
+COMMENT ON COLUMN customer.subscription_payment.payment_attempt_id IS
+    'FK to billing.payment_attempt. NULL until the first attempt is linked. '
+    'Phase 1: nullable. Phase 2: NOT NULL after cron + webhook are refactored.';
+COMMENT ON COLUMN customer.subscription_payment.attempt_number IS
+    'Attempt counter (1-based). 1 for the initial attempt; increments on retry.';
+
+\echo 'Creating table: billing.payment_attempt'
+CREATE TABLE IF NOT EXISTS billing.payment_attempt (
+    payment_attempt_id      UUID PRIMARY KEY DEFAULT uuidv7(),
+    provider                payment_provider_enum NOT NULL,
+    provider_payment_id     TEXT NULL,
+    idempotency_key         TEXT NULL,
+    amount_cents            INTEGER NOT NULL,
+    currency                CHAR(3) NOT NULL,
+    payment_status          payment_attempt_status_enum NOT NULL DEFAULT 'pending',
+    provider_status         TEXT NULL,
+    failure_reason          TEXT NULL,
+    provider_fee_cents      INTEGER NULL,
+    is_archived             BOOLEAN NOT NULL DEFAULT FALSE,
+    status                  status_enum NOT NULL DEFAULT 'active'::status_enum,
+    created_date            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by              UUID NULL,
+    modified_by             UUID NOT NULL,
+    modified_date           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_payment_attempt_provider_payment_id
+    ON billing.payment_attempt(provider_payment_id)
+    WHERE provider_payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_attempt_payment_status
+    ON billing.payment_attempt(payment_status);
+COMMENT ON TABLE billing.payment_attempt IS
+    'Financial record for a single payment attempt. Provider-specific: one row per attempt '
+    'regardless of provider (Stripe, Mercado Pago, etc.). Written by webhook handlers. '
+    'Linked to customer.subscription_payment via payment_attempt_id FK.';
+COMMENT ON COLUMN billing.payment_attempt.payment_attempt_id IS 'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN billing.payment_attempt.provider IS 'Payment provider that processed this attempt.';
+COMMENT ON COLUMN billing.payment_attempt.provider_payment_id IS 'Provider-assigned ID (e.g. Stripe pi_…). Indexed for webhook lookup.';
+COMMENT ON COLUMN billing.payment_attempt.idempotency_key IS 'Idempotency key sent to the provider to prevent duplicate charges.';
+COMMENT ON COLUMN billing.payment_attempt.amount_cents IS 'Charge amount in smallest currency unit.';
+COMMENT ON COLUMN billing.payment_attempt.currency IS 'ISO 4217 3-letter currency code.';
+COMMENT ON COLUMN billing.payment_attempt.payment_status IS 'Financial state of this attempt.';
+COMMENT ON COLUMN billing.payment_attempt.provider_status IS 'Raw status string from the provider (debug/fidelity).';
+COMMENT ON COLUMN billing.payment_attempt.failure_reason IS 'Human-readable failure reason from the provider, if failed.';
+COMMENT ON COLUMN billing.payment_attempt.provider_fee_cents IS 'Provider transaction fee in smallest currency unit, if known.';
+COMMENT ON COLUMN billing.payment_attempt.status IS 'Admin/audit lifecycle status (active/inactive). Separate from payment_status.';
+
+\echo 'Creating table: audit.payment_attempt_history'
+CREATE TABLE IF NOT EXISTS audit.payment_attempt_history (
+    event_id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    payment_attempt_id      UUID NOT NULL,
+    provider                payment_provider_enum NOT NULL,
+    provider_payment_id     TEXT NULL,
+    idempotency_key         TEXT NULL,
+    amount_cents            INTEGER NOT NULL,
+    currency                CHAR(3) NOT NULL,
+    payment_status          payment_attempt_status_enum NOT NULL,
+    provider_status         TEXT NULL,
+    failure_reason          TEXT NULL,
+    provider_fee_cents      INTEGER NULL,
+    is_archived             BOOLEAN NOT NULL,
+    status                  status_enum NOT NULL,
+    created_date            TIMESTAMPTZ NOT NULL,
+    created_by              UUID NULL,
+    modified_by             UUID NOT NULL,
+    modified_date           TIMESTAMPTZ NOT NULL,
+    is_current              BOOLEAN,
+    valid_until             TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+    FOREIGN KEY (payment_attempt_id) REFERENCES billing.payment_attempt(payment_attempt_id) ON DELETE RESTRICT
+);
+COMMENT ON TABLE audit.payment_attempt_history IS
+    'Trigger-managed history mirror of billing.payment_attempt. Never written by application code.';
+COMMENT ON COLUMN audit.payment_attempt_history.event_id IS 'UUIDv7 primary key for this history row. Time-ordered.';
+COMMENT ON COLUMN audit.payment_attempt_history.is_current IS 'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
+COMMENT ON COLUMN audit.payment_attempt_history.valid_until IS 'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.payment_method'
 CREATE TABLE IF NOT EXISTS customer.payment_method (
@@ -6499,6 +6596,14 @@ COMMENT ON COLUMN core.ad_zone.modified_date IS
 -- as a nullable UUID near the top of schema.sql so the audit history table
 -- could mirror it via the trigger pattern.
 -- ─────────────────────────────────────────────────────────────
+\echo 'Adding deferred FK: customer.subscription_payment.payment_attempt_id → billing.payment_attempt'
+ALTER TABLE customer.subscription_payment
+    ADD CONSTRAINT fk_subscription_payment_payment_attempt_id
+    FOREIGN KEY (payment_attempt_id) REFERENCES billing.payment_attempt(payment_attempt_id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_subscription_payment_attempt_id
+    ON customer.subscription_payment(payment_attempt_id)
+    WHERE payment_attempt_id IS NOT NULL;
+
 \echo 'Adding deferred FKs on core.address_info.city_metadata_id'
 ALTER TABLE core.address_info
     ADD CONSTRAINT fk_address_info_city_metadata_id

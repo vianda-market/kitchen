@@ -283,7 +283,7 @@ async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query param
     List city names for lead forms. No auth; rate-limited per IP.
 
     Default (no audience): cities with >=1 active restaurant with plate_kitchen_days + QR.
-    ?audience=supplier: all cities in supplier-audience countries (GeoNames u city_metadata u restaurant_lead).
+    ?audience=supplier: all cities in supplier-audience countries (GeoNames u city_metadata u ops.restaurant_lead).
     ?mode=coverage: returns [{city, restaurant_count}] -- coverage-filtered with counts, for marketing site.
 
     Client sends selected city_name in the lead/signup form body.

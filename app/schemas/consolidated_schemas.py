@@ -47,7 +47,14 @@ from app.config import (
     Status,
     TransactionType,
 )
-from app.config.enums import DietaryFlag, FavoriteEntityType, NationalHolidaySource, PaymentFrequency
+from app.config.enums import (
+    DietaryFlag,
+    FavoriteEntityType,
+    NationalHolidaySource,
+    PaymentAttemptStatus,
+    PaymentFrequency,
+    PaymentProvider,
+)
 from app.config.settings import settings
 from app.i18n.envelope import I18nValueError
 from app.utils.country import normalize_country_code
@@ -3691,3 +3698,54 @@ class AssignWorkplaceRequest(BaseModel):
 
     workplace_group_id: UUID = Field(..., description="Workplace group to join")
     address_id: UUID = Field(..., description="Workplace group address where user picks up")
+
+
+# =============================================================================
+# BILLING — PAYMENT ATTEMPT (multi-provider, issue #74)
+# =============================================================================
+
+
+class PaymentAttemptCreateSchema(BaseModel):
+    """Request body for creating a new billing.payment_attempt row.
+    Callers: subscription renewal cron (status=pending) and manual admin flows.
+    Webhook handlers update the row via PaymentAttemptUpdateSchema, not create."""
+
+    provider: PaymentProvider
+    amount_cents: int = Field(..., ge=0, description="Charge amount in smallest currency unit")
+    currency: str = Field(..., min_length=3, max_length=3, description="ISO 4217 3-letter code")
+    provider_payment_id: str | None = Field(None, description="Provider-assigned ID (e.g. Stripe pi_…)")
+    idempotency_key: str | None = Field(None, description="Idempotency key sent to the provider")
+    provider_status: str | None = Field(None, description="Raw provider status string")
+
+
+class PaymentAttemptUpdateSchema(BaseModel):
+    """Partial update for billing.payment_attempt. Used by webhook handlers to record
+    outcome after the provider responds. Only the fields being updated need to be supplied."""
+
+    payment_status: PaymentAttemptStatus | None = None
+    provider_payment_id: str | None = None
+    provider_status: str | None = None
+    failure_reason: str | None = None
+    provider_fee_cents: int | None = None
+
+
+class PaymentAttemptResponseSchema(BaseModel):
+    """Response shape for a billing.payment_attempt row. Returned by GET endpoints
+    that surface payment attempt details to internal/admin callers."""
+
+    payment_attempt_id: UUID
+    provider: PaymentProvider
+    provider_payment_id: str | None
+    idempotency_key: str | None
+    amount_cents: int
+    currency: str
+    payment_status: PaymentAttemptStatus
+    provider_status: str | None
+    failure_reason: str | None
+    provider_fee_cents: int | None
+    is_archived: bool
+    status: Status
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)

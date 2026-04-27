@@ -2429,3 +2429,71 @@ CREATE TRIGGER plate_pickup_live_history_trigger
 AFTER INSERT OR UPDATE ON customer.plate_pickup_live
 FOR EACH ROW
 EXECUTE FUNCTION plate_pickup_live_history_trigger_func();
+
+
+-- Trigger function for billing.payment_attempt history logging
+CREATE OR REPLACE FUNCTION payment_attempt_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        -- Mark the previous history record for this payment_attempt as not current
+        UPDATE audit.payment_attempt_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE payment_attempt_id = OLD.payment_attempt_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.payment_attempt_history (
+        event_id,
+        payment_attempt_id,
+        provider,
+        provider_payment_id,
+        idempotency_key,
+        amount_cents,
+        currency,
+        payment_status,
+        provider_status,
+        failure_reason,
+        provider_fee_cents,
+        is_archived,
+        status,
+        created_date,
+        created_by,
+        modified_by,
+        modified_date,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.payment_attempt_id,
+        NEW.provider,
+        NEW.provider_payment_id,
+        NEW.idempotency_key,
+        NEW.amount_cents,
+        NEW.currency,
+        NEW.payment_status,
+        NEW.provider_status,
+        NEW.failure_reason,
+        NEW.provider_fee_cents,
+        NEW.is_archived,
+        NEW.status,
+        NEW.created_date,
+        NEW.created_by,
+        NEW.modified_by,
+        NEW.modified_date,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS payment_attempt_history_trigger ON billing.payment_attempt;
+CREATE TRIGGER payment_attempt_history_trigger
+AFTER INSERT OR UPDATE ON billing.payment_attempt
+FOR EACH ROW
+EXECUTE FUNCTION payment_attempt_history_trigger_func();

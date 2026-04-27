@@ -290,19 +290,19 @@ INVENTORY: dict[str, InventoryEntry] = {
     # .source surfaces in LeadInterestResponseSchema.
     # vianda-platform: types/api.ts (LeadInterest.source).
     "core.lead_interest.source": {"surfaces": ["platform"]},
-    # --- core.restaurant_lead ---
+    # --- ops.restaurant_lead ---
     #
     # .business_name surfaces in RestaurantLeadResponseSchema (POST /leads/restaurant-interest).
     # vianda-home: RestaurantApplicationForm.tsx submits and receives this field.
-    "core.restaurant_lead.business_name": {"surfaces": ["home"]},
+    "ops.restaurant_lead.business_name": {"surfaces": ["home"]},
     #
     # .country_code surfaces in RestaurantLeadResponseSchema.
     # vianda-home: RestaurantApplicationForm.tsx — country selection.
-    "core.restaurant_lead.country_code": {"surfaces": ["home"]},
+    "ops.restaurant_lead.country_code": {"surfaces": ["home"]},
     #
     # .city_name surfaces in RestaurantLeadCreateSchema (submitted) and admin enriched views.
     # vianda-home: RestaurantApplicationForm.tsx — city selection.
-    "core.restaurant_lead.city_name": {"surfaces": ["home"]},
+    "ops.restaurant_lead.city_name": {"surfaces": ["home"]},
     # --- core.geolocation_info ---
     #
     # .latitude surfaces in restaurant enriched responses and geolocation responses.

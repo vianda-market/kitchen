@@ -360,7 +360,7 @@ def create_restaurant_lead(
     with db.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(
             """
-            INSERT INTO core.restaurant_lead (
+            INSERT INTO ops.restaurant_lead (
                 business_name, contact_name, contact_email, contact_phone,
                 country_code, city_name,
                 years_in_operation, employee_count_range, kitchen_capacity_daily,
@@ -406,7 +406,7 @@ def create_restaurant_lead(
         # Insert cuisine junction rows
         for cid in cuisine_ids:
             cursor.execute(
-                "INSERT INTO core.restaurant_lead_cuisine (restaurant_lead_id, cuisine_id) VALUES (%s, %s)",
+                "INSERT INTO ops.restaurant_lead_cuisine (restaurant_lead_id, cuisine_id) VALUES (%s, %s)",
                 (lead_id, str(cid)),
             )
 
