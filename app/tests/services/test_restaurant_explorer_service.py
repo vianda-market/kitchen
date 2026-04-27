@@ -1067,7 +1067,7 @@ class TestMaxCreditsFilter:
     def test_restaurants_with_no_surviving_plates_dropped(self, mock_db_read, mock_aggregates):
         """When max_credits=3, restaurant A (credit=3) survives; restaurant B (credit=7) is dropped."""
         rid_a, rid_b = uuid4(), uuid4()
-        pid_a, pid_b = uuid4(), uuid4()
+        pid_a = uuid4()
         mock_aggregates.return_value = {}
         mock_db_read.side_effect = [
             # _match_city_in_country
@@ -1173,8 +1173,24 @@ class TestMaxCreditsFilter:
                 },
             ],
             [
-                {"restaurant_id": rid_a, "plate_id": uuid4(), "product_name": "P1", "price": 8.0, "credit": 7, "kitchen_day": "monday", "image_url": None},
-                {"restaurant_id": rid_b, "plate_id": uuid4(), "product_name": "P2", "price": 5.0, "credit": 3, "kitchen_day": "monday", "image_url": None},
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": uuid4(),
+                    "product_name": "P1",
+                    "price": 8.0,
+                    "credit": 7,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
+                {
+                    "restaurant_id": rid_b,
+                    "plate_id": uuid4(),
+                    "product_name": "P2",
+                    "price": 5.0,
+                    "credit": 3,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                },
             ],
             [],
             {"lat": -34.65, "lng": -58.45},
@@ -1235,7 +1251,17 @@ class TestDietaryFilter:
                 },
             ],
             # plate query with && dietary filter: only A's vegan plate
-            [{"restaurant_id": rid_a, "plate_id": pid_a, "product_name": "VeganPlate", "price": 8.0, "credit": 2, "kitchen_day": "monday", "image_url": None}],
+            [
+                {
+                    "restaurant_id": rid_a,
+                    "plate_id": pid_a,
+                    "product_name": "VeganPlate",
+                    "price": 8.0,
+                    "credit": 2,
+                    "kitchen_day": "monday",
+                    "image_url": None,
+                }
+            ],
             [],  # vol_query
             {"lat": -34.65, "lng": -58.45},
         ]
@@ -1261,9 +1287,7 @@ class TestDietaryFilter:
             with patch("app.services.restaurant_explorer_service.get_plate_review_aggregates") as mock_agg:
                 mock_db_read.return_value = []
                 mock_agg.return_value = {}
-                result = get_plates_for_restaurants(
-                    [uuid4()], "monday", mock_db, dietary_filter=["vegan"]
-                )
+                result = get_plates_for_restaurants([uuid4()], "monday", mock_db, dietary_filter=["vegan"])
                 assert result == {}
 
 

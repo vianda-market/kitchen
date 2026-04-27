@@ -402,9 +402,15 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
             "Restaurants with no surviving plates are dropped."
         ),
     ),
-    lat: float | None = Query(None, description="Latitude of user center point for distance filter. Requires lng and radius_km."),
-    lng: float | None = Query(None, description="Longitude of user center point for distance filter. Requires lat and radius_km."),
-    radius_km: float | None = Query(None, gt=0, description="Radius in kilometres for distance filter. Requires lat and lng."),
+    lat: float | None = Query(
+        None, description="Latitude of user center point for distance filter. Requires lng and radius_km."
+    ),
+    lng: float | None = Query(
+        None, description="Longitude of user center point for distance filter. Requires lat and radius_km."
+    ),
+    radius_km: float | None = Query(
+        None, gt=0, description="Radius in kilometres for distance filter. Requires lat and lng."
+    ),
     current_user: dict = Depends(get_client_or_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
