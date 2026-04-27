@@ -470,7 +470,9 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
             locale=locale,
             msg=f"Distance filter requires all three params together: lat, lng, radius_km. Missing: {', '.join(missing)}",
         )
-    geo_filter: tuple[float, float, float] | None = (lat, lng, radius_km) if lat is not None else None
+    geo_filter: tuple[float, float, float] | None = (
+        (lat, lng, radius_km) if (lat is not None and lng is not None and radius_km is not None) else None
+    )
 
     user_id = current_user.get("user_id")
     assigned = get_assigned_market_ids(user_id, db, fallback_primary=current_user.get("market_id")) if user_id else []
