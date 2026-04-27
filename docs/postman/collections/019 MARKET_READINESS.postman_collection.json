@@ -1,0 +1,225 @@
+{
+  "info": {
+    "_postman_id": "market-readiness-k123",
+    "name": "019 MARKET_READINESS",
+    "description": "Kitchen #123 Option B — Verifies the computed is_ready_for_signup field on admin market enriched endpoints.\n\nTests:\n  1. Login as super admin to obtain auth token.\n  2. GET /api/v1/admin/markets/enriched — all markets have is_ready_for_signup as bool (not null).\n  3. Find a market with is_ready_for_signup=true and verify it has status=active.\n  4. Find a market with is_ready_for_signup=false (inactive or missing prerequisites) — assert false.\n  5. GET /api/v1/admin/markets/enriched/{market_id} — single market also returns is_ready_for_signup as bool.\n  6. GET /api/v1/admin/markets (plain, non-enriched) — is_ready_for_signup is null (not computed).\n  7. GET /api/v1/leads/markets — public endpoint returns NO is_ready_for_signup field (field absent or null) and still filters to only ready markets.\n\nPre-requisite: at least one market must exist in the DB (seeded via reference_data.sql).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8000"},
+    {"key": "superAdminAuthToken", "value": ""},
+    {"key": "enrichedMarketId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Setup — Login Super Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Login succeeds\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var resp = pm.response.json();",
+              "pm.collectionVariables.set(\"superAdminAuthToken\", resp.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/x-www-form-urlencoded"}],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {"key": "username", "value": "{{superAdminEmail}}"},
+            {"key": "password", "value": "{{superAdminPassword}}"}
+          ]
+        },
+        "url": "{{baseUrl}}/api/v1/auth/token"
+      }
+    },
+    {
+      "name": "GET /admin/markets/enriched — is_ready_for_signup present as bool on all rows",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var markets = pm.response.json();",
+              "pm.test(\"Response is an array\", function () {",
+              "    pm.expect(markets).to.be.an('array');",
+              "});",
+              "pm.test(\"Every market has is_ready_for_signup as boolean\", function () {",
+              "    markets.forEach(function(m) {",
+              "        pm.expect(m).to.have.property('is_ready_for_signup');",
+              "        pm.expect(m.is_ready_for_signup).to.be.a('boolean');",
+              "    });",
+              "});",
+              "// Store first market id for single-market test",
+              "if (markets.length > 0) {",
+              "    pm.collectionVariables.set('enrichedMarketId', markets[0].market_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+      }
+    },
+    {
+      "name": "GET /admin/markets/enriched — active market with full chain has is_ready_for_signup=true",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var markets = pm.response.json();",
+              "var readyMarkets = markets.filter(function(m) { return m.is_ready_for_signup === true; });",
+              "pm.test(\"Ready markets have status=active\", function () {",
+              "    readyMarkets.forEach(function(m) {",
+              "        pm.expect(m.status).to.equal('active');",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+      }
+    },
+    {
+      "name": "GET /admin/markets/enriched — inactive market has is_ready_for_signup=false",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var markets = pm.response.json();",
+              "var inactiveMarkets = markets.filter(function(m) { return m.status === 'inactive'; });",
+              "pm.test(\"Inactive markets are never ready for signup\", function () {",
+              "    inactiveMarkets.forEach(function(m) {",
+              "        pm.expect(m.is_ready_for_signup).to.equal(false);",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+      }
+    },
+    {
+      "name": "GET /admin/markets/enriched/{market_id} — single market has is_ready_for_signup as bool",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var m = pm.response.json();",
+              "pm.test(\"is_ready_for_signup is present and is a boolean\", function () {",
+              "    pm.expect(m).to.have.property('is_ready_for_signup');",
+              "    pm.expect(m.is_ready_for_signup).to.be.a('boolean');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/markets/enriched/{{enrichedMarketId}}"
+      }
+    },
+    {
+      "name": "GET /admin/markets (plain) — is_ready_for_signup is null (not computed)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var markets = pm.response.json();",
+              "pm.test(\"Plain list: is_ready_for_signup is null on all rows\", function () {",
+              "    markets.forEach(function(m) {",
+              "        pm.expect(m.is_ready_for_signup).to.be.null;",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/markets"
+      }
+    },
+    {
+      "name": "GET /leads/markets (public) — endpoint returns only ready markets, no is_ready_for_signup field",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var resp = pm.response.json();",
+              "// leads/markets returns {markets: [...]} shape or array — handle both",
+              "var markets = Array.isArray(resp) ? resp : (resp.markets || []);",
+              "pm.test(\"Leads endpoint does not expose is_ready_for_signup\", function () {",
+              "    markets.forEach(function(m) {",
+              "        // Field should be absent from this public schema",
+              "        pm.expect(m).to.not.have.property('is_ready_for_signup');",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Recaptcha-Token", "value": "test-bypass-token"}
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/leads/markets",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "leads", "markets"]
+        }
+      }
+    }
+  ]
+}

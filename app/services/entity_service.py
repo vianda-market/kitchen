@@ -2085,6 +2085,30 @@ def get_enriched_plate_by_id(
 # MARKET ENRICHED BUSINESS LOGIC
 # =============================================================================
 
+# Subquery that computes is_ready_for_signup at read time.
+# True when: market.status = 'active' AND the market has at least one active institution ->
+# restaurant -> plate -> plate_kitchen_days -> qr_code chain.
+# Mirrors the readiness predicate used by /leads/cities (city_metrics_service.get_cities_with_coverage).
+# No DB column, no DB constraint — readiness rules may evolve.
+_MARKET_READINESS_SUBQUERY = """(
+    m.status = 'active'
+    AND EXISTS (
+        SELECT 1
+        FROM core.institution_market im_sub
+        JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
+        JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
+        JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
+        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        JOIN ops.qr_code qc ON qc.restaurant_id = r.restaurant_id
+        WHERE im_sub.market_id = m.market_id
+          AND i.status = 'active' AND i.is_archived = FALSE
+          AND r.status = 'active' AND r.is_archived = FALSE
+          AND p.is_archived = FALSE
+          AND pkd.status = 'active' AND pkd.is_archived = FALSE
+          AND qc.status = 'active' AND qc.is_archived = FALSE
+    )
+) AS is_ready_for_signup"""
+
 # Initialize EnrichedService instance for markets
 # Note: Markets don't have institution scoping, so we pass None for institution_column
 _market_enriched_service = EnrichedService(
@@ -2149,6 +2173,7 @@ def get_enriched_markets(
             "m.status",
             "m.created_date",
             "m.modified_date",
+            _MARKET_READINESS_SUBQUERY,
         ],
         joins=[
             ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),
@@ -2205,6 +2230,7 @@ def get_enriched_market_by_id(
             "m.status",
             "m.created_date",
             "m.modified_date",
+            _MARKET_READINESS_SUBQUERY,
         ],
         joins=[
             ("LEFT", "currency_metadata", "c", "m.currency_metadata_id = c.currency_metadata_id"),

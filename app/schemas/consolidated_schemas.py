@@ -2931,6 +2931,15 @@ class MarketResponseSchema(BaseModel):
     status: Status = Field(..., description="Market status (Active/Inactive)")
     created_date: datetime = Field(..., description="When this market was created")
     modified_date: datetime = Field(..., description="When this market was last modified")
+    is_ready_for_signup: bool | None = Field(
+        None,
+        description=(
+            "Computed at read time. True when market.status='active' AND the market has at least one "
+            "active restaurant with active plate_kitchen_days and an active QR code. "
+            "Null on plain (non-enriched) endpoints that do not compute this field. "
+            "Do not add a DB column or constraint — the readiness rules may evolve."
+        ),
+    )
 
     @computed_field
     @property
