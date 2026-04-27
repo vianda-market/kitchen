@@ -3,7 +3,7 @@
 
 # Web framework and server
 fastapi>=0.114.0        # FastAPI framework; 0.114+ uses explicit ASGITransport (fixes httpx deprecation)
-uvicorn==0.27.0         # ASGI server for FastAPI
+uvicorn==0.46.0         # ASGI server for FastAPI
 
 # Authentication and security
 PyJWT>=2.12.0           # JSON Web Tokens for authentication (CVE-2026-32597 fixed in 2.12.0)
