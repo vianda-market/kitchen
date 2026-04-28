@@ -1841,6 +1841,7 @@ def create_plate_routes() -> APIRouter:
         PlateEnrichedResponseSchema,
         PlateResponseSchema,
         PlateUpdateSchema,
+        PlateUpsertByKeySchema,
     )
     from app.services.crud_service import plate_service
     from app.services.entity_service import get_enriched_plate_by_id, get_enriched_plates
@@ -2025,6 +2026,49 @@ def create_plate_routes() -> APIRouter:
             except Exception as e:
                 log_error(f"Error getting enriched plate {plate_id}: {e}")
                 raise HTTPException(status_code=500, detail="Failed to retrieve enriched plate") from None
+
+        # /by-key MUST be registered before /{plate_id} so the static segment wins
+        # over the UUID path parameter (FastAPI evaluates in registration order).
+        @router.put("/by-key", response_model=PlateResponseSchema, status_code=200)
+        def upsert_plate_by_key(
+            upsert_data: PlateUpsertByKeySchema,
+            current_user: dict = Depends(get_employee_user),  # Internal-only
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ) -> Any:
+            """Idempotent upsert a plate by canonical_key.
+
+            If a plate with this canonical_key already exists it is updated in-place;
+            otherwise a new plate is inserted.  Intended for Postman seed runs and
+            fixture data.  Running twice with the same payload is a no-op.
+
+            Auth: Internal only (same as POST /plates).
+
+            Returns the plate row (insert or update).  HTTP 200 on both insert and
+            update (unlike POST which returns 201) — callers should not depend on
+            distinguishing the two outcomes.
+            """
+            from app.services.crud_service import find_plate_by_canonical_key
+
+            def _upsert() -> Any:
+                key = upsert_data.canonical_key
+                existing = find_plate_by_canonical_key(key, db)
+                payload = upsert_data.model_dump()
+                payload["modified_by"] = current_user["user_id"]
+
+                if existing is not None:
+                    # Update: strip fields that must not change during update
+                    update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+                    result = plate_service.update(existing.plate_id, update_payload, db)
+                else:
+                    result = plate_service.create(payload, db)
+
+                if result is None:
+                    raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+                return result
+
+            from app.services.error_handling import handle_business_operation
+
+            return handle_business_operation(_upsert, "plate upsert by canonical key")
 
         @router.get("/{plate_id}", response_model=PlateResponseSchema)
         def get_plate(

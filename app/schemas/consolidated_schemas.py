@@ -1013,10 +1013,33 @@ class PlateResponseSchema(BaseModel):
     delivery_time_minutes: int
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PlateUpsertByKeySchema(BaseModel):
+    """Schema for idempotent plate upsert by canonical_key.
+
+    If a plate with the given canonical_key already exists it is updated in-place;
+    otherwise a new plate is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc plate creation (use POST /plates instead).
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA'",
+    )
+    product_id: UUID = Field(..., description="FK to ops.product_info — the recipe this plate is based on")
+    restaurant_id: UUID = Field(..., description="FK to ops.restaurant_info — the restaurant offering this plate")
+    price: Decimal = Field(..., ge=0, description="Local-currency price charged to subscribers")
+    credit: int = Field(..., gt=0, description="Credit cost deducted from the subscriber's balance")
+    delivery_time_minutes: int = Field(default=15, gt=0, description="Estimated minutes from order to plate readiness")
+    status: Status = Status.ACTIVE
 
 
 class PlateEnrichedResponseSchema(BaseModel):

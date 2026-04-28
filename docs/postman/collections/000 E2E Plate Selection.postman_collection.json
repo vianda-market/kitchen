@@ -2700,29 +2700,55 @@
           "response": []
         },
         {
-          "name": "Register Supplier Plate",
+          "name": "Upsert Canonical Plate (idempotent)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// 1) grab the raw JSON you just typed",
+                  "// PUT /plates/by-key requires Internal auth (same as POST /plates).",
+                  "// At this point in the E2E run, pm.environment.get('authToken') holds the",
+                  "// *supplier* token set by 'Login Supplier Admin' above.  However,",
+                  "// pm.collectionVariables.get('authToken') still holds the super-admin token",
+                  "// from the Supplier Setup 'Login Super Admin' step — that step wrote to",
+                  "// *both* environment and collection scopes, but Login Supplier Admin only",
+                  "// wrote to the *environment* scope.  Variable resolution priority in",
+                  "// Postman/Newman is: environment > collection, so {{authToken}} currently",
+                  "// resolves to the supplier token from the environment scope.",
+                  "//",
+                  "// Fix (synchronous — no pm.sendRequest):",
+                  "//   1. Read the admin token from the collection scope (not overwritten).",
+                  "//   2. Temporarily write it to the environment scope so {{authToken}}",
+                  "//      resolves to the admin token when collection-level bearer auth fires.",
+                  "//   3. The test script restores {{authToken}} to the supplier token.",
+                  "//",
+                  "// Why not pm.sendRequest?  Newman applies collection-level bearer auth",
+                  "// AFTER the pre-request phase.  Any Authorization header set inside a",
+                  "// pm.sendRequest callback is overwritten by that auth pass — this is the",
+                  "// root cause of the 403 that persisted across two prior fix attempts.",
+                  "",
+                  "// Step 1: retrieve the admin token from collection scope",
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error(",
+                  "        'adminToken not found in collection variables. ' +",
+                  "        \"Ensure the Supplier Setup 'Login Super Admin' step ran and \" +",
+                  "        \"called pm.collectionVariables.set('authToken', ...).\",",
+                  "    );",
+                  "}",
+                  "",
+                  "// Step 2: promote admin token to environment scope so collection auth uses it",
+                  "pm.environment.set('authToken', adminToken);",
+                  "console.log('Temporarily set authToken to admin token for Upsert Canonical Plate');",
+                  "",
+                  "// Step 3: build the upsert payload (product_id + restaurant_id injected at run-time)",
                   "let raw = pm.request.body.raw;",
-                  "",
-                  "// 2) parse it so we can update fields",
                   "let payload = JSON.parse(raw);",
-                  "",
-                  "// 3) pull the UUIDs (no quotes) from your collection variables",
-                  "payload.product_id = pm.collectionVariables.get(\"productId\");",
-                  "payload.restaurant_id = pm.collectionVariables.get(\"restaurantId\");",
-                  "",
-                  "// 4) ensure this goes out as JSON",
+                  "payload.product_id  = pm.collectionVariables.get('productId');",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantId');",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "",
-                  "// 5) overwrite the body with the new, merged JSON",
                   "pm.request.body.update(JSON.stringify(payload));",
-                  "",
-                  ""
+                  "console.log('Using product_id:', payload.product_id, 'restaurant_id:', payload.restaurant_id);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -2733,13 +2759,30 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Created plate\", () => {",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test(\"Upsert Plate - Status 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Upserted plate has plate_id\", () => {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"plate_id\");",
                   "",
-                  "    // persist it to this collection’s variables",
                   "    pm.collectionVariables.set(\"plateId\", body.plate_id);",
-                  "});"
+                  "    pm.environment.set(\"plateId\", body.plate_id);",
+                  "    pm.globals.set(\"plateId\", body.plate_id);",
+                  "    console.log(\"Set plateId:\", body.plate_id);",
+                  "});",
+                  "",
+                  "// Restore supplier token: the pre-request elevated authToken to the admin token.",
+                  "// Downstream steps in 'Supplier Menu Setup' expect the supplier token.",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "    console.log('Restored authToken to supplier token after Upsert Canonical Plate');",
+                  "} else {",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -2748,11 +2791,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n\"product_id\": \"\",\n\"restaurant_id\": \"\",\n\"price\": \"20000\",\n\"credit\": \"8\",\n\"delivery_time_minutes\":\"15\"\n}",
+              "raw": "{\n  \"canonical_key\": \"RESTAURANT_E2E_PLATE_STANDARD\",\n  \"product_id\": \"\",\n  \"restaurant_id\": \"\",\n  \"price\": \"20000\",\n  \"credit\": 8,\n  \"delivery_time_minutes\": 15\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2760,14 +2803,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates",
+              "raw": "{{baseUrl}}/api/v1/plates/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates"
+                "plates",
+                "by-key"
               ]
             }
           },
