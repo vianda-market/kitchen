@@ -926,7 +926,8 @@ CREATE TABLE IF NOT EXISTS core.institution_info (
     support_email_suppressed_until TIMESTAMPTZ NULL,
     last_support_email_date TIMESTAMPTZ NULL,
     modified_by UUID NOT NULL,
-    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    canonical_key VARCHAR(200) NULL
 );
 COMMENT ON TABLE core.institution_info IS
     'Top-level entity for supplier, employer, customer, and internal institutions. '
@@ -957,6 +958,11 @@ COMMENT ON COLUMN core.institution_info.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.institution_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.institution_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture institutions '
+    '(e.g. ''E2E_INSTITUTION_SUPPLIER''). Used by the '
+    'PUT /api/v1/institutions/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc institutions created via the normal POST endpoint.';
 
 \echo 'Creating table: core.address_info'
 CREATE TABLE IF NOT EXISTS core.address_info (

@@ -83,6 +83,7 @@ class InstitutionDTO(BaseModel):
     last_support_email_date: datetime | None = None
     is_archived: bool = False
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID

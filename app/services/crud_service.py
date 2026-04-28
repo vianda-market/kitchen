@@ -2660,3 +2660,28 @@ def find_restaurant_by_canonical_key(canonical_key: str, db: psycopg2.extensions
     except Exception as exc:
         log_error(f"Error finding restaurant by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_institution_by_canonical_key(
+    canonical_key: str, db: psycopg2.extensions.connection
+) -> "InstitutionDTO | None":
+    """Look up an institution by its canonical_key.
+
+    Returns the matching InstitutionDTO (including archived) or None if no
+    institution with that key exists.  Used by the PUT /institutions/by-key
+    upsert endpoint to decide insert vs update.
+    """
+    from app.dto.models import InstitutionDTO
+
+    query = """
+        SELECT * FROM core.institution_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return InstitutionDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding institution by canonical_key '{canonical_key}': {exc}")
+        return None
