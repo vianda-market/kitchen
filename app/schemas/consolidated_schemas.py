@@ -2737,6 +2737,7 @@ class InstitutionEntityResponseSchema(BaseModel):
     payout_aggregator: str | None = None
     payout_onboarding_status: str | None = None
     email_domain: str | None = None
+    canonical_key: str | None = Field(None, description="Stable seed/fixture identifier. Null for ad-hoc entities.")
     is_archived: bool
     status: Status
     created_date: datetime
@@ -2744,6 +2745,41 @@ class InstitutionEntityResponseSchema(BaseModel):
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InstitutionEntityUpsertByKeySchema(BaseModel):
+    """Schema for idempotent institution entity upsert by canonical_key.
+
+    If an institution entity with the given canonical_key already exists it is
+    updated in-place; otherwise a new entity is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc entity creation (use POST /institution-entities instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``institution_id`` is locked after insert and
+    ignored on the update path (entities cannot move between institutions after
+    creation). ``currency_metadata_id`` is always derived from the address
+    country code on both INSERT and UPDATE — do not send it directly.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_INSTITUTION_ENTITY_SUPPLIER'",
+    )
+    institution_id: UUID = Field(..., description="FK to core.institution_info — the owning institution")
+    address_id: UUID = Field(..., description="FK to core.address_info — registered office address for this entity")
+    tax_id: str = Field(..., max_length=50, description="Tax identification number for the entity's jurisdiction")
+    name: str = Field(..., max_length=100, description="Legal entity name as registered with the tax authority")
+    email_domain: str | None = Field(
+        None,
+        max_length=255,
+        description="Email domain for domain-gated employer enrollment (employer) or SSO (all types). NULL for suppliers.",
+    )
+    is_archived: bool = False
+    status: Status = Status.ACTIVE
 
 
 class InstitutionEntityEnrichedResponseSchema(BaseModel):

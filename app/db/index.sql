@@ -31,6 +31,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_email_change_request_email_active
 
 CREATE INDEX IF NOT EXISTS idx_institution_entity_history_institution_entity_id ON audit.institution_entity_history(institution_entity_id);
 
+-- Sparse unique index for canonical_key on institution_entity_info (only indexed when non-null).
+-- Supports idempotent upserts via PUT /api/v1/institution-entities/by-key.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_institution_entity_info_canonical_key
+    ON ops.institution_entity_info (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_address_history_address_id ON audit.address_history(address_id);
 
 -- idx_address_location on (country_code, province, city) retired — address_info.city is dropped.
