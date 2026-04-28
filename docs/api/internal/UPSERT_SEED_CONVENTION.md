@@ -200,8 +200,8 @@ E2E_USER_{ROLE_TYPE}_{ROLE_NAME}[_{DISCRIMINATOR}]
 ```
 
 Examples:
-- `E2E_USER_SUPPLIER_ADMIN` — shared E2E supplier admin used across collections
-- `E2E_USER_INTERNAL_ADMIN` — shared E2E internal admin
+- `E2E_USER_SUPPLIER_ADMIN` — shared E2E supplier admin used across collections (collection 000)
+- `E2E_USER_INTERNAL_ADMIN` — shared E2E internal admin (`vianda_admin`); used by downstream collections 001, 008, 010 (collection 000)
 - `E2E_USER_CUSTOMER_COMENSAL` — shared E2E customer
 
 ### System-user skip list
