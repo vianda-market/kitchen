@@ -115,6 +115,17 @@ Requires `newman` (`npm install -g newman`). The CI environment file is `docs/po
 
 Newman is one of the gates `scripts/verify.sh` runs; when only the postman collection changed, you can run `bash scripts/verify.sh --gate newman` instead of the full sweep.
 
+**Parallel Newman in worktrees is safe.** If running in a worktree at `.claude/worktrees/*`, source `scripts/worktree_env.sh` first to claim a unique port + DB name derived from `$PWD`:
+
+```sh
+source scripts/worktree_env.sh   # sets KITCHEN_API_PORT, KITCHEN_DB_NAME, NEWMAN_BASE_URL
+bash app/db/build_kitchen_db.sh  # builds a fresh DB under the unique name
+bash run_dev_quiet.sh            # starts API on the unique port
+./scripts/run_newman.sh 000      # Newman hits the unique base URL
+```
+
+`scripts/verify.sh` auto-sources `worktree_env.sh` when `$PWD` is inside `.claude/worktrees/*` — no manual step needed for agent dispatches. Multiple worktrees can verify Newman simultaneously without port or DB collisions. Human dev (main working tree, no worktree) is unchanged: port 8000, DB `kitchen`.
+
 ## Key Entry Points
 - **Route registration:** `application.py`
 - **All Pydantic schemas:** `app/schemas/consolidated_schemas.py`

@@ -29,12 +29,29 @@
 # NEWMAN NOTE
 #   The newman gate requires a running server (bash run_dev_quiet.sh in another
 #   terminal) and newman installed (npm install -g newman). The script skips
-#   newman automatically if no server is reachable on localhost:8000 and prints
-#   a warning rather than hard-failing (CI always starts its own server; you
-#   must do so manually when running locally). To force-fail on a missing
-#   server, set: NEWMAN_REQUIRE_SERVER=1
+#   newman automatically if no server is reachable and prints a warning rather
+#   than hard-failing (CI always starts its own server; you must do so manually
+#   when running locally). To force-fail on a missing server, set:
+#   NEWMAN_REQUIRE_SERVER=1
+#
+#   In a worktree, worktree_env.sh (auto-sourced above) sets KITCHEN_API_PORT
+#   to a unique port and NEWMAN_BASE_URL accordingly — multiple worktrees can
+#   run Newman in parallel without port collisions.
 
 set -euo pipefail
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Worktree auto-source: if running inside a .claude/worktrees/* path, source
+# worktree_env.sh to claim a unique KITCHEN_API_PORT and KITCHEN_DB_NAME.
+# No-op for human dev (main working tree stays on port 8000 / DB kitchen).
+# ──────────────────────────────────────────────────────────────────────────────
+if [[ "$PWD" == */.claude/worktrees/* ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -f "${SCRIPT_DIR}/worktree_env.sh" ]]; then
+        # shellcheck source=scripts/worktree_env.sh
+        source "${SCRIPT_DIR}/worktree_env.sh"
+    fi
+fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Resolve `python` — CI virtualenv exposes `python`; local machines often only
@@ -270,7 +287,7 @@ fi
 # SLOW — skipped with --fast; also skipped if no server is reachable and
 # NEWMAN_REQUIRE_SERVER is not set.
 #
-# Requires: server running on localhost:8000, newman installed globally.
+# Requires: server running on KITCHEN_API_PORT (default 8000), newman globally.
 # Start server: bash run_dev_quiet.sh (in another terminal)
 # Newman reference: Newman is one of the gates scripts/verify.sh runs; when
 # only the postman collection changed, you can run
@@ -280,20 +297,22 @@ if [[ "$FAST" -eq 1 ]]; then
     skip_gate "newman" "--fast flag set"
 elif [[ -z "$SINGLE_GATE" || "$SINGLE_GATE" == "newman" ]]; then
     NEWMAN_REQUIRE_SERVER="${NEWMAN_REQUIRE_SERVER:-0}"
-    if ! curl -sf http://localhost:8000/docs > /dev/null 2>&1; then
+    _NEWMAN_PORT="${KITCHEN_API_PORT:-8000}"
+    _NEWMAN_BASE_URL="${NEWMAN_BASE_URL:-http://localhost:${_NEWMAN_PORT}}"
+    if ! curl -sf "${_NEWMAN_BASE_URL}/docs" > /dev/null 2>&1; then
         if [[ "$NEWMAN_REQUIRE_SERVER" -eq 1 ]]; then
             echo ""
-            echo -e "${RED}FAIL${RESET} newman — server not reachable on localhost:8000 (NEWMAN_REQUIRE_SERVER=1)"
+            echo -e "${RED}FAIL${RESET} newman — server not reachable on ${_NEWMAN_BASE_URL} (NEWMAN_REQUIRE_SERVER=1)"
             FAILED_GATES+=("newman")
         else
-            skip_gate "newman" "server not reachable on localhost:8000 — start with: bash run_dev_quiet.sh"
+            skip_gate "newman" "server not reachable on ${_NEWMAN_BASE_URL} — start with: bash run_dev_quiet.sh"
         fi
     elif ! command -v newman &>/dev/null; then
         skip_gate "newman" "newman not installed — install with: npm install -g newman"
     else
         # Run the same collection sequence as CI (ci.yml line 495)
         run_gate "newman" \
-            "bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 017 018 010"
+            "NEWMAN_BASE_URL=${_NEWMAN_BASE_URL} bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 017 018 010"
     fi
 fi
 
