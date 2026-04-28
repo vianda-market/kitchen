@@ -10,7 +10,7 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.auth.dependencies import get_current_user, get_resolved_locale
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -20,9 +20,15 @@ from app.schemas.restaurant_holidays import (
     RestaurantHolidayEnrichedResponseSchema,
     RestaurantHolidayResponseSchema,
     RestaurantHolidayUpdateSchema,
+    RestaurantHolidayUpsertByKeySchema,
 )
 from app.security.entity_scoping import ENTITY_RESTAURANT_HOLIDAY, EntityScopingService
-from app.services.crud_service import address_service, restaurant_holidays_service, restaurant_service
+from app.services.crud_service import (
+    address_service,
+    find_restaurant_holiday_by_canonical_key,
+    restaurant_holidays_service,
+    restaurant_service,
+)
 from app.services.error_handling import handle_business_operation
 from app.services.market_detection import MarketDetectionService
 from app.services.plate_selection_validation import _is_date_national_holiday
@@ -380,6 +386,102 @@ def create_restaurant_holidays_bulk(
         return created_holidays
 
     return handle_business_operation(create_bulk_operation, "restaurant holidays bulk creation", None, db)
+
+
+# PUT /restaurant-holidays/by-key — idempotent upsert (seed/fixture endpoint).
+# MUST be registered before PUT /{holiday_id} so the static segment "by-key"
+# wins over the UUID path parameter (FastAPI evaluates in registration order).
+@router.put("/by-key", response_model=RestaurantHolidayResponseSchema, status_code=200)
+def upsert_restaurant_holiday_by_key(
+    upsert_data: RestaurantHolidayUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> RestaurantHolidayResponseSchema:
+    """Idempotent upsert a restaurant holiday by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc holiday creation
+    (use POST /restaurant-holidays instead).
+
+    If a holiday with this canonical_key already exists it is updated in-place;
+    otherwise a new holiday is inserted.
+
+    Immutable fields on UPDATE: ``restaurant_id`` and ``holiday_date`` are
+    locked after insert and ignored on the update path (the identity of a holiday
+    is the (restaurant_id, holiday_date) pair; changing either would create a
+    logically different holiday).
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+
+    def _upsert() -> RestaurantHolidayResponseSchema:
+        key = upsert_data.canonical_key
+        modified_by = current_user["user_id"]
+
+        # Primary lookup: by canonical_key.
+        existing = find_restaurant_holiday_by_canonical_key(key, db)
+
+        if existing is not None:
+            # UPDATE path — restaurant_id and holiday_date are immutable; update all other fields.
+            holiday_id = existing.holiday_id
+            update_data = {
+                "holiday_name": upsert_data.holiday_name,
+                "is_recurring": upsert_data.is_recurring,
+                "recurring_month": upsert_data.recurring_month,
+                "recurring_day": upsert_data.recurring_day,
+                "status": upsert_data.status.value if hasattr(upsert_data.status, "value") else upsert_data.status,
+                "modified_by": str(modified_by),
+            }
+            updated = restaurant_holidays_service.update(holiday_id, update_data, db)
+            if updated is None:
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+            # Persist canonical_key (restaurant_holidays_service.update does not touch it)
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE ops.restaurant_holidays
+                       SET canonical_key = %s,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE holiday_id = %s""",
+                    (key, str(holiday_id)),
+                )
+            db.commit()
+            log_info(f"Upsert updated restaurant holiday {holiday_id} with canonical_key '{key}'")
+            refreshed = restaurant_holidays_service.get_by_id(holiday_id, db)
+            if refreshed is None:
+                raise envelope_exception(ErrorCode.RESTAURANT_HOLIDAY_NOT_FOUND, status=404, locale="en")
+            return RestaurantHolidayResponseSchema.model_validate(refreshed)
+
+        # INSERT path — validate restaurant exists, derive country_code, create holiday.
+        restaurant = restaurant_service.get_by_id(upsert_data.restaurant_id, db)
+        if not restaurant:
+            raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale="en")
+
+        country_code = _derive_restaurant_country_code(upsert_data.restaurant_id, db, locale="en")
+
+        holiday_data = {
+            "restaurant_id": str(upsert_data.restaurant_id),
+            "country_code": country_code,
+            "holiday_date": upsert_data.holiday_date.isoformat(),
+            "holiday_name": upsert_data.holiday_name,
+            "is_recurring": upsert_data.is_recurring,
+            "recurring_month": upsert_data.recurring_month,
+            "recurring_day": upsert_data.recurring_day,
+            "is_archived": False,
+            "modified_by": str(modified_by),
+            "source": "manual",
+            "canonical_key": key,
+            "status": upsert_data.status.value if hasattr(upsert_data.status, "value") else upsert_data.status,
+        }
+
+        created = restaurant_holidays_service.create(holiday_data, db)
+        if created is None:
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+        log_info(f"Upsert inserted restaurant holiday {created.holiday_id} with canonical_key '{key}'")
+        return RestaurantHolidayResponseSchema.model_validate(created)
+
+    return handle_business_operation(_upsert, "restaurant holiday upsert by canonical key")
 
 
 @router.put("/{holiday_id}", response_model=RestaurantHolidayResponseSchema)

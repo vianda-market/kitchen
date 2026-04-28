@@ -2803,3 +2803,28 @@ def find_qr_code_by_canonical_key(canonical_key: str, db: psycopg2.extensions.co
     except Exception as exc:
         log_error(f"Error finding qr_code by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_restaurant_holiday_by_canonical_key(
+    canonical_key: str, db: psycopg2.extensions.connection
+) -> "RestaurantHolidaysDTO | None":
+    """Look up a restaurant holiday by its canonical_key.
+
+    Returns the matching RestaurantHolidaysDTO (including archived) or None if no
+    holiday with that key exists.  Used by the PUT /restaurant-holidays/by-key
+    upsert endpoint to decide insert vs update.
+    """
+    from app.dto.models import RestaurantHolidaysDTO
+
+    query = """
+        SELECT * FROM ops.restaurant_holidays
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return RestaurantHolidaysDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding restaurant holiday by canonical_key '{canonical_key}': {exc}")
+        return None

@@ -863,6 +863,81 @@ See "Upsert Canonical Restaurant QR Code (idempotent)" in
 
 ---
 
+## Restaurant Holidays — `PUT /api/v1/restaurant-holidays/by-key`
+
+```http
+PUT /api/v1/restaurant-holidays/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc holiday creation.
+Auth: Internal only. Returns 403 for Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_HOLIDAY_CAMBALACHE_MAINTENANCE` |
+| `restaurant_id` | UUID | yes | FK to `ops.restaurant_info`. **Immutable after INSERT.** |
+| `holiday_date` | date (YYYY-MM-DD) | yes | Calendar date of the closure. **Immutable after INSERT.** |
+| `holiday_name` | string (<=100 chars) | yes | Display name (e.g. `Restaurant Maintenance Day`) |
+| `is_recurring` | bool | no | When `true`, holiday repeats annually on `recurring_month`/`recurring_day` (default `false`) |
+| `recurring_month` | int (1-12) | no | Month of annual recurrence. Required when `is_recurring=true`. |
+| `recurring_day` | int (1-31) | no | Day-of-month of annual recurrence. Required when `is_recurring=true`. |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Response body is `RestaurantHolidayResponseSchema` (same shape as `GET /api/v1/restaurant-holidays/{holiday_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new holiday row is created with the given `canonical_key`. The
+  `restaurant_id`, `holiday_date`, and `canonical_key` are all set at creation and are
+  immutable after this point.
+- **UPDATE path**: only `holiday_name`, `is_recurring`, `recurring_month`,
+  `recurring_day`, and `status` are updated. `restaurant_id` and `holiday_date` are
+  stripped from the update payload — they cannot change after creation.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `restaurant_id` — the restaurant that owns this holiday; cannot change after creation
+- `holiday_date` — the identity of a holiday is `(restaurant_id, holiday_date)`; changing the date would create a logically different holiday
+
+### canonical_key convention for restaurant holidays
+
+```
+E2E_HOLIDAY_{RESTAURANT_SLUG}_{DESCRIPTION}
+```
+
+Examples:
+- `E2E_HOLIDAY_CAMBALACHE_MAINTENANCE` — maintenance closure for E2E fixture restaurant Cambalache
+- `E2E_HOLIDAY_CAMBALACHE_STAFF_TRAINING` — staff training closure for the same restaurant
+
+### Postman pre-request script
+
+`PUT /restaurant-holidays/by-key` is Internal-only but the Postman collection-level
+bearer auth may resolve to the current step's supplier token. Use the same
+synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. The test script restores `{{authToken}}` to the supplier token.
+
+See "Upsert Canonical Restaurant Holiday (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (restaurant holidays)
+
+- `ops.restaurant_holidays.canonical_key VARCHAR(200) NULL` — added in
+  migration `0010_restaurant_holiday_canonical_key.sql`.
+- Partial index `uq_restaurant_holidays_canonical_key` (sparse: only indexed when non-null).
+- `RestaurantHolidayResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is

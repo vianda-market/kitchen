@@ -3218,6 +3218,7 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_holidays (
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     source VARCHAR(20) NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'national_sync')),
+    canonical_key VARCHAR(200) NULL,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
@@ -3256,6 +3257,11 @@ COMMENT ON COLUMN ops.restaurant_holidays.modified_date IS
     'UTC timestamp of the most recent update.';
 COMMENT ON COLUMN ops.restaurant_holidays.source IS
     'Provenance: ''manual'' (admin-entered) or ''national_sync'' (populated by national holidays cron).';
+COMMENT ON COLUMN ops.restaurant_holidays.canonical_key IS
+'Optional stable human-readable identifier for seed/fixture holidays '
+'(e.g. ''E2E_HOLIDAY_CAMBALACHE_MAINTENANCE''). Used by the '
+'PUT /api/v1/restaurant-holidays/by-key upsert endpoint to make Postman seed runs '
+'idempotent. NULL for ad-hoc holidays created via the normal POST endpoint.';
 
 \echo 'Creating table: audit.restaurant_holidays_history'
 CREATE TABLE IF NOT EXISTS audit.restaurant_holidays_history (

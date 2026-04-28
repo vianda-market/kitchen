@@ -145,6 +145,13 @@ CREATE INDEX IF NOT EXISTS idx_restaurant_holidays_recurring
 CREATE INDEX IF NOT EXISTS idx_restaurant_holidays_history_holiday_id ON audit.restaurant_holidays_history(holiday_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_holidays_history_current ON audit.restaurant_holidays_history(holiday_id, is_current);
 
+-- Sparse unique index for canonical_key on restaurant_holidays.
+-- Only indexed when non-null; allows unlimited NULL rows.
+-- Added in migration 0010_restaurant_holiday_canonical_key.sql.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurant_holidays_canonical_key
+    ON ops.restaurant_holidays (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_history_plate_kitchen_day_id ON audit.plate_kitchen_days_history(plate_kitchen_day_id);
 CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_history_current ON audit.plate_kitchen_days_history(plate_kitchen_day_id, is_current);
 
