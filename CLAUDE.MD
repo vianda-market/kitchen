@@ -119,12 +119,21 @@ Newman is one of the gates `scripts/verify.sh` runs; when only the postman colle
 
 ```sh
 source scripts/worktree_env.sh   # sets KITCHEN_API_PORT, KITCHEN_DB_NAME, NEWMAN_BASE_URL
-bash app/db/build_kitchen_db.sh  # builds a fresh DB under the unique name
+                                  # also runs refresh_db_template.sh (no-op if fingerprint matches)
+bash app/db/build_kitchen_db.sh  # ~1-2s TEMPLATE clone (not a full rebuild) — see below
 bash run_dev_quiet.sh            # starts API on the unique port
 ./scripts/run_newman.sh 000      # Newman hits the unique base URL
 ```
 
 `scripts/verify.sh` auto-sources `worktree_env.sh` when `$PWD` is inside `.claude/worktrees/*` — no manual step needed for agent dispatches. Multiple worktrees can verify Newman simultaneously without port or DB collisions. Human dev (main working tree, no worktree) is unchanged: port 8000, DB `kitchen`.
+
+**Worktree DB creation is via Postgres TEMPLATE clone (~1-2 seconds, not a full rebuild).** `worktree_env.sh` calls `scripts/refresh_db_template.sh`, which maintains a `kitchen_template` database — a fully migrated + seeded + upstream-synced snapshot. When `build_kitchen_db.sh` is invoked with `KITCHEN_DB_NAME` set to a worktree-specific name, it clones from `kitchen_template` via `CREATE DATABASE ... TEMPLATE kitchen_template` instead of re-running migrations from scratch. Upstream API syncs (FX rates, national holidays) run **once** when the template is built, never per-worktree.
+
+- `refresh_db_template.sh` is a no-op when migration filenames + `dev_fixtures.sql` are unchanged. It rebuilds the template (~30s) when the fingerprint changes.
+- To force a refresh after upstream data changes (e.g. new currency rates): `bash scripts/refresh_db_template.sh --force`
+- To rebuild with full migrations from scratch in a worktree: `bash app/db/build_kitchen_db.sh --full`
+- To clean up orphaned worktree databases: `bash scripts/cleanup_worktree_dbs.sh --execute`
+- References: issue #197 (port + DB env-var pattern), issue #199 (TEMPLATE-clone implementation).
 
 ## Key Entry Points
 - **Route registration:** `application.py`
