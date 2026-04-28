@@ -2757,3 +2757,26 @@ def find_product_by_canonical_key(canonical_key: str, db: psycopg2.extensions.co
     except Exception as exc:
         log_error(f"Error finding product by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_plate_kitchen_day_by_canonical_key(
+    canonical_key: str, db: psycopg2.extensions.connection
+) -> "PlateKitchenDaysDTO | None":
+    """Look up a plate kitchen day by its canonical_key.
+
+    Returns the matching PlateKitchenDaysDTO (including archived) or None if no
+    row with that key exists.  Used by the PUT /plate-kitchen-days/by-key upsert
+    endpoint to decide insert vs update.
+    """
+    query = """
+        SELECT * FROM ops.plate_kitchen_days
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return PlateKitchenDaysDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding plate kitchen day by canonical_key '{canonical_key}': {exc}")
+        return None

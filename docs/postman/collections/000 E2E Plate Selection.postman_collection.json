@@ -2981,31 +2981,35 @@
           "response": []
         },
         {
-          "name": "Register Supplier Plate Kitchen Days",
+          "name": "Upsert Canonical Plate Kitchen Day Monday (idempotent)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// Validate plateId is available",
-                  "const plateId = pm.collectionVariables.get(\"plateId\");",
-                  "if (!plateId) {",
-                  "    throw new Error(\"Missing plateId. Please create a plate first.\");",
+                  "// PUT /plate-kitchen-days/by-key is Internal-only.  Elevate authToken",
+                  "// to the admin token (same pattern as Upsert Canonical Plate).",
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error(",
+                  "        'adminToken not found in collection variables. ' +",
+                  "        \"Ensure 'Login Super Admin' ran and called pm.collectionVariables.set('authToken', ...).\",",
+                  "    );",
                   "}",
+                  "pm.environment.set('authToken', adminToken);",
                   "",
-                  "// Prepare payload for new batch API",
+                  "const plateId = pm.collectionVariables.get('plateId');",
+                  "if (!plateId) {",
+                  "    throw new Error('Missing plateId. Run Upsert Canonical Plate first.');",
+                  "}",
                   "const payload = {",
+                  "    canonical_key: 'E2E_PKD_E2E_PLATE_STANDARD_MONDAY',",
                   "    plate_id: plateId,",
-                  "    kitchen_days: [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]",
+                  "    kitchen_day: 'monday',",
+                  "    status: 'active'",
                   "};",
-                  "",
-                  "// Update request body",
-                  "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "pm.request.body.update(JSON.stringify(payload));",
-                  "",
-                  "console.log(\"✅ Using new batch API for kitchen days assignment\");",
-                  "console.log(\"Plate ID:\", plateId);",
-                  "console.log(\"Kitchen Days:\", payload.kitchen_days);"
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -3016,26 +3020,19 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Kitchen days assigned successfully (batch API)\", () => {",
-                  "    pm.response.to.have.status(201);",
+                  "pm.test('Upsert PKD Monday - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Upsert PKD Monday - has plate_kitchen_day_id', () => {",
                   "    const body = pm.response.json();",
-                  "    ",
-                  "    // New API returns object with items array and optional restaurant_activated",
-                  "    pm.expect(body).to.be.an(\"object\");",
-                  "    pm.expect(body.items).to.be.an(\"array\");",
-                  "    pm.expect(body.items.length).to.equal(5);",
-                  "    ",
-                  "    // Verify each item has required fields",
-                  "    body.items.forEach((kitchenDay, index) => {",
-                  "        pm.expect(kitchenDay).to.have.property(\"plate_kitchen_day_id\");",
-                  "        pm.expect(kitchenDay).to.have.property(\"plate_id\");",
-                  "        pm.expect(kitchenDay).to.have.property(\"kitchen_day\");",
-                  "        pm.expect(kitchenDay.kitchen_day).to.be.oneOf([\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]);",
-                  "    });",
-                  "    ",
-                  "    console.log(\"✅ Successfully created\", body.items.length, \"kitchen day assignments\");",
-                  "    console.log(\"📋 Created days:\", body.items.map(d => d.kitchen_day).join(\", \"));",
-                  "});"
+                  "    pm.expect(body).to.have.property('plate_kitchen_day_id');",
+                  "    pm.expect(body.kitchen_day).to.equal('monday');",
+                  "});",
+                  "// Restore supplier token for downstream steps",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -3044,11 +3041,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_days\": [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]\n}",
+              "raw": "{\n  \"canonical_key\": \"E2E_PKD_E2E_PLATE_STANDARD_MONDAY\",\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_day\": \"monday\",\n  \"status\": \"active\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3056,14 +3053,339 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days",
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-kitchen-days"
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Canonical Plate Kitchen Day Tuesday (idempotent)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error('adminToken not found in collection variables.');",
+                  "}",
+                  "pm.environment.set('authToken', adminToken);",
+                  "const plateId = pm.collectionVariables.get('plateId');",
+                  "if (!plateId) {",
+                  "    throw new Error('Missing plateId. Run Upsert Canonical Plate first.');",
+                  "}",
+                  "const payload = {",
+                  "    canonical_key: 'E2E_PKD_E2E_PLATE_STANDARD_TUESDAY',",
+                  "    plate_id: plateId,",
+                  "    kitchen_day: 'tuesday',",
+                  "    status: 'active'",
+                  "};",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Upsert PKD Tuesday - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Upsert PKD Tuesday - has plate_kitchen_day_id', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_kitchen_day_id');",
+                  "    pm.expect(body.kitchen_day).to.equal('tuesday');",
+                  "});",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"E2E_PKD_E2E_PLATE_STANDARD_TUESDAY\",\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_day\": \"tuesday\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Canonical Plate Kitchen Day Wednesday (idempotent)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error('adminToken not found in collection variables.');",
+                  "}",
+                  "pm.environment.set('authToken', adminToken);",
+                  "const plateId = pm.collectionVariables.get('plateId');",
+                  "if (!plateId) {",
+                  "    throw new Error('Missing plateId. Run Upsert Canonical Plate first.');",
+                  "}",
+                  "const payload = {",
+                  "    canonical_key: 'E2E_PKD_E2E_PLATE_STANDARD_WEDNESDAY',",
+                  "    plate_id: plateId,",
+                  "    kitchen_day: 'wednesday',",
+                  "    status: 'active'",
+                  "};",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Upsert PKD Wednesday - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Upsert PKD Wednesday - has plate_kitchen_day_id', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_kitchen_day_id');",
+                  "    pm.expect(body.kitchen_day).to.equal('wednesday');",
+                  "});",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"E2E_PKD_E2E_PLATE_STANDARD_WEDNESDAY\",\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_day\": \"wednesday\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Canonical Plate Kitchen Day Thursday (idempotent)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error('adminToken not found in collection variables.');",
+                  "}",
+                  "pm.environment.set('authToken', adminToken);",
+                  "const plateId = pm.collectionVariables.get('plateId');",
+                  "if (!plateId) {",
+                  "    throw new Error('Missing plateId. Run Upsert Canonical Plate first.');",
+                  "}",
+                  "const payload = {",
+                  "    canonical_key: 'E2E_PKD_E2E_PLATE_STANDARD_THURSDAY',",
+                  "    plate_id: plateId,",
+                  "    kitchen_day: 'thursday',",
+                  "    status: 'active'",
+                  "};",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Upsert PKD Thursday - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Upsert PKD Thursday - has plate_kitchen_day_id', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_kitchen_day_id');",
+                  "    pm.expect(body.kitchen_day).to.equal('thursday');",
+                  "});",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"E2E_PKD_E2E_PLATE_STANDARD_THURSDAY\",\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_day\": \"thursday\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Canonical Plate Kitchen Day Friday (idempotent)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error('adminToken not found in collection variables.');",
+                  "}",
+                  "pm.environment.set('authToken', adminToken);",
+                  "const plateId = pm.collectionVariables.get('plateId');",
+                  "if (!plateId) {",
+                  "    throw new Error('Missing plateId. Run Upsert Canonical Plate first.');",
+                  "}",
+                  "const payload = {",
+                  "    canonical_key: 'E2E_PKD_E2E_PLATE_STANDARD_FRIDAY',",
+                  "    plate_id: plateId,",
+                  "    kitchen_day: 'friday',",
+                  "    status: 'active'",
+                  "};",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Upsert PKD Friday - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Upsert PKD Friday - has plate_kitchen_day_id', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('plate_kitchen_day_id');",
+                  "    pm.expect(body.kitchen_day).to.equal('friday');",
+                  "});",
+                  "// Restore supplier token for downstream steps",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "    console.log('Restored authToken to supplier token after Upsert Canonical Plate Kitchen Days');",
+                  "} else {",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"E2E_PKD_E2E_PLATE_STANDARD_FRIDAY\",\n  \"plate_id\": \"{{plateId}}\",\n  \"kitchen_day\": \"friday\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
               ]
             }
           },

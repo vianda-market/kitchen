@@ -696,6 +696,95 @@ Do not remove or rename this variable.
 - `ProductResponseSchema` includes `canonical_key` (nullable string).
 
 ---
+## Plate Kitchen Days — `PUT /api/v1/plate-kitchen-days/by-key`
+
+```http
+PUT /api/v1/plate-kitchen-days/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc kitchen day creation
+(use `POST /plate-kitchen-days` instead). Auth: Internal only. Returns 403 for
+Customer/Supplier roles.
+
+Plate kitchen days are unique by `(plate_id, kitchen_day)`.  The canonical_key
+identifies the logical fixture row — one key per plate + weekday combination.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_PKD_E2E_PLATE_STANDARD_MONDAY` |
+| `plate_id` | UUID | yes | FK to `ops.plate_info`. **Immutable after INSERT.** |
+| `kitchen_day` | string | yes | Weekday: `monday`–`friday`. **Immutable after INSERT.** |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Response body is `PlateKitchenDayResponseSchema` (same shape as
+`GET /api/v1/plate-kitchen-days/{plate_kitchen_day_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new plate kitchen day row is created with the given
+  `canonical_key`, `plate_id`, `kitchen_day`, and `status`. If a non-canonical
+  row already occupies the `(plate_id, kitchen_day)` slot (e.g. from a prior
+  `POST`), that existing row is adopted (stamped with the canonical_key) instead
+  of creating a duplicate.
+- **UPDATE path**: only `status` and `canonical_key` are updated.  `plate_id`
+  and `kitchen_day` are immutable after creation — any values sent in the payload
+  are silently ignored on the update path.
+
+### Immutable fields on UPDATE
+
+The following fields are locked after INSERT and cannot be changed via this
+endpoint:
+
+- `plate_id` — FK to the plate; cannot change after creation. To reassign a
+  kitchen day to a different plate, archive the old row and create a new
+  canonical row.
+- `kitchen_day` — the weekday this row represents; cannot change after creation.
+  To move the same plate to a different day, archive the old row and create a
+  new canonical row for the new day.
+
+### canonical_key convention for plate kitchen days
+
+```
+E2E_PKD_{PLATE_SLUG}_{DAY}
+```
+
+Where `PLATE_SLUG` is derived from the plate's canonical key (the segment after
+`RESTAURANT_..._PLATE_`) uppercased, and `DAY` is the weekday in UPPER_SNAKE_CASE.
+
+Examples:
+- `E2E_PKD_E2E_PLATE_STANDARD_MONDAY` — Monday slot for the standard E2E plate
+- `E2E_PKD_E2E_PLATE_STANDARD_TUESDAY` — Tuesday slot
+- `E2E_PKD_CAMBALACHE_BONDIOLA_MONDAY` — Monday slot for a named plate
+
+### Postman pre-request token elevation
+
+`PUT /plate-kitchen-days/by-key` is Internal-only.  The canonical kitchen-day
+upserts run inside the "Supplier Menu Setup" folder where the collection-level
+auth resolves to the supplier token.  Use the same admin-token elevation pattern
+as `PUT /plates/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. Restore the supplier token in the test script post-upsert (so downstream
+   supplier steps continue to work).
+
+See "Upsert Canonical Plate Kitchen Day Monday (idempotent)" through
+"Upsert Canonical Plate Kitchen Day Friday (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (plate kitchen days)
+
+- `ops.plate_kitchen_days.canonical_key VARCHAR(200) NULL` — added in
+  migration `0012_plate_kitchen_day_canonical_key.sql`.
+- Partial index `uq_plate_kitchen_days_canonical_key` (sparse: only indexed when non-null).
+- `PlateKitchenDayResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is

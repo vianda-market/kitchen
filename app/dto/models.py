@@ -1199,6 +1199,7 @@ class PlateKitchenDaysDTO(BaseModel):
     kitchen_day: str = Field(..., max_length=20)
     status: Status
     is_archived: bool
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
