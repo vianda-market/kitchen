@@ -1,15 +1,15 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), **markets** (issue #190), and **institution entities** (issue #190).
+Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), **markets** (issue #190), **institution entities** (issue #190), and **products** (issue #190).
 
 ## Overview
 
-Postman collections and dev seed scripts that create plans, plates, users, or restaurants
-should use the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
+Postman collections and dev seed scripts that create plans, plates, users, restaurants,
+or products should use the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
 `PUT /api/v1/plates/by-key`, `PUT /api/v1/users/by-key`,
-`PUT /api/v1/restaurants/by-key`) rather than the corresponding `POST` endpoints.
-Using POST creates a new row on every run, causing duplicate rows to accumulate
-in the dev DB.
+`PUT /api/v1/restaurants/by-key`, `PUT /api/v1/products/by-key`) rather than
+the corresponding `POST` endpoints. Using POST creates a new row on every run,
+causing duplicate rows to accumulate in the dev DB.
 
 ---
 
@@ -616,6 +616,86 @@ See "Upsert Canonical Supplier Entity (idempotent)" in
 
 ---
 
+## Products — `PUT /api/v1/products/by-key`
+
+```http
+PUT /api/v1/products/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for supplier ad-hoc product
+creation or management flows. Auth: Internal only. Returns 403 for
+Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_PRODUCT_BIG_BURGUER` |
+| `institution_id` | UUID | yes | FK to `core.institution_info` — the owning supplier institution. **Immutable after INSERT.** |
+| `name` | string (<=100 chars) | yes | Display name of the product |
+| `name_i18n` | object | no | Locale map: `{en: '...', es: '...'}` |
+| `ingredients` | string (<=255 chars) | no | Free-text ingredient list (primary locale) |
+| `ingredients_i18n` | object | no | Locale map for ingredient list |
+| `description` | string (<=1000 chars) | no | Short product description |
+| `description_i18n` | object | no | Locale map for description |
+| `dietary` | list[string] | no | Dietary attribute slugs (e.g. `vegan`, `gluten_free`) |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Response body is `ProductResponseSchema` (same shape as `GET /api/v1/products/{product_id}`).
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `institution_id` — FK to the owning institution; cannot change after creation
+
+### canonical_key convention for products
+
+```
+E2E_PRODUCT_{SLUG}
+```
+
+Examples:
+- `E2E_PRODUCT_BIG_BURGUER` — shared E2E product used across collections (the plate upsert references it via `productId`)
+
+### Why SQL fixtures are not used for products
+
+Like restaurants and plates, products require `institution_id` which is created
+at test run time via Postman. Therefore canonical product fixtures live in the
+Postman collection as `PUT /products/by-key` calls rather than as SQL
+`INSERT` statements.
+
+### Postman pre-request token elevation
+
+`PUT /products/by-key` is Internal-only but at the point where it runs in the
+E2E collection the environment-scope `authToken` holds the supplier token from
+"Login Supplier Admin". Use the same synchronous admin-token elevation pattern
+as `PUT /plates/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. After the upsert, restore `{{authToken}}` to the supplier token.
+
+See "Upsert Canonical Supplier Product (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### productId downstream propagation
+
+The test script sets `pm.collectionVariables.set('productId', body.product_id)` so
+the downstream "Upsert Canonical Plate" step can inject it as `payload.product_id`.
+Do not remove or rename this variable.
+
+### Schema Notes (products)
+
+- `ops.product_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0009_product_canonical_key.sql`.
+- Partial index `uq_product_info_canonical_key` (sparse: only indexed when non-null).
+- `ProductResponseSchema` includes `canonical_key` (nullable string).
+
+---
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
@@ -640,6 +720,7 @@ See "Upsert Canonical Supplier Entity (idempotent)" in
 | `dev_fixtures.sql` canonical plan row | `INSERT ... ON CONFLICT (canonical_key) DO UPDATE` |
 | Admin creating a real production plan | `POST /plans` |
 | Supplier creating a real production plate | `POST /plates` |
+| Supplier creating a real production product | `POST /products` |
 | Updating a known existing row | `PUT /{entity}/{id}` |
 
 ---
@@ -740,5 +821,15 @@ python scripts/cleanup_duplicate_institution_entities.py
 Institution entities with a `canonical_key` are never touched by the cleanup script.
 System entities (`SYSTEM_INSTITUTION_ENTITY_SKIP_LIST`) are always preserved
 regardless of duplication.
+### Products
 
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_products.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per institution+name:
+python scripts/cleanup_duplicate_products.py
+```
+
+Products with a `canonical_key` are never touched by the cleanup script.
 All scripts are idempotent: running again after a clean state does nothing.

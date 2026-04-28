@@ -399,10 +399,12 @@ def create_product_routes() -> APIRouter:
         ProductIngredientsSetSchema,
         ProductResponseSchema,
         ProductUpdateSchema,
+        ProductUpsertByKeySchema,
     )
     from app.security.field_policies import ensure_supplier_admin_or_manager
     from app.services.crud_service import product_service
     from app.services.entity_service import get_enriched_product_by_id, get_enriched_products
+    from app.services.error_handling import handle_business_operation
     from app.services.product_image_service import ProductImageService
     from app.utils.error_messages import entity_not_found
     from app.utils.log import log_error
@@ -563,6 +565,62 @@ def create_product_routes() -> APIRouter:
                 db.rollback()
                 log_error(f"Error creating product: {e}")
                 raise HTTPException(status_code=500, detail="Error creating product") from None
+
+        # PUT /by-key MUST be registered before PUT /{product_id} so the static
+        # segment "by-key" wins over the UUID path parameter (FastAPI first-match wins).
+        @router.put("/by-key", response_model=ProductResponseSchema, status_code=200)
+        def upsert_product_by_key(
+            upsert_data: ProductUpsertByKeySchema,
+            current_user: dict = Depends(get_employee_user),  # Internal-only
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ) -> ProductResponseSchema:
+            """Idempotent upsert a product by canonical_key.
+
+            INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc product creation
+            (use POST /products instead).
+
+            If a product with this canonical_key already exists it is updated in-place;
+            otherwise a new product is inserted.
+
+            Immutable fields on UPDATE: ``institution_id`` is locked after insert and
+            ignored on the update path.
+
+            Auth: Internal only (get_employee_user dependency).  Returns 403 for
+            Customer/Supplier roles.
+
+            Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+            """
+            from app.services.crud_service import find_product_by_canonical_key
+            from app.utils.gcs import resolve_product_image_urls
+            from app.utils.log import log_info
+
+            def _upsert() -> ProductResponseSchema:
+                key = upsert_data.canonical_key
+                modified_by = current_user["user_id"]
+
+                existing = find_product_by_canonical_key(key, db)
+
+                if existing is not None:
+                    # UPDATE path — institution_id is immutable; update all other fields.
+                    payload = upsert_data.model_dump(exclude_unset=True)
+                    update_payload = {k: v for k, v in payload.items() if k not in ("canonical_key", "institution_id")}
+                    update_payload["modified_by"] = modified_by
+                    product = product_service.update(existing.product_id, update_payload, db)
+                    if product is None:
+                        raise HTTPException(status_code=500, detail="Failed to update product")
+                    log_info(f"Upsert updated product {existing.product_id} with canonical_key '{key}'")
+                    return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+
+                # INSERT path
+                payload = upsert_data.model_dump()
+                payload["modified_by"] = modified_by
+                product = product_service.create(payload, db)
+                if product is None:
+                    raise HTTPException(status_code=500, detail="Failed to create product")
+                log_info(f"Upsert inserted product {product.product_id} with canonical_key '{key}'")
+                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+
+            return handle_business_operation(_upsert, "product upsert by canonical key")
 
         @router.put("/{product_id}", response_model=ProductResponseSchema)
         def update_product_with_ingredients(
