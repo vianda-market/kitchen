@@ -164,7 +164,8 @@ def test_in_with_uuid_list():
     result = build_filter_conditions("test_entity", {"tag_ids": [uid1, uid2]})
     assert result is not None
     condition, param = result[0]
-    assert condition == "t.tag_id = ANY(%s)"
+    # uuid cast → explicit array cast to avoid "operator does not exist: uuid = text"
+    assert condition == "t.tag_id = ANY(%s::uuid[])"
     # uuid cast coerces to str
     assert param == [[str(uid1), str(uid2)]]
 
