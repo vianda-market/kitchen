@@ -1,13 +1,13 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), and **users** (issue #168).
+Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), and **restaurants** (issue #167).
 
 ## Overview
 
-Postman collections and dev seed scripts that create plans, plates, or users should use
-the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
-`PUT /api/v1/plates/by-key`, `PUT /api/v1/users/by-key`) rather than the
-corresponding `POST` endpoints.
+Postman collections and dev seed scripts that create plans, plates, users, or restaurants
+should use the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
+`PUT /api/v1/plates/by-key`, `PUT /api/v1/users/by-key`,
+`PUT /api/v1/restaurants/by-key`) rather than the corresponding `POST` endpoints.
 Using POST creates a new row on every run, causing duplicate rows to accumulate
 in the dev DB.
 
@@ -247,6 +247,97 @@ call so downstream requests use the correct institution.
 
 ---
 
+## Restaurants — `PUT /api/v1/restaurants/by-key`
+
+```http
+PUT /api/v1/restaurants/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for supplier self-registration
+or ad-hoc restaurant creation. Auth: Internal only. Returns 403 for Customer/Supplier
+roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_RESTAURANT_CAMBALACHE` |
+| `institution_id` | UUID | yes | FK to `core.institution_info` — the supplier institution |
+| `institution_entity_id` | UUID | yes | FK to `ops.institution_entity_info` — the legal entity |
+| `address_id` | UUID | yes | FK to `core.address_info` — physical pickup location |
+| `name` | string (<=100 chars) | yes | Display name of the restaurant |
+| `cuisine_id` | UUID | no | FK to `ops.cuisine` — primary cuisine category |
+| `pickup_instructions` | string (<=500 chars) | no | Free-text pickup instructions |
+| `tagline` | string (<=500 chars) | no | Marketing tagline (primary locale) |
+| `tagline_i18n` | object | no | Locale map: `{en: '...', es: '...'}` |
+| `is_featured` | bool | no | Boost in explore listings |
+| `cover_image_url` | string | no | CDN URL for cover image |
+| `spotlight_label` | string (<=200 chars) | no | Short promotional label |
+| `spotlight_label_i18n` | object | no | Locale map for spotlight label |
+| `member_perks` | list[string] | no | Perk bullet points |
+| `member_perks_i18n` | object | no | Locale map for member perks |
+| `status` | string | no | `pending` (default on INSERT) |
+
+Response body is `RestaurantResponseSchema` (same shape as `GET /api/v1/restaurants/{restaurant_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new restaurant row is created **and** the corresponding
+  `restaurant_balance` record is created atomically (same transaction as
+  `POST /restaurants`). Status is forced to `pending` regardless of what the
+  caller sends.
+- **UPDATE path**: only the restaurant row is updated. The balance record is
+  left untouched — do not re-create it.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `institution_id` — FK to the owning institution; cannot change after creation
+- `institution_entity_id` — FK to the legal entity; cannot change after creation
+
+### canonical_key convention for restaurants
+
+```
+E2E_RESTAURANT_{SLUG}
+```
+
+Examples:
+- `E2E_RESTAURANT_CAMBALACHE` — E2E test fixture restaurant
+- `E2E_RESTAURANT_LA_COCINA_PORTENA` — alternate fixture restaurant
+
+### Why SQL fixtures are not used for restaurants
+
+Like plates, restaurants require `institution_id`, `institution_entity_id`, and
+`address_id`, which are created at test run time via Postman. Therefore canonical
+restaurant fixtures live in the Postman collection as `PUT /restaurants/by-key`
+calls rather than as SQL `INSERT` statements.
+
+### Postman pre-request token elevation
+
+`PUT /restaurants/by-key` is Internal-only but Postman collection-level bearer
+auth may resolve to the current step's supplier token. Use the same synchronous
+admin-token elevation pattern as `PUT /plates/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. Restore the supplier token in the test script post-upsert.
+
+See "Upsert Canonical Restaurant (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (restaurants)
+
+- `ops.restaurant_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0005_restaurant_canonical_key.sql`.
+- Partial index `uq_restaurant_info_canonical_key` (sparse: only indexed when non-null).
+- `RestaurantResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
@@ -317,5 +408,17 @@ python scripts/cleanup_duplicate_users.py
 Users with a `canonical_key` are never touched by the cleanup script.
 System users in `SYSTEM_USER_SKIP_LIST` (superadmin, vianda_admin) are always
 preserved regardless of duplication.
+
+### Restaurants
+
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_restaurants.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per institution+name:
+python scripts/cleanup_duplicate_restaurants.py
+```
+
+Restaurants with a `canonical_key` are never touched by the cleanup script.
 
 All scripts are idempotent: running again after a clean state does nothing.
