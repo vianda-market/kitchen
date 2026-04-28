@@ -303,6 +303,15 @@ _Deployment, hosting, and backend environment requirements_
 
 ---
 
+## Testing & Quality
+_Testing conventions, layer decisions, and CI gate reference for contributors._
+
+| File | Description |
+|------|-------------|
+| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/TESTING_LAYERS.md` | **Testing layers orientation** — layer table, decision flow, patterns (mypy baseline, vulture, diff-cover), hard gates vs signal-only, anti-patterns |
+
+---
+
 ## Internal — Backend Reference
 _Architecture decisions, design patterns, and implementation guides for agents working on the backend or coordinating cross-repo changes. Read these when you need to understand why something is designed a certain way, or before proposing a change that touches auth, scoping, billing, or routing._
 
