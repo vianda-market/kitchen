@@ -34,6 +34,7 @@ def _check_restaurant_prereqs(
 
     Returns a dict with:
       - status: current restaurant status string (or None if not found)
+      - name: restaurant name string (or None if not found)
       - is_archived: bool
       - has_plate_kitchen_days: bool — ≥1 active PKD for the restaurant
       - has_qr: bool — ≥1 active non-archived QR row for the restaurant
@@ -42,6 +43,7 @@ def _check_restaurant_prereqs(
         """
         SELECT
             r.status,
+            r.name,
             r.is_archived,
             EXISTS (
                 SELECT 1
@@ -67,7 +69,7 @@ def _check_restaurant_prereqs(
         fetch_one=True,
     )
     if not row or not isinstance(row, dict):
-        return {"status": None, "is_archived": True, "has_plate_kitchen_days": False, "has_qr": False}
+        return {"status": None, "name": None, "is_archived": True, "has_plate_kitchen_days": False, "has_qr": False}
     return dict(row)
 
 
@@ -101,7 +103,7 @@ def compute_restaurant_missing(
 def maybe_activate_restaurant(
     restaurant_id: UUID,
     db: psycopg2.extensions.connection,
-) -> bool:
+) -> dict | None:
     """
     Promote restaurant.status from 'pending' → 'active' when all prereqs are met.
 
@@ -111,19 +113,20 @@ def maybe_activate_restaurant(
       3. ≥1 active plate_kitchen_days exists for the restaurant
       4. ≥1 active non-archived QR code exists for the restaurant
 
-    Returns True if promotion happened, False otherwise (already active, not ready, not found).
+    Returns a dict with ``id`` and ``name`` of the promoted restaurant when promotion
+    happened, or ``None`` otherwise (already active, prereqs not met, not found).
     Does NOT commit — caller owns the transaction boundary.
     """
     prereqs = _check_restaurant_prereqs(restaurant_id, db)
 
     if prereqs["status"] != "pending":
         # Already active (or archived, or not found) — nothing to do
-        return False
+        return None
     if prereqs["is_archived"]:
-        return False
+        return None
     if not prereqs["has_plate_kitchen_days"] or not prereqs["has_qr"]:
         # Not all prereqs met yet
-        return False
+        return None
 
     with db.cursor() as cur:
         cur.execute(
@@ -141,8 +144,9 @@ def maybe_activate_restaurant(
 
     if promoted:
         log_info(f"Lazy activation: restaurant {restaurant_id} promoted pending → active")
+        return {"id": restaurant_id, "name": prereqs["name"]}
 
-    return promoted
+    return None
 
 
 def get_restaurant_readiness(
