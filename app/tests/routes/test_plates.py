@@ -12,7 +12,7 @@ import pytest
 from application import app
 from fastapi.testclient import TestClient
 
-from app.auth.dependencies import get_employee_user, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
 from app.services.crud_service import plate_service
 
 # Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
@@ -160,3 +160,39 @@ class TestPlateUpsertByKey:
         finally:
             app.dependency_overrides.pop(oauth2_scheme, None)
             app.dependency_overrides.pop(get_employee_user, None)
+
+    def test_upsert_rejects_supplier_role(self):
+        """PUT /plates/by-key with a supplier (non-internal) token returns 403.
+
+        Mirrors exactly the role the Postman E2E collection uses during the
+        Supplier Menu Setup phase.  The Postman step 'Upsert Canonical Plate'
+        runs *after* 'Login Supplier Admin', so it sends a supplier JWT;
+        get_employee_user must reject it.  This regression test ensures that
+        role gap is caught before CI Newman runs.
+        """
+        supplier_user = {
+            "user_id": str(uuid4()),
+            "role_type": "supplier",  # Not "internal" — must be rejected
+            "role_name": "admin",
+            "institution_id": str(uuid4()),
+        }
+
+        def _override_get_current_user():
+            return supplier_user
+
+        def _override_oauth2_scheme():
+            return "supplier-test-token"
+
+        app.dependency_overrides[oauth2_scheme] = _override_oauth2_scheme
+        app.dependency_overrides[get_current_user] = _override_get_current_user
+        try:
+            with TestClient(app) as c:
+                payload = _valid_upsert_payload()
+                resp = c.put("/api/v1/plates/by-key", json=payload)
+                assert resp.status_code == 403, (
+                    f"Expected 403 for supplier role, got {resp.status_code}. "
+                    "get_employee_user must reject non-internal users."
+                )
+        finally:
+            app.dependency_overrides.pop(oauth2_scheme, None)
+            app.dependency_overrides.pop(get_current_user, None)
