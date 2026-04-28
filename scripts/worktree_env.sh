@@ -52,3 +52,17 @@ export KITCHEN_DB_NAME="kitchen_${WORKTREE_HASH}"
 export NEWMAN_BASE_URL="http://localhost:${KITCHEN_API_PORT}"
 
 echo "worktree_env: port=${KITCHEN_API_PORT}  db=${KITCHEN_DB_NAME}  base_url=${NEWMAN_BASE_URL}"
+
+# Ensure kitchen_template is current before any worktree DB clone.
+# This is a no-op when the migration + seed fingerprint is unchanged (~0.1s).
+# When migrations or seed change, it rebuilds the template (~30s) so the next
+# clone reflects the new schema — downstream API syncs run ONCE here, not
+# per worktree.
+#
+# To force a refresh (e.g. after upstream currency rates change):
+#   bash scripts/refresh_db_template.sh --force
+#
+# Reference: issue #199
+if [ -f "scripts/refresh_db_template.sh" ]; then
+  bash scripts/refresh_db_template.sh
+fi

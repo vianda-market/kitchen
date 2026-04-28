@@ -4,10 +4,30 @@
 # Usage (from repository root — required so \i app/db/... paths resolve):
 #   ./app/db/build_kitchen_db.sh
 #
+# WORKTREE FAST PATH (automatic)
+#   When KITCHEN_DB_NAME is set and differs from "kitchen" (i.e. a worktree
+#   clone session sourced scripts/worktree_env.sh), this script performs a
+#   fast Postgres TEMPLATE clone instead of a full rebuild:
+#
+#     DROP DATABASE IF EXISTS <worktree_db>;
+#     CREATE DATABASE <worktree_db> TEMPLATE kitchen_template;
+#
+#   This takes ~1-2 seconds. Upstream API syncs (FX, holidays) are NOT re-run;
+#   clones inherit the synced data from kitchen_template for free.
+#
+#   Pass --full to force the full rebuild path even inside a worktree.
+#
+# PREREQUISITE FOR WORKTREE CLONE PATH
+#   The dev Postgres user must have CREATEDB privilege. One-time grant (as a
+#   Postgres superuser):
+#     ALTER USER <your_db_user> CREATEDB;
+#   If privilege is missing, this script exits with a clear error message.
+#
 # Environment (optional; defaults suit local macOS dev):
 #   DB_HOST      default: localhost
 #   DB_PORT      default: 5432
 #   DB_NAME      default: kitchen
+#   KITCHEN_DB_NAME  override target DB name (set by scripts/worktree_env.sh)
 #   DB_USER      default: cdeachaval
 #   PGPASSWORD   set when the DB user requires a password (e.g. GCP / kitchen_app)
 #   DB_SSLMODE       optional; non-local DB_HOST defaults to require (Cloud SQL TLS).
@@ -39,11 +59,97 @@
 #
 set -euo pipefail
 
+# Parse --full flag before variable defaults.
+FULL_REBUILD=0
+for _arg in "$@"; do
+  case "${_arg}" in
+    --full) FULL_REBUILD=1 ;;
+    *) echo "build_kitchen_db: unknown argument '${_arg}'" >&2; exit 1 ;;
+  esac
+done
+
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-kitchen}"
 DB_USER="${DB_USER:-cdeachaval}"
 ENV="${ENV:-dev}"
+
+# KITCHEN_DB_NAME is set by scripts/worktree_env.sh for per-worktree sessions.
+# When set and not "kitchen", the clone path is taken (unless --full).
+_EFFECTIVE_DB_NAME="${KITCHEN_DB_NAME:-${DB_NAME}}"
+
+# ---------------------------------------------------------------------------
+# WORKTREE CLONE FAST PATH
+# Condition: KITCHEN_DB_NAME is set, differs from "kitchen", and --full was
+# not passed.  When true: DROP+CREATE from kitchen_template and exit.
+# Post-rebuild upstream syncs do NOT run here — they ran once when the template
+# was built (refresh_db_template.sh). Clones inherit all synced data.
+# ---------------------------------------------------------------------------
+if [ "${_EFFECTIVE_DB_NAME}" != "kitchen" ] && [ "${_EFFECTIVE_DB_NAME}" != "${DB_NAME}" ] && [ "${FULL_REBUILD}" -eq 0 ]; then
+  echo "→ Worktree clone path: creating ${_EFFECTIVE_DB_NAME} from kitchen_template…"
+
+  case "${DB_HOST}" in
+    localhost|127.0.0.1|::1)
+      export PGSSLMODE="${PGSSLMODE:-prefer}"
+      ;;
+    *)
+      export PGSSLMODE="${PGSSLMODE:-require}"
+      ;;
+  esac
+
+  # CREATEDB privilege check.
+  _has_createdb=$(psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d postgres \
+    -tAX \
+    -c "SELECT rolcreatedb FROM pg_roles WHERE rolname = current_user;" 2>/dev/null || echo "f")
+  if [ "${_has_createdb}" != "t" ]; then
+    echo "" >&2
+    echo "ERROR: Postgres user '${DB_USER}' lacks CREATEDB privilege." >&2
+    echo "       Fix (run once as a Postgres superuser, e.g. psql -U postgres):" >&2
+    echo "         ALTER USER ${DB_USER} CREATEDB;" >&2
+    echo "" >&2
+    exit 1
+  fi
+
+  # Verify kitchen_template exists and is marked as a template.
+  _is_template=$(psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d postgres \
+    -tAX \
+    -c "SELECT datistemplate FROM pg_database WHERE datname = 'kitchen_template';" 2>/dev/null || echo "")
+  if [ "${_is_template}" != "t" ]; then
+    echo "ERROR: kitchen_template not found or not marked IS_TEMPLATE." >&2
+    echo "       Run: bash scripts/refresh_db_template.sh" >&2
+    exit 1
+  fi
+
+  # Drop any prior worktree DB with this name, then clone from template.
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d postgres \
+    -q -X -v ON_ERROR_STOP=1 \
+    -c "DROP DATABASE IF EXISTS \"${_EFFECTIVE_DB_NAME}\";"
+  psql \
+    -h "${DB_HOST}" \
+    -p "${DB_PORT}" \
+    -U "${DB_USER}" \
+    -d postgres \
+    -q -X -v ON_ERROR_STOP=1 \
+    -c "CREATE DATABASE \"${_EFFECTIVE_DB_NAME}\" TEMPLATE kitchen_template;"
+
+  echo "→ Clone complete: ${_EFFECTIVE_DB_NAME} ready (no migrations re-run, no API syncs)."
+  exit 0
+fi
+
+# Full rebuild path — use the effective DB name (handles --full inside a worktree).
+DB_NAME="${_EFFECTIVE_DB_NAME}"
 
 # psql uses libpq; Cloud SQL public IP requires TLS.
 if [ -n "${DB_SSLMODE:-}" ]; then
