@@ -1122,6 +1122,7 @@ class QRCodeDTO(BaseModel):
     qr_code_checksum: str | None = None
     is_archived: bool
     status: Status = Field(..., max_length=20)
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
