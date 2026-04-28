@@ -1104,10 +1104,49 @@ class ProductResponseSchema(BaseModel):
     image_checksum: str
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductUpsertByKeySchema(BaseModel):
+    """Schema for idempotent product upsert by canonical_key.
+
+    If a product with the given canonical_key already exists it is updated
+    in-place; otherwise a new product is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc product creation (use POST /products instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``institution_id`` is locked after insert and
+    ignored on the update path (the owning institution cannot change after
+    creation).
+
+    NOT NULL DEFAULT columns — ``is_archived``, ``status``, ``image_storage_path``,
+    ``image_checksum``, ``image_url``, ``image_thumbnail_storage_path``,
+    ``image_thumbnail_url`` — carry their DB defaults and must not be typed as
+    ``Optional[X] = None`` (that would silently overwrite a real value with None
+    on UPDATE).
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_PRODUCT_BIG_BURGUER'",
+    )
+    institution_id: UUID = Field(..., description="FK to core.institution_info — the owning supplier institution")
+    name: str = Field(..., max_length=100, description="Display name of the product")
+    name_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    ingredients: str | None = Field(None, max_length=255, description="Free-text ingredient list (primary locale)")
+    ingredients_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    description: str | None = Field(None, max_length=1000, description="Short product description")
+    description_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    dietary: list[DietaryFlag] | None = Field(None, description="Dietary attribute slugs for consumer filtering")
+    status: Status = Status.ACTIVE
 
 
 class ProductEnrichedResponseSchema(BaseModel):

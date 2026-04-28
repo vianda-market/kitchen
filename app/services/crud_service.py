@@ -2734,3 +2734,26 @@ def find_institution_entity_by_canonical_key(
     except Exception as exc:
         log_error(f"Error finding institution entity by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_product_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> "ProductDTO | None":
+    """Look up a product by its canonical_key.
+
+    Returns the matching ProductDTO (including archived) or None if no product
+    with that key exists.  Used by the PUT /products/by-key upsert endpoint to
+    decide insert vs update.
+    """
+    from app.dto.models import ProductDTO
+
+    query = """
+        SELECT * FROM ops.product_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return ProductDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding product by canonical_key '{canonical_key}': {exc}")
+        return None
