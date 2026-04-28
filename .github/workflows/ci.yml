@@ -365,7 +365,7 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Download coverage artifact from test job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-xml-${{ github.run_id }}
         continue-on-error: true
