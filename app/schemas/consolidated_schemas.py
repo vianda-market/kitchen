@@ -785,6 +785,46 @@ class RestaurantUpdateSchema(BaseModel):
     )
 
 
+class RestaurantUpsertByKeySchema(BaseModel):
+    """Schema for idempotent restaurant upsert by canonical_key.
+
+    If a restaurant with the given canonical_key already exists it is updated
+    in-place; otherwise a new restaurant is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc restaurant creation (use POST /restaurants instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``institution_id`` and ``institution_entity_id``
+    are locked after insert and ignored on the update path. The balance record
+    is only created on INSERT; updates leave the balance untouched.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_RESTAURANT_CAMBALACHE'",
+    )
+    institution_id: UUID = Field(..., description="FK to core.institution_info — the supplier institution")
+    institution_entity_id: UUID = Field(
+        ..., description="FK to ops.institution_entity_info — the legal entity that owns this restaurant"
+    )
+    address_id: UUID = Field(..., description="FK to core.address_info — physical pickup location")
+    name: str = Field(..., max_length=100, description="Display name of the restaurant")
+    cuisine_id: UUID | None = Field(None, description="FK to ops.cuisine — primary cuisine category")
+    pickup_instructions: str | None = Field(None, max_length=500)
+    tagline: str | None = Field(None, max_length=500)
+    tagline_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    is_featured: bool = False
+    cover_image_url: str | None = None
+    spotlight_label: str | None = Field(None, max_length=200)
+    spotlight_label_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
+    member_perks: list[str] | None = None
+    member_perks_i18n: dict | None = Field(None, description="Locale map: {en: [...], es: [...]}")
+    status: Status = Status.PENDING
+
+
 class RestaurantSearchResultSchema(BaseModel):
     """One restaurant in GET /restaurants/search/ response (minimal fields for discretionary recipient picker)."""
 
@@ -943,6 +983,7 @@ class RestaurantResponseSchema(BaseModel):
     require_kiosk_code_verification: bool = False
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     modified_date: datetime
     is_ready_for_signup: bool | None = Field(
