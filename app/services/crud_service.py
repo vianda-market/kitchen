@@ -2828,3 +2828,28 @@ def find_restaurant_holiday_by_canonical_key(
     except Exception as exc:
         log_error(f"Error finding restaurant holiday by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_credit_currency_by_canonical_key(
+    canonical_key: str, db: psycopg2.extensions.connection
+) -> "CreditCurrencyDTO | None":
+    """Look up a credit currency (currency_metadata row) by its canonical_key.
+
+    Returns the matching CreditCurrencyDTO (including archived) or None if no
+    currency with that key exists.  Used by the PUT /credit-currencies/by-key
+    upsert endpoint to decide insert vs update.
+    """
+    from app.dto.models import CreditCurrencyDTO
+
+    query = """
+        SELECT * FROM core.currency_metadata
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return CreditCurrencyDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding credit currency by canonical_key '{canonical_key}': {exc}")
+        return None

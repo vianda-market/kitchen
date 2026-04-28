@@ -1711,8 +1711,27 @@ class CreditCurrencyResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
+    canonical_key: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CreditCurrencyUpsertByKeySchema(BaseModel):
+    """Request schema for PUT /api/v1/credit-currencies/by-key (idempotent seed upsert).
+
+    INTERNAL SEED/FIXTURE ENDPOINT ONLY. Never use for ad-hoc currency creation
+    (use POST /credit-currencies instead).
+
+    Immutable fields on UPDATE:
+      - ``currency_code`` is the ISO 4217 natural unique key for a currency row.
+        It is locked after insert and silently ignored on the update path.
+        (Changing a currency's code after creation would break all FK references
+        and market associations.)
+    """
+
+    canonical_key: str = Field(..., max_length=200, description="Stable seed-fixture identifier, e.g. E2E_CURRENCY_ARS")
+    currency_name: str = Field(..., max_length=50, description="ISO 4217 currency name used to resolve currency_code server-side (e.g. 'Argentine Peso')")
+    credit_value_local_currency: Decimal = Field(..., gt=0, description="How many local currency units equal one Vianda credit")
 
 
 class CreditCurrencyMarketSchema(BaseModel):

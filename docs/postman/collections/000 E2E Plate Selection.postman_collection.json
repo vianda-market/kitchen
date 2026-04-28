@@ -478,97 +478,76 @@
           "response": []
         },
         {
-          "name": "Create Credit Currency",
+          "name": "Upsert Canonical Credit Currency (idempotent)",
           "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Test: Accept both 201 (created) and 409 (already exists) as success",
-                  "pm.test(\"Credit currency ready (201 created or 409 already exists)\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
-                  "});",
-                  "",
-                  "// Name → ISO 4217 code map (mirrors backend get_currency_code_by_name in app/config/supported_currencies.py).",
-                  "// Used by the 409 fallback to look up an existing currency by code (currency_name is no longer returned",
-                  "// by GET /credit-currencies since PR2a dropped the column — matching by name would fail).",
-                  "const NAME_TO_CODE = {",
-                  "    \"US Dollar\": \"USD\",",
-                  "    \"Argentine Peso\": \"ARS\",",
-                  "    \"Peruvian Sol\": \"PEN\",",
-                  "    \"Chilean Peso\": \"CLP\",",
-                  "    \"Mexican Peso\": \"MXN\",",
-                  "    \"Brazilian Real\": \"BRL\",",
-                  "};",
-                  "",
-                  "function storeCurrency(id, code) {",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyId\", id);",
-                  "    pm.environment.set(\"planCreditCurrencyId\", id);",
-                  "    pm.globals.set(\"planCreditCurrencyId\", id);",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyCode\", code);",
-                  "    pm.environment.set(\"planCreditCurrencyCode\", code);",
-                  "    pm.globals.set(\"planCreditCurrencyCode\", code);",
-                  "}",
-                  "",
-                  "if (pm.response.code === 409) {",
-                  "    console.log(\"Currency already exists (expected on re-runs). Looking up by currency_code...\");",
-                  "    const requestBody = JSON.parse(pm.request.body.raw);",
-                  "    const currencyName = (requestBody.currency_name || \"\").trim();",
-                  "    const expectedCode = NAME_TO_CODE[currencyName];",
-                  "    if (!expectedCode) {",
-                  "        console.error(\"NAME_TO_CODE has no mapping for '\" + currencyName + \"'. Add it to the collection script.\");",
-                  "    }",
-                  "    pm.sendRequest({",
-                  "        url: (pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\")) + \"/api/v1/credit-currencies\",",
-                  "        method: 'GET',",
-                  "        header: { 'Authorization': 'Bearer ' + pm.environment.get(\"authToken\") },",
-                  "    }, function (err, res) {",
-                  "        if (err || res.code !== 200) {",
-                  "            console.error(\"Failed to fetch currencies:\", err || res.code);",
-                  "            return;",
-                  "        }",
-                  "        const currencies = res.json();",
-                  "        const existing = currencies.find(c => (c.currency_code || \"\").trim() === expectedCode);",
-                  "        if (existing) {",
-                  "            storeCurrency(existing.currency_metadata_id, existing.currency_code);",
-                  "            console.log(\"Using existing currency:\", existing.currency_metadata_id, existing.currency_code);",
-                  "        } else {",
-                  "            console.error(\"Currency with code\", expectedCode, \"not found in list\");",
-                  "        }",
-                  "    });",
-                  "} else if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "    const body = pm.response.json();",
-                  "    storeCurrency(body.currency_metadata_id, body.currency_code);",
-                  "    console.log(\"Created new currency:\", body.currency_metadata_id, body.currency_code);",
-                  "} else {",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyId\", null);",
-                  "    pm.collectionVariables.set(\"planCreditCurrencyCode\", null);",
-                  "    console.error(\"Unexpected error; cleared currency variables.\");",
-                  "}"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            },
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  ""
+                  "// PUT /credit-currencies/by-key requires Internal auth.",
+                  "// At this point pm.environment.get('authToken') holds the super-admin token",
+                  "// set by the 'Login Super Admin' step above — no token swap needed.",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
                 ],
                 "type": "text/javascript",
-                "packages": {},
-                "requests": {}
+                "packages": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Upsert returns 200 whether inserting or updating — no ad-hoc fallback needed.",
+                  "pm.test(\"Upsert Credit Currency - Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains valid currency_metadata_id\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"currency_metadata_id\");",
+                  "    pm.expect(body.currency_metadata_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "",
+                  "pm.test(\"Response includes all required fields\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"currency_code\");",
+                  "    pm.expect(body).to.have.property(\"credit_value_local_currency\");",
+                  "    pm.expect(body).to.have.property(\"canonical_key\");",
+                  "    pm.expect(body).to.have.property(\"status\");",
+                  "    pm.expect(body).to.have.property(\"is_archived\");",
+                  "});",
+                  "",
+                  "pm.test(\"canonical_key matches request\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.canonical_key).to.equal(\"E2E_CURRENCY_ARS\");",
+                  "});",
+                  "",
+                  "pm.test(\"currency_code is ARS\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.currency_code).to.equal(\"ARS\");",
+                  "});",
+                  "",
+                  "// Save currency ID and code for downstream steps (market upsert, plan upsert, etc.)",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"planCreditCurrencyId\", body.currency_metadata_id);",
+                  "pm.environment.set(\"planCreditCurrencyId\", body.currency_metadata_id);",
+                  "pm.globals.set(\"planCreditCurrencyId\", body.currency_metadata_id);",
+                  "pm.collectionVariables.set(\"planCreditCurrencyCode\", body.currency_code);",
+                  "pm.environment.set(\"planCreditCurrencyCode\", body.currency_code);",
+                  "pm.globals.set(\"planCreditCurrencyCode\", body.currency_code);",
+                  "console.log(\"planCreditCurrencyId set:\", body.currency_metadata_id, \"code:\", body.currency_code);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
               }
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_local_currency\": 1400\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_CURRENCY_ARS\",\n    \"currency_name\": \"Argentine Peso\",\n    \"credit_value_local_currency\": 1400\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -576,14 +555,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/credit-currencies",
+              "raw": "{{baseUrl}}/api/v1/credit-currencies/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "credit-currencies"
+                "credit-currencies",
+                "by-key"
               ]
             }
           },
@@ -602,8 +582,9 @@
                   "// No token swap needed — admin is already current.",
                   "//",
                   "// Build upsert payload with run-time currency ID.",
-                  "// planCreditCurrencyId may be null if the 409 async fallback in 'Create Credit Currency'",
-                  "// has not completed yet. Fall back to the seeded ARS currency ID from reference_data.sql.",
+                  "// planCreditCurrencyId is set synchronously by the preceding",
+                  "// 'Upsert Canonical Credit Currency (idempotent)' step.",
+                  "// Fall back to the seeded ARS currency ID from reference_data.sql only if something went wrong.",
                   "const SEEDED_ARS_CURRENCY_ID = '66666666-6666-6666-6666-666666666601';",
                   "const planCreditCurrencyId = pm.collectionVariables.get('planCreditCurrencyId')",
                   "    || pm.environment.get('planCreditCurrencyId')",

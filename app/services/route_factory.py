@@ -1051,6 +1051,7 @@ def create_credit_currency_routes() -> APIRouter:
         CreditCurrencyEnrichedResponseSchema,
         CreditCurrencyResponseSchema,
         CreditCurrencyUpdateSchema,
+        CreditCurrencyUpsertByKeySchema,
     )
     from app.services.crud_service import credit_currency_service
 
@@ -1153,6 +1154,142 @@ def create_credit_currency_routes() -> APIRouter:
             return credit_currency_service.create(payload, connection, scope=scope)
 
         return handle_create(create_callable, data, db, "credit currency")
+
+    # PUT /by-key MUST be registered before PUT /{currency_id} so the static
+    # segment "by-key" wins over the UUID path parameter (FastAPI first-match wins).
+    @router.put("/by-key", response_model=CreditCurrencyResponseSchema, status_code=200)
+    def upsert_credit_currency_by_key(
+        upsert_data: CreditCurrencyUpsertByKeySchema,
+        current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
+        db: psycopg2.extensions.connection = Depends(get_db),
+    ) -> CreditCurrencyResponseSchema:
+        """Idempotent upsert a credit currency by canonical_key.
+
+        INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc currency creation
+        (use POST /credit-currencies instead).
+
+        If a currency with this canonical_key already exists it is updated
+        in-place; otherwise a new currency is inserted (or an existing row with
+        the same currency_code is adopted and stamped with the canonical_key).
+
+        Immutable fields on UPDATE: ``currency_code`` is locked after insert
+        and silently ignored on the update path.
+
+        Auth: Internal only (get_employee_user dependency). Returns 403 for
+        Customer/Supplier roles.
+
+        Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+        """
+        from app.config.supported_currencies import get_currency_code_by_name
+        from app.services.cron.currency_refresh import fetch_usd_rate_for_currency
+        from app.services.crud_service import find_credit_currency_by_canonical_key
+        from app.services.error_handling import handle_business_operation
+        from app.utils.db import db_read
+        from app.utils.log import log_info
+
+        def _upsert() -> CreditCurrencyResponseSchema:
+            key = upsert_data.canonical_key
+            modified_by = current_user["user_id"]
+
+            # Resolve currency_code from currency_name (same logic as POST endpoint).
+            currency_name = upsert_data.currency_name.strip()
+            currency_code = get_currency_code_by_name(currency_name)
+            if not currency_code:
+                raise envelope_exception(ErrorCode.CREDIT_CURRENCY_NAME_NOT_SUPPORTED, status=400, locale=locale)
+
+            # Primary lookup: by canonical_key.
+            existing = find_credit_currency_by_canonical_key(key, db)
+
+            if existing is not None:
+                # UPDATE path — currency_code is immutable; update credit_value_local_currency only.
+                currency_id = existing.currency_metadata_id
+                with db.cursor() as cur:
+                    cur.execute(
+                        """UPDATE core.currency_metadata
+                           SET credit_value_local_currency = %s,
+                               modified_by = %s::uuid,
+                               modified_date = CURRENT_TIMESTAMP
+                           WHERE currency_metadata_id = %s""",
+                        (
+                            float(upsert_data.credit_value_local_currency),
+                            str(modified_by),
+                            str(currency_id),
+                        ),
+                    )
+                db.commit()
+                log_info(f"Upsert updated credit currency {currency_id} with canonical_key '{key}'")
+                result = credit_currency_service.get_by_id(currency_id, db)
+                if result is None:
+                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
+                return CreditCurrencyResponseSchema(**result)
+
+            # Secondary lookup: if no row has this canonical_key, check if a currency already
+            # exists for this currency_code (e.g. the seeded currencies in reference_data.sql).
+            # In that case we adopt the existing row and stamp it with the canonical_key rather
+            # than attempting a duplicate INSERT that would violate the currency_code UNIQUE constraint.
+            row = db_read(
+                "SELECT * FROM core.currency_metadata WHERE currency_code = %s",
+                (currency_code,),
+                connection=db,
+                fetch_one=True,
+            )
+            if row and isinstance(row, dict):
+                # Adopt the existing row — stamp canonical_key and update credit_value.
+                currency_id = row["currency_metadata_id"]
+                with db.cursor() as cur:
+                    cur.execute(
+                        """UPDATE core.currency_metadata
+                           SET canonical_key = %s,
+                               credit_value_local_currency = %s,
+                               modified_by = %s::uuid,
+                               modified_date = CURRENT_TIMESTAMP
+                           WHERE currency_metadata_id = %s""",
+                        (
+                            key,
+                            float(upsert_data.credit_value_local_currency),
+                            str(modified_by),
+                            str(currency_id),
+                        ),
+                    )
+                db.commit()
+                log_info(f"Upsert adopted existing currency {currency_id} (code={currency_code}) with canonical_key '{key}'")
+                result = credit_currency_service.get_by_id(currency_id, db)
+                if result is None:
+                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
+                return CreditCurrencyResponseSchema(**result)
+
+            # Fully new INSERT — fetch USD rate and create.
+            rate, _ = fetch_usd_rate_for_currency(currency_code)
+            if rate is None:
+                raise envelope_exception(
+                    ErrorCode.CREDIT_CURRENCY_RATE_UNAVAILABLE, status=400, locale=locale, currency_code=currency_code
+                )
+            payload = {
+                "currency_code": currency_code,
+                "credit_value_local_currency": float(upsert_data.credit_value_local_currency),
+                "currency_conversion_usd": rate,
+                "modified_by": modified_by,
+            }
+            created = credit_currency_service.create(payload, db, scope=None)
+            # Stamp canonical_key on the newly created row.
+            currency_id = created["currency_metadata_id"]
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE core.currency_metadata
+                       SET canonical_key = %s,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE currency_metadata_id = %s""",
+                    (key, str(currency_id)),
+                )
+            db.commit()
+            log_info(f"Upsert inserted credit currency {currency_id} with canonical_key '{key}'")
+            result = credit_currency_service.get_by_id(currency_id, db)
+            if result is None:
+                raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
+            return CreditCurrencyResponseSchema(**result)
+
+        return handle_business_operation(_upsert, "credit currency upsert by canonical key")
 
     @router.put("/{currency_id}", response_model=CreditCurrencyResponseSchema)
     def update_credit_currency(

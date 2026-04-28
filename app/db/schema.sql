@@ -1608,6 +1608,7 @@ CREATE TABLE IF NOT EXISTS core.currency_metadata (
     created_by                  UUID NULL,
     modified_by                 UUID NOT NULL,
     modified_date               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    canonical_key               VARCHAR(200) NULL,   -- seed-fixture identifier; separate from currency_code (ISO 4217 natural key)
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 COMMENT ON TABLE core.currency_metadata IS
@@ -1638,6 +1639,12 @@ COMMENT ON COLUMN core.currency_metadata.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.currency_metadata.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.currency_metadata.canonical_key IS
+    'Stable seed-fixture identifier for this currency row (e.g. E2E_CURRENCY_ARS). '
+    'NULL for ad-hoc currencies created via POST /credit-currencies. '
+    'When set, the PUT /credit-currencies/by-key upsert endpoint uses this key '
+    'to decide insert-vs-update so the same currency is never duplicated across '
+    'Postman / seed runs. Separate from currency_code (the ISO 4217 natural key).';
 
 \echo 'Creating table: audit.currency_metadata_history'
 CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
@@ -1652,6 +1659,7 @@ CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
     created_by                  UUID NULL,
     modified_by                 UUID NOT NULL,
     modified_date               TIMESTAMPTZ NOT NULL,
+    canonical_key               VARCHAR(200) NULL,
     is_current                  BOOLEAN DEFAULT TRUE,
     valid_until                 TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,

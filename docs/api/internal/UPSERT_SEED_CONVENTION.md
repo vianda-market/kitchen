@@ -938,6 +938,105 @@ See "Upsert Canonical Restaurant Holiday (idempotent)" in
 
 ---
 
+## Credit Currencies — `PUT /api/v1/credit-currencies/by-key`
+
+```http
+PUT /api/v1/credit-currencies/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc currency creation
+(use `POST /credit-currencies` instead). Auth: Internal only. Returns 403 for
+Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_CURRENCY_ARS` |
+| `currency_name` | string (<=50 chars) | yes | ISO 4217 currency name — resolved to `currency_code` server-side (e.g. `Argentine Peso`) |
+| `credit_value_local_currency` | decimal (> 0) | yes | How many local currency units equal one Vianda credit |
+
+Response body is `CreditCurrencyResponseSchema` (same shape as `GET /api/v1/credit-currencies/{id}`),
+with `canonical_key` field included.
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path (new canonical_key, no existing row for this currency_code):** a new `core.currency_metadata` row is created, the USD conversion rate is fetched from the currency-refresh source, and `canonical_key` is stamped.
+- **Adopt path (new canonical_key, existing row with the same currency_code e.g. a seeded reference row):** the existing row is adopted — `canonical_key` is stamped and `credit_value_local_currency` is updated in-place. No new row is created. This is the common case for the 6 currencies seeded in `reference_data.sql` (USD, ARS, PEN, CLP, MXN, BRL).
+- **UPDATE path (existing canonical_key):** only `credit_value_local_currency` is updated. `currency_code` is immutable.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint:
+
+- `currency_code` — ISO 4217 natural unique key; immutable after insert
+
+### canonical_key convention for credit currencies
+
+```
+E2E_CURRENCY_{ISO4217_CODE}
+```
+
+Examples:
+- `E2E_CURRENCY_ARS` — Argentine Peso E2E fixture currency
+- `E2E_CURRENCY_USD` — USD E2E fixture currency
+
+### Retiring the old POST + retry pattern (issue #190)
+
+The Postman collection previously used `POST /credit-currencies` + a pre-request
+"if 409 skip" try/catch to handle re-runs.  This ad-hoc pattern has been retired
+in favour of `PUT /credit-currencies/by-key`.  The "Create Credit Currency" step
+in collection 000 has been replaced with "Upsert Canonical Credit Currency
+(idempotent)".  There is no longer any 409/try-catch branching in the currency
+setup step — the upsert handles insert, adopt, and update transparently, always
+returning 200.
+
+This was the final entity in umbrella issue #190 to be migrated to the canonical
+upsert pattern.  All 9 seed entity types now use `PUT /by-key` endpoints.
+
+### System currency skip list
+
+The `scripts/cleanup_duplicate_credit_currencies.py` script hard-skips the
+following currency IDs and will **never** archive them, regardless of duplication:
+
+| Currency ID | Code | Reason |
+|---|---|---|
+| `55555555-5555-5555-5555-555555555555` | USD | Seeded in `reference_data.sql` |
+| `66666666-6666-6666-6666-666666666601` | ARS | Seeded in `reference_data.sql` |
+| `66666666-6666-6666-6666-666666666602` | PEN | Seeded in `reference_data.sql` |
+| `66666666-6666-6666-6666-666666666603` | CLP | Seeded in `reference_data.sql` |
+| `66666666-6666-6666-6666-666666666604` | MXN | Seeded in `reference_data.sql` |
+| `66666666-6666-6666-6666-666666666605` | BRL | Seeded in `reference_data.sql` |
+
+Add entries to `SYSTEM_CREDIT_CURRENCY_SKIP_LIST` in
+`cleanup_duplicate_credit_currencies.py` when new system/sentinel currencies
+are added.
+
+### Postman pre-request script
+
+`PUT /credit-currencies/by-key` is Internal-only. The "Upsert Canonical Credit
+Currency (idempotent)" step runs early in collection 000 (before any supplier
+login), so the super-admin token from "Login Super Admin" is already current in
+`pm.environment.get('authToken')`. No token swap is needed.
+
+The pre-request script only upserts the `Content-Type` header:
+
+```javascript
+pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });
+```
+
+### Schema Notes (credit currencies)
+
+- `core.currency_metadata.canonical_key VARCHAR(200) NULL` — added in
+  migration `0013_credit_currency_canonical_key.sql`.
+- Partial index `uq_credit_currency_canonical_key` (sparse: only indexed when non-null).
+- `CreditCurrencyResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
