@@ -1,12 +1,13 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130) and **plates** (issue #166).
+Applies to: **plans** (issue #130), **plates** (issue #166), and **users** (issue #168).
 
 ## Overview
 
-Postman collections and dev seed scripts that create plans or plates should use
+Postman collections and dev seed scripts that create plans, plates, or users should use
 the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
-`PUT /api/v1/plates/by-key`) rather than the corresponding `POST` endpoints.
+`PUT /api/v1/plates/by-key`, `PUT /api/v1/users/by-key`) rather than the
+corresponding `POST` endpoints.
 Using POST creates a new row on every run, causing duplicate rows to accumulate
 in the dev DB.
 
@@ -142,7 +143,111 @@ DO UPDATE SET ...
 
 ---
 
-## Shared Semantics (both entities)
+## Users — `PUT /api/v1/users/by-key`
+
+```http
+PUT /api/v1/users/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for self-registration,
+customer-facing signup, or B2B invite flows. Auth: Internal only. Returns 403
+for Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_USER_SUPPLIER_ADMIN` |
+| `institution_id` | UUID | yes | Institution this user belongs to |
+| `role_type` | string | yes | `Supplier`, `Internal`, `Employer`, `Customer` |
+| `role_name` | string | yes | Role name within the role_type |
+| `username` | string (3-100 chars) | yes | Login username (must be unique) |
+| `email` | string | yes | User email address |
+| `password` | string (min 8 chars) | **INSERT only** | Plain-text password — hashed server-side before storage |
+| `first_name` | string | no | Given name |
+| `last_name` | string | no | Family name |
+| `mobile_number` | string | no | E.164 format, e.g. `+15005550006` |
+| `market_id` | UUID | no | Primary market ID |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Response body is `UserResponseSchema` (same shape as `GET /api/v1/users/{user_id}`).
+
+### Password semantics
+
+| Operation | `password` field | Behavior |
+|---|---|---|
+| INSERT (new canonical_key) | Required | Plain-text is hashed server-side; hash stored in `hashed_password` |
+| UPDATE (existing canonical_key) | Optional | If provided: re-hashed and stored. If absent: existing hash is left untouched |
+
+**Never** send a pre-hashed value — only plain-text is accepted. The endpoint
+always hashes before storage; the raw password is never persisted.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `institution_id` — use the existing user's institution
+- `role_type` — role type cannot change after creation
+- `username` — login identifier; use a dedicated username-change flow if needed
+
+### canonical_key convention for users
+
+```
+E2E_USER_{ROLE_TYPE}_{ROLE_NAME}[_{DISCRIMINATOR}]
+```
+
+Examples:
+- `E2E_USER_SUPPLIER_ADMIN` — shared E2E supplier admin used across collections
+- `E2E_USER_INTERNAL_ADMIN` — shared E2E internal admin
+- `E2E_USER_CUSTOMER_COMENSAL` — shared E2E customer
+
+### System-user skip list
+
+The `scripts/cleanup_duplicate_users.py` script hard-skips the following
+usernames and will **never** archive them, regardless of duplication:
+
+| Username | Reason |
+|---|---|
+| `superadmin` | Seeded super_admin in `dev_fixtures.sql` |
+| `vianda_admin` | Shared internal admin used by downstream collections |
+
+Add entries to `SYSTEM_USER_SKIP_LIST` in `cleanup_duplicate_users.py` when
+new system/sentinel accounts are added.
+
+### Postman pre-request token elevation
+
+`PUT /users/by-key` is Internal-only but Postman collection-level bearer auth
+may resolve to the current step's supplier/customer token. Use the same
+synchronous admin-token elevation pattern as `PUT /plates/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. After the upsert, the environment scope is left for the next `Login ...` step
+   to overwrite as normal.
+
+See "Upsert Canonical Supplier User (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Re-align institutionId after upsert
+
+On re-runs the user is already bound to a prior run's institution
+(`institution_id` is immutable). The Postman test script must re-align
+`institutionId` collection variable to `body.institution_id` after every upsert
+call so downstream requests use the correct institution.
+
+### Schema Notes (users)
+
+- `core.user_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0004_user_canonical_key.sql`.
+- Partial index `uq_user_info_canonical_key` (sparse: only indexed when non-null).
+- `UserResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
+## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
   inserted with that `canonical_key`.
@@ -199,4 +304,18 @@ python scripts/cleanup_duplicate_plates.py
 
 Plates with a `canonical_key` are never touched by the cleanup script.
 
-Both scripts are idempotent: running again after a clean state does nothing.
+### Users
+
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_users.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per username:
+python scripts/cleanup_duplicate_users.py
+```
+
+Users with a `canonical_key` are never touched by the cleanup script.
+System users in `SYSTEM_USER_SKIP_LIST` (superadmin, vianda_admin) are always
+preserved regardless of duplication.
+
+All scripts are idempotent: running again after a clean state does nothing.

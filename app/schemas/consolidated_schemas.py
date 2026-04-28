@@ -317,6 +317,7 @@ class UserResponseSchema(BaseModel):
     locale: str = Field("en", description="ISO 639-1 UI locale: en, es, pt")
     is_archived: bool
     status: Status
+    canonical_key: str | None = Field(None, description="Stable seed/fixture identifier. Null for ad-hoc users.")
     created_date: datetime
     modified_date: datetime
 
@@ -333,6 +334,89 @@ class UserResponseSchema(BaseModel):
         return v
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserUpsertByKeySchema(BaseModel):
+    """Schema for idempotent user upsert by canonical_key.
+
+    If a user with the given canonical_key already exists it is updated in-place;
+    otherwise a new user is inserted with that canonical_key.
+
+    Use this endpoint for Postman seed runs and fixture data — NEVER for
+    self-registration, customer-facing signup, or B2B invite flows (use POST
+    /users or the B2C signup endpoint instead).
+
+    Auth: Internal only (get_employee_user dependency — same tier as POST /users
+    for Internal users). Returns 403 for Customer/Supplier roles.
+
+    Password semantics:
+    - On INSERT: ``password`` is REQUIRED. The plain-text value is hashed
+      server-side before storage; the raw value is never persisted.
+    - On UPDATE: ``password`` is OPTIONAL. When provided it is re-hashed and
+      stored, replacing the existing hash. When absent, the existing password
+      hash is left untouched — callers can update any other field without
+      resetting authentication credentials.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_USER_SUPPLIER_ADMIN'",
+    )
+    institution_id: UUID = Field(..., description="Institution this user belongs to (FK to core.institution_info)")
+    role_type: RoleType = Field(..., description="Role type: Supplier, Internal, Employer, Customer")
+    role_name: RoleName = Field(..., description="Role name within the role_type")
+    username: str = Field(..., min_length=3, max_length=100, description="Login username (must be unique)")
+    email: str = Field(..., description="User email address")
+    password: str | None = Field(
+        None,
+        min_length=8,
+        description=(
+            "Plain-text password. Required on INSERT; optional on UPDATE. "
+            "When absent on update the existing hash is preserved."
+        ),
+    )
+    first_name: str | None = Field(None, max_length=50)
+    last_name: str | None = Field(None, max_length=50)
+    mobile_number: str | None = Field(None, description="E.164 format, e.g. +15005550006")
+    market_id: UUID | None = Field(None, description="Primary market ID for this user")
+    status: Status = Status.ACTIVE
+
+    @field_validator("username", "email", mode="before")
+    @classmethod
+    def normalize_lowercase(cls, v: object) -> object:
+        """Normalize username and email to lowercase."""
+        if v is None or not isinstance(v, str):
+            return v
+        return v.strip().lower()
+
+    @field_validator("role_type", mode="before")
+    @classmethod
+    def normalize_role_type(cls, v: object) -> object:
+        """Accept role_type string case-insensitively."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return v
+        if isinstance(v, RoleType):
+            return v
+        s = (v if isinstance(v, str) else str(v)).strip()
+        for rt in RoleType:
+            if rt.value.lower() == s.lower():
+                return rt
+        return v
+
+    @field_validator("role_name", mode="before")
+    @classmethod
+    def normalize_role_name(cls, v: object) -> object:
+        """Accept role_name string case-insensitively."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return v
+        if isinstance(v, RoleName):
+            return v
+        s = (v if isinstance(v, str) else str(v)).strip()
+        for rn in RoleName:
+            if rn.value.lower() == s.lower():
+                return rn
+        return v
 
 
 class MessagingPreferencesResponseSchema(BaseModel):

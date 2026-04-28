@@ -2616,3 +2616,24 @@ def find_plan_by_canonical_key(canonical_key: str, db: psycopg2.extensions.conne
     except Exception as exc:
         log_error(f"Error finding plan by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_user_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> UserDTO | None:
+    """Look up a user by its canonical_key.
+
+    Returns the matching UserDTO (including archived) or None if no user with
+    that key exists.  Used by the PUT /users/by-key upsert endpoint to decide
+    insert vs update.
+    """
+    query = """
+        SELECT * FROM core.user_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return UserDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding user by canonical_key '{canonical_key}': {exc}")
+        return None
