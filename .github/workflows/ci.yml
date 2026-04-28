@@ -492,9 +492,16 @@ jobs:
         # "'NoneType' object has no attribute 'model_dump'" at app/routes/billing/supplier_invoice.py:160.
         # supplier_invoice_service.get_by_id returns None immediately after insert+commit.
         # The rest of 012 runs cleanly; re-enable after this backend bug is fixed.
-        # TODO: re-enable 017 (FILTER_REGISTRY_ENTITIES) — pre-existing test bugs surfaced on PR #118.
-        # Two known issues: (1) URL-decode in city-match (fixed on PR #118); (2) empty-UUID in
-        # plate-pickup/enriched?market_id= filter test. Audit all 017 assertions before re-enabling.
+        # TODO: re-enable 017 (FILTER_REGISTRY_ENTITIES) — test bugs fixed (PR that added this comment),
+        # but two backend bugs remain in "Pass 5 New Filters" folder (both return 500):
+        # (a) GET /plates/enriched?cuisine_id=<uuid> — filter builder emits `cu.cuisine_id = ANY(%s)`
+        #     without a `::uuid[]` cast; psycopg2 binds the list as text, triggering
+        #     "operator does not exist: uuid = text". Fix: add cast to "in" op for uuid columns in
+        #     build_filter_conditions (filter_registry cuisine_id entry uses op="in" cast="uuid").
+        # (b) GET /restaurants/enriched?status=active — same ANY(%s) cast problem for status_enum.
+        #     filter_registry status entry for restaurants uses op="in" cast="text" but the column
+        #     is status_enum; psycopg2 needs `= ANY(%s::status_enum[])` or explicit list cast.
+        # Fix both in a follow-up backend PR, then remove this TODO and add 017 to the list below.
         run: bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 018 010
 
       - name: Stop server
