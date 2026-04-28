@@ -21,6 +21,7 @@ from app.schemas.consolidated_schemas import (
     QRCodeEnrichedResponseSchema,
     QRCodeResponseSchema,
     QRCodeUpdateSchema,
+    RestaurantActivatedSchema,
 )
 from app.security.entity_scoping import ENTITY_QR_CODE, ENTITY_RESTAURANT, EntityScopingService
 from app.services.crud_service import qr_code_service, restaurant_service
@@ -58,7 +59,22 @@ def create_qr_code_atomic(
         raise envelope_exception(ErrorCode.RESTAURANT_NOT_FOUND, status=404, locale=locale)
 
     def _create_qr_code():
-        return atomic_qr_service.create_qr_code_atomic(payload.restaurant_id, current_user["user_id"], db, scope=scope)
+        qr_dto, activation_result = atomic_qr_service.create_qr_code_atomic(
+            payload.restaurant_id, current_user["user_id"], db, scope=scope
+        )
+        activated: RestaurantActivatedSchema | None = None
+        if activation_result is not None:
+            activated = RestaurantActivatedSchema(
+                restaurant_id=activation_result["id"],
+                name=activation_result["name"],
+            )
+        if qr_dto is None:
+            raise envelope_exception(ErrorCode.QR_CODE_GET_FAILED, status=500, locale="en")
+        data = qr_dto.model_dump(mode="json")
+        from app.utils.gcs import resolve_qr_code_image_url
+
+        data = resolve_qr_code_image_url(data)
+        return QRCodeResponseSchema(**data, restaurant_activated=activated)
 
     return handle_business_operation(_create_qr_code, "QR code creation", "QR code created successfully with image")
 

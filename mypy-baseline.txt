@@ -865,7 +865,6 @@ app/services/referral_service.py:0: error: Invalid index type "int" for "dict[st
 app/services/referral_service.py:0: error: Invalid index type "int" for "dict[str, Any]"; expected type "str"  [index]
 app/services/referral_service.py:0: error: Item "None" of "ClientTransactionDTO | None" has no attribute "transaction_id"  [union-attr]
 app/services/qr_code_service.py:0: error: Function is missing a return type annotation  [no-untyped-def]
-app/services/qr_code_service.py:0: error: Incompatible return value type (got "QRCodeDTO | None", expected "QRCodeDTO")  [return-value]
 app/services/plate_selection_validation.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
 app/services/plate_selection_validation.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "str"  [call-overload]
 app/services/plate_selection_validation.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]

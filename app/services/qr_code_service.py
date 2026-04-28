@@ -30,7 +30,7 @@ class AtomicQRCodeService:
         current_user: UUID,
         db: psycopg2.extensions.connection,
         scope: InstitutionScope | None = None,
-    ) -> QRCodeDTO:
+    ) -> tuple[QRCodeDTO | None, dict | None]:
         """
         Atomically create QR code with image generation.
         If image generation fails, QR code creation is rolled back.
@@ -39,9 +39,13 @@ class AtomicQRCodeService:
             restaurant_id: Restaurant identifier
             current_user: User creating the QR code
             db: Database connection
+            scope: Optional institution scope for access control
 
         Returns:
-            QRCodeDTO: Complete QR code record with image
+            Tuple of (QRCodeDTO | None, activation_info).
+            QRCodeDTO is None only if the record could not be fetched after insert (unexpected).
+            ``activation_info`` is ``{"id": UUID, "name": str}`` when lazy activation fired,
+            or ``None`` when the restaurant was already active / prereqs not yet met.
 
         Raises:
             HTTPException: If creation fails
@@ -99,18 +103,20 @@ class AtomicQRCodeService:
 
             # Lazy activation: best-effort after QR commit. Run outside the `with cursor`
             # block so a failure cannot roll back the already-committed QR insertion.
+            activation_result: dict | None = None
             try:
-                promoted = maybe_activate_restaurant(restaurant_id, db)
-                if promoted:
+                activation_result = maybe_activate_restaurant(restaurant_id, db)
+                if activation_result is not None:
                     db.commit()
             except Exception as _act_exc:
                 log_error(f"Lazy activation check failed for restaurant {restaurant_id}: {_act_exc}")
+                activation_result = None
                 try:
                     db.rollback()
                 except Exception:
                     pass
 
-            return qr_result
+            return qr_result, activation_result
 
         except Exception as e:
             # Rollback on any error
