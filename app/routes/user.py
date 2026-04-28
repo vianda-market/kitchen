@@ -4,7 +4,7 @@ import psycopg2.extensions
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
 from pydantic import EmailStr
 
-from app.auth.dependencies import get_current_user, get_resolved_locale, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale, oauth2_scheme
 from app.auth.security import hash_password, verify_password
 from app.config.supported_cities import is_global_city
 from app.dependencies.database import get_db
@@ -25,6 +25,7 @@ from app.schemas.consolidated_schemas import (
     UserSearchResponseSchema,
     UserSearchResultSchema,
     UserUpdateSchema,
+    UserUpsertByKeySchema,
 )
 from app.security.entity_scoping import ENTITY_USER, EntityScopingService
 from app.security.field_policies import (
@@ -40,7 +41,7 @@ from app.security.field_policies import (
     ensure_user_role_type_allowed,
 )
 from app.security.scoping import get_user_scope, resolve_institution_filter
-from app.services.crud_service import city_service, institution_service, user_service
+from app.services.crud_service import city_service, find_user_by_canonical_key, institution_service, user_service
 from app.services.email_change_service import email_change_service
 from app.services.entity_service import (
     get_assigned_market_ids,
@@ -1001,6 +1002,70 @@ def create(
     return handle_business_operation(
         _create_user_with_validation, "user creation with validation", "User created successfully"
     )
+
+
+# PUT /users/by-key - Idempotent upsert a user by canonical_key (seed/fixture endpoint)
+# MUST be registered before PUT /{user_id} so the static segment "by-key" wins over
+# the UUID path parameter (FastAPI evaluates in registration order).
+@router.put("/by-key", response_model=UserResponseSchema, status_code=200)
+def upsert_user_by_key(
+    upsert_data: UserUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> UserResponseSchema:
+    """Idempotent upsert a user by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for self-registration,
+    customer-facing signup, or B2B invite flows.
+
+    If a user with this canonical_key already exists it is updated in-place;
+    otherwise a new user is inserted.  Intended for Postman seed runs and
+    fixture data.  Running twice with the same payload is a no-op (idempotent).
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Password semantics:
+    - INSERT path: ``password`` is required; it is hashed server-side before storage.
+    - UPDATE path: ``password`` is optional. When provided it is re-hashed and
+      replaces the existing hash.  When absent, the existing hash is preserved.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+
+    def _upsert() -> UserResponseSchema:
+        key = upsert_data.canonical_key
+        existing = find_user_by_canonical_key(key, db)
+        payload = upsert_data.model_dump()
+
+        if existing is not None:
+            # UPDATE path — strip fields that must not change and handle password
+            update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+            # Strip immutable fields
+            for immutable in ("role_type", "institution_id", "username"):
+                update_payload.pop(immutable, None)
+            # Password: re-hash if provided, otherwise drop so existing hash is preserved
+            pwd = update_payload.pop("password", None)
+            if pwd and isinstance(pwd, str) and pwd.strip():
+                update_payload["hashed_password"] = hash_password(pwd)
+            update_payload["modified_by"] = current_user["user_id"]
+            result = user_service.update(existing.user_id, update_payload, db)
+        else:
+            # INSERT path — password is required
+            pwd = payload.pop("password", None)
+            if not pwd or not isinstance(pwd, str) or not pwd.strip():
+                raise envelope_exception(ErrorCode.VALIDATION_FIELD_REQUIRED, status=400, locale="en")
+            payload["hashed_password"] = hash_password(pwd)
+            payload["modified_by"] = current_user["user_id"]
+            result = user_service.create(payload, db)
+
+        if result is None:
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+        return _user_dto_to_response(result, db)
+
+    from app.services.error_handling import handle_business_operation as _handle
+
+    return _handle(_upsert, "user upsert by canonical key")
 
 
 # PUT /users/{user_id} - Update an existing user

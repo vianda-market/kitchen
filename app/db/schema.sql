@@ -1438,12 +1438,20 @@ CREATE TABLE IF NOT EXISTS core.user_info (
     referred_by_code VARCHAR(20),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     -- Note: employer_entity_id FK to ops.institution_entity_info added via deferred ALTER (entity table created later)
 );
+
+COMMENT ON COLUMN core.user_info.canonical_key IS
+'Optional stable human-readable identifier for seed/fixture users '
+'(e.g. ''E2E_USER_SUPPLIER_ADMIN''). Used by the '
+'PUT /api/v1/users/by-key upsert endpoint to make Postman seed runs '
+'idempotent. NULL for ad-hoc users created via the normal POST endpoint. '
+'Never use this field for self-registration or customer-facing flows.';
 
 -- =============================================================================
 -- DEFERRED FOREIGN KEYS: tables created before core.user_info
