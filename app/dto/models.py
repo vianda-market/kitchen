@@ -878,6 +878,7 @@ class InstitutionEntityDTO(BaseModel):
     payout_aggregator: str | None = None
     payout_onboarding_status: str | None = None
     email_domain: str | None = None  # For domain-gated enrollment (employer entities) and future SSO (all entity types)
+    canonical_key: str | None = None  # Stable seed/fixture identifier; NULL for ad-hoc entities
     is_archived: bool = False
     status: Status
     created_date: datetime

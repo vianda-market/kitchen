@@ -1,6 +1,6 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), and **markets** (issue #190).
+Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), **markets** (issue #190), and **institution entities** (issue #190).
 
 ## Overview
 
@@ -527,6 +527,95 @@ See "Upsert Canonical Market Argentina (idempotent)" in
 
 ---
 
+## Institution Entities — `PUT /api/v1/institution-entities/by-key`
+
+```http
+PUT /api/v1/institution-entities/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for supplier self-registration
+or ad-hoc entity creation. Auth: Internal only. Returns 403 for Customer/Supplier
+roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_INSTITUTION_ENTITY_SUPPLIER` |
+| `institution_id` | UUID | yes | FK to `core.institution_info` — the owning institution |
+| `address_id` | UUID | yes | FK to `core.address_info` — registered office address for this entity |
+| `tax_id` | string (<=50 chars) | yes | Tax identification number for the entity's jurisdiction |
+| `name` | string (<=100 chars) | yes | Legal entity name as registered with the tax authority |
+| `email_domain` | string (<=255 chars) | no | Email domain for domain-gated employer enrollment or SSO. NULL for suppliers. |
+| `is_archived` | bool | no | Archive state (default `false`) |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Note: `currency_metadata_id` is **not** a request field — it is always derived
+server-side from the address country code (same policy as `POST /institution-entities`).
+
+Response body is `InstitutionEntityResponseSchema` (same shape as `GET /api/v1/institution-entities/{entity_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new institution entity row is created and `currency_metadata_id`
+  is derived from the address country code. The address country must map to a market
+  assigned to the institution (`institution_market`) — a 400 is returned otherwise.
+- **UPDATE path**: only the entity row is updated. `institution_id` is stripped from
+  the update payload — it is immutable after creation. `currency_metadata_id` is
+  re-derived if `address_id` is changed.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `institution_id` — entities cannot move between institutions after creation
+
+### canonical_key convention for institution entities
+
+```
+E2E_INSTITUTION_ENTITY_{ROLE_TYPE}[_{DISCRIMINATOR}]
+```
+
+Examples:
+- `E2E_INSTITUTION_ENTITY_SUPPLIER` — shared E2E supplier entity used across collections
+
+### System institution entity skip list
+
+The `scripts/cleanup_duplicate_institution_entities.py` script hard-skips the following
+entity IDs and will **never** archive them, regardless of duplication:
+
+| Entity ID | Reason |
+|---|---|
+| `aaaaaaaa-aaaa-0001-0000-000000000002` | Dev fixture: Mercado Vianda BA Entidad (in dev_fixtures.sql) |
+
+Add entries to `SYSTEM_INSTITUTION_ENTITY_SKIP_LIST` in
+`cleanup_duplicate_institution_entities.py` when new system/sentinel entities are added.
+
+### Postman pre-request token elevation
+
+`PUT /institution-entities/by-key` is Internal-only but Postman collection-level bearer
+auth may resolve to the current step's supplier/customer token. Use the same
+synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. Restore the supplier token in the test script post-upsert.
+
+See "Upsert Canonical Supplier Entity (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (institution entities)
+
+- `ops.institution_entity_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0008_institution_entity_canonical_key.sql`.
+- Partial index `uq_institution_entity_info_canonical_key` (sparse: only indexed when non-null).
+- `InstitutionEntityResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
@@ -637,5 +726,19 @@ python scripts/cleanup_duplicate_markets.py
 Markets with a `canonical_key` are never touched by the cleanup script.
 System markets in `SYSTEM_MARKET_SKIP_LIST` (all 7 seeded markets) are always
 preserved regardless of duplication.
+
+### Institution Entities
+
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_institution_entities.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per institution+tax_id:
+python scripts/cleanup_duplicate_institution_entities.py
+```
+
+Institution entities with a `canonical_key` are never touched by the cleanup script.
+System entities (`SYSTEM_INSTITUTION_ENTITY_SKIP_LIST`) are always preserved
+regardless of duplication.
 
 All scripts are idempotent: running again after a clean state does nothing.

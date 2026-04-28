@@ -3,7 +3,7 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Body, Depends, Response
 
-from app.auth.dependencies import get_current_user, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
 from app.config.settings import settings
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
@@ -11,11 +11,16 @@ from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
     InstitutionBillPayoutResponseSchema,
     InstitutionEntityEnrichedResponseSchema,
+    InstitutionEntityResponseSchema,
+    InstitutionEntityUpsertByKeySchema,
     MarketPayoutAggregatorResponseSchema,
 )
 from app.security.entity_scoping import ENTITY_INSTITUTION_ENTITY, EntityScopingService
 from app.security.scoping import resolve_institution_filter
-from app.services.crud_service import institution_entity_service
+from app.services.crud_service import (
+    find_institution_entity_by_canonical_key,
+    institution_entity_service,
+)
 from app.services.entity_service import get_enriched_institution_entities, get_enriched_institution_entity_by_id
 from app.services.error_handling import handle_business_operation
 from app.services.market_service import is_global_market
@@ -24,6 +29,94 @@ from app.utils.pagination import PaginationParams, get_pagination_params, set_pa
 from app.utils.query_params import institution_filter
 
 router = APIRouter(prefix="/institution-entities", tags=["Institution Entities"], dependencies=[Depends(oauth2_scheme)])
+
+# =============================================================================
+# UPSERT BY CANONICAL KEY (seed/fixture endpoint)
+# =============================================================================
+# PUT /institution-entities/by-key — idempotent upsert (seed/fixture endpoint).
+# MUST be registered before PUT /{entity_id} so the static segment "by-key"
+# wins over the UUID path parameter (FastAPI evaluates in registration order).
+# This router is included in application.py BEFORE the CRUD router that owns
+# the generic PUT /{entity_id}, so ordering is guaranteed.
+
+
+@router.put("/by-key", response_model=InstitutionEntityResponseSchema, status_code=200)
+def upsert_institution_entity_by_key(
+    upsert_data: InstitutionEntityUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> InstitutionEntityResponseSchema:
+    """Idempotent upsert an institution entity by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for supplier self-registration or
+    ad-hoc entity creation (use POST /institution-entities instead).
+
+    If an entity with this canonical_key already exists it is updated in-place;
+    otherwise a new entity is inserted.  On INSERT the ``currency_metadata_id``
+    is derived automatically from the address country code (same policy as
+    POST /institution-entities) — do not include it in the request body.
+
+    Immutable fields on UPDATE: ``institution_id`` is locked after insert and
+    ignored on the update path (entities cannot move between institutions after
+    creation).
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+    from app.services.entity_service import derive_currency_metadata_id_for_address
+    from app.utils.log import log_info
+
+    def _upsert() -> InstitutionEntityResponseSchema:
+        key = upsert_data.canonical_key
+        existing = find_institution_entity_by_canonical_key(key, db)
+        payload = upsert_data.model_dump()
+        payload["modified_by"] = current_user["user_id"]
+
+        if existing is not None:
+            # UPDATE path — strip fields that must not change after creation.
+            # institution_id is immutable; canonical_key is not in the update dict.
+            update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+            update_payload.pop("institution_id", None)
+            # Re-derive currency_metadata_id in case address changed.
+            if "address_id" in update_payload:
+                update_payload["currency_metadata_id"] = derive_currency_metadata_id_for_address(
+                    update_payload["address_id"], db
+                )
+
+            result = institution_entity_service.update(existing.institution_entity_id, update_payload, db)
+            if result is None:
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+            log_info(f"Upsert updated institution entity {existing.institution_entity_id} with canonical_key '{key}'")
+            return InstitutionEntityResponseSchema.model_validate(result)
+
+        # INSERT path — derive currency_metadata_id from address country (mirrors POST /institution-entities).
+        payload["currency_metadata_id"] = derive_currency_metadata_id_for_address(payload["address_id"], db)
+
+        # Validate that the entity's address country maps to a market assigned to the institution
+        from app.utils.db import db_read as _db_read
+
+        market_check = _db_read(
+            "SELECT a.country_code FROM core.institution_market im "
+            "JOIN core.market_info m ON im.market_id = m.market_id "
+            "JOIN core.address_info a ON a.country_code = m.country_code "
+            "WHERE im.institution_id = %s AND a.address_id = %s",
+            (str(payload["institution_id"]), str(payload["address_id"])),
+            connection=db,
+            fetch_one=True,
+        )
+        if not market_check:
+            raise envelope_exception(ErrorCode.INSTITUTION_ENTITY_MARKET_MISMATCH, status=400, locale="en")
+
+        institution = institution_entity_service.create(payload, db, scope=None)
+        if not institution:
+            raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+        log_info(f"Upsert inserted institution entity {institution.institution_entity_id} with canonical_key '{key}'")
+        return InstitutionEntityResponseSchema.model_validate(institution)
+
+    return handle_business_operation(_upsert, "institution entity upsert by canonical key")
+
 
 # =============================================================================
 # ENRICHED INSTITUTION ENTITY ENDPOINTS (with institution_name, address details)

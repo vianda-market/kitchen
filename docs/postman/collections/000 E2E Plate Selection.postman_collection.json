@@ -1861,29 +1861,46 @@
           "response": []
         },
         {
-          "name": "Register Supplier Entity",
+          "name": "Upsert Canonical Supplier Entity (idempotent)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// Validate environment variables",
-                  "const institutionId = pm.collectionVariables.get(\"institutionId\");",
-                  "const supplierAddressId = pm.collectionVariables.get(\"supplierAddressId\");",
-                  "",
-                  "if (!institutionId) {",
-                  "    throw new Error(\"Missing institutionId in collection variables\");",
+                  "// PUT /institution-entities/by-key requires Internal auth.",
+                  "// At this point pm.environment.get('authToken') may hold a stale supplier token.",
+                  "// pm.collectionVariables.get('authToken') still holds the super-admin token",
+                  "// set by the 'Login Super Admin' step (collection scope is not overwritten by",
+                  "// supplier login steps).",
+                  "//",
+                  "// Fix (synchronous — no pm.sendRequest):",
+                  "//   1. Read the admin token from collection scope.",
+                  "//   2. Temporarily write it to the environment scope so {{authToken}}",
+                  "//      resolves to the admin token when collection-level bearer auth fires.",
+                  "//   3. The test script restores {{authToken}} to the supplier token after the upsert.",
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error(",
+                  "        'adminToken not found in collection variables. ' +",
+                  "        \"Ensure 'Login Super Admin' ran and called pm.collectionVariables.set('authToken', ...).\",",
+                  "    );",
                   "}",
+                  "// Elevate admin token to environment scope so bearer auth uses it",
+                  "pm.environment.set('authToken', adminToken);",
+                  "console.log('Temporarily set authToken to admin token for Upsert Canonical Supplier Entity');",
                   "",
-                  "if (!supplierAddressId) {",
-                  "    throw new Error(\"Missing supplierAddressId in collection variables\");",
-                  "}",
+                  "// Inject run-time institution_id and address_id into the request body",
+                  "const institutionId = pm.collectionVariables.get('institutionId');",
+                  "const supplierAddressId = pm.collectionVariables.get('supplierAddressId');",
+                  "if (!institutionId) throw new Error('Missing institutionId in collectionVariables. Run Upsert Canonical Supplier Institution first.');",
+                  "if (!supplierAddressId) throw new Error('Missing supplierAddressId in collectionVariables. Run Create Supplier Address first.');",
                   "",
-                  "console.log(\"🏢 Creating Institution Entity with:\");",
-                  "console.log(\"Institution ID:\", institutionId);",
-                  "console.log(\"Address ID:\", supplierAddressId);",
-                  "console.log(\"Tax ID: SUPPLIER-TAX-001\");",
-                  "console.log(\"Name: Fresh Ingredients Supplier Corp\");"
+                  "let payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = institutionId;",
+                  "payload.address_id = supplierAddressId;",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "console.log('Upserting canonical supplier entity with institution_id:', institutionId, 'address_id:', supplierAddressId);"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -1893,20 +1910,39 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Register Supplier Entity - Status 201\", () => { pm.response.to.have.status(201); });",
-                  "if (pm.response.code === 201) {",
-                  "    const response = pm.response.json();",
-                  "    pm.test(\"Entity has address_id (for settlement country detection)\", () => {",
-                  "        pm.expect(response).to.have.property(\"address_id\");",
-                  "        const expectedAddr = pm.collectionVariables.get(\"supplierAddressId\");",
-                  "        if (expectedAddr) pm.expect(String(response.address_id)).to.equal(String(expectedAddr));",
-                  "    });",
-                  "    pm.collectionVariables.set(\"institutionEntityId\", response.institution_entity_id);",
-                  "    pm.environment.set(\"institutionEntityId\", response.institution_entity_id);",
-                  "    pm.globals.set(\"institutionEntityId\", response.institution_entity_id);",
-                  "    console.log(\"✅ Institution Entity created with address_id:\", response.address_id);",
-                  "} else {",
-                  "    console.log(\"❌ Failed to create Institution Entity\", pm.response.code, pm.response.text());",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test('Upsert Supplier Entity - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('Response contains institution_entity_id', () => {",
+                  "    pm.expect(body).to.have.property('institution_entity_id');",
+                  "    pm.expect(body.institution_entity_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "",
+                  "pm.test('Entity has address_id (for settlement country detection)', () => {",
+                  "    pm.expect(body).to.have.property('address_id');",
+                  "    const expectedAddr = pm.collectionVariables.get('supplierAddressId');",
+                  "    if (expectedAddr) pm.expect(String(body.address_id)).to.equal(String(expectedAddr));",
+                  "});",
+                  "",
+                  "pm.test('canonical_key matches request', () => {",
+                  "    pm.expect(body.canonical_key).to.equal('E2E_INSTITUTION_ENTITY_SUPPLIER');",
+                  "});",
+                  "",
+                  "// Save entity ID for subsequent requests",
+                  "pm.collectionVariables.set('institutionEntityId', body.institution_entity_id);",
+                  "pm.environment.set('institutionEntityId', body.institution_entity_id);",
+                  "pm.globals.set('institutionEntityId', body.institution_entity_id);",
+                  "console.log('institutionEntityId set:', body.institution_entity_id);",
+                  "",
+                  "// Restore the supplier token so subsequent supplier steps work",
+                  "const supplierToken = pm.collectionVariables.get('supplierToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "    console.log('Restored authToken to supplier token after Upsert Canonical Supplier Entity');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -1915,11 +1951,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"institution_id\": \"{{institutionId}}\",\n  \"address_id\": \"{{supplierAddressId}}\",\n  \"tax_id\": \"30123456789\",\n  \"name\": \"Fresh Ingredients Supplier Corp\"\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_INSTITUTION_ENTITY_SUPPLIER\",\n    \"institution_id\": \"\",\n    \"address_id\": \"\",\n    \"tax_id\": \"30123456789\",\n    \"name\": \"Fresh Ingredients Supplier Corp\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1927,14 +1963,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/institution-entities",
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "institution-entities"
+                "institution-entities",
+                "by-key"
               ]
             }
           },

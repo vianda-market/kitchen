@@ -2565,6 +2565,7 @@ CREATE TABLE IF NOT EXISTS ops.institution_entity_info (
     payout_onboarding_status   VARCHAR(50)  NULL,
     -- Email domain for domain-gated enrollment (employer entities) and future SSO (all entity types)
     email_domain               VARCHAR(255) NULL,
+    canonical_key              VARCHAR(200) NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2605,6 +2606,11 @@ COMMENT ON COLUMN ops.institution_entity_info.payout_onboarding_status IS
     'Current payout onboarding state (e.g. ''pending'', ''restricted'', ''complete''). Sourced from the provider webhook.';
 COMMENT ON COLUMN ops.institution_entity_info.email_domain IS
     'Domain used for domain-gated employer enrollment (e.g. ''acme.com''). NULL for suppliers. Unique across active entities.';
+COMMENT ON COLUMN ops.institution_entity_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture institution entities '
+    '(e.g. ''E2E_INSTITUTION_ENTITY_SUPPLIER''). Used by the '
+    'PUT /api/v1/institution-entities/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc entities created via the normal POST endpoint.';
 COMMENT ON COLUMN ops.institution_entity_info.is_archived IS
     'Soft-delete tombstone. Archived entities are excluded from active payout and enrollment flows.';
 COMMENT ON COLUMN ops.institution_entity_info.status IS
