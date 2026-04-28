@@ -7,13 +7,20 @@ for EnrichedService / CRUDService.
 
 Per-field dict shape:
   For single-column ops (eq, in, gte, lte, bool):
-    { "col": str, "alias": str, "op": str, "cast": str, "enum"?: str }
+    { "col": str, "alias": str, "op": str, "cast": str, "enum"?: str, "array_cast"?: str }
   For multi-column search (ilike):
     { "cols": list[str], "op": "ilike" }
   For geo ops (PostGIS):
     { "col": str, "alias": str, "op": "geo", "mode": "bbox" | "radius" }
     bbox   value shape: [min_lng, min_lat, max_lng, max_lat]
     radius value shape: [lat, lng, radius_m]
+
+The optional "array_cast" key applies only to the "in" op.  When present, it overrides
+the default array type inferred from "cast" and is appended to the ANY() placeholder:
+  ANY(%s::<array_cast>[])
+Use "array_cast" when the DB column is a PostgreSQL enum type but "cast" must remain
+"text" for psycopg2 coercion purposes (e.g. status_enum columns).  For uuid/int/float
+columns the default inference from "cast" is sufficient and "array_cast" is not needed.
 
 Supported ops:
   "eq"    — equality: alias.col = %s (with cast)
@@ -81,7 +88,15 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "radius": {"col": "location", "alias": "r", "op": "geo", "mode": "radius"},
         # Pass 5 register-adds:
         # status: multi-select (restaurant status: active, inactive, pending)
-        "status": {"col": "status", "alias": "r", "op": "in", "cast": "text", "enum": "Status"},
+        # array_cast overrides the default text[] binding — r.status is status_enum, not text.
+        "status": {
+            "col": "status",
+            "alias": "r",
+            "op": "in",
+            "cast": "text",
+            "enum": "Status",
+            "array_cast": "status_enum",
+        },
         # country_code: multi-select on address_info alias "a"
         "country_code": {"col": "country_code", "alias": "a", "op": "in", "cast": "upper"},
         # institution_id: multi-select on restaurant_info alias "r"
@@ -190,6 +205,14 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         # source: multi-select (NationalHolidaySource enum: manual, nager_date).
         "source": {"col": "source", "alias": "nh", "op": "in", "cast": "text", "enum": "NationalHolidaySource"},
         # status: multi-select (text, Status enum)
-        "status": {"col": "status", "alias": "nh", "op": "in", "cast": "text", "enum": "Status"},
+        # array_cast overrides the default text[] binding — nh.status is status_enum, not text.
+        "status": {
+            "col": "status",
+            "alias": "nh",
+            "op": "in",
+            "cast": "text",
+            "enum": "Status",
+            "array_cast": "status_enum",
+        },
     },
 }

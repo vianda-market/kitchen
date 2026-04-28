@@ -97,6 +97,24 @@ _CAST_SQL: dict[str, str] = {
     "text": "%s",
 }
 
+# For the "in" op, psycopg2 binds a Python list as text by default, which fails when
+# the column is typed uuid, integer, or a PostgreSQL enum.  This table maps each cast
+# value to the explicit PostgreSQL array type that must appear in the ANY(%s::<type>[])
+# placeholder.  "text" and "upper" are fine without a cast (psycopg2 handles them as
+# text[]), so they map to None (no cast appended).  When a registry entry carries an
+# "array_cast" key (e.g. for a status_enum column registered with cast="text"), that
+# value takes precedence over this table.
+_IN_ARRAY_CAST: dict[str, str | None] = {
+    "uuid": "uuid",
+    "int": "int",
+    "float": "float",
+    "date": "date",
+    "timestamptz": "timestamptz",
+    "bool": "bool",
+    "text": None,
+    "upper": None,
+}
+
 _CAST_COERCE: dict[str, Any] = {
     "uuid": str,
     "upper": lambda v: (v if isinstance(v, str) else str(v)).upper(),
@@ -233,8 +251,18 @@ def _op_in(field: dict, value: Any, param_name: str) -> tuple[str, list]:
             check_item = item.upper() if cast == "upper" else item
             _validate_enum_value(check_item, enum_name, context, param_name)
     coerced = [_coerce(i, cast) for i in items]
-    # psycopg2 list binding: col = ANY(%s) with a list as the single param
-    return (f"{_col_ref(field)} = ANY(%s)", [coerced])
+    # Determine the PostgreSQL array type for the ANY() placeholder.
+    # psycopg2 binds a Python list as text[] by default; for uuid, int, float,
+    # date, timestamptz, bool, and PostgreSQL enum columns this causes
+    # "operator does not exist: <col_type> = text".  The registry entry may
+    # carry an explicit "array_cast" key (e.g. "status_enum" for enum columns
+    # declared with cast="text"); otherwise we fall back to _IN_ARRAY_CAST.
+    array_type = field.get("array_cast") or _IN_ARRAY_CAST.get(cast)
+    if array_type:
+        placeholder = f"%s::{array_type}[]"
+    else:
+        placeholder = "%s"
+    return (f"{_col_ref(field)} = ANY({placeholder})", [coerced])
 
 
 def _op_gte(field: dict, value: Any, param_name: str) -> tuple[str, list]:
