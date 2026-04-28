@@ -1258,13 +1258,15 @@ def get_enriched_restaurants(
     """
     merged_conditions: list[tuple[str, list]] = list(additional_conditions or [])
     if institution_id is not None:
-        merged_conditions.append(("r.institution_id = %s", [institution_id]))
+        # Cast to str — psycopg2 does not accept raw UUID objects in parameterised queries.
+        merged_conditions.append(("r.institution_id = %s::uuid", [str(institution_id)]))
     if institution_market_id is not None:
-        # Restrict to restaurants in this market (address.country_code = market.country_code)
+        # Restrict to restaurants in this market (address.country_code = market.country_code).
+        # Cast to str — psycopg2 does not accept raw UUID objects in parameterised queries.
         merged_conditions.append(
             (
-                "a.country_code = (SELECT country_code FROM market_info WHERE market_id = %s AND is_archived = FALSE LIMIT 1)",
-                [institution_market_id],
+                "a.country_code = (SELECT country_code FROM market_info WHERE market_id = %s::uuid AND is_archived = FALSE LIMIT 1)",
+                [str(institution_market_id)],
             )
         )
     return _restaurant_enriched_service.get_enriched(
