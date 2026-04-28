@@ -68,6 +68,50 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /admin/markets/enriched – capture sampleMarketId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const markets = pm.response.json();",
+                  "pm.test('Response is array with at least one market', function () {",
+                  "    pm.expect(markets).to.be.an('array').with.length.above(0);",
+                  "});",
+                  "if (markets.length > 0) {",
+                  "    pm.collectionVariables.set('sampleMarketId', markets[0].market_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/markets/enriched",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "markets",
+                "enriched"
+              ]
+            }
+          }
         }
       ]
     },
@@ -1127,13 +1171,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{adminAuthToken}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/national-holidays?holiday_date_from=2025-01-01&holiday_date_to=2025-12-31",
+              "raw": "{{baseUrl}}/api/v1/national-holidays?holiday_date_from=2025-01-01&holiday_date_to=2025-12-31",
               "host": [
-                "{{base_url}}"
+                "{{baseUrl}}"
               ],
               "path": [
                 "api",
@@ -1179,13 +1223,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{adminAuthToken}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/plate-pickup/enriched?was_collected=true",
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?was_collected=true",
               "host": [
-                "{{base_url}}"
+                "{{baseUrl}}"
               ],
               "path": [
                 "api",
@@ -1225,13 +1269,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{adminAuthToken}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/plans/enriched?credit_from=5&credit_to=20",
+              "raw": "{{baseUrl}}/api/v1/plans/enriched?credit_from=5&credit_to=20",
               "host": [
-                "{{base_url}}"
+                "{{baseUrl}}"
               ],
               "path": [
                 "api",
@@ -1272,19 +1316,62 @@
           ]
         },
         {
+          "name": "GET /cuisines – capture cuisine_id for downstream filter test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const cuisines = pm.response.json();",
+                  "pm.test('Response is array with at least one cuisine', function () {",
+                  "    pm.expect(cuisines).to.be.an('array').with.length.above(0);",
+                  "});",
+                  "if (cuisines.length > 0) {",
+                  "    pm.collectionVariables.set('cuisine_id', cuisines[0].cuisine_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cuisines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cuisines"
+              ]
+            }
+          }
+        },
+        {
           "name": "GET /plates/enriched – filter by cuisine_id (in/multi-select, uuid)",
           "request": {
             "method": "GET",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{adminAuthToken}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/plates/enriched?cuisine_id={{cuisine_id}}",
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?cuisine_id={{cuisine_id}}",
               "host": [
-                "{{base_url}}"
+                "{{baseUrl}}"
               ],
               "path": [
                 "api",
@@ -1309,9 +1396,15 @@
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.test(\"Returns array\", () => pm.expect(Array.isArray(body)).to.be.true);",
-                  "// When cuisine_id is a valid seeded ID, verify all plates match that cuisine.",
-                  "// When cuisine_id is {{cuisine_id}} (unset), Postman sends the literal and the",
-                  "// endpoint returns 422 or empty — acceptable for schema verification."
+                  "// cuisine_id is captured from GET /cuisines in the prior request.",
+                  "// Plates may or may not be linked to this cuisine, so an empty result",
+                  "// is acceptable. When results exist, every plate must match the cuisine.",
+                  "const cuisineId = pm.collectionVariables.get('cuisine_id');",
+                  "body.forEach(function(p) {",
+                  "    pm.test('Plate cuisine_id matches filter', function () {",
+                  "        pm.expect(p.cuisine_id).to.equal(cuisineId);",
+                  "    });",
+                  "});"
                 ]
               }
             }
@@ -1324,13 +1417,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{adminAuthToken}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/restaurants/enriched?status=active",
+              "raw": "{{baseUrl}}/api/v1/restaurants/enriched?status=active",
               "host": [
-                "{{base_url}}"
+                "{{baseUrl}}"
               ],
               "path": [
                 "api",
@@ -1721,6 +1814,10 @@
     },
     {
       "key": "sampleMarketId",
+      "value": ""
+    },
+    {
+      "key": "cuisine_id",
       "value": ""
     }
   ]
