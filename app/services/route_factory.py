@@ -1478,11 +1478,12 @@ def create_subscription_routes() -> APIRouter:
 def create_institution_routes() -> APIRouter:
     """Create routes for Institution entity with POST/PUT/DELETE restricted to Internal Admin and Super Admin only.
     GET endpoints scoped: Suppliers, Customers, and Internal Management see only their institution."""
-    from app.auth.dependencies import get_admin_user
+    from app.auth.dependencies import get_admin_user, get_employee_user
     from app.schemas.consolidated_schemas import (
         InstitutionCreateSchema,
         InstitutionResponseSchema,
         InstitutionUpdateSchema,
+        InstitutionUpsertByKeySchema,
     )
     from app.services.crud_service import institution_service, supplier_terms_service
     from app.services.entity_service import (
@@ -1550,6 +1551,92 @@ def create_institution_routes() -> APIRouter:
             if institution is None:
                 return institution
             return InstitutionResponseSchema(**attach_institution_market_ids(institution, db))
+
+        # PUT /institutions/by-key — idempotent upsert (seed/fixture endpoint).
+        # MUST be registered before PUT /{entity_id} so the static segment "by-key"
+        # wins over the UUID path parameter (FastAPI evaluates in registration order).
+        @router.put("/by-key", response_model=InstitutionResponseSchema, status_code=200)
+        def upsert_institution_by_key(
+            upsert_data: InstitutionUpsertByKeySchema,
+            current_user: dict = Depends(get_employee_user),  # Internal-only
+            db: psycopg2.extensions.connection = Depends(get_db),
+        ) -> InstitutionResponseSchema:
+            """Idempotent upsert an institution by canonical_key.
+
+            INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc institution creation
+            (use POST /institutions instead).
+
+            If an institution with this canonical_key already exists it is updated
+            in-place; otherwise a new institution is inserted together with its
+            market assignments (same atomic transaction as POST /institutions).
+
+            Immutable fields on UPDATE: ``institution_type`` is ignored on the update
+            path (it was set at insert time and cannot change).  Market assignments are
+            always reapplied so the institution stays in the expected markets on every
+            idempotent run.
+
+            Auth: Internal only (get_employee_user dependency).  Returns 403 for
+            Customer/Supplier roles.
+
+            Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+            """
+            from app.services.crud_service import find_institution_by_canonical_key as _find_by_key
+            from app.services.entity_service import attach_institution_market_ids as _attach_markets
+            from app.services.error_handling import handle_business_operation
+
+            def _upsert() -> InstitutionResponseSchema:
+                key = upsert_data.canonical_key
+                existing = _find_by_key(key, db)
+                payload = upsert_data.model_dump()
+                market_ids = payload.pop("market_ids", [])
+                payload["modified_by"] = current_user["user_id"]
+
+                if existing is not None:
+                    # UPDATE path — strip immutable fields
+                    update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+                    update_payload.pop("institution_type", None)
+
+                    result = institution_service.update(
+                        existing.institution_id, update_payload, db, scope=None, commit=False
+                    )
+                    if result is None:
+                        db.rollback()
+                        raise HTTPException(status_code=500, detail="Failed to update institution")
+
+                    # Reapply market assignments (idempotent: delete + re-insert)
+                    cursor = db.cursor()
+                    cursor.execute(
+                        "DELETE FROM core.institution_market WHERE institution_id = %s",
+                        (str(existing.institution_id),),
+                    )
+                    for idx, mid in enumerate(market_ids):
+                        cursor.execute(
+                            "INSERT INTO core.institution_market (institution_id, market_id, is_primary) VALUES (%s, %s, %s)",
+                            (str(existing.institution_id), str(mid), idx == 0),
+                        )
+                    db.commit()
+                    log_info(f"Upsert updated institution {existing.institution_id} with canonical_key '{key}'")
+                    return InstitutionResponseSchema(**_attach_markets(result, db))
+
+                # INSERT path — create institution + market assignments atomically
+                institution = institution_service.create(payload, db, scope=None, commit=False)
+                if not institution:
+                    db.rollback()
+                    raise HTTPException(status_code=500, detail="Failed to create institution")
+
+                if market_ids:
+                    cursor = db.cursor()
+                    for idx, mid in enumerate(market_ids):
+                        cursor.execute(
+                            "INSERT INTO core.institution_market (institution_id, market_id, is_primary) VALUES (%s, %s, %s)",
+                            (str(institution.institution_id), str(mid), idx == 0),
+                        )
+
+                db.commit()
+                log_info(f"Upsert inserted institution {institution.institution_id} with canonical_key '{key}'")
+                return InstitutionResponseSchema(**_attach_markets(institution, db))
+
+            return handle_business_operation(_upsert, "institution upsert by canonical key")
 
         @router.put("/{entity_id}", response_model=InstitutionResponseSchema)
         def update_institution(

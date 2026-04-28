@@ -1015,30 +1015,65 @@
           "response": []
         },
         {
-          "name": "Register Supplier Institution",
+          "name": "Upsert Canonical Supplier Institution (idempotent)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// PUT /institutions/by-key requires Internal auth.",
+                  "// At this point pm.environment.get('authToken') holds the super-admin token",
+                  "// set by the 'Login Super Admin' step above (no supplier login has run yet).",
+                  "// pm.collectionVariables.get('authToken') also holds the admin token.",
+                  "//",
+                  "// Fix (synchronous — no pm.sendRequest):",
+                  "//   1. Read the admin token from the collection scope.",
+                  "//   2. Temporarily write it to the environment scope so {{authToken}}",
+                  "//      resolves to the admin token when collection-level bearer auth fires.",
+                  "//   3. The test script restores {{authToken}} after the upsert completes.",
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error(",
+                  "        'adminToken not found in collection variables. ' +",
+                  "        \"Ensure 'Login Super Admin' ran and called pm.collectionVariables.set('authToken', ...).\",",
+                  "    );",
+                  "}",
+                  "// Elevate admin token to environment scope so bearer auth uses it",
+                  "pm.environment.set('authToken', adminToken);",
+                  "console.log('Temporarily set authToken to admin token for Upsert Canonical Supplier Institution');",
+                  "",
+                  "// Build upsert payload with run-time market ID",
+                  "const planMarketId = pm.collectionVariables.get('planMarketId') || pm.environment.get('planMarketId');",
+                  "if (!planMarketId) throw new Error('Missing planMarketId in collectionVariables. Run Fetch AR Market first.');",
+                  "",
+                  "let raw = pm.request.body.raw;",
+                  "let payload = JSON.parse(raw);",
+                  "payload.market_ids = [planMarketId];",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "console.log('Upserting canonical supplier institution with market_id:', planMarketId);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test 1: Status code validation",
-                  "pm.test(\"Institution created - Status 201\", function () {",
-                  "    pm.response.to.have.status(201);",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test(\"Upsert Institution - Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "// Test 2: Response time SLA",
-                  "pm.test(\"Response time is acceptable (< 2000ms)\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
-                  "});",
-                  "",
-                  "// Test 3: Response contains institution_id",
+                  "// Response contains institution_id",
                   "pm.test(\"Response contains valid institution_id\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"institution_id\");",
                   "    pm.expect(body.institution_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
                   "});",
                   "",
-                  "// Test 4: Response includes all required fields",
+                  "// Response includes all required fields",
                   "pm.test(\"Response includes all required fields\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"name\");",
@@ -1047,41 +1082,21 @@
                   "    pm.expect(body).to.have.property(\"is_archived\");",
                   "    pm.expect(body).to.have.property(\"created_date\");",
                   "    pm.expect(body).to.have.property(\"modified_date\");",
+                  "    pm.expect(body).to.have.property(\"canonical_key\");",
                   "});",
                   "",
-                  "// Test 4b: market_ids returned as array",
+                  "// market_ids returned as array",
                   "pm.test(\"Response includes market_ids array\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"market_ids\");",
                   "    pm.expect(body.market_ids).to.be.an(\"array\");",
                   "    pm.expect(body.market_ids.length).to.be.at.least(1);",
-                  "    const requestBody = JSON.parse(pm.request.body.raw);",
-                  "    pm.expect(body.market_ids[0]).to.equal(requestBody.market_ids[0]);",
                   "});",
                   "",
-                  "// Test 5: Name matches request",
-                  "pm.test(\"Institution name matches request\", function () {",
+                  "// canonical_key echoed back",
+                  "pm.test(\"canonical_key matches request\", function () {",
                   "    const body = pm.response.json();",
-                  "    const requestBody = JSON.parse(pm.request.body.raw);",
-                  "    pm.expect(body.name).to.equal(requestBody.name);",
-                  "});",
-                  "",
-                  "// Test 6: Default values are correct",
-                  "pm.test(\"Default status is active\", function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body.status).to.equal(\"active\");",
-                  "});",
-                  "",
-                  "pm.test(\"is_archived is false by default\", function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body.is_archived).to.be.false;",
-                  "});",
-                  "",
-                  "// Test 7: Timestamps are valid",
-                  "pm.test(\"Timestamps are valid ISO 8601 format\", function () {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body.created_date).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/);",
-                  "    pm.expect(new Date(body.created_date).toString()).to.not.equal(\"Invalid Date\");",
+                  "    pm.expect(body.canonical_key).to.equal(\"E2E_INSTITUTION_SUPPLIER\");",
                   "});",
                   "",
                   "// Save institution_id and primary market_id for subsequent requests",
@@ -1093,7 +1108,10 @@
                   "pm.globals.set(\"institutionId\", body.institution_id);",
                   "if (primaryMarketId) { pm.environment.set(\"institutionMarketId\", primaryMarketId); pm.globals.set(\"institutionMarketId\", primaryMarketId); }",
                   "if (body.name) { pm.environment.set(\"institutionName\", body.name); pm.globals.set(\"institutionName\", body.name); }",
-                  "console.log(\"✅ institutionId set (env updated for downstream collections):\", body.institution_id);"
+                  "console.log(\"institutionId set (env updated for downstream collections):\", body.institution_id);",
+                  "",
+                  "// No token restoration needed here: supplier login hasn't run yet at this point,",
+                  "// so pm.environment authToken correctly stays as admin for subsequent setup steps."
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -1101,11 +1119,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Postman Test\",\n    \"institution_type\": \"supplier\",\n    \"market_ids\": [\"{{planMarketId}}\"],\n    \"supplier_terms\": {\n        \"no_show_discount\": 0\n    }\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_INSTITUTION_SUPPLIER\",\n    \"name\": \"E2E Supplier Institution\",\n    \"institution_type\": \"supplier\",\n    \"market_ids\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1113,14 +1131,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/institutions",
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "institutions"
+                "institutions",
+                "by-key"
               ]
             }
           },

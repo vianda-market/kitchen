@@ -1,6 +1,6 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), and **restaurants** (issue #167).
+Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), and **institutions** (issue #190).
 
 ## Overview
 
@@ -338,6 +338,92 @@ See "Upsert Canonical Restaurant (idempotent)" in
 
 ---
 
+## Institutions — `PUT /api/v1/institutions/by-key`
+
+```http
+PUT /api/v1/institutions/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for admin-driven institution
+creation or self-registration flows. Auth: Internal only. Returns 403 for
+Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_INSTITUTION_SUPPLIER` |
+| `name` | string (<=100 chars) | yes | Display name of the institution |
+| `institution_type` | string | yes | `Supplier`, `Employer`, `Customer`, or `Internal` |
+| `market_ids` | list[UUID] | yes | Markets to assign (first is primary). At least one required. |
+| `status` | string | no | `active` (default) |
+
+Response body is `InstitutionResponseSchema` (same shape as `GET /api/v1/institutions/{institution_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new institution row is created and market assignments are
+  inserted atomically into `core.institution_market` (same transaction).
+- **UPDATE path**: only `name` and `status` are updated. `institution_type` is
+  immutable after insert. Market assignments are always reapplied (delete + re-insert)
+  so the institution stays in the expected markets on every idempotent run.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `institution_type` — discriminator (supplier/employer/customer/internal) cannot
+  change after creation
+
+### canonical_key convention for institutions
+
+```
+E2E_INSTITUTION_{ROLE_TYPE}[_{DISCRIMINATOR}]
+```
+
+Examples:
+- `E2E_INSTITUTION_SUPPLIER` — shared E2E supplier institution used across collections
+- `E2E_INSTITUTION_EMPLOYER` — shared E2E employer institution
+
+### System institution skip list
+
+The `scripts/cleanup_duplicate_institutions.py` script hard-skips the following
+institution IDs and will **never** archive them, regardless of duplication:
+
+| Institution ID | Reason |
+|---|---|
+| `11111111-1111-1111-1111-111111111111` | Vianda Enterprises (internal, seeded in reference_data.sql) |
+| `22222222-2222-2222-2222-222222222222` | Vianda Customers (customer group, seeded in reference_data.sql) |
+| `aaaaaaaa-aaaa-0001-0000-000000000001` | Dev fixture: Mercado Vianda BA (supplier, in dev_fixtures.sql) |
+
+Add entries to `SYSTEM_INSTITUTION_SKIP_LIST` in `cleanup_duplicate_institutions.py` when
+new system/sentinel institutions are added.
+
+### Postman pre-request token elevation
+
+`PUT /institutions/by-key` is Internal-only but Postman collection-level bearer
+auth may resolve to the current step's supplier/customer token. Use the same
+synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. After the upsert, restore `{{authToken}}` to the supplier token.
+
+See "Upsert Canonical Supplier Institution (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (institutions)
+
+- `core.institution_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0006_institution_canonical_key.sql`.
+- Partial index `uq_institution_info_canonical_key` (sparse: only indexed when non-null).
+- `InstitutionResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
@@ -420,5 +506,19 @@ python scripts/cleanup_duplicate_restaurants.py
 ```
 
 Restaurants with a `canonical_key` are never touched by the cleanup script.
+
+### Institutions
+
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_institutions.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per name:
+python scripts/cleanup_duplicate_institutions.py
+```
+
+Institutions with a `canonical_key` are never touched by the cleanup script.
+System institutions (`SYSTEM_INSTITUTION_SKIP_LIST`) are always preserved
+regardless of duplication.
 
 All scripts are idempotent: running again after a clean state does nothing.

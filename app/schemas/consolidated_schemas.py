@@ -623,12 +623,45 @@ class InstitutionResponseSchema(BaseModel):
     last_support_email_date: datetime | None = None
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID | None = None
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InstitutionUpsertByKeySchema(BaseModel):
+    """Schema for idempotent institution upsert by canonical_key.
+
+    If an institution with the given canonical_key already exists it is updated
+    in-place; otherwise a new institution is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc institution creation (use POST /institutions instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``institution_type`` is locked after insert and
+    ignored on the update path. The market assignment is always applied (both
+    on INSERT and UPDATE) so the institution remains in the expected markets after
+    each idempotent run.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_INSTITUTION_SUPPLIER'",
+    )
+    name: str = Field(..., max_length=100, description="Display name of the institution")
+    institution_type: RoleType = Field(..., description="Discriminator: supplier, employer, customer, or internal")
+    market_ids: list[UUID] = Field(
+        ...,
+        min_length=1,
+        description="Markets to assign (first is primary). At least one required.",
+    )
+    status: Status = Status.ACTIVE
 
 
 # RoleCreateSchema, RoleUpdateSchema, RoleResponseSchema removed
