@@ -132,6 +132,7 @@ class PlateDTO(BaseModel):
     delivery_time_minutes: int
     is_archived: bool = False
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     modified_by: UUID
     modified_date: datetime

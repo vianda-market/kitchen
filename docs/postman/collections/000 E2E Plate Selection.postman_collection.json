@@ -2700,29 +2700,25 @@
           "response": []
         },
         {
-          "name": "Register Supplier Plate",
+          "name": "Upsert Canonical Plate (idempotent)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// 1) grab the raw JSON you just typed",
+                  "// Build the upsert payload using productId + restaurantId from collection variables.",
+                  "// PUT /plates/by-key is idempotent: running again updates in-place instead of",
+                  "// creating a duplicate (fixes the duplicate-plate anti-pattern from issue #166).",
                   "let raw = pm.request.body.raw;",
-                  "",
-                  "// 2) parse it so we can update fields",
                   "let payload = JSON.parse(raw);",
                   "",
-                  "// 3) pull the UUIDs (no quotes) from your collection variables",
                   "payload.product_id = pm.collectionVariables.get(\"productId\");",
                   "payload.restaurant_id = pm.collectionVariables.get(\"restaurantId\");",
                   "",
-                  "// 4) ensure this goes out as JSON",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "",
-                  "// 5) overwrite the body with the new, merged JSON",
                   "pm.request.body.update(JSON.stringify(payload));",
                   "",
-                  ""
+                  "console.log(\"Using product_id:\", payload.product_id, \"restaurant_id:\", payload.restaurant_id);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -2733,12 +2729,19 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Created plate\", () => {",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test(\"Upsert Plate - Status 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Upserted plate has plate_id\", () => {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"plate_id\");",
                   "",
-                  "    // persist it to this collection’s variables",
                   "    pm.collectionVariables.set(\"plateId\", body.plate_id);",
+                  "    pm.environment.set(\"plateId\", body.plate_id);",
+                  "    pm.globals.set(\"plateId\", body.plate_id);",
+                  "    console.log(\"Set plateId:\", body.plate_id);",
                   "});"
                 ],
                 "type": "text/javascript",
@@ -2748,11 +2751,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n\"product_id\": \"\",\n\"restaurant_id\": \"\",\n\"price\": \"20000\",\n\"credit\": \"8\",\n\"delivery_time_minutes\":\"15\"\n}",
+              "raw": "{\n  \"canonical_key\": \"RESTAURANT_E2E_PLATE_STANDARD\",\n  \"product_id\": \"\",\n  \"restaurant_id\": \"\",\n  \"price\": \"20000\",\n  \"credit\": 8,\n  \"delivery_time_minutes\": 15\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2760,14 +2763,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates",
+              "raw": "{{baseUrl}}/api/v1/plates/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates"
+                "plates",
+                "by-key"
               ]
             }
           },

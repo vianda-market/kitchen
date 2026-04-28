@@ -174,6 +174,24 @@ INSERT INTO ops.restaurant_info (
 );
 
 -- =============================================================================
+-- DEV FIXTURE: Canonical plates
+-- Plates depend on both a product_id and a restaurant_id, both of which are
+-- created at test run time (via Postman) rather than seeded here.  Canonical
+-- plate fixtures therefore live in the Postman collection (000 E2E Plate
+-- Selection) as PUT /api/v1/plates/by-key calls, not as SQL INSERTs.
+--
+-- canonical_key convention: RESTAURANT_{SLUG}_PLATE_{SLUG}
+-- Examples:
+--   RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA
+--   RESTAURANT_LA_COCINA_PORTENA_PLATE_ENSALADA_GRIEGA
+--
+-- If you need a fully SQL-driven plate fixture (e.g. for geo tests), create
+-- the product and restaurant rows with fixed UUIDs first, then INSERT INTO
+-- ops.plate_info ... ON CONFLICT (canonical_key) WHERE canonical_key IS NOT NULL
+-- DO UPDATE SET ... — exactly like the plan fixtures below.
+-- =============================================================================
+
+-- =============================================================================
 -- DEV FIXTURE: Canonical subscription plans
 -- One realistic plan per active test market.  Prices are above Stripe's
 -- USD-equivalent minimum (~$0.50) with comfortable margin.

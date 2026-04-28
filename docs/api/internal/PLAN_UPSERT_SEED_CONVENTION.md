@@ -1,5 +1,12 @@
 # Plan Upsert Endpoint & Canonical Fixture Convention
 
+> **Superseded.** This doc covers plans only.
+> The canonical-key pattern has been generalized to plates as well.
+> See [UPSERT_SEED_CONVENTION.md](./UPSERT_SEED_CONVENTION.md) for the
+> entity-agnostic reference (plans + plates).
+
+
+
 ## Overview
 
 Postman collections and dev seed scripts that create plans should use the idempotent

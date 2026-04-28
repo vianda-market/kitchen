@@ -3112,6 +3112,7 @@ CREATE TABLE IF NOT EXISTS ops.plate_info (
     delivery_time_minutes INTEGER NOT NULL DEFAULT 15,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -3141,6 +3142,11 @@ COMMENT ON COLUMN ops.plate_info.delivery_time_minutes IS
     'Estimated minutes from order confirmation to plate readiness at the kitchen. Used to set pickup_time_range.';
 COMMENT ON COLUMN ops.plate_info.is_archived IS
     'Soft-delete tombstone. Archived plates cannot be selected by subscribers.';
+COMMENT ON COLUMN ops.plate_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture plates '
+    '(e.g. ''RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA''). Used by the '
+    'PUT /api/v1/plates/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc plates created via the normal POST endpoint.';
 COMMENT ON COLUMN ops.plate_info.status IS
     'Lifecycle status (status_enum). Controls whether the plate is shown in explore results.';
 COMMENT ON COLUMN ops.plate_info.created_date IS

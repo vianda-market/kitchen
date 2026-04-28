@@ -61,6 +61,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_plan_info_canonical_key
     ON customer.plan_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc plates)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plate_info_canonical_key
+    ON ops.plate_info (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_history_subscription_id ON audit.subscription_history(subscription_id);
 
 CREATE INDEX IF NOT EXISTS idx_client_bill_history_client_bill_id ON audit.client_bill_history(client_bill_id);

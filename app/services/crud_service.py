@@ -2576,6 +2576,27 @@ referral_transaction_service = CRUDService("referral_transaction", ReferralTrans
 workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")
 
 
+def find_plate_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> PlateDTO | None:
+    """Look up a plate by its canonical_key.
+
+    Returns the matching PlateDTO (including archived) or None if no plate with
+    that key exists.  Used by the PUT /plates/by-key upsert endpoint to decide
+    insert vs update.
+    """
+    query = """
+        SELECT * FROM ops.plate_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return PlateDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding plate by canonical_key '{canonical_key}': {exc}")
+        return None
+
+
 def find_plan_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> PlanDTO | None:
     """Look up a plan by its canonical_key.
 
