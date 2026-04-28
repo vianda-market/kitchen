@@ -80,6 +80,7 @@ Pagination is **opt-in per endpoint**. Not all list endpoints accept `page`/`pag
 | `/supplier-invoices/enriched` | Yes |
 | `/admin/markets/enriched` | Yes |
 | `/super-admin/discretionary` | Yes |
+| `/national-holidays` | Yes |
 
 ---
 

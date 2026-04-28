@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "filter-registry-entities-2026-v1",
     "name": "017 FILTER_REGISTRY_ENTITIES",
-    "description": "017 \u2013 Filter Registry Entities. Covers restaurants, plates, and pickups filter params registered in \u00a73.2. Flow: (1) Login as admin, (2) Restaurants \u2013 eq (city, kitchen_day), in (cuisine), ilike search, (3) Plates \u2013 eq status, eq restaurant_id, eq market_id, date range, (4) Pickups \u2013 eq status, eq market_id, timestamptz window range. Run after DB has seeded test data. Uses {{baseUrl}} and {{adminAuthToken}}.",
+    "description": "017 – Filter Registry Entities. Covers restaurants, plates, and pickups filter params registered in §3.2. Flow: (1) Login as admin, (2) Restaurants – eq (city, kitchen_day), in (cuisine), ilike search, (3) Plates – eq status, eq restaurant_id, eq market_id, date range, (4) Pickups – eq status, eq market_id, timestamptz window range. Run after DB has seeded test data. Uses {{baseUrl}} and {{adminAuthToken}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "item": [
@@ -75,7 +75,7 @@
       "name": "Restaurants",
       "item": [
         {
-          "name": "GET /restaurants/enriched \u2013 no filter (baseline)",
+          "name": "GET /restaurants/enriched – no filter (baseline)",
           "event": [
             {
               "listen": "test",
@@ -120,7 +120,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 filter by city (eq)",
+          "name": "GET /restaurants/enriched – filter by city (eq)",
           "event": [
             {
               "listen": "test",
@@ -174,7 +174,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 filter by kitchen_day (eq via pkd join)",
+          "name": "GET /restaurants/enriched – filter by kitchen_day (eq via pkd join)",
           "event": [
             {
               "listen": "test",
@@ -220,7 +220,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 filter by cuisine (in/multi-select)",
+          "name": "GET /restaurants/enriched – filter by cuisine (in/multi-select)",
           "event": [
             {
               "listen": "test",
@@ -270,7 +270,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 search (ilike OR name+tagline)",
+          "name": "GET /restaurants/enriched – search (ilike OR name+tagline)",
           "event": [
             {
               "listen": "test",
@@ -326,7 +326,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 with pagination (X-Total-Count check)",
+          "name": "GET /restaurants/enriched – with pagination (X-Total-Count check)",
           "event": [
             {
               "listen": "test",
@@ -382,7 +382,7 @@
       "name": "Plates",
       "item": [
         {
-          "name": "GET /plates/enriched \u2013 no filter (baseline, stores count for row-inflation guard)",
+          "name": "GET /plates/enriched – no filter (baseline, stores count for row-inflation guard)",
           "event": [
             {
               "listen": "test",
@@ -424,7 +424,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched \u2013 filter by status (eq)",
+          "name": "GET /plates/enriched – filter by status (eq)",
           "event": [
             {
               "listen": "test",
@@ -473,7 +473,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched \u2013 filter by restaurant_id (eq/uuid)",
+          "name": "GET /plates/enriched – filter by restaurant_id (eq/uuid)",
           "event": [
             {
               "listen": "test",
@@ -526,7 +526,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched \u2013 filter by service date range (pickup_date gte/lte via psi join)",
+          "name": "GET /plates/enriched – filter by service date range (pickup_date gte/lte via psi join)",
           "event": [
             {
               "listen": "test",
@@ -589,7 +589,7 @@
       "name": "Pickups",
       "item": [
         {
-          "name": "GET /plate-pickup/enriched \u2013 no filter (baseline)",
+          "name": "GET /plate-pickup/enriched – no filter (baseline)",
           "event": [
             {
               "listen": "test",
@@ -629,7 +629,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched \u2013 filter by status (eq)",
+          "name": "GET /plate-pickup/enriched – filter by status (eq)",
           "event": [
             {
               "listen": "test",
@@ -678,7 +678,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched \u2013 filter by market_id (eq/uuid)",
+          "name": "GET /plate-pickup/enriched – filter by market_id (eq/uuid)",
           "event": [
             {
               "listen": "test",
@@ -724,7 +724,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched \u2013 filter by expected range (gte/lte timestamptz)",
+          "name": "GET /plate-pickup/enriched – filter by expected range (gte/lte timestamptz)",
           "event": [
             {
               "listen": "test",
@@ -780,7 +780,7 @@
       "description": "Geo bbox and radius filter tests for GET /restaurants/enriched. Requires PostGIS installed and ops.restaurant_info.location populated with seed data. Use a bbox / center point that covers at least one seeded restaurant to verify a 200 with results.",
       "item": [
         {
-          "name": "GET /restaurants/enriched \u2013 bbox (wide NYC area, expects results if seeded)",
+          "name": "GET /restaurants/enriched – bbox (wide NYC area, expects results if seeded)",
           "event": [
             {
               "listen": "test",
@@ -824,14 +824,14 @@
                 {
                   "key": "bbox",
                   "value": "-74.05,40.68,-73.91,40.83",
-                  "description": "min_lng,min_lat,max_lng,max_lat \u2014 NYC bounding box"
+                  "description": "min_lng,min_lat,max_lng,max_lat — NYC bounding box"
                 }
               ]
             }
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 bbox (Antarctic, expects empty result)",
+          "name": "GET /restaurants/enriched – bbox (Antarctic, expects empty result)",
           "event": [
             {
               "listen": "test",
@@ -874,14 +874,14 @@
                 {
                   "key": "bbox",
                   "value": "-10.0,-80.0,10.0,-70.0",
-                  "description": "Antarctic bounding box \u2014 no restaurants expected"
+                  "description": "Antarctic bounding box — no restaurants expected"
                 }
               ]
             }
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 radius (1 km from midtown NYC)",
+          "name": "GET /restaurants/enriched – radius (1 km from midtown NYC)",
           "event": [
             {
               "listen": "test",
@@ -925,7 +925,7 @@
                 {
                   "key": "center",
                   "value": "40.7484,-73.9857",
-                  "description": "lat,lng \u2014 midtown Manhattan"
+                  "description": "lat,lng — midtown Manhattan"
                 },
                 {
                   "key": "radius_m",
@@ -937,7 +937,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 bbox + city (AND semantics)",
+          "name": "GET /restaurants/enriched – bbox + city (AND semantics)",
           "event": [
             {
               "listen": "test",
@@ -987,7 +987,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 bad bbox (not numbers) \u2192 400",
+          "name": "GET /restaurants/enriched – bad bbox (not numbers) → 400",
           "event": [
             {
               "listen": "test",
@@ -1030,7 +1030,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 bad bbox (wrong arity, 3 values) \u2192 400",
+          "name": "GET /restaurants/enriched – bad bbox (wrong arity, 3 values) → 400",
           "event": [
             {
               "listen": "test",
@@ -1073,7 +1073,7 @@
           }
         },
         {
-          "name": "GET /restaurants/enriched \u2013 center without radius_m \u2192 400",
+          "name": "GET /restaurants/enriched – center without radius_m → 400",
           "event": [
             {
               "listen": "test",
@@ -1121,7 +1121,7 @@
       "name": "Pass 5 New Filters",
       "item": [
         {
-          "name": "GET /national-holidays \u2013 filter by holiday_date range (gte/lte date)",
+          "name": "GET /national-holidays – filter by holiday_date range (gte/lte date)",
           "request": {
             "method": "GET",
             "header": [
@@ -1173,7 +1173,7 @@
           ]
         },
         {
-          "name": "GET /plate-pickup/enriched \u2013 filter by was_collected toggle (bool)",
+          "name": "GET /plate-pickup/enriched – filter by was_collected toggle (bool)",
           "request": {
             "method": "GET",
             "header": [
@@ -1219,7 +1219,7 @@
           ]
         },
         {
-          "name": "GET /plans/enriched \u2013 filter by credit range (credit_from / credit_to)",
+          "name": "GET /plans/enriched – filter by credit range (credit_from / credit_to)",
           "request": {
             "method": "GET",
             "header": [
@@ -1272,7 +1272,7 @@
           ]
         },
         {
-          "name": "GET /plates/enriched \u2013 filter by cuisine_id (in/multi-select, uuid)",
+          "name": "GET /plates/enriched – filter by cuisine_id (in/multi-select, uuid)",
           "request": {
             "method": "GET",
             "header": [
@@ -1311,14 +1311,14 @@
                   "pm.test(\"Returns array\", () => pm.expect(Array.isArray(body)).to.be.true);",
                   "// When cuisine_id is a valid seeded ID, verify all plates match that cuisine.",
                   "// When cuisine_id is {{cuisine_id}} (unset), Postman sends the literal and the",
-                  "// endpoint returns 422 or empty \u2014 acceptable for schema verification."
+                  "// endpoint returns 422 or empty — acceptable for schema verification."
                 ]
               }
             }
           ]
         },
         {
-          "name": "GET /restaurants/enriched \u2013 filter by status (in/multi-select)",
+          "name": "GET /restaurants/enriched – filter by status (in/multi-select)",
           "request": {
             "method": "GET",
             "header": [
@@ -1394,9 +1394,21 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/plates/enriched?status=processed",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "plates", "enriched"],
-              "query": [{"key": "status", "value": "processed"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "processed"
+                }
+              ]
             }
           }
         },
@@ -1428,9 +1440,21 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/plates/enriched?status=active",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "plates", "enriched"],
-              "query": [{"key": "status", "value": "active"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
             }
           }
         },
@@ -1459,9 +1483,21 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/plans/enriched?status=processed",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "plans", "enriched"],
-              "query": [{"key": "status", "value": "processed"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plans",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "processed"
+                }
+              ]
             }
           }
         },
@@ -1493,9 +1529,21 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/plans/enriched?status=active",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "plans", "enriched"],
-              "query": [{"key": "status", "value": "active"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plans",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
             }
           }
         }
@@ -1539,9 +1587,20 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/national-holidays?source=manual",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "national-holidays"],
-              "query": [{"key": "source", "value": "manual"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "national-holidays"
+              ],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "manual"
+                }
+              ]
             }
           }
         },
@@ -1570,9 +1629,81 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/national-holidays?source=garbage",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "national-holidays"],
-              "query": [{"key": "source", "value": "garbage"}]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "national-holidays"
+              ],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "garbage"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /national-holidays – paginated fetch (page=1&page_size=50)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response body is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Response body length is <= 50', function () {",
+                  "    pm.expect(pm.response.json().length).to.be.at.most(50);",
+                  "});",
+                  "pm.test('X-Total-Count header is present', function () {",
+                  "    pm.expect(pm.response.headers.get('X-Total-Count')).to.not.be.null;",
+                  "    pm.expect(pm.response.headers.get('X-Total-Count')).to.not.be.undefined;",
+                  "});",
+                  "pm.test('X-Total-Count header is a positive integer', function () {",
+                  "    const totalCount = parseInt(pm.response.headers.get('X-Total-Count'), 10);",
+                  "    pm.expect(totalCount).to.be.a('number');",
+                  "    pm.expect(totalCount).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/national-holidays?page=1&page_size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "national-holidays"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "50"
+                }
+              ]
             }
           }
         }
