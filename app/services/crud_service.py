@@ -2639,9 +2639,7 @@ def find_user_by_canonical_key(canonical_key: str, db: psycopg2.extensions.conne
         return None
 
 
-def find_restaurant_by_canonical_key(
-    canonical_key: str, db: psycopg2.extensions.connection
-) -> "RestaurantDTO | None":
+def find_restaurant_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> "RestaurantDTO | None":
     """Look up a restaurant by its canonical_key.
 
     Returns the matching RestaurantDTO (including archived) or None if no

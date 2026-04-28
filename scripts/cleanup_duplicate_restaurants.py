@@ -158,9 +158,7 @@ def run(dry_run: bool = False) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Archive duplicate restaurant rows (keep oldest per institution+name)"
-    )
+    parser = argparse.ArgumentParser(description="Archive duplicate restaurant rows (keep oldest per institution+name)")
     parser.add_argument(
         "--dry-run",
         action="store_true",
