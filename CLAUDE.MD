@@ -97,6 +97,21 @@ Server-side pagination is **opt-in per route** — not all endpoints need it.
 - Collections live in `docs/postman/collections/`
 - One concept per test, Arrange-Act-Assert, mock external deps
 
+### Run Newman locally before pushing any PR that touches a Postman collection
+
+Postman/Newman failures are reproducible locally — there is no excuse for letting CI catch them. Before pushing any PR that adds or edits a collection, runs against an endpoint a collection exercises, or changes auth/role gating:
+
+```sh
+# Terminal 1 — start the API:
+bash scripts/run_dev_quiet.sh
+
+# Terminal 2 — run the collection(s) you touched:
+./scripts/run_newman.sh 000              # specific collection by NNN prefix
+./scripts/run_newman.sh                  # full suite (slower; do once before final push)
+```
+
+Requires `newman` (`npm install -g newman`). The CI environment file is `docs/postman/environments/ci.postman_environment.json` — if your collection's pre-request scripts depend on env vars (e.g. `superAdminUsername`, `superAdminPassword`), confirm they exist in `ci.postman_environment.json` AND that your local environment provides matching values, otherwise CI will diverge from local. Fixing a Newman failure on CI without first reproducing it locally is the wrong order — reproduce, fix, verify locally, then push.
+
 ## Key Entry Points
 - **Route registration:** `application.py`
 - **All Pydantic schemas:** `app/schemas/consolidated_schemas.py`
