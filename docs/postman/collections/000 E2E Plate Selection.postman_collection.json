@@ -590,28 +590,75 @@
           "response": []
         },
         {
-          "name": "Create Market Argentina",
+          "name": "Upsert Canonical Market Argentina (idempotent)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// PUT /markets/by-key requires Internal auth.",
+                  "// At this point pm.environment.get('authToken') holds the super-admin token",
+                  "// set by the 'Login Super Admin' step above (no supplier login has run yet).",
+                  "// No token swap needed — admin is already current.",
+                  "//",
+                  "// Build upsert payload with run-time currency ID.",
+                  "// planCreditCurrencyId may be null if the 409 async fallback in 'Create Credit Currency'",
+                  "// has not completed yet. Fall back to the seeded ARS currency ID from reference_data.sql.",
+                  "const SEEDED_ARS_CURRENCY_ID = '66666666-6666-6666-6666-666666666601';",
+                  "const planCreditCurrencyId = pm.collectionVariables.get('planCreditCurrencyId')",
+                  "    || pm.environment.get('planCreditCurrencyId')",
+                  "    || SEEDED_ARS_CURRENCY_ID;",
+                  "",
+                  "let payload = JSON.parse(pm.request.body.raw);",
+                  "payload.currency_metadata_id = planCreditCurrencyId;",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+                  "pm.request.body.update(JSON.stringify(payload));",
+                  "console.log('Upserting canonical AR market with currency_metadata_id:', planCreditCurrencyId);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Market Argentina ready (201 or 409)\", function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-                  "if (pm.response.code === 201) {",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test(\"Upsert Market AR - Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains valid market_id\", function () {",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set(\"planMarketId\", body.market_id);",
-                  "    pm.environment.set(\"planMarketId\", body.market_id);",
-                  "    pm.globals.set(\"planMarketId\", body.market_id);",
-                  "    console.log(\"✅ Created Argentina market:\", body.market_id);",
-                  "} else if (pm.response.code === 409) {",
-                  "    const planCreditCurrencyId = pm.collectionVariables.get(\"planCreditCurrencyId\");",
-                  "    pm.sendRequest((pm.environment.get(\"baseUrl\") || pm.collectionVariables.get(\"baseUrl\")) + \"/api/v1/markets\", function (err, res) {",
-                  "        if (!err && res.code === 200) {",
-                  "            const ar = res.json().find(m => m.country_code === 'AR');",
-                  "            if (ar) { pm.collectionVariables.set(\"planMarketId\", ar.market_id); pm.environment.set(\"planMarketId\", ar.market_id); pm.globals.set(\"planMarketId\", ar.market_id); }",
-                  "        }",
-                  "    });",
-                  "}"
+                  "    pm.expect(body).to.have.property(\"market_id\");",
+                  "    pm.expect(body.market_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "",
+                  "pm.test(\"Response includes all required fields\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"country_code\");",
+                  "    pm.expect(body).to.have.property(\"currency_metadata_id\");",
+                  "    pm.expect(body).to.have.property(\"status\");",
+                  "    pm.expect(body).to.have.property(\"is_archived\");",
+                  "    pm.expect(body).to.have.property(\"canonical_key\");",
+                  "});",
+                  "",
+                  "pm.test(\"canonical_key matches request\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.canonical_key).to.equal(\"E2E_MARKET_AR\");",
+                  "});",
+                  "",
+                  "pm.test(\"country_code is AR\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.country_code).to.equal(\"AR\");",
+                  "});",
+                  "",
+                  "// Save market_id for downstream steps",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"planMarketId\", body.market_id);",
+                  "pm.environment.set(\"planMarketId\", body.market_id);",
+                  "pm.globals.set(\"planMarketId\", body.market_id);",
+                  "console.log(\"planMarketId set:\", body.market_id);"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -619,17 +666,11 @@
             }
           ],
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
+            "method": "PUT",
+            "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country_code\": \"AR\",\n  \"currency_metadata_id\": \"{{planCreditCurrencyId}}\",\n  \"timezone\": \"America/Argentina/Buenos_Aires\"\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_MARKET_AR\",\n    \"country_code\": \"AR\",\n    \"currency_metadata_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"language\": \"es\",\n    \"phone_dial_code\": \"+54\",\n    \"phone_local_digits\": 10,\n    \"status\": \"active\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -637,14 +678,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/markets",
+              "raw": "{{baseUrl}}/api/v1/markets/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "markets"
+                "markets",
+                "by-key"
               ]
             }
           },

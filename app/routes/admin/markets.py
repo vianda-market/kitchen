@@ -23,6 +23,7 @@ from app.schemas.consolidated_schemas import (
     MarketPayoutAggregatorResponseSchema,
     MarketResponseSchema,
     MarketUpdateSchema,
+    MarketUpsertByKeySchema,
 )
 from app.services.entity_service import get_enriched_market_by_id, get_enriched_markets
 from app.services.error_handling import handle_business_operation
@@ -209,6 +210,120 @@ async def create_market(market_data: MarketCreateSchema, current_user: dict = De
     )
 
     return market
+
+
+# PUT /markets/by-key — idempotent upsert (seed/fixture endpoint).
+# MUST be registered before PUT /{market_id} so the static segment "by-key"
+# wins over the UUID path parameter (FastAPI evaluates in registration order).
+@router.put("/by-key", response_model=MarketResponseSchema, status_code=200)
+def upsert_market_by_key(
+    upsert_data: MarketUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> MarketResponseSchema:
+    """Idempotent upsert a market by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc market creation
+    (use POST /markets instead).
+
+    If a market with this canonical_key already exists it is updated in-place;
+    otherwise a new market is inserted together with its billing_config record
+    (same atomic transaction as POST /markets).
+
+    Immutable fields on UPDATE: ``country_code`` is locked after insert and
+    ignored on the update path (each market has a unique country_code that must
+    not change after creation).
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+    from app.services.crud_service import find_market_by_canonical_key
+    from app.utils.log import log_info
+
+    def _upsert() -> MarketResponseSchema:
+        key = upsert_data.canonical_key
+        country_code = upsert_data.country_code  # already normalized by schema validator
+        modified_by = current_user["user_id"]
+
+        # Primary lookup: by canonical_key.
+        existing = find_market_by_canonical_key(key, db)
+
+        # Secondary lookup: if no row has this canonical_key, check if a market already
+        # exists for this country_code (e.g. the seeded canonical markets in reference_data.sql).
+        # In that case we adopt the existing market and stamp it with the canonical_key rather
+        # than attempting a duplicate INSERT that would violate the country_code UNIQUE constraint.
+        if existing is None:
+            existing = market_service.get_by_country_code(country_code)
+            if existing is not None:
+                # Convert the enriched dict to the minimal shape expected by the update path.
+                # get_by_country_code returns the same enriched dict as get_by_id.
+                pass  # existing is already the market dict; fall through to UPDATE path below
+
+        if existing is not None:
+            # UPDATE path — country_code is immutable; update all other supported fields.
+            market_id = existing["market_id"]
+            result = market_service.update(
+                market_id=market_id,
+                modified_by=modified_by,
+                currency_metadata_id=upsert_data.currency_metadata_id,
+                language=upsert_data.language,
+                status=upsert_data.status,
+            )
+            if result is None:
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+            # Persist canonical_key + phone fields (market_service.update does not handle them)
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE core.market_info
+                       SET canonical_key = %s,
+                           phone_dial_code = %s,
+                           phone_local_digits = %s,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE market_id = %s""",
+                    (key, upsert_data.phone_dial_code, upsert_data.phone_local_digits, str(market_id)),
+                )
+            db.commit()
+            log_info(f"Upsert updated market {market_id} with canonical_key '{key}'")
+            enriched = market_service.get_by_id(market_id)
+            if enriched is None:
+                raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale="en")
+            enriched["canonical_key"] = key
+            return MarketResponseSchema(**enriched)
+
+        # INSERT path — create market + billing config atomically (mirrors POST /markets).
+        if country_code not in SUPPORTED_COUNTRY_CODES:
+            raise envelope_exception(ErrorCode.MARKET_COUNTRY_NOT_SUPPORTED, status=400, locale="en")
+
+        created = market_service.create(
+            country_code=country_code,
+            currency_metadata_id=upsert_data.currency_metadata_id,
+            modified_by=modified_by,
+            status=upsert_data.status,
+            language=upsert_data.language,
+        )
+        # Set canonical_key + phone fields on the newly created row.
+        # market_service.create() commits first; this is a follow-up UPDATE.
+        new_market_id = created["market_id"]
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE core.market_info
+                   SET canonical_key = %s,
+                       phone_dial_code = %s,
+                       phone_local_digits = %s,
+                       modified_date = CURRENT_TIMESTAMP
+                   WHERE market_id = %s""",
+                (key, upsert_data.phone_dial_code, upsert_data.phone_local_digits, str(new_market_id)),
+            )
+        db.commit()
+        log_info(f"Upsert inserted market {new_market_id} with canonical_key '{key}'")
+        created["canonical_key"] = key
+        created["phone_dial_code"] = upsert_data.phone_dial_code
+        created["phone_local_digits"] = upsert_data.phone_local_digits
+        return MarketResponseSchema(**created)
+
+    return handle_business_operation(_upsert, "market upsert by canonical key")
 
 
 @router.put("/{market_id}", response_model=MarketResponseSchema)

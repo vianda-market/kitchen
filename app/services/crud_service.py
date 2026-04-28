@@ -2639,6 +2639,30 @@ def find_user_by_canonical_key(canonical_key: str, db: psycopg2.extensions.conne
         return None
 
 
+def find_market_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> "dict | None":
+    """Look up a market by its canonical_key.
+
+    Returns the matching market dict (including archived) or None if no
+    market with that key exists.  Used by the PUT /markets/by-key upsert
+    endpoint to decide insert vs update.
+    """
+    query = """
+        SELECT market_id, country_code, currency_metadata_id, language,
+               phone_dial_code, phone_local_digits, is_archived, status,
+               canonical_key, created_date, created_by, modified_by, modified_date
+        FROM core.market_info
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return dict(result)
+    except Exception as exc:
+        log_error(f"Error finding market by canonical_key '{canonical_key}': {exc}")
+        return None
+
+
 def find_restaurant_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> "RestaurantDTO | None":
     """Look up a restaurant by its canonical_key.
 
