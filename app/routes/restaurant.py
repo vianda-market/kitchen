@@ -8,7 +8,7 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from app.auth.dependencies import get_client_or_employee_user, get_current_user, get_resolved_locale
+from app.auth.dependencies import get_client_or_employee_user, get_current_user, get_employee_user, get_resolved_locale
 from app.config import Status
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
@@ -27,12 +27,14 @@ from app.schemas.consolidated_schemas import (
     RestaurantSearchResponseSchema,
     RestaurantSearchResultSchema,
     RestaurantUpdateSchema,
+    RestaurantUpsertByKeySchema,
 )
 from app.security.entity_scoping import ENTITY_RESTAURANT, EntityScopingService
 from app.security.scoping import resolve_institution_filter
 from app.services.city_metrics_service import get_cities_with_coverage
 from app.services.crud_service import (
     credit_currency_service,
+    find_restaurant_by_canonical_key,
     get_credit_cost_local_currency_of_most_expensive_plan_for_market,
     institution_entity_service,
     restaurant_balance_service,
@@ -788,6 +790,104 @@ def get_restaurant(
     except Exception as e:
         log_error(f"Error getting restaurant {restaurant_id}: {e}")
         raise envelope_exception(ErrorCode.RESTAURANT_GET_FAILED, status=500, locale="en") from None
+
+
+# PUT /restaurants/by-key - Idempotent upsert a restaurant by canonical_key (seed/fixture endpoint)
+# MUST be registered before PUT /{restaurant_id} so the static segment "by-key" wins over
+# the UUID path parameter (FastAPI evaluates in registration order).
+@router.put("/by-key", response_model=RestaurantResponseSchema, status_code=200)
+def upsert_restaurant_by_key(
+    upsert_data: RestaurantUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> RestaurantResponseSchema:
+    """Idempotent upsert a restaurant by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for supplier self-registration or
+    ad-hoc restaurant creation (use POST /restaurants instead).
+
+    If a restaurant with this canonical_key already exists it is updated in-place;
+    otherwise a new restaurant is inserted together with its balance record (same
+    atomic transaction as POST /restaurants).
+
+    Immutable fields on UPDATE: ``institution_id`` and ``institution_entity_id``
+    are ignored on the update path.  The balance record is only created on INSERT.
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+    from app.services.error_handling import handle_business_operation
+
+    def _upsert() -> RestaurantResponseSchema:
+        key = upsert_data.canonical_key
+        existing = find_restaurant_by_canonical_key(key, db)
+        payload = upsert_data.model_dump()
+        payload["modified_by"] = current_user["user_id"]
+
+        if existing is not None:
+            # UPDATE path — strip fields that must not change after creation
+            update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
+            for immutable in ("institution_id", "institution_entity_id"):
+                update_payload.pop(immutable, None)
+            result = restaurant_service.update(existing.restaurant_id, update_payload, db)
+            if result is None:
+                from app.i18n.envelope import envelope_exception
+                from app.i18n.error_codes import ErrorCode
+
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+            return RestaurantResponseSchema(**_restaurant_to_response(result, db))
+
+        # INSERT path — create restaurant + balance atomically (mirrors POST /restaurants)
+        entity = institution_entity_service.get_by_id(payload["institution_entity_id"], db, scope=None)
+        if not entity:
+            from app.i18n.envelope import envelope_exception
+            from app.i18n.error_codes import ErrorCode
+
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Institution entity")
+
+        credit_currency = credit_currency_service.get_by_id(entity.currency_metadata_id, db)
+        if not credit_currency:
+            from app.i18n.envelope import envelope_exception
+            from app.i18n.error_codes import ErrorCode
+
+            raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity="Credit currency")
+
+        # Force pending status on insert (same policy as POST /restaurants)
+        payload["status"] = "pending"
+
+        restaurant = restaurant_service.create(payload, db, scope=None, commit=False)
+        if not restaurant:
+            db.rollback()
+            from app.i18n.envelope import envelope_exception
+            from app.i18n.error_codes import ErrorCode
+
+            raise envelope_exception(ErrorCode.RESTAURANT_CREATION_FAILED, status=500, locale="en")
+
+        balance_created = restaurant_balance_service.create_balance_record(
+            restaurant.restaurant_id,
+            entity.currency_metadata_id,
+            currency_code=credit_currency.currency_code,
+            modified_by=current_user["user_id"],
+            db=db,
+            commit=False,
+        )
+        if not balance_created:
+            db.rollback()
+            from app.i18n.envelope import envelope_exception
+            from app.i18n.error_codes import ErrorCode
+
+            raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_CREATION_FAILED, status=500, locale="en")
+
+        db.commit()
+        from app.services.address_service import update_address_type_from_linkages
+
+        update_address_type_from_linkages(restaurant.address_id, db)
+        log_info(f"Upsert inserted restaurant {restaurant.restaurant_id} with canonical_key '{key}'")
+        return RestaurantResponseSchema(**_restaurant_to_response(restaurant, db))
+
+    return handle_business_operation(_upsert, "restaurant upsert by canonical key")
 
 
 @router.put("/{restaurant_id}", response_model=RestaurantResponseSchema)

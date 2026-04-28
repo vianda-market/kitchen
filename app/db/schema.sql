@@ -2767,6 +2767,7 @@ CREATE TABLE IF NOT EXISTS ops.restaurant_info (
     location geometry(Point, 4326),
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'pending'::status_enum,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -2837,6 +2838,11 @@ COMMENT ON COLUMN ops.restaurant_info.modified_by IS
     'FK to core.user_info. Last user to update this restaurant record.';
 COMMENT ON COLUMN ops.restaurant_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN ops.restaurant_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture restaurants '
+    '(e.g. ''E2E_RESTAURANT_CAMBALACHE''). Used by the '
+    'PUT /api/v1/restaurants/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc restaurants created via the normal POST endpoint.';
 
 \echo 'Creating table: audit.restaurant_history'
 CREATE TABLE IF NOT EXISTS audit.restaurant_history (

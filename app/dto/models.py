@@ -280,6 +280,7 @@ class RestaurantDTO(BaseModel):
     # which explicitly project ST_AsGeoJSON(r.location)::jsonb → dict.
     is_archived: bool = False
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
