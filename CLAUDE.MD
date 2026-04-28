@@ -18,6 +18,7 @@ Update `CLAUDE_ARCHITECTURE.MD` after adding new modules, tables, services, rout
 - **Merge without forgetting the `deploy:dev` label.** `.github/workflows/deploy.yml` triggers on PR-merge ONLY when the PR carries the `deploy:dev` label. Without it, the workflow runs but short-circuits with `skipped` — code lands on main but does NOT ship to dev. Before merging any PR intended for dev: `gh pr edit <number> --repo vianda-market/kitchen --add-label deploy:dev` (or use the GitHub UI sidebar). To deploy already-merged code that missed the label: Actions tab → "Deploy Kitchen Backend" → "Run workflow" → select branch `main` (or specific SHA) and add a 1-line reason. To verify a merge shipped: `gh run list --repo vianda-market/kitchen --workflow=deploy.yml --limit 5 --json conclusion,event,headBranch,createdAt,databaseId` — look for `success` (deployed) vs `skipped` (label missing). (Caught 2026-04-27: PRs #160 uvicorn, #161 arq, #163 pydantic-settings all merged without label and sat undeployed until manual `workflow_dispatch`. Operational doc: `~/learn/vianda/docs/commands/kitchen_smoketest.md`.)
 
 ## Essential Commands
+- **Full local gate sweep:** `bash scripts/verify.sh` — mirrors every required CI gate exactly. **Run before every push.** Use `--fast` to skip pytest+newman, `--gate <name>` to run one gate.
 - **Apply migrations:** `bash app/db/migrate.sh` (incremental — preserves data)
 - **Rebuild DB (fresh):** `bash app/db/build_kitchen_db.sh` (full tear-down — use for new environments or clean reset only)
 - **Import check:** `python3 -c "from application import app; print('OK')"`
@@ -111,6 +112,8 @@ bash scripts/run_dev_quiet.sh
 ```
 
 Requires `newman` (`npm install -g newman`). The CI environment file is `docs/postman/environments/ci.postman_environment.json` — if your collection's pre-request scripts depend on env vars (e.g. `superAdminUsername`, `superAdminPassword`), confirm they exist in `ci.postman_environment.json` AND that your local environment provides matching values, otherwise CI will diverge from local. Fixing a Newman failure on CI without first reproducing it locally is the wrong order — reproduce, fix, verify locally, then push.
+
+Newman is one of the gates `scripts/verify.sh` runs; when only the postman collection changed, you can run `bash scripts/verify.sh --gate newman` instead of the full sweep.
 
 ## Key Entry Points
 - **Route registration:** `application.py`
