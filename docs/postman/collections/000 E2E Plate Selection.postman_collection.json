@@ -2746,6 +2746,7 @@
                   "let payload = JSON.parse(raw);",
                   "payload.product_id  = pm.collectionVariables.get('productId');",
                   "payload.restaurant_id = pm.collectionVariables.get('restaurantId');",
+                  "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
                   "pm.request.body.update(JSON.stringify(payload));",
                   "console.log('Using product_id:', payload.product_id, 'restaurant_id:', payload.restaurant_id);"
                 ],
