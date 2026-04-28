@@ -81,6 +81,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_institution_info_canonical_key
     ON core.institution_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc markets)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_market_info_canonical_key
+    ON core.market_info (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_history_subscription_id ON audit.subscription_history(subscription_id);
 
 CREATE INDEX IF NOT EXISTS idx_client_bill_history_client_bill_id ON audit.client_bill_history(client_bill_id);

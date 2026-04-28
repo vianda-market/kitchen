@@ -3219,6 +3219,7 @@ class MarketResponseSchema(BaseModel):
     tax_id_example: str | None = Field(
         None, description="Example tax ID in raw digits for placeholder text (e.g. '123456789')."
     )
+    canonical_key: str | None = Field(None, description="Stable seed/fixture identifier. Null for ad-hoc markets.")
     is_archived: bool = Field(..., description="Whether this market is archived")
     status: Status = Field(..., description="Market status (Active/Inactive)")
     created_date: datetime = Field(..., description="When this market was created")
@@ -3560,6 +3561,62 @@ class MarketUpdateSchema(BaseModel):
     @field_validator("language")
     @classmethod
     def validate_market_language_update(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        allowed = tuple(settings.SUPPORTED_LOCALES)
+        if v not in allowed:
+            raise I18nValueError("validation.market.language_unsupported", language=v, allowed=", ".join(allowed))
+        return v
+
+
+class MarketUpsertByKeySchema(BaseModel):
+    """Schema for idempotent market upsert by canonical_key.
+
+    If a market with the given canonical_key already exists it is updated
+    in-place; otherwise a new market is inserted with that canonical_key.
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc market creation (use POST /markets instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``country_code`` is locked after insert and
+    ignored on the update path (each market has a unique country_code that
+    must not change).
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_MARKET_AR'",
+    )
+    country_code: str = Field(
+        ...,
+        description="ISO 3166-1 alpha-2 or alpha-3 (e.g. AR, ARG). API normalizes to alpha-2.",
+        min_length=2,
+        max_length=3,
+    )
+    currency_metadata_id: UUID = Field(..., description="FK to core.currency_metadata")
+    language: str | None = Field(
+        None, min_length=2, max_length=5, description="Default UI locale: en, es, pt; derived from country if omitted"
+    )
+    phone_dial_code: str | None = Field(
+        None, max_length=6, description="E.164 dial code prefix (e.g. '+54'). Derived from country_code if omitted."
+    )
+    phone_local_digits: int | None = Field(
+        None, description="Max digits in the national number after the dial code (e.g. 10)."
+    )
+    status: Status = Status.ACTIVE
+
+    @field_validator("country_code")
+    @classmethod
+    def normalize_country_code_upsert(cls, v: str) -> str:
+        """Normalize country_code at API boundary (uppercase, max 2 chars)."""
+        return normalize_country_code(v) if v else v
+
+    @field_validator("language")
+    @classmethod
+    def validate_market_language_upsert(cls, v: str | None) -> str | None:
         if v is None:
             return v
         allowed = tuple(settings.SUPPORTED_LOCALES)

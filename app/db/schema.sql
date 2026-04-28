@@ -1684,6 +1684,7 @@ CREATE TABLE IF NOT EXISTS core.market_info (
     phone_local_digits SMALLINT NULL,                   -- Max national digits after dial code; UI maxLength hint e.g. 10
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    canonical_key VARCHAR(200) NULL,                    -- Optional stable seed/fixture identifier (e.g. 'E2E_MARKET_AR')
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1729,6 +1730,11 @@ COMMENT ON COLUMN core.market_info.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.market_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.market_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture markets '
+    '(e.g. ''E2E_MARKET_AR''). Used by the PUT /api/v1/markets/by-key upsert endpoint '
+    'to make Postman seed runs idempotent. NULL for ad-hoc markets created via the '
+    'normal POST endpoint. Unique when not null (enforced by partial index uq_market_info_canonical_key).';
 
 -- Add foreign key constraint from core.address_info to external.geonames_country (deferred until external schema + all tables exist)
 \echo 'Adding foreign key: core.address_info.country_code -> external.geonames_country.iso_alpha2'

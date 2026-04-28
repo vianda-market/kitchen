@@ -1,6 +1,6 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), and **institutions** (issue #190).
+Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), and **markets** (issue #190).
 
 ## Overview
 
@@ -424,6 +424,109 @@ See "Upsert Canonical Supplier Institution (idempotent)" in
 
 ---
 
+## Markets — `PUT /api/v1/markets/by-key`
+
+```http
+PUT /api/v1/markets/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc market creation.
+Auth: Internal only. Returns 403 for Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_MARKET_AR` |
+| `country_code` | string (2-3 chars) | yes | ISO 3166-1 alpha-2 or alpha-3; API normalizes to alpha-2. **Immutable after INSERT.** |
+| `currency_metadata_id` | UUID | yes | FK to `core.currency_metadata` |
+| `language` | string (2-5 chars) | no | Default UI locale: `en`, `es`, `pt`. Derived from country_code if omitted. |
+| `phone_dial_code` | string (<=6 chars) | no | E.164 dial code prefix (e.g. `+54`) |
+| `phone_local_digits` | int | no | Max digits in national number after dial code (e.g. 10) |
+| `status` | string | no | `active` (default) or `inactive` |
+
+Response body is `MarketResponseSchema` (same shape as `GET /api/v1/markets/{market_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new market row is created and the corresponding
+  `billing.market_payout_aggregator` record is created atomically (same
+  transaction as `POST /markets`). `canonical_key` is set on the new row.
+- **UPDATE path**: only the market row is updated. `country_code` is stripped
+  — it is immutable after creation and cannot change via this endpoint.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `country_code` — each market is keyed by country; cannot change after creation
+
+### canonical_key convention for markets
+
+```
+E2E_MARKET_{ISO2_CODE}
+```
+
+Examples:
+- `E2E_MARKET_AR` — Argentina E2E fixture market
+- `E2E_MARKET_US` — US E2E fixture market
+
+### System market skip list
+
+The `scripts/cleanup_duplicate_markets.py` script hard-skips the following
+market IDs and will **never** archive them, regardless of duplication:
+
+| Market ID | Country | Reason |
+|---|---|---|
+| `00000000-0000-0000-0000-000000000001` | Global (XG) | Sentinel global market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000002` | Argentina (AR) | Canonical AR market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000003` | Peru (PE) | Canonical PE market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000004` | US | Canonical US market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000005` | Chile (CL) | Canonical CL market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000006` | Mexico (MX) | Canonical MX market, seeded in `reference_data.sql` |
+| `00000000-0000-0000-0000-000000000007` | Brazil (BR) | Canonical BR market, seeded in `reference_data.sql` |
+
+Add entries to `SYSTEM_MARKET_SKIP_LIST` in `cleanup_duplicate_markets.py` when
+new system/sentinel markets are added.
+
+### Postman pre-request script
+
+`PUT /markets/by-key` is Internal-only. The "Upsert Canonical Market Argentina
+(idempotent)" step runs early in the E2E collection before any supplier login, so
+the super-admin token from "Login Super Admin" is already current in
+`pm.environment.get('authToken')`. No token swap is needed.
+
+The pre-request script reads `planCreditCurrencyId` from collection scope and
+injects it into the body payload before sending:
+
+```javascript
+// planCreditCurrencyId may be null if the 409 async fallback in 'Create Credit Currency'
+// has not completed yet. Fall back to the seeded ARS currency ID from reference_data.sql.
+const SEEDED_ARS_CURRENCY_ID = '66666666-6666-6666-6666-666666666601';
+const planCreditCurrencyId = pm.collectionVariables.get('planCreditCurrencyId')
+    || pm.environment.get('planCreditCurrencyId')
+    || SEEDED_ARS_CURRENCY_ID;
+let payload = JSON.parse(pm.request.body.raw);
+payload.currency_metadata_id = planCreditCurrencyId;
+pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });
+pm.request.body.update(JSON.stringify(payload));
+```
+
+See "Upsert Canonical Market Argentina (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (markets)
+
+- `core.market_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0007_market_canonical_key.sql`.
+- Partial index `uq_market_info_canonical_key` (sparse: only indexed when non-null).
+- `MarketResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
@@ -520,5 +623,19 @@ python scripts/cleanup_duplicate_institutions.py
 Institutions with a `canonical_key` are never touched by the cleanup script.
 System institutions (`SYSTEM_INSTITUTION_SKIP_LIST`) are always preserved
 regardless of duplication.
+
+### Markets
+
+```bash
+# Dry-run first:
+python scripts/cleanup_duplicate_markets.py --dry-run
+
+# Live run — archives duplicates, keeps the oldest row per country_code:
+python scripts/cleanup_duplicate_markets.py
+```
+
+Markets with a `canonical_key` are never touched by the cleanup script.
+System markets in `SYSTEM_MARKET_SKIP_LIST` (all 7 seeded markets) are always
+preserved regardless of duplication.
 
 All scripts are idempotent: running again after a clean state does nothing.
