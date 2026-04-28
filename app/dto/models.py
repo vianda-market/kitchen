@@ -114,6 +114,7 @@ class ProductDTO(BaseModel):
     image_thumbnail_url: str
     image_thumbnail_storage_path: str
     image_checksum: str
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID

@@ -1697,7 +1697,7 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"address_id\");",
                   "",
-                  "    // persist it to this collection’s variables",
+                  "    // persist it to this collection's variables",
                   "    pm.collectionVariables.set(\"supplierAddressId\", body.address_id);",
                   "    pm.environment.set(\"supplierAddressId\", body.address_id);",
                   "    pm.globals.set(\"supplierAddressId\", body.address_id);",
@@ -2528,28 +2528,41 @@
           "response": []
         },
         {
-          "name": "Register Supplier Product",
+          "name": "Upsert Canonical Supplier Product (idempotent)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// 1) grab the raw JSON you just typed",
+                  "// PUT /products/by-key requires Internal auth.",
+                  "// At this point pm.environment.get('authToken') holds the *supplier* token",
+                  "// set by 'Login Supplier Admin' above.  pm.collectionVariables.get('authToken')",
+                  "// still holds the super-admin token — collection scope is not overwritten by",
+                  "// Login Supplier Admin.",
+                  "//",
+                  "// Fix (synchronous — no pm.sendRequest):",
+                  "//   1. Read the admin token from the collection scope.",
+                  "//   2. Temporarily write it to the environment scope so {{authToken}}",
+                  "//      resolves to the admin token when collection-level bearer auth fires.",
+                  "//   3. The test script restores {{authToken}} to the supplier token.",
+                  "const adminToken = pm.collectionVariables.get('authToken');",
+                  "if (!adminToken) {",
+                  "    throw new Error('adminToken not found in collection variables. Ensure Login Super Admin ran and called pm.collectionVariables.set(authToken, ...).');",
+                  "}",
+                  "// Elevate admin token to environment scope so bearer auth uses it",
+                  "pm.environment.set('authToken', adminToken);",
+                  "console.log('Temporarily set authToken to admin token for Upsert Canonical Supplier Product');",
+                  "",
+                  "// Inject institution_id from collection variables",
+                  "const institutionId = pm.collectionVariables.get('institutionId');",
+                  "if (!institutionId) throw new Error('Missing institutionId in collectionVariables.');",
+                  "",
                   "let raw = pm.request.body.raw;",
-                  "",
-                  "// 2) parse it so we can update fields",
                   "let payload = JSON.parse(raw);",
-                  "",
-                  "// 3) pull the UUIDs (no quotes) from your collection variables",
-                  "payload.institution_id = pm.collectionVariables.get(\"institutionId\");",
-                  "",
-                  "// 4) ensure this goes out as JSON",
-                  "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });",
-                  "",
-                  "// 5) overwrite the body with the new, merged JSON",
+                  "payload.institution_id = institutionId;",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
                   "pm.request.body.update(JSON.stringify(payload));",
-                  "",
-                  ""
+                  "console.log('Upserting canonical supplier product with institution_id:', institutionId);"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -2559,13 +2572,36 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Created product\", () => {",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property(\"product_id\");",
+                  "// Upsert returns 200 whether inserting or updating",
+                  "pm.test('Upsert Product - Status 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
                   "",
-                  "    // persist it to this collection’s variables",
-                  "    pm.collectionVariables.set(\"productId\", body.product_id);",
-                  "});"
+                  "const body = pm.response.json();",
+                  "pm.test('Upserted product has product_id', () => {",
+                  "    pm.expect(body).to.have.property('product_id');",
+                  "    pm.expect(body.product_id).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('canonical_key echoed back', () => {",
+                  "    pm.expect(body.canonical_key).to.equal('E2E_PRODUCT_BIG_BURGUER');",
+                  "});",
+                  "",
+                  "// Persist productId for the downstream plate upsert step",
+                  "pm.collectionVariables.set('productId', body.product_id);",
+                  "pm.environment.set('productId', body.product_id);",
+                  "pm.globals.set('productId', body.product_id);",
+                  "console.log('Set productId:', body.product_id);",
+                  "",
+                  "// Restore supplier token: the pre-request elevated authToken to the admin token.",
+                  "// Downstream steps in 'Supplier Menu Setup' expect the supplier token.",
+                  "const supplierToken = pm.environment.get('supplierAuthToken') || pm.globals.get('supplierAuthToken');",
+                  "if (supplierToken) {",
+                  "    pm.environment.set('authToken', supplierToken);",
+                  "    console.log('Restored authToken to supplier token after Upsert Canonical Supplier Product');",
+                  "} else {",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
+                  "}"
                 ],
                 "type": "text/javascript",
                 "packages": {}
@@ -2573,11 +2609,11 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"institution_id\": \"\",\n    \"name\": \"Green Salad with Chicken\"\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_PRODUCT_BIG_BURGUER\",\n    \"institution_id\": \"\",\n    \"name\": \"Big Burguer\",\n    \"description\": \"Juicy beef burger with lettuce, tomato and special sauce\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2585,14 +2621,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/products",
+              "raw": "{{baseUrl}}/api/v1/products/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "products"
+                "products",
+                "by-key"
               ]
             }
           },
@@ -3779,7 +3816,7 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"address_id\");",
                   "",
-                  "    // persist it to this collection’s variables",
+                  "    // persist it to this collection's variables",
                   "    pm.collectionVariables.set(\"customerAddressId\", body.address_id);",
                   "    pm.environment.set(\"customerAddressId\", body.address_id);",
                   "    pm.globals.set(\"customerAddressId\", body.address_id);",

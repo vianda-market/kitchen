@@ -3043,6 +3043,7 @@ CREATE TABLE IF NOT EXISTS ops.product_info (
     image_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
     image_thumbnail_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
     image_thumbnail_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -3095,6 +3096,11 @@ COMMENT ON COLUMN ops.product_info.modified_by IS
     'FK to core.user_info. Last user to update this product record.';
 COMMENT ON COLUMN ops.product_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN ops.product_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture products '
+    '(e.g. ''E2E_PRODUCT_BIG_BURGUER''). Used by the '
+    'PUT /api/v1/products/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc products created via the normal POST endpoint.';
 
 \echo 'Creating table: audit.product_history'
 CREATE TABLE IF NOT EXISTS audit.product_history (
