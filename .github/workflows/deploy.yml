@@ -65,7 +65,7 @@ jobs:
       # ───── In-progress PR marker (PR-merge path only) ─────
       - name: Post in-progress deploy marker
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- cloud-run-deploy-dev -->';
@@ -150,7 +150,7 @@ jobs:
       # ───── Final PR marker (success or failure) ─────
       - name: Post final deploy marker
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- cloud-run-deploy-dev -->';
