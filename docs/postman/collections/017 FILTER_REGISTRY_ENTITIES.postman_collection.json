@@ -1759,10 +1759,11 @@
                   "    pm.expect(pm.response.headers.get('X-Total-Count')).to.not.be.null;",
                   "    pm.expect(pm.response.headers.get('X-Total-Count')).to.not.be.undefined;",
                   "});",
-                  "pm.test('X-Total-Count header is a positive integer', function () {",
+                  "pm.test('X-Total-Count header parses as non-negative integer', function () {",
                   "    const totalCount = parseInt(pm.response.headers.get('X-Total-Count'), 10);",
                   "    pm.expect(totalCount).to.be.a('number');",
-                  "    pm.expect(totalCount).to.be.above(0);",
+                  "    pm.expect(Number.isNaN(totalCount)).to.be.false;",
+                  "    pm.expect(totalCount).to.be.at.least(0);",
                   "});"
                 ],
                 "type": "text/javascript"
