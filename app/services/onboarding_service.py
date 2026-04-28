@@ -50,7 +50,7 @@ SELECT
     ) AS has_active_entity_with_payouts,
     EXISTS(
         SELECT 1 FROM ops.restaurant_info
-        WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
+        WHERE institution_id = %(iid)s AND status IN ('pending', 'active') AND NOT is_archived
     ) AS has_active_restaurant,
     EXISTS(
         SELECT 1 FROM ops.product_info
@@ -357,7 +357,7 @@ WHERE i.institution_type = %(inst_type)s
 _SUPPLIER_SUMMARY_CHECKLIST = """
     EXISTS(SELECT 1 FROM core.address_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_address,
     EXISTS(SELECT 1 FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived AND payout_onboarding_status = 'complete') AS has_active_entity_with_payouts,
-    EXISTS(SELECT 1 FROM ops.restaurant_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_restaurant,
+    EXISTS(SELECT 1 FROM ops.restaurant_info WHERE institution_id = i.institution_id AND status IN ('pending', 'active') AND NOT is_archived) AS has_active_restaurant,
     EXISTS(SELECT 1 FROM ops.product_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_product,
     EXISTS(SELECT 1 FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND p.status = 'active' AND NOT p.is_archived) AS has_active_plate,
     EXISTS(SELECT 1 FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND pkd.status = 'active' AND NOT pkd.is_archived) AS has_active_kitchen_day,

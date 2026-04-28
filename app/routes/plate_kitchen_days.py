@@ -17,10 +17,12 @@ from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
+    PlateKitchenDayCreateResponseSchema,
     PlateKitchenDayCreateSchema,
     PlateKitchenDayEnrichedResponseSchema,
     PlateKitchenDayResponseSchema,
     PlateKitchenDayUpdateSchema,
+    RestaurantActivatedSchema,
 )
 from app.security.entity_scoping import ENTITY_PLATE_KITCHEN_DAYS, EntityScopingService
 from app.security.institution_scope import InstitutionScope
@@ -188,7 +190,7 @@ def get_plate_kitchen_day(
     return kitchen_day
 
 
-@router.post("", response_model=list[PlateKitchenDayResponseSchema], status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PlateKitchenDayCreateResponseSchema, status_code=status.HTTP_201_CREATED)
 def create_plate_kitchen_day(
     payload: PlateKitchenDayCreateSchema,
     current_user: dict = Depends(get_current_user),
@@ -203,7 +205,8 @@ def create_plate_kitchen_day(
 
     After successful creation, attempts lazy restaurant activation: if the restaurant
     is 'pending' and all activation prereqs are now met, it is promoted to 'active'
-    silently (no event, no notification).
+    silently. The ``restaurant_activated`` field in the response is populated when
+    activation fires, null otherwise.
     """
     scope = _get_scope_for_entity(current_user)
 
@@ -256,14 +259,19 @@ def create_plate_kitchen_day(
         log_info(f"Created {len(created_days)} kitchen days for plate {payload.plate_id}")
         return created_days
 
-    result = handle_business_operation(create_operation, "create plate kitchen days", None, db)
+    items = handle_business_operation(create_operation, "create plate kitchen days", None, db)
 
     # Lazy activation: best-effort, must not fail the HTTP response.
     # db_batch_insert already committed; this runs in a new implicit transaction.
+    activated: RestaurantActivatedSchema | None = None
     try:
-        promoted = maybe_activate_restaurant(restaurant_id, db)
-        if promoted:
+        activation_result = maybe_activate_restaurant(restaurant_id, db)
+        if activation_result is not None:
             db.commit()
+            activated = RestaurantActivatedSchema(
+                restaurant_id=activation_result["id"],
+                name=activation_result["name"],
+            )
     except Exception as _exc:
         log_error(f"Lazy activation check failed for restaurant {restaurant_id}: {_exc}")
         try:
@@ -271,7 +279,7 @@ def create_plate_kitchen_day(
         except Exception:
             pass
 
-    return result
+    return PlateKitchenDayCreateResponseSchema(items=items, restaurant_activated=activated)
 
 
 @router.put("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)

@@ -87,7 +87,7 @@ These are checked in dependency order — `next_step` returns the first `false`:
 |-----|---------------|-----------------|------------|
 | `has_active_address` | Active, non-archived address for the institution | `address` | — |
 | `has_active_entity_with_payouts` | Active entity with `payout_onboarding_status = 'complete'` | `entity_payout_setup` | address |
-| `has_active_restaurant` | Active, non-archived restaurant | `restaurant` | address, entity |
+| `has_active_restaurant` | Non-archived restaurant in `pending` or `active` status — "usable" for nav gating (lazy-activation-aware; see note below) | `restaurant` | address, entity |
 | `has_active_product` | Active, non-archived product | `product` | — |
 | `has_active_plate` | Active plate linked to a restaurant | `plate` | restaurant, product |
 | `has_active_kitchen_day` | Active kitchen day on a plate | `kitchen_day` | plate |
@@ -142,6 +142,10 @@ const nav = {
   "QR Codes":     data.checklist.has_active_restaurant,
 };
 ```
+
+### Note on `has_active_restaurant` and lazy activation
+
+`has_active_restaurant` counts any non-archived restaurant with `status IN ('pending', 'active')`. A restaurant starts in `pending` status and is promoted to `active` lazily once plate_kitchen_days and a QR code exist (see `RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md`). The checklist uses the broader "usable" definition so that the **Plates** and **QR Codes** nav items unlock as soon as a restaurant record exists — the supplier doesn't need to manually activate it first.
 
 ### 4. Regression Handling
 

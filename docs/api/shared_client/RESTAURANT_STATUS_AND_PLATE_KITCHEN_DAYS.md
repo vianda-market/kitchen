@@ -11,7 +11,7 @@ This document describes how restaurant **status**, **plate_kitchen_days**, and *
 - A restaurant is created with status **Pending**.
 - It can be set to **Active** only when it has (1) at least one non-archived plate with at least one **active** plate_kitchen_days row (non-archived and status Active), **and** (2) at least one non-archived QR code with **status = "Active"**; otherwise the update API returns **400**.
 - It can be set to **Inactive** at any time (no validation).
-- **Lazy activation (kitchen#123):** When a `plate_kitchen_days` row is created OR a QR code is provisioned for a `pending` restaurant, the backend checks whether all prerequisites are now met. If yes, the restaurant is automatically promoted from `pending` to `active`. This promotion is **one-way only** (no auto-demotion) and **silent** (no event, no email, no audit row).
+- **Lazy activation (kitchen#123):** When a `plate_kitchen_days` row is created OR a QR code is provisioned for a `pending` restaurant, the backend checks whether all prerequisites are now met. If yes, the restaurant is automatically promoted from `pending` to `active`. This promotion is **one-way only** (no auto-demotion) and **silent** (no event, no email, no audit row). When activation fires, the mutation response includes a `restaurant_activated` envelope — see [Response field: `restaurant_activated`](#response-field-restaurant_activated) below.
 - If all **active** plate_kitchen_days for a restaurant are removed (archived, deleted, or set to non-Active status), the system **automatically** sets that restaurant’s status to **Inactive**.
 - If all **active** QR codes for a restaurant are removed (archived, deleted, or set to non-Active status), the system **automatically** sets that restaurant’s status to **Inactive**.
 - **Leads and Explorer** endpoints return only restaurants that (a) have at least one **active** plate_kitchen_day, (b) have at least one **active** QR code, and (c) have **status = Active**, so metrics and lists are accurate.
@@ -100,6 +100,96 @@ So Pending or Inactive restaurants, or restaurants with no **active** plate_kitc
 - The `is_ready_for_signup` field should be the primary signal for admin UI readiness indicators, not `market.status` or `restaurant.status` alone.
 
 See [API_CLIENT_QR_CODES.md](../b2b_client/API_CLIENT_QR_CODES.md) for QR code create flow and display options (print vs screen).
+
+---
+
+## Response field: `restaurant_activated`
+
+**Applies to:** `POST /api/v1/plate-kitchen-days` and `POST /api/v1/qr-codes`.
+
+Both mutation endpoints now include `restaurant_activated` in their responses. This field allows the frontend to detect when lazy activation fires and show a contextual toast or progress update.
+
+### Shape
+
+```json
+{
+  "restaurant_activated": {
+    "restaurant_id": "<uuid>",
+    "name": "La Cocina"
+  }
+}
+```
+
+When lazy activation does **not** fire (restaurant was already active, or not all prereqs are yet met):
+
+```json
+{
+  "restaurant_activated": null
+}
+```
+
+The field is **always present** in the response (never missing) — `null` means no activation, object means activation fired.
+
+### POST /api/v1/plate-kitchen-days response shape
+
+The create endpoint now returns a wrapper object instead of a bare array:
+
+```json
+{
+  "items": [
+    { "plate_kitchen_day_id": "...", "plate_id": "...", "kitchen_day": "monday", ... }
+  ],
+  "restaurant_activated": {
+    "restaurant_id": "<uuid>",
+    "name": "My Restaurant"
+  }
+}
+```
+
+`items` contains the list of created records (same shape as before). `restaurant_activated` is `null` when activation did not fire.
+
+**CONTRACT CHANGE:** The `POST /plate-kitchen-days` response shape changed from `list[PlateKitchenDayResponseSchema]` (bare array) to `PlateKitchenDayCreateResponseSchema` (object with `items` array + `restaurant_activated`). Frontend consumers must update their response parsing.
+
+### POST /api/v1/qr-codes response shape
+
+The `QRCodeResponseSchema` gains an optional `restaurant_activated` field (always present, `null` when no activation):
+
+```json
+{
+  "qr_code_id": "...",
+  "restaurant_id": "...",
+  "qr_code_payload": "...",
+  "qr_code_image_url": "...",
+  "image_storage_path": "...",
+  "is_archived": false,
+  "status": "active",
+  "created_date": "...",
+  "modified_date": "...",
+  "restaurant_activated": {
+    "restaurant_id": "<uuid>",
+    "name": "My Restaurant"
+  }
+}
+```
+
+`GET`, `PUT`, `DELETE` responses for QR codes also include `restaurant_activated: null` as it is part of the schema. Clients should treat it as `null` on non-create operations.
+
+---
+
+## Checklist semantic: `has_active_restaurant` (lazy-activation-aware)
+
+The supplier onboarding checklist field `has_active_restaurant` (returned by `GET /institutions/{id}/onboarding-status`) has been redefined to avoid a circular dependency introduced by lazy activation:
+
+| Version | Definition |
+|---------|-----------|
+| Before kitchen #172 follow-up | `≥1 restaurant with status = 'active' AND is_archived = false` |
+| After (current) | `≥1 restaurant with status IN ('pending', 'active') AND is_archived = false` |
+
+**Rationale:** With lazy activation, a restaurant starts `pending` and only becomes `active` after plate_kitchen_days AND a QR code exist. The checklist gates the "Plates" and "QR Codes" nav items on `has_active_restaurant`. Under the old definition, suppliers couldn't see those nav items until after the restaurant was active — but the restaurant can only become active via those very routes. The new definition counts `pending` as "usable" for navigation gating purposes.
+
+**Field name unchanged:** The field is still called `has_active_restaurant`. "Active" in this context means "usable" (non-archived and in pending or active state), not strictly `status = 'active'`.
+
+**No regression:** Restaurants already in `active` status are still counted (the `IN ('pending', 'active')` clause includes `active`).
 
 ## For B2C clients
 
