@@ -3293,6 +3293,7 @@ CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -3300,6 +3301,7 @@ CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
     FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE CASCADE,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
     -- Uniqueness (plate_id, kitchen_day) enforced only for non-archived rows via partial unique index in index.sql
+    -- canonical_key uniqueness enforced via uq_plate_kitchen_days_canonical_key partial index in index.sql
 );
 
 COMMENT ON TABLE ops.plate_kitchen_days IS
@@ -3317,6 +3319,10 @@ COMMENT ON COLUMN ops.plate_kitchen_days.status IS
     'Lifecycle status (status_enum). Inactive rows are excluded from available-day lookups.';
 COMMENT ON COLUMN ops.plate_kitchen_days.is_archived IS
     'Soft-delete tombstone. Archived scheduling rows are ignored by the explore and selection flows.';
+COMMENT ON COLUMN ops.plate_kitchen_days.canonical_key IS
+    'Optional stable identifier for seed/fixture rows managed by PUT /plate-kitchen-days/by-key. '
+    'NULL for ad-hoc rows created by suppliers. When set, must be UPPER_SNAKE_CASE and unique '
+    'across all non-NULL rows (enforced by the uq_plate_kitchen_days_canonical_key partial index).';
 COMMENT ON COLUMN ops.plate_kitchen_days.created_date IS
     'UTC timestamp when the scheduling row was first inserted.';
 COMMENT ON COLUMN ops.plate_kitchen_days.created_by IS
@@ -3334,6 +3340,7 @@ CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,

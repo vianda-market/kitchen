@@ -12,7 +12,7 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.auth.dependencies import get_current_user, get_resolved_locale
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -22,13 +22,18 @@ from app.schemas.consolidated_schemas import (
     PlateKitchenDayEnrichedResponseSchema,
     PlateKitchenDayResponseSchema,
     PlateKitchenDayUpdateSchema,
+    PlateKitchenDayUpsertByKeySchema,
     RestaurantActivatedSchema,
 )
 from app.security.entity_scoping import ENTITY_PLATE_KITCHEN_DAYS, EntityScopingService
 from app.security.institution_scope import InstitutionScope
 from app.security.scoping import resolve_institution_filter
 from app.services.activation_service import maybe_activate_restaurant
-from app.services.crud_service import plate_kitchen_days_service, plate_service
+from app.services.crud_service import (
+    find_plate_kitchen_day_by_canonical_key,
+    plate_kitchen_days_service,
+    plate_service,
+)
 from app.services.entity_service import get_enriched_plate_kitchen_day_by_id, get_enriched_plate_kitchen_days
 from app.services.error_handling import handle_business_operation
 from app.utils.db import db_read
@@ -280,6 +285,140 @@ def create_plate_kitchen_day(
             pass
 
     return PlateKitchenDayCreateResponseSchema(items=items, restaurant_activated=activated)
+
+
+# PUT /plate-kitchen-days/by-key — idempotent upsert (seed/fixture endpoint).
+# MUST be registered before PUT /{kitchen_day_id} so the static segment "by-key"
+# wins over the UUID path parameter (FastAPI evaluates in registration order).
+@router.put("/by-key", response_model=PlateKitchenDayResponseSchema, status_code=200)
+def upsert_plate_kitchen_day_by_key(
+    upsert_data: PlateKitchenDayUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),  # Internal-only
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> PlateKitchenDayResponseSchema:
+    """Idempotent upsert a plate kitchen day by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc kitchen day creation
+    (use POST /plate-kitchen-days instead).
+
+    Plate kitchen days are unique by (plate_id, kitchen_day).  If a row with the
+    given canonical_key already exists it is updated in-place; otherwise a new
+    row is inserted.
+
+    Immutable fields on UPDATE:
+        - ``plate_id`` — FK to the plate; cannot change after creation.
+        - ``kitchen_day`` — the weekday this row represents; cannot change after
+          creation.  Archive the old row and create a new canonical row to change
+          either of these.
+
+    Auth: Internal only (get_employee_user dependency).  Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+
+    def _upsert() -> PlateKitchenDayResponseSchema:
+        key = upsert_data.canonical_key
+        modified_by = current_user["user_id"]
+
+        existing = find_plate_kitchen_day_by_canonical_key(key, db)
+
+        if existing is not None:
+            # UPDATE path — plate_id and kitchen_day are immutable.
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE ops.plate_kitchen_days
+                       SET status = %s,
+                           canonical_key = %s,
+                           modified_by = %s::uuid,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE plate_kitchen_day_id = %s""",
+                    (
+                        upsert_data.status.value,
+                        key,
+                        str(modified_by),
+                        str(existing.plate_kitchen_day_id),
+                    ),
+                )
+            db.commit()
+            log_info(f"Upsert updated plate kitchen day {existing.plate_kitchen_day_id} with canonical_key '{key}'")
+            updated = plate_kitchen_days_service.get_by_id(existing.plate_kitchen_day_id, db)
+            if updated is None:
+                raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale="en")
+            return PlateKitchenDayResponseSchema.model_validate(updated)
+
+        # INSERT path.
+        # Validate that plate_id exists.
+        plate = plate_service.get_by_id(upsert_data.plate_id, db)
+        if plate is None:
+            raise envelope_exception(
+                ErrorCode.ENTITY_NOT_FOUND,
+                status=404,
+                locale="en",
+                entity="Plate",
+                id=str(upsert_data.plate_id),
+            )
+
+        # Check (plate_id, kitchen_day) uniqueness for non-archived rows.
+        if _check_unique_constraint(upsert_data.plate_id, upsert_data.kitchen_day.value, db):
+            # A non-canonical row already owns this slot.  Stamp it with the canonical_key
+            # instead of creating a duplicate — mirrors the markets "adopt existing" pattern.
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE ops.plate_kitchen_days
+                       SET canonical_key = %s,
+                           status = %s,
+                           modified_by = %s::uuid,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE plate_id = %s
+                         AND kitchen_day = %s
+                         AND is_archived = FALSE""",
+                    (
+                        key,
+                        upsert_data.status.value,
+                        str(modified_by),
+                        str(upsert_data.plate_id),
+                        upsert_data.kitchen_day.value,
+                    ),
+                )
+            db.commit()
+            log_info(
+                f"Upsert adopted existing plate kitchen day for "
+                f"plate {upsert_data.plate_id} / {upsert_data.kitchen_day.value} "
+                f"with canonical_key '{key}'"
+            )
+            adopted = find_plate_kitchen_day_by_canonical_key(key, db)
+            if adopted is None:
+                raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale="en")
+            return PlateKitchenDayResponseSchema.model_validate(adopted)
+
+        # No existing row — perform a clean insert.
+        with db.cursor() as cur:
+            cur.execute(
+                """INSERT INTO ops.plate_kitchen_days
+                       (plate_id, kitchen_day, status, canonical_key, is_archived,
+                        created_by, modified_by)
+                   VALUES (%s, %s, %s, %s, FALSE, %s::uuid, %s::uuid)
+                   RETURNING plate_kitchen_day_id""",
+                (
+                    str(upsert_data.plate_id),
+                    upsert_data.kitchen_day.value,
+                    upsert_data.status.value,
+                    key,
+                    str(modified_by),
+                    str(modified_by),
+                ),
+            )
+            row = cur.fetchone()
+        db.commit()
+        new_id = row["plate_kitchen_day_id"] if isinstance(row, dict) else row[0]
+        log_info(f"Upsert inserted plate kitchen day {new_id} with canonical_key '{key}'")
+        created = plate_kitchen_days_service.get_by_id(new_id, db)
+        if created is None:
+            raise envelope_exception(ErrorCode.PLATE_KITCHEN_DAY_NOT_FOUND, status=404, locale="en")
+        return PlateKitchenDayResponseSchema.model_validate(created)
+
+    return handle_business_operation(_upsert, "plate kitchen day upsert by canonical key")
 
 
 @router.put("/{kitchen_day_id}", response_model=PlateKitchenDayResponseSchema)

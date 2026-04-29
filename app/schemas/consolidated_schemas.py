@@ -1393,9 +1393,42 @@ class PlateKitchenDayResponseSchema(BaseModel):
     kitchen_day: KitchenDay
     status: Status
     is_archived: bool
+    canonical_key: str | None = None
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlateKitchenDayUpsertByKeySchema(BaseModel):
+    """Schema for idempotent plate kitchen day upsert by canonical_key.
+
+    If a plate kitchen day with the given canonical_key already exists it is
+    updated in-place; otherwise a new row is inserted.  Use this endpoint for
+    Postman seed runs and fixture data — never for ad-hoc kitchen day creation
+    (use POST /plate-kitchen-days instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE:
+        - ``plate_id`` — FK to the plate; cannot change after creation.
+          To reassign a kitchen day to a different plate, archive the old row
+          and create a new one.
+        - ``kitchen_day`` — the weekday this row represents; cannot change after
+          creation.  To reassign the same plate to a different day, archive the
+          old row and create a new canonical row for the new day.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable identifier, e.g. 'E2E_PKD_CAMBALACHE_BONDIOLA_MONDAY'",
+    )
+    plate_id: UUID = Field(..., description="FK to ops.plate_info. Immutable after INSERT.")
+    kitchen_day: KitchenDay = Field(..., description="Weekday (Monday–Friday). Immutable after INSERT.")
+    status: Status = Status.ACTIVE
 
     model_config = ConfigDict(from_attributes=True)
 

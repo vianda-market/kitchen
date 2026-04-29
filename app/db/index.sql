@@ -97,6 +97,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_product_info_canonical_key
     ON ops.product_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc plate kitchen days)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plate_kitchen_days_canonical_key
+    ON ops.plate_kitchen_days (canonical_key)
+    WHERE canonical_key IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_history_subscription_id ON audit.subscription_history(subscription_id);
 
 CREATE INDEX IF NOT EXISTS idx_client_bill_history_client_bill_id ON audit.client_bill_history(client_bill_id);
