@@ -94,22 +94,16 @@ class TestLeadsCountriesResponseSchema:
     """Unit tests for the response envelope schema."""
 
     def test_schema_with_suggested_code(self):
-        schema = LeadsCountriesResponseSchema(
-            countries=_SAMPLE_COUNTRIES, suggested_country_code="AR"
-        )
+        schema = LeadsCountriesResponseSchema(countries=_SAMPLE_COUNTRIES, suggested_country_code="AR")
         assert schema.suggested_country_code == "AR"
         assert len(schema.countries) == 2
 
     def test_schema_with_null_suggested_code(self):
-        schema = LeadsCountriesResponseSchema(
-            countries=_SAMPLE_COUNTRIES, suggested_country_code=None
-        )
+        schema = LeadsCountriesResponseSchema(countries=_SAMPLE_COUNTRIES, suggested_country_code=None)
         assert schema.suggested_country_code is None
 
     def test_schema_countries_preserve_all_fields(self):
-        schema = LeadsCountriesResponseSchema(
-            countries=_SAMPLE_COUNTRIES, suggested_country_code=None
-        )
+        schema = LeadsCountriesResponseSchema(countries=_SAMPLE_COUNTRIES, suggested_country_code=None)
         first = schema.countries[0]
         assert first.code == "AR"
         assert first.currency == "ARS"
