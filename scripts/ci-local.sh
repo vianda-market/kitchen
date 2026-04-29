@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/verify.sh — full local gate sweep mirroring CI exactly.
+# scripts/ci-local.sh — full local gate sweep mirroring CI exactly.
 #
 # PURPOSE
 #   One command that runs every required gate CI runs, in CI's exact commands.
@@ -9,9 +9,9 @@
 #   agent reported "ruff: clean" — it only ran `ruff check`.
 #
 # USAGE
-#   bash scripts/verify.sh                  # full sweep (all gates)
-#   bash scripts/verify.sh --fast           # skip slow gates (pytest + newman)
-#   bash scripts/verify.sh --gate ruff-fmt  # run a single named gate
+#   bash scripts/ci-local.sh                  # full sweep (all gates)
+#   bash scripts/ci-local.sh --fast           # skip slow gates (pytest + newman)
+#   bash scripts/ci-local.sh --gate ruff-fmt  # run a single named gate
 #
 # GATE NAMES (for --gate)
 #   ruff-lint, ruff-fmt, mypy, lint-imports, complexity,
@@ -289,9 +289,9 @@ fi
 #
 # Requires: server running on KITCHEN_API_PORT (default 8000), newman globally.
 # Start server: bash run_dev_quiet.sh (in another terminal)
-# Newman reference: Newman is one of the gates scripts/verify.sh runs; when
+# Newman reference: Newman is one of the gates scripts/ci-local.sh runs; when
 # only the postman collection changed, you can run
-# `bash scripts/verify.sh --gate newman` instead of the full sweep.
+# `bash scripts/ci-local.sh --gate newman` instead of the full sweep.
 # ──────────────────────────────────────────────────────────────────────────────
 if [[ "$FAST" -eq 1 ]]; then
     skip_gate "newman" "--fast flag set"

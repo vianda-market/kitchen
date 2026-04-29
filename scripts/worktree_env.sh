@@ -18,7 +18,7 @@
 #   bash run_dev_quiet.sh
 #   ./scripts/run_newman.sh 000
 #
-#   # Option B — scripts/verify.sh auto-sources this file when $PWD matches
+#   # Option B — scripts/ci-local.sh auto-sources this file when $PWD matches
 #   # */.claude/worktrees/* so no manual step is needed for agent dispatches.
 #
 # DERIVATION CONTRACT

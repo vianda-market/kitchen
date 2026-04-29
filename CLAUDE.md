@@ -24,7 +24,7 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 
 ## Essential Commands
 
-Run `bash scripts/verify.sh` before every push — full local mirror of every required CI gate. Use `--fast` to skip pytest+newman, `--gate <name>` to run one gate.
+Run `bash scripts/ci-local.sh` before every push — full local mirror of every required CI gate. Use `--fast` to skip pytest+newman, `--gate <name>` to run one gate.
 
 For the full command catalogue (DB, tests, lint, type, quality gates, Newman, pre-commit setup), see [`docs/COMMANDS.md`](docs/COMMANDS.md).
 
@@ -104,7 +104,7 @@ Server-side pagination is opt-in per route — not all endpoints need it.
 
 ### Run Newman locally before pushing any PR that touches a Postman collection
 
-Reproduce Newman failures locally before pushing — never let CI catch them. Run `bash scripts/verify.sh --gate newman` when only the collection changed (skips the full sweep), or:
+Reproduce Newman failures locally before pushing — never let CI catch them. Run `bash scripts/ci-local.sh --gate newman` when only the collection changed (skips the full sweep), or:
 
 ```sh
 # Terminal 1 — start the API:
@@ -129,7 +129,7 @@ bash run_dev_quiet.sh            # starts API on the unique port
 ./scripts/run_newman.sh 000      # Newman hits the unique base URL
 ```
 
-`scripts/verify.sh` auto-sources `worktree_env.sh` when `$PWD` is inside `.claude/worktrees/*`. Multiple worktrees can verify Newman simultaneously without port or DB collisions. Human dev (main working tree, no worktree) is unchanged: port 8000, DB `kitchen`.
+`scripts/ci-local.sh` auto-sources `worktree_env.sh` when `$PWD` is inside `.claude/worktrees/*`. Multiple worktrees can verify Newman simultaneously without port or DB collisions. Human dev (main working tree, no worktree) is unchanged: port 8000, DB `kitchen`.
 
 Worktree DB creation is via Postgres TEMPLATE clone (~1-2 seconds, not a full rebuild). `worktree_env.sh` calls `scripts/refresh_db_template.sh`, which maintains a `kitchen_template` database — fully migrated, seeded, and upstream-synced. To force a refresh: `bash scripts/refresh_db_template.sh --force`. To rebuild a worktree DB with full migrations from scratch: `bash app/db/build_kitchen_db.sh --full`. To clean up orphaned worktree DBs: `bash scripts/cleanup_worktree_dbs.sh --execute`. References: issue #197 (port + DB env-var pattern), #199 (TEMPLATE-clone implementation).
 
