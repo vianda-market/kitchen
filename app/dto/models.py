@@ -414,6 +414,7 @@ class CreditCurrencyDTO(BaseModel):
     created_date: datetime
     modified_by: UUID
     modified_date: datetime
+    canonical_key: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
