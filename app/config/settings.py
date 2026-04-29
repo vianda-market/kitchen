@@ -4,9 +4,16 @@ from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Only load .env for local development. Cloud Run environments (dev/staging/prod) read
+# exclusively from the process environment injected by Cloud Run, never from a file.
+# This prevents any .env that accidentally leaks into the image from silently overriding
+# Cloud Run env vars (closes the root cause of issue #189).
+_ENVIRONMENT = (os.getenv("ENVIRONMENT") or "local").lower()
+_ENV_FILE = ".env" if _ENVIRONMENT == "local" else None
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int

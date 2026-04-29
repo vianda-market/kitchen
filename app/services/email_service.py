@@ -14,6 +14,17 @@ from app.services.email.template_renderer import render_email
 from app.utils.log import log_email_tracking
 
 
+def _is_local_environment() -> bool:
+    """Return True when running in a local development environment.
+
+    Mirrors the ENVIRONMENT convention used in app/config/settings.py and
+    app/config/settings.py:get_google_api_key().  When ENVIRONMENT is unset
+    the runtime is assumed to be a developer laptop (same default as pydantic-settings
+    env_file gating introduced in issue #189 fix).
+    """
+    return (os.getenv("ENVIRONMENT") or "local").lower() == "local"
+
+
 class EmailService:
     def __init__(self):
         self._provider = get_email_provider()
@@ -82,16 +93,21 @@ class EmailService:
         set_password_url_template: str | None = None,
         locale: str = "en",
     ) -> bool:
-        template = set_password_url_template or get_settings().B2B_INVITE_SET_PASSWORD_URL or ""
+        settings = get_settings()
+        template = set_password_url_template or settings.B2B_INVITE_SET_PASSWORD_URL or ""
         if template:
             set_password_url = template.replace("{code}", reset_code)
         else:
-            b2b_url = (get_settings().B2B_FRONTEND_URL or "").rstrip("/")
-            set_password_url = (
-                f"{b2b_url}/set-password?code={reset_code}"
-                if b2b_url
-                else f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
-            )
+            b2b_url = (settings.B2B_FRONTEND_URL or "").rstrip("/")
+            if b2b_url:
+                set_password_url = f"{b2b_url}/set-password?code={reset_code}"
+            elif _is_local_environment():
+                set_password_url = f"http://localhost:5173/set-password?code={reset_code}"
+            else:
+                raise RuntimeError(
+                    "B2B invite email cannot be sent: B2B_FRONTEND_URL (or B2B_INVITE_SET_PASSWORD_URL) "
+                    "is not configured. Set the environment variable on the Cloud Run service."
+                )
         first_name = user_first_name or "there"
         subject = get_message("email.subject_b2b_invite", locale)
         body_text, body_html = render_email(
@@ -119,11 +135,16 @@ class EmailService:
             set_password_url = template.replace("{code}", reset_code)
         else:
             b2b_url = (settings.B2B_FRONTEND_URL or "").rstrip("/")
-            set_password_url = (
-                f"{b2b_url}/set-password?code={reset_code}"
-                if b2b_url
-                else f"https://vianda-platform-dev.web.app/set-password?code={reset_code}"
-            )
+            if b2b_url:
+                set_password_url = f"{b2b_url}/set-password?code={reset_code}"
+            elif _is_local_environment():
+                set_password_url = f"http://localhost:5173/set-password?code={reset_code}"
+            else:
+                raise RuntimeError(
+                    "Benefit employee invite email cannot be sent: B2B_FRONTEND_URL (or "
+                    "BENEFIT_INVITE_SET_PASSWORD_URL / B2B_INVITE_SET_PASSWORD_URL) is not configured. "
+                    "Set the environment variable on the Cloud Run service."
+                )
         first_name = user_first_name or "there"
         subject = get_message("email.subject_benefit_invite", locale, employer_name=employer_name)
         body_text, body_html = render_email(
