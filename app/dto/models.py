@@ -1163,6 +1163,7 @@ class RestaurantHolidaysDTO(BaseModel):
     status: Status
     is_archived: bool
     source: str = Field(default="manual", max_length=20)
+    canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
