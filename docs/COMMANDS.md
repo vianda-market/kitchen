@@ -6,9 +6,9 @@ Quick-reference for every command an executor or contributor needs. CLAUDE.md li
 
 | Command | Purpose |
 |---|---|
-| `bash scripts/verify.sh` | Full local mirror of every required CI gate. Run before every push. |
-| `bash scripts/verify.sh --fast` | Skips pytest + newman; runs lint/format/typecheck-style gates. |
-| `bash scripts/verify.sh --gate <name>` | Run a single gate (e.g. `--gate newman`, `--gate mypy`). |
+| `bash scripts/ci-local.sh` | Full local mirror of every required CI gate. Run before every push. |
+| `bash scripts/ci-local.sh --fast` | Skips pytest + newman; runs lint/format/typecheck-style gates. |
+| `bash scripts/ci-local.sh --gate <name>` | Run a single gate (e.g. `--gate newman`, `--gate mypy`). |
 
 ## Database
 
