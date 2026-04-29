@@ -70,7 +70,7 @@ Full reference: `docs/api/internal/ROLE_BASED_ACCESS_CONTROL.md`.
 - **No trailing slash** on collection endpoints — `/entity-name`, not `/entity-name/`.
 - **In-memory caches** must have TTL/size eviction — never unbounded growth.
 - **Enriched endpoints** use SQL JOINs; only rename fields on real column collisions.
-- **Error handling:** Routes/CRUD → raise `HTTPException`. Internal lookups where "not found" is normal → return `None`.
+- **Error handling:** Routes/CRUD → raise `HTTPException`. Internal lookups where "not found" is normal → return `None`. 4xx raises must use `envelope_exception(ErrorCode.X, ...)` — bare-string `detail=` is a lint violation. 5xx raises are exempt: bare `HTTPException(status_code=500, detail=f"…{e}…")` is correct; the catch-all in `application.py` re-envelopes them as `server.internal_error` so `str(e)` never reaches the client. Never put `str(e)` or exception data in `params` of a 5xx `envelope_exception` call. → `docs/api/error-envelope.md#9-5xx-error-handling-decision-3-and-exception-message-redaction-decision-f`
 - **Schema field names:** Never use Python built-in type names as field names (`date`, `time`, `type`, `list`) — use `order_date`, `pickup_time`, etc.
 
 Details + examples: `docs/guidelines/CODE_CONVENTIONS.md`. Enriched endpoint pattern + field naming: `docs/guidelines/ENRICHED_ENDPOINTS.md`.

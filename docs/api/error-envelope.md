@@ -257,4 +257,76 @@ A separate sibling list of skipped collections (kitchen#79) covers PR #60 regres
 
 ---
 
-*Last updated: K5 — detailed Pydantic type→code mapping, `I18nValueError` subclass, domain-specific validation codes across all schema files. Next updates: K6..KN (HTTPException sweep), K-last (enforcement).*
+## 9. 5xx error handling (Decision 3) and exception-message redaction (Decision F)
+
+### Why 5xx sites are treated differently
+
+5xx errors are **operator-actionable, not user-actionable**. When a DB query fails or an unexpected exception escapes, there is nothing a user can do — the right audience for that information is ops (logs, alerting). Localizing 5xx messages would add catalog churn for strings no end user can act on. Worse, forwarding `str(e)` or traceback fragments to the client is a security and UX foot-gun: internal table names, SQL, stack paths, or exception details can leak sensitive system information.
+
+The architecture resolves both concerns in one step: let the catch-all handler in `application.py` re-envelope all 5xx responses as `server.internal_error`, so the client sees a generic, localized message regardless of what the original `detail` string said.
+
+### Decision 3 — 5xx raises are exempt from the bare-string lint
+
+Routes and services **may** raise `HTTPException(status_code=500, detail=f"…{e}…")` with a raw English f-string. The AST scan in `app/tests/i18n/test_no_bare_string_raises.py` filters via `_extract_status_code()` against `_5XX_RANGE = range(500, 600)` and skips those sites entirely. No `envelope_exception` wrapping is required for 5xx.
+
+Do **not** migrate existing 5xx f-string sites to `envelope_exception`. A future sweep that adds `envelope_exception(status=500, ...)` at these sites is wrong and must be reverted — see the context in this section for why.
+
+### The catch-all handler normalizes 5xx responses (Decision 3 continued)
+
+`_envelope_http_exception` in `application.py` intercepts all `StarletteHTTPException` instances. When `exc.status_code` is 5xx and the detail is a bare string, the handler replaces the original `detail` with the `server.internal_error` envelope. The client **never** sees the original f-string message — it receives the generic localized `server.internal_error` message only.
+
+The `server.internal_error` code maps to `ErrorCode.SERVER_INTERNAL_ERROR` (K9). Clients should display it as "Something went wrong. Please try again." (locale-resolved via `messages.py`).
+
+### Decision F — never put raw exception data into client-facing envelope `params`
+
+When writing a 5xx raise or a catch block that raises for the client:
+
+- **Log the detail server-side** via `log_error()` (or equivalent). This is where ops discovers the root cause.
+- **Raise the generic envelope** — either let the catch-all handle a bare 5xx f-string raise, or raise `envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)` with no `params`.
+- **Never** put `params={"reason": str(e)}`, `params={"detail": error_msg}`, or any traceback fragment into the `envelope_exception` call at a 5xx site. Such params flow through to the client response body, undoing the redaction that Decision 3 is designed to provide.
+
+Example of correct pattern:
+
+```python
+except Exception as e:
+    log_error(f"Failed to do X for {entity_id}: {e}")
+    raise HTTPException(status_code=500, detail=f"Failed to do X: {e}") from None
+    # Catch-all in application.py re-envelopes as server.internal_error — no leak.
+```
+
+Example of incorrect pattern (Decision F violation — do not copy):
+
+```python
+# WRONG: str(e) leaks to client via params
+raise envelope_exception(
+    ErrorCode.SOME_ERROR, status=500, locale=locale, reason=str(e)
+)
+```
+
+### Implication for future sweeps
+
+A `grep` for `HTTPException(.*detail=f"` in `app/` will return non-zero matches — that is intentional, not a sweep gap. Only 4xx f-string and bare-string sites are lint violations. The 5xx f-string sites are documented and expected.
+
+### Known 5xx f-string sites (as of K16)
+
+These sites are deliberately left as bare 5xx f-strings per Decision 3. Do not migrate them during future K-series sweeps:
+
+| File | Line | Detail |
+|------|------|--------|
+| `app/utils/db.py` | 812 | `"Error executing query: {e}"` |
+| `app/utils/db.py` | 929 | `"Error deleting record: {e}"` |
+| `app/services/enriched_service.py` | 159 | `"Failed to execute enriched query: {str(e)}"` |
+| `app/services/enriched_service.py` | 275 | `"Failed to get enriched {self.base_table}: {str(e)}"` |
+| `app/services/enriched_service.py` | 353 | `"Failed to get enriched {self.base_table}: {str(e)}"` |
+| `app/services/market_service.py` | 252 | `"Error retrieving markets: {str(e)}"` |
+| `app/services/market_service.py` | 560 | `"Error updating market: {str(e)}"` |
+| `app/services/entity_service.py` | 3777 | `"Failed to get enriched plate pickups: {error_msg}"` |
+| `app/services/entity_service.py` | 4108–4109 | `"Failed to retrieve enriched restaurant holidays: {str(e)}"` |
+
+If lines shift during future refactors, re-anchor against the function names rather than line numbers.
+
+**Enforcement cross-reference:** `app/tests/i18n/test_no_bare_string_raises.py` (5xx exemption via `_5XX_RANGE`), `app/i18n/error_codes.py` (`ErrorCode.SERVER_INTERNAL_ERROR` — K9).
+
+---
+
+*Last updated: K16 — added §9 (Decision 3 + Decision F policy; 5xx exemption rationale; known sites); dropped d8b0e78 (envelope_exception wrapping of 5xx sites with str(e) params, which violated Decision F). Prior: K5 — detailed Pydantic type→code mapping, I18nValueError subclass, domain-specific validation codes.*
