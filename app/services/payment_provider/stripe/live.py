@@ -80,7 +80,7 @@ def create_payment_for_subscription(
             idempotency_key=idempotency_key,
             automatic_payment_methods={"enabled": True},
         )
-    except stripe.error.InvalidRequestError as e:
+    except stripe.InvalidRequestError as e:
         raise HTTPException(
             status_code=400,
             detail={
@@ -103,7 +103,7 @@ def cancel_payment_intent(external_payment_id: str) -> None:
         return
     try:
         stripe.PaymentIntent.cancel(external_payment_id)
-    except stripe.error.InvalidRequestError:
+    except stripe.InvalidRequestError:
         pass  # Already canceled or doesn't exist
 
 
@@ -200,7 +200,7 @@ def detach_customer_payment_method_external(external_id: str | None) -> None:
         return
     try:
         stripe.PaymentMethod.detach(str(external_id))
-    except stripe.error.InvalidRequestError as e:
+    except stripe.InvalidRequestError as e:
         if getattr(e, "code", None) == "resource_missing":
             return
         raise

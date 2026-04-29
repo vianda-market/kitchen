@@ -182,7 +182,7 @@ def create_setup_session(
         if "not found" in msg.lower():
             raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale="en", entity=msg) from e
         raise envelope_exception(ErrorCode.PAYMENT_METHOD_SETUP_URL_REQUIRED, status=400, locale="en") from e
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         log_warning(f"Stripe setup-session failed: {e}")
         raise envelope_exception(ErrorCode.PAYMENT_METHOD_PROVIDER_UNAVAILABLE, status=502, locale="en") from e
 
@@ -274,10 +274,10 @@ def delete_customer_payment_method(
     if _get_payment_provider() == "stripe" and external_id:
         try:
             detach_customer_payment_method_external(external_id)
-        except stripe.error.InvalidRequestError as e:
+        except stripe.InvalidRequestError as e:
             if getattr(e, "code", None) != "resource_missing":
                 log_warning(f"Stripe PaymentMethod.detach failed (still archiving): {e}")
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             log_warning(f"Stripe PaymentMethod.detach failed (still archiving): {e}")
 
     db_update(
