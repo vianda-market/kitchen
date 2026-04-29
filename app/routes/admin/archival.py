@@ -30,7 +30,6 @@ async def get_archival_statistics(current_user: dict = Depends(get_current_user)
     """
     # TODO: Add admin role check
     # if current_user.get("role_type") != "Admin":
-    #     raise HTTPException(status_code=403, detail="Admin access required")
 
     def _get_archival_statistics():
         stats = ArchivalService.get_archival_stats()

@@ -228,7 +228,7 @@ def set_user_market_assignments(
             log_error("set_user_market_assignments: user_market_assignment table missing — run schema migration")
             raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en") from None
         log_error(f"set_user_market_assignments failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update market assignments") from None
+        raise envelope_exception(ErrorCode.USER_MARKET_UPDATE_FAILED, status=500, locale="en") from None
     finally:
         cur.close()
 
@@ -314,7 +314,7 @@ def get_user_by_username(
         return user_service.get_by_field("username", username_normalized, db, scope=scope)
     except Exception as e:
         log_error(f"Error getting user by username {username}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get user by username") from None
+        raise envelope_exception(ErrorCode.USER_GET_FAILED, status=500, locale="en") from None
 
 
 def get_user_by_email(
@@ -338,7 +338,7 @@ def get_user_by_email(
         return user_service.get_by_field("email", email_normalized, db, scope=scope)
     except Exception as e:
         log_error(f"Error getting user by email {email}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get user by email") from None
+        raise envelope_exception(ErrorCode.USER_GET_FAILED, status=500, locale="en") from None
 
 
 def create_user_with_validation(
@@ -372,7 +372,7 @@ def create_user_with_validation(
     # Create user using generic CRUD
     user = user_service.create(user_data, db, scope=scope)
     if not user:
-        raise HTTPException(status_code=500, detail="Failed to create user")
+        raise envelope_exception(ErrorCode.USER_CREATION_FAILED, status=500, locale="en")
 
     return user
 
@@ -404,7 +404,7 @@ def get_users_by_institution(institution_id: UUID, db: psycopg2.extensions.conne
         return institution_users
     except Exception as e:
         log_error(f"Error getting users by institution {institution_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get users for institution") from None
+        raise envelope_exception(ErrorCode.USER_LIST_FAILED, status=500, locale="en") from None
 
 
 # Initialize EnrichedService instance for users
@@ -598,7 +598,7 @@ def get_enriched_user_by_id(
         return enriched_user
     except Exception as e:
         log_error(f"Error getting enriched user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get enriched user") from None
+        raise envelope_exception(ErrorCode.USER_ENRICHED_GET_FAILED, status=500, locale="en") from None
 
 
 def search_users(
@@ -2713,7 +2713,7 @@ def get_products_by_institution(institution_id: UUID, db: psycopg2.extensions.co
         return institution_products
     except Exception as e:
         log_error(f"Error getting products by institution {institution_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get products for institution") from None
+        raise envelope_exception(ErrorCode.SERVICE_PRODUCT_LIST_FAILED, status=500, locale="en") from None
 
 
 def search_products_by_name(
@@ -2751,7 +2751,7 @@ def search_products_by_name(
         return matching_products
     except Exception as e:
         log_error(f"Error searching products by name {search_term}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to search products") from None
+        raise envelope_exception(ErrorCode.SERVICE_PRODUCT_SEARCH_FAILED, status=500, locale="en") from None
 
 
 def get_plates_by_product(product_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
@@ -2781,7 +2781,7 @@ def get_plates_by_product(product_id: UUID, db: psycopg2.extensions.connection) 
         return product_plates
     except Exception as e:
         log_error(f"Error getting plates by product {product_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get plates for product") from None
+        raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale="en") from None
 
 
 # =============================================================================
@@ -2821,7 +2821,7 @@ def get_pending_bills_by_institution(
         return pending_bills
     except Exception as e:
         log_error(f"Error getting pending bills by institution {institution_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get pending bills for institution") from None
+        raise envelope_exception(ErrorCode.SERVICE_BILL_LIST_FAILED, status=500, locale="en") from None
 
 
 def get_bills_by_status(
@@ -2856,7 +2856,7 @@ def get_bills_by_status(
         return filtered_bills
     except Exception as e:
         log_error(f"Error getting bills by status {status} for institution {institution_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get bills for institution") from None
+        raise envelope_exception(ErrorCode.SERVICE_BILL_LIST_FAILED, status=500, locale="en") from None
 
 
 # =============================================================================
@@ -2891,7 +2891,7 @@ def get_geolocation_by_address_id(address_id: UUID, db: psycopg2.extensions.conn
         return geolocation_service.get_by_field("address_id", address_id, db)
     except Exception as e:
         log_error(f"Error getting geolocation by address ID {address_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get geolocation by address ID") from None
+        raise envelope_exception(ErrorCode.SERVICE_GEOLOCATION_GET_FAILED, status=500, locale="en") from None
 
 
 # =============================================================================

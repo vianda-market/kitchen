@@ -77,17 +77,14 @@ def load_qr_png_base64(image_storage_path: str) -> str:
             raw = download_internal_bucket_blob_bytes(path)
         else:
             if not os.path.isfile(path):
-                raise HTTPException(
-                    status_code=500,
-                    detail="QR code image file not found on server",
-                )
+                raise envelope_exception(ErrorCode.QR_CODE_IMAGE_NOT_FOUND, status=500, locale="en")
             with open(path, "rb") as f:
                 raw = f.read()
     except HTTPException:
         raise
     except Exception as e:
         log_error(f"Failed to load QR image for print: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load QR code image") from e
+        raise envelope_exception(ErrorCode.QR_CODE_IMAGE_LOAD_FAILED, status=500, locale="en") from e
 
     return base64.b64encode(raw).decode("ascii")
 

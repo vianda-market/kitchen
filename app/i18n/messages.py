@@ -553,6 +553,46 @@ MESSAGES: dict[str, dict[str, str]] = {
         "api.version_unsupported": "Unsupported API version: {version}.",
         # market.* extended — K15
         "market.global_entity_invalid": "Global Marketplace cannot be assigned to {entity_name}.",
+        # ── K16: services sweep ───────────────────────────────────────────────
+        # qr_code.* (operation failures) — K16
+        "qr_code.create_failed": "Failed to create QR code.",
+        "qr_code.update_failed": "Failed to update QR code status.",
+        "qr_code.image_generation_failed": "Failed to generate QR code image.",
+        "qr_code.image_not_found": "QR code image file not found on server.",
+        "qr_code.image_load_failed": "Failed to load QR code image.",
+        # product.* (operation failures) — K16
+        "product.enriched_list_failed": "Failed to retrieve products.",
+        "product.enriched_get_failed": "Failed to retrieve product.",
+        "product.creation_failed": "Failed to create product.",
+        "product.update_failed": "Failed to update product.",
+        "product.image_update_failed": "Failed to update product image.",
+        "product.image_revert_failed": "Failed to revert product image to placeholder.",
+        # plan.* (operation failures) — K16
+        "plan.enriched_list_failed": "Failed to retrieve plans.",
+        "plan.enriched_get_failed": "Failed to retrieve plan.",
+        # institution.* (operation failures) — K16
+        "institution.creation_failed": "Failed to create institution.",
+        "institution.update_failed": "Failed to update institution.",
+        "institution.supplier_terms_creation_failed": "Failed to create supplier terms.",
+        # ingredient.* (operation failures) — K16
+        "ingredient.creation_failed": "Failed to create ingredient.",
+        "ingredient.product_update_failed": "Failed to update product ingredients.",
+        # notification.* (operation failures) — K16
+        "notification.acknowledge_failed": "Failed to acknowledge notification.",
+        # subscription.* (operation failures) — K16
+        "subscription.renewal_update_failed": "Failed to update renewal preferences.",
+        # user.* (service operation failures) — K16
+        "user.get_failed": "Failed to retrieve user.",
+        "user.creation_failed": "Failed to create user.",
+        "user.list_failed": "Failed to retrieve users.",
+        "user.enriched_get_failed": "Failed to retrieve user details.",
+        "user.market_update_failed": "Failed to update market assignments.",
+        # service.* (product/plate/bill/geolocation helpers) — K16
+        "service.product_list_failed": "Failed to retrieve products.",
+        "service.product_search_failed": "Failed to search products.",
+        "service.plate_list_failed": "Failed to retrieve plates.",
+        "service.bill_list_failed": "Failed to retrieve bills.",
+        "service.geolocation_get_failed": "Failed to retrieve geolocation.",
     },
     "es": {
         # Auth / user errors
@@ -1101,6 +1141,46 @@ MESSAGES: dict[str, dict[str, str]] = {
         "api.version_unsupported": "Versión de API no soportada: {version}.",
         # market.* extended — K15
         "market.global_entity_invalid": "El Mercado Global no puede asignarse a {entity_name}.",
+        # ── K16: services sweep ───────────────────────────────────────────────
+        # qr_code.* (operation failures) — K16
+        "qr_code.create_failed": "Error al crear el código QR.",
+        "qr_code.update_failed": "Error al actualizar el estado del código QR.",
+        "qr_code.image_generation_failed": "Error al generar la imagen del código QR.",
+        "qr_code.image_not_found": "Archivo de imagen del código QR no encontrado en el servidor.",
+        "qr_code.image_load_failed": "Error al cargar la imagen del código QR.",
+        # product.* (operation failures) — K16
+        "product.enriched_list_failed": "Error al obtener los productos.",
+        "product.enriched_get_failed": "Error al obtener el producto.",
+        "product.creation_failed": "Error al crear el producto.",
+        "product.update_failed": "Error al actualizar el producto.",
+        "product.image_update_failed": "Error al actualizar la imagen del producto.",
+        "product.image_revert_failed": "Error al revertir la imagen del producto al marcador de posición.",
+        # plan.* (operation failures) — K16
+        "plan.enriched_list_failed": "Error al obtener los planes.",
+        "plan.enriched_get_failed": "Error al obtener el plan.",
+        # institution.* (operation failures) — K16
+        "institution.creation_failed": "Error al crear la institución.",
+        "institution.update_failed": "Error al actualizar la institución.",
+        "institution.supplier_terms_creation_failed": "Error al crear los términos de proveedor.",
+        # ingredient.* (operation failures) — K16
+        "ingredient.creation_failed": "Error al crear el ingrediente.",
+        "ingredient.product_update_failed": "Error al actualizar los ingredientes del producto.",
+        # notification.* (operation failures) — K16
+        "notification.acknowledge_failed": "Error al confirmar la notificación.",
+        # subscription.* (operation failures) — K16
+        "subscription.renewal_update_failed": "Error al actualizar las preferencias de renovación.",
+        # user.* (service operation failures) — K16
+        "user.get_failed": "Error al obtener el usuario.",
+        "user.creation_failed": "Error al crear el usuario.",
+        "user.list_failed": "Error al obtener los usuarios.",
+        "user.enriched_get_failed": "Error al obtener los detalles del usuario.",
+        "user.market_update_failed": "Error al actualizar las asignaciones de mercado.",
+        # service.* (product/plate/bill/geolocation helpers) — K16
+        "service.product_list_failed": "Error al obtener los productos.",
+        "service.product_search_failed": "Error al buscar productos.",
+        "service.plate_list_failed": "Error al obtener los platos.",
+        "service.bill_list_failed": "Error al obtener las facturas.",
+        "service.geolocation_get_failed": "Error al obtener la geolocalización.",
     },
     "pt": {
         # Auth / user errors
@@ -1649,6 +1729,46 @@ MESSAGES: dict[str, dict[str, str]] = {
         "api.version_unsupported": "Versão de API não suportada: {version}.",
         # market.* extended — K15
         "market.global_entity_invalid": "O Mercado Global não pode ser atribuído a {entity_name}.",
+        # ── K16: services sweep ───────────────────────────────────────────────
+        # qr_code.* (operation failures) — K16
+        "qr_code.create_failed": "Falha ao criar o código QR.",
+        "qr_code.update_failed": "Falha ao atualizar o status do código QR.",
+        "qr_code.image_generation_failed": "Falha ao gerar a imagem do código QR.",
+        "qr_code.image_not_found": "Arquivo de imagem do código QR não encontrado no servidor.",
+        "qr_code.image_load_failed": "Falha ao carregar a imagem do código QR.",
+        # product.* (operation failures) — K16
+        "product.enriched_list_failed": "Falha ao recuperar os produtos.",
+        "product.enriched_get_failed": "Falha ao recuperar o produto.",
+        "product.creation_failed": "Falha ao criar o produto.",
+        "product.update_failed": "Falha ao atualizar o produto.",
+        "product.image_update_failed": "Falha ao atualizar a imagem do produto.",
+        "product.image_revert_failed": "Falha ao reverter a imagem do produto para o marcador.",
+        # plan.* (operation failures) — K16
+        "plan.enriched_list_failed": "Falha ao recuperar os planos.",
+        "plan.enriched_get_failed": "Falha ao recuperar o plano.",
+        # institution.* (operation failures) — K16
+        "institution.creation_failed": "Falha ao criar a instituição.",
+        "institution.update_failed": "Falha ao atualizar a instituição.",
+        "institution.supplier_terms_creation_failed": "Falha ao criar os termos do fornecedor.",
+        # ingredient.* (operation failures) — K16
+        "ingredient.creation_failed": "Falha ao criar o ingrediente.",
+        "ingredient.product_update_failed": "Falha ao atualizar os ingredientes do produto.",
+        # notification.* (operation failures) — K16
+        "notification.acknowledge_failed": "Falha ao confirmar a notificação.",
+        # subscription.* (operation failures) — K16
+        "subscription.renewal_update_failed": "Falha ao atualizar as preferências de renovação.",
+        # user.* (service operation failures) — K16
+        "user.get_failed": "Falha ao recuperar o usuário.",
+        "user.creation_failed": "Falha ao criar o usuário.",
+        "user.list_failed": "Falha ao recuperar os usuários.",
+        "user.enriched_get_failed": "Falha ao recuperar os detalhes do usuário.",
+        "user.market_update_failed": "Falha ao atualizar as atribuições de mercado.",
+        # service.* (product/plate/bill/geolocation helpers) — K16
+        "service.product_list_failed": "Falha ao recuperar os produtos.",
+        "service.product_search_failed": "Falha ao pesquisar produtos.",
+        "service.plate_list_failed": "Falha ao recuperar os pratos.",
+        "service.bill_list_failed": "Falha ao recuperar as faturas.",
+        "service.geolocation_get_failed": "Falha ao recuperar a geolocalização.",
     },
 }
 

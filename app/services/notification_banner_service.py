@@ -194,7 +194,7 @@ def acknowledge_notification(
     except Exception as e:
         db.rollback()
         log_error(f"Failed to acknowledge notification {notification_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to acknowledge notification") from None
+        raise envelope_exception(ErrorCode.NOTIFICATION_ACKNOWLEDGE_FAILED, status=500, locale="en") from None
 
 
 def expire_stale_notifications(

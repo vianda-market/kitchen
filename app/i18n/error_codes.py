@@ -521,6 +521,12 @@ class ErrorCode(StrEnum):
     QR_CODE_LIST_FAILED = "qr_code.list_failed"
     QR_CODE_GET_FAILED = "qr_code.get_failed"
     QR_CODE_DELETE_FAILED = "qr_code.delete_failed"
+    # QR code service errors. Wired in K16.
+    QR_CODE_CREATE_FAILED = "qr_code.create_failed"
+    QR_CODE_UPDATE_FAILED = "qr_code.update_failed"
+    QR_CODE_IMAGE_GENERATION_FAILED = "qr_code.image_generation_failed"
+    QR_CODE_IMAGE_NOT_FOUND = "qr_code.image_not_found"
+    QR_CODE_IMAGE_LOAD_FAILED = "qr_code.image_load_failed"
 
     # ── restaurant.* ─────────────────────────────────────────────────────────
     # Restaurant operation errors. Wired in K15.
@@ -683,3 +689,52 @@ class ErrorCode(StrEnum):
     DATABASE_INVALID_UUID = "database.invalid_uuid"
     DATABASE_INVALID_FORMAT = "database.invalid_format"
     DATABASE_ERROR = "database.error"
+
+    # ── product.* (operation failures) ───────────────────────────────────────
+    # Product service/route operation errors. Wired in K16 (services sweep).
+    PRODUCT_ENRICHED_LIST_FAILED = "product.enriched_list_failed"
+    PRODUCT_ENRICHED_GET_FAILED = "product.enriched_get_failed"
+    PRODUCT_CREATION_FAILED = "product.creation_failed"
+    PRODUCT_UPDATE_FAILED = "product.update_failed"
+    PRODUCT_IMAGE_UPDATE_FAILED = "product.image_update_failed"
+    PRODUCT_IMAGE_REVERT_FAILED = "product.image_revert_failed"
+
+    # ── plan.* (operation failures) ───────────────────────────────────────────
+    # Plan service/route operation errors. Wired in K16.
+    PLAN_ENRICHED_LIST_FAILED = "plan.enriched_list_failed"
+    PLAN_ENRICHED_GET_FAILED = "plan.enriched_get_failed"
+
+    # ── institution.* (operation failures) ────────────────────────────────────
+    # Institution service/route operation errors. Wired in K16.
+    INSTITUTION_CREATION_FAILED = "institution.creation_failed"
+    INSTITUTION_UPDATE_FAILED = "institution.update_failed"
+    INSTITUTION_SUPPLIER_TERMS_CREATION_FAILED = "institution.supplier_terms_creation_failed"
+
+    # ── ingredient.* (operation failures) ─────────────────────────────────────
+    # Ingredient service operation errors. Wired in K16.
+    INGREDIENT_CREATION_FAILED = "ingredient.creation_failed"
+    INGREDIENT_PRODUCT_UPDATE_FAILED = "ingredient.product_update_failed"
+
+    # ── notification.* (operation failures) ───────────────────────────────────
+    # Notification banner service operation errors. Wired in K16.
+    NOTIFICATION_ACKNOWLEDGE_FAILED = "notification.acknowledge_failed"
+
+    # ── subscription.* (operation failures) ───────────────────────────────────
+    # Subscription renewal update failure. Wired in K16.
+    SUBSCRIPTION_RENEWAL_UPDATE_FAILED = "subscription.renewal_update_failed"
+
+    # ── user.* (service operation failures) ───────────────────────────────────
+    # User entity-service operation errors. Wired in K16.
+    USER_GET_FAILED = "user.get_failed"
+    USER_CREATION_FAILED = "user.creation_failed"
+    USER_LIST_FAILED = "user.list_failed"
+    USER_ENRICHED_GET_FAILED = "user.enriched_get_failed"
+    USER_MARKET_UPDATE_FAILED = "user.market_update_failed"
+
+    # ── service.product.* ─────────────────────────────────────────────────────
+    # Product entity-service operation errors. Wired in K16.
+    SERVICE_PRODUCT_LIST_FAILED = "service.product_list_failed"
+    SERVICE_PRODUCT_SEARCH_FAILED = "service.product_search_failed"
+    SERVICE_PLATE_LIST_FAILED = "service.plate_list_failed"
+    SERVICE_BILL_LIST_FAILED = "service.bill_list_failed"
+    SERVICE_GEOLOCATION_GET_FAILED = "service.geolocation_get_failed"

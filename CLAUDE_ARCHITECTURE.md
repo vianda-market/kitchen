@@ -61,7 +61,14 @@ app/
 ├── i18n/                    # Internationalization (locale-aware labels, names, messages)
 │   ├── enum_labels.py       # Enum display labels per locale (get_label, labels_for_values)
 │   ├── locale_names.py      # Country/currency name localization via pycountry gettext
-│   └── messages.py          # Message catalog stub (get_message, future error/alert i18n)
+│   ├── error_codes.py       # ErrorCode StrEnum — stable dotted error keys; namespaces:
+│   │                        #   auth.*, subscription.*, qr_code.*, product.*, plan.*,
+│   │                        #   institution.*, ingredient.*, notification.*, user.*,
+│   │                        #   service.* (K15/K16 phases); append-only, never rename
+│   ├── envelope.py          # envelope_exception() factory — wraps HTTPException with
+│   │                        #   {"detail":{"code","message","params"}} contract shape
+│   └── messages.py          # Localized message catalog — en/es/pt entries for every
+│                            #   ErrorCode; used by envelope_exception(locale=...)
 ├── routes/                  # API endpoints
 │   ├── crud_routes.py       # Admin CRUD (Product, Plan, Restaurant, etc.)
 │   ├── crud_routes_user.py  # User CRUD (Subscription, PaymentMethod)

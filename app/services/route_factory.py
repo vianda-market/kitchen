@@ -434,7 +434,7 @@ def create_product_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched products: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched products") from None
+                raise envelope_exception(ErrorCode.PRODUCT_ENRICHED_LIST_FAILED, status=500, locale="en") from None
 
         @router.get("/enriched/{product_id}", response_model=ProductEnrichedResponseSchema)
         def get_enriched_product_by_id_route(
@@ -453,7 +453,7 @@ def create_product_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched product {product_id}: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched product") from None
+                raise envelope_exception(ErrorCode.PRODUCT_ENRICHED_GET_FAILED, status=500, locale="en") from None
 
         @router.get("/{product_id}/ingredients", response_model=list[ProductIngredientResponseSchema])
         def get_product_ingredients_route(
@@ -538,7 +538,7 @@ def create_product_routes() -> APIRouter:
             try:
                 product = product_service.create(data, db, scope=scope, commit=not has_ingredients)
                 if not product:
-                    raise HTTPException(status_code=500, detail="Failed to create product")
+                    raise envelope_exception(ErrorCode.PRODUCT_CREATION_FAILED, status=500, locale="en")
 
                 if has_ingredients:
                     market_id = (
@@ -564,7 +564,7 @@ def create_product_routes() -> APIRouter:
             except Exception as e:
                 db.rollback()
                 log_error(f"Error creating product: {e}")
-                raise HTTPException(status_code=500, detail="Error creating product") from None
+                raise envelope_exception(ErrorCode.PRODUCT_CREATION_FAILED, status=500, locale="en") from None
 
         # PUT /by-key MUST be registered before PUT /{product_id} so the static
         # segment "by-key" wins over the UUID path parameter (FastAPI first-match wins).
@@ -607,7 +607,7 @@ def create_product_routes() -> APIRouter:
                     update_payload["modified_by"] = modified_by
                     product = product_service.update(existing.product_id, update_payload, db)
                     if product is None:
-                        raise HTTPException(status_code=500, detail="Failed to update product")
+                        raise envelope_exception(ErrorCode.PRODUCT_UPDATE_FAILED, status=500, locale="en")
                     log_info(f"Upsert updated product {existing.product_id} with canonical_key '{key}'")
                     return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
 
@@ -616,7 +616,7 @@ def create_product_routes() -> APIRouter:
                 payload["modified_by"] = modified_by
                 product = product_service.create(payload, db)
                 if product is None:
-                    raise HTTPException(status_code=500, detail="Failed to create product")
+                    raise envelope_exception(ErrorCode.PRODUCT_CREATION_FAILED, status=500, locale="en")
                 log_info(f"Upsert inserted product {product.product_id} with canonical_key '{key}'")
                 return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
 
@@ -642,7 +642,7 @@ def create_product_routes() -> APIRouter:
             try:
                 product = product_service.update(product_id, data, db, scope=scope, commit=not has_ingredients)
                 if not product:
-                    raise HTTPException(status_code=500, detail="Failed to update product")
+                    raise envelope_exception(ErrorCode.PRODUCT_UPDATE_FAILED, status=500, locale="en")
 
                 if has_ingredients:
                     market_id = (
@@ -676,7 +676,7 @@ def create_product_routes() -> APIRouter:
             except Exception as e:
                 db.rollback()
                 log_error(f"Error updating product {product_id}: {e}")
-                raise HTTPException(status_code=500, detail="Error updating product") from None
+                raise envelope_exception(ErrorCode.PRODUCT_UPDATE_FAILED, status=500, locale="en") from None
 
         @router.post("/{product_id}/image", response_model=ProductResponseSchema)
         async def upload_product_image(
@@ -717,7 +717,7 @@ def create_product_routes() -> APIRouter:
             updated_product = product_service.update(product_id, update_data, db, scope=scope)
             if not updated_product:
                 product_image_service.delete_image(storage_path, thumb_storage_path)
-                raise HTTPException(status_code=500, detail="Failed to update product image")
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_UPDATE_FAILED, status=500, locale=locale)
             if product.image_storage_path != storage_path and not product_image_service.is_placeholder(
                 product.image_storage_path
             ):
@@ -757,7 +757,7 @@ def create_product_routes() -> APIRouter:
             }
             updated_product = product_service.update(product_id, update_data, db, scope=scope)
             if not updated_product:
-                raise HTTPException(status_code=500, detail="Failed to revert product to placeholder")
+                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_REVERT_FAILED, status=500, locale="en")
             data = updated_product.model_dump(mode="json")
             from app.utils.gcs import resolve_product_image_urls
 
@@ -880,7 +880,7 @@ def create_plan_routes() -> APIRouter:
             raise
         except Exception as e:
             log_error(f"Error getting enriched plans: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plans") from None
+            raise envelope_exception(ErrorCode.PLAN_ENRICHED_LIST_FAILED, status=500, locale=locale) from None
 
     @router.get("/enriched/{plan_id}", response_model=PlanEnrichedResponseSchema)
     def get_enriched_plan_by_id_route(
@@ -906,7 +906,7 @@ def create_plan_routes() -> APIRouter:
             raise
         except Exception as e:
             log_error(f"Error getting enriched plan {plan_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve enriched plan") from None
+            raise envelope_exception(ErrorCode.PLAN_ENRICHED_GET_FAILED, status=500, locale=locale) from None
 
     # /by-key MUST be registered before /{plan_id} so the static segment wins
     # over the UUID path parameter (FastAPI evaluates in registration order).
@@ -1471,7 +1471,7 @@ def create_subscription_routes() -> APIRouter:
             }
             updated = subscription_service.update(subscription.subscription_id, update_data, db, scope=None)
             if not updated:
-                raise HTTPException(status_code=500, detail="Failed to update renewal preferences")
+                raise envelope_exception(ErrorCode.SUBSCRIPTION_RENEWAL_UPDATE_FAILED, status=500, locale=locale)
             return updated
 
         @router.get("/benefit-plans")
@@ -1806,7 +1806,7 @@ def create_institution_routes() -> APIRouter:
                     )
                     if result is None:
                         db.rollback()
-                        raise HTTPException(status_code=500, detail="Failed to update institution")
+                        raise envelope_exception(ErrorCode.INSTITUTION_UPDATE_FAILED, status=500, locale="en")
 
                     # Reapply market assignments (idempotent: delete + re-insert)
                     cursor = db.cursor()
@@ -1827,7 +1827,7 @@ def create_institution_routes() -> APIRouter:
                 institution = institution_service.create(payload, db, scope=None, commit=False)
                 if not institution:
                     db.rollback()
-                    raise HTTPException(status_code=500, detail="Failed to create institution")
+                    raise envelope_exception(ErrorCode.INSTITUTION_CREATION_FAILED, status=500, locale="en")
 
                 if market_ids:
                     cursor = db.cursor()
@@ -1964,7 +1964,7 @@ def create_institution_routes() -> APIRouter:
                 # Always defer commit — junction rows and optional supplier_terms are part of the same transaction
                 institution = institution_service.create(data, db, scope=None, commit=False)
                 if not institution:
-                    raise HTTPException(status_code=500, detail="Failed to create institution")
+                    raise envelope_exception(ErrorCode.INSTITUTION_CREATION_FAILED, status=500, locale=locale)
 
                 # Insert institution_market junction rows
                 if market_ids:
@@ -1984,7 +1984,9 @@ def create_institution_routes() -> APIRouter:
                     terms = supplier_terms_service.create(terms_payload, db, commit=False)
                     if not terms:
                         db.rollback()
-                        raise HTTPException(status_code=500, detail="Failed to create supplier terms")
+                        raise envelope_exception(
+                            ErrorCode.INSTITUTION_SUPPLIER_TERMS_CREATION_FAILED, status=500, locale=locale
+                        )
                     log_info(f"Created institution {institution.institution_id} with supplier terms")
 
                 db.commit()
@@ -1995,7 +1997,7 @@ def create_institution_routes() -> APIRouter:
             except Exception as e:
                 db.rollback()
                 log_error(f"Error creating institution: {e}")
-                raise HTTPException(status_code=500, detail="Error creating institution") from None
+                raise envelope_exception(ErrorCode.INSTITUTION_CREATION_FAILED, status=500, locale=locale) from None
 
     router = create_crud_routes(
         config=config,
@@ -2250,7 +2252,7 @@ def create_plate_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched plates: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plates") from None
+                raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale=locale) from None
 
         @router.get("/enriched/{plate_id}", response_model=PlateEnrichedResponseSchema)
         def get_enriched_plate_by_id_route(
@@ -2317,7 +2319,7 @@ def create_plate_routes() -> APIRouter:
                 raise
             except Exception as e:
                 log_error(f"Error getting enriched plate {plate_id}: {e}")
-                raise HTTPException(status_code=500, detail="Failed to retrieve enriched plate") from None
+                raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale=locale) from None
 
         # /by-key MUST be registered before /{plate_id} so the static segment wins
         # over the UUID path parameter (FastAPI evaluates in registration order).
