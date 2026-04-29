@@ -53,6 +53,7 @@ jobs:
         env:
           DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
           GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+          IAM_ADMIN_EMAIL: ${{ vars.IAM_ADMIN_EMAIL }}
         run: |
           gcloud compute ssh vianda-dev-bastion \
             --project="${GCP_PROJECT}" \
@@ -68,4 +69,5 @@ jobs:
             --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
           DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
             DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+            IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
             bash app/db/build_kitchen_db.sh
