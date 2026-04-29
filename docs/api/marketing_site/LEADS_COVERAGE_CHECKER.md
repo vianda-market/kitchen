@@ -29,23 +29,40 @@ Returns markets with `status='active'` — countries currently serving customers
 navbar country selector and scopes plans, restaurants, featured-restaurant, coverage checker,
 and metrics.
 
-**Response:** `[{ code, name, currency, phone_prefix, default_locale }]`
-- `code` — ISO 3166-1 alpha-2 (e.g. `"AR"`)
-- `name` — localized per `language`
-- `currency` — ISO 4217 code (e.g. `"ARS"`)
-- `phone_prefix` — E.164 dial code, may be `null` for pseudo-markets
-- `default_locale` — one of `en`, `es`, `pt`
+**Response (envelope):**
+```json
+{
+  "countries": [{ "code": "AR", "name": "Argentina", "currency": "ARS", "phone_prefix": "+54", "default_locale": "es" }],
+  "suggested_country_code": "AR"
+}
+```
+- `countries` — array of country objects (same items as before the envelope was added)
+  - `code` — ISO 3166-1 alpha-2 (e.g. `"AR"`)
+  - `name` — localized per `language`
+  - `currency` — ISO 4217 code (e.g. `"ARS"`)
+  - `phone_prefix` — E.164 dial code, may be `null` for pseudo-markets
+  - `default_locale` — one of `en`, `es`, `pt`
+- `suggested_country_code` — ISO 3166-1 alpha-2 of the visitor's country inferred from the
+  `cf-ipcountry` request header (set by Cloudflare). `null` when:
+  - Cloudflare is not in the deploy chain (Cloud Run direct — current state),
+  - the header is absent or the value is `"XX"` (CF sentinel for unresolvable IPs), or
+  - the resolved code is not present in the returned `countries` list.
+  Treat `null` as "no suggestion available" and fall back to your own default.
 
-**Empty array contract:** `[]` means no markets currently serve customers. The frontend hides
-the navbar country selector and every country-scoped section (plans, restaurants,
+**BREAKING CHANGE (kitchen #217):** The former array-at-root response is replaced by an
+object envelope. Consumers must read `response.countries` instead of `response` directly.
+The only consumer is vianda-home (vianda-home#96 migrates simultaneously).
+
+**Empty countries contract:** `countries: []` means no markets currently serve customers. The
+frontend hides the navbar country selector and every country-scoped section (plans, restaurants,
 featured-restaurant, coverage checker, metrics). Country-agnostic sections (hero, how-it-works,
 footer, supplier CTA) stay visible. The supplier application form is unaffected — it reads
 `/leads/supplier-countries`.
 
-**Caching:** `Cache-Control: public, max-age=86400, stale-while-revalidate=3600`.
-Response includes an `ETag` header. Send `If-None-Match` on revalidation to get `304 Not Modified`.
-The ETag is a hash of response-field values plus per-row `modified_date` from `market_info` and
-`currency_metadata` — no triggers or cross-table reasoning in the DB layer (see §ETag Strategy).
+**Caching:** `Cache-Control: private, no-store`.
+The response contains a per-visitor `suggested_country_code` — shared caches (CDN / reverse
+proxy) must not serve one visitor's suggestion to another. The countries list itself is served
+from a 10-minute in-process cache per locale; only the suggestion varies per-request.
 
 **reCAPTCHA:** **not required** — this is a navbar-load fetch called on every page render.
 
@@ -58,16 +75,19 @@ GET /api/v1/leads/supplier-countries?language={locale}
 
 Superset of `/leads/countries`: markets with `status IN ('active', 'inactive')`. `inactive`
 markets are configured in `market_info` but not yet serving customers — suppliers can still
-apply, and we capture interest ahead of launch. Same response shape as `/leads/countries`.
+apply, and we capture interest ahead of launch.
 
-**Empty array contract:** `[]` means no markets are configured at all. Frontend renders
-`RestaurantApplicationForm` **without** the country dropdown and promotes
-`mailto:partners@vianda.market` as the primary CTA: *"We'd still love to hear from you —
-email partners@vianda.market to tell us where you're cooking."* Same email as the
-"don't see your country?" fallback shown when a supplier's country is not in a non-empty list,
-promoted to primary when the list is empty.
+**Response:** same envelope shape as `/leads/countries` (see §0a above).
+`suggested_country_code` resolves against the supplier-countries list; a code present in
+`/leads/supplier-countries` but absent from `/leads/countries` (inactive market) can still be
+suggested to a visitor from that country.
 
-**Caching & reCAPTCHA & rate limit:** same as `/leads/countries`.
+**Empty countries contract:** `countries: []` means no markets are configured at all. Frontend
+renders `RestaurantApplicationForm` **without** the country dropdown and promotes
+`mailto:partners@vianda.market` as the primary CTA.
+
+**Caching, reCAPTCHA, and rate limit:** same as `/leads/countries` (private, no-store;
+no reCAPTCHA; 60/min per IP).
 
 **Automated status maintenance (planned, not in v1):** the `active`/`inactive` flips are
 currently admin-maintained. The daily auto-flip cron is covered in
@@ -386,7 +406,7 @@ The following items in `src/api/types.ts` need updating:
 
 | Endpoint | `country_code` param | Missing param | Unsupported country |
 |---|---|---|---|
-| `/leads/countries` | n/a (returns the list) | — | — |
+| `/leads/countries` | n/a (returns the envelope) | — | — |
 | `/leads/supplier-countries` | n/a | — | — |
 | `/leads/markets` | key of the row, implicit | returns all | — |
 | `/leads/cities` | optional, defaults to `US` | returns `US` cities | empty list |
@@ -407,14 +427,26 @@ Legacy default-to-`US` on `/leads/cities`, `/leads/city-metrics`, and `/leads/zi
 
 ---
 
-## ETag Strategy (option c — response-field-scoped)
+## Caching: private, no-store (kitchen #217)
 
-Applies to `/leads/countries` and `/leads/supplier-countries`.
+Applies to `/leads/countries` and `/leads/supplier-countries` as of kitchen #217.
 
-- The ETag is a truncated SHA-256 hash over per-row `(code, currency, phone_prefix, default_locale, market_info.modified_date, currency_metadata.modified_date)` plus the `language` query param.
-- No triggers on `currency_metadata` that bump `market_info.modified_date`. No materialized invalidation columns. The hash input lives entirely at the query/response boundary — a reader can see the full story in one function.
-- Natural invalidation: when an admin flips `status` or edits currency metadata, `modified_date` bumps → ETag bumps → the browser's next `If-None-Match` revalidation gets a `200` with fresh data instead of a `304`.
-- Browser cache: `max-age=86400, stale-while-revalidate=3600`. Users see fresh data within 1h of the stale window on their next navigation.
+Both responses are now `Cache-Control: private, no-store` because the envelope includes
+`suggested_country_code`, which is derived from the visitor's IP and therefore varies
+per-visitor. A shared CDN cache serving one visitor's country suggestion to another visitor
+would be incorrect.
+
+The countries list itself is cached in-process (per locale, 10-minute TTL) on each API
+worker pod. ETag / `If-None-Match` / `304` revalidation is no longer supported on these
+endpoints — clients should issue a fresh GET on each page load (the response is small and
+fast from the in-process cache).
+
+**Former ETag strategy (option c — retired by #217):**
+The former design sent `Cache-Control: public, max-age=86400, stale-while-revalidate=3600`
+with an ETag hashed over `(code, currency, phone_prefix, default_locale,
+market_info.modified_date, currency_metadata.modified_date, locale)`. This was valid when
+the response was a plain list and could be shared across visitors. The envelope response
+makes per-visitor sharing incorrect.
 
 ## Cache semantics on /leads/markets and /leads/cities
 
@@ -438,9 +470,16 @@ These are admin-mutable content endpoints — markets get activated, cities get 
 
 ## Server-Side Cache Semantics
 
-- Both country endpoints use a process-local, locale-keyed cache with a 10-minute TTL (mirrors `_markets_cache` / `_cities_cache`).
-- **Per-worker visibility:** when an admin flips a market to `active`/`inactive`, other workers pick up the change over the next 10 minutes. Combined with the 1h `stale-while-revalidate` window, end users see fresh data within ~1h of an admin flip. Acceptable at marketing-site change cadence.
-- **Redis:** scaffolded in the repo but not used for this feature. A shared cross-worker cache isn't needed at the current change frequency. Considered, deferred.
+- Both country endpoints use a process-local, locale-keyed cache with a 10-minute TTL for the
+  countries list (mirrors `_markets_cache` / `_cities_cache`).
+- `suggested_country_code` is computed per-request from the `cf-ipcountry` header and is never
+  cached — it is derived from the request, not the data.
+- **Per-worker visibility:** when an admin flips a market to `active`/`inactive`, other workers
+  pick up the change within 10 minutes. There is no client-side browser cache (responses are
+  `private, no-store`), so end users see fresh data on their next page load after the worker
+  TTL expires.
+- **Redis:** scaffolded in the repo but not used for this feature. A shared cross-worker cache
+  isn't needed at the current change frequency. Considered, deferred.
 
 ## Future "All Countries" View
 

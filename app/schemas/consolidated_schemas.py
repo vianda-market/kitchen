@@ -3477,6 +3477,38 @@ class LeadsCountrySchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadsCountriesResponseSchema(BaseModel):
+    """Envelope for GET /leads/countries and /leads/supplier-countries.
+
+    Wraps the country list and adds a geo-suggested country for the visitor.
+    ``suggested_country_code`` is the ISO 3166-1 alpha-2 of the visitor's
+    country, resolved from the ``cf-ipcountry`` request header (set by
+    Cloudflare when CF fronts the deploy). It is ``null`` when:
+    - the header is absent (no Cloudflare in front),
+    - the resolved code is not present in the returned ``countries`` list, or
+    - the header value is invalid / unresolvable.
+
+    NOTE: Cloudflare is not currently in the kitchen deploy chain (Cloud Run
+    direct). This field will return ``null`` for all requests until CF is added.
+    It is safe to deploy now; the frontend should treat ``null`` as "no
+    suggestion" and fall back to its own default.
+    """
+
+    countries: list[LeadsCountrySchema] = Field(
+        ..., description="Active (or supplier-configured) markets, same items as the former list response"
+    )
+    suggested_country_code: str | None = Field(
+        None,
+        description=(
+            "ISO 3166-1 alpha-2 of the visitor's country inferred from the cf-ipcountry header. "
+            "null when unresolvable, when the header is absent, or when the code is not in "
+            "the returned countries list."
+        ),
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LeadInterestCreateSchema(BaseModel):
     """POST /leads/interest — notify-me request from marketing site or B2C app."""
 

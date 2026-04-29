@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "leads-marketing-site-2026",
 		"name": "006 LEADS_MARKETING_SITE",
-		"description": "All public /leads/* surface consumed by the vianda-home marketing site. Organized by frontend consumer (one collection per consumer), not per endpoint group.\n\nFolders:\n- Zipcode metrics (no auth, no reCAPTCHA) \u2014 navbar coverage probe.\n- Country selectors (no auth, no reCAPTCHA) \u2014 /leads/countries, /leads/supplier-countries with ETag + 304 + long Cache-Control.\n- country_code contract \u2014 /leads/plans, /leads/restaurants, /leads/featured-restaurant (required \u2192 400; unsupported \u2192 [] or null, 200).\n- Admin override on market status (guardrails) \u2014 PUT /admin/markets/{id} activation/deactivation rules. Requires super admin.\n\nContracts:\n- docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md\n- docs/api/b2c_client/feedback_from_client/RESTAURANTS_BY_ZIPCODE.md\n- Cron follow-up: docs/plans/market-status-cron.md\n\nShared auth: Login Super Admin is idempotent \u2014 if `superAdminAuthToken` is already set as a Postman global (e.g. via Newman --globals from a seed run), the login request is skipped. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md.",
+		"description": "All public /leads/* surface consumed by the vianda-home marketing site. Organized by frontend consumer (one collection per consumer), not per endpoint group.\n\nFolders:\n- Zipcode metrics (no auth, no reCAPTCHA) \u2014 navbar coverage probe.\n- Country selectors (no auth, no reCAPTCHA) \u2014 /leads/countries, /leads/supplier-countries. Response is LeadsCountriesResponseSchema envelope: {countries, suggested_country_code}. Cache-Control: private, no-store (kitchen #217 \u2014 breaking change from former array response).\n- country_code contract \u2014 /leads/plans, /leads/restaurants, /leads/featured-restaurant (required \u2192 400; unsupported \u2192 [] or null, 200).\n- Admin override on market status (guardrails) \u2014 PUT /admin/markets/{id} activation/deactivation rules. Requires super admin.\n\nContracts:\n- docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md\n- docs/api/b2c_client/feedback_from_client/RESTAURANTS_BY_ZIPCODE.md\n- Cron follow-up: docs/plans/market-status-cron.md\n\nShared auth: Login Super Admin is idempotent \u2014 if `superAdminAuthToken` is already set as a Postman global (e.g. via Newman --globals from a seed run), the login request is skipped. See docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -159,7 +159,7 @@
 			"name": "Country selectors (no auth, no reCAPTCHA)",
 			"item": [
 				{
-					"name": "GET /leads/countries (en) \u2014 happy path + ETag + Cache-Control",
+					"name": "GET /leads/countries (en) \u2014 happy path + envelope + Cache-Control",
 					"event": [
 						{
 							"listen": "test",
@@ -170,24 +170,23 @@
 									"pm.test('No recaptcha token required (token header was not sent)', () => { /* documented */ });",
 									"",
 									"const cc = pm.response.headers.get('Cache-Control') || '';",
-									"pm.test('Cache-Control is public, max-age=86400, stale-while-revalidate=3600', () => {",
-									"    pm.expect(cc).to.include('public');",
-									"    pm.expect(cc).to.include('max-age=86400');",
-									"    pm.expect(cc).to.include('stale-while-revalidate=3600');",
+									"pm.test('Cache-Control is private, no-store (kitchen #217 \u2014 per-visitor suggested_country_code)', () => {",
+									"    pm.expect(cc).to.include('private');",
+									"    pm.expect(cc).to.include('no-store');",
 									"});",
 									"",
-									"const etag = pm.response.headers.get('ETag');",
-									"pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
-									"if (etag) {",
-									"    pm.collectionVariables.set('countriesEtagEn', etag);",
-									"}",
-									"",
 									"const body = pm.response.json();",
-									"pm.test('Response is a JSON array', () => pm.expect(body).to.be.an('array'));",
+									"pm.test('Response is an object envelope (not a raw array)', () => pm.expect(body).to.be.an('object'));",
+									"pm.test('Envelope has countries array', () => pm.expect(body.countries).to.be.an('array'));",
+									"pm.test('Envelope has suggested_country_code field (string or null)', () => {",
+									"    pm.expect(body).to.have.property('suggested_country_code');",
+									"    const s = body.suggested_country_code;",
+									"    pm.expect(s === null || (typeof s === 'string' && s.length === 2)).to.be.true;",
+									"});",
 									"",
-									"if (body.length > 0) {",
-									"    const first = body[0];",
-									"    pm.test('Rows include code/name/currency/phone_prefix/default_locale', () => {",
+									"if (body.countries.length > 0) {",
+									"    const first = body.countries[0];",
+									"    pm.test('Country rows include code/name/currency/phone_prefix/default_locale', () => {",
 									"        pm.expect(first).to.have.property('code');",
 									"        pm.expect(first).to.have.property('name');",
 									"        pm.expect(first).to.have.property('currency');",
@@ -197,7 +196,7 @@
 									"    pm.test('default_locale is en|es|pt', () => pm.expect(['en','es','pt']).to.include(first.default_locale));",
 									"    pm.collectionVariables.set('firstActiveCountryCode', first.code);",
 									"} else {",
-									"    console.log('Empty /leads/countries \u2014 frontend contract: hide navbar selector + country-scoped sections');",
+									"    console.log('Empty /leads/countries \u2014 frontend contract: countries:[] hides navbar selector + country-scoped sections');",
 									"}"
 								]
 							}
@@ -224,11 +223,11 @@
 								}
 							]
 						},
-						"description": "Customer-facing country selector source. Markets with status='active'. No reCAPTCHA token required \u2014 this is a navbar-load fetch."
+						"description": "Customer-facing country selector source. Markets with status='active'. No reCAPTCHA token required. Response is LeadsCountriesResponseSchema envelope: {countries, suggested_country_code}. Cache-Control: private, no-store (kitchen #217)."
 					}
 				},
 				{
-					"name": "GET /leads/countries (es) \u2014 different ETag, localized names",
+					"name": "GET /leads/countries (es) \u2014 localized names",
 					"event": [
 						{
 							"listen": "test",
@@ -236,11 +235,10 @@
 								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
-									"const etagEs = pm.response.headers.get('ETag');",
-									"const etagEn = pm.collectionVariables.get('countriesEtagEn');",
-									"pm.test('ETag differs per locale (en vs es)', () => {",
-									"    pm.expect(etagEs).to.be.a('string').and.not.empty;",
-									"    if (etagEn) pm.expect(etagEs).to.not.equal(etagEn);",
+									"const body = pm.response.json();",
+									"pm.test('Response is envelope with countries array', () => {",
+									"    pm.expect(body).to.be.an('object');",
+									"    pm.expect(body.countries).to.be.an('array');",
 									"});"
 								]
 							}
@@ -267,22 +265,28 @@
 								}
 							]
 						},
-						"description": "Same endpoint, different locale \u2192 different ETag + localized country names."
+						"description": "Same endpoint, different locale \u2192 localized country names."
 					}
 				},
 				{
-					"name": "GET /leads/countries with If-None-Match \u2192 304",
+					"name": "GET /leads/countries with cf-ipcountry header \u2014 suggested_country_code resolves",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"pm.test('Status is 304 Not Modified', () => pm.response.to.have.status(304));",
-									"pm.test('Body is empty on 304', () => pm.expect(pm.response.text()).to.have.lengthOf(0));",
-									"const etag = pm.response.headers.get('ETag');",
-									"const priorEtag = pm.collectionVariables.get('countriesEtagEn');",
-									"pm.test('ETag preserved on 304', () => pm.expect(etag).to.equal(priorEtag));"
+									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"const codes = (body.countries || []).map(c => c.code);",
+									"const suggested = body.suggested_country_code;",
+									"pm.test('suggested_country_code is null or a launched country code', () => {",
+									"    if (suggested !== null) {",
+									"        pm.expect(codes).to.include(suggested);",
+									"    }",
+									"});",
+									"// Note: in local/dev (no Cloudflare in deploy chain) suggested is always null.",
+									"// In staging/prod behind CF, suggested resolves to the visitor's country."
 								]
 							}
 						}
@@ -291,8 +295,9 @@
 						"method": "GET",
 						"header": [
 							{
-								"key": "If-None-Match",
-								"value": "{{countriesEtagEn}}"
+								"key": "cf-ipcountry",
+								"value": "AR",
+								"description": "Simulates Cloudflare forwarding visitor country. In production CF sets this automatically."
 							}
 						],
 						"url": {
@@ -313,7 +318,7 @@
 								}
 							]
 						},
-						"description": "Revalidation. Requires the prior 'en' request to have populated countriesEtagEn."
+						"description": "Passes cf-ipcountry header to test suggested_country_code resolution. When AR is a launched market, suggested_country_code=AR. When not launched, null."
 					}
 				},
 				{
@@ -364,26 +369,27 @@
 								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status is 200', () => pm.response.to.have.status(200));",
-									"const etag = pm.response.headers.get('ETag');",
-									"pm.test('ETag header is present', () => pm.expect(etag).to.be.a('string').and.not.empty);",
-									"pm.test('Cache-Control long-cache + SWR', () => {",
+									"",
+									"pm.test('Cache-Control is private, no-store (kitchen #217)', () => {",
 									"    const cc = pm.response.headers.get('Cache-Control') || '';",
-									"    pm.expect(cc).to.include('max-age=86400');",
-									"    pm.expect(cc).to.include('stale-while-revalidate=3600');",
+									"    pm.expect(cc).to.include('private');",
+									"    pm.expect(cc).to.include('no-store');",
 									"});",
 									"",
 									"const body = pm.response.json();",
-									"pm.test('Response is an array', () => pm.expect(body).to.be.an('array'));",
+									"pm.test('Response is an object envelope', () => pm.expect(body).to.be.an('object'));",
+									"pm.test('Envelope has countries array', () => pm.expect(body.countries).to.be.an('array'));",
+									"pm.test('Envelope has suggested_country_code field', () => pm.expect(body).to.have.property('suggested_country_code'));",
 									"",
 									"const firstActive = pm.collectionVariables.get('firstActiveCountryCode');",
 									"if (firstActive) {",
 									"    pm.test('Active countries are present in supplier-countries (superset)', () => {",
-									"        const codes = body.map(r => r.code);",
+									"        const codes = body.countries.map(r => r.code);",
 									"        pm.expect(codes).to.include(firstActive);",
 									"    });",
 									"}",
 									"",
-									"if (body.length === 0) {",
+									"if (body.countries.length === 0) {",
 									"    console.log('Empty /leads/supplier-countries \u2014 frontend drops dropdown + promotes partners@vianda.market mailto');",
 									"}"
 								]
@@ -411,7 +417,7 @@
 								}
 							]
 						},
-						"description": "Supplier form source. status IN ('active','inactive'). No reCAPTCHA."
+						"description": "Supplier form source. status IN ('active','inactive'). No reCAPTCHA. Response is LeadsCountriesResponseSchema envelope: {countries, suggested_country_code}. Cache-Control: private, no-store (kitchen #217)."
 					}
 				}
 			]
@@ -1476,7 +1482,7 @@
 			"key": "countriesEtagEn",
 			"value": "",
 			"type": "string",
-			"description": "Captured from the first /leads/countries?language=en call; reused by the 304 test."
+			"description": "Retired (kitchen #217): ETags no longer sent on /leads/countries (Cache-Control is now private, no-store). Kept as placeholder to avoid breaking variable references in older runs."
 		},
 		{
 			"key": "firstActiveCountryCode",
