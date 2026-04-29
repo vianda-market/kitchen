@@ -1730,8 +1730,14 @@ class CreditCurrencyUpsertByKeySchema(BaseModel):
     """
 
     canonical_key: str = Field(..., max_length=200, description="Stable seed-fixture identifier, e.g. E2E_CURRENCY_ARS")
-    currency_name: str = Field(..., max_length=50, description="ISO 4217 currency name used to resolve currency_code server-side (e.g. 'Argentine Peso')")
-    credit_value_local_currency: Decimal = Field(..., gt=0, description="How many local currency units equal one Vianda credit")
+    currency_name: str = Field(
+        ...,
+        max_length=50,
+        description="ISO 4217 currency name used to resolve currency_code server-side (e.g. 'Argentine Peso')",
+    )
+    credit_value_local_currency: Decimal = Field(
+        ..., gt=0, description="How many local currency units equal one Vianda credit"
+    )
 
 
 class CreditCurrencyMarketSchema(BaseModel):

@@ -1221,8 +1221,10 @@ def create_credit_currency_routes() -> APIRouter:
                 log_info(f"Upsert updated credit currency {currency_id} with canonical_key '{key}'")
                 result = credit_currency_service.get_by_id(currency_id, db)
                 if result is None:
-                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
-                return CreditCurrencyResponseSchema(**result)
+                    raise envelope_exception(
+                        ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency"
+                    )
+                return CreditCurrencyResponseSchema.model_validate(result, from_attributes=True)
 
             # Secondary lookup: if no row has this canonical_key, check if a currency already
             # exists for this currency_code (e.g. the seeded currencies in reference_data.sql).
@@ -1253,11 +1255,15 @@ def create_credit_currency_routes() -> APIRouter:
                         ),
                     )
                 db.commit()
-                log_info(f"Upsert adopted existing currency {currency_id} (code={currency_code}) with canonical_key '{key}'")
+                log_info(
+                    f"Upsert adopted existing currency {currency_id} (code={currency_code}) with canonical_key '{key}'"
+                )
                 result = credit_currency_service.get_by_id(currency_id, db)
                 if result is None:
-                    raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
-                return CreditCurrencyResponseSchema(**result)
+                    raise envelope_exception(
+                        ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency"
+                    )
+                return CreditCurrencyResponseSchema.model_validate(result, from_attributes=True)
 
             # Fully new INSERT — fetch USD rate and create.
             rate, _ = fetch_usd_rate_for_currency(currency_code)
@@ -1273,7 +1279,9 @@ def create_credit_currency_routes() -> APIRouter:
             }
             created = credit_currency_service.create(payload, db, scope=None)
             # Stamp canonical_key on the newly created row.
-            currency_id = created["currency_metadata_id"]
+            if created is None:
+                raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale=locale)
+            currency_id = created.currency_metadata_id
             with db.cursor() as cur:
                 cur.execute(
                     """UPDATE core.currency_metadata
@@ -1286,8 +1294,10 @@ def create_credit_currency_routes() -> APIRouter:
             log_info(f"Upsert inserted credit currency {currency_id} with canonical_key '{key}'")
             result = credit_currency_service.get_by_id(currency_id, db)
             if result is None:
-                raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency")
-            return CreditCurrencyResponseSchema(**result)
+                raise envelope_exception(
+                    ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Credit currency"
+                )
+            return CreditCurrencyResponseSchema.model_validate(result, from_attributes=True)
 
         return handle_business_operation(_upsert, "credit currency upsert by canonical key")
 

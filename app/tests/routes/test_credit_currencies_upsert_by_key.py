@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale, oauth2_scheme
 from app.dependencies.database import get_db
+from app.dto.enums import Status
 
 # Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
 # Excluded from unit test job by -m "not database"; runs in acceptance (Newman).
@@ -77,9 +78,7 @@ def client_with_employee(mock_employee_user, mock_db):
         app.dependency_overrides.pop(get_db, None)
 
 
-def _make_currency_dto(
-    *, canonical_key: str | None = None, currency_metadata_id=None, currency_code: str = "ARS"
-):
+def _make_currency_dto(*, canonical_key: str | None = None, currency_metadata_id=None, currency_code: str = "ARS"):
     """Build a minimal mock CreditCurrencyDTO."""
     from datetime import UTC, datetime
 
@@ -92,7 +91,7 @@ def _make_currency_dto(
         credit_value_local_currency=Decimal("1400"),
         currency_conversion_usd=Decimal("0.001"),
         is_archived=False,
-        status="active",
+        status=Status.ACTIVE,
         created_date=datetime(2026, 1, 1, tzinfo=UTC),
         modified_by=uuid4(),
         modified_date=datetime(2026, 1, 1, tzinfo=UTC),
@@ -146,7 +145,9 @@ class TestCreditCurrencyUpsertByKey:
             patch("app.config.supported_currencies.get_currency_code_by_name", return_value="ARS"),
             patch("app.services.cron.currency_refresh.fetch_usd_rate_for_currency", return_value=(0.001, None)),
             patch("app.utils.db.db_read", return_value=None),
-            patch.object(credit_currency_service, "create", return_value={"currency_metadata_id": created_id}) as mock_create,
+            patch.object(
+                credit_currency_service, "create", return_value={"currency_metadata_id": created_id}
+            ) as mock_create,
             patch.object(credit_currency_service, "get_by_id", return_value=response_dict),
         ):
             payload = _valid_upsert_payload(canonical_key="E2E_CURRENCY_ARS")
@@ -204,9 +205,7 @@ class TestCreditCurrencyUpsertByKey:
         assert resp1.status_code == 200
 
         # Second call: update path (key now exists)
-        existing_dto = _make_currency_dto(
-            canonical_key="E2E_CURRENCY_IDEMPOTENT", currency_metadata_id=created_id
-        )
+        existing_dto = _make_currency_dto(canonical_key="E2E_CURRENCY_IDEMPOTENT", currency_metadata_id=created_id)
         with (
             patch("app.services.crud_service.find_credit_currency_by_canonical_key", return_value=existing_dto),
             patch("app.config.supported_currencies.get_currency_code_by_name", return_value="ARS"),
