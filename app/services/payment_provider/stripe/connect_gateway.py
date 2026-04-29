@@ -20,18 +20,18 @@ from app.utils.log import log_error, log_info
 
 def _handle_stripe_error(e: Exception, locale: str = "en") -> HTTPException:
     """Map Stripe exceptions to appropriate HTTP status codes. Never leak raw Stripe messages."""
-    if isinstance(e, stripe.error.AuthenticationError):
+    if isinstance(e, stripe.AuthenticationError):
         log_error(f"Stripe authentication error: {e}")
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_AUTH_FAILED, status=500, locale=locale)
-    if isinstance(e, stripe.error.InvalidRequestError):
+    if isinstance(e, stripe.InvalidRequestError):
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=400, locale=locale)
-    if isinstance(e, stripe.error.PermissionError):
+    if isinstance(e, stripe.PermissionError):
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_NOT_READY, status=400, locale=locale)
-    if isinstance(e, stripe.error.APIConnectionError):
+    if isinstance(e, stripe.APIConnectionError):
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_UNAVAILABLE, status=503, locale=locale)
-    if isinstance(e, stripe.error.RateLimitError):
+    if isinstance(e, stripe.RateLimitError):
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_RATE_LIMITED, status=429, locale=locale)
-    if isinstance(e, stripe.error.StripeError):
+    if isinstance(e, stripe.StripeError):
         log_error(f"Stripe error: {e}")
         return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=502, locale=locale)
     return envelope_exception(ErrorCode.PAYMENT_PROVIDER_ERROR, status=502, locale=locale)
