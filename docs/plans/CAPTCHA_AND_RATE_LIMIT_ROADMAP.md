@@ -22,6 +22,7 @@ This roadmap covers human verification (e.g. CAPTCHA) and rate limiting across e
 | Endpoint / area | Rate limit (implemented) | CAPTCHA mode | Status |
 |----------------|--------------------------|-------------|--------|
 | `GET /leads/*`, `POST /leads/interest` | 5-60 req/min per IP (varies by endpoint) | **Always-on** — reCAPTCHA v3 token required on every call | **Implemented** |
+| Country-scoped leads reads (see §below) | 20-60 req/min per IP | **Captcha-on-rate-limit** — 429 body carries `captcha_required: true` + `action: "leads_read"`; retry with token passes | **Implemented (#218)** |
 | `POST /auth/token` (login) | 20/min per IP | **Conditional** — after 5 failed attempts in 15min window | **Implemented** |
 | `POST /customers/signup/request` | 10/min per IP | **Always-on** for web clients; mobile exempt | **Implemented** |
 | `POST /customers/signup/verify` | 20/min per IP | **Conditional** — after 3 failed attempts in 15min window | **Implemented** |
@@ -93,6 +94,59 @@ Protects `POST /api/v1/auth/token` from brute-force credential stuffing.
 - `app/auth/routes.py` — login CAPTCHA wiring
 - `app/routes/user_public.py` — signup + recovery CAPTCHA wiring
 - `app/config/settings.py` — per-endpoint threshold/window settings
+
+---
+
+## Implemented: Leads Captcha-on-Rate-Limit (#218)
+
+Country-scoped leads read endpoints carry an additive captcha hint on 429.
+
+### Covered endpoints
+
+| Endpoint | Rate limit | Action string |
+|----------|-----------|---------------|
+| `GET /leads/plans` | 60/min | `leads_read` |
+| `GET /leads/restaurants` | 60/min | `leads_read` |
+| `GET /leads/featured-restaurant` | 60/min | `leads_read` |
+| `GET /leads/cities` | 20/min | `leads_read` |
+| `GET /leads/city-metrics` | 20/min | `leads_read` |
+| `GET /leads/zipcode-metrics` | 20/min | `leads_read` |
+
+**Excluded (navbar-load, captcha-exempt):** `/leads/countries`, `/leads/supplier-countries`.
+These two endpoints sit on `public_router` (no `verify_recaptcha` dependency) and load on every
+marketing-site page render, so they must not carry a challenge.
+
+### Wire shape (additive on existing 429)
+
+```json
+{
+  "detail": {
+    "code": "request.rate_limited",
+    "message": "...",
+    "params": { "retry_after_seconds": 60 }
+  },
+  "captcha_required": true,
+  "action": "leads_read"
+}
+```
+
+The `detail` field is unchanged — existing consumers continue to parse it. The two new
+top-level fields (`captcha_required`, `action`) are only present on the covered endpoints.
+
+### Retry contract
+
+Frontend detects `captcha_required: true` → renders invisible reCAPTCHA v3 with `action="leads_read"` →
+retries the request with `X-Recaptcha-Token: <token>` header. The existing `verify_recaptcha` dependency
+on the `leads_router` validates the token. If the token is valid, the request proceeds normally (200).
+
+A single action string `leads_read` is used across all covered endpoints — keeps frontend retry logic simple.
+
+### Implementation
+
+- `application.py::_structured_rate_limit_handler` — detects `request.url.path` against a frozenset of
+  covered paths; adds `captcha_required` and `action` to the response content when matched.
+- No changes to `app/routes/leads.py` or `app/auth/recaptcha.py` — the existing `verify_recaptcha`
+  dependency handles the token on retry.
 
 ---
 

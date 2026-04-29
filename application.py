@@ -406,13 +406,33 @@ def create_app() -> FastAPI:
 
     # Rate limiting (slowapi) — emits request.rate_limited envelope (K3).
     # Replaces the previous plain {"detail": "rate_limited", "retry_after_seconds": 60}.
+    #
+    # Leads captcha-on-rate-limit extension (issue #218):
+    # Country-scoped leads read endpoints add captcha_required + action fields
+    # to the 429 body when the per-IP rate limit is tripped.  The two navbar-load
+    # country endpoints (/leads/countries, /leads/supplier-countries) are excluded
+    # because they sit on the captcha-exempt public_router.
+    _LEADS_CAPTCHA_PATHS: frozenset[str] = frozenset(
+        {
+            "/api/v1/leads/plans",
+            "/api/v1/leads/restaurants",
+            "/api/v1/leads/featured-restaurant",
+            "/api/v1/leads/cities",
+            "/api/v1/leads/city-metrics",
+            "/api/v1/leads/zipcode-metrics",
+        }
+    )
 
     async def _structured_rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
         locale = _resolve_handler_locale(request)
         envelope = build_envelope(ErrorCode.REQUEST_RATE_LIMITED, locale, retry_after_seconds=60)
+        content: dict = {"detail": envelope}
+        if request.url.path in _LEADS_CAPTCHA_PATHS:
+            content["captcha_required"] = True
+            content["action"] = "leads_read"
         return JSONResponse(
             status_code=429,
-            content={"detail": envelope},
+            content=content,
             headers={"Retry-After": "60"},
         )
 
