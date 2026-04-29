@@ -1,25 +1,39 @@
 """
 Public country-list endpoints for the marketing site (vianda-home).
 
-Carved out of `app/routes/leads.py` so the main leads router stays compact and
+Carved out of ``app/routes/leads.py`` so the main leads router stays compact and
 keeps a healthy maintainability index. These two endpoints are the only
-`/leads/*` routes that intentionally skip reCAPTCHA — they back the navbar
+``/leads/*`` routes that intentionally skip reCAPTCHA — they back the navbar
 country selector, which loads on every page render and therefore cannot sit
 behind a challenge.
 
-Both responses are heavily cached:
-- `Cache-Control: public, max-age=86400, stale-while-revalidate=3600`
-- Strong `ETag` (option c: hash over response fields + per-row modified_date + locale)
-- `If-None-Match` → 304
+**Cache-Control: private, no-store**
 
-A locale-keyed in-process cache fronts the DB read; admin status flips reach
-all workers within `_COUNTRIES_CACHE_TTL_SECONDS + 24h browser cache`, which is
-acceptable at the change frequency of this data.
+The response envelope now includes ``suggested_country_code``, derived from the
+visitor's IP via the ``cf-ipcountry`` header (Cloudflare).  Because this value
+varies per-visitor, responses MUST NOT be served from shared caches (CDN /
+reverse proxy).  ``private, no-store`` prevents any intermediate cache from
+holding and re-serving a visitor's suggestion to a different visitor.
 
-Full contract: `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md`.
+An in-process, locale-keyed cache (10-minute TTL) fronts the DB read for the
+countries list itself — only the suggestion varies.  Admin status flips reach
+all workers within the TTL window.
+
+**Geo source: Cloudflare cf-ipcountry header**
+
+Cloudflare forwards the visitor's country as the ``cf-ipcountry`` HTTP request
+header.  When this header is absent (Cloudflare not in the deploy chain, local
+dev, or an unresolvable IP), ``suggested_country_code`` is ``null``.
+
+NOTE: Cloudflare is not currently in the kitchen deploy chain (Cloud Run
+direct).  This field will return ``null`` for all requests until CF is placed
+in front of Cloud Run.  The implementation is forward-compatible: once CF is
+added, the header is forwarded automatically and no further backend changes are
+needed.
+
+Full contract: ``docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md``.
 """
 
-import hashlib
 import time
 
 import psycopg2.extensions
@@ -30,7 +44,7 @@ from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.i18n.locale_names import localize_country_name
-from app.schemas.consolidated_schemas import LeadsCountrySchema
+from app.schemas.consolidated_schemas import LeadsCountriesResponseSchema, LeadsCountrySchema
 from app.services.leads_public_service import (
     get_public_countries,
     get_public_supplier_countries,
@@ -39,14 +53,17 @@ from app.utils.locale import resolve_locale_from_header
 from app.utils.rate_limit import limiter
 
 # Sibling router at the same /leads prefix, *without* the router-level
-# Depends(verify_recaptcha) used by `app.routes.leads.router`.
+# Depends(verify_recaptcha) used by ``app.routes.leads.router``.
 public_router = APIRouter(prefix="/leads", tags=["Leads"])
 
 _COUNTRIES_CACHE_TTL_SECONDS = 600  # 10 minutes
-_countries_cache: dict[str, tuple[list[dict], str, float]] = {}  # locale -> (rows, etag, expiry)
-_supplier_countries_cache: dict[str, tuple[list[dict], str, float]] = {}
+# locale -> (serialized rows, expiry)
+_countries_cache: dict[str, tuple[list[dict], float]] = {}
+_supplier_countries_cache: dict[str, tuple[list[dict], float]] = {}
 
-_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=3600"
+# Cache-Control: private, no-store because the envelope includes a per-visitor
+# suggested_country_code.  No shared CDN/proxy caching permitted.
+_CACHE_CONTROL = "private, no-store"
 
 
 def _resolve_leads_locale(request: Request, language: str | None) -> str:
@@ -63,30 +80,8 @@ def _resolve_leads_locale(request: Request, language: str | None) -> str:
     return locale
 
 
-def _compute_countries_etag(rows: list[dict], locale: str) -> str:
-    """ETag over response-field values + per-row market/currency modified_date + locale.
-
-    Option (c) from the plan: no cross-table triggers, no materialization — the hash
-    input is explicit and lives entirely at the query/response boundary.
-    """
-    h = hashlib.sha256()
-    h.update(locale.encode("utf-8"))
-    for r in rows:
-        parts = [
-            r.get("code") or "",
-            r.get("currency") or "",
-            r.get("phone_prefix") or "",
-            r.get("default_locale") or "",
-            str(r.get("market_modified_date") or ""),
-            str(r.get("currency_modified_date") or ""),
-        ]
-        h.update("\x1f".join(parts).encode("utf-8"))
-        h.update(b"\x1e")
-    return f'"{h.hexdigest()[:32]}"'
-
-
 def _to_country_payload(rows: list[dict], locale: str) -> list[dict]:
-    """Localize country names and drop ETag-only fields before serialization."""
+    """Localize country names and drop DB-only fields before serialization."""
     return [
         {
             "code": r["code"],
@@ -99,41 +94,63 @@ def _to_country_payload(rows: list[dict], locale: str) -> list[dict]:
     ]
 
 
+def _resolve_suggested_country(cf_ipcountry: str | None, country_codes: set[str]) -> str | None:
+    """Resolve the visitor's suggested country from the Cloudflare cf-ipcountry header.
+
+    Returns the ISO 3166-1 alpha-2 code only when:
+    - The header is present and non-empty.
+    - The resolved code is present in ``country_codes`` (the returned countries list).
+
+    Returns ``None`` when the header is absent, invalid, or the resolved country
+    is not a launched/configured market.
+
+    Cloudflare uses ``"XX"`` for IPs it cannot resolve — treated as absent.
+    """
+    if not cf_ipcountry:
+        return None
+    code = cf_ipcountry.strip().upper()
+    # Cloudflare sets "XX" for unknown/unresolvable IPs — treat as absent.
+    if not code or code == "XX" or len(code) != 2:
+        return None
+    return code if code in country_codes else None
+
+
 def _serve_countries(
     *,
     response: Response,
     locale: str,
-    if_none_match: str | None,
+    cf_ipcountry: str | None,
     supplier_audience: bool,
     db: psycopg2.extensions.connection,
-) -> list[LeadsCountrySchema] | Response:
+) -> LeadsCountriesResponseSchema:
     """Shared serve path for /leads/countries (supplier_audience=False) and
-    /leads/supplier-countries (True). Cache lookup → DB fallback → ETag/Cache-Control.
-    Returns a 304 Response when If-None-Match matches, else the serialized list.
+    /leads/supplier-countries (True). In-process cache → DB fallback → envelope.
+
+    Response is always ``private, no-store`` because the envelope contains a
+    per-visitor ``suggested_country_code``.
     """
     cache = _supplier_countries_cache if supplier_audience else _countries_cache
     fetch = get_public_supplier_countries if supplier_audience else get_public_countries
 
     now = time.time()
     entry = cache.get(locale)
-    if entry and now < entry[2]:
-        rows, etag = entry[0], entry[1]
+    if entry and now < entry[1]:
+        rows = entry[0]
     else:
         raw_rows = fetch(db)
-        etag = _compute_countries_etag(raw_rows, locale)
         rows = _to_country_payload(raw_rows, locale)
-        cache[locale] = (rows, etag, now + _COUNTRIES_CACHE_TTL_SECONDS)
+        cache[locale] = (rows, now + _COUNTRIES_CACHE_TTL_SECONDS)
 
     response.headers["Cache-Control"] = _CACHE_CONTROL
-    response.headers["ETag"] = etag
 
-    if if_none_match and if_none_match.strip() == etag:
-        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": _CACHE_CONTROL})
+    country_codes = {r["code"] for r in rows}
+    suggested = _resolve_suggested_country(cf_ipcountry, country_codes)
 
-    return [LeadsCountrySchema(**r) for r in rows]
+    countries = [LeadsCountrySchema(**r) for r in rows]
+    return LeadsCountriesResponseSchema(countries=countries, suggested_country_code=suggested)
 
 
-@public_router.get("/countries", response_model=list[LeadsCountrySchema])
+@public_router.get("/countries", response_model=LeadsCountriesResponseSchema)
 @limiter.limit("60/minute")
 async def list_leads_countries(
     request: Request,
@@ -142,30 +159,42 @@ async def list_leads_countries(
         None,
         description="Locale for country names (en, es, pt). Falls back to Accept-Language header.",
     ),
-    if_none_match: str | None = Header(None, alias="If-None-Match"),
+    cf_ipcountry: str | None = Header(None, alias="cf-ipcountry"),
     db: psycopg2.extensions.connection = Depends(get_db),
-) -> list[LeadsCountrySchema] | Response:
+) -> LeadsCountriesResponseSchema:
     """
     Public (no auth, no reCAPTCHA) country selector source for the marketing-site navbar.
 
-    Returns markets with `status='active'` (currently serving customers). Response shape:
-    `[{code, name, currency, phone_prefix, default_locale}]`.
+    Returns markets with ``status='active'`` (currently serving customers). Response shape::
 
-    **Empty array contract:** `[]` means no markets currently serve customers. The frontend
-    hides the navbar country selector and every country-scoped section. The supplier
-    application form is unaffected (it reads `/leads/supplier-countries`).
+        {
+          "countries": [{code, name, currency, phone_prefix, default_locale}, ...],
+          "suggested_country_code": "AR" | null
+        }
+
+    ``suggested_country_code`` is the ISO 3166-1 alpha-2 of the visitor's country, inferred
+    from the ``cf-ipcountry`` header forwarded by Cloudflare.  Returns ``null`` when CF is not
+    in the deploy chain, when the header is absent, or when the resolved country is not a
+    launched market.
+
+    **Empty countries contract:** ``countries: []`` means no markets currently serve customers.
+    The frontend hides the navbar country selector and every country-scoped section. The
+    supplier application form is unaffected (it reads ``/leads/supplier-countries``).
+
+    **Cache-Control: private, no-store** — the envelope contains a per-visitor suggestion;
+    shared caches must not serve one visitor's response to another.
     """
     locale = _resolve_leads_locale(request, language)
     return _serve_countries(
         response=response,
         locale=locale,
-        if_none_match=if_none_match,
+        cf_ipcountry=cf_ipcountry,
         supplier_audience=False,
         db=db,
     )
 
 
-@public_router.get("/supplier-countries", response_model=list[LeadsCountrySchema])
+@public_router.get("/supplier-countries", response_model=LeadsCountriesResponseSchema)
 @limiter.limit("60/minute")
 async def list_leads_supplier_countries(
     request: Request,
@@ -174,25 +203,33 @@ async def list_leads_supplier_countries(
         None,
         description="Locale for country names (en, es, pt). Falls back to Accept-Language header.",
     ),
-    if_none_match: str | None = Header(None, alias="If-None-Match"),
+    cf_ipcountry: str | None = Header(None, alias="cf-ipcountry"),
     db: psycopg2.extensions.connection = Depends(get_db),
-) -> list[LeadsCountrySchema] | Response:
+) -> LeadsCountriesResponseSchema:
     """
     Public (no auth, no reCAPTCHA) country list for the supplier application form.
 
-    Superset of `/leads/countries`: includes markets with `status IN ('active', 'inactive')`.
-    Inactive markets are configured in `market_info` but not yet serving customers — suppliers
+    Superset of ``/leads/countries``: includes markets with ``status IN ('active', 'inactive')``.
+    Inactive markets are configured in ``market_info`` but not yet serving customers — suppliers
     can still apply so we capture interest ahead of launch.
 
-    **Empty array contract:** `[]` means no markets are configured at all. Frontend renders
-    the supplier form without the country dropdown and promotes
-    `mailto:partners@vianda.market` as the primary CTA.
+    ``suggested_country_code`` is the ISO 3166-1 alpha-2 of the visitor's country, inferred
+    from the ``cf-ipcountry`` header forwarded by Cloudflare.  Returns ``null`` when CF is not
+    in the deploy chain, when the header is absent, or when the resolved country is not a
+    configured market (active or inactive).
+
+    **Empty countries contract:** ``countries: []`` means no markets are configured at all.
+    Frontend renders the supplier form without the country dropdown and promotes
+    ``mailto:partners@vianda.market`` as the primary CTA.
+
+    **Cache-Control: private, no-store** — the envelope contains a per-visitor suggestion;
+    shared caches must not serve one visitor's response to another.
     """
     locale = _resolve_leads_locale(request, language)
     return _serve_countries(
         response=response,
         locale=locale,
-        if_none_match=if_none_match,
+        cf_ipcountry=cf_ipcountry,
         supplier_audience=True,
         db=db,
     )
