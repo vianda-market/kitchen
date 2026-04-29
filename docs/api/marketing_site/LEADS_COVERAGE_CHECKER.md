@@ -254,7 +254,7 @@ UX placement (separate forms, tabs, or distinct sections) is your design decisio
 - `GET /api/v1/leads/countries`
 - `GET /api/v1/leads/supplier-countries`
 
-These are navbar-load fetches executed on every page render and cannot sit behind a challenge. They are rate-limited (60/min per IP) and return cacheable responses with ETags, so the anti-scraping story relies on the per-IP limiter rather than a per-request token. A rate-limit-breach → CAPTCHA-unlock handshake for the other country-scoped reads is planned for v2 (see the feedback note).
+These are navbar-load fetches executed on every page render and cannot sit behind a challenge. They are rate-limited (60/min per IP) and return cacheable responses with ETags, so the anti-scraping story relies on the per-IP limiter rather than a per-request token.
 
 ### Setup
 1. Add reCAPTCHA v3 JS script to the page:
@@ -275,8 +275,9 @@ These are navbar-load fetches executed on every page render and cannot sit behin
 
 ### Action names (for reCAPTCHA admin console analytics)
 Use distinct `action` values per endpoint type:
-- `leads_coverage_check` — markets, cities, city-metrics, zipcode-metrics
-- `leads_content` — restaurants, featured-restaurant, plans
+- `leads_coverage_check` — markets, cities, city-metrics, zipcode-metrics (normal calls)
+- `leads_content` — restaurants, featured-restaurant, plans (normal calls)
+- `leads_read` — **captcha retry only** — use this action when executing reCAPTCHA after a 429 with `captcha_required: true` on any country-scoped leads endpoint
 - `leads_interest_submit` — POST /leads/interest
 - *(no token)* — countries, supplier-countries
 
@@ -338,11 +339,32 @@ Parse and forward UTM params from marketing campaigns. Firebase Analytics handle
 | `/leads/employee-count-ranges` | 60/min per IP |
 | `POST /leads/interest` | 5/min per IP |
 
-429 response shape (structured):
+429 response shape — all endpoints:
 ```json
-{ "detail": "rate_limited", "retry_after_seconds": 42 }
+{
+  "detail": {
+    "code": "request.rate_limited",
+    "message": "Too many requests. Please try again later.",
+    "params": { "retry_after_seconds": 60 }
+  }
+}
 ```
-The response also includes a `Retry-After` header (seconds until the limit resets).
+The response also includes a `Retry-After: 60` header.
+
+**Captcha-on-rate-limit (country-scoped reads only):** When the rate limit is tripped on
+`/leads/plans`, `/leads/restaurants`, `/leads/featured-restaurant`, `/leads/cities`,
+`/leads/city-metrics`, or `/leads/zipcode-metrics`, the 429 body carries two **additive**
+fields on top of the standard envelope:
+```json
+{
+  "detail": { "code": "request.rate_limited", "message": "...", "params": { "retry_after_seconds": 60 } },
+  "captcha_required": true,
+  "action": "leads_read"
+}
+```
+Frontend flow: detect `captcha_required: true` → execute `grecaptcha.execute(SITE_KEY, { action: "leads_read" })` → retry the request with `X-Recaptcha-Token: <token>` → the backend validates the token and, if valid, lets the request through (200).
+
+`/leads/countries` and `/leads/supplier-countries` never carry `captcha_required` — they are exempt from the captcha gate.
 
 ---
 
