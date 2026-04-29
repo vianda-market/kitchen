@@ -34,7 +34,7 @@ jobs:
     outputs:
       app-relevant: ${{ steps.filter.outputs.app-relevant }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -71,9 +71,9 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -104,9 +104,9 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -117,7 +117,7 @@ jobs:
         run: pip install -r requirements-test.txt
 
       # Item #2: cache .mypy_cache independently.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: .mypy_cache
           key: mypy-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-${{ github.sha }}
@@ -143,12 +143,12 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # complexity_strict + maintainability diff against origin/main.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -188,9 +188,9 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -225,7 +225,7 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -262,12 +262,12 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Full history so diff-cover can diff against origin/main.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -278,7 +278,7 @@ jobs:
         run: pip install -r requirements-test.txt
 
       # Item #3: cache .pytest_cache so collection is a noop on warm boot.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: .pytest_cache
           key: pytest-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}-${{ github.sha }}
@@ -325,7 +325,7 @@ jobs:
 
       - name: Upload coverage artifact for post-test
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-xml-${{ github.run_id }}
           path: coverage.xml
@@ -352,9 +352,9 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
@@ -437,16 +437,16 @@ jobs:
       EMAIL_PROVIDER: smtp
       QR_HMAC_SECRET: ci-test-hmac-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           allow-prereleases: true
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -454,7 +454,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Cache newman global install
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: newman-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -525,7 +525,7 @@ jobs:
       # Required so `./.github/actions/notify-routine` (below) can resolve its
       # action.yml. Without it the notify step fails with "Can't find action.yml"
       # and Claude is silently never paged on CI failures.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: All required jobs passed or intentionally skipped
         run: |
