@@ -429,7 +429,7 @@ class EmployeeCustomerAccessControl:
         Example:
             subscription = get_subscription_by_id(subscription_id, db)
             if not subscription:
-                raise HTTPException(status_code=404, detail="Subscription not found")
+                raise envelope_exception(ErrorCode.SUBSCRIPTION_NOT_FOUND, status=404, locale="en")
 
             error = EmployeeCustomerAccessControl.verify_ownership(
                 subscription.user_id,

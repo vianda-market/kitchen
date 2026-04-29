@@ -12,9 +12,10 @@ from io import BytesIO
 from uuid import UUID
 
 import qrcode
-from fastapi import HTTPException
 
 from app.config.settings import settings
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.utils.log import log_error, log_info
 
 # Local dev only — in GCS mode (GCS_INTERNAL_BUCKET set), files go to GCS instead
@@ -70,7 +71,7 @@ class QRCodeGenerationService:
 
         except Exception as e:
             log_error(f"Failed to generate QR code image for {qr_code_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate QR code image") from None
+            raise envelope_exception(ErrorCode.QR_CODE_IMAGE_GENERATION_FAILED, status=500, locale="en") from None
 
     def _generate_local_storage(self, year_month: str, filename: str, image_bytes: bytes) -> tuple[str, str]:
         """Save QR code image to local storage."""

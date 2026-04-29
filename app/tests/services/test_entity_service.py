@@ -94,7 +94,8 @@ class TestEntityService:
                 get_user_by_username(username, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to get user by username" in str(exc_info.value.detail)
+            detail = exc_info.value.detail
+            assert isinstance(detail, dict) and detail.get("code") == "user.get_failed"
 
     def test_get_user_by_username_normalizes_to_lowercase(self, mock_db):
         """Test that get_user_by_username normalizes username to lowercase before lookup."""
@@ -323,7 +324,8 @@ class TestEntityService:
                 get_products_by_institution(institution_id, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to get products for institution" in str(exc_info.value.detail)
+            detail = exc_info.value.detail
+            assert isinstance(detail, dict) and detail.get("code") == "service.product_list_failed"
 
     def test_get_bills_by_status_handles_service_error(self, mock_db):
         """Test that get_bills_by_status handles service errors gracefully."""
@@ -339,7 +341,8 @@ class TestEntityService:
                 get_bills_by_status(institution_id, status, mock_db)
 
             assert exc_info.value.status_code == 500
-            assert "Failed to get bills for institution" in str(exc_info.value.detail)
+            detail = exc_info.value.detail
+            assert isinstance(detail, dict) and detail.get("code") == "service.bill_list_failed"
 
     @patch("app.services.entity_service.db_read")
     def test_search_users_applies_institution_id_and_market_id_filters(self, mock_db_read, mock_db):

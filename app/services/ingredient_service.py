@@ -213,7 +213,7 @@ def create_custom_ingredient(name: str, lang: str, user_id: UUID, db) -> dict:
         row = cursor.fetchone()
         db.commit()
         if row is None:
-            raise HTTPException(status_code=500, detail="Failed to create ingredient")
+            raise envelope_exception(ErrorCode.INGREDIENT_CREATION_FAILED, status=500, locale="en")
         # Build dict from RETURNING columns
         columns = [
             "ingredient_id",
@@ -232,7 +232,7 @@ def create_custom_ingredient(name: str, lang: str, user_id: UUID, db) -> dict:
     except Exception as exc:
         db.rollback()
         logger.error("Custom ingredient creation failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to create ingredient") from None
+        raise envelope_exception(ErrorCode.INGREDIENT_CREATION_FAILED, status=500, locale="en") from None
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ def set_product_ingredients(
     except Exception as exc:
         db.rollback()
         logger.error("set_product_ingredients failed for product %s: %s", product_id, exc)
-        raise HTTPException(status_code=500, detail="Failed to update product ingredients") from None
+        raise envelope_exception(ErrorCode.INGREDIENT_PRODUCT_UPDATE_FAILED, status=500, locale="en") from None
 
     return get_product_ingredients(product_id, market_id, db)
 

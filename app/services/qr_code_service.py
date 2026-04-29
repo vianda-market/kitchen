@@ -8,9 +8,10 @@ Ensures data consistency between database records and image files.
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import HTTPException
 
 from app.dto.models import QRCodeDTO
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.activation_service import maybe_activate_restaurant
 from app.services.crud_service import qr_code_service
@@ -122,7 +123,7 @@ class AtomicQRCodeService:
             # Rollback on any error
             db.rollback()
             log_error(f"Failed to create QR code atomically: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create QR code with image") from None
+            raise envelope_exception(ErrorCode.QR_CODE_CREATE_FAILED, status=500, locale="en") from None
 
     def delete_qr_code_atomic(
         self, qr_code_id: UUID, db: psycopg2.extensions.connection, scope: InstitutionScope | None = None
@@ -180,7 +181,7 @@ class AtomicQRCodeService:
                 pass  # Ignore rollback errors
 
             log_error(f"Failed to delete QR code atomically: {e}")
-            raise HTTPException(status_code=500, detail="Failed to delete QR code") from None
+            raise envelope_exception(ErrorCode.QR_CODE_DELETE_FAILED, status=500, locale="en") from None
 
     def update_qr_code_status(
         self,
@@ -213,4 +214,4 @@ class AtomicQRCodeService:
 
         except Exception as e:
             log_error(f"Failed to update QR code status: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update QR code status") from None
+            raise envelope_exception(ErrorCode.QR_CODE_UPDATE_FAILED, status=500, locale="en") from None
