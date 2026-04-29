@@ -1627,6 +1627,7 @@ class QRCodeResponseSchema(BaseModel):
     qr_code_checksum: str | None = None
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
     created_date: datetime
     modified_date: datetime
     restaurant_activated: RestaurantActivatedSchema | None = Field(
@@ -1639,6 +1640,38 @@ class QRCodeResponseSchema(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class QrCodeUpsertByKeySchema(BaseModel):
+    """Schema for idempotent QR code upsert by canonical_key.
+
+    If a QR code with the given canonical_key already exists it is updated
+    in-place; otherwise a new QR code is created atomically (including QR
+    image generation) with that canonical_key.
+
+    Use this endpoint for Postman seed runs and fixture data — never for
+    ad-hoc QR code creation (use POST /qr-codes instead).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Immutable fields on UPDATE: ``restaurant_id`` is locked after insert and
+    ignored on the update path (a QR code always belongs to the restaurant it
+    was originally created for).
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description="Stable human-readable identifier, e.g. 'E2E_QR_CAMBALACHE'",
+    )
+    restaurant_id: UUID = Field(
+        ...,
+        description=(
+            "FK to ops.restaurant_info. **Immutable after INSERT** — "
+            "ignored on the update path to prevent reassignment."
+        ),
+    )
 
 
 # =============================================================================

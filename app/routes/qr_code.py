@@ -12,7 +12,7 @@ import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import HTMLResponse
 
-from app.auth.dependencies import get_current_user, get_resolved_locale
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -21,10 +21,11 @@ from app.schemas.consolidated_schemas import (
     QRCodeEnrichedResponseSchema,
     QRCodeResponseSchema,
     QRCodeUpdateSchema,
+    QrCodeUpsertByKeySchema,
     RestaurantActivatedSchema,
 )
 from app.security.entity_scoping import ENTITY_QR_CODE, ENTITY_RESTAURANT, EntityScopingService
-from app.services.crud_service import qr_code_service, restaurant_service
+from app.services.crud_service import find_qr_code_by_canonical_key, qr_code_service, restaurant_service
 from app.services.entity_service import (
     get_enriched_qr_code_by_id,
     get_enriched_qr_codes,
@@ -218,6 +219,92 @@ def get_qr_code(
 
     data = resolve_qr_code_image_url(data)
     return QRCodeResponseSchema(**data)
+
+
+# =============================================================================
+# PUT /qr-codes/by-key — idempotent upsert (seed/fixture endpoint).
+# MUST be registered before PUT /{qr_code_id} so the static segment "by-key"
+# wins over the UUID path parameter (FastAPI evaluates in registration order).
+# =============================================================================
+
+
+@router.put("/by-key", response_model=QRCodeResponseSchema, status_code=200)
+def upsert_qr_code_by_key(
+    upsert_data: QrCodeUpsertByKeySchema,
+    current_user: dict = Depends(get_employee_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> QRCodeResponseSchema:
+    """Idempotent upsert a QR code by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT — never use for ad-hoc QR code creation
+    (use POST /qr-codes instead).
+
+    If a QR code with this canonical_key already exists it is updated in-place;
+    otherwise a new QR code is created atomically (including image generation)
+    with that canonical_key.
+
+    Immutable fields on UPDATE: ``restaurant_id`` is locked after insert and
+    ignored on the update path (a QR code always belongs to the restaurant it
+    was originally created for).
+
+    Auth: Internal only (get_employee_user dependency). Returns 403 for
+    Customer/Supplier roles.
+
+    Returns HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+    from app.utils.gcs import resolve_qr_code_image_url
+    from app.utils.log import log_info
+
+    def _upsert() -> QRCodeResponseSchema:
+        key = upsert_data.canonical_key
+        modified_by = current_user["user_id"]
+
+        existing = find_qr_code_by_canonical_key(key, db)
+
+        if existing is not None:
+            # UPDATE path — restaurant_id is immutable; refresh canonical_key stamp only.
+            with db.cursor() as cur:
+                cur.execute(
+                    """UPDATE ops.qr_code
+                       SET canonical_key = %s,
+                           modified_by = %s::uuid,
+                           modified_date = CURRENT_TIMESTAMP
+                       WHERE qr_code_id = %s::uuid""",
+                    (key, str(modified_by), str(existing.qr_code_id)),
+                )
+            db.commit()
+            log_info(f"Upsert updated qr_code {existing.qr_code_id} with canonical_key '{key}'")
+            refreshed = qr_code_service.get_by_id(existing.qr_code_id, db)
+            if refreshed is None:
+                raise envelope_exception(ErrorCode.QR_CODE_GET_FAILED, status=500, locale="en")
+            data = refreshed.model_dump(mode="json")
+            data = resolve_qr_code_image_url(data)
+            return QRCodeResponseSchema(**data)
+
+        # INSERT path — create QR code atomically (mirrors POST /qr-codes).
+        scope = EntityScopingService.get_scope_for_entity(ENTITY_QR_CODE, current_user)
+        qr_dto, _activation = atomic_qr_service.create_qr_code_atomic(
+            upsert_data.restaurant_id, modified_by, db, scope=scope
+        )
+        if qr_dto is None:
+            raise envelope_exception(ErrorCode.QR_CODE_GET_FAILED, status=500, locale="en")
+        # Stamp canonical_key on the freshly-inserted row.
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE ops.qr_code
+                   SET canonical_key = %s,
+                       modified_date = CURRENT_TIMESTAMP
+                   WHERE qr_code_id = %s::uuid""",
+                (key, str(qr_dto.qr_code_id)),
+            )
+        db.commit()
+        log_info(f"Upsert inserted qr_code {qr_dto.qr_code_id} with canonical_key '{key}'")
+        data = qr_dto.model_dump(mode="json")
+        data["canonical_key"] = key
+        data = resolve_qr_code_image_url(data)
+        return QRCodeResponseSchema(**data)
+
+    return handle_business_operation(_upsert, "qr code upsert by canonical key")
 
 
 @router.put("/{qr_code_id}", response_model=QRCodeResponseSchema)

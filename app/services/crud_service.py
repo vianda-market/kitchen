@@ -2780,3 +2780,26 @@ def find_plate_kitchen_day_by_canonical_key(
     except Exception as exc:
         log_error(f"Error finding plate kitchen day by canonical_key '{canonical_key}': {exc}")
         return None
+
+
+def find_qr_code_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> "QRCodeDTO | None":
+    """Look up a QR code by its canonical_key.
+
+    Returns the matching QRCodeDTO (including archived) or None if no
+    QR code with that key exists.  Used by the PUT /qr-codes/by-key
+    upsert endpoint to decide insert vs update.
+    """
+    from app.dto.models import QRCodeDTO
+
+    query = """
+        SELECT * FROM ops.qr_code
+        WHERE canonical_key = %s
+    """
+    try:
+        result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
+        if not result or not isinstance(result, dict):
+            return None
+        return QRCodeDTO(**result)
+    except Exception as exc:
+        log_error(f"Error finding qr_code by canonical_key '{canonical_key}': {exc}")
+        return None

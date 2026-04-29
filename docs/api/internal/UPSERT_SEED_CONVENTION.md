@@ -785,6 +785,84 @@ See "Upsert Canonical Plate Kitchen Day Monday (idempotent)" through
 
 ---
 
+## QR Codes — `PUT /api/v1/qr-codes/by-key`
+
+```http
+PUT /api/v1/qr-codes/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for supplier QR code
+generation or ad-hoc kiosk setup. Auth: Internal only. Returns 403 for
+Customer/Supplier roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_QR_CAMBALACHE` |
+| `restaurant_id` | UUID | yes | FK to `ops.restaurant_info`. **Immutable after INSERT** — ignored on the update path. |
+
+Response body is `QRCodeResponseSchema` (same shape as `GET /api/v1/qr-codes/{qr_code_id}`).
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new QR code row is created atomically (same image-generation
+  pipeline as `POST /qr-codes`). `canonical_key` is stamped onto the new row
+  immediately after atomic creation. Status is `active` and the QR image is
+  generated in GCS.
+- **UPDATE path**: only the `canonical_key` stamp and `modified_date` are
+  refreshed. The QR image, payload, and `restaurant_id` are left untouched —
+  do not re-generate the image.
+
+### Immutable fields on UPDATE
+
+The following fields are stripped from the update payload and cannot be changed
+via this endpoint (they were set at insert time and are immutable by design):
+
+- `restaurant_id` — FK to the owning restaurant; cannot change after creation
+
+### canonical_key convention for QR codes
+
+```
+E2E_QR_{RESTAURANT_SLUG}
+```
+
+Examples:
+- `E2E_QR_CAMBALACHE` — QR code for the E2E test restaurant "Cambalache"
+- `E2E_QR_LA_COCINA_PORTENA` — QR code for the alternate E2E fixture restaurant
+
+### Why SQL fixtures are not used for QR codes
+
+QR codes require `restaurant_id` (created at test run time via Postman) and
+trigger GCS image generation that cannot be replicated in SQL. Therefore
+canonical QR code fixtures live in the Postman collection as
+`PUT /qr-codes/by-key` calls rather than as SQL `INSERT` statements.
+
+### Postman pre-request token elevation
+
+`PUT /qr-codes/by-key` is Internal-only but at the point in the E2E collection
+where QR codes are created, the supplier login has already set the environment
+`authToken`. Use the same synchronous admin-token elevation pattern as
+`PUT /restaurants/by-key`:
+
+1. Read the admin token from collection scope (not overwritten by supplier login).
+2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
+3. Restore the supplier token in the test script post-upsert.
+
+See "Upsert Canonical Restaurant QR Code (idempotent)" in
+`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+
+### Schema Notes (QR codes)
+
+- `ops.qr_code.canonical_key VARCHAR(200) NULL` — added in
+  migration `0010_qr_code_canonical_key.sql`.
+- Partial index `uq_qr_code_canonical_key` (sparse: only indexed when non-null).
+- `QRCodeResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is
