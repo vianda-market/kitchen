@@ -19,7 +19,7 @@ app/
 │   └── middleware/
 │       └── permission_cache.py
 ├── config/                  # Settings, enums, static config
-│   ├── settings.py          # App settings, env vars
+│   ├── settings.py          # App settings, env vars. `.env` file loaded ONLY when ENVIRONMENT=local (or unset); Cloud Run envs (dev/staging/prod) read from process environment only (issue #189).
 │   ├── enums/               # Python enums (kitchen_days, address_types, status, etc.)
 │   ├── location_config.py   # Location/city configuration
 │   ├── market_config.py     # Market-specific configuration
