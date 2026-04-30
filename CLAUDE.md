@@ -162,7 +162,7 @@ Worktree DB creation is via Postgres TEMPLATE clone (~1-2 seconds, not a full re
 | `docs/guidelines/database/ENUM_MAINTENANCE.md` | Adding or modifying a PostgreSQL enum |
 | `docs/guidelines/database/DATABASE_REBUILD_PERSISTENCE.md` | Rebuilding the database or managing seed data |
 | `docs/plans/MULTINATIONAL_INSTITUTIONS.md` | Understanding institution-market model, three-tier cascade, employer entity normalization |
-| `docs/plans/vianda_home_apis.md` | Implementing vianda-home marketing site APIs |
+| `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md` | Implementing vianda-home marketing site APIs (leads, plans, restaurants, country selector) |
 
 ---
 

@@ -1,40 +1,39 @@
-# Mapbox Migration Roadmap — Replacing Google Geocoding, Address Autocomplete & Maps
+# Mapbox Migration Roadmap
 
-**Last Updated**: 2026-04-03  
-**Purpose**: Migrate from Google Maps/Places APIs to Mapbox for geocoding, address autocomplete, and maps display. Phase out Google as the primary address provider while keeping it as a fallback for unsupported regions.
+**Last Updated**: 2026-04-30
+**Purpose**: Mapbox is the sole provider for geocoding, address autocomplete, and maps. This roadmap covers the remaining work to move from ephemeral free-tier usage to permanent storage of address data.
 
 ---
 
 ## Executive Summary
 
-The backend currently relies on Google Places API (autocomplete + place details) and Google Geocoding API for all address resolution. Google's Terms of Service prohibit storing any response data except `place_id`, meaning our current practice of persisting address components and coordinates from Google responses **violates their ToS**. Google API keys for autocomplete and geocoding are being turned off immediately to stop the violation.
+Google Places + Geocoding APIs have been retired. Their keys are removed from the repo. Mapbox is now the only address provider; there is no Google fallback path.
 
 Mapbox offers two geocoding tiers that align with our growth trajectory:
 
 1. **Temporary (ephemeral)** — free tier of 100K requests/month, results cannot be stored in DB
 2. **Permanent** — $5/1,000 requests, results can be stored and reused indefinitely
 
-This roadmap has three phases:
+This roadmap has two phases:
 
 | Phase | Priority | What | Why |
 |-------|----------|------|-----|
-| **Phase 1** | **High** | Integrate Mapbox ephemeral APIs | Restore address functionality using free tier during testing/early launch |
-| **Phase 2** | **Medium** | Switch to Mapbox permanent APIs for DB storage | Scale without re-querying — store coordinates, address components permanently |
-| **Phase 3** | **Low** | Refactor Google integration to place_id-only fallback | Keep as backup for regions Mapbox doesn't cover, fully ToS-compliant |
+| **Phase 1** | **Done** | Mapbox ephemeral APIs in production | Address functionality restored on the free tier during early launch |
+| **Phase 2** | **Medium** | Switch to Mapbox permanent APIs for DB storage | Scale without re-querying — store coordinates and address components permanently |
 
 ---
 
 ## Current State vs Target
 
-| Aspect | Current (Google) | Phase 1 Target (Mapbox Ephemeral) | Phase 2 Target (Mapbox Permanent) | Phase 3 Target (Google Fallback) |
-|--------|-----------------|-----------------------------------|-----------------------------------|----------------------------------|
-| Address autocomplete | Places API `places:autocomplete` | Search Box API `/suggest` + `/retrieve` | Same as Phase 1 (autocomplete is always session-based) | Google Places with session tokens, place_id only |
-| Address resolution | Place Details by `place_id` | Search Box `/retrieve` by `mapbox_id` | Geocoding v6 `permanent=true` | Place Details → return only `place_id` |
-| Geocoding | Maps Geocoding API | Geocoding v6 (temporary) | Geocoding v6 (`permanent=true`) | Maps Geocoding → return only `place_id` |
-| Reverse geocoding | Maps Geocoding API | Geocoding v6 reverse (temporary) | Geocoding v6 reverse (`permanent=true`) | Not needed for fallback |
-| Data storage | All fields stored in DB (**ToS violation**) | **No DB storage** — always query API | All fields stored in DB (**ToS compliant**) | Only `place_id` stored |
-| Coordinates in DB | `geolocation_info.latitude/longitude` | Query on demand, cache in session only | Stored permanently in `geolocation_info` | Not stored — query Google each time |
-| Cost | $7/1,000 autocomplete sessions + $5/1,000 geocode | **Free** (100K geocode + ~500 search sessions/month) | $5/1,000 permanent geocode requests | Pay-per-use, minimize calls |
+| Aspect | Phase 1 (Mapbox Ephemeral — shipped) | Phase 2 Target (Mapbox Permanent) |
+|--------|--------------------------------------|-----------------------------------|
+| Address autocomplete | Search Box API `/suggest` + `/retrieve` | Same as Phase 1 (autocomplete is always session-based) |
+| Address resolution | Search Box `/retrieve` by `mapbox_id` | Geocoding v6 `permanent=true` |
+| Geocoding | Geocoding v6 (temporary) | Geocoding v6 (`permanent=true`) |
+| Reverse geocoding | Geocoding v6 reverse (temporary) | Geocoding v6 reverse (`permanent=true`) |
+| Data storage | **No DB storage** — always query API | All fields stored in DB (ToS compliant) |
+| Coordinates in DB | Query on demand, cache in session only | Stored permanently in `geolocation_info` |
+| Cost | **Free** (100K geocode + ~500 search sessions/month) | $5/1,000 permanent geocode requests |
 
 ---
 
@@ -82,9 +81,11 @@ Two-step suggest/retrieve flow — equivalent to Google Places Autocomplete:
 
 | File | Current Role | Migration Action |
 |------|-------------|-----------------|
-| `app/gateways/google_places_gateway.py` | Places autocomplete + place details | Phase 1: Add `mapbox_search_gateway.py` alongside. Phase 3: Refactor to place_id-only |
-| `app/gateways/google_maps_gateway.py` | Geocoding + reverse geocoding | Phase 1: Add `mapbox_geocoding_gateway.py` alongside. Phase 3: Refactor to place_id-only |
-| `app/gateways/base_gateway.py` | Abstract base with dev/prod switching | No change — new gateways extend this |
+| `app/gateways/mapbox_search_gateway.py` | Search Box suggest + retrieve | Phase 1: shipped. Phase 2: no change |
+| `app/gateways/mapbox_geocoding_gateway.py` | Forward + reverse geocoding | Phase 1: shipped. Phase 2: pass `permanent=true` for storable calls |
+| `app/gateways/mapbox_static_gateway.py` | Static map images | Phase 1: shipped |
+| `app/gateways/base_gateway.py` | Abstract base with dev/prod switching | No change |
+| `app/gateways/google_places_gateway.py` / `app/gateways/google_maps_gateway.py` | _Removed._ Google keys are out of the repo and these gateways are no longer wired | Delete any remaining references during Phase 2 schema cleanup |
 
 ### Service Layer (refactor)
 
@@ -99,7 +100,7 @@ Two-step suggest/retrieve flow — equivalent to Google Places Autocomplete:
 
 | File | Migration Action |
 |------|-----------------|
-| `app/db/schema.sql` | Phase 2: Add `mapbox_id VARCHAR(255)` to `geolocation_info`; rename `formatted_address_google` → `formatted_address`; keep `place_id` for Phase 3 fallback |
+| `app/db/schema.sql` | Phase 2: Add `mapbox_id VARCHAR(255)` to `geolocation_info`; rename `formatted_address_google` → `formatted_address`; drop the legacy `place_id` column |
 | `app/db/trigger.sql` | Phase 2: Mirror new columns in `audit.geolocation_history` |
 | `app/dto/models.py` | Phase 2: Add `mapbox_id` to `GeolocationDTO` |
 | `app/schemas/consolidated_schemas.py` | Phase 2: Add `mapbox_id` to response schemas |
@@ -108,7 +109,7 @@ Two-step suggest/retrieve flow — equivalent to Google Places Autocomplete:
 
 | File | Migration Action |
 |------|-----------------|
-| `app/config/settings.py` | Phase 1: Add `MAPBOX_ACCESS_TOKEN_DEV/STAGING/PROD` + `get_mapbox_access_token()`. Add `ADDRESS_PROVIDER` enum (`mapbox` / `google`) |
+| `app/config/settings.py` | Phase 1: shipped — `MAPBOX_ACCESS_TOKEN_DEV/STAGING/PROD` + `get_mapbox_access_token()`. `ADDRESS_PROVIDER` is fixed to `mapbox`; the multi-provider toggle was removed when Google was retired |
 | `.env.example` | Phase 1: Add `MAPBOX_ACCESS_TOKEN_DEV=` |
 
 ### Mocks
@@ -116,13 +117,13 @@ Two-step suggest/retrieve flow — equivalent to Google Places Autocomplete:
 | File | Migration Action |
 |------|-----------------|
 | `app/mocks/address_autocomplete_mocks.json` | Phase 1: Add Mapbox suggest/retrieve mock responses |
-| `app/mocks/google_maps_responses.json` | No change (kept for Phase 3 Google fallback) |
+| `app/mocks/google_maps_responses.json` | Delete during Phase 2 cleanup — Google is no longer a provider |
 
 ### Tests
 
 | File | Migration Action |
 |------|-----------------|
-| `app/tests/gateways/test_google_maps_gateway.py` | Keep — still needed for Phase 3 |
+| `app/tests/gateways/test_google_maps_gateway.py` | Delete during Phase 2 cleanup — Google gateway is retired |
 | `app/tests/services/test_address_autocomplete_service.py` | Phase 1: Update for Mapbox flow |
 | `app/tests/services/test_address_autocomplete_mapping.py` | Phase 1: Rewrite for Mapbox GeoJSON mapping |
 
@@ -197,15 +198,7 @@ Rewrite `app/services/address_autocomplete_mapping.py` for Mapbox GeoJSON:
 
 ### 1.4 — Provider Abstraction
 
-Add `ADDRESS_PROVIDER` setting to `app/config/settings.py`:
-
-```python
-ADDRESS_PROVIDER: str = "mapbox"  # "mapbox" | "google"
-```
-
-Update `address_autocomplete_service.py` and `geolocation_service.py` to select the gateway based on this setting. This enables:
-- Switching to Google fallback per-environment without code changes
-- Running both providers in parallel during migration testing
+`ADDRESS_PROVIDER` is fixed to `mapbox` in `app/config/settings.py`. The setting exists so a future second provider (e.g., Smarty for an international market with poor Mapbox coverage — see Risk Assessment) can be wired in without refactoring `address_autocomplete_service.py` or `geolocation_service.py`. Until that contingency materialises, only the Mapbox gateway is registered.
 
 ### 1.5 — Session Token Management
 
@@ -271,11 +264,11 @@ This is a one-parameter change in the gateway but has billing implications ($5/1
 -- Add Mapbox-specific identifier
 ALTER TABLE core.geolocation_info ADD COLUMN mapbox_id VARCHAR(255) NULL;
 
--- Rename Google-specific column to generic name
+-- Rename Google-era column to provider-neutral name
 ALTER TABLE core.geolocation_info RENAME COLUMN formatted_address_google TO formatted_address;
 
--- Keep place_id for Google fallback (Phase 3)
--- place_id VARCHAR(255) NULL  -- already exists
+-- Drop legacy Google place_id column (Google provider is retired)
+ALTER TABLE core.geolocation_info DROP COLUMN IF EXISTS place_id;
 ```
 
 Follow the schema change protocol: `schema.sql` → `trigger.sql` → `seed.sql` → `models.py` → `consolidated_schemas.py`
@@ -350,115 +343,44 @@ Track permanent geocoding usage to ensure it stays within budget:
 
 ---
 
-## Phase 3: Google Fallback — Place ID Only (Low Priority)
-
-**Goal:** Keep Google as a backup provider for regions Mapbox doesn't cover, but fully ToS-compliant by storing only `place_id` and always querying Google for any data.
-
-### 3.1 — Refactor Google Places Gateway
-
-Strip `google_places_gateway.py` to return only identifiers:
-
-```python
-# Before (current — stores everything)
-def place_details(place_id) → full address components + coordinates
-
-# After (Phase 3 — place_id only)
-def place_details(place_id) → {place_id, formatted_address}  # For display only, not stored
-```
-
-### 3.2 — Refactor Google Maps Gateway
-
-Strip `google_maps_gateway.py` to return only identifiers:
-
-```python
-# Before (current — stores coordinates)
-def geocode(address) → {latitude, longitude, place_id, components}
-
-# After (Phase 3 — place_id only)
-def geocode(address) → {place_id}  # Coordinates displayed but never stored
-```
-
-### 3.3 — Google-Mode Address Flow
-
-When `ADDRESS_PROVIDER=google`:
-
-1. **Suggest:** Google Places Autocomplete → return `place_id` + display text
-2. **Create:** Store address with `place_id` in `geolocation_info.place_id`, but **no coordinates, no address components from Google**
-3. **Display:** Every time coordinates or address details are needed, call Google API with `place_id` in real time
-4. **Trade-off:** Higher latency and API cost, but fully ToS-compliant
-
-### 3.4 — Implement Google Session Tokens
-
-Align with the existing roadmap doc `docs/plans/database/ADDRESS_AUTOCOMPLETE_SESSION_TOKENS.md` — Google Places Autocomplete sessions reduce cost from per-request to per-session billing.
-
-### Phase 3 Deliverables
-
-- [ ] Refactored `google_places_gateway.py` — place_id-only returns
-- [ ] Refactored `google_maps_gateway.py` — place_id-only returns
-- [ ] Google-mode address flow (no data storage from Google)
-- [ ] Google session token support
-- [ ] Updated tests
-- [ ] Updated `CLAUDE_ARCHITECTURE.md`
-
----
-
-## Provider Switching Strategy
-
-The `ADDRESS_PROVIDER` setting controls which gateway is used at runtime:
-
-```
-ADDRESS_PROVIDER=mapbox      → Mapbox Search Box + Geocoding (default)
-ADDRESS_PROVIDER=google      → Google Places + Geocoding (fallback)
-```
-
-This is an **environment-level** setting, not per-request. Switching providers requires a config change + restart, not a code deploy. This keeps the routing logic simple and avoids per-request complexity.
-
-**When to use Google fallback:**
-- Mapbox coverage gap in a new market (e.g., a country where Mapbox has poor address data)
-- Mapbox API outage exceeding SLA tolerance
-- Temporary bridge while evaluating Mapbox quality in a new region
-
----
-
 ## Risk Assessment
 
 | Risk | Mitigation |
 |------|-----------|
-| Mapbox address quality varies by country | Vianda operates in **major urban commercial districts** around offices — exactly where Mapbox has the strongest coverage. We do not develop markets in suburban or rural areas where quality gaps are more likely. Test per market before launch; keep Google fallback for edge cases. |
+| Mapbox address quality varies by country | Vianda operates in **major urban commercial districts** around offices — exactly where Mapbox has the strongest coverage. We do not develop markets in suburban or rural areas where quality gaps are more likely. Test per market before launch. |
 | Billing/invoicing addresses may be in lower-quality areas | Customer home addresses may be in suburbs far from their workplace. However, payment aggregators (Stripe) collect billing addresses directly — we only need our own address data for invoicing features, which are institution-level (urban). For edge cases, see Smarty fallback below. |
 | Phase 1 ephemeral mode means no stored coordinates | Acceptable for testing; features needing coords call API on demand |
 | Mapbox Search Box data cannot be stored (even with permanent geocoding) | Use Search Box for suggest only; re-geocode via Geocoding API `permanent=true` for storage |
 | Session token billing complexity | Client-generated tokens are simple; document pattern for frontend teams |
 | Street type extraction logic may differ | Mapbox street names follow similar patterns; reuse existing extraction with Mapbox-specific adjustments |
 | Batch backfill cost in Phase 2 | $5/1,000 addresses — budget before running; one-time cost |
-| Mapbox quality insufficient in a future international market | **Final fallback: Smarty** (formerly SmartyStreets). If Mapbox shows poor address/geolocation quality in a specific international market, evaluate Smarty as a targeted provider for that market's address validation and geocoding. Smarty has strong international address verification and could serve as a third provider option behind Mapbox and Google. This is not planned work — it is a contingency to document now so the provider abstraction layer (Phase 1.4) is designed to accommodate a third provider without refactoring. |
+| Mapbox quality insufficient in a future international market | **Contingency: Smarty** (formerly SmartyStreets). If Mapbox shows poor address/geolocation quality in a specific international market, evaluate Smarty as a targeted provider for that market's address validation and geocoding. Smarty has strong international address verification. This is not planned work — it is a contingency documented so the provider abstraction layer (Phase 1.4) can accommodate a second provider without refactoring. |
 
 ---
 
-## Pricing Comparison
+## Pricing
 
-| Scenario (monthly) | Google Maps | Mapbox Ephemeral | Mapbox Permanent |
-|--------------------|-------------|------------------|------------------|
-| 1,000 autocomplete sessions | ~$7.00 | Free (within 500 free sessions) | N/A (autocomplete is session-based) |
-| 10,000 geocode requests | ~$50.00 | Free (within 100K free tier) | $50.00 |
-| 100,000 geocode requests | ~$500.00 | Free (at limit) | $500.00 |
-| 50,000 map loads (web) | ~$350.00 | Free (within 50K free tier) | Free (maps are separate) |
+| Scenario (monthly) | Mapbox Ephemeral | Mapbox Permanent |
+|--------------------|------------------|------------------|
+| 1,000 autocomplete sessions | Free (within 500 free sessions) | N/A (autocomplete is session-based) |
+| 10,000 geocode requests | Free (within 100K free tier) | $50.00 |
+| 100,000 geocode requests | Free (at limit) | $500.00 |
+| 50,000 map loads (web) | Free (within 50K free tier) | Free (maps are separate) |
 
-**Phase 1 cost during testing:** Effectively **$0/month** — well within Mapbox free tiers.  
-**Phase 2 cost at scale:** Comparable to Google, but with the critical advantage of **legal data storage**.
+**Phase 1 cost during early launch:** Effectively **$0/month** — well within Mapbox free tiers.
+**Phase 2 cost at scale:** $5/1,000 permanent geocode requests — the cost we accept in exchange for legal data storage.
 
 ---
 
 ## Timeline Dependencies
 
 ```
-Phase 1 ──────────────────► Phase 2 ──────────────────► Phase 3
-(Mapbox ephemeral)          (Mapbox permanent)           (Google place_id fallback)
-                                                         
-├── Google API keys OFF     ├── Requires billing setup   ├── Re-enable Google keys
-├── No blocker              ├── Blocked by Phase 1       ├── Blocked by Phase 1
-├── Free tier               ├── $5/1K geocode calls      ├── Low priority
-└── Testing + early users   └── Scale + stored data      └── Coverage insurance
+Phase 1 (shipped) ──────────────► Phase 2
+(Mapbox ephemeral)                (Mapbox permanent)
+
+├── Google API keys removed       ├── Requires billing setup
+├── Free tier                     ├── $5/1K permanent geocode calls
+└── Early launch + testing        └── Scale + stored coordinates / address data
 ```
 
 ---
@@ -467,9 +389,9 @@ Phase 1 ──────────────────► Phase 2 ──
 
 | Document | Relationship |
 |----------|-------------|
-| `docs/plans/database/ADDRESS_AUTOCOMPLETE_SESSION_TOKENS.md` | Phase 3 implements Google session tokens from this doc |
-| `docs/plans/database/ADDRESS_RATE_LIMITING_AND_CACHING.md` | Rate limiting applies to both Mapbox and Google providers |
-| `docs/plans/GOOGLE_MAPS_OTHER_APIS_ROADMAP.md` | Distance Matrix, Nearby Search — future evaluation for Mapbox equivalents |
+| `docs/plans/database/ADDRESS_AUTOCOMPLETE_SESSION_TOKENS.md` | Mapbox Search Box session-token billing pattern |
+| `docs/plans/database/ADDRESS_RATE_LIMITING_AND_CACHING.md` | Rate limiting and caching for Mapbox-backed address endpoints |
+| `docs/plans/defer/GOOGLE_MAPS_OTHER_APIS_ROADMAP.md` | _(Deferred)_ Distance Matrix, Nearby Search — future evaluation for Mapbox equivalents |
 | `docs/plans/database/ADDRESS_CITY_BOUNDS_SCOPING.md` | Superseded — Mapbox `country` + `proximity` params handle scoping natively |
 
 ---
