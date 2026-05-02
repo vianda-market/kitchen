@@ -63,3 +63,8 @@ google-ads>=24.0.0
 
 # Ads platform: Meta Marketing API + Conversions API (CAPI)
 facebook-business>=25.0.1
+
+# Image processing pipeline (Cloud Run job — libvips system dep installed in Dockerfile)
+pyvips>=2.2.0                       # Python bindings for libvips (fast image resizing)
+google-cloud-vision>=3.7.0          # Cloud Vision SafeSearch moderation
+google-cloud-pubsub>=2.21.0         # Pub/Sub event listener for image_event worker
