@@ -287,6 +287,7 @@ class ErrorCode(StrEnum):
     RESTAURANT_ACTIVE_REQUIRES_SETUP = "restaurant.active_requires_setup"
     RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS = "restaurant.active_requires_plate_days"
     RESTAURANT_ACTIVE_REQUIRES_QR = "restaurant.active_requires_qr"
+    RESTAURANT_ACTIVE_REQUIRES_ENTITY_PAYOUTS = "restaurant.active_requires_entity_payouts"
 
     # ── restaurant_holiday.* ──────────────────────────────────────────────
     # Restaurant holiday management errors. Wired in K11.
