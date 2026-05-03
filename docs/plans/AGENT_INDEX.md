@@ -19,16 +19,24 @@ These features have work items in multiple repos. Read the roadmap doc before st
 
 | Affects | File | What Is Planned |
 |---------|------|-----------------|
-| Marketing + B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/LEADS_MIGRATION_TO_MARKETING_SITE.md` | **Complete** — Leads discovery flow migrated to marketing site. Coverage checker, interest capture, B2C simplification, B2B dashboard |
 | B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/STRIPE_CUSTOMER_INTEGRATION_ROADMAP.md` | Full Stripe integration — Setup Session, saved cards, webhooks (Phase 3 live) |
-| B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` | Production hardening — race conditions, webhook sync, idempotency |
-| B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/MOBILE_VERIFICATION_ROADMAP.md` | SMS verification for mobile numbers via Twilio Verify |
+| B2C + Backend | _(Deferred)_ `docs/plans/defer/STRIPE_CUSTOMER_INTEGRATION_FOLLOWUPS.md` | Production hardening — race conditions, webhook sync, idempotency. Out of current implementation scope |
 | B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/MESSAGING_AND_NOTIFICATIONS_ROADMAP.md` | Delivery systems for push, SMS, and email notification channels |
-| B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md` | Language-aware enum labels and market language support for localized UI |
 | B2C + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2c_client/MULTI_LANGUAGE_ROADMAP.md` | Spanish language toggle — UI strings and locale-aware API responses |
 | B2B + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/VIANDA_EMPLOYER_BENEFITS_PROGRAM.md` | Employer benefit institutions — onboarding, employee enrollment, benefit limits |
-| B2B + Backend | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/SUBSCRIPTION_MANAGEMENT_FUTURE.md` | Employee cancel/hold/resume on behalf of customer, cron reconciliation |
+| B2B + Backend | _(Deferred)_ `docs/plans/defer/SUBSCRIPTION_MANAGEMENT_FUTURE.md` | Employee cancel/hold/resume on behalf of customer, cron reconciliation. Future / out of scope |
 | B2B + Backend | _(Archived)_ `docs/zArchive/roadmap/SUPPLIER_TERMS_ROADMAP.md` | Implemented — Supplier terms table, pipeline wiring, B2B API. See `docs/api/b2b_client/API_CLIENT_SUPPLIER_TERMS.md` for client guide |
+
+> **Tracked via GitHub issue (deferred — plan archived):**
+> - kitchen#225 — Phase 6 (localized push notifications) + Phase 9 (DB-managed message translations). Was `LANGUAGE_AWARE_ENUMS_AND_MARKET_LANGUAGE.md`
+> - kitchen#226 — Phase 3 peer-pickup volunteer notifications. Was `NOTIFICATION_BANNERS_PLAN.md`
+> - kitchen#227 — Post-MVP SMS verification + feature gating. Was `MOBILE_VERIFICATION_ROADMAP.md`
+> - kitchen#224 — Phase 3 employer composite-create pattern. Was `api_thin_update_pattern.md`
+> - kitchen#229 — Quality-cleanup P3 tail (scoping tests, optional test deps, mutation scope). Was `QUALITY_CLEANUP_2026_04_14.md`
+>
+> **Completed and archived (no follow-up issue):**
+> - `LEADS_MIGRATION_TO_MARKETING_SITE.md` — All phases shipped
+> - `87c-bare-string-triage.md` — Sweep complete, lint enforcing
 
 ---
 
@@ -37,7 +45,7 @@ These features have work items in multiple repos. Read the roadmap doc before st
 | File | What Is Planned |
 |------|-----------------|
 | _(Archived)_ `docs/zArchive/roadmap/STATIC_MAP_CITY_SNAPSHOT_ROADMAP.md` | Implemented — Static map images via `GET /maps/city-snapshot`. See `docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` for client guide |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/B2C_EXPLORE_ZIPCODE.md` | Scope Explore to city, then refine search by zipcode |
+| _(Deferred)_ `docs/plans/defer/B2C_EXPLORE_ZIPCODE.md` | Scope Explore to city, then refine search by zipcode (future enhancement) |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2c_client/EXPLORE_FILTERS_ROADMAP.md` | Radius, cuisine, and dietary filters on the restaurant Explore screen |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2c_client/ACCESSIBILITY_ROADMAP.md` | WCAG 2.1 AA accessibility standards for mobile |
 
@@ -47,7 +55,7 @@ These features have work items in multiple repos. Read the roadmap doc before st
 
 | File | What Is Planned |
 |------|-----------------|
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/RESTAURANT_KITCHEN_HOURS_OVERRIDE_ROADMAP.md` | Restaurant-level overrides of market-wide kitchen hours |
+| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/RESTAURANT_KITCHEN_HOURS_OVERRIDE_ROADMAP.md` | **Active** — Restaurant-defined open/close per weekday, bounded by a market-level envelope. Decoupled from billing-cron kitchen day |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2b_client/SETUP_WIZARD_POST_CREATE_FLOW_ROADMAP.md` | Multi-step wizard pattern for dependent entity creation flows |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2b_client/BULK_OPERATIONS_AUDIT.md` | Entities and workflows where bulk operations would reduce friction |
 
@@ -77,7 +85,7 @@ These are backend-only planned changes. Client agents should read them when they
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/database/ADDRESS_AUTOCOMPLETE_SESSION_TOKENS.md` | Google session tokens for address autocomplete to reduce API cost (feeds into Mapbox Phase 3) |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/database/ADDRESS_RATE_LIMITING_AND_CACHING.md` | Rate limiting and caching for address suggest and create endpoints |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/database/ADDRESS_CITY_BOUNDS_SCOPING.md` | _(Superseded)_ Scoped address search to supported cities — Mapbox handles natively |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/GOOGLE_MAPS_OTHER_APIS_ROADMAP.md` | Evaluating Distance Matrix, Nearby Search, delivery zones APIs — future evaluation for Mapbox equivalents |
+| _(Deferred)_ `docs/plans/defer/GOOGLE_MAPS_OTHER_APIS_ROADMAP.md` | Evaluating Distance Matrix, Nearby Search, delivery zones APIs — future evaluation for Mapbox equivalents |
 
 ### Configuration & Data
 
@@ -97,14 +105,16 @@ These are backend-only planned changes. Client agents should read them when they
 | File | What Is Planned |
 |------|-----------------|
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/LEAD_INTEREST_ALERT_CRONS.md` | Zipcode + city alert crons — notify leads when new restaurants open in their area |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/market-status-cron.md` | Daily cron to auto-flip `market_info.status` between `active`/`inactive` based on a forward coverage window. Complements the admin-maintained status model shipped with the country-filter feature. |
+| _(Deferred)_ `docs/plans/defer/market-status-cron.md` | Daily cron to auto-flip `market_info.status` based on a forward coverage window. Not implemented |
 
 ### Security & Infrastructure
 
 | File | What Is Planned |
 |------|-----------------|
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/CAPTCHA_AND_RATE_LIMIT_ROADMAP.md` | CAPTCHA and rate limiting for address suggest, leads, and signup endpoints |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/efficiencies/EXISTENCE_VS_ACCESS_CONTROL.md` | Security pattern — existence checks vs. access control checks analysis |
+
+> **Tracked via GitHub issue (deferred):**
+> - kitchen#228 — Address suggest CAPTCHA-on-rate-limit (was `CAPTCHA_AND_RATE_LIMIT_ROADMAP.md`)
 
 ### Observability
 
