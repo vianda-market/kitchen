@@ -2910,6 +2910,16 @@ class InstitutionEntityUpsertByKeySchema(BaseModel):
     )
     is_archived: bool = False
     status: Status = Status.ACTIVE
+    payout_onboarding_status: str | None = Field(
+        None,
+        max_length=50,
+        description=(
+            "Stripe Connect onboarding status. Pass 'complete' on seed/fixture entities "
+            "that need to be activatable downstream — restaurant activation gates on this "
+            "(see app/services/restaurant_visibility.py). Real entities are written by the "
+            "Stripe webhook on completion (app/routes/webhooks.py); leave NULL for those."
+        ),
+    )
 
 
 class InstitutionEntityEnrichedResponseSchema(BaseModel):
