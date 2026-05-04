@@ -50,16 +50,23 @@ def client_with_auth(mock_current_user):
 
 
 class TestRestaurantActivationPayoutsGate:
-    """PUT /api/v1/restaurants/{id} status=Active — payouts gate runs before setup checks."""
+    """PUT /api/v1/restaurants/{id} status=Active — payouts gate runs LAST (after plate_kitchen_days + QR checks)."""
 
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
+    @patch("app.routes.restaurant.restaurant_has_active_qr_code")
+    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
     def test_returns_422_when_entity_payouts_not_complete(
-        self, mock_payouts, mock_restaurant_service, client_with_auth
+        self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """Activation fails 422 with entity_payouts_required error code when Stripe Connect is incomplete."""
+        """Activation fails 422 with entity_payouts_required error code when Stripe Connect is incomplete.
+
+        Plate/QR checks pass so the chain reaches the payouts gate (which fires last).
+        """
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
+        mock_has_pkd.return_value = True
+        mock_has_qr.return_value = True
         mock_payouts.return_value = False
 
         resp = client_with_auth.put(
@@ -77,15 +84,15 @@ class TestRestaurantActivationPayoutsGate:
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
     @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
-    def test_payouts_check_runs_before_setup_checks(
+    def test_payouts_check_runs_after_setup_checks(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """Payouts gate short-circuits before plate/QR checks when payouts are missing."""
+        """Payouts gate fires AFTER plate/QR checks pass — both plate and QR must be called first."""
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
-        mock_payouts.return_value = False
         mock_has_pkd.return_value = True
         mock_has_qr.return_value = True
+        mock_payouts.return_value = False
 
         resp = client_with_auth.put(
             f"/api/v1/restaurants/{restaurant_id}",
@@ -94,9 +101,9 @@ class TestRestaurantActivationPayoutsGate:
         assert resp.status_code == 422
         raw = resp.json().get("detail", {})
         assert raw.get("code") == "restaurant.active_requires_entity_payouts"
-        # plate/QR checks must not have been called — payouts gate fires first
-        mock_has_pkd.assert_not_called()
-        mock_has_qr.assert_not_called()
+        # plate/QR checks must have been called — they fire before payouts
+        mock_has_pkd.assert_called_once()
+        mock_has_qr.assert_called_once()
 
     @patch("app.routes.restaurant.get_currency_metadata_id_for_restaurant")
     @patch("app.routes.restaurant.restaurant_service")
