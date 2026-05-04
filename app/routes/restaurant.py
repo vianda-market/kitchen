@@ -58,6 +58,7 @@ from app.services.restaurant_explorer_service import (
     validate_kitchen_day_in_window,
 )
 from app.services.restaurant_visibility import (
+    restaurant_entity_has_payouts_enabled,
     restaurant_has_active_plate_kitchen_days,
     restaurant_has_active_qr_code,
 )
@@ -918,7 +919,13 @@ def update_restaurant(
                 )
             update_data.pop("institution_id", None)
 
-        # Setting status to Active requires (a) active plate_kitchen_days and (b) active QR code
+        # Setting status to Active requires:
+        # (a) active plate_kitchen_days  — wizard prerequisite (Workflow #1, Steps 2-4)
+        # (b) active QR code             — wizard prerequisite (Workflow #1, Steps 2-4)
+        # (c) entity with completed Stripe Connect payout onboarding — parallel flow (Workflow #5, Step 3)
+        # Order matters: (a)+(b) fire first so suppliers still inside the setup wizard
+        # get actionable wizard errors; (c) fires last for suppliers who have completed
+        # setup but haven't finished payout onboarding.
         if update_data.get("status") == Status.ACTIVE:
             has_plate_kitchen_days = restaurant_has_active_plate_kitchen_days(restaurant_id, db)
             has_qr_code = restaurant_has_active_qr_code(restaurant_id, db)
@@ -928,6 +935,8 @@ def update_restaurant(
                 raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS, status=400, locale=locale)
             if not has_qr_code:
                 raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_QR, status=400, locale=locale)
+            if not restaurant_entity_has_payouts_enabled(restaurant_id, db):
+                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_ENTITY_PAYOUTS, status=422, locale=locale)
 
         # Update the restaurant
         updated_restaurant = restaurant_service.update(restaurant_id, update_data, db, scope=scope)
