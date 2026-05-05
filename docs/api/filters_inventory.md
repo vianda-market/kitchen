@@ -106,7 +106,6 @@ Status legend:
 | `plate_id` | exempt | "enriched join field; not a direct column on plate_info" |
 | `price` | exempt | "range-bound; use price_from / price_to filter params" |
 | `product_id` | exempt | "enriched join field; product_id is a join key, not a filterable dimension" |
-| `product_image_url` | exempt | "enriched join field; computed from storage_path; not filterable" |
 | `product_name` | exempt | "enriched join field; filter by plate_id instead" |
 | `product_name_i18n` | exempt | "i18n translation payload; not filterable" |
 | `province` | exempt | "enriched join field; address subfield, not independently filterable" |

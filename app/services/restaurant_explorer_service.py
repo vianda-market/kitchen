@@ -392,7 +392,8 @@ def get_plates_for_restaurants(
 ) -> dict:
     """
     Return map restaurant_id -> list of plates (plate_id, product_name, price, credit, kitchen_day,
-    image_url from product_info). Savings are NOT read from DB; caller should compute from
+    image_url — always None post image-pipeline-atomic; pipeline populates via image_asset).
+    Savings are NOT read from DB; caller should compute from
     price, credit, and user's credit_cost_local_currency (see get_restaurants_by_city).
     Only non-archived plates with a matching plate_kitchen_day.
 
@@ -428,7 +429,7 @@ def get_plates_for_restaurants(
             p.price,
             p.credit,
             pkd.kitchen_day,
-            COALESCE(pr.image_thumbnail_url, pr.image_url) AS image_url,
+            NULL::text AS image_url,
             pr.ingredients,
             pr.dietary
         FROM plate_info p

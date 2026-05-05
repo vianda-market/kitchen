@@ -25,7 +25,7 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 import psycopg2.extensions
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 
 from app.auth.dependencies import (
@@ -35,7 +35,6 @@ from app.auth.dependencies import (
     get_resolved_locale,
     oauth2_scheme,
 )
-from app.config.settings import settings
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -405,7 +404,6 @@ def create_product_routes() -> APIRouter:
     from app.services.crud_service import product_service
     from app.services.entity_service import get_enriched_product_by_id, get_enriched_products
     from app.services.error_handling import handle_business_operation
-    from app.services.product_image_service import ProductImageService
     from app.utils.error_messages import entity_not_found
     from app.utils.log import log_error
 
@@ -418,7 +416,6 @@ def create_product_routes() -> APIRouter:
         entity_type=ENTITY_PRODUCT,
         paginatable=True,
     )
-    product_image_service = ProductImageService()
 
     def _product_custom_routes(router: APIRouter) -> None:
         # Static path segments must be registered before /{product_id} or "enriched" is parsed as a UUID.
@@ -498,16 +495,12 @@ def create_product_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """Get a single product by ID with resolved image URLs (signed URLs when GCS)."""
+            """Get a single product by ID. Image URLs are served via GET /api/v1/uploads/{image_asset_id}."""
             scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
             product = product_service.get_by_id(product_id, db, scope=scope)
             if not product or product.is_archived:
                 raise entity_not_found("Product", product_id)
-            data = product.model_dump(mode="json")
-            from app.utils.gcs import resolve_product_image_urls
-
-            data = resolve_product_image_urls(data)
-            return ProductResponseSchema(**data)
+            return ProductResponseSchema(**product.model_dump(mode="json"))
 
         @router.post("", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
         def create_product_with_image_validation(
@@ -515,24 +508,14 @@ def create_product_routes() -> APIRouter:
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """Create a new product with image validation.
-            Supports composite creation: embed ingredient_ids for atomic product + ingredients."""
+            """Create a new product. Supports composite creation: embed ingredient_ids for atomic product + ingredients.
+            Images are uploaded separately via POST /api/v1/uploads."""
             from app.services.ingredient_service import set_product_ingredients
 
             data = create_data.model_dump()
             ingredient_ids = data.pop("ingredient_ids", None)
             data["modified_by"] = current_user["user_id"]
             scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
-            validated = product_image_service.validate_product_image_at_creation(
-                image_storage_path=data.get("image_storage_path"),
-                image_url=data.get("image_url"),
-                image_checksum=data.get("image_checksum"),
-            )
-            data["image_storage_path"] = validated["storage_path"]
-            data["image_url"] = validated["image_url"]
-            data["image_thumbnail_storage_path"] = validated["thumbnail_storage_path"]
-            data["image_thumbnail_url"] = validated["thumbnail_url"]
-            data["image_checksum"] = validated["checksum"]
             has_ingredients = ingredient_ids is not None and len(ingredient_ids) > 0
 
             try:
@@ -556,9 +539,7 @@ def create_product_routes() -> APIRouter:
                     )
                     db.commit()
 
-                from app.utils.gcs import resolve_product_image_urls
-
-                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+                return ProductResponseSchema(**product.model_dump(mode="json"))
             except HTTPException:
                 raise
             except Exception as e:
@@ -591,7 +572,6 @@ def create_product_routes() -> APIRouter:
             Returns HTTP 200 on both insert and update (unlike POST which returns 201).
             """
             from app.services.crud_service import find_product_by_canonical_key
-            from app.utils.gcs import resolve_product_image_urls
             from app.utils.log import log_info
 
             def _upsert() -> ProductResponseSchema:
@@ -609,7 +589,7 @@ def create_product_routes() -> APIRouter:
                     if product is None:
                         raise envelope_exception(ErrorCode.PRODUCT_UPDATE_FAILED, status=500, locale="en")
                     log_info(f"Upsert updated product {existing.product_id} with canonical_key '{key}'")
-                    return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+                    return ProductResponseSchema(**product.model_dump(mode="json"))
 
                 # INSERT path
                 payload = upsert_data.model_dump()
@@ -618,7 +598,7 @@ def create_product_routes() -> APIRouter:
                 if product is None:
                     raise envelope_exception(ErrorCode.PRODUCT_CREATION_FAILED, status=500, locale="en")
                 log_info(f"Upsert inserted product {product.product_id} with canonical_key '{key}'")
-                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+                return ProductResponseSchema(**product.model_dump(mode="json"))
 
             return handle_business_operation(_upsert, "product upsert by canonical key")
 
@@ -668,101 +648,13 @@ def create_product_routes() -> APIRouter:
                         )
                     db.commit()
 
-                from app.utils.gcs import resolve_product_image_urls
-
-                return ProductResponseSchema(**resolve_product_image_urls(product.model_dump(mode="json")))
+                return ProductResponseSchema(**product.model_dump(mode="json"))
             except HTTPException:
                 raise
             except Exception as e:
                 db.rollback()
                 log_error(f"Error updating product {product_id}: {e}")
                 raise envelope_exception(ErrorCode.PRODUCT_UPDATE_FAILED, status=500, locale="en") from None
-
-        @router.post("/{product_id}/image", response_model=ProductResponseSchema)
-        async def upload_product_image(
-            product_id: UUID,
-            file: UploadFile = File(...),
-            client_checksum: str = Form(...),
-            checksum_algorithm: str = Form(default="sha256"),
-            current_user: dict = Depends(get_current_user),
-            locale: str = Depends(get_resolved_locale),
-            db: psycopg2.extensions.connection = Depends(get_db),
-        ):
-            """Upload or replace a product image."""
-            from app.utils.checksum import verify_checksum
-
-            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
-            product = product_service.get_by_id(product_id, db, scope=scope)
-            if not product or product.is_archived:
-                raise entity_not_found("Product", product_id, locale=locale)
-            contents = await file.read()
-            if len(contents) > settings.MAX_PRODUCT_IMAGE_BYTES:
-                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_TOO_LARGE, status=400, locale=locale)
-            verify_checksum(contents, client_checksum, checksum_algorithm)
-            storage_path, url_path, thumb_storage_path, thumb_url_path, checksum = product_image_service.save_image(
-                product_id,
-                product.institution_id,
-                image_bytes=contents,
-                content_type=file.content_type or "",
-                expected_checksum=client_checksum,
-            )
-            update_data = {
-                "image_url": url_path,
-                "image_storage_path": storage_path,
-                "image_thumbnail_url": thumb_url_path,
-                "image_thumbnail_storage_path": thumb_storage_path,
-                "image_checksum": checksum,
-                "modified_by": current_user["user_id"],
-            }
-            updated_product = product_service.update(product_id, update_data, db, scope=scope)
-            if not updated_product:
-                product_image_service.delete_image(storage_path, thumb_storage_path)
-                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_UPDATE_FAILED, status=500, locale=locale)
-            if product.image_storage_path != storage_path and not product_image_service.is_placeholder(
-                product.image_storage_path
-            ):
-                old_thumb = getattr(product, "image_thumbnail_storage_path", None)
-                product_image_service.delete_image(product.image_storage_path, old_thumb)
-            return updated_product
-
-        @router.delete("/{product_id}/image", response_model=ProductResponseSchema)
-        def delete_product_image(
-            product_id: UUID,
-            current_user: dict = Depends(get_current_user),
-            db: psycopg2.extensions.connection = Depends(get_db),
-        ):
-            """Delete product image and revert to placeholder. Idempotent: returns 200 if already placeholder."""
-            scope = EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)
-            product = product_service.get_by_id(product_id, db, scope=scope)
-            if not product or product.is_archived:
-                raise entity_not_found("Product", product_id)
-            if product_image_service.is_placeholder(product.image_storage_path):
-                data = product.model_dump(mode="json")
-                from app.utils.gcs import resolve_product_image_urls
-
-                data = resolve_product_image_urls(data)
-                return ProductResponseSchema(**data)
-            product_image_service.delete_image(
-                product.image_storage_path,
-                getattr(product, "image_thumbnail_storage_path", None),
-            )
-            meta = product_image_service.placeholder_metadata()
-            update_data = {
-                "image_storage_path": meta["storage_path"],
-                "image_thumbnail_storage_path": meta["thumbnail_storage_path"],
-                "image_url": meta["image_url"],
-                "image_thumbnail_url": meta["thumbnail_url"],
-                "image_checksum": meta["checksum"],
-                "modified_by": current_user["user_id"],
-            }
-            updated_product = product_service.update(product_id, update_data, db, scope=scope)
-            if not updated_product:
-                raise envelope_exception(ErrorCode.PRODUCT_IMAGE_REVERT_FAILED, status=500, locale="en")
-            data = updated_product.model_dump(mode="json")
-            from app.utils.gcs import resolve_product_image_urls
-
-            data = resolve_product_image_urls(data)
-            return ProductResponseSchema(**data)
 
     router = create_crud_routes(
         config=config,

@@ -134,6 +134,8 @@ DROP TABLE IF EXISTS ops.ingredient_nutrition CASCADE;
 DROP TABLE IF EXISTS ops.ingredient_alias CASCADE;
 DROP TABLE IF EXISTS ops.product_ingredient CASCADE;
 DROP TABLE IF EXISTS ops.ingredient_catalog CASCADE;
+DROP TABLE IF EXISTS audit.image_asset_history CASCADE;
+DROP TABLE IF EXISTS ops.image_asset CASCADE;
 DROP TABLE IF EXISTS ops.product_info CASCADE;
 DROP TABLE IF EXISTS customer.plan_info CASCADE;
 DROP TABLE IF EXISTS ops.cuisine_suggestion CASCADE;
@@ -3051,11 +3053,6 @@ CREATE TABLE IF NOT EXISTS ops.product_info (
     dietary TEXT[] NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
-    image_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
-    image_checksum VARCHAR(128) NOT NULL DEFAULT '7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c',
-    image_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
-    image_thumbnail_storage_path VARCHAR(500) NOT NULL DEFAULT 'static/placeholders/product_default.png',
-    image_thumbnail_url VARCHAR(500) NOT NULL DEFAULT 'http://localhost:8000/static/placeholders/product_default.png',
     canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -3091,16 +3088,6 @@ COMMENT ON COLUMN ops.product_info.is_archived IS
     'Soft-delete tombstone. Archived products are hidden from supplier product lists and cannot be linked to new plates.';
 COMMENT ON COLUMN ops.product_info.status IS
     'Lifecycle status (status_enum). Controls whether the product is visible in the platform and app.';
-COMMENT ON COLUMN ops.product_info.image_storage_path IS
-    'Internal storage path of the full-resolution product image.';
-COMMENT ON COLUMN ops.product_info.image_checksum IS
-    'SHA-256 checksum of the image file for deduplication and integrity verification.';
-COMMENT ON COLUMN ops.product_info.image_url IS
-    'CDN URL of the full-resolution product image rendered on plate detail screens.';
-COMMENT ON COLUMN ops.product_info.image_thumbnail_storage_path IS
-    'Internal storage path of the thumbnail image.';
-COMMENT ON COLUMN ops.product_info.image_thumbnail_url IS
-    'CDN URL of the thumbnail image used on explore cards and lists.';
 COMMENT ON COLUMN ops.product_info.created_date IS
     'UTC timestamp when the product was first created.';
 COMMENT ON COLUMN ops.product_info.created_by IS
@@ -3129,11 +3116,6 @@ CREATE TABLE IF NOT EXISTS audit.product_history (
     dietary TEXT[] NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
-    image_storage_path VARCHAR(500) NOT NULL,
-    image_checksum VARCHAR(128) NOT NULL,
-    image_url VARCHAR(500) NOT NULL,
-    image_thumbnail_storage_path VARCHAR(500) NOT NULL,
-    image_thumbnail_url VARCHAR(500) NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -3151,6 +3133,63 @@ COMMENT ON COLUMN audit.product_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
 COMMENT ON COLUMN audit.product_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
+
+\echo 'Creating table: ops.image_asset'
+CREATE TABLE IF NOT EXISTS ops.image_asset (
+    image_asset_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    product_id UUID NOT NULL REFERENCES ops.product_info(product_id) ON DELETE CASCADE,
+    institution_id UUID NOT NULL REFERENCES core.institution_info(institution_id) ON DELETE RESTRICT,
+    original_storage_path TEXT,
+    original_checksum TEXT,
+    pipeline_status TEXT NOT NULL CHECK (pipeline_status IN ('pending', 'processing', 'ready', 'rejected', 'failed')),
+    moderation_status TEXT NOT NULL CHECK (moderation_status IN ('pending', 'passed', 'rejected')),
+    moderation_signals JSONB NULL,
+    processing_version INTEGER NOT NULL DEFAULT 1,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    created_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+    modified_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+    modified_by UUID NULL REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    UNIQUE (product_id)
+);
+
+COMMENT ON TABLE ops.image_asset IS
+    'Tracks upload and processing lifecycle of a product image. '
+    'One row per product (v1). pipeline_status starts pending and is flipped '
+    'to ready by the Cloud Run image processor after pyvips + SafeSearch. '
+    'institution_id is denormalized for fast scope checks.';
+COMMENT ON COLUMN ops.image_asset.image_asset_id IS 'UUIDv7 primary key. Time-ordered.';
+COMMENT ON COLUMN ops.image_asset.product_id IS 'FK to ops.product_info. One image per product (v1). CASCADE on delete.';
+COMMENT ON COLUMN ops.image_asset.institution_id IS 'Denormalized FK to core.institution_info. Used for supplier scoping without JOIN.';
+COMMENT ON COLUMN ops.image_asset.original_storage_path IS 'GCS path: products/{institution_id}/{product_id}/original.';
+COMMENT ON COLUMN ops.image_asset.original_checksum IS 'SHA-256 hex checksum of uploaded original bytes.';
+COMMENT ON COLUMN ops.image_asset.pipeline_status IS 'Processing lifecycle: pending → processing → ready | rejected | failed.';
+COMMENT ON COLUMN ops.image_asset.moderation_status IS 'SafeSearch result: pending → passed | rejected.';
+COMMENT ON COLUMN ops.image_asset.moderation_signals IS 'Raw Cloud Vision SafeSearch likelihoods JSON. NULL until moderation runs.';
+COMMENT ON COLUMN ops.image_asset.processing_version IS 'Pipeline standard version applied. Backfill iterates WHERE processing_version < PROCESSING_VERSION.';
+COMMENT ON COLUMN ops.image_asset.failure_count IS 'Number of processing attempts that ended in failure.';
+COMMENT ON COLUMN ops.image_asset.modified_by IS 'FK to core.user_info. NULL for pipeline-driven updates.';
+
+\echo 'Creating table: audit.image_asset_history'
+CREATE TABLE IF NOT EXISTS audit.image_asset_history (
+    event_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    image_asset_id UUID NOT NULL,
+    product_id UUID NOT NULL,
+    institution_id UUID NOT NULL,
+    original_storage_path TEXT,
+    original_checksum TEXT,
+    pipeline_status TEXT NOT NULL,
+    moderation_status TEXT NOT NULL,
+    moderation_signals JSONB NULL,
+    processing_version INTEGER NOT NULL,
+    failure_count INTEGER NOT NULL,
+    created_date TIMESTAMPTZ NOT NULL,
+    modified_date TIMESTAMPTZ NOT NULL,
+    modified_by UUID NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity'
+);
+COMMENT ON TABLE audit.image_asset_history IS
+    'Trigger-managed history mirror of ops.image_asset. Never written by application code.';
 
 \echo 'Creating table: ops.plate_info'
 CREATE TABLE IF NOT EXISTS ops.plate_info (

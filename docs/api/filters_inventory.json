@@ -554,14 +554,6 @@
   {
     "endpoint": "/api/v1/plates/enriched",
     "entity": "plates",
-    "exempt_reason": "\"enriched join field; computed from storage_path; not filterable\"",
-    "field": "product_image_url",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
     "exempt_reason": "\"enriched join field; filter by plate_id instead\"",
     "field": "product_name",
     "model": "PlateEnrichedResponseSchema",

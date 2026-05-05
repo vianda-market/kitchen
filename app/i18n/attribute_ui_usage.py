@@ -1319,14 +1319,9 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-app: api/types.ts — dietary badges on plate cards (1 hit).
     "ops.product_info.dietary": {"surfaces": ["platform", "app"]},
     #
-    # .image_url surfaces in ProductResponseSchema and plate enriched responses.
-    # vianda-platform: types/api.ts — product image in admin management (3 hits).
-    # vianda-app: api/types.ts — plate image on explore cards and detail screens (7 hits).
-    "ops.product_info.image_url": {"surfaces": ["platform", "app"]},
-    #
-    # .image_thumbnail_url surfaces in ProductResponseSchema.
-    # vianda-platform: types/api.ts — thumbnail in admin product list (2 hits).
-    "ops.product_info.image_thumbnail_url": {"surfaces": ["platform"]},
+    # NOTE: image_url and image_thumbnail_url were removed from ops.product_info
+    # as part of image-pipeline-uploads-atomic. Image data is now served via
+    # ops.image_asset (GET /api/v1/uploads/{image_asset_id}).
     #
     # .status surfaces in ProductResponseSchema.
     # vianda-platform: types/api.ts — status column in product management.

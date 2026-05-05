@@ -547,11 +547,6 @@ BEGIN
         dietary,
         is_archived,
         status,
-        image_storage_path,
-        image_checksum,
-        image_url,
-        image_thumbnail_storage_path,
-        image_thumbnail_url,
         created_date,
         created_by,
         modified_by,
@@ -572,11 +567,6 @@ BEGIN
         NEW.dietary,
         NEW.is_archived,
         NEW.status,
-        NEW.image_storage_path,
-        NEW.image_checksum,
-        NEW.image_url,
-        NEW.image_thumbnail_storage_path,
-        NEW.image_thumbnail_url,
         NEW.created_date,
         NEW.created_by,
         NEW.modified_by,
@@ -595,6 +585,66 @@ CREATE TRIGGER product_history_trigger
 AFTER INSERT OR UPDATE ON ops.product_info
 FOR EACH ROW
 EXECUTE FUNCTION product_history_trigger_func();
+
+-- Trigger function for ops.image_asset history logging
+CREATE OR REPLACE FUNCTION image_asset_history_trigger_func()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_event_id UUID := uuidv7();
+BEGIN
+    IF (TG_OP = 'UPDATE') THEN
+        UPDATE audit.image_asset_history
+        SET is_current = FALSE,
+            valid_until = CURRENT_TIMESTAMP
+        WHERE image_asset_id = OLD.image_asset_id AND is_current = TRUE;
+    END IF;
+
+    INSERT INTO audit.image_asset_history (
+        event_id,
+        image_asset_id,
+        product_id,
+        institution_id,
+        original_storage_path,
+        original_checksum,
+        pipeline_status,
+        moderation_status,
+        moderation_signals,
+        processing_version,
+        failure_count,
+        created_date,
+        modified_date,
+        modified_by,
+        is_current,
+        valid_until
+    )
+    VALUES (
+        new_event_id,
+        NEW.image_asset_id,
+        NEW.product_id,
+        NEW.institution_id,
+        NEW.original_storage_path,
+        NEW.original_checksum,
+        NEW.pipeline_status,
+        NEW.moderation_status,
+        NEW.moderation_signals,
+        NEW.processing_version,
+        NEW.failure_count,
+        NEW.created_date,
+        NEW.modified_date,
+        NEW.modified_by,
+        TRUE,
+        'infinity'
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS image_asset_history_trigger ON ops.image_asset;
+CREATE TRIGGER image_asset_history_trigger
+AFTER INSERT OR UPDATE ON ops.image_asset
+FOR EACH ROW
+EXECUTE FUNCTION image_asset_history_trigger_func();
 
 -- Before insert/update on ops.plate_info: set expected_payout_local_currency = credit * credit_value_local_currency
 CREATE OR REPLACE FUNCTION plate_info_set_expected_payout_local_currency_func()

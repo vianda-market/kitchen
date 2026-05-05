@@ -398,8 +398,6 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "ingredients": "Ingredients",
                 "description": "Description",
                 "dietary": "Dietary",
-                "image_url": "Product Image",
-                "image_thumbnail_url": "Thumbnail",
                 "status": "Status",
             },
             "plate_info": {
@@ -836,8 +834,6 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "ingredients": "Ingredientes",
                 "description": "Descripción",
                 "dietary": "Dieta",
-                "image_url": "Imagen del producto",
-                "image_thumbnail_url": "Miniatura",
                 "status": "Estado",
             },
             "plate_info": {
@@ -1274,8 +1270,6 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "ingredients": "Ingredientes",
                 "description": "Descrição",
                 "dietary": "Dieta",
-                "image_url": "Imagem do produto",
-                "image_thumbnail_url": "Miniatura",
                 "status": "Status",
             },
             "plate_info": {

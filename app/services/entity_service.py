@@ -1799,11 +1799,9 @@ def get_enriched_products(
     Raises:
         HTTPException: For system errors or database failures
     """
-    from app.utils.gcs import resolve_product_image_urls
-
     return _product_enriched_service.get_enriched(
         db,
-        row_transform=resolve_product_image_urls,
+        row_transform=None,
         select_fields=[
             "p.product_id",
             "p.institution_id",
@@ -1815,12 +1813,6 @@ def get_enriched_products(
             "p.description",
             "p.description_i18n",
             "p.dietary",
-            "p.image_url",
-            "p.image_storage_path",
-            "p.image_thumbnail_url",
-            "p.image_thumbnail_storage_path",
-            "p.image_checksum",
-            "CASE WHEN p.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.is_archived",
             "p.status",
             "p.created_date",
@@ -1856,12 +1848,10 @@ def get_enriched_product_by_id(
     Raises:
         HTTPException: For system errors or database failures
     """
-    from app.utils.gcs import resolve_product_image_urls
-
     return _product_enriched_service.get_enriched_by_id(
         product_id,
         db,
-        row_transform=resolve_product_image_urls,
+        row_transform=None,
         select_fields=[
             "p.product_id",
             "p.institution_id",
@@ -1873,12 +1863,6 @@ def get_enriched_product_by_id(
             "p.description",
             "p.description_i18n",
             "p.dietary",
-            "p.image_url",
-            "p.image_storage_path",
-            "p.image_thumbnail_url",
-            "p.image_thumbnail_storage_path",
-            "p.image_checksum",
-            "CASE WHEN p.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.is_archived",
             "p.status",
             "p.created_date",
@@ -1930,11 +1914,9 @@ def get_enriched_plates(
     Raises:
         HTTPException: For system errors or database failures
     """
-    from app.utils.gcs import resolve_product_image_urls
-
     plates = _plate_enriched_service.get_enriched(
         db,
-        row_transform=resolve_product_image_urls,
+        row_transform=None,
         select_fields=[
             "p.plate_id",
             "p.product_id",
@@ -1960,9 +1942,6 @@ def get_enriched_plates(
             "pr.ingredients_i18n",
             "pr.description",
             "pr.description_i18n",
-            "pr.image_url as product_image_url",
-            "pr.image_storage_path as product_image_storage_path",
-            "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
             "p.expected_payout_local_currency",
@@ -2047,12 +2026,10 @@ def get_enriched_plate_by_id(
     Raises:
         HTTPException: For system errors or database failures
     """
-    from app.utils.gcs import resolve_product_image_urls
-
     plate = _plate_enriched_service.get_enriched_by_id(
         plate_id,
         db,
-        row_transform=resolve_product_image_urls,
+        row_transform=None,
         select_fields=[
             "p.plate_id",
             "p.product_id",
@@ -2078,9 +2055,6 @@ def get_enriched_plate_by_id(
             "pr.ingredients_i18n",
             "pr.description",
             "pr.description_i18n",
-            "pr.image_url as product_image_url",
-            "pr.image_storage_path as product_image_storage_path",
-            "CASE WHEN pr.image_storage_path NOT IN ('static/placeholders/product_default.png', 'placeholder/product_default.png') THEN TRUE ELSE FALSE END as has_image",
             "p.price",
             "p.credit",
             "p.expected_payout_local_currency",
