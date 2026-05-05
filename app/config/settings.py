@@ -93,6 +93,11 @@ class Settings(BaseSettings):
     GCS_QR_SIGNED_URL_EXPIRATION_SECONDS: int = 86400
     GCS_SIGNING_SA_EMAIL: str = ""  # Cloud Run: set to run_sa email; local: empty = default creds
 
+    # Image pipeline: SafeSearch moderation rejection threshold.
+    # One of UNKNOWN, VERY_UNLIKELY, UNLIKELY, POSSIBLE, LIKELY, VERY_LIKELY.
+    # Any of adult/violence/racy at or above this level causes rejection.
+    MODERATION_REJECT_LIKELIHOOD: str = "LIKELY"
+
     # Product image upload: max file size in bytes (default 5 MB)
     MAX_PRODUCT_IMAGE_BYTES: int = 5 * 1024 * 1024
 
