@@ -365,6 +365,12 @@
               "pm.test(\"signed_urls is null or absent (not ready yet)\", function () {",
               "    var su = resp.signed_urls;",
               "    pm.expect(su === null || su === undefined || Object.keys(su || {}).length === 0).to.be.true;",
+              "});",
+              "pm.test(\"product_id is a UUID\", function () {",
+              "    pm.expect(resp.product_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+              "});",
+              "pm.test(\"product_id matches the seeded product\", function () {",
+              "    pm.expect(resp.product_id).to.equal(pm.collectionVariables.get(\"productAId\"));",
               "});"
             ],
             "type": "text/javascript"
@@ -542,6 +548,51 @@
           "raw": "{\"product_id\": \"{{productAId}}\"}"
         },
         "url": "{{baseUrl}}/api/v1/uploads"
+      }
+    },
+    {
+      "name": "GET /products/enriched — image_asset fields present on product (no upload = nulls)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var products = pm.response.json();",
+              "pm.test(\"Response is an array\", function () {",
+              "    pm.expect(Array.isArray(products)).to.be.true;",
+              "});",
+              "// Find our seeded product A",
+              "var productId = pm.collectionVariables.get(\"productAId\");",
+              "var found = products.find(function(p) { return p.product_id === productId; });",
+              "pm.test(\"Product A is in enriched list\", function () {",
+              "    pm.expect(found).to.not.be.undefined;",
+              "});",
+              "if (found) {",
+              "    pm.test(\"image_asset_id field is present (null = no upload)\", function () {",
+              "        pm.expect(found).to.have.property(\"image_asset_id\");",
+              "    });",
+              "    pm.test(\"image_pipeline_status field is present\", function () {",
+              "        pm.expect(found).to.have.property(\"image_pipeline_status\");",
+              "    });",
+              "    pm.test(\"image_moderation_status field is present\", function () {",
+              "        pm.expect(found).to.have.property(\"image_moderation_status\");",
+              "    });",
+              "    pm.test(\"image_signed_urls field is present (null when not ready)\", function () {",
+              "        pm.expect(found).to.have.property(\"image_signed_urls\");",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{supplierAToken}}" }],
+        "url": "{{baseUrl}}/api/v1/products/enriched"
       }
     },
     {
