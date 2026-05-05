@@ -142,7 +142,8 @@ _Routes: `/restaurants/`, `/plates/`, `/plate-kitchen-days/`, `/cuisines/`, `/qr
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation — status logic and kitchen day requirements |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/PLATE_API_CLIENT.md` | Plate CRUD, enriched endpoints, bulk kitchen day assignment |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/CUISINES_API_CLIENT.md` | List supported cuisines for restaurant dropdown validation |
-| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_PRODUCTS.md` | Product CRUD, enriched endpoints, and image upload |
+| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_PRODUCTS.md` | Product CRUD and enriched endpoints (image upload is a separate pipeline) |
+| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_UPLOADS.md` | Image upload pipeline — `POST/GET/DELETE /api/v1/uploads`, async SafeSearch + pyvips pipeline, state machine, polling guidance |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_NATIONAL_HOLIDAYS.md` | Manage country-scoped holiday calendar |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation logic with status and kitchen day requirements |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/SUPPLIER_DASHBOARD_METRICS_B2B.md` | Metrics and APIs for supplier/restaurant dashboard |
