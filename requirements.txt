@@ -46,7 +46,7 @@ google-auth>=2.28.0     # Explicit: GCS signed URL impersonation (google.auth.im
 stripe>=9.0.0,<10.0.0
 
 # SendGrid (production email; only imported when EMAIL_PROVIDER=sendgrid)
-sendgrid>=6.11.0
+sendgrid>=6.12.5
 
 # Jinja2 (email template rendering)
 Jinja2>=3.1.0
