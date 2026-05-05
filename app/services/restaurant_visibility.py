@@ -10,6 +10,29 @@ import psycopg2.extensions
 from app.utils.db import db_read
 
 
+def restaurant_entity_has_payouts_enabled(
+    restaurant_id: UUID,
+    db: psycopg2.extensions.connection,
+) -> bool:
+    """
+    Return True if the institution_entity linked to this restaurant has
+    payout_onboarding_status = 'complete' (Stripe Connect fully onboarded).
+    Used to gate restaurant activation: a supplier may create a restaurant
+    without payouts, but cannot activate it until payouts are wired.
+    """
+    query = """
+        SELECT 1
+        FROM ops.restaurant_info r
+        JOIN ops.institution_entity_info e ON e.institution_entity_id = r.institution_entity_id
+        WHERE r.restaurant_id = %s
+          AND e.payout_onboarding_status = 'complete'
+          AND NOT e.is_archived
+        LIMIT 1
+    """
+    row = db_read(query, (str(restaurant_id),), connection=db, fetch_one=True)
+    return row is not None
+
+
 def restaurant_has_active_plate_kitchen_days(
     restaurant_id: UUID,
     db: psycopg2.extensions.connection,

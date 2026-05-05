@@ -297,6 +297,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.active_requires_setup": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days and at least one active QR code. Add plate_kitchen_days and create a QR code via POST /api/v1/qr-codes, then try again.",
         "restaurant.active_requires_plate_days": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days. Add and activate plate_kitchen_days for the restaurant's plates, then try again.",
         "restaurant.active_requires_qr": "Cannot set restaurant to Active. The restaurant must have at least one active QR code. Create a QR code via POST /api/v1/qr-codes for this restaurant, then try again.",
+        "restaurant.active_requires_entity_payouts": "Cannot activate restaurant: the linked institution entity has not completed Stripe Connect. Complete payout onboarding for the entity, then try again.",
         # restaurant_holiday.* — K11
         "restaurant_holiday.not_found": "Restaurant holiday not found.",
         "restaurant_holiday.duplicate": "Restaurant already has a holiday registered for {holiday_date}.",
@@ -885,6 +886,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.active_requires_setup": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos y al menos un código QR activo. Agrega plate_kitchen_days y crea un código QR.",
         "restaurant.active_requires_plate_days": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos.",
         "restaurant.active_requires_qr": "No se puede activar el restaurante. Debe tener al menos un código QR activo. Crea un código QR para este restaurante.",
+        "restaurant.active_requires_entity_payouts": "No se puede activar el restaurante: la entidad institucional vinculada no ha completado Stripe Connect. Completa el proceso de pago para la entidad e inténtalo de nuevo.",
         # restaurant_holiday.* — K11
         "restaurant_holiday.not_found": "Feriado de restaurante no encontrado.",
         "restaurant_holiday.duplicate": "El restaurante ya tiene un feriado registrado para {holiday_date}.",
@@ -1473,6 +1475,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.active_requires_setup": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos e pelo menos um código QR ativo.",
         "restaurant.active_requires_plate_days": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos.",
         "restaurant.active_requires_qr": "Não é possível ativar o restaurante. Ele deve ter pelo menos um código QR ativo. Crie um código QR para este restaurante.",
+        "restaurant.active_requires_entity_payouts": "Não é possível ativar o restaurante: a entidade institucional vinculada não concluiu o Stripe Connect. Conclua o processo de pagamento para a entidade e tente novamente.",
         # restaurant_holiday.* — K11
         "restaurant_holiday.not_found": "Feriado do restaurante não encontrado.",
         "restaurant_holiday.duplicate": "O restaurante já tem um feriado registrado para {holiday_date}.",
