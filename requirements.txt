@@ -24,7 +24,7 @@ slowapi>=0.1.9          # Rate limiting for unauthenticated endpoints
 # Configuration and utilities
 python-dotenv==1.2.2    # Environment variable loader (CVE-2026-28684 fix)
 pyyaml                  # YAML configuration parsing
-pytz==2026.1.post1           # Timezone handling
+pytz==2026.2           # Timezone handling
 pycountry==26.2.16      # ISO 3166 country code to name (alpha-2; offline, no API key)
 phonenumbers>=8.13.0   # E.164 validation and normalization (offline, no API calls)
 
