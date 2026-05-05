@@ -1776,6 +1776,61 @@ _product_enriched_service = EnrichedService(
     institution_table_alias="p",  # institution_id is on the base table
 )
 
+# Common select fields for product enriched queries (list + detail).
+# Includes image_asset fields from LEFT JOIN — NULL when no upload exists.
+_PRODUCT_ENRICHED_SELECT_FIELDS = [
+    "p.product_id",
+    "p.institution_id",
+    "i.name as institution_name",
+    "p.name",
+    "p.name_i18n",
+    "p.ingredients",
+    "p.ingredients_i18n",
+    "p.description",
+    "p.description_i18n",
+    "p.dietary",
+    "p.is_archived",
+    "p.status",
+    "p.created_date",
+    "p.modified_date",
+    "ia.image_asset_id",
+    "ia.pipeline_status as image_pipeline_status",
+    "ia.moderation_status as image_moderation_status",
+]
+
+# Common joins for product enriched queries.
+_PRODUCT_ENRICHED_JOINS = [
+    ("INNER", "institution_info", "i", "p.institution_id = i.institution_id"),
+    ("LEFT", "image_asset", "ia", "ia.product_id = p.product_id"),
+]
+
+
+def _populate_product_image_signed_urls(
+    products: list[ProductEnrichedResponseSchema],
+) -> None:
+    """
+    Compute image_signed_urls for each product in-place after the DB SELECT.
+
+    Only called when pipeline_status='ready'. Uses a per-call cache keyed on
+    (institution_id, product_id) so products appearing multiple times in a
+    single request only pay the GCS HMAC cost once.
+
+    Mutates the list in-place; returns None.
+    """
+    from app.utils.gcs import get_image_asset_signed_urls
+
+    url_cache: dict[tuple[str, str], dict[str, str]] = {}
+    for product in products:
+        if product.image_pipeline_status != "ready":
+            product.image_signed_urls = None
+            continue
+        cache_key = (str(product.institution_id), str(product.product_id))
+        if cache_key not in url_cache:
+            urls = get_image_asset_signed_urls(product.institution_id, product.product_id)
+            url_cache[cache_key] = urls if urls else {}
+        cached = url_cache[cache_key]
+        product.image_signed_urls = cached if cached else None
+
 
 def get_enriched_products(
     db: psycopg2.extensions.connection,
@@ -1786,7 +1841,7 @@ def get_enriched_products(
     page_size: int | None = None,
 ) -> list[ProductEnrichedResponseSchema]:
     """
-    Get all products with enriched data (institution name).
+    Get all products with enriched data (institution name, image asset summary).
 
     Args:
         db: Database connection
@@ -1794,36 +1849,23 @@ def get_enriched_products(
         include_archived: Whether to include archived records (default: False)
 
     Returns:
-        List of ProductEnrichedResponseSchema with institution name
+        List of ProductEnrichedResponseSchema with institution name and image fields
 
     Raises:
         HTTPException: For system errors or database failures
     """
-    return _product_enriched_service.get_enriched(
+    products = _product_enriched_service.get_enriched(
         db,
         row_transform=None,
-        select_fields=[
-            "p.product_id",
-            "p.institution_id",
-            "i.name as institution_name",
-            "p.name",
-            "p.name_i18n",
-            "p.ingredients",
-            "p.ingredients_i18n",
-            "p.description",
-            "p.description_i18n",
-            "p.dietary",
-            "p.is_archived",
-            "p.status",
-            "p.created_date",
-            "p.modified_date",
-        ],
-        joins=[("INNER", "institution_info", "i", "p.institution_id = i.institution_id")],
+        select_fields=_PRODUCT_ENRICHED_SELECT_FIELDS,
+        joins=_PRODUCT_ENRICHED_JOINS,
         scope=scope,
         include_archived=include_archived,
         page=page,
         page_size=page_size,
     )
+    _populate_product_image_signed_urls(products)
+    return products
 
 
 def get_enriched_product_by_id(
@@ -1834,7 +1876,7 @@ def get_enriched_product_by_id(
     include_archived: bool = False,
 ) -> ProductEnrichedResponseSchema | None:
     """
-    Get a single product by ID with enriched data (institution name).
+    Get a single product by ID with enriched data (institution name, image asset summary).
 
     Args:
         product_id: Product ID
@@ -1843,35 +1885,23 @@ def get_enriched_product_by_id(
         include_archived: Whether to include archived records (default: False)
 
     Returns:
-        ProductEnrichedResponseSchema with institution name, or None if not found
+        ProductEnrichedResponseSchema with institution name and image fields, or None if not found
 
     Raises:
         HTTPException: For system errors or database failures
     """
-    return _product_enriched_service.get_enriched_by_id(
+    product = _product_enriched_service.get_enriched_by_id(
         product_id,
         db,
         row_transform=None,
-        select_fields=[
-            "p.product_id",
-            "p.institution_id",
-            "i.name as institution_name",
-            "p.name",
-            "p.name_i18n",
-            "p.ingredients",
-            "p.ingredients_i18n",
-            "p.description",
-            "p.description_i18n",
-            "p.dietary",
-            "p.is_archived",
-            "p.status",
-            "p.created_date",
-            "p.modified_date",
-        ],
-        joins=[("INNER", "institution_info", "i", "p.institution_id = i.institution_id")],
+        select_fields=_PRODUCT_ENRICHED_SELECT_FIELDS,
+        joins=_PRODUCT_ENRICHED_JOINS,
         scope=scope,
         include_archived=include_archived,
     )
+    if product:
+        _populate_product_image_signed_urls([product])
+    return product
 
 
 # =============================================================================

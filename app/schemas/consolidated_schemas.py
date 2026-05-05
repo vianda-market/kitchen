@@ -1135,7 +1135,8 @@ class ProductUpsertByKeySchema(BaseModel):
 
 class ProductEnrichedResponseSchema(BaseModel):
     """Schema for enriched product response data with institution name.
-    Inline image fields removed — image state lives in image_asset (see GET /api/v1/uploads/{id})."""
+    Inline image fields removed — image state lives in image_asset (see GET /api/v1/uploads/{id}).
+    Image summary is surfaced here for list/detail views without requiring a separate uploads call."""
 
     product_id: UUID
     institution_id: UUID
@@ -1151,6 +1152,24 @@ class ProductEnrichedResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
+    # Image asset fields — populated via LEFT JOIN on ops.image_asset.
+    # NULL when no upload exists for the product.
+    image_asset_id: UUID | None = Field(
+        None,
+        description="image_asset PK. Use with DELETE /api/v1/uploads/{id} to remove the image.",
+    )
+    image_pipeline_status: str | None = Field(
+        None,
+        description="Pipeline lifecycle: pending | processing | ready | rejected | failed. NULL = no upload.",
+    )
+    image_moderation_status: str | None = Field(
+        None,
+        description="SafeSearch result: pending | passed | rejected. NULL = no upload.",
+    )
+    image_signed_urls: dict[str, str] | None = Field(
+        None,
+        description="Signed read URLs for hero, card, thumbnail. Non-null only when image_pipeline_status='ready'.",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1193,6 +1212,7 @@ class UploadStatusResponse(BaseModel):
     """Response body for GET /api/v1/uploads/{image_asset_id}."""
 
     image_asset_id: UUID
+    product_id: UUID = Field(..., description="Product this image asset belongs to.")
     pipeline_status: str
     moderation_status: str
     signed_urls: dict[str, str] | None = Field(

@@ -188,6 +188,7 @@ def get_upload_status(
 
     return UploadStatusResponse(
         image_asset_id=row["image_asset_id"],
+        product_id=row["product_id"],
         pipeline_status=row["pipeline_status"],
         moderation_status=row["moderation_status"],
         signed_urls=signed_urls,

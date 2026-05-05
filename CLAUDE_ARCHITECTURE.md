@@ -554,7 +554,22 @@ Five inline image columns dropped from `ops.product_info` and `audit.product_his
 
 - `UploadCreateRequest` — `{ product_id: UUID }`
 - `UploadCreateResponse` — `{ image_asset_id: UUID, signed_write_url: str, expires_at: datetime }`
-- `UploadStatusResponse` — `{ image_asset_id: UUID, pipeline_status: str, moderation_status: str, signed_urls: dict | null }`
+- `UploadStatusResponse` — `{ image_asset_id: UUID, product_id: UUID, pipeline_status: str, moderation_status: str, signed_urls: dict | null }` — `product_id` closes the round-trip gap: callers can navigate from an upload back to the product without a separate products lookup.
+
+### Image state on ProductEnriched (slice 2e)
+
+`GET /api/v1/products/enriched` and `GET /api/v1/products/enriched/{id}` surface image state directly on each product via a `LEFT JOIN ops.image_asset ia ON ia.product_id = p.product_id`. Fields added to `ProductEnrichedResponseSchema`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `image_asset_id` | UUID \| null | PK of the `image_asset` row. Null when no upload exists. Pass to `DELETE /uploads/{id}` for removal. |
+| `image_pipeline_status` | str \| null | `pending\|processing\|ready\|rejected\|failed`. Null when no row. |
+| `image_moderation_status` | str \| null | `pending\|passed\|rejected`. Null when no row. |
+| `image_signed_urls` | dict \| null | `{hero, card, thumbnail}` signed read URLs. Non-null only when `pipeline_status == 'ready'`. Computed at response-build time via `get_image_asset_signed_urls()` in `app/utils/gcs.py`. |
+
+Implementation: `_populate_product_image_signed_urls()` in `app/services/entity_service.py` runs after the DB SELECT, with a per-request cache keyed on `(institution_id, product_id)` to avoid duplicate GCS HMAC calls when the same product appears multiple times.
+
+B2B list view should use `image_signed_urls['card']` (600×400) for the thumbnail. The `image_asset_id` field is the handle for the supplier "remove image" button.
 
 ### GCS blob layout
 
