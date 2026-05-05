@@ -109,7 +109,7 @@ def _run_safe_search(image_bytes: bytes) -> dict[str, str]:
     Call Cloud Vision SafeSearch on raw image bytes.
     Returns a dict mapping signal name -> likelihood string.
     """
-    from google.cloud import vision  # type: ignore[attr-defined]
+    from google.cloud import vision
 
     client = vision.ImageAnnotatorClient()
     image = vision.Image(content=image_bytes)

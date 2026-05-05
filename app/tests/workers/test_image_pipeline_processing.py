@@ -11,9 +11,18 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from app.workers.image_pipeline.processing import (
+    _DERIVED_SIZES,
     PROCESSING_VERSION,
+    _delete_original_blob,
+    _download_original,
+    _get_asset_row,
+    _json_dumps,
     _likelihood_value,
+    _process_with_pyvips,
+    _run_safe_search,
+    _set_pipeline_status,
     _should_reject,
+    _upload_derived_blob,
     process_image,
 )
 
@@ -403,3 +412,307 @@ class TestProcessImageFailureRetry:
         final = all_kwargs[-1]
         assert final.get("pipeline_status") == "pending"
         assert final.get("failure_count") == 2
+
+
+# ─── Helper-level tests (cover internal bodies) ───────────────────────────────
+
+
+class TestJsonDumps:
+    def test_serializes_dict(self) -> None:
+        result = _json_dumps({"adult": "LIKELY", "racy": "POSSIBLE"})
+        parsed = json.loads(result)
+        assert parsed["adult"] == "LIKELY"
+        assert parsed["racy"] == "POSSIBLE"
+
+    def test_returns_string(self) -> None:
+        assert isinstance(_json_dumps({}), str)
+
+
+class TestGetAssetRow:
+    """Covers _get_asset_row body (import + db_read call path)."""
+
+    def test_returns_row_when_found(self) -> None:
+        db = MagicMock()
+        expected_row = {**_BASE_ROW}
+
+        # db_read is imported locally inside _get_asset_row; patch at source.
+        with patch("app.utils.db.db_read", return_value=expected_row) as mock_read:
+            result = _get_asset_row(IMAGE_ASSET_ID, db)
+
+        assert result == expected_row
+        mock_read.assert_called_once()
+        call_kwargs = mock_read.call_args
+        assert call_kwargs.kwargs.get("fetch_one") is True
+
+    def test_returns_none_when_not_found(self) -> None:
+        db = MagicMock()
+
+        with patch("app.utils.db.db_read", return_value=None):
+            result = _get_asset_row(IMAGE_ASSET_ID, db)
+
+        assert result is None
+
+
+class TestSetPipelineStatus:
+    """Covers _set_pipeline_status body."""
+
+    def test_no_fields_returns_early(self) -> None:
+        db = MagicMock()
+        _set_pipeline_status(IMAGE_ASSET_ID, db)
+        db.cursor.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_executes_update_and_commits(self) -> None:
+        db = MagicMock()
+        mock_cursor = MagicMock()
+        db.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        db.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+        _set_pipeline_status(IMAGE_ASSET_ID, db, pipeline_status="processing")
+
+        mock_cursor.execute.assert_called_once()
+        db.commit.assert_called_once()
+
+    def test_sets_multiple_fields(self) -> None:
+        db = MagicMock()
+        mock_cursor = MagicMock()
+        db.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        db.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+        _set_pipeline_status(IMAGE_ASSET_ID, db, pipeline_status="ready", processing_version=1)
+
+        sql = mock_cursor.execute.call_args[0][0]
+        assert "pipeline_status = %s" in sql
+        assert "processing_version = %s" in sql
+
+
+class TestDownloadOriginal:
+    """Covers _download_original body including no-bucket path."""
+
+    def test_raises_when_no_bucket(self) -> None:
+        import pytest
+
+        # settings and get_gcs_client are imported locally inside _download_original.
+        with (
+            patch("app.config.settings.settings") as mock_settings,
+            patch("app.utils.gcs.get_gcs_client"),
+        ):
+            mock_settings.GCS_SUPPLIER_BUCKET = ""
+            with pytest.raises(RuntimeError, match="GCS_SUPPLIER_BUCKET"):
+                _download_original(INSTITUTION_ID, PRODUCT_ID)
+
+    def test_downloads_from_correct_path(self) -> None:
+        mock_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_blob.download_as_bytes.return_value = b"image-data"
+        mock_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+
+        with (
+            patch("app.config.settings.settings") as mock_settings,
+            patch("app.utils.gcs.get_gcs_client", return_value=mock_client),
+        ):
+            mock_settings.GCS_SUPPLIER_BUCKET = "test-bucket"
+            result = _download_original(INSTITUTION_ID, PRODUCT_ID)
+
+        assert result == b"image-data"
+        expected_blob_name = f"products/{INSTITUTION_ID}/{PRODUCT_ID}/original"
+        mock_bucket.blob.assert_called_once_with(expected_blob_name)
+
+
+class TestDeleteOriginalBlob:
+    """Covers _delete_original_blob body including no-bucket and exception paths."""
+
+    def test_no_op_when_no_bucket(self) -> None:
+        with patch("app.config.settings.settings") as mock_settings:
+            mock_settings.GCS_SUPPLIER_BUCKET = ""
+            # Should not raise
+            _delete_original_blob(INSTITUTION_ID, PRODUCT_ID)
+
+    def test_deletes_blob_on_success(self) -> None:
+        mock_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+
+        with (
+            patch("app.config.settings.settings") as mock_settings,
+            patch("app.utils.gcs.get_gcs_client", return_value=mock_client),
+        ):
+            mock_settings.GCS_SUPPLIER_BUCKET = "test-bucket"
+            _delete_original_blob(INSTITUTION_ID, PRODUCT_ID)
+
+        mock_blob.delete.assert_called_once()
+
+    def test_logs_warning_on_delete_exception(self) -> None:
+        mock_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_blob.delete.side_effect = Exception("GCS unavailable")
+        mock_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+
+        with (
+            patch("app.config.settings.settings") as mock_settings,
+            patch("app.utils.gcs.get_gcs_client", return_value=mock_client),
+            patch("app.workers.image_pipeline.processing.logger") as mock_logger,
+        ):
+            mock_settings.GCS_SUPPLIER_BUCKET = "test-bucket"
+            _delete_original_blob(INSTITUTION_ID, PRODUCT_ID)
+
+        mock_logger.warning.assert_called_once()
+
+
+class TestRunSafeSearch:
+    """Covers _run_safe_search body."""
+
+    def test_returns_signal_dict(self) -> None:
+        # Build mock Vision annotation
+        mock_ann = MagicMock()
+        mock_ann.adult.name = "VERY_UNLIKELY"
+        mock_ann.violence.name = "VERY_UNLIKELY"
+        mock_ann.racy.name = "VERY_UNLIKELY"
+        mock_ann.medical.name = "VERY_UNLIKELY"
+        mock_ann.spoof.name = "VERY_UNLIKELY"
+
+        mock_response = MagicMock()
+        mock_response.safe_search_annotation = mock_ann
+
+        mock_annotator_client = MagicMock()
+        mock_annotator_client.safe_search_detection.return_value = mock_response
+
+        mock_vision_module = MagicMock()
+        mock_vision_module.ImageAnnotatorClient.return_value = mock_annotator_client
+
+        # _run_safe_search does `from google.cloud import vision` locally.
+        # Patch via sys.modules so the local import resolves to our mock.
+
+        fake_google = MagicMock()
+        fake_google.cloud.vision = mock_vision_module
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "google": fake_google,
+                "google.cloud": fake_google.cloud,
+                "google.cloud.vision": mock_vision_module,
+            },
+        ):
+            result = _run_safe_search(b"fake-image")
+
+        assert "adult" in result
+        assert "violence" in result
+        assert "racy" in result
+        assert "medical" in result
+        assert "spoof" in result
+
+
+class TestUploadDerivedBlob:
+    """Covers _upload_derived_blob body including no-bucket path."""
+
+    def test_raises_when_no_bucket(self) -> None:
+        import pytest
+
+        with patch("app.config.settings.settings") as mock_settings:
+            mock_settings.GCS_SUPPLIER_BUCKET = ""
+            with pytest.raises(RuntimeError, match="GCS_SUPPLIER_BUCKET"):
+                _upload_derived_blob(INSTITUTION_ID, PRODUCT_ID, "hero", b"data", "image/webp")
+
+    def test_uploads_to_correct_path(self) -> None:
+        mock_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+
+        with (
+            patch("app.config.settings.settings") as mock_settings,
+            patch("app.utils.gcs.get_gcs_client", return_value=mock_client),
+        ):
+            mock_settings.GCS_SUPPLIER_BUCKET = "test-bucket"
+            _upload_derived_blob(INSTITUTION_ID, PRODUCT_ID, "hero", b"webp-data", "image/webp")
+
+        expected_blob_name = f"products/{INSTITUTION_ID}/{PRODUCT_ID}/hero"
+        mock_bucket.blob.assert_called_once_with(expected_blob_name)
+        mock_blob.upload_from_string.assert_called_once_with(b"webp-data", content_type="image/webp")
+
+
+def _make_pyvips_mock() -> MagicMock:
+    """Build a pyvips module mock with a realistic Image chain."""
+    mock_resized = MagicMock()
+    mock_resized.webpsave_buffer.return_value = b"webp"
+    mock_resized.jpegsave_buffer.return_value = b"jpeg"
+
+    mock_img = MagicMock()
+    mock_img.thumbnail_image.return_value = mock_resized
+
+    mock_pyvips = MagicMock()
+    mock_pyvips.Image.new_from_buffer.return_value = mock_img
+    return mock_pyvips
+
+
+class TestProcessWithPyvips:
+    """Covers _process_with_pyvips body — iterates all three derived sizes."""
+
+    def test_produces_all_three_derived_sizes(self) -> None:
+        upload_calls: list[tuple[str, str, str, bytes, str]] = []
+
+        def fake_upload(institution_id: str, product_id: str, key: str, data: bytes, content_type: str) -> None:
+            upload_calls.append((institution_id, product_id, key, data, content_type))
+
+        mock_pyvips = _make_pyvips_mock()
+
+        with (
+            patch.dict("sys.modules", {"pyvips": mock_pyvips}),
+            patch("app.workers.image_pipeline.processing._upload_derived_blob", side_effect=fake_upload),
+        ):
+            _process_with_pyvips(b"fake-image", INSTITUTION_ID, PRODUCT_ID)
+
+        # 3 sizes × 2 formats = 6 uploads
+        assert len(upload_calls) == 6
+
+        keys_uploaded = [c[2] for c in upload_calls]
+        assert "hero" in keys_uploaded
+        assert "card" in keys_uploaded
+        assert "thumbnail" in keys_uploaded
+        assert "hero.jpg" in keys_uploaded
+        assert "card.jpg" in keys_uploaded
+        assert "thumbnail.jpg" in keys_uploaded
+
+    def test_webp_and_jpeg_content_types(self) -> None:
+        upload_calls: list[tuple] = []
+        mock_pyvips = _make_pyvips_mock()
+
+        with (
+            patch.dict("sys.modules", {"pyvips": mock_pyvips}),
+            patch(
+                "app.workers.image_pipeline.processing._upload_derived_blob",
+                side_effect=lambda *a: upload_calls.append(a),
+            ),
+        ):
+            _process_with_pyvips(b"fake-image", INSTITUTION_ID, PRODUCT_ID)
+
+        webp_calls = [c for c in upload_calls if c[4] == "image/webp"]
+        jpeg_calls = [c for c in upload_calls if c[4] == "image/jpeg"]
+        assert len(webp_calls) == len(_DERIVED_SIZES)
+        assert len(jpeg_calls) == len(_DERIVED_SIZES)
+
+    def test_derived_sizes_dimensions_passed(self) -> None:
+        """thumbnail_image is called with the correct width/height for each size."""
+        mock_pyvips = _make_pyvips_mock()
+
+        with (
+            patch.dict("sys.modules", {"pyvips": mock_pyvips}),
+            patch("app.workers.image_pipeline.processing._upload_derived_blob"),
+        ):
+            _process_with_pyvips(b"fake-image", INSTITUTION_ID, PRODUCT_ID)
+
+        mock_img = mock_pyvips.Image.new_from_buffer.return_value
+        calls = mock_img.thumbnail_image.call_args_list
+        assert len(calls) == len(_DERIVED_SIZES)
+        widths = [c[0][0] for c in calls]
+        assert 1600 in widths
+        assert 600 in widths
+        assert 200 in widths
