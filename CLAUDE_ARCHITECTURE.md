@@ -559,13 +559,18 @@ Five inline image columns dropped from `ops.product_info` and `audit.product_his
 ### GCS blob layout
 
 ```
-products/{institution_id}/{product_id}/original      ← supplier upload
-products/{institution_id}/{product_id}/hero           ← pipeline output (future)
-products/{institution_id}/{product_id}/card           ← pipeline output (future)
-products/{institution_id}/{product_id}/thumbnail      ← pipeline output (future)
+products/{institution_id}/{product_id}/original      ← supplier upload (kept forever as source of truth for backfill)
+products/{institution_id}/{product_id}/hero           ← pipeline output (WebP, 1600×1066)
+products/{institution_id}/{product_id}/hero.jpg       ← pipeline output (JPEG fallback, 1600×1066)
+products/{institution_id}/{product_id}/card           ← pipeline output (WebP, 600×400)
+products/{institution_id}/{product_id}/card.jpg       ← pipeline output (JPEG fallback, 600×400)
+products/{institution_id}/{product_id}/thumbnail      ← pipeline output (WebP, 200×200)
+products/{institution_id}/{product_id}/thumbnail.jpg  ← pipeline output (JPEG fallback, 200×200)
 ```
 
 Bucket: `GCS_SUPPLIER_BUCKET`. Signed-URL expiry: `GCS_SIGNED_URL_EXPIRATION_SECONDS`.
+
+Clients should prefer `.webp` blobs and fall back to `.jpg` based on browser/platform support. The `get_image_asset_signed_urls()` helper currently returns `{hero, card, thumbnail}` (WebP keys). JPEG fallback keys are present in GCS alongside the WebP blobs; the signed-URL helper can be extended to surface them when frontends need them.
 
 ### Container entrypoint — `RUN_MODE`
 
@@ -574,17 +579,77 @@ The Dockerfile `CMD` invokes `scripts/entrypoint.sh`, which dispatches on the `R
 | `RUN_MODE` value | Behavior |
 |---|---|
 | unset or `api` | Start FastAPI via uvicorn (default — same as before) |
-| `image_event` | Run `run_image_event_listener()` — Pub/Sub listener stub |
-| `image_backfill` | Run `run_image_backfill()` — backfill worker stub |
+| `image_event` | Run `run_image_event_listener()` — Pub/Sub push HTTP listener (port `PORT`, default 8080) |
+| `image_backfill` | Run `run_image_backfill()` — batch re-processing worker (exits 0 on completion) |
 | any other value | Log warning to stderr, fall through to API mode |
 
-### Module
+### Worker modules (slice 2d — implemented)
 
-- **`app/workers/image_pipeline/__init__.py`** — two stub functions (`run_image_event_listener`, `run_image_backfill`); real processing logic TBD.
+| Module | Purpose |
+|---|---|
+| `app/workers/image_pipeline/__init__.py` | Public exports: `run_image_event_listener`, `run_image_backfill` |
+| `app/workers/image_pipeline/processing.py` | Core: `process_image()`, `PROCESSING_VERSION`, moderation logic |
+| `app/workers/image_pipeline/event_entrypoint.py` | FastAPI sub-app for Pub/Sub push delivery |
+| `app/workers/image_pipeline/backfill_entrypoint.py` | Batch iterator for stale rows |
+
+### Processing version model
+
+`PROCESSING_VERSION = 1` is the current standard. Bumping it in `processing.py` causes `run_image_backfill()` to re-process all rows where `processing_version < PROCESSING_VERSION`. Backfill always uses `force=True`, so already-ready rows are reprocessed against the new standard.
+
+### Pub/Sub ack-vs-nack contract
+
+| Worker return | HTTP status | Pub/Sub effect |
+|---|---|---|
+| Success | 204 | Message acknowledged — not redelivered |
+| Permanent failure (malformed path, product not found) | 4xx | Message acknowledged — not redelivered (drop) |
+| Transient failure (processing error, GCS timeout) | 5xx | Message redelivered by Pub/Sub (retry) |
+
+On transient failure, `process_image()` increments `failure_count`. After 3 failures, `pipeline_status` is flipped to `failed` and subsequent Pub/Sub redeliveries are silently acked (4xx path — see event_entrypoint.py comment).
+
+### Moderation threshold
+
+`MODERATION_REJECT_LIKELIHOOD` env var (default `LIKELY`). One of `UNKNOWN`, `VERY_UNLIKELY`, `UNLIKELY`, `POSSIBLE`, `LIKELY`, `VERY_LIKELY`. Any of `adult / violence / racy` at or above this level causes rejection. The original blob is purged on rejection. Signals are captured in `moderation_signals JSONB` for audit regardless of outcome.
+
+### pyvips invocation pattern
+
+```python
+img = pyvips.Image.new_from_buffer(image_bytes, "", access="sequential")
+resized = img.thumbnail_image(width, height=height,
+    crop=pyvips.enums.Interesting.ATTENTION,
+    size=pyvips.enums.Size.FORCE)
+webp_bytes = resized.webpsave_buffer(strip=True, Q=85)
+jpeg_bytes = resized.jpegsave_buffer(strip=True, Q=85)
+```
+
+`ATTENTION` crop selects the most visually interesting region. `FORCE` size ensures exact output dimensions even when the input aspect ratio differs. `strip=True` removes EXIF / ICC metadata for privacy and size reduction.
+
+### Manual smoke test (dev environment)
+
+Prerequisites: `RUN_MODE=image_event` Cloud Run job deployed to `vianda-dev`, GCS notifications wired to `vianda-dev-image-processing` Pub/Sub topic, push subscription pointed at the job's execution endpoint.
+
+1. Log in to vianda-platform as a Supplier Admin.
+2. Upload a product image via `POST /api/v1/uploads` — note the `image_asset_id`.
+3. Use the signed PUT URL to upload a real JPEG to GCS (e.g. `curl -X PUT -T photo.jpg "$SIGNED_URL"`).
+4. Wait ~10-30s for the Pub/Sub notification round-trip.
+5. Poll `GET /api/v1/uploads/{image_asset_id}` until `pipeline_status` is `ready` (or `rejected` / `failed`).
+6. When `ready`, verify `signed_urls` contains `hero`, `card`, `thumbnail` keys and that URLs resolve to valid WebP images.
+7. For a moderation test: upload an image that triggers SafeSearch rejection. Verify `pipeline_status=rejected`, `moderation_status=rejected`, and `moderation_signals` contains the signal that tripped the threshold.
 
 ### System dependency
 
 `libvips` is installed in the Dockerfile via `apt-get install -y libvips`. Required by `pyvips` (Python bindings). Only affects the Docker image layer; no local-dev change needed unless running image-processing code locally.
+
+### Env vars (image pipeline)
+
+| Var | Default | Description |
+|---|---|---|
+| `RUN_MODE` | `api` | Container dispatch mode: `api`, `image_event`, `image_backfill` |
+| `MODERATION_REJECT_LIKELIHOOD` | `LIKELY` | SafeSearch rejection threshold (adult/violence/racy) |
+| `PORT` | `8080` | HTTP port for `image_event` listener (Cloud Run assigns this) |
+
+### Tests
+
+`app/tests/workers/test_image_pipeline_processing.py` — 21 pytest unit tests covering all `process_image` paths (happy path, idempotent re-run, force re-run, moderation rejection, threshold override, failure retry at counts 1/2/3). All GCS/Vision/pyvips/DB calls fully mocked.
 
 ---
 
