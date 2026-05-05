@@ -125,6 +125,7 @@ END $$;
 INSERT INTO ops.institution_entity_info (
     institution_entity_id, institution_id, address_id,
     currency_metadata_id, tax_id, name,
+    payout_onboarding_status,
     is_archived, status, created_by, modified_by
 ) VALUES (
     'aaaaaaaa-aaaa-0001-0000-000000000002',
@@ -133,6 +134,7 @@ INSERT INTO ops.institution_entity_info (
     '66666666-6666-6666-6666-666666666601',  -- ARS currency_metadata
     '20-12345678-9',
     'Mercado Vianda BA Entidad (dev)',
+    'complete',  -- Stripe Connect payout-ready (required by activation gate; see app/services/restaurant_visibility.py)
     FALSE, 'active'::status_enum,
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'dddddddd-dddd-dddd-dddd-dddddddddddd'
