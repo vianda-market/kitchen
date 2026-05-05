@@ -1040,14 +1040,10 @@ class RestaurantResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-PLACEHOLDER_IMAGE_URL = "http://localhost:8000/static/placeholders/product_default.png"
-PLACEHOLDER_IMAGE_PATH = "static/placeholders/product_default.png"
-PLACEHOLDER_IMAGE_CHECKSUM = "7d959ae9353a02d3707dbeefe68f0af43e35d3ff8b479e8a9b16121d90ce947c"
-
-
 class ProductCreateSchema(BaseModel):
     """Schema for creating a new product.
-    Optionally embed ingredient_ids for atomic product + ingredients creation."""
+    Optionally embed ingredient_ids for atomic product + ingredients creation.
+    Image upload is handled separately via POST /api/v1/uploads."""
 
     institution_id: UUID
     name: str = Field(..., max_length=100)
@@ -1057,9 +1053,6 @@ class ProductCreateSchema(BaseModel):
     description: str | None = Field(None, max_length=1000)
     description_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
     dietary: list[DietaryFlag] | None = None
-    image_url: str = Field(default=PLACEHOLDER_IMAGE_URL, max_length=500)
-    image_storage_path: str = Field(default=PLACEHOLDER_IMAGE_PATH, max_length=500)
-    image_checksum: str = Field(default=PLACEHOLDER_IMAGE_CHECKSUM, max_length=128)
     ingredient_ids: list[UUID] | None = Field(
         None, max_length=30, description="Ingredient UUIDs — atomic assignment at creation"
     )
@@ -1067,7 +1060,8 @@ class ProductCreateSchema(BaseModel):
 
 class ProductUpdateSchema(BaseModel):
     """Schema for updating product information.
-    If ingredient_ids is provided, the ingredient set is full-replaced atomically."""
+    If ingredient_ids is provided, the ingredient set is full-replaced atomically.
+    Image upload is handled separately via POST /api/v1/uploads."""
 
     institution_id: UUID | None = None
     name: str | None = Field(None, max_length=100)
@@ -1077,16 +1071,14 @@ class ProductUpdateSchema(BaseModel):
     description: str | None = Field(None, max_length=1000)
     description_i18n: dict | None = Field(None, description="Locale map: {en: '...', es: '...'}")
     dietary: list[DietaryFlag] | None = None
-    image_url: str | None = Field(None, max_length=500)
-    image_storage_path: str | None = Field(None, max_length=500)
-    image_checksum: str | None = Field(None, max_length=128)
     ingredient_ids: list[UUID] | None = Field(
         None, max_length=30, description="Full-replace ingredient set; absent = no change, [] = remove all"
     )
 
 
 class ProductResponseSchema(BaseModel):
-    """Schema for product response data. Includes full _i18n locale maps for B2B edit forms."""
+    """Schema for product response data. Includes full _i18n locale maps for B2B edit forms.
+    Image state is no longer inline — query GET /api/v1/uploads/{image_asset_id} for image URLs."""
 
     product_id: UUID
     institution_id: UUID
@@ -1097,11 +1089,6 @@ class ProductResponseSchema(BaseModel):
     description: str | None = None
     description_i18n: dict | None = None
     dietary: list[DietaryFlag] | None
-    image_url: str | None
-    image_storage_path: str
-    image_thumbnail_url: str | None = None
-    image_thumbnail_storage_path: str | None = None
-    image_checksum: str
     is_archived: bool
     status: Status
     canonical_key: str | None = None
@@ -1126,11 +1113,8 @@ class ProductUpsertByKeySchema(BaseModel):
     ignored on the update path (the owning institution cannot change after
     creation).
 
-    NOT NULL DEFAULT columns — ``is_archived``, ``status``, ``image_storage_path``,
-    ``image_checksum``, ``image_url``, ``image_thumbnail_storage_path``,
-    ``image_thumbnail_url`` — carry their DB defaults and must not be typed as
-    ``Optional[X] = None`` (that would silently overwrite a real value with None
-    on UPDATE).
+    Inline image columns have been removed. Image state is managed via
+    POST /api/v1/uploads (two-step signed-URL upload flow).
     """
 
     canonical_key: str = Field(
@@ -1150,7 +1134,8 @@ class ProductUpsertByKeySchema(BaseModel):
 
 
 class ProductEnrichedResponseSchema(BaseModel):
-    """Schema for enriched product response data with institution name. B2B suppliers get both image sizes."""
+    """Schema for enriched product response data with institution name.
+    Inline image fields removed — image state lives in image_asset (see GET /api/v1/uploads/{id})."""
 
     product_id: UUID
     institution_id: UUID
@@ -1162,18 +1147,58 @@ class ProductEnrichedResponseSchema(BaseModel):
     description: str | None = None
     description_i18n: dict | None = Field(None, exclude=True)
     dietary: list[DietaryFlag] | None
-    image_url: str | None
-    image_storage_path: str
-    image_thumbnail_url: str | None
-    image_thumbnail_storage_path: str
-    image_checksum: str
-    has_image: bool
     is_archived: bool
     status: Status
     created_date: datetime
     modified_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# =============================================================================
+# IMAGE ASSET / UPLOAD SCHEMAS (image-pipeline Phase 2)
+# =============================================================================
+
+
+class ImageAssetRead(BaseModel):
+    """Response schema for a single image_asset row (from GET /api/v1/uploads/{id})."""
+
+    image_asset_id: UUID
+    product_id: UUID
+    pipeline_status: str
+    moderation_status: str
+    signed_urls: dict[str, str] | None = Field(
+        None,
+        description="Signed read URLs for hero, card, thumbnail. Populated only when pipeline_status='ready'.",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UploadCreateRequest(BaseModel):
+    """Request body for POST /api/v1/uploads — initiates a two-step product image upload."""
+
+    product_id: UUID = Field(..., description="Product the image belongs to.")
+
+
+class UploadCreateResponse(BaseModel):
+    """Response body for POST /api/v1/uploads — includes the signed PUT URL for direct GCS upload."""
+
+    image_asset_id: UUID
+    signed_write_url: str = Field(..., description="Signed PUT URL for direct GCS upload of the original image.")
+    expires_at: datetime = Field(..., description="UTC expiry of the signed write URL.")
+
+
+class UploadStatusResponse(BaseModel):
+    """Response body for GET /api/v1/uploads/{image_asset_id}."""
+
+    image_asset_id: UUID
+    pipeline_status: str
+    moderation_status: str
+    signed_urls: dict[str, str] | None = Field(
+        None,
+        description="Signed read URLs for hero, card, thumbnail. Null until pipeline_status='ready'.",
+    )
 
 
 class PlateCreateSchema(BaseModel):
@@ -1303,10 +1328,6 @@ class PlateEnrichedResponseSchema(BaseModel):
     description: str | None = None
     # filter-registry:exempt reason="i18n translation payload; not filterable"
     description_i18n: dict | None = Field(None, exclude=True)
-    # filter-registry:exempt reason="enriched join field; computed from storage_path; not filterable"
-    product_image_url: str | None
-    # filter-registry:exempt reason="internal storage path; not exposed as filter; use has_image toggle instead"
-    has_image: bool  # Flag indicating if product has a custom uploaded image (TRUE) or default placeholder (FALSE)
     # filter-registry:exempt reason="range-bound; use price_from / price_to filter params"
     price: Decimal
     # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"

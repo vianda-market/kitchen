@@ -1,5 +1,8 @@
 -- idx_role_history_role_id removed - role_history table deprecated
 
+-- image_asset: index on processing_version for future backfill query (WHERE processing_version < PROCESSING_VERSION)
+CREATE INDEX IF NOT EXISTS idx_image_asset_processing_version ON ops.image_asset (processing_version);
+
 CREATE INDEX IF NOT EXISTS idx_institution_history_institution_id ON audit.institution_history(institution_id);
 
 CREATE INDEX IF NOT EXISTS idx_user_history_user_id ON audit.user_history(user_id);

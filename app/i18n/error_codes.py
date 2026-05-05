@@ -732,6 +732,13 @@ class ErrorCode(StrEnum):
     USER_ENRICHED_GET_FAILED = "user.enriched_get_failed"
     USER_MARKET_UPDATE_FAILED = "user.market_update_failed"
 
+    # ── upload.* ─────────────────────────────────────────────────────────────
+    # Image-asset upload pipeline errors. Wired in image-pipeline-uploads-atomic.
+    UPLOAD_PRODUCT_NOT_FOUND = "upload.product_not_found"
+    UPLOAD_ACCESS_DENIED = "upload.access_denied"
+    UPLOAD_NOT_FOUND = "upload.not_found"
+    UPLOAD_SIGNED_URL_FAILED = "upload.signed_url_failed"
+
     # ── service.product.* ─────────────────────────────────────────────────────
     # Product entity-service operation errors. Wired in K16.
     SERVICE_PRODUCT_LIST_FAILED = "service.product_list_failed"

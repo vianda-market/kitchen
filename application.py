@@ -199,6 +199,7 @@ OPENAPI_TAGS = [
     {"name": "Admin Cuisines", "description": "Admin cuisine management and suggestion review"},
     {"name": "Workplace Groups", "description": "B2C workplace group management for coworker pickup coordination"},
     {"name": "Admin Workplace Groups", "description": "Admin workplace group management"},
+    {"name": "Uploads", "description": "Image-asset upload pipeline (two-step GCS signed URL flow)"},
 ]
 
 
@@ -832,6 +833,13 @@ def create_app() -> FastAPI:
     v1_maps_router = create_versioned_router("api", ["Maps"], APIVersion.V1)
     v1_maps_router.include_router(maps_router)
     app.include_router(v1_maps_router)
+
+    # Image-asset upload pipeline (two-step GCS signed URL flow)
+    from app.routes.uploads import router as uploads_router
+
+    v1_uploads_router = create_versioned_router("api", ["Uploads"], APIVersion.V1)
+    v1_uploads_router.include_router(uploads_router)
+    app.include_router(v1_uploads_router)
 
     # Dev-only routes (guarded by DEV_MODE)
     from app.routes.dev import router as dev_router

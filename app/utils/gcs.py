@@ -128,59 +128,126 @@ def download_internal_bucket_blob_bytes(blob_name: str) -> bytes:
     return blob.download_as_bytes()
 
 
-def upload_product_image(
-    product_id: str | UUID,
+def generate_image_asset_write_signed_url(
     institution_id: str | UUID,
-    full_data: bytes,
-    thumb_data: bytes,
-    content_type: str,
-) -> tuple[str, str]:
+    product_id: str | UUID,
+) -> tuple[str, "datetime.datetime"]:
     """
-    Upload product full + thumbnail to supplier bucket. Rollback full on thumbnail failure.
-    Returns (blob_full, blob_thumb).
+    Generate a signed PUT URL for uploading a product image original to GCS.
+    Returns (signed_url, expiry_datetime).
+    Blob path: products/{institution_id}/{product_id}/original
     """
     from app.config.settings import settings
 
-    bucket = settings.GCS_SUPPLIER_BUCKET
-    blob_full = f"products/{institution_id}/{product_id}/image"
-    blob_thumb = f"products/{institution_id}/{product_id}/thumbnail"
-    md5_full = hashlib.md5(full_data).digest()
-    md5_thumb = hashlib.md5(thumb_data).digest()
+    blob_name = f"products/{institution_id}/{product_id}/original"
+    expiration_seconds = settings.GCS_SIGNED_URL_EXPIRATION_SECONDS
 
-    try:
-        upload_file(bucket, blob_full, full_data, content_type, md5_hash=md5_full)
-        upload_file(bucket, blob_thumb, thumb_data, content_type, md5_hash=md5_thumb)
-        return blob_full, blob_thumb
-    except Exception:
+    client = get_gcs_client()
+    bucket = client.bucket(settings.GCS_SUPPLIER_BUCKET)
+    blob = bucket.blob(blob_name)
+
+    service_account_email = os.getenv("GCS_SIGNING_SA_EMAIL", "")
+    expiration = datetime.timedelta(seconds=expiration_seconds)
+    expiry_dt = datetime.datetime.now(datetime.UTC) + expiration
+
+    if service_account_email:
+        import google.auth
+        from google.auth import impersonated_credentials
+
+        credentials, _ = google.auth.default()
+        signing_credentials = impersonated_credentials.Credentials(
+            source_credentials=credentials,
+            target_principal=service_account_email,
+            target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="PUT",
+            credentials=signing_credentials,
+        )
+    else:
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="PUT",
+        )
+
+    return signed_url, expiry_dt
+
+
+def get_image_asset_signed_urls(
+    institution_id: str | UUID,
+    product_id: str | UUID,
+) -> dict[str, str]:
+    """
+    Generate signed read URLs for hero, card, thumbnail derived sizes.
+    Does NOT include 'original' (private, pipeline-only).
+    Returns {} if any key does not exist in the bucket.
+    """
+    from app.config.settings import settings
+
+    bucket_name = settings.GCS_SUPPLIER_BUCKET
+    if not bucket_name:
+        return {}
+
+    keys = ("hero", "card", "thumbnail")
+    result: dict[str, str] = {}
+    client = get_gcs_client()
+    bucket = client.bucket(bucket_name)
+
+    service_account_email = os.getenv("GCS_SIGNING_SA_EMAIL", "")
+    expiration = datetime.timedelta(seconds=settings.GCS_SIGNED_URL_EXPIRATION_SECONDS)
+
+    for key in keys:
+        blob_name = f"products/{institution_id}/{product_id}/{key}"
+        blob = bucket.blob(blob_name)
+        if not blob.exists():
+            return {}
         try:
-            delete_file(bucket, blob_full)
+            if service_account_email:
+                import google.auth
+                from google.auth import impersonated_credentials
+
+                credentials, _ = google.auth.default()
+                signing_credentials = impersonated_credentials.Credentials(
+                    source_credentials=credentials,
+                    target_principal=service_account_email,
+                    target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                )
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=expiration,
+                    method="GET",
+                    credentials=signing_credentials,
+                )
+            else:
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=expiration,
+                    method="GET",
+                )
+            result[key] = url
+        except Exception:
+            return {}
+
+    return result
+
+
+def delete_image_asset_blobs(institution_id: str | UUID, product_id: str | UUID) -> None:
+    """Purge original, hero, card, thumbnail blobs for a product image asset. Best-effort."""
+    from app.config.settings import settings
+
+    bucket_name = settings.GCS_SUPPLIER_BUCKET
+    if not bucket_name:
+        return
+
+    for key in ("original", "hero", "card", "thumbnail"):
+        blob_name = f"products/{institution_id}/{product_id}/{key}"
+        try:
+            delete_file(bucket_name, blob_name)
         except Exception:
             pass
-        raise
-
-
-def get_product_image_signed_url(product_id: str | UUID, institution_id: str | UUID) -> str:
-    """Generate signed URL for product full image."""
-    from app.config.settings import settings
-
-    blob_name = f"products/{institution_id}/{product_id}/image"
-    return generate_signed_url(
-        settings.GCS_SUPPLIER_BUCKET,
-        blob_name,
-        settings.GCS_SIGNED_URL_EXPIRATION_SECONDS,
-    )
-
-
-def get_product_thumbnail_signed_url(product_id: str | UUID, institution_id: str | UUID) -> str:
-    """Generate signed URL for product thumbnail."""
-    from app.config.settings import settings
-
-    blob_name = f"products/{institution_id}/{product_id}/thumbnail"
-    return generate_signed_url(
-        settings.GCS_SUPPLIER_BUCKET,
-        blob_name,
-        settings.GCS_SIGNED_URL_EXPIRATION_SECONDS,
-    )
 
 
 def get_placeholder_signed_url() -> str:
@@ -193,19 +260,6 @@ def get_placeholder_signed_url() -> str:
         blob_name,
         settings.GCS_SIGNED_URL_EXPIRATION_SECONDS,
     )
-
-
-def delete_product_image(product_id: str | UUID, institution_id: str | UUID) -> None:
-    """Delete product image and thumbnail from supplier bucket."""
-    from app.config.settings import settings
-
-    bucket = settings.GCS_SUPPLIER_BUCKET
-    for suffix in ("/image", "/thumbnail"):
-        blob_name = f"products/{institution_id}/{product_id}{suffix}"
-        try:
-            delete_file(bucket, blob_name)
-        except Exception:
-            pass
 
 
 def delete_qr_code_blob(blob_name: str) -> None:
@@ -259,42 +313,6 @@ def get_employer_logo_signed_url(employer_id: str | UUID) -> str:
 
 
 # ── URL resolution for API responses ──
-
-
-def resolve_product_image_urls(row: dict) -> dict:
-    """
-    Resolve product image URLs to signed URLs when using GCS.
-    Mutates row in place; returns row.
-    """
-    from app.config.settings import settings
-
-    if not settings.GCS_SUPPLIER_BUCKET:
-        return row
-    storage_path = row.get("image_storage_path") or row.get("product_image_storage_path")
-    if not storage_path:
-        return row
-    if storage_path == "placeholder/product_default.png":
-        url = get_placeholder_signed_url()
-        if "image_url" in row:
-            row["image_url"] = url
-        if "image_thumbnail_url" in row:
-            row["image_thumbnail_url"] = url
-        if "product_image_url" in row:
-            row["product_image_url"] = url
-        return row
-    if storage_path.startswith("products/"):
-        parts = storage_path.split("/")
-        if len(parts) >= 4:
-            institution_id, product_id = parts[1], parts[2]
-            full_url = get_product_image_signed_url(product_id, institution_id)
-            thumb_url = get_product_thumbnail_signed_url(product_id, institution_id)
-            if "image_url" in row:
-                row["image_url"] = full_url
-            if "image_thumbnail_url" in row:
-                row["image_thumbnail_url"] = thumb_url
-            if "product_image_url" in row:
-                row["product_image_url"] = full_url
-    return row
 
 
 def resolve_qr_code_image_url(row: dict) -> dict:

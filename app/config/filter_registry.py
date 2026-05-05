@@ -135,10 +135,14 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         # credit: range-bound (int)
         "credit_from": {"col": "credit", "alias": "p", "op": "gte", "cast": "int"},
         "credit_to": {"col": "credit", "alias": "p", "op": "lte", "cast": "int"},
-        # has_image: toggle (bool) -- has_image in SELECT is a CASE expression on pr.image_storage_path.
-        # Registered for schema publication; route wiring uses a manual SQL condition until
-        # filter_builder supports CASE-derived columns. Tracking: kitchen#87.
-        "has_image": {"col": "image_storage_path", "alias": "pr", "op": "bool", "cast": "bool"},
+        # has_image: toggle (bool) -- image_asset row exists for the product.
+        # Inline image columns were dropped (image-pipeline-uploads-atomic); has_image now
+        # requires a LEFT JOIN on ops.image_asset. Filter wiring deferred until
+        # filter_builder supports existence-subquery ops. Tracking: kitchen#87.
+        # STUB — col/alias kept so schema publication still emits the filter descriptor;
+        # SQL-layer filtering is NOT wired (same as before). Remove stub when filter_builder
+        # gains subquery-exists support.
+        "has_image": {"col": "image_asset_id", "alias": "ia", "op": "bool", "cast": "bool"},
         # portion_size: multi-select -- entirely computed in Python (bucket_portion_size()); no DB column.
         # Registered for schema publication only; SQL-layer filtering not wired. Tracking: kitchen#87.
         "portion_size": {

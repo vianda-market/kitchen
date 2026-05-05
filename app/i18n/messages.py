@@ -594,6 +594,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "service.plate_list_failed": "Failed to retrieve plates.",
         "service.bill_list_failed": "Failed to retrieve bills.",
         "service.geolocation_get_failed": "Failed to retrieve geolocation.",
+        # upload.* — image-pipeline-uploads-atomic
+        "upload.product_not_found": "Product not found.",
+        "upload.access_denied": "You do not have permission to manage images for this product.",
+        "upload.not_found": "Image upload record not found.",
+        "upload.signed_url_failed": "Failed to generate upload URL. Please try again.",
     },
     "es": {
         # Auth / user errors
@@ -1183,6 +1188,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "service.plate_list_failed": "Error al obtener los platos.",
         "service.bill_list_failed": "Error al obtener las facturas.",
         "service.geolocation_get_failed": "Error al obtener la geolocalización.",
+        # upload.* — image-pipeline-uploads-atomic
+        "upload.product_not_found": "Producto no encontrado.",
+        "upload.access_denied": "No tienes permiso para gestionar imágenes de este producto.",
+        "upload.not_found": "Registro de carga de imagen no encontrado.",
+        "upload.signed_url_failed": "No se pudo generar la URL de carga. Por favor, inténtalo de nuevo.",
     },
     "pt": {
         # Auth / user errors
@@ -1772,6 +1782,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "service.plate_list_failed": "Falha ao recuperar os pratos.",
         "service.bill_list_failed": "Falha ao recuperar as faturas.",
         "service.geolocation_get_failed": "Falha ao recuperar a geolocalização.",
+        # upload.* — image-pipeline-uploads-atomic
+        "upload.product_not_found": "Produto não encontrado.",
+        "upload.access_denied": "Você não tem permissão para gerenciar imagens deste produto.",
+        "upload.not_found": "Registro de upload de imagem não encontrado.",
+        "upload.signed_url_failed": "Falha ao gerar a URL de upload. Por favor, tente novamente.",
     },
 }
 

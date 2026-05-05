@@ -96,7 +96,7 @@ class InstitutionDTO(BaseModel):
 
 
 class ProductDTO(BaseModel):
-    """Pure DTO for product data"""
+    """Pure DTO for product data. Inline image columns removed — image state lives in ImageAssetDTO."""
 
     product_id: UUID
     institution_id: UUID
@@ -109,16 +109,31 @@ class ProductDTO(BaseModel):
     dietary: list[str] | None = None
     is_archived: bool = False
     status: Status
-    image_url: str
-    image_storage_path: str
-    image_thumbnail_url: str
-    image_thumbnail_storage_path: str
-    image_checksum: str
     canonical_key: str | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
     modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ImageAssetDTO(BaseModel):
+    """Pure DTO for image_asset data — tracks product image upload + pipeline state."""
+
+    image_asset_id: UUID
+    product_id: UUID
+    institution_id: UUID
+    original_storage_path: str
+    original_checksum: str
+    pipeline_status: str
+    moderation_status: str
+    moderation_signals: dict | None = None
+    processing_version: int = 1
+    failure_count: int = 0
+    created_date: datetime
+    modified_date: datetime
+    modified_by: UUID | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

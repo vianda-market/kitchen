@@ -64,7 +64,7 @@ app/
 │   ├── error_codes.py       # ErrorCode StrEnum — stable dotted error keys; namespaces:
 │   │                        #   auth.*, subscription.*, qr_code.*, product.*, plan.*,
 │   │                        #   institution.*, ingredient.*, notification.*, user.*,
-│   │                        #   service.* (K15/K16 phases); append-only, never rename
+│   │                        #   upload.*, service.* (K15/K16 phases); append-only, never rename
 │   ├── envelope.py          # envelope_exception() factory — wraps HTTPException with
 │   │                        #   {"detail":{"code","message","params"}} contract shape
 │   └── messages.py          # Localized message catalog — en/es/pt entries for every
@@ -80,6 +80,7 @@ app/
 │   ├── ingredients.py       # Ingredient search (OFF-backed), custom ingredient creation
 │   ├── onboarding.py        # GET /institutions/{id}/onboarding-status, GET /institutions/onboarding-summary
 │   ├── locales.py           # GET /locales — public, cacheable supported-locales discovery
+│   ├── uploads.py           # POST/GET/DELETE /uploads — image-asset signed-URL upload pipeline
 │   └── *.py                 # Domain routes (plate_selection, restaurant, address, etc.)
 ├── schemas/                 # Pydantic API contracts (request/response)
 │   ├── consolidated_schemas.py
@@ -128,7 +129,7 @@ app/
     ├── country.py           # Country code utilities: normalize, alpha-2/3 conversion, name resolution
     ├── map_projection.py    # Web Mercator projection: lat/lng → pixel position, grid cells, zoom computation
     ├── log.py
-    ├── gcs.py               # Google Cloud Storage (products, QR codes, supplier invoices)
+    ├── gcs.py               # Google Cloud Storage (products, QR codes, supplier invoices, image-asset pipeline)
     ├── checksum.py
     └── rate_limit.py
 
@@ -507,11 +508,64 @@ Declarative query-param filtering for list and enriched endpoints. Three compone
 
 ---
 
-## Image Processing Pipeline (STUB)
+## Image Processing Pipeline
 
-Async image pipeline for product photos — libvips resizing (three derived sizes), Cloud Vision SafeSearch moderation, GCS upload. Real implementation is a future slice; this scaffold exists so `infra-kitchen-gcp` can reference a buildable Cloud Run job image now.
+Async image pipeline for product photos — libvips resizing (three derived sizes), Cloud Vision SafeSearch moderation, GCS upload. Full design doc (orchestrator level): `~/learn/vianda/docs/plans/image-processing-pipeline.md`
 
-Full design doc (orchestrator level): `~/learn/vianda/docs/plans/image-processing-pipeline.md`
+### Upload flow (Phase 2 — implemented)
+
+Two-step signed-URL upload: client requests a signed PUT URL from kitchen, then uploads the file directly to GCS. Kitchen never touches the raw bytes.
+
+```
+POST /api/v1/uploads           → insert image_asset row (pipeline_status='pending'), return signed PUT URL
+Client PUT file → GCS          → directly (signed URL, no kitchen involvement)
+GET  /api/v1/uploads/{id}      → poll pipeline_status; signed read URLs returned only when 'ready'
+DELETE /api/v1/uploads/{id}    → purge GCS blobs, remove row
+```
+
+**Replace semantics:** if an `image_asset` row already exists for the product on `POST /uploads`, the old GCS blobs are purged and the row deleted before a new row and signed URL are created.
+
+**Auth:** Supplier admin or Internal employee. Suppliers are scoped to their own institution's products via `EntityScopingService.get_scope_for_entity(ENTITY_PRODUCT, current_user)`.
+
+### Key files
+
+| File | Purpose |
+|---|---|
+| `app/routes/uploads.py` | POST / GET / DELETE upload lifecycle endpoints |
+| `app/utils/gcs.py` | `generate_image_asset_write_signed_url()`, `get_image_asset_signed_urls()`, `delete_image_asset_blobs()` |
+| `app/db/migrations/0014_image_asset.sql` | Creates `ops.image_asset` + `audit.image_asset_history` |
+| `app/db/migrations/0015_drop_inline_product_image.sql` | Drops inline image columns from `ops.product_info` + `audit.product_history` |
+| `app/tests/utils/test_gcs.py` | 10 unit tests for the three GCS helpers |
+
+### DB tables
+
+- **`ops.image_asset`** — one row per product (UNIQUE on `product_id`). Columns: `image_asset_id` (UUIDv7 PK), `product_id` (FK → CASCADE), `institution_id` (denormalized for scoping), `original_storage_path` (nullable TEXT), `original_checksum` (nullable TEXT), `pipeline_status` (`pending|processing|ready|rejected|failed`), `moderation_status` (`pending|passed|rejected`), `moderation_signals` (JSONB), `processing_version`, `failure_count`, `modified_by`.
+- **`audit.image_asset_history`** — trigger-managed history mirror; never written by application code.
+
+### Removed (migration 0015)
+
+Five inline image columns dropped from `ops.product_info` and `audit.product_history`: `image_storage_path`, `image_checksum`, `image_url`, `image_thumbnail_storage_path`, `image_thumbnail_url`. The `has_image` filter now joins `ops.image_asset` instead (via `image_asset_id` column in `app/config/filter_registry.py`).
+
+### Error codes (new)
+
+`upload.product_not_found` (404), `upload.access_denied` (403), `upload.not_found` (404), `upload.signed_url_failed` (500). Defined in `app/i18n/error_codes.py`; messages in `app/i18n/messages.py` (en/es/pt).
+
+### Schemas (new, in `app/schemas/consolidated_schemas.py`)
+
+- `UploadCreateRequest` — `{ product_id: UUID }`
+- `UploadCreateResponse` — `{ image_asset_id: UUID, signed_write_url: str, expires_at: datetime }`
+- `UploadStatusResponse` — `{ image_asset_id: UUID, pipeline_status: str, moderation_status: str, signed_urls: dict | null }`
+
+### GCS blob layout
+
+```
+products/{institution_id}/{product_id}/original      ← supplier upload
+products/{institution_id}/{product_id}/hero           ← pipeline output (future)
+products/{institution_id}/{product_id}/card           ← pipeline output (future)
+products/{institution_id}/{product_id}/thumbnail      ← pipeline output (future)
+```
+
+Bucket: `GCS_SUPPLIER_BUCKET`. Signed-URL expiry: `GCS_SIGNED_URL_EXPIRATION_SECONDS`.
 
 ### Container entrypoint — `RUN_MODE`
 

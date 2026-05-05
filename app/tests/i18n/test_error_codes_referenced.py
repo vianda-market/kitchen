@@ -96,6 +96,17 @@ ALLOWLISTED: dict[str, str] = {
     "ENTITY_CREATION_FAILED": "K6",
     "ENTITY_UPDATE_FAILED": "K6",
     "ENTITY_DELETION_FAILED": "K6",
+    # image-pipeline-uploads-atomic — old inline product image upload codes
+    # product_image_service.py was deleted; these codes are superseded by
+    # the upload.* namespace. Kept in the registry (append-only) but no longer
+    # raised at any active call site.
+    "PRODUCT_IMAGE_TOO_LARGE": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_EMPTY": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_FORMAT_INVALID": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_CHECKSUM_MISMATCH": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_UNREADABLE": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_UPDATE_FAILED": "image-pipeline-uploads-atomic",
+    "PRODUCT_IMAGE_REVERT_FAILED": "image-pipeline-uploads-atomic",
     # K6 — database constraint violation handler
     "DATABASE_DUPLICATE_KEY": "K6",
     "DATABASE_DUPLICATE_EMAIL": "K6",
