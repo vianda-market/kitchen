@@ -119,6 +119,7 @@ curl "https://api.vianda.market/api/v1/uploads/018f5678-0000-7000-8000-000000000
 ```json
 {
   "image_asset_id": "018f5678-0000-7000-8000-000000000002",
+  "product_id": "018f1234-0000-7000-8000-000000000001",
   "pipeline_status": "ready",
   "moderation_status": "passed",
   "signed_urls": {
@@ -129,7 +130,7 @@ curl "https://api.vianda.market/api/v1/uploads/018f5678-0000-7000-8000-000000000
 }
 ```
 
-`signed_urls` is `null` for any status other than `ready`.
+`signed_urls` is `null` for any status other than `ready`. `product_id` is always returned so clients holding only an `image_asset_id` can route back to the owning product without a separate query.
 
 **Error responses:**
 
