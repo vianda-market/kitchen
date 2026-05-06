@@ -80,12 +80,16 @@ To check whether a product has an image or to get image URLs, call `GET /api/v1/
 | `ingredients` | string \| null | Ingredients |
 | `dietary` | list[string] \| null | Dietary info |
 | `has_image` | bool | True if an `image_asset` row exists for this product |
+| `image_asset_id` | UUID \| null | The product's `image_asset` row id; `null` when no upload exists |
+| `image_pipeline_status` | string \| null | `pending` / `processing` / `ready` / `rejected` / `failed`; `null` when no upload |
+| `image_moderation_status` | string \| null | `pending` / `passed` / `rejected`; `null` when no upload |
+| `image_signed_urls` | object \| null | `{ hero, card, thumbnail }` GCS read URLs (1h TTL); populated only when `image_pipeline_status='ready'`. `null` otherwise |
 | `is_archived` | bool | Archived flag |
 | `status` | string | Active, Inactive, etc. |
 | `created_date` | datetime | Creation timestamp |
 | `modified_date` | datetime | Last modification |
 
-`has_image` is derived from a JOIN to `ops.image_asset`. To get image URLs, call `GET /api/v1/uploads/{image_asset_id}` — the `image_asset_id` for a product can be retrieved by filtering `GET /api/v1/uploads` (future endpoint) or stored client-side after the upload flow.
+`has_image` is derived from a JOIN to `ops.image_asset`. The four `image_*` fields are surfaced from the same JOIN — clients consuming the enriched response do not need to call `GET /api/v1/uploads/{image_asset_id}` separately for list rendering. The signed URLs are computed server-side and cached per-request, so a 50-product page issues one DB JOIN, not 50 follow-up requests. Use `image_signed_urls.card` for list-row previews; reach for `hero` only when rendering full-size detail.
 
 ---
 
