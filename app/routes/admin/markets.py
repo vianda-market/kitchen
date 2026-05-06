@@ -10,7 +10,7 @@ from uuid import UUID
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
+from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale, get_super_admin_user
 from app.config import Status
 from app.config.supported_countries import SUPPORTED_COUNTRY_CODES
 from app.dependencies.database import get_db
@@ -22,8 +22,10 @@ from app.schemas.consolidated_schemas import (
     MarketCreateSchema,
     MarketPayoutAggregatorResponseSchema,
     MarketResponseSchema,
+    MarketSpreadFloorUpdateSchema,
     MarketUpdateSchema,
     MarketUpsertByKeySchema,
+    SpreadReadoutResponseSchema,
 )
 from app.services.entity_service import get_enriched_market_by_id, get_enriched_markets
 from app.services.error_handling import handle_business_operation
@@ -392,6 +394,129 @@ async def update_market(
         raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
 
     return market
+
+
+@router.patch("/{market_id}/spread-floor", response_model=MarketResponseSchema)
+def update_market_spread_floor(
+    market_id: UUID,
+    data: MarketSpreadFloorUpdateSchema,
+    current_user: dict = Depends(get_super_admin_user),  # Super Admin only
+    locale: str = Depends(get_resolved_locale),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> MarketResponseSchema:
+    """
+    Update the minimum credit spread floor for a market.
+
+    **Authorization**: Super Admin only. The spread floor governs Vianda's gross margin
+    per credit redemption; only Super Admin may lower or raise it.
+
+    **Path Parameters**:
+    - `market_id`: UUID of the market
+
+    **Request Body**:
+    - `min_credit_spread_pct`: New floor (0 to 1, e.g. 0.20 = 20%)
+    - `acknowledge_spread_compression`: Set to true to accept if the new floor
+      conflicts with existing active plans (warn-and-ack contract).
+    - `spread_acknowledgement_justification`: Optional justification text for audit.
+
+    **Returns**: Updated market with enriched data.
+
+    **Raises**:
+    - 403: Insufficient permissions (non-Super Admin)
+    - 404: Market not found
+    - 422: Spread floor conflicts with active plans (without ack)
+    """
+    from app.services.credit_spread import (
+        SpreadAckContext,
+        check_spread_floor_with_new_floor_pct,
+        record_acknowledgement,
+    )
+
+    spread = check_spread_floor_with_new_floor_pct(
+        db, market_id=market_id, proposed_floor_pct=data.min_credit_spread_pct
+    )
+    if not spread.ok:
+        if not data.acknowledge_spread_compression:
+            raise envelope_exception(
+                ErrorCode.SPREAD_FLOOR_VIOLATION,
+                status=422,
+                locale=locale,
+                observed_pct=float(spread.observed_pct),
+                floor_pct=float(spread.floor_pct),
+            )
+
+    def _update() -> MarketResponseSchema:
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE core.market_info
+                   SET min_credit_spread_pct = %s,
+                       modified_by = %s::uuid,
+                       modified_date = CURRENT_TIMESTAMP
+                   WHERE market_id = %s""",
+                (float(data.min_credit_spread_pct), str(current_user["user_id"]), str(market_id)),
+            )
+        db.commit()
+
+        if not spread.ok and data.acknowledge_spread_compression:
+            record_acknowledgement(
+                db,
+                SpreadAckContext(
+                    actor_user_id=current_user["user_id"],
+                    market_id=market_id,
+                    write_kind="spread_floor",
+                    entity_id=market_id,
+                    justification=data.spread_acknowledgement_justification,
+                ),
+                spread,
+            )
+
+        enriched = market_service.get_by_id(market_id)
+        if enriched is None:
+            raise envelope_exception(ErrorCode.MARKET_NOT_FOUND, status=404, locale=locale)
+        return MarketResponseSchema(**enriched)
+
+    return handle_business_operation(_update, "market spread floor update")
+
+
+@router.get("/{market_id}/spread-readout", response_model=SpreadReadoutResponseSchema)
+def get_market_spread_readout(
+    market_id: UUID,
+    current_user: dict = Depends(get_employee_user),  # Internal users (finance/market-admin)
+    locale: str = Depends(get_resolved_locale),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> SpreadReadoutResponseSchema:
+    """
+    Get the current credit spread readout for a market.
+
+    **Authorization**: Internal users (employee or above).
+
+    Returns the current spread between the cheapest active plan's per-credit
+    price and the supplier credit value. Used by market admins to see whether
+    the market is within the spread floor and which plans (if any) are offending.
+
+    **Path Parameters**:
+    - `market_id`: UUID of the market
+
+    **Returns**:
+    - `cheapest_plan_per_credit`: Cheapest per-credit price across active plans
+    - `supplier_value`: credit_value_supplier_local for the market
+    - `headroom_pct`: Observed spread (min(price/credit)/supplier_value - 1)
+    - `floor_pct`: The market's min_credit_spread_pct
+    - `offending_plan_ids`: Plans whose price/credit is below the floor threshold
+
+    **Raises**:
+    - 404: Market not found
+    """
+    from app.services.credit_spread import check_spread_floor
+
+    spread = check_spread_floor(db, market_id=market_id)
+    return SpreadReadoutResponseSchema(
+        cheapest_plan_per_credit=spread.cheapest_per_credit,
+        supplier_value=spread.supplier_value,
+        headroom_pct=spread.observed_pct,
+        floor_pct=spread.floor_pct,
+        offending_plan_ids=spread.offending_plan_ids,
+    )
 
 
 @router.delete("/{market_id}", status_code=204)

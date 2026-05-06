@@ -646,13 +646,13 @@ AFTER INSERT OR UPDATE ON ops.image_asset
 FOR EACH ROW
 EXECUTE FUNCTION image_asset_history_trigger_func();
 
--- Before insert/update on ops.plate_info: set expected_payout_local_currency = credit * credit_value_local_currency
+-- Before insert/update on ops.plate_info: set expected_payout_local_currency = credit * credit_value_supplier_local
 CREATE OR REPLACE FUNCTION plate_info_set_expected_payout_local_currency_func()
 RETURNS TRIGGER AS $$
 DECLARE
     cv NUMERIC;
 BEGIN
-    SELECT cm.credit_value_local_currency INTO cv
+    SELECT cm.credit_value_supplier_local INTO cv
     FROM ops.restaurant_info r
     JOIN ops.institution_entity_info ie ON r.institution_entity_id = ie.institution_entity_id
     JOIN core.currency_metadata cm ON ie.currency_metadata_id = cm.currency_metadata_id
@@ -1408,6 +1408,7 @@ BEGIN
         language,
         phone_dial_code,
         phone_local_digits,
+        min_credit_spread_pct,
         is_archived,
         status,
         created_date,
@@ -1425,6 +1426,7 @@ BEGIN
         NEW.language,
         NEW.phone_dial_code,
         NEW.phone_local_digits,
+        NEW.min_credit_spread_pct,
         NEW.is_archived,
         NEW.status,
         NEW.created_date,
@@ -2313,7 +2315,7 @@ BEGIN
         event_id,
         currency_metadata_id,
         currency_code,
-        credit_value_local_currency,
+        credit_value_supplier_local,
         currency_conversion_usd,
         is_archived,
         status,
@@ -2328,7 +2330,7 @@ BEGIN
         new_event_id,
         NEW.currency_metadata_id,
         NEW.currency_code,
-        NEW.credit_value_local_currency,
+        NEW.credit_value_supplier_local,
         NEW.currency_conversion_usd,
         NEW.is_archived,
         NEW.status,

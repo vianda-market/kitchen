@@ -303,7 +303,7 @@ def sample_credit_currency_dto():
     return CreditCurrencyDTO(
         currency_metadata_id=uuid4(),
         currency_code="USD",
-        credit_value_local_currency=Decimal("1.0"),
+        credit_value_supplier_local=Decimal("1.0"),
         currency_conversion_usd=Decimal("1.0"),
         is_archived=False,
         status="active",

@@ -309,6 +309,29 @@ Backend-computed onboarding checklist for Supplier/Employer institutions. Tracks
 
 ---
 
+## Credit-Currency Spread (Margin Machine)
+
+Per-market structural margin between the cheapest customer per-credit price and the stable
+supplier credit value. Finance's primary lever for gross margin per redemption.
+
+- **Schema:**
+  - `core.currency_metadata.credit_value_supplier_local` — stable per-credit payout to suppliers. Renamed from `credit_value_local_currency`.
+  - `core.market_info.min_credit_spread_pct NUMERIC(5,4)` — minimum required spread floor. Default 0.20 (20%). Super Admin only.
+  - `audit.spread_acknowledgement` — event log of every write accepted despite a floor violation. Columns: `actor_user_id`, `market_id NOT NULL`, `write_kind` (enum: `plan`, `currency_value`, `spread_floor`), `entity_id NULL`, `observed_spread_pct`, `floor_pct`, `offending_plan_ids JSONB`, `justification`, `acknowledged_at`.
+- **Services:**
+  - `app/services/credit_spread.py` — `check_spread_floor`, `check_spread_floor_with_plan`, `check_spread_floor_with_new_supplier_value`, `check_spread_floor_with_new_floor_pct`, `record_acknowledgement`. All check functions acquire `SELECT FOR UPDATE` on market + currency rows.
+  - `app/services/margin_report.py` — `get_margin_report()`: per-market per-period aggregation of `Σ (plan.credit_cost_local_currency − credit_value_supplier_local) × credits_redeemed` grouped by plan tier.
+- **Routes:**
+  - Plan writes (create/update/upsert-by-key in `route_factory.py`): spread check + warn-and-ack contract. Error code: `spread.floor_violation`.
+  - Currency writes (create/update/upsert-by-key in `route_factory.py`): spread check against every market using the currency; decrease requires Super Admin (`spread.currency_decrease_super_admin_only`).
+  - `PATCH /api/v1/markets/{market_id}/spread-floor` (`app/routes/admin/markets.py`): Super Admin only. Updates `min_credit_spread_pct` with warn-and-ack.
+  - `GET /api/v1/markets/{market_id}/spread-readout` (`app/routes/admin/markets.py`): Employee (Internal). Returns `{cheapest_plan_per_credit, supplier_value, headroom_pct, floor_pct, offending_plan_ids}`.
+  - `GET /internal/margin-report` (`app/routes/admin/margin_report.py`): Super Admin. Query params: `market_id`, `period_start`, `period_end`.
+- **Warn-and-ack contract:** Violations return `422 spread.floor_violation` unless `acknowledge_spread_compression=true` is set, in which case the write proceeds and an audit row is written.
+- **Durable doc:** `docs/api/internal/credit-currency-spread.md`
+
+---
+
 ## Plate Pickup Flow (B2C)
 
 QR-code-based pickup confirmation flow for the B2C mobile app.

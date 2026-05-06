@@ -39,9 +39,9 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-app: api/types.ts (SelectedMarket, SyncUserMarketToSelector.tsx).
     "core.currency_metadata.currency_code": {"surfaces": ["platform", "app"]},
     #
-    # .credit_value_local_currency surfaces in MarketResponseSchema as market_credit_value_local_currency.
-    # vianda-platform: types/api.ts — used in plan pricing preview calculations.
-    "core.currency_metadata.credit_value_local_currency": {"surfaces": ["platform"]},
+    # .credit_value_supplier_local surfaces in MarketResponseSchema as market_credit_value_supplier_local.
+    # vianda-platform: types/api.ts — used in plan pricing preview calculations and supplier payout display.
+    "core.currency_metadata.credit_value_supplier_local": {"surfaces": ["platform"]},
     #
     # .currency_conversion_usd surfaces in MarketResponseSchema.
     # vianda-platform: types/api.ts — used for USD cost estimates in plan forms.

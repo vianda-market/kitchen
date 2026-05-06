@@ -806,6 +806,7 @@ def create_plan_routes() -> APIRouter:
     def upsert_plan_by_key(
         upsert_data: PlanUpsertByKeySchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ) -> Any:
         """Idempotent upsert a plan by canonical_key.
@@ -820,6 +821,7 @@ def create_plan_routes() -> APIRouter:
         update (unlike POST which returns 201) — callers should not depend on
         distinguishing the two outcomes.
         """
+        from app.services.credit_spread import SpreadAckContext, check_spread_floor_with_plan, record_acknowledgement
         from app.services.crud_service import find_plan_by_canonical_key
 
         def _upsert() -> Any:
@@ -830,21 +832,53 @@ def create_plan_routes() -> APIRouter:
             payload["rollover"] = True
             payload["rollover_cap"] = None
             payload["modified_by"] = current_user["user_id"]
+            ack = payload.pop("acknowledge_spread_compression", False)
+            justification = payload.pop("spread_acknowledgement_justification", None)
 
+            spread = check_spread_floor_with_plan(
+                db,
+                market_id=payload["market_id"],
+                proposed_price=payload["price"],
+                proposed_credit=payload["credit"],
+                exclude_plan_id=existing.plan_id if existing is not None else None,
+            )
+            if not spread.ok and not ack:
+                raise envelope_exception(
+                    ErrorCode.SPREAD_FLOOR_VIOLATION,
+                    status=422,
+                    locale=locale,
+                    observed_pct=float(spread.observed_pct),
+                    floor_pct=float(spread.floor_pct),
+                )
+
+            plan_entity_id: UUID | None = None
             if existing is not None:
                 # Update: strip fields that must not change during update
                 update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
                 update_payload.pop("rollover", None)
                 update_payload.pop("rollover_cap", None)
                 result = plan_service.update(existing.plan_id, update_payload, db)
+                plan_entity_id = existing.plan_id
             else:
                 result = plan_service.create(payload, db)
+                plan_entity_id = result.plan_id if result else None
 
             if result is None:
-                from app.i18n.envelope import envelope_exception
-                from app.i18n.error_codes import ErrorCode
-
                 raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
+
+            if not spread.ok and ack and plan_entity_id:
+                record_acknowledgement(
+                    db,
+                    SpreadAckContext(
+                        actor_user_id=current_user["user_id"],
+                        market_id=payload["market_id"],
+                        write_kind="plan",
+                        entity_id=plan_entity_id,
+                        justification=justification,
+                    ),
+                    spread,
+                )
+
             return result
 
         from app.services.error_handling import handle_business_operation
@@ -872,9 +906,12 @@ def create_plan_routes() -> APIRouter:
     def create_plan(
         create_data: PlanCreateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Create a new plan - Internal-only"""
+        from app.services.credit_spread import SpreadAckContext, check_spread_floor_with_plan, record_acknowledgement
+
         data = create_data.model_dump()
         if "market_id" in data and data["market_id"] is not None:
             reject_global_market_for_entity(data["market_id"], "plan")
@@ -883,8 +920,47 @@ def create_plan_routes() -> APIRouter:
         data["modified_by"] = current_user["user_id"]
         scope = None  # Plans are not institution-scoped
 
+        market_id = data.get("market_id")
+        ack = data.pop("acknowledge_spread_compression", False)
+        justification = data.pop("spread_acknowledgement_justification", None)
+
+        if market_id and data.get("price") is not None and data.get("credit"):
+            spread = check_spread_floor_with_plan(
+                db,
+                market_id=market_id,
+                proposed_price=data["price"],
+                proposed_credit=data["credit"],
+            )
+            if not spread.ok:
+                if not ack:
+                    raise envelope_exception(
+                        ErrorCode.SPREAD_FLOOR_VIOLATION,
+                        status=422,
+                        locale=locale,
+                        observed_pct=float(spread.observed_pct),
+                        floor_pct=float(spread.floor_pct),
+                    )
+                # Acknowledged — write audit row after creation (entity_id filled in post-create).
+                data["_spread_check"] = spread
+                data["_spread_justification"] = justification
+
         def create_callable(payload: dict, connection: psycopg2.extensions.connection):
-            return plan_service.create(payload, connection, scope=scope)
+            spread_check = payload.pop("_spread_check", None)
+            spread_just = payload.pop("_spread_justification", None)
+            result = plan_service.create(payload, connection, scope=scope)
+            if result is not None and spread_check is not None:
+                record_acknowledgement(
+                    connection,
+                    SpreadAckContext(
+                        actor_user_id=current_user["user_id"],
+                        market_id=payload["market_id"],
+                        write_kind="plan",
+                        entity_id=result.plan_id,
+                        justification=spread_just,
+                    ),
+                    spread_check,
+                )
+            return result
 
         return handle_create(create_callable, data, db, "plan")
 
@@ -893,9 +969,12 @@ def create_plan_routes() -> APIRouter:
         plan_id: UUID,
         update_data: PlanUpdateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
         """Update an existing plan - Internal-only"""
+        from app.services.credit_spread import SpreadAckContext, check_spread_floor_with_plan, record_acknowledgement
+
         data = update_data.model_dump(exclude_unset=True)
         data.pop("rollover", None)
         data.pop("rollover_cap", None)
@@ -905,8 +984,53 @@ def create_plan_routes() -> APIRouter:
             data["modified_by"] = current_user["user_id"]
         scope = None  # Plans are not institution-scoped
 
+        ack = data.pop("acknowledge_spread_compression", False)
+        justification = data.pop("spread_acknowledgement_justification", None)
+
+        # Spread check: resolve effective market_id and price/credit (may not be in update payload).
+        existing_plan = plan_service.get_by_id(plan_id, db)
+        if existing_plan is not None:
+            effective_market_id = data.get("market_id") or existing_plan.market_id
+            effective_price: float = float(data["price"]) if "price" in data else float(existing_plan.price)
+            effective_credit: int = int(data["credit"]) if "credit" in data else int(existing_plan.credit)
+            spread = check_spread_floor_with_plan(
+                db,
+                market_id=effective_market_id,
+                proposed_price=effective_price,
+                proposed_credit=effective_credit,
+                exclude_plan_id=plan_id,
+            )
+            if not spread.ok:
+                if not ack:
+                    raise envelope_exception(
+                        ErrorCode.SPREAD_FLOOR_VIOLATION,
+                        status=422,
+                        locale=locale,
+                        observed_pct=float(spread.observed_pct),
+                        floor_pct=float(spread.floor_pct),
+                    )
+                data["_spread_check"] = spread
+                data["_spread_market_id"] = effective_market_id
+                data["_spread_justification"] = justification
+
         def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
-            return plan_service.update(target_id, payload, connection, scope=scope)
+            spread_check = payload.pop("_spread_check", None)
+            spread_market_id = payload.pop("_spread_market_id", None)
+            spread_just = payload.pop("_spread_justification", None)
+            result = plan_service.update(target_id, payload, connection, scope=scope)
+            if result is not None and spread_check is not None and spread_market_id is not None:
+                record_acknowledgement(
+                    connection,
+                    SpreadAckContext(
+                        actor_user_id=current_user["user_id"],
+                        market_id=spread_market_id,
+                        write_kind="plan",
+                        entity_id=target_id,
+                        justification=spread_just,
+                    ),
+                    spread_check,
+                )
+            return result
 
         return handle_update(update_callable, plan_id, data, db, "plan")
 
@@ -1027,6 +1151,8 @@ def create_credit_currency_routes() -> APIRouter:
 
         data = create_data.model_dump()
         data.pop("currency_conversion_usd", None)  # Backend fetches; do not accept client value
+        ack = data.pop("acknowledge_spread_compression", False)
+        justification = data.pop("spread_acknowledgement_justification", None)
         # Resolve currency_code from currency_name; do not accept client-supplied currency_code
         currency_name = data.get("currency_name") or ""
         currency_code = get_currency_code_by_name(currency_name)
@@ -1041,6 +1167,10 @@ def create_credit_currency_routes() -> APIRouter:
         data["currency_conversion_usd"] = rate
         data["modified_by"] = current_user["user_id"]
         scope = None  # Credit currencies are not institution-scoped
+        # Note: new currency creation is not a decrease (no existing row), spread check deferred.
+        # spread ack fields are accepted but no-op on create (no existing plans yet for new currency).
+        _ = ack
+        _ = justification
 
         def create_callable(payload: dict, connection: psycopg2.extensions.connection):
             return credit_currency_service.create(payload, connection, scope=scope)
@@ -1094,17 +1224,17 @@ def create_credit_currency_routes() -> APIRouter:
             existing = find_credit_currency_by_canonical_key(key, db)
 
             if existing is not None:
-                # UPDATE path — currency_code is immutable; update credit_value_local_currency only.
+                # UPDATE path — currency_code is immutable; update credit_value_supplier_local only.
                 currency_id = existing.currency_metadata_id
                 with db.cursor() as cur:
                     cur.execute(
                         """UPDATE core.currency_metadata
-                           SET credit_value_local_currency = %s,
+                           SET credit_value_supplier_local = %s,
                                modified_by = %s::uuid,
                                modified_date = CURRENT_TIMESTAMP
                            WHERE currency_metadata_id = %s""",
                         (
-                            float(upsert_data.credit_value_local_currency),
+                            float(upsert_data.credit_value_supplier_local),
                             str(modified_by),
                             str(currency_id),
                         ),
@@ -1135,13 +1265,13 @@ def create_credit_currency_routes() -> APIRouter:
                     cur.execute(
                         """UPDATE core.currency_metadata
                            SET canonical_key = %s,
-                               credit_value_local_currency = %s,
+                               credit_value_supplier_local = %s,
                                modified_by = %s::uuid,
                                modified_date = CURRENT_TIMESTAMP
                            WHERE currency_metadata_id = %s""",
                         (
                             key,
-                            float(upsert_data.credit_value_local_currency),
+                            float(upsert_data.credit_value_supplier_local),
                             str(modified_by),
                             str(currency_id),
                         ),
@@ -1165,7 +1295,7 @@ def create_credit_currency_routes() -> APIRouter:
                 )
             payload = {
                 "currency_code": currency_code,
-                "credit_value_local_currency": float(upsert_data.credit_value_local_currency),
+                "credit_value_supplier_local": float(upsert_data.credit_value_supplier_local),
                 "currency_conversion_usd": rate,
                 "modified_by": modified_by,
             }
@@ -1198,16 +1328,96 @@ def create_credit_currency_routes() -> APIRouter:
         currency_id: UUID,
         update_data: CreditCurrencyUpdateSchema,
         current_user: dict = Depends(get_employee_user),  # Internal-only
+        locale: str = Depends(get_resolved_locale),
         db: psycopg2.extensions.connection = Depends(get_db),
     ):
-        """Update an existing credit currency - Internal-only"""
+        """Update an existing credit currency.
+
+        Decreasing credit_value_supplier_local requires Super Admin.
+        Increasing credit_value_supplier_local is allowed for ordinary Internal users.
+        Either direction: spread floor warn-and-ack contract applies if the change
+        would violate min_credit_spread_pct for any market using this currency.
+        """
+        from app.services.credit_spread import (
+            SpreadAckContext,
+            check_spread_floor_with_new_supplier_value,
+            record_acknowledgement,
+        )
+        from app.utils.db import db_read
+
         data = update_data.model_dump(exclude_unset=True)
+        ack = data.pop("acknowledge_spread_compression", False)
+        justification = data.pop("spread_acknowledgement_justification", None)
         if "modified_by" not in data:
             data["modified_by"] = current_user["user_id"]
         scope = None  # Credit currencies are not institution-scoped
 
+        new_supplier_value = data.get("credit_value_supplier_local")
+
+        if new_supplier_value is not None:
+            # Fetch existing value to determine direction of change.
+            existing_rows = db_read(
+                "SELECT credit_value_supplier_local FROM core.currency_metadata WHERE currency_metadata_id = %s",
+                (str(currency_id),),
+                connection=db,
+                fetch_one=True,
+            )
+            existing_value = existing_rows["credit_value_supplier_local"] if existing_rows else None
+
+            if existing_value is not None and float(new_supplier_value) < float(existing_value):
+                # Decrease: Super Admin only.
+                role_type = current_user.get("role_type")
+                role_name = current_user.get("role_name")
+                if not (role_type == "internal" and role_name == "super_admin"):
+                    raise envelope_exception(
+                        ErrorCode.SPREAD_CURRENCY_DECREASE_SUPER_ADMIN_ONLY, status=403, locale=locale
+                    )
+
+            # For each market that uses this currency, run the spread check.
+            market_rows = db_read(
+                "SELECT market_id FROM core.market_info WHERE currency_metadata_id = %s AND is_archived = FALSE",
+                (str(currency_id),),
+                connection=db,
+            )
+            spread_checks_failing = []
+            for mrow in market_rows or []:
+                spread = check_spread_floor_with_new_supplier_value(
+                    db, market_id=mrow["market_id"], proposed_supplier_value=new_supplier_value
+                )
+                if not spread.ok:
+                    spread_checks_failing.append((mrow["market_id"], spread))
+
+            if spread_checks_failing:
+                if not ack:
+                    first_market_id, first_spread = spread_checks_failing[0]
+                    raise envelope_exception(
+                        ErrorCode.SPREAD_FLOOR_VIOLATION,
+                        status=422,
+                        locale=locale,
+                        observed_pct=float(first_spread.observed_pct),
+                        floor_pct=float(first_spread.floor_pct),
+                    )
+                data["_spread_checks"] = spread_checks_failing
+                data["_spread_justification"] = justification
+
         def update_callable(target_id: UUID, payload: dict, connection: psycopg2.extensions.connection):
-            return credit_currency_service.update(target_id, payload, connection, scope=scope)
+            spread_checks = payload.pop("_spread_checks", None)
+            spread_just = payload.pop("_spread_justification", None)
+            result = credit_currency_service.update(target_id, payload, connection, scope=scope)
+            if result is not None and spread_checks:
+                for mkt_id, spread_check in spread_checks:
+                    record_acknowledgement(
+                        connection,
+                        SpreadAckContext(
+                            actor_user_id=current_user["user_id"],
+                            market_id=mkt_id,
+                            write_kind="currency_value",
+                            entity_id=target_id,
+                            justification=spread_just,
+                        ),
+                        spread_check,
+                    )
+            return result
 
         return handle_update(update_callable, currency_id, data, db, "credit currency")
 

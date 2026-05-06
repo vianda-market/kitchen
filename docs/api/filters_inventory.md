@@ -135,7 +135,7 @@ Status legend:
 | `is_featured` | exempt | "boolean display flag; not a filter dimension" |
 | `is_ready_for_signup` | exempt | "computed readiness flag; not a filter dimension" |
 | `location` | exempt | "PostGIS geometry; geo filter op handles spatial queries separately" |
-| `market_credit_value_local_currency` | exempt | "enriched join field; market dimension, not a restaurant filter" |
+| `market_credit_value_supplier_local` | exempt | "enriched join field; market dimension, not a restaurant filter" |
 | `member_perks` | exempt | "display list; not independently filterable" |
 | `member_perks_i18n` | exempt | "i18n translation payload; not filterable" |
 | `missing` | exempt | "computed readiness detail list; not a filter dimension" |

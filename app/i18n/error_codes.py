@@ -746,3 +746,8 @@ class ErrorCode(StrEnum):
     SERVICE_PLATE_LIST_FAILED = "service.plate_list_failed"
     SERVICE_BILL_LIST_FAILED = "service.bill_list_failed"
     SERVICE_GEOLOCATION_GET_FAILED = "service.geolocation_get_failed"
+
+    # ── spread.* ─────────────────────────────────────────────────────────────
+    # Credit-currency spread guardrail errors. Wired in credit-currency-spread feature.
+    SPREAD_FLOOR_VIOLATION = "spread.floor_violation"
+    SPREAD_CURRENCY_DECREASE_SUPER_ADMIN_ONLY = "spread.currency_decrease_super_admin_only"
