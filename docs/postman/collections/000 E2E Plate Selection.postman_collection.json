@@ -804,7 +804,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"MARKET_AR_PLAN_STANDARD_100000_ARS\",\n  \"market_id\": \"\",\n  \"name\": \"Standard Plan\",\n  \"credit\": 70,\n  \"price\": 100000.00,\n  \"highlighted\": true\n}",
+              "raw": "{\n  \"canonical_key\": \"E2E_PLAN_AR_STANDARD\",\n  \"market_id\": \"\",\n  \"name\": \"Standard Plan\",\n  \"credit\": 70,\n  \"price\": 120960.00,\n  \"highlighted\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"

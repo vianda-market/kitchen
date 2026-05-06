@@ -379,7 +379,6 @@ app/gateways/address_provider.py:0: error: Function is missing a return type ann
 app/gateways/address_provider.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/services/address_autocomplete_service.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/tests/gateways/ads/test_factory.py:0: error: Argument 1 to "get_conversion_gateway" has incompatible type "str"; expected "AdsPlatform"  [arg-type]
-app/workers/image_pipeline/processing.py:0: error: Module "google.cloud" has no attribute "vision"  [attr-defined]
 app/utils/locale.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
 app/utils/locale.py:0: error: Item "list[dict[str, Any]]" of "dict[str, Any] | list[dict[str, Any]]" has no attribute "get"  [union-attr]
 app/utils/locale.py:0: error: Returning Any from function declared to return "str"  [no-any-return]
