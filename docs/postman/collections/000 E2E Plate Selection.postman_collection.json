@@ -501,7 +501,7 @@
                   "pm.test(\"Response includes all required fields\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property(\"currency_code\");",
-                  "    pm.expect(body).to.have.property(\"credit_value_local_currency\");",
+                  "    pm.expect(body).to.have.property(\"credit_value_supplier_local\");",
                   "    pm.expect(body).to.have.property(\"canonical_key\");",
                   "    pm.expect(body).to.have.property(\"status\");",
                   "    pm.expect(body).to.have.property(\"is_archived\");",
@@ -537,7 +537,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"canonical_key\": \"E2E_CURRENCY_ARS\",\n    \"currency_name\": \"Argentine Peso\",\n    \"credit_value_local_currency\": 1400\n}",
+              "raw": "{\n    \"canonical_key\": \"E2E_CURRENCY_ARS\",\n    \"currency_name\": \"Argentine Peso\",\n    \"credit_value_supplier_local\": 1400\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -804,7 +804,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"MARKET_AR_PLAN_STANDARD_100000_ARS\",\n  \"market_id\": \"\",\n  \"name\": \"Standard Plan\",\n  \"credit\": 70,\n  \"price\": 100000.00,\n  \"highlighted\": true\n}",
+              "raw": "{\n  \"canonical_key\": \"E2E_PLAN_AR_STANDARD\",\n  \"market_id\": \"\",\n  \"name\": \"Standard Plan\",\n  \"credit\": 70,\n  \"price\": 120960.00,\n  \"highlighted\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"

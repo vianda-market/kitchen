@@ -1602,7 +1602,7 @@ CREATE TABLE IF NOT EXISTS core.currency_metadata (
     currency_metadata_id        UUID PRIMARY KEY DEFAULT uuidv7(),
     currency_code               VARCHAR(3) NOT NULL UNIQUE
                                 REFERENCES external.iso4217_currency(code) ON DELETE RESTRICT,
-    credit_value_local_currency NUMERIC NOT NULL,    -- Vianda-owned pricing policy: "1 credit" local currency value
+    credit_value_supplier_local NUMERIC NOT NULL,    -- Vianda-owned pricing policy: stable per-credit payout value to suppliers
     currency_conversion_usd     NUMERIC NOT NULL,    -- operational USD conversion rate (snapshotted; updated via ops flow)
     is_archived                 BOOLEAN NOT NULL DEFAULT FALSE,
     status                      status_enum NOT NULL DEFAULT 'active'::status_enum,
@@ -1622,9 +1622,11 @@ COMMENT ON COLUMN core.currency_metadata.currency_metadata_id IS
 COMMENT ON COLUMN core.currency_metadata.currency_code IS
     'ISO 4217 alpha code. Unique FK to external.iso4217_currency.code. '
     'Display name and minor_unit are always derived via JOIN — not stored redundantly here.';
-COMMENT ON COLUMN core.currency_metadata.credit_value_local_currency IS
-    'Vianda pricing policy: how many local currency units equal one Vianda credit. '
-    'Example: if 1 credit = 500 ARS, this column is 500. Used in plan pricing and invoice calculations.';
+COMMENT ON COLUMN core.currency_metadata.credit_value_supplier_local IS
+    'Vianda pricing policy: stable per-credit fiat payout value to suppliers. '
+    'Example: if 1 credit pays out 500 ARS to a supplier, this column is 500. '
+    'This is the supplier-side value only; customer per-credit cost is emergent from each plan (plan.price / plan.credit). '
+    'Governed by core.market_info.min_credit_spread_pct to protect Vianda''s gross margin per redemption.';
 COMMENT ON COLUMN core.currency_metadata.currency_conversion_usd IS
     'Operational USD exchange rate: how many local currency units equal 1 USD. '
     'Snapshotted from the currency refresh cron; not real-time. '
@@ -1653,7 +1655,7 @@ CREATE TABLE IF NOT EXISTS audit.currency_metadata_history (
     event_id                    UUID PRIMARY KEY DEFAULT uuidv7(),
     currency_metadata_id        UUID NOT NULL,
     currency_code               VARCHAR(3) NOT NULL,
-    credit_value_local_currency NUMERIC NOT NULL,
+    credit_value_supplier_local NUMERIC NOT NULL,
     currency_conversion_usd     NUMERIC NOT NULL,
     is_archived                 BOOLEAN NOT NULL,
     status                      status_enum NOT NULL,
@@ -1692,6 +1694,7 @@ CREATE TABLE IF NOT EXISTS core.market_info (
     language VARCHAR(5) NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'es', 'pt')),
     phone_dial_code VARCHAR(6) NULL,                    -- E.164 country prefix e.g. '+54'; NULL for pseudo-markets
     phone_local_digits SMALLINT NULL,                   -- Max national digits after dial code; UI maxLength hint e.g. 10
+    min_credit_spread_pct NUMERIC(5,4) NOT NULL DEFAULT 0.2000,  -- Minimum % spread floor between cheapest customer per-credit price and supplier value; Super Admin only
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     canonical_key VARCHAR(200) NULL,                    -- Optional stable seed/fixture identifier (e.g. 'E2E_MARKET_AR')
@@ -1740,6 +1743,11 @@ COMMENT ON COLUMN core.market_info.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.market_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.market_info.min_credit_spread_pct IS
+    'Minimum % spread floor between the cheapest customer per-credit price (lowest plan.price/plan.credit) '
+    'and credit_value_supplier_local for this market. Example: 0.20 = 20% floor. '
+    'Enforced as a warn-and-acknowledge guardrail on every plan and currency write. '
+    'Super Admin only; modifications require explicit acknowledgement. Default 0.20.';
 COMMENT ON COLUMN core.market_info.canonical_key IS
     'Optional stable human-readable identifier for seed/fixture markets '
     '(e.g. ''E2E_MARKET_AR''). Used by the PUT /api/v1/markets/by-key upsert endpoint '
@@ -1820,6 +1828,7 @@ CREATE TABLE IF NOT EXISTS audit.market_history (
     language VARCHAR(5) NOT NULL CHECK (language IN ('en', 'es', 'pt')),
     phone_dial_code VARCHAR(6) NULL,
     phone_local_digits SMALLINT NULL,
+    min_credit_spread_pct NUMERIC(5,4) NOT NULL DEFAULT 0.2000,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMPTZ NOT NULL,
@@ -1840,6 +1849,32 @@ COMMENT ON COLUMN audit.market_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
 COMMENT ON COLUMN audit.market_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
+
+\echo 'Creating enum type: spread_write_kind_enum'
+CREATE TYPE spread_write_kind_enum AS ENUM ('plan', 'currency_value', 'spread_floor');
+
+\echo 'Creating table: audit.spread_acknowledgement'
+CREATE TABLE IF NOT EXISTS audit.spread_acknowledgement (
+    id                  UUID PRIMARY KEY DEFAULT uuidv7(),
+    actor_user_id       UUID NOT NULL,
+    market_id           UUID NOT NULL,
+    write_kind          spread_write_kind_enum NOT NULL,
+    entity_id           UUID NULL,                          -- plan_id, currency_metadata_id, or market_id depending on write_kind
+    observed_spread_pct NUMERIC(10,6) NOT NULL,             -- observed min(plan.price/plan.credit) / credit_value_supplier_local - 1
+    floor_pct           NUMERIC(5,4) NOT NULL,              -- min_credit_spread_pct at time of write
+    offending_plan_ids  JSONB NOT NULL DEFAULT '[]',        -- list of plan_ids whose price/credit violates the floor
+    justification       TEXT NULL,                          -- free-text explanation from the acknowledging actor
+    acknowledged_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (market_id) REFERENCES core.market_info(market_id) ON DELETE RESTRICT
+);
+COMMENT ON TABLE audit.spread_acknowledgement IS
+    'Event log of every accepted-with-acknowledgement write that would violate min_credit_spread_pct. '
+    'Written by application code (not a trigger). Finance reviews these to plan supplier comms.';
+COMMENT ON COLUMN audit.spread_acknowledgement.write_kind IS
+    '''plan'' = plan create/update; ''currency_value'' = credit_value_supplier_local change; ''spread_floor'' = min_credit_spread_pct change.';
+COMMENT ON COLUMN audit.spread_acknowledgement.observed_spread_pct IS
+    'Observed spread at the time of the acknowledged write: min(plan.price/plan.credit)/credit_value_supplier_local - 1. Negative means below floor.';
 
 -- =============================================================================
 -- METADATA LAYER (Vianda flags + policy on top of external.* raw data)

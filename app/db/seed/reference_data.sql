@@ -132,8 +132,8 @@ INSERT INTO external.geonames_city (
 -- 6 currency_metadata rows. UUIDs are preserved from the old credit_currency_info
 -- seed for continuity (so tests and dev_fixtures that hardcoded these UUIDs still work).
 -- Display name resolves via JOIN external.iso4217_currency ic ON ic.code = cm.currency_code.
--- credit_value_local_currency and currency_conversion_usd are Vianda pricing policy.
-INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, credit_value_local_currency, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+-- credit_value_supplier_local = stable per-credit fiat payout to suppliers; currency_conversion_usd are Vianda pricing policy.
+INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, credit_value_supplier_local, currency_conversion_usd, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
 ('55555555-5555-5555-5555-555555555555', 'USD', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
 ('66666666-6666-6666-6666-666666666601', 'ARS', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
 ('66666666-6666-6666-6666-666666666602', 'PEN', 1.0, 1.0, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
@@ -148,14 +148,14 @@ INSERT INTO core.currency_metadata (currency_metadata_id, currency_code, credit_
 -- currency_metadata_id FKs core.currency_metadata. Same UUIDs preserved.
 -- kitchen_open_time + kitchen_close_time now live on billing.market_payout_aggregator (market defaults)
 -- and billing.supplier_terms (per-supplier overrides). Restaurants inherit at create time.
-INSERT INTO market_info (market_id, country_code, currency_metadata_id, language, phone_dial_code, phone_local_digits, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
-('00000000-0000-0000-0000-000000000001', 'XG', '55555555-5555-5555-5555-555555555555', 'en', NULL,   NULL, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000002', 'AR', '66666666-6666-6666-6666-666666666601', 'es', '+54',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000003', 'PE', '66666666-6666-6666-6666-666666666602', 'es', '+51',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000004', 'US', '55555555-5555-5555-5555-555555555555', 'en', '+1',   10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000005', 'CL', '66666666-6666-6666-6666-666666666603', 'es', '+56',  9,    FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000006', 'MX', '66666666-6666-6666-6666-666666666604', 'es', '+52',  10,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
-('00000000-0000-0000-0000-000000000007', 'BR', '66666666-6666-6666-6666-666666666605', 'pt', '+55',  11,   FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
+INSERT INTO market_info (market_id, country_code, currency_metadata_id, language, phone_dial_code, phone_local_digits, min_credit_spread_pct, is_archived, status, created_date, created_by, modified_by, modified_date) VALUES
+('00000000-0000-0000-0000-000000000001', 'XG', '55555555-5555-5555-5555-555555555555', 'en', NULL,   NULL, 0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000002', 'AR', '66666666-6666-6666-6666-666666666601', 'es', '+54',  10,   0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000003', 'PE', '66666666-6666-6666-6666-666666666602', 'es', '+51',  9,    0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000004', 'US', '55555555-5555-5555-5555-555555555555', 'en', '+1',   10,   0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000005', 'CL', '66666666-6666-6666-6666-666666666603', 'es', '+56',  9,    0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000006', 'MX', '66666666-6666-6666-6666-666666666604', 'es', '+52',  10,   0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP),
+('00000000-0000-0000-0000-000000000007', 'BR', '66666666-6666-6666-6666-666666666605', 'pt', '+55',  11,   0.2000, FALSE, 'active'::status_enum, CURRENT_TIMESTAMP, 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'dddddddd-dddd-dddd-dddd-dddddddddddd', CURRENT_TIMESTAMP);
 
 -- Institutions: only Vianda Enterprises (employees) and Vianda Customers (B2C). Suppliers created via API.
 -- market_id removed from institution_info — markets now assigned via core.institution_market junction.

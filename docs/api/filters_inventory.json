@@ -723,7 +723,7 @@
     "endpoint": "/api/v1/restaurants/enriched",
     "entity": "restaurants",
     "exempt_reason": "\"enriched join field; market dimension, not a restaurant filter\"",
-    "field": "market_credit_value_local_currency",
+    "field": "market_credit_value_supplier_local",
     "model": "RestaurantEnrichedResponseSchema",
     "status": "exempt"
   },

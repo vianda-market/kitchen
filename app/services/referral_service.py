@@ -291,7 +291,7 @@ def _compute_bonus_credits(
     # Convert currency amount to credits using market's credit currency
     rows = db_read(
         """
-        SELECT cc.credit_value_local_currency
+        SELECT cc.credit_value_supplier_local
         FROM market_info m
         JOIN currency_metadata cc ON m.currency_metadata_id = cc.currency_metadata_id
         WHERE m.market_id = %s
@@ -299,8 +299,8 @@ def _compute_bonus_credits(
         (str(market_id),),
         connection=db,
     )
-    if rows and rows[0]["credit_value_local_currency"]:
-        credit_value = Decimal(str(rows[0]["credit_value_local_currency"]))
+    if rows and rows[0]["credit_value_supplier_local"]:
+        credit_value = Decimal(str(rows[0]["credit_value_supplier_local"]))
         if credit_value > 0:
             return Decimal(str(math.floor(raw_bonus / credit_value)))
 

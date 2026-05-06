@@ -1,4 +1,3 @@
-import math
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -7,7 +6,7 @@ import psycopg2.extensions
 from app.config import Status
 from app.services.crud_service import (
     client_bill_service,
-    credit_currency_service,
+    plan_service,
     subscription_service,
     update_balance,
 )
@@ -24,6 +23,10 @@ def process_client_bill_internal(
     """
     Process a client bill: add credits to subscription balance, set renewal_date, mark bill Processed.
     Idempotent: no-op if bill is already Processed. Use commit=False for atomic multi-step transactions.
+
+    Credits granted = plan.credit (the plan defines credits-per-period, NOT a dollar/credit conversion).
+    The supplier credit value (credit_value_supplier_local) governs supplier payouts and is intentionally
+    decoupled from customer credit grants — mixing the two is the billing.py:43 bug this fixes.
     """
     bill = client_bill_service.get_by_id(client_bill_id, db)
     if not bill:
@@ -36,11 +39,14 @@ def process_client_bill_internal(
     if not subscription:
         raise Exception("Subscription not found")
 
-    credit_currency = credit_currency_service.get_by_id(bill.currency_metadata_id, db)
-    if not credit_currency:
-        raise Exception("Credit currency not found")
+    plan = plan_service.get_by_id(subscription.plan_id, db)
+    if not plan:
+        raise Exception("Plan not found for subscription")
 
-    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value_local_currency))
+    # Grant the credits defined by the plan — do NOT derive from supplier credit value.
+    # plan.credit is the credits-per-period the customer purchased; it is independent of
+    # credit_value_supplier_local (which is the per-credit fiat payout to suppliers).
+    credits_to_add = plan.credit
     renewal_date = subscription.renewal_date
     if renewal_date.tzinfo is None:
         renewal_date = renewal_date.replace(tzinfo=UTC)
@@ -76,11 +82,12 @@ def process_completed_bill(bill_id: UUID, db: psycopg2.extensions.connection):
     if not subscription:
         raise Exception("Subscription not found")
 
-    credit_currency = credit_currency_service.get_by_id(bill.currency_metadata_id, db)
-    if not credit_currency:
-        raise Exception("Credit currency not found")
+    plan = plan_service.get_by_id(subscription.plan_id, db)
+    if not plan:
+        raise Exception("Plan not found for subscription")
 
-    credits_to_add = math.ceil(float(bill.amount) / float(credit_currency.credit_value_local_currency))
+    # Grant the credits defined by the plan — same fix as process_client_bill_internal.
+    credits_to_add = plan.credit
     new_balance = float(subscription.balance) + credits_to_add
 
     # Calculate new renewal_date: today (UTC) + 30 days, rounded up to next day at 00:00 UTC

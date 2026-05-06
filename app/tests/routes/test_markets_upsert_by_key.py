@@ -50,6 +50,9 @@ def client_with_employee(mock_employee_user, mock_db):
     def _override_get_employee_user():
         return mock_employee_user
 
+    def _override_get_current_user():
+        return mock_employee_user
+
     def _override_oauth2_scheme():
         return "test-token"
 
@@ -58,6 +61,7 @@ def client_with_employee(mock_employee_user, mock_db):
 
     app.dependency_overrides[oauth2_scheme] = _override_oauth2_scheme
     app.dependency_overrides[get_employee_user] = _override_get_employee_user
+    app.dependency_overrides[get_current_user] = _override_get_current_user
     app.dependency_overrides[get_db] = _override_get_db
     try:
         with TestClient(app) as c:
@@ -65,6 +69,7 @@ def client_with_employee(mock_employee_user, mock_db):
     finally:
         app.dependency_overrides.pop(oauth2_scheme, None)
         app.dependency_overrides.pop(get_employee_user, None)
+        app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_db, None)
 
 
@@ -79,7 +84,7 @@ def _make_market_dict(*, canonical_key: str | None = None, market_id=None, count
         "currency_metadata_id": currency_id,
         "currency_code": "ARS",
         "currency_name": "Argentine Peso",
-        "credit_value_local_currency": None,
+        "credit_value_supplier_local": None,
         "currency_conversion_usd": None,
         "timezone": None,
         "language": "es",
@@ -124,6 +129,7 @@ class TestMarketUpsertByKey:
     ):
         """PUT /markets/by-key with a new canonical_key inserts a new market and returns 200."""
         mock_find.return_value = None  # key does not exist yet
+        mock_market_service.get_by_country_code.return_value = None  # no existing market for country
 
         created = _make_market_dict(canonical_key="E2E_MARKET_AR")
         mock_market_service.create.return_value = created
@@ -176,6 +182,7 @@ class TestMarketUpsertByKey:
     ):
         """Calling upsert twice with identical payload should behave consistently."""
         mock_find.return_value = None  # First call: insert
+        mock_market_service.get_by_country_code.return_value = None  # no existing market for country
         created = _make_market_dict(canonical_key="E2E_MARKET_IDEMPOTENT")
         mock_market_service.create.return_value = created
         mock_market_service.get_by_id.return_value = created

@@ -599,6 +599,18 @@ MESSAGES: dict[str, dict[str, str]] = {
         "upload.access_denied": "You do not have permission to manage images for this product.",
         "upload.not_found": "Image upload record not found.",
         "upload.signed_url_failed": "Failed to generate upload URL. Please try again.",
+        # spread.* — credit-currency-spread guardrail
+        "spread.floor_violation": (
+            "This write compresses the market spread below the floor. "
+            "Observed spread: {observed_pct:.1%}, floor: {floor_pct:.1%}. "
+            "Recovery options: (a) reshape the plan to increase per-credit cost, or "
+            "(b) lower credit_value_supplier_local (requires supplier comms and Super Admin auth). "
+            "Set acknowledge_spread_compression=true to proceed with an audit record."
+        ),
+        "spread.currency_decrease_super_admin_only": (
+            "Decreasing credit_value_supplier_local requires Super Admin authorization. "
+            "This change lowers supplier per-credit payout and may require supplier renegotiation."
+        ),
     },
     "es": {
         # Auth / user errors
@@ -1193,6 +1205,18 @@ MESSAGES: dict[str, dict[str, str]] = {
         "upload.access_denied": "No tienes permiso para gestionar imágenes de este producto.",
         "upload.not_found": "Registro de carga de imagen no encontrado.",
         "upload.signed_url_failed": "No se pudo generar la URL de carga. Por favor, inténtalo de nuevo.",
+        # spread.* — credit-currency-spread guardrail
+        "spread.floor_violation": (
+            "Esta escritura comprime el spread del mercado por debajo del piso. "
+            "Spread observado: {observed_pct:.1%}, piso: {floor_pct:.1%}. "
+            "Opciones de recuperación: (a) rediseñar el plan para aumentar el costo por crédito, o "
+            "(b) reducir credit_value_supplier_local (requiere comunicación con proveedores y autorización Super Admin). "
+            "Establece acknowledge_spread_compression=true para proceder con un registro de auditoría."
+        ),
+        "spread.currency_decrease_super_admin_only": (
+            "Reducir credit_value_supplier_local requiere autorización de Super Admin. "
+            "Este cambio reduce el pago por crédito al proveedor y puede requerir renegociación."
+        ),
     },
     "pt": {
         # Auth / user errors
@@ -1787,6 +1811,18 @@ MESSAGES: dict[str, dict[str, str]] = {
         "upload.access_denied": "Você não tem permissão para gerenciar imagens deste produto.",
         "upload.not_found": "Registro de upload de imagem não encontrado.",
         "upload.signed_url_failed": "Falha ao gerar a URL de upload. Por favor, tente novamente.",
+        # spread.* — credit-currency-spread guardrail
+        "spread.floor_violation": (
+            "Esta escrita comprime o spread do mercado abaixo do piso. "
+            "Spread observado: {observed_pct:.1%}, piso: {floor_pct:.1%}. "
+            "Opções de recuperação: (a) reformular o plano para aumentar o custo por crédito, ou "
+            "(b) reduzir credit_value_supplier_local (requer comunicação com fornecedores e autorização Super Admin). "
+            "Defina acknowledge_spread_compression=true para prosseguir com um registro de auditoria."
+        ),
+        "spread.currency_decrease_super_admin_only": (
+            "Reduzir credit_value_supplier_local requer autorização de Super Admin. "
+            "Esta alteração reduz o pagamento por crédito ao fornecedor e pode exigir renegociação."
+        ),
     },
 }
 

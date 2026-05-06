@@ -841,6 +841,13 @@ def create_app() -> FastAPI:
     v1_uploads_router.include_router(uploads_router)
     app.include_router(v1_uploads_router)
 
+    # Internal finance routes (Super Admin only)
+    from app.routes.admin.margin_report import router as margin_report_router
+
+    v1_margin_report_router = create_versioned_router("api", ["Internal Finance"], APIVersion.V1)
+    v1_margin_report_router.include_router(margin_report_router)
+    app.include_router(v1_margin_report_router)
+
     # Dev-only routes (guarded by DEV_MODE)
     from app.routes.dev import router as dev_router
 

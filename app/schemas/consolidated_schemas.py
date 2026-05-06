@@ -1724,7 +1724,16 @@ class CreditCurrencyCreateSchema(BaseModel):
     """Schema for creating a new credit currency. Backend assigns currency_code from supported list and fetches currency_conversion_usd from open.er-api.com."""
 
     currency_name: str = Field(..., max_length=50)
-    credit_value_local_currency: Decimal = Field(..., gt=0)
+    credit_value_supplier_local: Decimal = Field(
+        ..., gt=0, description="Stable per-credit fiat payout value to suppliers"
+    )
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that this write compresses spread below the market floor, if applicable.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
+    )
 
 
 class CreditCurrencyUpdateSchema(BaseModel):
@@ -1732,7 +1741,16 @@ class CreditCurrencyUpdateSchema(BaseModel):
 
     currency_name: str | None = Field(None, max_length=50)
     currency_code: str | None = Field(None, max_length=10)
-    credit_value_local_currency: Decimal | None = Field(None, gt=0)
+    credit_value_supplier_local: Decimal | None = Field(
+        None, gt=0, description="Stable per-credit fiat payout value to suppliers"
+    )
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that this write compresses spread below the market floor, if applicable.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
+    )
 
 
 class CreditCurrencyResponseSchema(BaseModel):
@@ -1746,7 +1764,7 @@ class CreditCurrencyResponseSchema(BaseModel):
     currency_metadata_id: UUID
     currency_name: str | None = None
     currency_code: str
-    credit_value_local_currency: Decimal
+    credit_value_supplier_local: Decimal
     currency_conversion_usd: Decimal
     is_archived: bool
     status: Status
@@ -1776,8 +1794,8 @@ class CreditCurrencyUpsertByKeySchema(BaseModel):
         max_length=50,
         description="ISO 4217 currency name used to resolve currency_code server-side (e.g. 'Argentine Peso')",
     )
-    credit_value_local_currency: Decimal = Field(
-        ..., gt=0, description="How many local currency units equal one Vianda credit"
+    credit_value_supplier_local: Decimal = Field(
+        ..., gt=0, description="Stable per-credit fiat payout value to suppliers"
     )
 
 
@@ -1797,7 +1815,7 @@ class CreditCurrencyEnrichedResponseSchema(BaseModel):
     currency_metadata_id: UUID
     currency_name: str
     currency_code: str
-    credit_value_local_currency: Decimal
+    credit_value_supplier_local: Decimal
     currency_conversion_usd: Decimal
     markets: list[CreditCurrencyMarketSchema] = Field(
         default_factory=list, description="Markets that use this currency"
@@ -1829,6 +1847,13 @@ class PlanCreateSchema(BaseModel):
     canonical_key: str | None = Field(
         None, max_length=200, description="Optional stable identifier for seed/fixture plans"
     )
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that this plan compresses spread below the market floor.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
+    )
 
 
 class PlanUpdateSchema(BaseModel):
@@ -1850,6 +1875,13 @@ class PlanUpdateSchema(BaseModel):
     status: Status | None = None
     canonical_key: str | None = Field(
         None, max_length=200, description="Optional stable identifier for seed/fixture plans"
+    )
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that this plan update compresses spread below the market floor.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
     )
 
 
@@ -1878,6 +1910,13 @@ class PlanUpsertByKeySchema(BaseModel):
     price: float = Field(..., ge=0)
     highlighted: bool = False
     status: Status = Status.ACTIVE
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that this upsert compresses spread below the market floor.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
+    )
 
 
 class PlanResponseSchema(BaseModel):
@@ -2321,9 +2360,9 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
     currency_metadata_id: UUID
     # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
-    market_credit_value_local_currency: Decimal = Field(
+    market_credit_value_supplier_local: Decimal = Field(
         ...,
-        description="Credit value in local currency for this market; use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_local_currency)",
+        description="Supplier credit value in local currency for this market (credit_value_supplier_local); use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_supplier_local)",
     )
     # filter-registry:exempt reason="free-text label; use search filter instead"
     name: str
@@ -3400,9 +3439,9 @@ class MarketResponseSchema(BaseModel):
     currency_metadata_id: UUID = Field(..., description="FK to currency_metadata")
     currency_code: str | None = Field(None, description="Currency code (enriched from JOIN)")
     currency_name: str | None = Field(None, description="Currency name (enriched from JOIN)")
-    credit_value_local_currency: Decimal | None = Field(
+    credit_value_supplier_local: Decimal | None = Field(
         None,
-        description="Local currency amount per credit (from currency_metadata). Use for plan form preview: credit_cost_local_currency = price / credit.",
+        description="Stable per-credit fiat payout to suppliers (from currency_metadata.credit_value_supplier_local). Use for plan form preview: credit_cost_local_currency = price / credit.",
     )
     currency_conversion_usd: Decimal | None = Field(
         None,
@@ -3435,6 +3474,14 @@ class MarketResponseSchema(BaseModel):
     )
     tax_id_example: str | None = Field(
         None, description="Example tax ID in raw digits for placeholder text (e.g. '123456789')."
+    )
+    min_credit_spread_pct: Decimal | None = Field(
+        None,
+        description=(
+            "Minimum % spread floor between the cheapest customer per-credit price and credit_value_supplier_local. "
+            "Example: 0.20 = 20% floor. Super Admin only to modify. "
+            "Null on non-enriched endpoints that do not query market_info."
+        ),
     )
     canonical_key: str | None = Field(None, description="Stable seed/fixture identifier. Null for ad-hoc markets.")
     is_archived: bool = Field(..., description="Whether this market is archived")
@@ -3872,6 +3919,109 @@ class MarketUpsertByKeySchema(BaseModel):
         if v not in allowed:
             raise I18nValueError("validation.market.language_unsupported", language=v, allowed=", ".join(allowed))
         return v
+
+
+# =============================================================================
+# MARKET SPREAD FLOOR
+# =============================================================================
+
+
+class MarketSpreadFloorUpdateSchema(BaseModel):
+    """Request schema for PATCH /api/v1/markets/{market_id}/spread-floor.
+
+    Super Admin only. Sets the minimum % spread between the cheapest active
+    plan's per-credit price and credit_value_supplier_local for the market.
+
+    If the new floor would conflict with any active plan (i.e. the floor is
+    being raised above the current observed spread), the same warn-and-ack
+    contract applies: set acknowledge_spread_compression=true to accept.
+    """
+
+    min_credit_spread_pct: Decimal = Field(
+        ...,
+        ge=Decimal("0"),
+        le=Decimal("1"),
+        description="Minimum spread floor as a decimal fraction (e.g. 0.20 = 20%). Must be between 0 and 1.",
+    )
+    acknowledge_spread_compression: bool = Field(
+        False,
+        description="Set to true to acknowledge that the new floor conflicts with an active plan.",
+    )
+    spread_acknowledgement_justification: str | None = Field(
+        None, description="Optional free-text justification for spread compression acknowledgement."
+    )
+
+
+# =============================================================================
+# SPREAD READOUT (headroom endpoint)
+# =============================================================================
+
+
+class SpreadReadoutResponseSchema(BaseModel):
+    """Response schema for GET /api/v1/markets/{market_id}/spread-readout.
+
+    Returns the current spread between the cheapest active plan's per-credit
+    price and the supplier credit value, for finance/admin visibility.
+    """
+
+    cheapest_plan_per_credit: Decimal | None = Field(
+        None,
+        description="Cheapest per-credit price across active plans (min plan.price/plan.credit). "
+        "Null when no active plans exist.",
+    )
+    supplier_value: Decimal | None = Field(
+        None,
+        description="credit_value_supplier_local for the market. Null when market has no currency.",
+    )
+    headroom_pct: Decimal = Field(
+        ...,
+        description="Observed spread percentage: min(plan.price/plan.credit)/credit_value_supplier_local - 1. "
+        "Negative means below floor.",
+    )
+    floor_pct: Decimal = Field(
+        ...,
+        description="The market's min_credit_spread_pct (the required minimum spread).",
+    )
+    offending_plan_ids: list[str] = Field(
+        default_factory=list,
+        description="UUIDs of active plans whose price/credit is below the floor threshold.",
+    )
+
+
+# =============================================================================
+# MARGIN REPORT
+# =============================================================================
+
+
+class MarginReportPlanRow(BaseModel):
+    """Per-plan-tier margin breakdown row for the margin report response."""
+
+    plan_id: UUID
+    plan_name: str
+    redemptions: Decimal = Field(..., description="Total credits redeemed by customers on this plan tier.")
+    margin_per_credit: Decimal = Field(
+        ...,
+        description="credit_cost_local_currency - credit_value_supplier_local for this plan tier.",
+    )
+    margin_local: Decimal = Field(..., description="margin_per_credit × redemptions for this plan tier.")
+
+
+class MarginReportResponseSchema(BaseModel):
+    """Response schema for GET /internal/margin-report.
+
+    Per-market per-period gross margin aggregation.
+    """
+
+    market_id: UUID
+    period_start: datetime
+    period_end: datetime
+    total_margin_local: Decimal = Field(..., description="Total gross margin in local currency over the period.")
+    total_credits_redeemed: Decimal = Field(..., description="Total credits redeemed across all plan tiers.")
+    by_plan: list[MarginReportPlanRow] = Field(
+        default_factory=list,
+        description="Per-plan-tier margin breakdown.",
+    )
+    currency_code: str | None = Field(None, description="ISO currency code for the market.")
 
 
 # =============================================================================

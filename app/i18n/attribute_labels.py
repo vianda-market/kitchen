@@ -22,7 +22,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
         "core": {
             "currency_metadata": {
                 "currency_code": "Currency",
-                "credit_value_local_currency": "Credit Value (Local Currency)",
+                "credit_value_supplier_local": "Supplier Credit Value (Local Currency)",
                 "currency_conversion_usd": "Exchange Rate (USD)",
             },
             "market_info": {
@@ -458,7 +458,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
         "core": {
             "currency_metadata": {
                 "currency_code": "Moneda",
-                "credit_value_local_currency": "Valor del crédito (moneda local)",
+                "credit_value_supplier_local": "Valor del crédito al proveedor (moneda local)",
                 "currency_conversion_usd": "Tipo de cambio (USD)",
             },
             "market_info": {
@@ -894,7 +894,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
         "core": {
             "currency_metadata": {
                 "currency_code": "Moeda",
-                "credit_value_local_currency": "Valor do crédito (moeda local)",
+                "credit_value_supplier_local": "Valor do crédito ao fornecedor (moeda local)",
                 "currency_conversion_usd": "Taxa de câmbio (USD)",
             },
             "market_info": {

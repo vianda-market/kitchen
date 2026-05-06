@@ -604,7 +604,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_local_currency\": 1.2\n}"
+							"raw": "{\n  \"currency_name\": \"Argentine Peso\",\n  \"credit_value_supplier_local\": 1.2\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/credit-currencies",

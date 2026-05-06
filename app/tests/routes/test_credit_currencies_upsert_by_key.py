@@ -16,8 +16,8 @@ from application import app
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale, oauth2_scheme
+from app.config import Status
 from app.dependencies.database import get_db
-from app.dto.enums import Status
 
 # Needs live Postgres (TestClient triggers DB pool init via unmocked code paths).
 # Excluded from unit test job by -m "not database"; runs in acceptance (Newman).
@@ -88,7 +88,7 @@ def _make_currency_dto(*, canonical_key: str | None = None, currency_metadata_id
     return CreditCurrencyDTO(
         currency_metadata_id=mid,
         currency_code=currency_code,
-        credit_value_local_currency=Decimal("1400"),
+        credit_value_supplier_local=Decimal("1400"),
         currency_conversion_usd=Decimal("0.001"),
         is_archived=False,
         status=Status.ACTIVE,
@@ -111,7 +111,7 @@ def _make_currency_response_dict(
         "currency_metadata_id": mid,
         "currency_name": None,
         "currency_code": currency_code,
-        "credit_value_local_currency": 1400.0,
+        "credit_value_supplier_local": 1400.0,
         "currency_conversion_usd": 0.001,
         "is_archived": False,
         "status": "active",
@@ -126,7 +126,7 @@ def _valid_upsert_payload(*, canonical_key: str = "E2E_CURRENCY_ARS") -> dict:
     return {
         "canonical_key": canonical_key,
         "currency_name": "Argentine Peso",
-        "credit_value_local_currency": 1400,
+        "credit_value_supplier_local": 1400,
     }
 
 
@@ -146,7 +146,9 @@ class TestCreditCurrencyUpsertByKey:
             patch("app.services.cron.currency_refresh.fetch_usd_rate_for_currency", return_value=(0.001, None)),
             patch("app.utils.db.db_read", return_value=None),
             patch.object(
-                credit_currency_service, "create", return_value={"currency_metadata_id": created_id}
+                credit_currency_service,
+                "create",
+                return_value=_make_currency_dto(canonical_key="E2E_CURRENCY_ARS", currency_metadata_id=created_id),
             ) as mock_create,
             patch.object(credit_currency_service, "get_by_id", return_value=response_dict),
         ):
@@ -176,7 +178,7 @@ class TestCreditCurrencyUpsertByKey:
             patch.object(credit_currency_service, "get_by_id", return_value=updated_response),
         ):
             payload = _valid_upsert_payload(canonical_key="E2E_CURRENCY_ARS")
-            payload["credit_value_local_currency"] = 1600
+            payload["credit_value_supplier_local"] = 1600
             resp = client_with_employee.put("/api/v1/credit-currencies/by-key", json=payload)
 
         assert resp.status_code == 200
@@ -198,7 +200,13 @@ class TestCreditCurrencyUpsertByKey:
             patch("app.config.supported_currencies.get_currency_code_by_name", return_value="ARS"),
             patch("app.services.cron.currency_refresh.fetch_usd_rate_for_currency", return_value=(0.001, None)),
             patch("app.utils.db.db_read", return_value=None),
-            patch.object(credit_currency_service, "create", return_value={"currency_metadata_id": created_id}),
+            patch.object(
+                credit_currency_service,
+                "create",
+                return_value=_make_currency_dto(
+                    canonical_key="E2E_CURRENCY_IDEMPOTENT", currency_metadata_id=created_id
+                ),
+            ),
             patch.object(credit_currency_service, "get_by_id", return_value=response_dict),
         ):
             resp1 = client_with_employee.put("/api/v1/credit-currencies/by-key", json=payload)
@@ -249,7 +257,7 @@ class TestCreditCurrencyUpsertByKey:
         """PUT /credit-currencies/by-key update path must NOT update currency_code.
 
         currency_code is the ISO 4217 natural unique key and is immutable after
-        creation.  The update path only writes credit_value_local_currency — it
+        creation.  The update path only writes credit_value_supplier_local — it
         must not attempt to change currency_code.
         """
         from app.services.crud_service import credit_currency_service

@@ -422,7 +422,7 @@ class CreditCurrencyDTO(BaseModel):
 
     currency_metadata_id: UUID
     currency_code: str
-    credit_value_local_currency: Decimal
+    credit_value_supplier_local: Decimal
     currency_conversion_usd: Decimal
     is_archived: bool = False
     status: Status

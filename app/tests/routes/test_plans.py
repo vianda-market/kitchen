@@ -13,7 +13,7 @@ import pytest
 from application import app
 from fastapi.testclient import TestClient
 
-from app.auth.dependencies import get_employee_user, oauth2_scheme
+from app.auth.dependencies import get_current_user, get_employee_user, oauth2_scheme
 from app.services.crud_service import plan_service
 from app.services.market_service import GLOBAL_MARKET_ID
 
@@ -37,27 +37,36 @@ def client_with_employee(mock_employee_user):
     def _override_get_employee_user():
         return mock_employee_user
 
+    def _override_get_current_user():
+        return mock_employee_user
+
     def _override_oauth2_scheme():
         return "test-token"
 
     app.dependency_overrides[oauth2_scheme] = _override_oauth2_scheme
     app.dependency_overrides[get_employee_user] = _override_get_employee_user
+    app.dependency_overrides[get_current_user] = _override_get_current_user
     try:
         with TestClient(app) as c:
             yield c
     finally:
         app.dependency_overrides.pop(oauth2_scheme, None)
         app.dependency_overrides.pop(get_employee_user, None)
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 def _valid_plan_payload(market_id=None):
-    """Minimal valid plan create payload; use market_id or a random UUID."""
+    """Minimal valid plan create payload; use market_id or a random UUID.
+
+    price/credit = 100.0/10 = 10.0/credit, well above the 20% spread floor
+    (seeded supplier_value=1.0, floor=20% → threshold=1.2/credit).
+    """
     mid = market_id or uuid4()
     return {
         "market_id": str(mid),
         "name": "Test Plan",
         "credit": 10,
-        "price": 9.99,
+        "price": 100.0,
     }
 
 
