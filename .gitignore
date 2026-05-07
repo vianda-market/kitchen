@@ -47,6 +47,12 @@ kenv/
 # Local-only documentation (credentials, notes)
 docs/local/
 
+# Demo-day loader credentials (generated per run, never commit)
+.demo_credentials.local
+
+# Local backup of .env taken before flipping PAYMENT_PROVIDER for demo loads
+.env.backup-pre-demo
+
 # Archived documentation (deprecated, kept out of version control)
 docs/zArchive/
 

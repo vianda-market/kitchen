@@ -691,6 +691,21 @@ Prerequisites: `RUN_MODE=image_event` Cloud Run job deployed to `vianda-dev`, GC
 
 ---
 
+## Demo Seed Subsystem
+
+Opt-in two-layer dataset that populates a narrative demo for stakeholder presentations against the dev environment. Never loaded in staging or production. Requires `PAYMENT_PROVIDER=mock` so subscriptions and orders flow through the API rather than SQL.
+
+- **Layer A — `app/db/seed/demo_baseline.sql`:** SQL-only entities that must pre-exist before the API starts: one demo supplier institution (PE market), one demo super-admin user (`demo-admin@vianda.demo`), the supplier-entity office address (San Isidro, Lima), the restaurant address (Miraflores, Lima), and one institution entity (PEN currency). All rows use the `dddddddd-dec0-` UUID prefix and are idempotent (`ON CONFLICT ... DO UPDATE`).
+- **Layer B — `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`:** Newman collection (PE-only v1, ~248 requests) that runs the full mock-Stripe happy path: auth → supplier menu (restaurant, QR, 4 Peruvian products, 4 plates, plate-kitchen-days Mon–Fri, 1 PE plan via `PUT /by-key`) → 5 customer signups (verified email flow, Lima neighborhoods) → 5 subscriptions (`POST /subscriptions/with-payment` + mock `confirm-payment`) → 5×5 order loop (plate-selection → run-promotion → scan-qr → enriched pickup → complete → review) → sanity checks. AR/US scope deferred to a follow-up.
+- **Loader — `scripts/load_demo_data.sh`:** Runs Layer A, generates and hashes a random demo-admin password, probes the API health endpoint, runs Newman, and prints credentials to stdout and `.demo_credentials.local` (gitignored). Refuses to run unless `ENV=dev`, `DB_HOST` not staging/prod, AND `PAYMENT_PROVIDER=mock`.
+- **Purge — `scripts/purge_demo_data.sh`:** Deletes all rows matching UUID prefix `dddddddd-dec0-`, canonical key `DEMO_*`, or username `demo.cliente.pe.%@vianda.demo` in child-first dependency order, wrapped in a single transaction. Transactional descendants (subscriptions, orders, reviews, billing rows) get system-generated UUIDs and are matched via username FK chain.
+- **Environment — `docs/postman/environments/dev.postman_environment.json`:** Dev-local Postman environment; adds `demoAdminUsername`, `demoAdminPassword`, `mediaBaseUrl`, `customerSharedPassword` on top of the standard CI vars.
+- **Re-run posture:** Customer signups and transactional events are NOT idempotent. Reset pattern: `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.
+- **Mechanics guide:** `docs/guidelines/database/DATABASE_REBUILD_PERSISTENCE.md` — "Demo Data (Third Layer)" section.
+- **Dataset narrative (what's in it, persona table, feedback log):** `docs/guidelines/database/DEMO_DAY_DATASET.md`. Update this doc when the dataset changes or when stakeholder demos surface gaps.
+
+---
+
 ## CI/CD
 
 ### Workflows

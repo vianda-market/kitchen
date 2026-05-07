@@ -183,6 +183,85 @@ config = get_table_archival_config("plate_pickup_live")
 assert config.retention_days > 0
 ```
 
+---
+
+## **Demo Data (Third Layer)**
+
+Kitchen has a third seed layer on top of reference data and dev fixtures: an opt-in, narrative dataset that populates restaurants, plans, customers, and sample activity for stakeholder demos.
+
+### Three-layer model
+
+| Layer | File(s) | Loaded in | How |
+|---|---|---|---|
+| Reference (canonical) | `app/db/seed/reference_data.sql` | every env | always by `build_kitchen_db.sh` |
+| Dev fixtures | `app/db/seed/dev_fixtures.sql` | dev only | `build_kitchen_db.sh` when `ENV=dev` |
+| **Demo (opt-in)** | `app/db/seed/demo_baseline.sql` + `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json` | dev only, opt-in | `bash scripts/load_demo_data.sh` |
+
+Demo data is **never** loaded by the default rebuild path. Neither `build_kitchen_db.sh` nor `migrate.sh` reference the demo files. Demo data does not affect the `kitchen_template` fingerprint used by worktree clones.
+
+### Loading demo data
+
+Prerequisites:
+1. Dev DB is up (rebuilt with `build_kitchen_db.sh`).
+2. `PAYMENT_PROVIDER=mock` is set in `.env` (required — subscriptions go through the API, not SQL).
+3. Kitchen API is running: `bash scripts/run_dev_quiet.sh`.
+4. `newman` is installed: `npm install -g newman`.
+
+Then:
+
+```bash
+bash scripts/load_demo_data.sh
+```
+
+The loader runs two layers in order:
+1. **Layer A** — `demo_baseline.sql`: inserts the supplier institution, demo admin user, addresses, and institution entity directly via SQL (no API endpoint for these entities).
+2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon–Fri, 1 PE plan; signs up 5 PE customers via the verified email flow; subscribes each customer (mock payment); and runs 5 orders per customer (plate-selection → QR-scan → complete → review).
+
+At the end, credentials are printed to stdout and written to `.demo_credentials.local` (gitignored).
+
+**Scope (v1):** Peru only. One supplier, one restaurant in Miraflores, one plan, five customers in Lima, one active order per customer (5 orders total — the API enforces one plate-selection per customer per day, so we don't backdate). For the full narrative — what's in the dataset, who the customers are, what stakeholders see, and the running feedback log — read **`DEMO_DAY_DATASET.md`** in this same folder. That doc is the authoritative reference.
+
+**Re-running:** Customer signups, subscriptions, and orders are NOT idempotent — they create new rows on each run. To reset: `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.
+
+### Demo UUID scheme
+
+All demo rows use UUIDs starting with `dddddddd-dec0-`. This prefix makes demo entities visually distinct and purgeable:
+
+```
+dddddddd-dec0-0001-XXXX-...   supplier institution / admin user / entity
+dddddddd-dec0-0010-XXXX-...   addresses (entity office + restaurant)
+```
+
+Transactional rows (subscriptions, orders, reviews) get system-generated UUIDs — they are linked to demo users via `username LIKE 'demo.cliente.pe.%@vianda.demo'`.
+
+### Credentials flow
+
+- The demo super-admin password is generated at load time with `openssl rand -base64 18`.
+- It is hashed (bcrypt, passlib) and stored in `core.user_info` before Newman runs.
+- The password is passed to Newman as `--env-var demoAdminPassword=...`.
+- It is printed at the end of `load_demo_data.sh` and saved to `.demo_credentials.local`.
+- `.demo_credentials.local` is gitignored — never commit it.
+
+### Env guards
+
+`load_demo_data.sh` exits non-zero when:
+- `ENV` is anything other than `dev`.
+- `DB_HOST` contains `prod` or `staging`.
+
+These are independent layers of defense: the SQL files also contain a `DO $$ ... RAISE EXCEPTION $$` guard that checks `current_database()` at psql execution time.
+
+### Purging demo data
+
+To remove all demo rows without rebuilding the DB:
+
+```bash
+bash scripts/purge_demo_data.sh
+```
+
+Deletes all rows matching UUID prefix `dddddddd-dec0-` (and canonical_key `DEMO_*` for entities keyed by canonical key) in child-first dependency order, wrapped in a single transaction. A partial failure rolls back completely.
+
+---
+
 ## **Things to Never Do**
 
 - **Never apply DDL directly** — changes will be lost on rebuild. Always use a migration file.
