@@ -4379,53 +4379,19 @@ BEGIN
             v_changed_by
         );
         RETURN NEW;
-    ELSIF (TG_OP = 'DELETE') THEN
-        v_operation := 'delete'::audit_operation_enum;
-        v_changed_by := OLD.modified_by;
-        INSERT INTO audit.discretionary_history (
-            discretionary_id,
-            user_id,
-            restaurant_id,
-            approval_id,
-            category,
-            reason,
-            amount,
-            comment,
-            is_archived,
-            status,
-            created_date,
-            created_by,
-            modified_date,
-            modified_by,
-            operation,
-            changed_by
-        ) VALUES (
-            OLD.discretionary_id,
-            OLD.user_id,
-            OLD.restaurant_id,
-            OLD.approval_id,
-            OLD.category,
-            OLD.reason,
-            OLD.amount,
-            OLD.comment,
-            OLD.is_archived,
-            OLD.status,
-            OLD.created_date,
-            OLD.created_by,
-            OLD.modified_date,
-            OLD.modified_by,
-            v_operation,
-            v_changed_by
-        );
-        RETURN OLD;
     END IF;
+    -- DELETE intentionally skipped: matches the codebase pattern (only the
+    -- two discretionary triggers ever fired on DELETE; both audit FKs are
+    -- ON DELETE RESTRICT, so re-inserting an audit row for a deleted main
+    -- row failed.  See migration 0016 + #247.  Soft delete via is_archived
+    -- captures lifecycle events through the UPDATE branch.
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS discretionary_info_history_trigger ON billing.discretionary_info;
 CREATE TRIGGER discretionary_info_history_trigger
-AFTER INSERT OR UPDATE OR DELETE ON billing.discretionary_info
+AFTER INSERT OR UPDATE ON billing.discretionary_info
 FOR EACH ROW EXECUTE FUNCTION discretionary_info_history_trigger();
 
 \echo 'Creating trigger function: discretionary_resolution_info_history_trigger'
@@ -4493,43 +4459,15 @@ BEGIN
             v_changed_by
         );
         RETURN NEW;
-    ELSIF (TG_OP = 'DELETE') THEN
-        v_operation := 'delete'::audit_operation_enum;
-        v_changed_by := OLD.resolved_by;
-        INSERT INTO audit.discretionary_resolution_history (
-            approval_id,
-            discretionary_id,
-            resolution,
-            is_archived,
-            status,
-            resolved_by,
-            resolved_date,
-            created_date,
-            resolution_comment,
-            operation,
-            changed_by
-        ) VALUES (
-            OLD.approval_id,
-            OLD.discretionary_id,
-            OLD.resolution,
-            OLD.is_archived,
-            OLD.status,
-            OLD.resolved_by,
-            OLD.resolved_date,
-            OLD.created_date,
-            OLD.resolution_comment,
-            v_operation,
-            v_changed_by
-        );
-        RETURN OLD;
     END IF;
+    -- DELETE intentionally skipped: see migration 0016 + #247.
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS discretionary_resolution_info_history_trigger ON billing.discretionary_resolution_info;
 CREATE TRIGGER discretionary_resolution_info_history_trigger
-AFTER INSERT OR UPDATE OR DELETE ON billing.discretionary_resolution_info
+AFTER INSERT OR UPDATE ON billing.discretionary_resolution_info
 FOR EACH ROW EXECUTE FUNCTION discretionary_resolution_info_history_trigger();
 
 \echo 'Creating table: billing.client_transaction'
