@@ -60,7 +60,13 @@ from app.utils.db import db_read
 from app.utils.locale import resolve_locale_from_header
 from app.utils.rate_limit import limiter
 
-router = APIRouter(prefix="/leads", tags=["Leads"], dependencies=[Depends(verify_recaptcha)])
+# Captcha protection is opt-in per route on this router. All GETs return
+# read-only public reference data — captcha is theatre on those, and the
+# B2C app's MarketProvider calls /markets on every screen including login
+# (where the app architecture isn't set up to attach a token proactively).
+# The two POST routes (/interest, /restaurant-interest) DO need captcha —
+# they create lead records — and have it attached explicitly below.
+router = APIRouter(prefix="/leads", tags=["Leads"])
 
 
 def _require_country_code(country_code: str | None) -> str:
@@ -512,7 +518,12 @@ async def list_employee_count_ranges(
     return [EmployeeCountRangeSchema(**r) for r in ranges]
 
 
-@router.post("/interest", response_model=LeadInterestResponseSchema, status_code=201)
+@router.post(
+    "/interest",
+    response_model=LeadInterestResponseSchema,
+    status_code=201,
+    dependencies=[Depends(verify_recaptcha)],
+)
 @limiter.limit("5/minute")
 async def submit_lead_interest(
     request: Request,
@@ -540,7 +551,12 @@ async def submit_lead_interest(
     return LeadInterestResponseSchema(**row)
 
 
-@router.post("/restaurant-interest", response_model=RestaurantLeadResponseSchema, status_code=201)
+@router.post(
+    "/restaurant-interest",
+    response_model=RestaurantLeadResponseSchema,
+    status_code=201,
+    dependencies=[Depends(verify_recaptcha)],
+)
 @limiter.limit("5/minute")
 async def submit_restaurant_interest(
     request: Request,
