@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "demo-day-seed-2026-v2",
     "name": "900_DEMO_DAY_SEED",
-    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.demo\n  10 Supplier menu  \u2014 PE restaurant, QR, 4 products, 4 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 5 PE customers via verified signup flow\n  30 Subscribe      \u2014 Subscribe each customer to PE plan (mock payment)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US in v1.",
+    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.market\n  10 Supplier menu  \u2014 PE restaurant, QR, 4 products, 4 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 5 PE customers via verified signup flow\n  30 Subscribe      \u2014 Subscribe each customer to PE plan (mock payment)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US in v1.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "auth": {
@@ -184,7 +184,7 @@
   "item": [
     {
       "name": "00 Setup",
-      "description": "Login as demo-admin@vianda.demo (seeded by demo_baseline.sql). No creates \u2014 all SQL-only entities already exist.",
+      "description": "Login as demo-admin@vianda.market (seeded by demo_baseline.sql). No creates \u2014 all SQL-only entities already exist.",
       "item": [
         {
           "name": "Login Demo Admin",
@@ -240,7 +240,7 @@
                 "token"
               ]
             },
-            "description": "Log in as demo-admin@vianda.demo. Password injected by load_demo_data.sh via --env-var demoAdminPassword."
+            "description": "Log in as demo-admin@vianda.market. Password injected by load_demo_data.sh via --env-var demoAdminPassword."
           }
         }
       ]
