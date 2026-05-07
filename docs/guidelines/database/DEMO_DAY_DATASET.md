@@ -128,14 +128,51 @@ Capture stakeholder feedback that needs more here:
 Two layers, run by `scripts/load_demo_data.sh`:
 
 1. **Layer A — `app/db/seed/demo_baseline.sql`** — direct SQL for the supplier institution, demo super-admin, and the two pre-existing addresses. These must exist before the API can authenticate the Postman collection.
-2. **Layer B — Newman + `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`** — drives the API as if a real supplier were onboarding: upserts the restaurant, products, plates, plate-kitchen-days, plan; activates the restaurant; signs up 5 customers via the verified-email flow; subscribes each via mock-Stripe; runs each through the order happy path.
+2. **Layer B — Newman + `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`** — drives the API as if a real supplier were onboarding: upserts the restaurant, products, plates, plate-kitchen-days, plan; activates the restaurant; signs up 5 customers via the verified-email flow; subscribes each; runs each through the order happy path.
+
+The loader has **two targets**:
+
+### Target: `local` (default) — laptop demo
+
+```bash
+# .env: PAYMENT_PROVIDER=mock
+bash scripts/run_dev_quiet.sh        # API on :8000 in mock mode
+bash scripts/load_demo_data.sh       # or --target=local explicitly
+```
+
+Subscriptions activate via the kitchen mock-confirm endpoint (no Stripe round-trip). Fast (~12s end to end), works offline.
+
+### Target: `gcp-dev` — deployed dev demo (stakeholder-facing)
+
+For demos against the actual cloud URL, where multiple stakeholders share state and Stripe webhooks land naturally because the dev API is publicly reachable.
 
 Prerequisites:
-- `PAYMENT_PROVIDER=mock` in `.env` (and the API restarted so it's loaded).
-- API up at `http://localhost:8000`.
-- `newman` installed globally.
+1. `cloud-sql-proxy` (or equivalent) forwarding the dev Cloud SQL instance to a local port — and `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `PGPASSWORD` set accordingly.
+2. `KITCHEN_API_BASE` pointing at the deployed dev API URL (must be HTTPS, publicly reachable, and the same host configured in the Stripe sandbox webhook endpoint).
+3. `STRIPE_SECRET_KEY` set to a Stripe sandbox **test** key (`sk_test_…`) from the same Stripe account whose webhook is wired to the dev API. Live keys are refused.
+4. `newman` installed.
 
-The demo data is **never** loaded automatically by `build_kitchen_db.sh`. It must be invoked explicitly. Demo files are not hashed into the `kitchen_template` fingerprint.
+```bash
+STRIPE_SECRET_KEY=sk_test_xxx \
+KITCHEN_API_BASE=https://kitchen-dev-xxx.run.app \
+DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen-dev DB_USER=kitchen-dev-app \
+PGPASSWORD=… \
+bash scripts/load_demo_data.sh --target=gcp-dev
+```
+
+Flow per customer:
+1. `POST /subscriptions/with-payment` on the dev API → Stripe sandbox creates a PaymentIntent; subscription row stored as `pending`.
+2. Loader confirms the PaymentIntent against `api.stripe.com` directly using `pm_card_visa` (Stripe's permanent test card that always succeeds).
+3. Stripe fires `payment_intent.succeeded` to the dev API's webhook (`/api/v1/webhooks/stripe`).
+4. Webhook handler activates the subscription.
+5. Loader polls `GET /subscriptions/{id}` for up to 30s until `subscription_status == 'active'`. Override with `subscriptionPollSeconds` collection variable if your dev environment has slow webhook delivery.
+
+Common failure modes for `gcp-dev`:
+- **Polling timeout.** Stripe webhook endpoint isn't configured for the dev URL, or is configured for a different account than the `STRIPE_SECRET_KEY` you're using. Check the Stripe dashboard's webhook log for that PaymentIntent.
+- **`STRIPE_WEBHOOK_SECRET` mismatch on dev API.** Webhook reaches the API but signature verification fails (400). Check Cloud Run logs for `Stripe webhook signature verification failed`.
+- **Cloud SQL proxy not running.** `psql` can't reach the DB → loader fails at Step 1.
+
+The demo data is **never** loaded automatically by `build_kitchen_db.sh` or any deploy. It must be invoked explicitly. Demo files are not hashed into the `kitchen_template` fingerprint.
 
 ## How the data is purged
 
@@ -144,7 +181,7 @@ The demo data is **never** loaded automatically by `build_kitchen_db.sh`. It mus
 - Canonical key `DEMO_*` for entities upserted via Newman.
 - Username pattern `demo.cliente.pe.%@vianda.demo` for transactional rows tied to demo customers (which get system-generated UUIDs).
 
-Re-running the loader on a previously-loaded DB will fail (duplicate username). The standard reset is `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.
+Re-running the loader on a previously-loaded DB will fail (duplicate username). The standard reset is `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh [--target=...]`. The purge script honors the same `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` env vars as the loader, so it can target either local or GCP dev (via Cloud SQL proxy).
 
 ---
 

@@ -1,37 +1,79 @@
 #!/usr/bin/env bash
 # =============================================================================
-# load_demo_data.sh — Demo-day data loader (Layer A + B)
+# load_demo_data.sh — Demo-day data loader
 #
-# Usage:
-#   bash scripts/load_demo_data.sh
+# Two targets:
+#   --target=local    (default) — laptop API, PAYMENT_PROVIDER=mock,
+#                                 confirms subscriptions via the kitchen
+#                                 mock-confirm endpoint. Fast, offline.
+#   --target=gcp-dev             — points at the deployed GCP dev API + DB,
+#                                 confirms PaymentIntents via Stripe sandbox
+#                                 (test card pm_card_visa), then waits for
+#                                 the Stripe webhook to activate each
+#                                 subscription.
 #
-# Prerequisites:
-#   1. kitchen dev DB is up (build_kitchen_db.sh ran successfully)
-#   2. Kitchen API is running with PAYMENT_PROVIDER=mock in .env — start it with:
-#      bash scripts/run_dev_quiet.sh
-#   3. newman is installed globally:  npm install -g newman
+# Prerequisites (target=local):
+#   1. kitchen dev DB rebuilt (build_kitchen_db.sh).
+#   2. API running locally with PAYMENT_PROVIDER=mock.
+#   3. newman installed:  npm install -g newman
 #
-# What this script does:
-#   1. Refuses to run on non-dev environments (ENV guard + DB_HOST guard)
-#   2. Requires PAYMENT_PROVIDER=mock (subscriptions go through the API, not SQL)
-#   3. Runs Layer A — app/db/seed/demo_baseline.sql (SQL fixtures)
-#   4. Generates a random password for the demo super-admin
-#   5. Hashes the password with bcrypt (Python passlib) and UPDATEs the DB row
-#   6. Probes the kitchen API health endpoint; exits with a clear message if down
-#   7. Runs Layer B — Newman (900_DEMO_DAY_SEED.postman_collection.json)
-#   8. Prints the demo credentials block
-#   9. Writes credentials to .demo_credentials.local (gitignored)
+# Prerequisites (target=gcp-dev):
+#   1. cloud-sql-proxy (or equivalent) forwarding the dev Cloud SQL instance,
+#      and DB_HOST/DB_PORT/DB_NAME/DB_USER/PGPASSWORD set accordingly.
+#   2. KITCHEN_API_BASE pointing at the deployed dev API URL (must be HTTPS
+#      and publicly reachable from Stripe so webhooks land).
+#   3. STRIPE_SECRET_KEY set to a Stripe sandbox test key (sk_test_…). The
+#      same Stripe account whose webhook is configured against the dev API.
+#   4. newman installed:  npm install -g newman
 #
-# Re-running on an already-seeded DB will create duplicate customers/subscriptions/orders.
+# Usage examples:
+#   bash scripts/load_demo_data.sh                      # local + mock
+#   bash scripts/load_demo_data.sh --target=local       # explicit
+#
+#   STRIPE_SECRET_KEY=sk_test_xxx \
+#   KITCHEN_API_BASE=https://kitchen-dev-xxx.run.app \
+#   DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen-dev DB_USER=kitchen-dev-app \
+#   PGPASSWORD=… \
+#   bash scripts/load_demo_data.sh --target=gcp-dev
+#
+# Re-running on a previously-loaded DB creates duplicate customers / orders.
 # To reset:  bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh
-#
-# To purge demo data:  bash scripts/purge_demo_data.sh
 # =============================================================================
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Environment guards
+# Parse --target flag
+# ---------------------------------------------------------------------------
+
+TARGET="local"
+for arg in "$@"; do
+  case "${arg}" in
+    --target=*)
+      TARGET="${arg#--target=}"
+      ;;
+    --help|-h)
+      sed -n '2,40p' "$0"
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: ${arg}"
+      echo "Usage: $0 [--target=local|gcp-dev]"
+      exit 1
+      ;;
+  esac
+done
+
+case "${TARGET}" in
+  local|gcp-dev) ;;
+  *)
+    echo "ERROR: --target must be 'local' or 'gcp-dev' (got: ${TARGET})"
+    exit 1
+    ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Environment guards (apply to both targets)
 # ---------------------------------------------------------------------------
 
 ENV="${ENV:-dev}"
@@ -51,20 +93,61 @@ case "${DB_HOST}" in
 esac
 
 # ---------------------------------------------------------------------------
-# PAYMENT_PROVIDER guard — subscriptions go through the API (not SQL bypass)
+# Per-target guards
 # ---------------------------------------------------------------------------
 
-if [ "${PAYMENT_PROVIDER:-}" != "mock" ]; then
-  echo ""
-  echo "ERROR: PAYMENT_PROVIDER=mock is required to load demo data."
-  echo ""
-  echo "  The demo creates subscriptions via the API (POST /subscriptions/with-payment"
-  echo "  + POST /subscriptions/{id}/confirm-payment). This requires mock mode."
-  echo ""
-  echo "  Add to your .env:  PAYMENT_PROVIDER=mock"
-  echo "  Then restart the API:  bash scripts/run_dev_quiet.sh"
-  echo ""
-  exit 1
+if [ "${TARGET}" = "local" ]; then
+  if [ "${PAYMENT_PROVIDER:-}" != "mock" ]; then
+    echo ""
+    echo "ERROR: --target=local requires PAYMENT_PROVIDER=mock."
+    echo ""
+    echo "  Add to your .env:  PAYMENT_PROVIDER=mock"
+    echo "  Then restart the API:  bash scripts/run_dev_quiet.sh"
+    echo ""
+    echo "  Alternative: target the deployed dev environment with"
+    echo "    bash scripts/load_demo_data.sh --target=gcp-dev"
+    exit 1
+  fi
+  PAYMENT_MODE="mock"
+  KITCHEN_API_BASE="${KITCHEN_API_BASE:-http://localhost:${KITCHEN_API_PORT:-8000}}"
+  STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"  # not used in mock mode
+fi
+
+if [ "${TARGET}" = "gcp-dev" ]; then
+  if [ -z "${KITCHEN_API_BASE:-}" ]; then
+    echo "ERROR: --target=gcp-dev requires KITCHEN_API_BASE (e.g. https://kitchen-dev-xxx.run.app)."
+    exit 1
+  fi
+  case "${KITCHEN_API_BASE}" in
+    https://*) ;;
+    *)
+      echo "ERROR: KITCHEN_API_BASE must start with https:// for gcp-dev (got: ${KITCHEN_API_BASE})."
+      echo "       Stripe webhooks won't reach an http:// endpoint."
+      exit 1
+      ;;
+  esac
+  case "${KITCHEN_API_BASE}" in
+    *prod*|*staging*)
+      echo "ERROR: KITCHEN_API_BASE=${KITCHEN_API_BASE} smells like prod or staging. Aborting."
+      exit 1
+      ;;
+  esac
+  if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
+    echo "ERROR: --target=gcp-dev requires STRIPE_SECRET_KEY (sk_test_…)."
+    echo "       Use the test key from the same Stripe account whose webhook is configured against ${KITCHEN_API_BASE}."
+    exit 1
+  fi
+  case "${STRIPE_SECRET_KEY}" in
+    sk_test_*) ;;
+    sk_live_*)
+      echo "ERROR: STRIPE_SECRET_KEY appears to be a LIVE key (sk_live_…). Refusing — demo seeding must use sandbox only."
+      exit 1
+      ;;
+    *)
+      echo "WARNING: STRIPE_SECRET_KEY does not look like a Stripe key (expected sk_test_…). Continuing anyway."
+      ;;
+  esac
+  PAYMENT_MODE="stripe"
 fi
 
 # ---------------------------------------------------------------------------
@@ -83,21 +166,24 @@ PSQL_ARGS=(
   -v ON_ERROR_STOP=1
 )
 
-KITCHEN_API_PORT="${KITCHEN_API_PORT:-8000}"
-HEALTH_URL="http://localhost:${KITCHEN_API_PORT}/health"
+HEALTH_URL="${KITCHEN_API_BASE}/health"
 
-# Collection and environment paths (relative to repo root)
 COLLECTION="docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json"
 ENVIRONMENT="docs/postman/environments/dev.postman_environment.json"
 CREDENTIALS_FILE=".demo_credentials.local"
+
+echo ""
+echo "=== DEMO DAY LOADER ==="
+echo "  target:           ${TARGET}"
+echo "  payment mode:     ${PAYMENT_MODE}"
+echo "  API base:         ${KITCHEN_API_BASE}"
+echo "  DB:               ${DB_HOST}:${DB_PORT}/${DB_NAME} (user=${DB_USER})"
+echo ""
 
 # ---------------------------------------------------------------------------
 # Step 1 — Layer A: SQL baseline
 # ---------------------------------------------------------------------------
 
-echo ""
-echo "=== DEMO DAY LOADER ==="
-echo ""
 echo "[1/4] Running Layer A: demo_baseline.sql..."
 psql "${PSQL_ARGS[@]}" -f app/db/seed/demo_baseline.sql
 echo "      Layer A complete."
@@ -111,10 +197,16 @@ echo "[2/4] Generating demo admin password and updating DB..."
 
 DEMO_PASSWORD="$(openssl rand -base64 18)"
 
-# Hash the password using kitchen's passlib bcrypt setup
+# Hash the password. Prefer kitchen's passlib helper when this script runs
+# from a checkout that has it on PYTHONPATH; otherwise fall back to passlib
+# directly so gcp-dev runs from any workstation.
 DEMO_HASH=$(PYTHONPATH=. python3 -c "
-from app.auth.security import hash_password
-print(hash_password('${DEMO_PASSWORD}'))
+try:
+    from app.auth.security import hash_password
+    print(hash_password('''${DEMO_PASSWORD}'''))
+except ImportError:
+    from passlib.context import CryptContext
+    print(CryptContext(schemes=['bcrypt'], deprecated='auto').hash('''${DEMO_PASSWORD}'''))
 ")
 
 psql "${PSQL_ARGS[@]}" -c \
@@ -135,10 +227,12 @@ if [ "${API_STATUS}" != "200" ]; then
   echo ""
   echo "ERROR: Kitchen API is not reachable (HTTP ${API_STATUS:-no response})."
   echo ""
-  echo "  Start the API first:"
-  echo "    bash scripts/run_dev_quiet.sh"
-  echo ""
-  echo "  Then re-run this script."
+  if [ "${TARGET}" = "local" ]; then
+    echo "  Start the API first:"
+    echo "    bash scripts/run_dev_quiet.sh"
+  else
+    echo "  Verify KITCHEN_API_BASE=${KITCHEN_API_BASE} is correct and the dev API is up."
+  fi
   exit 1
 fi
 
@@ -158,11 +252,21 @@ if ! command -v newman >/dev/null 2>&1; then
   exit 1
 fi
 
-newman run "${COLLECTION}" \
-  -e "${ENVIRONMENT}" \
-  --env-var "demoAdminUsername=demo-admin@vianda.demo" \
-  --env-var "demoAdminPassword=${DEMO_PASSWORD}" \
+NEWMAN_ARGS=(
+  run "${COLLECTION}"
+  -e "${ENVIRONMENT}"
+  --env-var "demoAdminUsername=demo-admin@vianda.demo"
+  --env-var "demoAdminPassword=${DEMO_PASSWORD}"
+  --env-var "baseUrl=${KITCHEN_API_BASE}"
+  --env-var "paymentMode=${PAYMENT_MODE}"
   --bail
+)
+
+if [ "${TARGET}" = "gcp-dev" ]; then
+  NEWMAN_ARGS+=(--env-var "stripeSecretKey=${STRIPE_SECRET_KEY}")
+fi
+
+newman "${NEWMAN_ARGS[@]}"
 
 echo "      Layer B complete."
 
@@ -173,6 +277,9 @@ echo "      Layer B complete."
 CREDS_BLOCK="$(cat <<CREDS
 
 === DEMO CREDENTIALS ===
+Target:           ${TARGET}
+API base:         ${KITCHEN_API_BASE}
+
 Super Admin:
   username: demo-admin@vianda.demo
   password: ${DEMO_PASSWORD}
@@ -187,7 +294,7 @@ Demo Customers (shared password: DemoPass1!):
 
 NOTE: Re-running this loader on a previously-seeded DB will create duplicate
 customers/subscriptions/orders. To reset:
-  bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh
+  bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh --target=${TARGET}
 CREDS
 )"
 
