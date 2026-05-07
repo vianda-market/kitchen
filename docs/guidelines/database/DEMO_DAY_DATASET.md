@@ -150,16 +150,28 @@ Subscriptions activate via the kitchen mock-confirm endpoint (no Stripe round-tr
 
 For demos against the actual cloud URL, where multiple stakeholders share state and Stripe webhooks land naturally because the dev API is publicly reachable.
 
-Prerequisites:
-1. `cloud-sql-proxy` (or equivalent) forwarding the dev Cloud SQL instance to a local port — and `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `PGPASSWORD` set accordingly.
-2. `KITCHEN_API_BASE` pointing at the deployed dev API URL (must be HTTPS, publicly reachable, and the same host configured in the Stripe sandbox webhook endpoint).
-3. `STRIPE_SECRET_KEY` set to a Stripe sandbox **test** key (`sk_test_…`) from the same Stripe account whose webhook is wired to the dev API. Live keys are refused.
-4. `newman` installed.
+**Recommended path: use the wrapper.** `scripts/load_demo_data_gcp.sh` discovers project/region/URL from gcloud, starts cloud-sql-proxy in the background (cleaned up on exit), pulls `STRIPE_SECRET_KEY` and the dev DB password from Secret Manager, and execs the underlying loader with everything pre-set:
+
+```bash
+bash scripts/load_demo_data_gcp.sh             # load
+bash scripts/load_demo_data_gcp.sh --purge     # wipe demo entities, then load
+bash scripts/load_demo_data_gcp.sh --purge-only
+```
+
+One-time prerequisites:
+1. `gcloud auth login` and `gcloud config set project <kitchen-dev-project>`.
+2. `cloud-sql-proxy` installed (`brew install cloud-sql-proxy`).
+3. `newman` installed (`npm install -g newman`).
+4. Your gcloud account needs IAM to read the secrets `vianda-dev-stripe-secret-key` and `vianda-dev-database-url`, and Cloud SQL Client to use the proxy.
+
+**Stripe sandbox webhook must be configured against the dev API URL.** If a load gets to step 4 (Newman) and the polling step times out, that's the most likely cause — Stripe's confirmation succeeded but the webhook never reached the dev API to flip the subscription to active.
+
+**Manual fallback** — if the wrapper doesn't fit your environment (different naming convention, custom proxy setup, etc.), invoke the underlying loader directly:
 
 ```bash
 STRIPE_SECRET_KEY=sk_test_xxx \
 KITCHEN_API_BASE=https://kitchen-dev-xxx.run.app \
-DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen-dev DB_USER=kitchen-dev-app \
+DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen DB_USER=kitchen_app \
 PGPASSWORD=… \
 bash scripts/load_demo_data.sh --target=gcp-dev
 ```
