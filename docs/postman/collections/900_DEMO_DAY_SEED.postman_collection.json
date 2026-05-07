@@ -155,6 +155,30 @@
       "key": "customerPe05Id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "paymentMode",
+      "value": "mock",
+      "type": "default",
+      "description": "Either \"mock\" (local with PAYMENT_PROVIDER=mock) or \"stripe\" (sandbox PaymentIntent confirmation + webhook polling)."
+    },
+    {
+      "key": "stripeApiBase",
+      "value": "https://api.stripe.com",
+      "type": "default",
+      "description": "Stripe API root (sandbox uses the same root; sandbox key selects test mode)."
+    },
+    {
+      "key": "stripeSecretKey",
+      "value": "",
+      "type": "default",
+      "description": "Stripe sandbox secret key (sk_test_...). Populated at load time by load_demo_data.sh; NEVER commit a value."
+    },
+    {
+      "key": "subscriptionPollSeconds",
+      "value": "30",
+      "type": "default",
+      "description": "Max seconds to wait for Stripe webhook to activate a subscription before failing."
     }
   ],
   "item": [
@@ -3445,6 +3469,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe01');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -3503,6 +3528,153 @@
               ]
             }
           }
+        },
+        {
+          "name": "C01 Confirm Payment (Stripe)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const piId = pm.collectionVariables.get('paymentIdPe01');",
+                  "if (!piId) { throw new Error('paymentIdPe01 not set. Confirm Create Subscription stored it.'); }",
+                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stripe confirm 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PaymentIntent succeeded', () => pm.expect(body.status).to.eql('succeeded'));",
+                  "console.log('Customer 1 PaymentIntent succeeded:', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{stripeSecretKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "payment_method",
+                  "value": "pm_card_visa",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{stripeApiBase}}/v1/payment_intents/{{paymentIdPe01}}/confirm",
+              "host": [
+                "{{stripeApiBase}}"
+              ],
+              "path": [
+                "v1",
+                "payment_intents",
+                "{{paymentIdPe01}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C01 Wait For Subscription Active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const subId = pm.collectionVariables.get('subIdPe01');",
+                  "if (!subId) { throw new Error('subIdPe01 not set.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const subId = pm.collectionVariables.get('subIdPe01');",
+                  "const token = pm.collectionVariables.get('customerPe01Token');",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
+                  "let attempt = 0;",
+                  "function check() {",
+                  "  attempt += 1;",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/subscriptions/' + subId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) {",
+                  "      pm.test('Webhook activation', () => { throw new Error('sendRequest err: ' + err); });",
+                  "      return;",
+                  "    }",
+                  "    if (res.code !== 200) {",
+                  "      console.warn('Customer 1 poll attempt', attempt, 'got', res.code);",
+                  "    } else {",
+                  "      const body = res.json();",
+                  "      if (body.subscription_status === 'active') {",
+                  "        pm.test('Customer 1 subscription activated via webhook', () => true);",
+                  "        console.log('Customer 1 active after', attempt, 'attempt(s)');",
+                  "        return;",
+                  "      }",
+                  "    }",
+                  "    if (attempt >= maxAttempts) {",
+                  "      pm.test('Customer 1 subscription activated via webhook', () => { throw new Error('Timeout after ' + maxAttempts + 's; webhook may not have fired. Check Stripe dashboard + dev API logs.'); });",
+                  "      return;",
+                  "    }",
+                  "    setTimeout(check, 1000);",
+                  "  });",
+                  "}",
+                  "check();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            },
+            "description": "Polling logic lives in the test script via pm.sendRequest. The actual top-level URL is a no-op probe."
+          },
+          "response": []
         },
         {
           "name": "C02 Create Subscription",
@@ -3582,6 +3754,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe02');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -3640,6 +3813,153 @@
               ]
             }
           }
+        },
+        {
+          "name": "C02 Confirm Payment (Stripe)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const piId = pm.collectionVariables.get('paymentIdPe02');",
+                  "if (!piId) { throw new Error('paymentIdPe02 not set. Confirm Create Subscription stored it.'); }",
+                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stripe confirm 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PaymentIntent succeeded', () => pm.expect(body.status).to.eql('succeeded'));",
+                  "console.log('Customer 2 PaymentIntent succeeded:', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{stripeSecretKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "payment_method",
+                  "value": "pm_card_visa",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{stripeApiBase}}/v1/payment_intents/{{paymentIdPe02}}/confirm",
+              "host": [
+                "{{stripeApiBase}}"
+              ],
+              "path": [
+                "v1",
+                "payment_intents",
+                "{{paymentIdPe02}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C02 Wait For Subscription Active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const subId = pm.collectionVariables.get('subIdPe02');",
+                  "if (!subId) { throw new Error('subIdPe02 not set.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const subId = pm.collectionVariables.get('subIdPe02');",
+                  "const token = pm.collectionVariables.get('customerPe02Token');",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
+                  "let attempt = 0;",
+                  "function check() {",
+                  "  attempt += 1;",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/subscriptions/' + subId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) {",
+                  "      pm.test('Webhook activation', () => { throw new Error('sendRequest err: ' + err); });",
+                  "      return;",
+                  "    }",
+                  "    if (res.code !== 200) {",
+                  "      console.warn('Customer 2 poll attempt', attempt, 'got', res.code);",
+                  "    } else {",
+                  "      const body = res.json();",
+                  "      if (body.subscription_status === 'active') {",
+                  "        pm.test('Customer 2 subscription activated via webhook', () => true);",
+                  "        console.log('Customer 2 active after', attempt, 'attempt(s)');",
+                  "        return;",
+                  "      }",
+                  "    }",
+                  "    if (attempt >= maxAttempts) {",
+                  "      pm.test('Customer 2 subscription activated via webhook', () => { throw new Error('Timeout after ' + maxAttempts + 's; webhook may not have fired. Check Stripe dashboard + dev API logs.'); });",
+                  "      return;",
+                  "    }",
+                  "    setTimeout(check, 1000);",
+                  "  });",
+                  "}",
+                  "check();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            },
+            "description": "Polling logic lives in the test script via pm.sendRequest. The actual top-level URL is a no-op probe."
+          },
+          "response": []
         },
         {
           "name": "C03 Create Subscription",
@@ -3719,6 +4039,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe03');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -3777,6 +4098,153 @@
               ]
             }
           }
+        },
+        {
+          "name": "C03 Confirm Payment (Stripe)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const piId = pm.collectionVariables.get('paymentIdPe03');",
+                  "if (!piId) { throw new Error('paymentIdPe03 not set. Confirm Create Subscription stored it.'); }",
+                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stripe confirm 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PaymentIntent succeeded', () => pm.expect(body.status).to.eql('succeeded'));",
+                  "console.log('Customer 3 PaymentIntent succeeded:', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{stripeSecretKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "payment_method",
+                  "value": "pm_card_visa",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{stripeApiBase}}/v1/payment_intents/{{paymentIdPe03}}/confirm",
+              "host": [
+                "{{stripeApiBase}}"
+              ],
+              "path": [
+                "v1",
+                "payment_intents",
+                "{{paymentIdPe03}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C03 Wait For Subscription Active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const subId = pm.collectionVariables.get('subIdPe03');",
+                  "if (!subId) { throw new Error('subIdPe03 not set.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const subId = pm.collectionVariables.get('subIdPe03');",
+                  "const token = pm.collectionVariables.get('customerPe03Token');",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
+                  "let attempt = 0;",
+                  "function check() {",
+                  "  attempt += 1;",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/subscriptions/' + subId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) {",
+                  "      pm.test('Webhook activation', () => { throw new Error('sendRequest err: ' + err); });",
+                  "      return;",
+                  "    }",
+                  "    if (res.code !== 200) {",
+                  "      console.warn('Customer 3 poll attempt', attempt, 'got', res.code);",
+                  "    } else {",
+                  "      const body = res.json();",
+                  "      if (body.subscription_status === 'active') {",
+                  "        pm.test('Customer 3 subscription activated via webhook', () => true);",
+                  "        console.log('Customer 3 active after', attempt, 'attempt(s)');",
+                  "        return;",
+                  "      }",
+                  "    }",
+                  "    if (attempt >= maxAttempts) {",
+                  "      pm.test('Customer 3 subscription activated via webhook', () => { throw new Error('Timeout after ' + maxAttempts + 's; webhook may not have fired. Check Stripe dashboard + dev API logs.'); });",
+                  "      return;",
+                  "    }",
+                  "    setTimeout(check, 1000);",
+                  "  });",
+                  "}",
+                  "check();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            },
+            "description": "Polling logic lives in the test script via pm.sendRequest. The actual top-level URL is a no-op probe."
+          },
+          "response": []
         },
         {
           "name": "C04 Create Subscription",
@@ -3856,6 +4324,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe04');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -3914,6 +4383,153 @@
               ]
             }
           }
+        },
+        {
+          "name": "C04 Confirm Payment (Stripe)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const piId = pm.collectionVariables.get('paymentIdPe04');",
+                  "if (!piId) { throw new Error('paymentIdPe04 not set. Confirm Create Subscription stored it.'); }",
+                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stripe confirm 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PaymentIntent succeeded', () => pm.expect(body.status).to.eql('succeeded'));",
+                  "console.log('Customer 4 PaymentIntent succeeded:', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{stripeSecretKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "payment_method",
+                  "value": "pm_card_visa",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{stripeApiBase}}/v1/payment_intents/{{paymentIdPe04}}/confirm",
+              "host": [
+                "{{stripeApiBase}}"
+              ],
+              "path": [
+                "v1",
+                "payment_intents",
+                "{{paymentIdPe04}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C04 Wait For Subscription Active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const subId = pm.collectionVariables.get('subIdPe04');",
+                  "if (!subId) { throw new Error('subIdPe04 not set.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const subId = pm.collectionVariables.get('subIdPe04');",
+                  "const token = pm.collectionVariables.get('customerPe04Token');",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
+                  "let attempt = 0;",
+                  "function check() {",
+                  "  attempt += 1;",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/subscriptions/' + subId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) {",
+                  "      pm.test('Webhook activation', () => { throw new Error('sendRequest err: ' + err); });",
+                  "      return;",
+                  "    }",
+                  "    if (res.code !== 200) {",
+                  "      console.warn('Customer 4 poll attempt', attempt, 'got', res.code);",
+                  "    } else {",
+                  "      const body = res.json();",
+                  "      if (body.subscription_status === 'active') {",
+                  "        pm.test('Customer 4 subscription activated via webhook', () => true);",
+                  "        console.log('Customer 4 active after', attempt, 'attempt(s)');",
+                  "        return;",
+                  "      }",
+                  "    }",
+                  "    if (attempt >= maxAttempts) {",
+                  "      pm.test('Customer 4 subscription activated via webhook', () => { throw new Error('Timeout after ' + maxAttempts + 's; webhook may not have fired. Check Stripe dashboard + dev API logs.'); });",
+                  "      return;",
+                  "    }",
+                  "    setTimeout(check, 1000);",
+                  "  });",
+                  "}",
+                  "check();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            },
+            "description": "Polling logic lives in the test script via pm.sendRequest. The actual top-level URL is a no-op probe."
+          },
+          "response": []
         },
         {
           "name": "C05 Create Subscription",
@@ -3993,6 +4609,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe05');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -4051,6 +4668,153 @@
               ]
             }
           }
+        },
+        {
+          "name": "C05 Confirm Payment (Stripe)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const piId = pm.collectionVariables.get('paymentIdPe05');",
+                  "if (!piId) { throw new Error('paymentIdPe05 not set. Confirm Create Subscription stored it.'); }",
+                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stripe confirm 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PaymentIntent succeeded', () => pm.expect(body.status).to.eql('succeeded'));",
+                  "console.log('Customer 5 PaymentIntent succeeded:', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{stripeSecretKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "payment_method",
+                  "value": "pm_card_visa",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{stripeApiBase}}/v1/payment_intents/{{paymentIdPe05}}/confirm",
+              "host": [
+                "{{stripeApiBase}}"
+              ],
+              "path": [
+                "v1",
+                "payment_intents",
+                "{{paymentIdPe05}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C05 Wait For Subscription Active",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "const subId = pm.collectionVariables.get('subIdPe05');",
+                  "if (!subId) { throw new Error('subIdPe05 not set.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const subId = pm.collectionVariables.get('subIdPe05');",
+                  "const token = pm.collectionVariables.get('customerPe05Token');",
+                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
+                  "let attempt = 0;",
+                  "function check() {",
+                  "  attempt += 1;",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/subscriptions/' + subId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) {",
+                  "      pm.test('Webhook activation', () => { throw new Error('sendRequest err: ' + err); });",
+                  "      return;",
+                  "    }",
+                  "    if (res.code !== 200) {",
+                  "      console.warn('Customer 5 poll attempt', attempt, 'got', res.code);",
+                  "    } else {",
+                  "      const body = res.json();",
+                  "      if (body.subscription_status === 'active') {",
+                  "        pm.test('Customer 5 subscription activated via webhook', () => true);",
+                  "        console.log('Customer 5 active after', attempt, 'attempt(s)');",
+                  "        return;",
+                  "      }",
+                  "    }",
+                  "    if (attempt >= maxAttempts) {",
+                  "      pm.test('Customer 5 subscription activated via webhook', () => { throw new Error('Timeout after ' + maxAttempts + 's; webhook may not have fired. Check Stripe dashboard + dev API logs.'); });",
+                  "      return;",
+                  "    }",
+                  "    setTimeout(check, 1000);",
+                  "  });",
+                  "}",
+                  "check();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            },
+            "description": "Polling logic lives in the test script via pm.sendRequest. The actual top-level URL is a no-op probe."
+          },
+          "response": []
         }
       ]
     },

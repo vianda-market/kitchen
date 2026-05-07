@@ -201,21 +201,16 @@ Demo data is **never** loaded by the default rebuild path. Neither `build_kitche
 
 ### Loading demo data
 
-Prerequisites:
-1. Dev DB is up (rebuilt with `build_kitchen_db.sh`).
-2. `PAYMENT_PROVIDER=mock` is set in `.env` (required — subscriptions go through the API, not SQL).
-3. Kitchen API is running: `bash scripts/run_dev_quiet.sh`.
-4. `newman` is installed: `npm install -g newman`.
-
-Then:
+The loader has two targets — `local` (default, mock payments) and `gcp-dev` (deployed dev API + Stripe sandbox). Operational details, prerequisites, and failure modes for each live in **`DEMO_DAY_DATASET.md`** in this same folder. Quick local-mode recipe:
 
 ```bash
+# .env: PAYMENT_PROVIDER=mock + API running on :8000
 bash scripts/load_demo_data.sh
 ```
 
 The loader runs two layers in order:
 1. **Layer A** — `demo_baseline.sql`: inserts the supplier institution, demo admin user, addresses, and institution entity directly via SQL (no API endpoint for these entities).
-2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon–Fri, 1 PE plan; signs up 5 PE customers via the verified email flow; subscribes each customer (mock payment); and runs 5 orders per customer (plate-selection → QR-scan → complete → review).
+2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon–Fri, 1 PE plan; signs up 5 PE customers via the verified email flow; subscribes each customer (mock payment for `local`, sandbox-confirmed PaymentIntent + webhook polling for `gcp-dev`); and runs 5 orders per customer (plate-selection → QR-scan → complete → review).
 
 At the end, credentials are printed to stdout and written to `.demo_credentials.local` (gitignored).
 
