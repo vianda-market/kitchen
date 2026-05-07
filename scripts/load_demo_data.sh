@@ -210,9 +210,9 @@ except ImportError:
 ")
 
 psql "${PSQL_ARGS[@]}" -c \
-  "UPDATE core.user_info SET hashed_password = '${DEMO_HASH}', modified_date = CURRENT_TIMESTAMP WHERE username = 'demo-admin@vianda.demo';"
+  "UPDATE core.user_info SET hashed_password = '${DEMO_HASH}', modified_date = CURRENT_TIMESTAMP WHERE username = 'demo-admin@vianda.market';"
 
-echo "      Password hash updated for demo-admin@vianda.demo."
+echo "      Password hash updated for demo-admin@vianda.market."
 
 # ---------------------------------------------------------------------------
 # Step 3 — Probe API health
@@ -255,7 +255,7 @@ fi
 NEWMAN_ARGS=(
   run "${COLLECTION}"
   -e "${ENVIRONMENT}"
-  --env-var "demoAdminUsername=demo-admin@vianda.demo"
+  --env-var "demoAdminUsername=demo-admin@vianda.market"
   --env-var "demoAdminPassword=${DEMO_PASSWORD}"
   --env-var "baseUrl=${KITCHEN_API_BASE}"
   --env-var "paymentMode=${PAYMENT_MODE}"
@@ -281,7 +281,7 @@ Target:           ${TARGET}
 API base:         ${KITCHEN_API_BASE}
 
 Super Admin:
-  username: demo-admin@vianda.demo
+  username: demo-admin@vianda.market
   password: ${DEMO_PASSWORD}
 
 Demo Customers (shared password: DemoPass1!):

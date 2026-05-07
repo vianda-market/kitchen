@@ -44,10 +44,14 @@ The Postman collection authenticates as this user to upsert the menu, activate t
 
 | Field | Value |
 |---|---|
-| Username / email | `demo-admin@vianda.demo` |
+| Username / email | `demo-admin@vianda.market` |
 | Role type | Internal |
 | Role name | Super Admin |
 | Password | **Generated per load.** Printed at the end of `scripts/load_demo_data.sh` and written to gitignored `.demo_credentials.local`. |
+
+**About the email address:** `demo-admin@vianda.market` is a real Gmail alias that forwards to the orchestrator's admin inbox. This is intentional — it makes the password-recovery flow demoable end-to-end during stakeholder presentations: trigger "Forgot password?" on the demo super-admin → the recovery email actually lands → reset the password live. Treat the alias the same as any other admin-controlled mailbox.
+
+**Important — separate from the canonical superadmin:** every environment also has a built-in `superadmin` user (seeded by `reference_data.sql`, password `SuperAdmin1`) that is the internal super-admin. The `demo-admin@vianda.market` user only exists when demo data is loaded and is intended for stakeholder-facing demos. Don't confuse the two — the canonical `superadmin` should not be shared during demos.
 
 ## The restaurant
 

@@ -89,7 +89,7 @@ ON CONFLICT (institution_id, market_id) DO NOTHING;
 -- =============================================================================
 -- SECTION 2 — Demo super-admin user
 --
--- Username: demo-admin@vianda.demo
+-- Username: demo-admin@vianda.market
 -- user_id:  dddddddd-dec0-0001-0000-000000000002
 --
 -- The hashed_password is set to a bcrypt hash of 'PLACEHOLDER' here.
@@ -109,7 +109,7 @@ INSERT INTO core.user_info (
 )
 VALUES (
     'dddddddd-dec0-0001-0000-000000000002',
-    'demo-admin@vianda.demo',
+    'demo-admin@vianda.market',
     -- Bcrypt hash of 'PLACEHOLDER' — overwritten by load_demo_data.sh before Newman runs
     '$2b$12$PJzLzFtIz3PnhOL5p8M9c.oLPbLdYyYP5FMNI7lH7K9MXnbQKA.Su',
     'Demo',
@@ -117,7 +117,7 @@ VALUES (
     '11111111-1111-1111-1111-111111111111',  -- Vianda Enterprises (internal institution)
     'internal'::role_type_enum,
     'super_admin'::role_name_enum,
-    'demo-admin@vianda.demo',
+    'demo-admin@vianda.market',
     NULL,
     TRUE,
     CURRENT_TIMESTAMP,
