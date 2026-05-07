@@ -214,6 +214,28 @@ psql "${PSQL_ARGS[@]}" -c \
 
 echo "      Password hash updated for demo-admin@vianda.market."
 
+# Write credentials to file IMMEDIATELY so a failed Newman run still leaves
+# debug-able state. Re-written at the end with the same content (defense in
+# depth — if writes are flaky, the later one rescues the earlier one).
+cat > "${CREDENTIALS_FILE}" <<EARLYCREDS
+
+=== DEMO CREDENTIALS ===
+Target:           ${TARGET}
+API base:         ${KITCHEN_API_BASE}
+
+Super Admin:
+  username: demo-admin@vianda.market
+  password: ${DEMO_PASSWORD}
+
+Demo Customers (shared password: DemoPass1!):
+  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
+  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
+  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
+  demo.cliente.pe.04@vianda.demo  (PE — Surco)
+  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
+========================
+EARLYCREDS
+
 # ---------------------------------------------------------------------------
 # Step 3 — Probe API health
 # ---------------------------------------------------------------------------
