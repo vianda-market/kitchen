@@ -147,14 +147,20 @@ VALUES ('dddddddd-dec0-0001-0000-000000000002', '00000000-0000-0000-0000-0000000
 ON CONFLICT (user_id, market_id) DO NOTHING;
 
 -- =============================================================================
--- SECTION 3 — Addresses for supplier entity office + demo restaurant
+-- SECTION 3 — Addresses for supplier entity office + demo restaurants
 --
 -- address_id sub-range: dddddddd-dec0-0010-XXXX-...
 --
 --   dddddddd-dec0-0010-0000-000000000001  Supplier entity office — San Isidro, Lima, PE
---   dddddddd-dec0-0010-0000-000000000002  Restaurant PE          — Miraflores, Lima, PE
+--   dddddddd-dec0-0010-0000-000000000002  Restaurant PE R1       — Miraflores, Lima, PE (Av. Larco)
+--   dddddddd-dec0-0010-0000-000000000003  Restaurant PE R2       — San Isidro, Lima, PE (Miguel Dasso 137)
+--   dddddddd-dec0-0010-0000-000000000004  Restaurant PE R3       — San Isidro, Lima, PE (Coronel Andrés Reyes 218)
+--   dddddddd-dec0-0010-0000-000000000005  Restaurant PE R4       — San Isidro, Lima, PE (Manuel Bañón 295)
+--   dddddddd-dec0-0010-0000-000000000006  Restaurant PE R5       — San Isidro, Lima, PE (Conquistadores 510)
 --
 -- city_metadata_id resolved at runtime via GeoNames join.
+-- Cluster centroid: lat -12.0978, lon -77.0383 (Calle Miguel Dasso, San Isidro)
+-- All 4 cluster addresses are within ~300 m of each other.
 -- =============================================================================
 
 DO $$
@@ -200,7 +206,7 @@ BEGIN
         modified_date = CURRENT_TIMESTAMP;
 
     -- -------------------------------------------------------------------------
-    -- Address: Restaurant PE — Miraflores, Lima
+    -- Address: Restaurant PE R1 — Miraflores, Lima
     -- (lat -12.1191, lon -77.0290 — Miraflores, Av. Larco)
     -- -------------------------------------------------------------------------
     INSERT INTO core.address_info (
@@ -216,6 +222,106 @@ BEGIN
         ARRAY['restaurant'::address_type_enum],
         'PE', 'Lima', 'Lima', 'Lima 18',
         'ave'::street_type_enum, 'Larco', '345',
+        'America/Lima',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- Address: Restaurant PE R2 — San Isidro, Miguel Dasso 137
+    -- (lat -12.0975, lon -77.0381 — Calle Miguel Dasso, San Isidro)
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0010-0000-000000000003',
+        v_demo_inst,
+        v_lima_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'PE', 'Lima', 'Lima', 'Lima 27',
+        'str'::street_type_enum, 'Miguel Dasso', '137',
+        'America/Lima',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- Address: Restaurant PE R3 — San Isidro, Coronel Andrés Reyes 218
+    -- (lat -12.0972, lon -77.0389 — ~150 m from Miguel Dasso)
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0010-0000-000000000004',
+        v_demo_inst,
+        v_lima_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'PE', 'Lima', 'Lima', 'Lima 27',
+        'str'::street_type_enum, 'Coronel Andres Reyes', '218',
+        'America/Lima',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- Address: Restaurant PE R4 — San Isidro, Manuel Bañón 295
+    -- (lat -12.0980, lon -77.0375 — ~100 m from Miguel Dasso)
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0010-0000-000000000005',
+        v_demo_inst,
+        v_lima_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'PE', 'Lima', 'Lima', 'Lima 27',
+        'str'::street_type_enum, 'Manuel Banon', '295',
+        'America/Lima',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- Address: Restaurant PE R5 — San Isidro, Conquistadores 510
+    -- (lat -12.0968, lon -77.0395 — ~200 m from Miguel Dasso)
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0010-0000-000000000006',
+        v_demo_inst,
+        v_lima_city_id,
+        ARRAY['restaurant'::address_type_enum],
+        'PE', 'Lima', 'Lima', 'Lima 27',
+        'str'::street_type_enum, 'Conquistadores', '510',
         'America/Lima',
         FALSE, 'active'::status_enum,
         v_system, v_system
@@ -287,6 +393,6 @@ BEGIN
     WHERE institution_entity_id::text LIKE 'dddddddd-dec0%';
 
     RAISE NOTICE
-        'demo_baseline.sql complete: % institution(s), % user(s), % address(es), % entity(ies) with dec0 prefix.',
+        'demo_baseline.sql complete: % institution(s), % user(s), % address(es) [1 office + 5 restaurants], % entity(ies) with dec0 prefix.',
         v_inst_count, v_user_count, v_addr_count, v_entity_count;
 END $$;

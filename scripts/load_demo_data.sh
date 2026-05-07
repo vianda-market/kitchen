@@ -228,11 +228,13 @@ Super Admin:
   password: ${DEMO_PASSWORD}
 
 Demo Customers (shared password: DemoPass1!):
-  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
-  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
-  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
-  demo.cliente.pe.04@vianda.demo  (PE — Surco)
-  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
+  C01  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
+  C02  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
+  C03  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
+  C04  demo.cliente.pe.04@vianda.demo  (PE — Surco)
+  C05  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
+  C06  demo.cliente.pe.06@vianda.demo  (NO PLAN — show purchase flow)
+  C07  demo.cliente.pe.07@vianda.demo  (NO ORDERS — show ordering flow)
 ========================
 EARLYCREDS
 
@@ -307,11 +309,13 @@ Super Admin:
   password: ${DEMO_PASSWORD}
 
 Demo Customers (shared password: DemoPass1!):
-  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
-  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
-  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
-  demo.cliente.pe.04@vianda.demo  (PE — Surco)
-  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
+  C01  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
+  C02  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
+  C03  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
+  C04  demo.cliente.pe.04@vianda.demo  (PE — Surco)
+  C05  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
+  C06  demo.cliente.pe.06@vianda.demo  (NO PLAN — show purchase flow)
+  C07  demo.cliente.pe.07@vianda.demo  (NO ORDERS — show ordering flow)
 ========================
 
 NOTE: Re-running this loader on a previously-seeded DB will create duplicate
