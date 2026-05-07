@@ -12,14 +12,15 @@
 #
 # Prerequisites (one-time):
 #   1. gcloud SDK installed and authenticated:  gcloud auth login
-#   2. cloud-sql-proxy installed:
-#        brew install cloud-sql-proxy
-#      (or download from https://cloud.google.com/sql/docs/postgres/sql-proxy)
-#   3. newman installed:                         npm install -g newman
+#   2. newman installed:                         npm install -g newman
+#   3. The dev Cloud SQL instance is private-IP only (ipv4_enabled=False).
+#      This wrapper opens an IAP SSH tunnel through the dev bastion VM
+#      (vianda-${STACK}-bastion) — no separate cloud-sql-proxy install needed.
 #
 # What this script does:
-#   1. Discovers project / region / Cloud Run URL / Cloud SQL instance from gcloud.
-#   2. Starts cloud-sql-proxy in the background on 127.0.0.1:5433 (cleaned up on exit).
+#   1. Discovers project / region / Cloud Run URL / Cloud SQL private IP from gcloud.
+#   2. Opens an IAP SSH tunnel through the bastion VM, forwarding 127.0.0.1:5433
+#      to the Cloud SQL private IP (cleaned up on exit).
 #   3. Pulls STRIPE_SECRET_KEY (sk_test_…) from Secret Manager.
 #   4. Pulls dev DB password by reading the database URL secret and parsing it.
 #   5. Execs scripts/load_demo_data.sh --target=gcp-dev with everything pre-set.
@@ -68,7 +69,7 @@ esac
 # Tool checks
 # -----------------------------------------------------------------------------
 
-for tool in gcloud cloud-sql-proxy newman psql; do
+for tool in gcloud newman psql ssh; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "ERROR: ${tool} not found in PATH. See header for install commands."
     exit 1
@@ -131,20 +132,36 @@ if [ -z "${KITCHEN_API_BASE}" ]; then
 fi
 case "${KITCHEN_API_BASE}" in https://*) ;; *) echo "ERROR: API URL is not https: ${KITCHEN_API_BASE}"; exit 1 ;; esac
 
-# Cloud SQL connection name (project:region:instance)
-SQL_CONNECTION_NAME="$(
+# Cloud SQL: discover the PRIVATE IP. The dev instance has ipv4_enabled=False
+# (per src/components/database.py in infra-kitchen-gcp), so cloud-sql-proxy
+# can't reach it directly from the laptop. We tunnel through the bastion VM.
+# Filter by PRIVATE type via jq for clean extraction (gcloud format value()
+# with .filter().extract() returns Python-style ['x'] which has to be cleaned).
+SQL_PRIVATE_IP="$(
   gcloud sql instances describe "vianda-${STACK}-postgres" \
     --project="${PROJECT}" \
-    --format='value(connectionName)' 2>/dev/null
+    --format=json 2>/dev/null \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(next((a['ipAddress'] for a in d.get('ipAddresses',[]) if a.get('type')=='PRIVATE'), ''))"
 )"
-if [ -z "${SQL_CONNECTION_NAME}" ]; then
-  echo "ERROR: could not resolve Cloud SQL instance vianda-${STACK}-postgres."
+if [ -z "${SQL_PRIVATE_IP}" ]; then
+  echo "ERROR: could not resolve Cloud SQL PRIVATE IP for vianda-${STACK}-postgres."
   exit 1
 fi
+# Sanity: must look like an IP (a.b.c.d), not surrounding quotes/junk.
+case "${SQL_PRIVATE_IP}" in
+  *.*.*.*) ;;
+  *) echo "ERROR: parsed SQL private IP looks malformed: ${SQL_PRIVATE_IP}"; exit 1 ;;
+esac
+
+# Bastion VM (vianda-${STACK}-bastion in zone ${REGION}-a per
+# src/components/bastion.py).
+BASTION_NAME="vianda-${STACK}-bastion"
+BASTION_ZONE="${REGION}-a"
 
 echo "  cloud run URL:        ${KITCHEN_API_BASE}"
-echo "  cloud sql instance:   ${SQL_CONNECTION_NAME}"
-echo "  proxy port:           127.0.0.1:${PROXY_PORT}"
+echo "  cloud sql private IP: ${SQL_PRIVATE_IP}"
+echo "  bastion VM:           ${BASTION_NAME} (${BASTION_ZONE})"
+echo "  local tunnel port:    127.0.0.1:${PROXY_PORT}"
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -198,36 +215,60 @@ echo "  db credentials:       loaded for ${DB_USER}@${DB_NAME}"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Start cloud-sql-proxy in background (trap to clean up on any exit)
+# Open IAP SSH tunnel through the bastion to the Cloud SQL private IP.
+# Trap-cleaned on any exit.
 # -----------------------------------------------------------------------------
 
-PROXY_LOG="$(mktemp -t cloud-sql-proxy.XXXXXX.log)"
-echo "Starting cloud-sql-proxy → 127.0.0.1:${PROXY_PORT} (log: ${PROXY_LOG})..."
+TUNNEL_LOG="$(mktemp -t demo-bastion-tunnel.XXXXXX.log)"
+echo "Opening IAP tunnel  ${BASTION_NAME} → ${SQL_PRIVATE_IP}:5432 → 127.0.0.1:${PROXY_PORT}"
+echo "  (log: ${TUNNEL_LOG})"
 
-cloud-sql-proxy "${SQL_CONNECTION_NAME}" \
-  --port="${PROXY_PORT}" \
-  > "${PROXY_LOG}" 2>&1 &
-PROXY_PID=$!
+# -N = no command, -L = local port forward, -o ServerAliveInterval keeps the
+# tunnel up during the (~30s) Newman polling.  StrictHostKeyChecking=no skips
+# the first-time-host prompt that would otherwise hang in non-interactive
+# mode (the IAP tunnel itself is the security boundary).
+gcloud compute ssh "${BASTION_NAME}" \
+  --project="${PROJECT}" \
+  --zone="${BASTION_ZONE}" \
+  --tunnel-through-iap \
+  --ssh-flag="-N" \
+  --ssh-flag="-L ${PROXY_PORT}:${SQL_PRIVATE_IP}:5432" \
+  --ssh-flag="-o ServerAliveInterval=30" \
+  --ssh-flag="-o StrictHostKeyChecking=no" \
+  --ssh-flag="-o UserKnownHostsFile=/dev/null" \
+  > "${TUNNEL_LOG}" 2>&1 &
+TUNNEL_PID=$!
 
 cleanup() {
-  if kill -0 "${PROXY_PID}" 2>/dev/null; then
-    kill "${PROXY_PID}" 2>/dev/null || true
-    wait "${PROXY_PID}" 2>/dev/null || true
+  if kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+    kill "${TUNNEL_PID}" 2>/dev/null || true
+    wait "${TUNNEL_PID}" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM
 
-# Wait up to 15s for proxy to be ready
-for _ in $(seq 1 30); do
+# Wait up to 30s for the tunnel to be ready (IAP cold-start can be slow)
+for _ in $(seq 1 60); do
   if pg_isready -h 127.0.0.1 -p "${PROXY_PORT}" -U "${DB_USER}" >/dev/null 2>&1; then
-    echo "  proxy ready."
+    echo "  tunnel ready."
     break
+  fi
+  if ! kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+    echo "ERROR: IAP tunnel process exited early. Log:"
+    cat "${TUNNEL_LOG}"
+    exit 1
   fi
   sleep 0.5
 done
 if ! pg_isready -h 127.0.0.1 -p "${PROXY_PORT}" -U "${DB_USER}" >/dev/null 2>&1; then
-  echo "ERROR: cloud-sql-proxy did not become ready. Tail of log:"
-  tail -20 "${PROXY_LOG}"
+  echo "ERROR: IAP tunnel did not become ready within 30s. Log:"
+  tail -20 "${TUNNEL_LOG}"
+  echo ""
+  echo "  Common causes:"
+  echo "    - Bastion VM ${BASTION_NAME} not running. Check 'gcloud compute instances list'."
+  echo "    - Your account lacks roles/iap.tunnelResourceAccessor on the project."
+  echo "    - Your account lacks roles/compute.osLogin (or login is disabled on the bastion)."
+  echo "    - First-time IAP setup needs:  gcloud components install ssh"
   exit 1
 fi
 echo ""
