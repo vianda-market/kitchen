@@ -246,7 +246,7 @@ BEGIN
         v_lima_city_id,
         ARRAY['restaurant'::address_type_enum],
         'PE', 'Lima', 'Lima', 'Lima 27',
-        'str'::street_type_enum, 'Miguel Dasso', '137',
+        'st'::street_type_enum, 'Miguel Dasso', '137',
         'America/Lima',
         FALSE, 'active'::status_enum,
         v_system, v_system
@@ -271,7 +271,7 @@ BEGIN
         v_lima_city_id,
         ARRAY['restaurant'::address_type_enum],
         'PE', 'Lima', 'Lima', 'Lima 27',
-        'str'::street_type_enum, 'Coronel Andres Reyes', '218',
+        'st'::street_type_enum, 'Coronel Andres Reyes', '218',
         'America/Lima',
         FALSE, 'active'::status_enum,
         v_system, v_system
@@ -296,7 +296,7 @@ BEGIN
         v_lima_city_id,
         ARRAY['restaurant'::address_type_enum],
         'PE', 'Lima', 'Lima', 'Lima 27',
-        'str'::street_type_enum, 'Manuel Banon', '295',
+        'st'::street_type_enum, 'Manuel Banon', '295',
         'America/Lima',
         FALSE, 'active'::status_enum,
         v_system, v_system
@@ -321,7 +321,7 @@ BEGIN
         v_lima_city_id,
         ARRAY['restaurant'::address_type_enum],
         'PE', 'Lima', 'Lima', 'Lima 27',
-        'str'::street_type_enum, 'Conquistadores', '510',
+        'st'::street_type_enum, 'Conquistadores', '510',
         'America/Lima',
         FALSE, 'active'::status_enum,
         v_system, v_system
