@@ -258,6 +258,49 @@ Market UUIDs are seeded in `reference_data.sql` with stable values:
 
 Use these literal UUIDs in Postman request bodies (e.g. `"market_id": "00000000-0000-0000-0000-000000000002"` for AR). The PE collection uses `00000000-0000-0000-0000-000000000003` throughout.
 
+### 6.10 Plan upserts require `acknowledge_spread_compression: true` for non-PE markets
+
+The `PUT /plans/by-key` endpoint guards against inadvertently pricing credits below the market's `min_credit_spread_pct` floor. When the plan's implicit credit cost (`plan_price / credit`) compresses the spread, the API returns 409 unless `"acknowledge_spread_compression": true` is present in the upsert body.
+
+For PE (credit_cost = 4 PEN) the spread is above the floor and the flag is not required. For AR (credit_cost = 800 ARS) and US (credit_cost = 0.75 USD), the flag is required. Add it to every plan upsert for non-PE markets:
+
+```json
+{
+  "canonical_key": "DEMO_PLAN_AR_ESTANDAR",
+  ...
+  "acknowledge_spread_compression": true
+}
+```
+
+This is an **audited API flag** — it signals "I know this plan compresses the spread and I accept it." It is not a workaround; the demo dataset intentionally uses a tight spread to maximise visible savings percentages for stakeholder demos.
+
+### 6.11 DEV_MODE holiday bypass — pin `target_kitchen_day` explicitly in folder 40
+
+`app/services/plate_selection_validation._find_next_available_kitchen_day_in_week` skips national holidays when auto-selecting a kitchen day. However, in `DEV_MODE` (which defaults to `True` in `app/config/settings.py`), Saturdays are mapped to `"friday"` so E2E flows work on weekends.
+
+When today IS a national holiday for the plate's market AND `DEV_MODE=True`, the following sequence fires:
+1. Auto-select tries today (holiday) → skips (correct).
+2. Auto-select tries tomorrow (Saturday) → maps to `"friday"` via DEV_MODE logic.
+3. Checks if Saturday's date (`tomorrow`) is a national holiday — it is NOT.
+4. Returns `"friday"` with tomorrow's date as the target, **not today's** — bypassing the holiday guard.
+5. `_validate_restaurant_for_day` then resolves `"friday"` to today (the actual nearest Friday) → 403 holiday block.
+
+**Fix:** add `"target_kitchen_day": "wednesday"` (or any safe mid-week day) to every plate selection request body in folder 40 for non-PE markets. This bypasses auto-selection entirely and prevents the DEV_MODE edge case.
+
+Confirmed safe days by market (no 2026 public holidays on Wednesday):
+- AR: Wednesday is never a national holiday in 2026. Use `"wednesday"`.
+- US: Only Veterans Day (Nov 11) falls on Wednesday in 2026. For year-round safety, use `"wednesday"` — demo days are unlikely to land on Veterans Day.
+
+PE folder 40 uses auto-selection today (no Friday holidays in the near term), but should also be pinned for safety when the next engineer adds it.
+
+```json
+{
+  "plate_id": "PLACEHOLDER",
+  "pickup_time_range": "12:00-12:15",
+  "target_kitchen_day": "wednesday"
+}
+```
+
 ---
 
 ## 7. Per-Market Checklist
@@ -286,6 +329,8 @@ Work through these in order. Each item has a verification gate before proceeding
    - C06 and C07 use the `.no_plan` / `.no_orders` suffixes.
    - Subscribe folder skips C06 and subscribes C07.
    - Order folder skips both C06 and C07.
+   - Every plate selection request body in folder 40 includes `"target_kitchen_day": "wednesday"` (see Gotcha 6.11).
+   - The plan upsert body in folder 10 includes `"acknowledge_spread_compression": true` (see Gotcha 6.10).
 
 8. **Add collection-level variables** for all new entity IDs and tokens to the top of the collection JSON.
 
@@ -324,3 +369,4 @@ Work through these in order. Each item has a verification gate before proceeding
 - Do not touch `reference_data.sql` or migrations to add demo content.
 - Do not add demo data UUIDs to `kitchen_template`'s fingerprint in `scripts/refresh_db_template.sh`.
 - Do not hard-code `city_metadata_id` UUIDs in `demo_baseline.sql`. Always resolve them at runtime via the GeoNames JOIN — the UUID can change between rebuilds if the reference data is regenerated.
+- Do not add a `DEV_MODE` holiday-bypass patch to `app/services/plate_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. Fix it in the Postman collection instead (pin `target_kitchen_day`, see Gotcha 6.11).
