@@ -114,30 +114,31 @@ All 5 cluster restaurants are within ~300 m of Pike Place Market.
 
 | # | Restaurant | Address | Plates | price (USD) | credits | savings |
 |---|---|---|---|---|---|---|
-| R1 | Pike Place Chowder | Pike Pl 1428 | Clam Chowder | $13 | 14 | -8% |
-| R1 | Pike Place Chowder | | Fish and Chips | $15 | 16 | -20% |
-| R2 | Beecher's Deli | Pike Pl 1916 | Flagship Mac and Cheese | $12 | 13 | -19% |
-| R2 | Beecher's Deli | | Grilled Cheese on Sourdough | $14 | 15 | -7% |
-| R3 | Post Alley Pizza | 1st Ave 94 | Margherita Pizza Slice | $13 | 14 | -8% |
-| R3 | Post Alley Pizza | | Pepperoni Pizza Slice | $14 | 15 | -7% |
-| R4 | Market Street Poke | Pike Pl 1500 | Salmon Poke Bowl | $16 | 17 | -20% |
-| R4 | Market Street Poke | | Ahi Tuna Poke Bowl | $15 | 16 | -20% |
-| R5 | Stewart Street Diner | Western Ave 2000 | Northwest Clam Bake Plate | $18 | 19 | -21% |
-| R5 | Stewart Street Diner | | Turkey Club Sandwich | $12 | 13 | -19% |
+| R1 | Pike Place Chowder | Pike Pl 1428 | Clam Chowder | $13 | 14 | 19% |
+| R1 | Pike Place Chowder | | Fish and Chips | $15 | 16 | 20% |
+| R2 | Beecher's Deli | Pike Pl 1916 | Flagship Mac and Cheese | $12 | 13 | 19% |
+| R2 | Beecher's Deli | | Grilled Cheese on Sourdough | $14 | 15 | 20% |
+| R3 | Post Alley Pizza | 1st Ave 94 | Margherita Pizza Slice | $13 | 14 | 19% |
+| R3 | Post Alley Pizza | | Pepperoni Pizza Slice | $14 | 15 | 20% |
+| R4 | Market Street Poke | Pike Pl 1500 | Salmon Poke Bowl | $16 | 17 | 20% |
+| R4 | Market Street Poke | | Ahi Tuna Poke Bowl | $15 | 16 | 20% |
+| R5 | Stewart Street Diner | Western Ave 2000 | Northwest Clam Bake Plate | $18 | 19 | 21% |
+| R5 | Stewart Street Diner | | Turkey Club Sandwich | $12 | 13 | 19% |
 
 US secondary (Capitol Hill outlier):
 
 | Restaurant | Address | Plate | price (USD) | credits | savings |
 |---|---|---|---|---|---|
-| Summit Bowl Capitol Hill | E Pike St 500, Capitol Hill | Grains and Greens Bowl | $15 | 16 | -20% |
+| Summit Bowl Capitol Hill | E Pike St 500, Capitol Hill | Grains and Greens Bowl | $15 | 16 | 20% |
 
-**Note on US savings:** The US plan has `credit_cost_per_credit = $0.75`, but the US
-plate prices are denominated as single-unit dollar amounts (e.g. $13 for a bowl of
-chowder). At $0.75 per credit, a 14-credit plate costs $10.50 in plan value vs. $13
-retail — that is negative savings (the plan costs more per plate than paying retail).
-The US dataset intentionally carries `acknowledge_spread_compression: true` on the
-plan upsert. For demo purposes, the US market illustrates the platform mechanics; the
-PE and AR markets are the primary savings-story markets for stakeholder presentations.
+**Note on `acknowledge_spread_compression`:** The US plan sets this flag to `true`
+on the plan upsert. This is an audit-logged toggle in `app/services/credit_spread.py`
+that fires when the supplier spread compresses below the configured floor. Demo plans
+are deliberately priced thin so customers see ~19–21% savings without overpaying
+suppliers; the flag acknowledges the compression with an audit record. It does not
+indicate negative savings — US savings are positive ~19–21% across all plates
+(plan price $15 / 20 credits = $0.75 per credit; a 14-credit plate costs $10.50 in
+plan value vs. $13 retail = 19.2% savings).
 
 ---
 
@@ -158,7 +159,7 @@ Per-market plan numbers:
 |---|---|---|---|---|---|
 | PE | `DEMO_PLAN_PE_ESTANDAR` | S/ 80 | 20 | S/ 4 | 16–25% |
 | AR | `DEMO_PLAN_AR_ESTANDAR` | ARS 16,000 | 20 | ARS 800 | 20–24% |
-| US | `DEMO_PLAN_US_STANDARD` | USD 15.00 | 20 | USD 0.75 | negative (see note above) |
+| US | `DEMO_PLAN_US_STANDARD` | USD 15.00 | 20 | USD 0.75 | 19–21% |
 
 All three plans are set to `highlighted: true` and `status: active`.
 
@@ -221,24 +222,20 @@ This makes the password-recovery flow demoable live. Do not confuse it with the
 built-in `superadmin` user seeded by `reference_data.sql` (password `SuperAdmin1`),
 which is the canonical internal super-admin and should not be shared during demos.
 
-### PE supplier admins
+### Supplier admins — all markets
 
-| ID | Email | Password | Institution |
-|---|---|---|---|
-| SUP01 | (primary supplier admin — seeded via `demo_baseline.sql`, upserted by folder `12 Secondary supplier (PE)`) | `DemoPass1!` | Vianda Demo Supplier (PE entity) |
-| SUP02 | `demo.proveedor.pe.02.admin@vianda.demo` | `DemoPass1!` | Cocina Andina S.A.C. |
+| Market | Role | Email | Password | Scope |
+|---|---|---|---|---|
+| PE | SUP01 (primary) | `demo.proveedor.pe.01.admin@vianda.demo` | `DemoPass1!` | Vianda Demo Supplier (Sabores del Pacifico cluster, Miraflores) |
+| PE | SUP02 (secondary) | `demo.proveedor.pe.02.admin@vianda.demo` | `DemoPass1!` | Cocina Andina S.A.C. (Barranco outlier) |
+| AR | SUP01 (primary) | `demo.proveedor.ar.01.admin@vianda.demo` | `DemoPass1!` | Vianda Demo Supplier (Parrilla La Lavalle cluster, Microcentro) |
+| AR | SUP02 (secondary) | `demo.proveedor.ar.02.admin@vianda.demo` | `DemoPass1!` | Cocina de Recoleta S.R.L. (Recoleta outlier) |
+| US | SUP01 (primary) | `demo.proveedor.us.01.admin@vianda.demo` | `DemoPass1!` | Vianda Demo Supplier (Pike Place Chowder cluster, Seattle) |
+| US | SUP02 (secondary) | `demo.proveedor.us.02.admin@vianda.demo` | `DemoPass1!` | Capitol Hill Kitchen LLC (Capitol Hill outlier) |
 
-### AR supplier admins
-
-| ID | Email | Password | Institution |
-|---|---|---|---|
-| SUP02 | `demo.proveedor.ar.02.admin@vianda.demo` | `DemoPass1!` | Cocina de Recoleta S.R.L. |
-
-### US supplier admins
-
-| ID | Email | Password | Institution |
-|---|---|---|---|
-| SUP02 | `demo.proveedor.us.02.admin@vianda.demo` | `DemoPass1!` | Capitol Hill Kitchen LLC |
+All SUP01 accounts are scoped to the primary supplier institution
+`dddddddd-dec0-0001-0000-000000000001` (Vianda Demo Supplier). SUP02 accounts are
+scoped to the respective secondary institution in each market.
 
 ---
 
@@ -322,29 +319,49 @@ for institutions that have no live order flow in the demo.
 
 ---
 
-## 10. How to load / refresh
+## 10. Load / refresh — local
 
-**Quick start (local, mock payments):**
+With the kitchen API running locally (`bash scripts/run_dev_quiet.sh` in another terminal):
 
 ```bash
-# 1. API must be running with PAYMENT_PROVIDER=mock
-bash scripts/run_dev_quiet.sh
-
-# 2. Load demo data
+cd ~/learn/vianda/kitchen
 PAYMENT_PROVIDER=mock bash scripts/load_demo_data.sh
 ```
 
-Credentials (super-admin password + all email addresses) are printed to the terminal
-and written to `.demo_credentials.local` (gitignored).
-
-**Reset (purge then reload):**
+Refresh anytime — purge + reload is idempotent:
 
 ```bash
 bash scripts/purge_demo_data.sh && PAYMENT_PROVIDER=mock bash scripts/load_demo_data.sh
 ```
 
-**GCP dev target:** use `scripts/load_demo_data_gcp.sh` (handles Cloud SQL proxy,
-secret fetching, Stripe sandbox webhooks). See the script header for prerequisites.
+Credentials are printed at the end of the loader and persisted to gitignored `.demo_credentials.local`.
+
+### Where to look once the API is running
+
+`http://localhost:8000/` returns the API's health JSON — that's the health endpoint, not a UI. To see actual content:
+
+- Swagger UI: `http://localhost:8000/docs`
+- Direct API hit: `http://localhost:8000/api/v1/restaurants/by-city?city=Lima` (after auth)
+- Live frontends: start vianda-app or vianda-platform locally — they read `localhost:8000` in dev mode.
+
+### Logs that look scary but aren't
+
+- `RequestsDependencyWarning: urllib3 ... doesn't match a supported version!` — cosmetic Homebrew Python version-pin warning.
+- `GET /favicon.ico HTTP/1.1 404` — your browser asks for a favicon; we don't ship one.
+
+## 10b. Load / refresh — gcp-dev
+
+Deploys ship code + migrations only. Demo data is opt-in and must be loaded against dev separately. The GCP loader wraps the bastion tunnel for the private-IP Cloud SQL.
+
+```bash
+cd ~/learn/vianda/kitchen
+bash scripts/purge_demo_data.sh --target=gcp-dev    # wipe stale demo data first
+bash scripts/load_demo_data_gcp.sh                  # tunnels through bastion, runs Layer A SQL + Newman
+```
+
+If credentials don't work after a deploy: the deploy ran migrations but the loader hasn't been re-run since. Run the purge + reload pair above.
+
+See `~/learn/vianda/docs/commands/local_commands.md` and `~/learn/vianda/docs/commands/gcp_commands.md` for the orchestrator-root command catalog (same content, different surface).
 
 For DB rebuild procedures, worktree clone patterns, and migration sequence, see
 `DATABASE_REBUILD_PERSISTENCE.md`. Demo data is never loaded automatically by
