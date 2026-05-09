@@ -407,3 +407,31 @@ if [ "${SKIP_POST_REBUILD_SYNC:-0}" != "1" ]; then
 else
   echo "→ Skipping post-rebuild sync (SKIP_POST_REBUILD_SYNC=1)"
 fi
+
+# Backfill geocoding from cache — restores restaurant locations after rebuild.
+# Runs in replay_only mode so zero Mapbox API calls are made. Addresses with no
+# cache entry are logged and skipped (non-blocking). To add new addresses, run:
+#   MAPBOX_CACHE_MODE=record PYTHONPATH=. python3 scripts/backfill_mapbox_geocoding.py
+if [ "${SKIP_GEOCODE_BACKFILL:-0}" != "1" ]; then
+  if [ -f "venv/bin/activate" ]; then
+    _BF_VENV="venv/bin/activate"
+  elif [ -f ".venv/bin/activate" ]; then
+    _BF_VENV=".venv/bin/activate"
+  else
+    _BF_VENV=""
+  fi
+  if [ -n "${_BF_VENV}" ]; then
+    echo "→ Backfilling Mapbox geocoding from cache (replay_only, zero API calls)…"
+    # shellcheck source=/dev/null
+    source "${_BF_VENV}"
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
+    export KITCHEN_DB_NAME="${_EFFECTIVE_DB_NAME}"
+    export MAPBOX_CACHE_MODE=replay_only
+    export PYTHONPATH=.
+    python3 scripts/backfill_mapbox_geocoding.py
+  else
+    echo "⚠️  Skipping geocode backfill - venv not found. Set SKIP_GEOCODE_BACKFILL=1 to silence, or create a venv."
+  fi
+else
+  echo "→ Skipping geocode backfill (SKIP_GEOCODE_BACKFILL=1)"
+fi

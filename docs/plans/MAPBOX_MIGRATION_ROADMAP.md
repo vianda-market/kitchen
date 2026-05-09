@@ -1,6 +1,6 @@
 # Mapbox Migration Roadmap
 
-**Last Updated**: 2026-04-30
+**Last Updated**: 2026-05-09
 **Purpose**: Mapbox is the sole provider for geocoding, address autocomplete, and maps. This roadmap covers the remaining work to move from ephemeral free-tier usage to permanent storage of address data.
 
 ---
@@ -382,6 +382,125 @@ Phase 1 (shipped) ──────────────► Phase 2
 ├── Free tier                     ├── $5/1K permanent geocode calls
 └── Early launch + testing        └── Scale + stored coordinates / address data
 ```
+
+---
+
+---
+
+## Geocoding Cache (Shipped — 2026-05-09)
+
+### Why a cache instead of locking down the dev DB
+
+Mapbox TOS restricts long-term storage of ephemeral geocoding results, but caching **raw API responses** for replay during dev is fine (it's equivalent to caching any HTTP response). Locking the dev DB to prevent teardown would force real down-migrations on every risky schema change — a much bigger workflow tax than a 100-line cache. The cache lets us tear down freely **and** only pay Mapbox once per unique address across all devs and all rebuilds.
+
+### Design
+
+| File | Role |
+|------|------|
+| `app/gateways/mapbox_geocode_cache.py` | Cache module: `MapboxGeocodeCache`, `CacheMode`, `make_cache_key`, `MapboxCacheMiss` |
+| `seeds/mapbox_geocode_cache.json` | Committed JSON cache — treat as production data, never `.gitignore` |
+| `scripts/backfill_mapbox_geocoding.py` | Walk missing coordinates after rebuild, replay from cache |
+
+### Cache key format
+
+```
+"geocode|{normalized_q}|{country}|{language}"
+```
+
+Where `normalized_q` = lowercase, trimmed, whitespace-collapsed address string.
+For the default geocoding path (called without country param): `"geocode|{addr}||es"`.
+
+### `MAPBOX_CACHE_MODE` values
+
+| Value | Default for | Behavior on cache miss |
+|-------|-------------|----------------------|
+| `replay_only` | Tests + dev seed + DB rebuild | Raises `MapboxCacheMiss` — never calls Mapbox |
+| `record` | Dev when adding new addresses | Calls live Mapbox API and writes response to cache |
+| `bypass` | Prod | Skips cache entirely, always calls Mapbox live |
+
+Set via env var. Setting is also exposed in `app/config/settings.py` as `MAPBOX_CACHE_MODE`.
+
+### Adding a new address to the cache
+
+```sh
+# 1. Set a live Mapbox token (use the dev token — these are ephemeral calls):
+export MAPBOX_ACCESS_TOKEN_DEV=pk.eyJ1...
+
+# 2. Run backfill in record mode — new addresses hit the API, response is written to cache:
+MAPBOX_CACHE_MODE=record PYTHONPATH=. python3 scripts/backfill_mapbox_geocoding.py
+
+# 3. Commit the updated seeds/mapbox_geocode_cache.json.
+```
+
+### Tear-down / rebuild flow (zero Mapbox calls)
+
+`build_kitchen_db.sh` automatically runs the backfill in `replay_only` mode after seeding:
+
+```sh
+bash app/db/build_kitchen_db.sh
+# → ... seeding ...
+# → Backfilling Mapbox geocoding from cache (replay_only, zero API calls)…
+# [backfill-mapbox] restaurant aaaaa...: "500 Defensa, Buenos Aires, Buenos Aires, AR" → (-34.6226, -58.3701)
+# [backfill-mapbox] done
+```
+
+Skip with `SKIP_GEOCODE_BACKFILL=1`.
+
+### Schema additions (migration 0019)
+
+Two nullable tracking columns added to `core.geolocation_info` (and mirrored in `audit.geolocation_history`):
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `mapbox_geocoded_at` | `TIMESTAMPTZ NULL` | When coordinates were resolved (live or cache replay) |
+| `mapbox_normalized_address` | `TEXT NULL` | Normalized query string = cache key, stored for backfill re-derivation |
+
+---
+
+## Infra Cutover Handoff (NOT YET EXECUTED)
+
+**Status: documented only. Do NOT execute without explicit user confirmation.**
+
+The current Mapbox token in use is the dev/free-tier token. Switching to the paid (permanent-storage-allowed) key requires an infra-executor task in `infra-kitchen-gcp`. Steps:
+
+### 1. Provision paid Mapbox key in Secret Manager (infra-kitchen-gcp task)
+
+```
+# infra-executor brief (do NOT run from kitchen or this session):
+# In src/components/backend.py (Pulumi):
+#   - Add Secret Manager secret: mapbox_access_token_prod
+#   - Mount as Cloud Run env var: MAPBOX_ACCESS_TOKEN_PROD
+#   - Same for STAGING: mapbox_access_token_staging → MAPBOX_ACCESS_TOKEN_STAGING
+# Confirm _DEPLOY_SA_ROLES includes secretmanager.secretAccessor for the new secrets.
+```
+
+### 2. Enable `permanent=true` in the geocoding gateway (kitchen task)
+
+In `app/gateways/mapbox_geocoding_gateway.py`, `_make_request()`, add to `params` when `permanent=true` is appropriate:
+
+```python
+if kwargs.get("permanent"):
+    params["permanent"] = "true"
+```
+
+And update `geocode_full()` call in `geolocation_service.geocode_address()` to pass `permanent=True` for restaurant and institution addresses (see Phase 2.5 for the cost-optimization logic).
+
+### 3. Set `MAPBOX_CACHE_MODE=bypass` in prod Cloud Run config (infra task)
+
+Add to the Cloud Run env var block in `infra-kitchen-gcp/src/components/backend.py`:
+```python
+{"name": "MAPBOX_CACHE_MODE", "value": "bypass"},
+```
+
+### 4. Run batch backfill for Phase 1 addresses (one-time ops task)
+
+After deploying with the paid key:
+```sh
+MAPBOX_CACHE_MODE=record MAPBOX_ACCESS_TOKEN_PROD=pk.ey... PYTHONPATH=. \
+  python3 scripts/backfill_mapbox_geocoding.py
+```
+
+This re-geocodes any restaurant/address rows that have placeholder `(0,0)` coordinates from Phase 1 ephemeral mode.
 
 ---
 
