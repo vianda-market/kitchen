@@ -1055,7 +1055,6 @@ app/services/payment_provider/stripe/connect_gateway.py:0: error: "InstitutionEn
 app/services/payment_provider/stripe/connect_gateway.py:0: error: "InstitutionBillDTO" has no attribute "get"  [attr-defined]
 app/services/payment_provider/stripe/connect_gateway.py:0: error: "InstitutionBillDTO" has no attribute "get"  [attr-defined]
 app/services/employer/program_service.py:0: error: Item "None" of "Any | None" has no attribute "value"  [union-attr]
-app/services/employer/program_service.py:0: error: Item "None" of "Any | None" has no attribute "value"  [union-attr]
 app/services/employer/program_service.py:0: error: Argument after ** must be a mapping, not "dict[str, Any] | list[dict[str, Any]]"  [arg-type]
 app/services/employer/program_service.py:0: error: Argument after ** must be a mapping, not "dict[str, Any] | list[dict[str, Any]]"  [arg-type]
 app/services/billing/tax_doc_service.py:0: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
