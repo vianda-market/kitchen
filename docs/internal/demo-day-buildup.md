@@ -110,26 +110,31 @@ C01–C05 customer addresses must be in different neighborhoods of the market's 
 
 Entities without a `PUT /by-key` endpoint go into `demo_baseline.sql` using deterministic UUIDs with the `dddddddd-dec0-` prefix. This prefix is the purge selector used by `scripts/purge_demo_data.sh`. Every row uses `ON CONFLICT (...) DO UPDATE SET ...`.
 
-**Address UUID sub-ranges:**
+**UUID sub-ranges (complete table):**
 
 | Sub-range | Content |
 |---|---|
-| `dddddddd-dec0-0010-0000-00000000000N` | PE addresses (N = 1 office, 2–6 restaurants) |
-| `dddddddd-dec0-0020-0000-00000000000N` | AR addresses (N = 1 office, 2–6 restaurants) |
-| `dddddddd-dec0-0030-0000-00000000000N` | US addresses (N = 1 office, 2–6 restaurants) |
-| `dddddddd-dec0-0040-...` | Reserve for next market (CL, MX, BR, etc.) |
+| `dddddddd-dec0-0001-0000-000000000001` | Primary demo supplier institution (shared PE/AR/US) |
+| `dddddddd-dec0-0001-0000-000000000002` | Demo super-admin user |
+| `dddddddd-dec0-0001-0000-000000000003` | PE institution entity (primary supplier) |
+| `dddddddd-dec0-0001-0000-000000000004` | AR institution entity (primary supplier) |
+| `dddddddd-dec0-0001-0000-000000000005` | US institution entity (primary supplier) |
+| `dddddddd-dec0-0002-0000-000000000001` | PE secondary institution (Cocina Andina S.A.C.) |
+| `dddddddd-dec0-0002-0000-000000000002` | AR secondary institution (Cocina de Recoleta S.R.L.) |
+| `dddddddd-dec0-0002-0000-000000000003` | US secondary institution (Capitol Hill Kitchen LLC) |
+| `dddddddd-dec0-0002-0000-000000000004` | PE secondary institution entity |
+| `dddddddd-dec0-0002-0000-000000000005` | AR secondary institution entity |
+| `dddddddd-dec0-0002-0000-000000000006` | US secondary institution entity |
+| `dddddddd-dec0-0010-0000-00000000000N` | PE primary addresses (N=1 office, 2–6 restaurants) |
+| `dddddddd-dec0-0011-0000-00000000000N` | PE secondary addresses (N=1 office, N=2 restaurant) |
+| `dddddddd-dec0-0020-0000-00000000000N` | AR primary addresses |
+| `dddddddd-dec0-0021-0000-00000000000N` | AR secondary addresses |
+| `dddddddd-dec0-0030-0000-00000000000N` | US primary addresses |
+| `dddddddd-dec0-0031-0000-00000000000N` | US secondary addresses |
+| `dddddddd-dec0-0040-...` | Reserved for next primary market (CL, MX, BR) |
+| `dddddddd-dec0-0050-0000-00000000000N` | SQL-seeded institution_bill_info for secondary suppliers |
 
-The institution entity UUID uses the `0001` sub-range with a per-market suffix:
-
-| UUID | Entity |
-|---|---|
-| `dddddddd-dec0-0001-0000-000000000001` | Demo supplier institution (shared, PE-market primary) |
-| `dddddddd-dec0-0001-0000-000000000002` | Demo super-admin user (shared) |
-| `dddddddd-dec0-0001-0000-000000000003` | PE institution entity |
-| `dddddddd-dec0-0001-0000-000000000004` | AR institution entity |
-| `dddddddd-dec0-0001-0000-000000000005` | US institution entity |
-
-When adding a new market: add the institution_market binding in Section 1 (the shared institution already exists), add addresses in Section 3 under a new sub-range, and add the institution entity in a new section following the PE/AR/US pattern. The institution entity must reference the correct currency_metadata_id from `reference_data.sql`.
+When adding a new market: add the institution_market binding in Section 1 (the shared institution already exists), add addresses in Section 3 under a new sub-range (`0040` for the 4th market), and add the institution entity in a new section following the PE/AR/US pattern. The institution entity must reference the correct currency_metadata_id from `reference_data.sql`.
 
 ### 4.2 API-created entities (Postman collection)
 
@@ -152,20 +157,26 @@ Reference: `docs/api/internal/UPSERT_SEED_CONVENTION.md`.
 The collection has one set of folders per market, numbered by execution order:
 
 ```
-00 Setup                        — shared: login as demo-admin; run once
-10 Supplier menu (PE)           — PE restaurants, products, plates, PKDs, plan
-10 Supplier menu (AR)           — AR restaurants, products, plates, PKDs, plan
-10 Supplier menu (US)           — US restaurants, products, plates, PKDs, plan
-20 Customers (PE)               — PE customer signup flow
-20 Customers (AR)               — AR customer signup flow
-20 Customers (US)               — US customer signup flow
-30 Subscribe each customer      — shared folder: subscribe all markets' C01-C05 + C07
-30 Subscribe each customer (AR) — AR subscription steps (inside 30, or separate 30 AR)
-30 Subscribe each customer (US) — US subscription steps
-40 Order history loop           — PE orders
-40 Order history (AR)           — AR orders
-40 Order history (US)           — US orders
-99 Sanity checks                — shared: assertions for ALL markets
+00 Setup                           — shared: login as demo-admin; run once
+10 Supplier menu (PE)              — PE restaurants, products, plates, PKDs, plan
+12 Secondary supplier (PE)         — PE secondary institution + restaurant + plate + activate
+20 Customers (PE)                  — PE customer signup flow
+30 Subscribe each customer         — PE subscription steps
+40 Order history loop              — PE orders
+45 Supplier billing (PE)           — POST run-settlement-pipeline?country_code=PE
+10 Supplier menu (AR)              — AR restaurants, products, plates, PKDs, plan
+12 Secondary supplier (AR)         — AR secondary institution + restaurant + plate + activate
+20 Customers (AR)                  — AR customer signup flow
+30 Subscribe each customer (AR)    — AR subscription steps
+40 Order history (AR)              — AR orders
+45 Supplier billing (AR)           — POST run-settlement-pipeline?country_code=AR
+10 Supplier menu (US)              — US restaurants, products, plates, PKDs, plan
+12 Secondary supplier (US)         — US secondary institution + restaurant + plate + activate
+20 Customers (US)                  — US customer signup flow
+30 Subscribe each customer (US)    — US subscription steps
+40 Order history (US)              — US orders
+45 Supplier billing (US)           — POST run-settlement-pipeline?country_code=US
+99 Sanity checks                   — shared: assertions for ALL markets
 ```
 
 **Within each `10 Supplier menu (<CC>)` folder, execution order must be:**
@@ -360,7 +371,102 @@ Work through these in order. Each item has a verification gate before proceeding
 
 ---
 
-## 8. What NOT to Do
+## 8. Secondary Supplier Pattern (multi-tenant admin view)
+
+Each market has a second, smaller supplier institution to demonstrate multi-tenant admin views. This is a "secondary tenant" that appears alongside the primary in `GET /institutions` filtered by market.
+
+### 8.1 What the secondary supplier contains
+
+Per market:
+- 1 institution (distinct name, e.g. "Cocina Andina S.A.C." for PE)
+- 1 institution entity with `payout_onboarding_status = 'complete'` (required for restaurant activation)
+- 1 restaurant in a different neighborhood from the primary cluster
+- 1 plate with Mon–Fri PKDs (savings within 18–22 %)
+- 1 supplier admin user (`demo.proveedor.<cc>.02.admin@vianda.demo`)
+
+### 8.2 Why entities are pre-seeded in demo_baseline.sql
+
+The restaurant activation gate (`restaurant.active_requires_entity_payouts`) checks `payout_onboarding_status`. The `PUT /institution-entities/by-key` upsert schema has `payout_onboarding_status` as optional (default `None`). If the upsert body omits it, the Postman update path would NULL out the field, blocking activation.
+
+Resolution: pre-seed the secondary institution AND its entity in `demo_baseline.sql` with fixed dec0 UUIDs and `payout_onboarding_status = 'complete'`. Use `ON CONFLICT DO UPDATE SET canonical_key = ...` so that the subsequent `PUT /by-key` Postman call **adopts** the existing row (matching by canonical_key) and returns the stable UUID — it does not create a duplicate.
+
+Key sub-ranges used:
+| Sub-range | Content |
+|---|---|
+| `dddddddd-dec0-0002-0000-000000000001` | PE secondary institution |
+| `dddddddd-dec0-0002-0000-000000000002` | AR secondary institution |
+| `dddddddd-dec0-0002-0000-000000000003` | US secondary institution |
+| `dddddddd-dec0-0002-0000-000000000004` | PE secondary institution entity |
+| `dddddddd-dec0-0002-0000-000000000005` | AR secondary institution entity |
+| `dddddddd-dec0-0002-0000-000000000006` | US secondary institution entity |
+| `dddddddd-dec0-0011-0000-0000000000NN` | PE secondary addresses |
+| `dddddddd-dec0-0021-0000-0000000000NN` | AR secondary addresses |
+| `dddddddd-dec0-0031-0000-0000000000NN` | US secondary addresses |
+
+### 8.3 The exclude_none=True fix on the entity upsert
+
+`app/routes/institution_entity.py` `PUT /by-key` was updated to use `model_dump(exclude_none=True)` on the UPDATE path. Without this fix, optional fields absent from the request body (like `payout_onboarding_status`) were serialised as `None` and overwrote the existing DB value. This is a general correctness fix, not a demo-specific workaround.
+
+### 8.4 Postman folder layout for secondary suppliers
+
+Each market gets two new top-level folders immediately after its primary `40` order folder:
+
+```
+12 Secondary supplier (<CC>)  — institution + entity + user + restaurant + plate + PKDs + activate
+45 Supplier billing (<CC>)    — POST run-settlement-pipeline?country_code=<CC>
+```
+
+The secondary supplier folder follows the same canonical-key and prerequest pattern as the primary `10` folder. Auth uses the demo-admin token for all internal-facing steps.
+
+### 8.5 Sanity check for secondary suppliers
+
+Folder 99 now includes assertions:
+- **"Assert 2 <CC> demo suppliers exist"** — filters `GET /institutions` by `institution_type=supplier`, `market_ids` contains the market UUID, and `canonical_key.startsWith('DEMO_')`. The primary institution has `canonical_key = 'DEMO_INSTITUTION_PE_VIANDA_DEMO'` (PE-prefix only, but it covers all three markets). The secondary has `DEMO_INSTITUTION_<CC>_<NAME>`. Together: 2 per market.
+- **"Assert <CC> secondary restaurant visible in by-city"** — uses the pre-stored customer token (`customerXxN1Token`) because `GET /restaurants/by-city` is customer-scoped (admins see 0 restaurants). Filters by `name` in the response `restaurants` array.
+
+---
+
+## 9. Supplier Billing
+
+### 9.1 Pipeline-generated bills (primary supplier, all markets)
+
+Postman folder `45 Supplier billing (<CC>)` calls `POST /api/v1/institution-bills/run-settlement-pipeline?country_code=<CC>` once per market, after the order history folder. This generates `institution_bill_info` rows for the primary supplier's entity (standard UUID, not dec0 prefix).
+
+### 9.2 SQL-seeded bills (secondary supplier, all markets)
+
+`demo_baseline.sql` Section 7 backfills 2 `institution_bill_info` rows per market for the secondary supplier entity. The dec0-0050 sub-range is used:
+
+| UUID | Market | Status |
+|---|---|---|
+| `dddddddd-dec0-0050-0000-000000000001` | PE | pending |
+| `dddddddd-dec0-0050-0000-000000000002` | PE | paid |
+| `dddddddd-dec0-0050-0000-000000000003` | AR | pending |
+| `dddddddd-dec0-0050-0000-000000000004` | AR | paid |
+| `dddddddd-dec0-0050-0000-000000000005` | US | pending |
+| `dddddddd-dec0-0050-0000-000000000006` | US | paid |
+
+### 9.3 Purge script additions for billing
+
+The purge handles the billing tables in this FK order:
+1. `institution_settlement_history` (audit) — references `institution_settlement`
+2. `institution_settlement` — references `restaurant_balance_history`, `institution_bill_info`
+3. `institution_bill_history` (audit)
+4. `institution_bill_info` — purges all demo entity bills (both dec0-0050 and dynamic pipeline UUIDs)
+
+The institution bills purge uses `WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%'` to catch both SQL-seeded and pipeline-generated bills for demo entities.
+
+### 9.4 Known purge gotcha — circular FK between institution_info and user_info
+
+`institution_info.modified_by → user_info` (RESTRICT, NOT NULL) and `user_info.institution_id → institution_info` (RESTRICT). The secondary institutions are modified by the demo admin user. Resolution in the purge script:
+
+1. `UPDATE institution_info SET modified_by = superadmin_user_id WHERE institution_id LIKE 'dddddddd-dec0-%'` — neutralises the modified_by FK.
+2. `DELETE FROM institution_history` — also references users via modified_by.
+3. `DELETE FROM user_info` — now unblocked.
+4. `DELETE FROM institution_market` + `DELETE FROM institution_info` — institutions are deleted last.
+
+---
+
+## 10. What NOT to Do
 
 - Do not write raw SQL outside `demo_baseline.sql` to create demo entities.
 - Do not use `POST /<entity>` to create fixture entities. Use `PUT /<entity>/by-key`. The only POST calls in the collection are for transactional events: orders, reviews, favorites, subscriptions, and the customer signup flow (which has no by-key endpoint).
@@ -370,3 +476,4 @@ Work through these in order. Each item has a verification gate before proceeding
 - Do not add demo data UUIDs to `kitchen_template`'s fingerprint in `scripts/refresh_db_template.sh`.
 - Do not hard-code `city_metadata_id` UUIDs in `demo_baseline.sql`. Always resolve them at runtime via the GeoNames JOIN — the UUID can change between rebuilds if the reference data is regenerated.
 - Do not add a `DEV_MODE` holiday-bypass patch to `app/services/plate_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. Fix it in the Postman collection instead (pin `target_kitchen_day`, see Gotcha 6.11).
+- Do not update the dec0 sub-range table in Section 4.1 without also documenting the new sub-range in the UUID SCHEME comment block at the top of `demo_baseline.sql`.
