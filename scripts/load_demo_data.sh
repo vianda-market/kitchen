@@ -238,6 +238,9 @@ Demo Customers (shared password: DemoPass1!):
   C06  demo.cliente.pe.06.no_plan@vianda.demo   (PE — NO PLAN — show purchase flow)
   C07  demo.cliente.pe.07.no_orders@vianda.demo  (PE — NO ORDERS — show ordering flow)
 
+  Secondary supplier (PE):
+    SUP02_PE  demo.proveedor.pe.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Cocina Andina S.A.C.)
+
   --- Argentina (AR) ---
   C01  demo.cliente.ar.01@vianda.demo  (AR — Recoleta)
   C02  demo.cliente.ar.02@vianda.demo  (AR — Palermo)
@@ -247,6 +250,9 @@ Demo Customers (shared password: DemoPass1!):
   C06  demo.cliente.ar.06.no_plan@vianda.demo   (AR — NO PLAN — show purchase flow)
   C07  demo.cliente.ar.07.no_orders@vianda.demo  (AR — NO ORDERS — show ordering flow)
 
+  Secondary supplier (AR):
+    SUP02_AR  demo.proveedor.ar.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Cocina de Recoleta S.R.L.)
+
   --- United States (US) ---
   C01  demo.cliente.us.01@vianda.demo  (US — Capitol Hill)
   C02  demo.cliente.us.02@vianda.demo  (US — Ballard)
@@ -255,6 +261,9 @@ Demo Customers (shared password: DemoPass1!):
   C05  demo.cliente.us.05@vianda.demo  (US — West Seattle)
   C06  demo.cliente.us.06.no_plan@vianda.demo   (US — NO PLAN — show purchase flow)
   C07  demo.cliente.us.07.no_orders@vianda.demo  (US — NO ORDERS — show ordering flow)
+
+  Secondary supplier (US):
+    SUP02_US  demo.proveedor.us.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Capitol Hill Kitchen LLC)
 ========================
 EARLYCREDS
 
@@ -339,6 +348,9 @@ Demo Customers (shared password: DemoPass1!):
   C06  demo.cliente.pe.06.no_plan@vianda.demo   (PE — NO PLAN — show purchase flow)
   C07  demo.cliente.pe.07.no_orders@vianda.demo  (PE — NO ORDERS — show ordering flow)
 
+  Secondary supplier (PE):
+    SUP02_PE  demo.proveedor.pe.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Cocina Andina S.A.C.)
+
   --- Argentina (AR) ---
   C01  demo.cliente.ar.01@vianda.demo  (AR — Recoleta)
   C02  demo.cliente.ar.02@vianda.demo  (AR — Palermo)
@@ -348,6 +360,9 @@ Demo Customers (shared password: DemoPass1!):
   C06  demo.cliente.ar.06.no_plan@vianda.demo   (AR — NO PLAN — show purchase flow)
   C07  demo.cliente.ar.07.no_orders@vianda.demo  (AR — NO ORDERS — show ordering flow)
 
+  Secondary supplier (AR):
+    SUP02_AR  demo.proveedor.ar.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Cocina de Recoleta S.R.L.)
+
   --- United States (US) ---
   C01  demo.cliente.us.01@vianda.demo  (US — Capitol Hill)
   C02  demo.cliente.us.02@vianda.demo  (US — Ballard)
@@ -356,6 +371,9 @@ Demo Customers (shared password: DemoPass1!):
   C05  demo.cliente.us.05@vianda.demo  (US — West Seattle)
   C06  demo.cliente.us.06.no_plan@vianda.demo   (US — NO PLAN — show purchase flow)
   C07  demo.cliente.us.07.no_orders@vianda.demo  (US — NO ORDERS — show ordering flow)
+
+  Secondary supplier (US):
+    SUP02_US  demo.proveedor.us.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Capitol Hill Kitchen LLC)
 ========================
 
 NOTE: Re-running this loader on a previously-seeded DB will create duplicate

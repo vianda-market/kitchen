@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "demo-day-seed-2026-v2",
     "name": "900_DEMO_DAY_SEED",
-    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          — Login as demo-admin@vianda.market\n  10 Supplier menu  — 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      — 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      — Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  — 5 customers x 5 orders each (plate-sel → QR → complete → review)\n  99 Sanity checks  — Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
+    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.market\n  10 Supplier menu  \u2014 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      \u2014 Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "auth": {
@@ -889,12 +889,72 @@
       "key": "paymentIdUs07",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "demoInstitutionPe2Id",
+      "value": ""
+    },
+    {
+      "key": "demoEntityPe2Id",
+      "value": ""
+    },
+    {
+      "key": "restaurantPe2R1Id",
+      "value": ""
+    },
+    {
+      "key": "productPe2LomoAlpacaId",
+      "value": ""
+    },
+    {
+      "key": "platePe2R1LomoAlpacaId",
+      "value": ""
+    },
+    {
+      "key": "demoInstitutionAr2Id",
+      "value": ""
+    },
+    {
+      "key": "demoEntityAr2Id",
+      "value": ""
+    },
+    {
+      "key": "restaurantAr2R1Id",
+      "value": ""
+    },
+    {
+      "key": "productAr2NoquisId",
+      "value": ""
+    },
+    {
+      "key": "plateAr2R1NoquisId",
+      "value": ""
+    },
+    {
+      "key": "demoInstitutionUs2Id",
+      "value": ""
+    },
+    {
+      "key": "demoEntityUs2Id",
+      "value": ""
+    },
+    {
+      "key": "restaurantUs2R1Id",
+      "value": ""
+    },
+    {
+      "key": "productUs2GrainsBowlId",
+      "value": ""
+    },
+    {
+      "key": "plateUs2R1GrainsBowlId",
+      "value": ""
     }
   ],
   "item": [
     {
       "name": "00 Setup",
-      "description": "Login as demo-admin@vianda.market (seeded by demo_baseline.sql). No creates — all SQL-only entities already exist.",
+      "description": "Login as demo-admin@vianda.market (seeded by demo_baseline.sql). No creates \u2014 all SQL-only entities already exist.",
       "item": [
         {
           "name": "Login Demo Admin",
@@ -960,7 +1020,7 @@
       "description": "Upsert the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon-Fri, and 1 PE plan. All via PUT /by-key (idempotent). Auth: demo admin token.",
       "item": [
         {
-          "name": "Upsert Restaurant PE — Sabores del Pacifico",
+          "name": "Upsert Restaurant PE \u2014 Sabores del Pacifico",
           "event": [
             {
               "listen": "test",
@@ -1004,7 +1064,7 @@
           }
         },
         {
-          "name": "Upsert QR Code — PE Restaurant",
+          "name": "Upsert QR Code \u2014 PE Restaurant",
           "event": [
             {
               "listen": "prerequest",
@@ -1058,7 +1118,7 @@
           }
         },
         {
-          "name": "Upsert Product PE — Ceviche Clasico",
+          "name": "Upsert Product PE \u2014 Ceviche Clasico",
           "event": [
             {
               "listen": "test",
@@ -1100,7 +1160,7 @@
           }
         },
         {
-          "name": "Upsert Product PE — Lomo Saltado",
+          "name": "Upsert Product PE \u2014 Lomo Saltado",
           "event": [
             {
               "listen": "test",
@@ -1142,7 +1202,7 @@
           }
         },
         {
-          "name": "Upsert Product PE — Aji de Gallina",
+          "name": "Upsert Product PE \u2014 Aji de Gallina",
           "event": [
             {
               "listen": "test",
@@ -1184,7 +1244,7 @@
           }
         },
         {
-          "name": "Upsert Product PE — Causa Limena",
+          "name": "Upsert Product PE \u2014 Causa Limena",
           "event": [
             {
               "listen": "test",
@@ -1226,7 +1286,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE — Ceviche",
+          "name": "Upsert Plate PE \u2014 Ceviche",
           "event": [
             {
               "listen": "prerequest",
@@ -1280,7 +1340,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE — Lomo Saltado",
+          "name": "Upsert Plate PE \u2014 Lomo Saltado",
           "event": [
             {
               "listen": "prerequest",
@@ -1334,7 +1394,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE — Aji de Gallina",
+          "name": "Upsert Plate PE \u2014 Aji de Gallina",
           "event": [
             {
               "listen": "prerequest",
@@ -1388,7 +1448,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE — Causa Limena",
+          "name": "Upsert Plate PE \u2014 Causa Limena",
           "event": [
             {
               "listen": "prerequest",
@@ -1442,7 +1502,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant PE — Doña Lucha Sangucheria",
+          "name": "Upsert Restaurant PE \u2014 Do\u00f1a Lucha Sangucheria",
           "event": [
             {
               "listen": "test",
@@ -1453,7 +1513,7 @@
                   "pm.test('Has restaurant_id', function () { pm.expect(body).to.have.property('restaurant_id'); });",
                   "pm.collectionVariables.set('restaurantPeR2Id', body.restaurant_id);",
                   "pm.environment.set('restaurantPeR2Id', body.restaurant_id);",
-                  "console.log('Doña Lucha Sangucheria:', body.restaurant_id);"
+                  "console.log('Do\u00f1a Lucha Sangucheria:', body.restaurant_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1487,7 +1547,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code — Doña Lucha",
+          "name": "Upsert QR Code \u2014 Do\u00f1a Lucha",
           "event": [
             {
               "listen": "prerequest",
@@ -1508,7 +1568,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has qr_code_id', function () { pm.expect(body).to.have.property('qr_code_id'); });",
                   "pm.collectionVariables.set('restaurantPeR2QrId', body.qr_code_id);",
-                  "console.log('Doña Lucha QR:', body.qr_code_id);"
+                  "console.log('Do\u00f1a Lucha QR:', body.qr_code_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1542,7 +1602,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Butifarra",
+          "name": "Upsert Product PE \u2014 Butifarra",
           "event": [
             {
               "listen": "test",
@@ -1585,7 +1645,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Pan con Chicharrón",
+          "name": "Upsert Product PE \u2014 Pan con Chicharr\u00f3n",
           "event": [
             {
               "listen": "test",
@@ -1628,7 +1688,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Butifarra (R2)",
+          "name": "Upsert Plate PE \u2014 Butifarra (R2)",
           "event": [
             {
               "listen": "prerequest",
@@ -1683,7 +1743,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Pan con Chicharrón (R2)",
+          "name": "Upsert Plate PE \u2014 Pan con Chicharr\u00f3n (R2)",
           "event": [
             {
               "listen": "prerequest",
@@ -1738,7 +1798,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE — Anticuchería Don Tomás",
+          "name": "Upsert Restaurant PE \u2014 Anticucher\u00eda Don Tom\u00e1s",
           "event": [
             {
               "listen": "test",
@@ -1749,7 +1809,7 @@
                   "pm.test('Has restaurant_id', function () { pm.expect(body).to.have.property('restaurant_id'); });",
                   "pm.collectionVariables.set('restaurantPeR3Id', body.restaurant_id);",
                   "pm.environment.set('restaurantPeR3Id', body.restaurant_id);",
-                  "console.log('Anticuchería Don Tomás:', body.restaurant_id);"
+                  "console.log('Anticucher\u00eda Don Tom\u00e1s:', body.restaurant_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1783,7 +1843,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code — Don Tomás",
+          "name": "Upsert QR Code \u2014 Don Tom\u00e1s",
           "event": [
             {
               "listen": "prerequest",
@@ -1804,7 +1864,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has qr_code_id', function () { pm.expect(body).to.have.property('qr_code_id'); });",
                   "pm.collectionVariables.set('restaurantPeR3QrId', body.qr_code_id);",
-                  "console.log('Don Tomás QR:', body.qr_code_id);"
+                  "console.log('Don Tom\u00e1s QR:', body.qr_code_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1838,7 +1898,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Anticuchos de Res",
+          "name": "Upsert Product PE \u2014 Anticuchos de Res",
           "event": [
             {
               "listen": "test",
@@ -1881,7 +1941,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Anticuchos (R3)",
+          "name": "Upsert Plate PE \u2014 Anticuchos (R3)",
           "event": [
             {
               "listen": "prerequest",
@@ -1936,7 +1996,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE — La Esquina del Tiradito",
+          "name": "Upsert Restaurant PE \u2014 La Esquina del Tiradito",
           "event": [
             {
               "listen": "test",
@@ -1981,7 +2041,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code — La Esquina",
+          "name": "Upsert QR Code \u2014 La Esquina",
           "event": [
             {
               "listen": "prerequest",
@@ -2036,7 +2096,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Tiradito de Lenguado",
+          "name": "Upsert Product PE \u2014 Tiradito de Lenguado",
           "event": [
             {
               "listen": "test",
@@ -2079,7 +2139,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Pulpo al Olivo",
+          "name": "Upsert Product PE \u2014 Pulpo al Olivo",
           "event": [
             {
               "listen": "test",
@@ -2122,7 +2182,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Tiradito de Lenguado (R4)",
+          "name": "Upsert Plate PE \u2014 Tiradito de Lenguado (R4)",
           "event": [
             {
               "listen": "prerequest",
@@ -2177,7 +2237,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Pulpo al Olivo (R4)",
+          "name": "Upsert Plate PE \u2014 Pulpo al Olivo (R4)",
           "event": [
             {
               "listen": "prerequest",
@@ -2232,7 +2292,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE — Pollos a la Brasa Don Lucho",
+          "name": "Upsert Restaurant PE \u2014 Pollos a la Brasa Don Lucho",
           "event": [
             {
               "listen": "test",
@@ -2277,7 +2337,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code — Don Lucho",
+          "name": "Upsert QR Code \u2014 Don Lucho",
           "event": [
             {
               "listen": "prerequest",
@@ -2332,7 +2392,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE — Pollo a la Brasa (cuarto)",
+          "name": "Upsert Product PE \u2014 Pollo a la Brasa (cuarto)",
           "event": [
             {
               "listen": "test",
@@ -2375,7 +2435,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE — Pollo a la Brasa (R5)",
+          "name": "Upsert Plate PE \u2014 Pollo a la Brasa (R5)",
           "event": [
             {
               "listen": "prerequest",
@@ -2430,7 +2490,7 @@
           "response": []
         },
         {
-          "name": "Plate Kitchen Days — PE Plates",
+          "name": "Plate Kitchen Days \u2014 PE Plates",
           "item": [
             {
               "name": "PKD PE Ceviche Monday",
@@ -4965,7 +5025,7 @@
           ]
         },
         {
-          "name": "Upsert Plan PE — Estandar",
+          "name": "Upsert Plan PE \u2014 Estandar",
           "event": [
             {
               "listen": "test",
@@ -5051,7 +5111,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE — Doña Lucha Sangucheria",
+          "name": "Activate Restaurant PE \u2014 Do\u00f1a Lucha Sangucheria",
           "event": [
             {
               "listen": "test",
@@ -5093,7 +5153,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE — Anticuchería Don Tomás",
+          "name": "Activate Restaurant PE \u2014 Anticucher\u00eda Don Tom\u00e1s",
           "event": [
             {
               "listen": "test",
@@ -5135,7 +5195,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE — La Esquina del Tiradito",
+          "name": "Activate Restaurant PE \u2014 La Esquina del Tiradito",
           "event": [
             {
               "listen": "test",
@@ -5177,7 +5237,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE — Pollos a la Brasa Don Lucho",
+          "name": "Activate Restaurant PE \u2014 Pollos a la Brasa Don Lucho",
           "event": [
             {
               "listen": "test",
@@ -5217,6 +5277,704 @@
             }
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "12 Secondary supplier (PE)",
+      "item": [
+        {
+          "name": "Upsert Institution \u2014 Cocina Andina S.A.C. (PE secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_PE_COCINA_ANDINA\",\n  \"name\": \"Cocina Andina S.A.C.\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000003\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionPe2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionPe2Id', body.institution_id);",
+                  "console.log('PE secondary institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Institution Entity \u2014 Cocina Andina S.A.C. (PE secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_PE2\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0011-0000-000000000001\",\n  \"tax_id\": \"20612345678\",\n  \"name\": \"Cocina Andina S.A.C.\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionPe2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEntityPe2Id', body.institution_entity_id);",
+                  "pm.environment.set('demoEntityPe2Id', body.institution_entity_id);",
+                  "console.log('PE secondary entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User \u2014 demo.proveedor.pe.02.admin@vianda.demo (PE secondary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE2_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.pe.02.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.pe.02.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Andina PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionPe2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('PE secondary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Restaurant \u2014 La Alpaca Barranco (PE secondary, outlier)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_ALPACA_BARRANCO\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"institution_entity_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0011-0000-000000000002\",\n  \"name\": \"La Alpaca Barranco\",\n  \"tagline\": \"Cocina andina contemporanea en el corazon de Barranco\",\n  \"tagline_i18n\": {\n    \"en\": \"Contemporary Andean cuisine in the heart of Barranco\",\n    \"es\": \"Cocina andina contemporanea en el corazon de Barranco\"\n  },\n  \"pickup_instructions\": \"Ingreso por la calle Pedro de Osma. Mostrador junto a la entrada.\",\n  \"is_featured\": false,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionPe2Id');",
+                  "payload.institution_entity_id = pm.collectionVariables.get('demoEntityPe2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has restaurant_id', () => { pm.expect(body).to.have.property('restaurant_id'); });",
+                  "pm.collectionVariables.set('restaurantPe2R1Id', body.restaurant_id);",
+                  "pm.environment.set('restaurantPe2R1Id', body.restaurant_id);",
+                  "console.log('PE secondary restaurant DEMO_RESTAURANT_PE_ALPACA_BARRANCO:', body.restaurant_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert QR \u2014 DEMO_QR_PE2_BARRANCO",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_QR_PE2_BARRANCO\",\n  \"restaurant_id\": \"PLACEHOLDER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/qr-codes/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "qr-codes",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantPe2R1Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has qr_code_id', () => { pm.expect(body).to.have.property('qr_code_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Product \u2014 Lomo Saltado de Alpaca (PE secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE2_LOMO_SALTADO_ALPACA\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"name\": \"Lomo Saltado de Alpaca\",\n  \"description\": \"Lomo saltado preparado con carne de alpaca, papas fritas, cebolla morada y tomate. Servido con arroz blanco.\",\n  \"ingredients\": \"alpaca, papa, cebolla morada, tomate, sillau, aji amarillo, arroz\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionPe2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has product_id', () => { pm.expect(body).to.have.property('product_id'); });",
+                  "pm.collectionVariables.set('productPe2LomoAlpacaId', body.product_id);",
+                  "console.log('PE2 product DEMO_PRODUCT_PE2_LOMO_SALTADO_ALPACA:', body.product_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Plate \u2014 DEMO_PLATE_PE2_R1_LOMO_SALTADO_ALPACA",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PLATE_PE2_R1_LOMO_SALTADO_ALPACA\",\n  \"restaurant_id\": \"PLACEHOLDER\",\n  \"product_id\": \"PLACEHOLDER\",\n  \"price\": 44,\n  \"credit\": 9,\n  \"delivery_time_minutes\": 12,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantPe2R1Id');",
+                  "payload.product_id = pm.collectionVariables.get('productPe2LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has plate_id', () => { pm.expect(body).to.have.property('plate_id'); });",
+                  "pm.collectionVariables.set('platePe2R1LomoAlpacaId', body.plate_id);",
+                  "console.log('Plate DEMO_PLATE_PE2_R1_LOMO_SALTADO_ALPACA:', body.plate_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA Monday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA_MONDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"monday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('platePe2R1LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD monday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA Tuesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA_TUESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"tuesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('platePe2R1LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD tuesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA Wednesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA_WEDNESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"wednesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('platePe2R1LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD wednesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA Thursday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA_THURSDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"thursday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('platePe2R1LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD thursday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA Friday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_PE2_R1_LOMO_SALTADO_ALPACA_FRIDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"friday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('platePe2R1LomoAlpacaId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD friday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate Restaurant \u2014 La Alpaca Barranco (PE secondary)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});",
+                  "const restId = pm.collectionVariables.get('restaurantPe2R1Id');",
+                  "if (!restId) { pm.execution.skipRequest('No restaurant ID'); return; }",
+                  "const url = pm.request.url.toString();",
+                  "pm.request.url = url.replace('{{restaurantPe2R1Id}}', restId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Activate 200', () => { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"active\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantPe2R1Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "{{restaurantPe2R1Id}}"
+              ]
+            }
+          }
         }
       ]
     },
@@ -7379,7 +8137,7 @@
     },
     {
       "name": "30 Subscribe each customer",
-      "description": "POST /subscriptions/with-payment then POST /subscriptions/{id}/confirm-payment (mock) for each of the 5 PE demo customers. Requires PAYMENT_PROVIDER=mock in .env — loader enforces this upfront. The confirm-payment step gracefully skips with a warning if PAYMENT_PROVIDER is not mock. C07 (no_orders) also subscribes here. C06 (no_plan) is intentionally skipped.",
+      "description": "POST /subscriptions/with-payment then POST /subscriptions/{id}/confirm-payment (mock) for each of the 5 PE demo customers. Requires PAYMENT_PROVIDER=mock in .env \u2014 loader enforces this upfront. The confirm-payment step gracefully skips with a warning if PAYMENT_PROVIDER is not mock. C07 (no_orders) also subscribes here. C06 (no_plan) is intentionally skipped.",
       "item": [
         {
           "name": "C01 Create Subscription",
@@ -9093,13 +9851,13 @@
     },
     {
       "name": "40 Order history loop",
-      "description": "5 customers x 5 orders each = 25 completed orders. For each: plate-selection -> kitchen-start-promotion -> list-pending-qr -> qr-scan -> enriched-pickups -> complete -> review. Not idempotent — creates new rows each run. To reset: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh",
+      "description": "5 customers x 5 orders each = 25 completed orders. For each: plate-selection -> kitchen-start-promotion -> list-pending-qr -> qr-scan -> enriched-pickups -> complete -> review. Not idempotent \u2014 creates new rows each run. To reset: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh",
       "item": [
         {
-          "name": "Customer 01 — Camila Quispe",
+          "name": "Customer 01 \u2014 Camila Quispe",
           "item": [
             {
-              "name": "C01 Order1 — Plate Selection",
+              "name": "C01 Order1 \u2014 Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9107,7 +9865,7 @@
                     "exec": [
                       "// Customer 1 order 1",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -9166,7 +9924,7 @@
               }
             },
             {
-              "name": "C01 Order1 — Kitchen Start Promotion",
+              "name": "C01 Order1 \u2014 Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9219,7 +9977,7 @@
               }
             },
             {
-              "name": "C01 Order1 — List Pending QR",
+              "name": "C01 Order1 \u2014 List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9279,7 +10037,7 @@
               }
             },
             {
-              "name": "C01 Order1 — QR Scan",
+              "name": "C01 Order1 \u2014 QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9287,7 +10045,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe01O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe01O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -9346,7 +10104,7 @@
               }
             },
             {
-              "name": "C01 Order1 — Get Enriched Pickups",
+              "name": "C01 Order1 \u2014 Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9400,14 +10158,14 @@
               }
             },
             {
-              "name": "C01 Order1 — Complete Order",
+              "name": "C01 Order1 \u2014 Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe01O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -9455,14 +10213,14 @@
               }
             },
             {
-              "name": "C01 Order1 — Plate Review (5 stars)",
+              "name": "C01 Order1 \u2014 Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe01O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -9521,10 +10279,10 @@
           ]
         },
         {
-          "name": "Customer 02 — Sebastian Torres",
+          "name": "Customer 02 \u2014 Sebastian Torres",
           "item": [
             {
-              "name": "C02 Order1 — Plate Selection",
+              "name": "C02 Order1 \u2014 Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9532,7 +10290,7 @@
                     "exec": [
                       "// Customer 2 order 1",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -9591,7 +10349,7 @@
               }
             },
             {
-              "name": "C02 Order1 — Kitchen Start Promotion",
+              "name": "C02 Order1 \u2014 Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9644,7 +10402,7 @@
               }
             },
             {
-              "name": "C02 Order1 — List Pending QR",
+              "name": "C02 Order1 \u2014 List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9704,7 +10462,7 @@
               }
             },
             {
-              "name": "C02 Order1 — QR Scan",
+              "name": "C02 Order1 \u2014 QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9712,7 +10470,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe02O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe02O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -9771,7 +10529,7 @@
               }
             },
             {
-              "name": "C02 Order1 — Get Enriched Pickups",
+              "name": "C02 Order1 \u2014 Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9825,14 +10583,14 @@
               }
             },
             {
-              "name": "C02 Order1 — Complete Order",
+              "name": "C02 Order1 \u2014 Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe02O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -9880,14 +10638,14 @@
               }
             },
             {
-              "name": "C02 Order1 — Plate Review (5 stars)",
+              "name": "C02 Order1 \u2014 Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe02O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -9946,10 +10704,10 @@
           ]
         },
         {
-          "name": "Customer 03 — Valeria Mendoza",
+          "name": "Customer 03 \u2014 Valeria Mendoza",
           "item": [
             {
-              "name": "C03 Order1 — Plate Selection",
+              "name": "C03 Order1 \u2014 Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -9957,7 +10715,7 @@
                     "exec": [
                       "// Customer 3 order 1",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -10016,7 +10774,7 @@
               }
             },
             {
-              "name": "C03 Order1 — Kitchen Start Promotion",
+              "name": "C03 Order1 \u2014 Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10069,7 +10827,7 @@
               }
             },
             {
-              "name": "C03 Order1 — List Pending QR",
+              "name": "C03 Order1 \u2014 List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10129,7 +10887,7 @@
               }
             },
             {
-              "name": "C03 Order1 — QR Scan",
+              "name": "C03 Order1 \u2014 QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10137,7 +10895,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe03O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe03O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -10196,7 +10954,7 @@
               }
             },
             {
-              "name": "C03 Order1 — Get Enriched Pickups",
+              "name": "C03 Order1 \u2014 Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10250,14 +11008,14 @@
               }
             },
             {
-              "name": "C03 Order1 — Complete Order",
+              "name": "C03 Order1 \u2014 Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe03O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -10305,14 +11063,14 @@
               }
             },
             {
-              "name": "C03 Order1 — Plate Review (5 stars)",
+              "name": "C03 Order1 \u2014 Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe03O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -10371,10 +11129,10 @@
           ]
         },
         {
-          "name": "Customer 04 — Diego Ramirez",
+          "name": "Customer 04 \u2014 Diego Ramirez",
           "item": [
             {
-              "name": "C04 Order1 — Plate Selection",
+              "name": "C04 Order1 \u2014 Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10382,7 +11140,7 @@
                     "exec": [
                       "// Customer 4 order 1",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -10441,7 +11199,7 @@
               }
             },
             {
-              "name": "C04 Order1 — Kitchen Start Promotion",
+              "name": "C04 Order1 \u2014 Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10494,7 +11252,7 @@
               }
             },
             {
-              "name": "C04 Order1 — List Pending QR",
+              "name": "C04 Order1 \u2014 List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10554,7 +11312,7 @@
               }
             },
             {
-              "name": "C04 Order1 — QR Scan",
+              "name": "C04 Order1 \u2014 QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10562,7 +11320,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe04O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe04O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -10621,7 +11379,7 @@
               }
             },
             {
-              "name": "C04 Order1 — Get Enriched Pickups",
+              "name": "C04 Order1 \u2014 Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10675,14 +11433,14 @@
               }
             },
             {
-              "name": "C04 Order1 — Complete Order",
+              "name": "C04 Order1 \u2014 Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe04O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -10730,14 +11488,14 @@
               }
             },
             {
-              "name": "C04 Order1 — Plate Review (5 stars)",
+              "name": "C04 Order1 \u2014 Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe04O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -10796,10 +11554,10 @@
           ]
         },
         {
-          "name": "Customer 05 — Andrea Flores",
+          "name": "Customer 05 \u2014 Andrea Flores",
           "item": [
             {
-              "name": "C05 Order1 — Plate Selection",
+              "name": "C05 Order1 \u2014 Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10807,7 +11565,7 @@
                     "exec": [
                       "// Customer 5 order 1",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -10866,7 +11624,7 @@
               }
             },
             {
-              "name": "C05 Order1 — Kitchen Start Promotion",
+              "name": "C05 Order1 \u2014 Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10919,7 +11677,7 @@
               }
             },
             {
-              "name": "C05 Order1 — List Pending QR",
+              "name": "C05 Order1 \u2014 List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10979,7 +11737,7 @@
               }
             },
             {
-              "name": "C05 Order1 — QR Scan",
+              "name": "C05 Order1 \u2014 QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10987,7 +11745,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe05O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe05O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11046,7 +11804,7 @@
               }
             },
             {
-              "name": "C05 Order1 — Get Enriched Pickups",
+              "name": "C05 Order1 \u2014 Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11100,14 +11858,14 @@
               }
             },
             {
-              "name": "C05 Order1 — Complete Order",
+              "name": "C05 Order1 \u2014 Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe05O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -11155,14 +11913,14 @@
               }
             },
             {
-              "name": "C05 Order1 — Plate Review (5 stars)",
+              "name": "C05 Order1 \u2014 Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe05O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11223,11 +11981,74 @@
       ]
     },
     {
+      "name": "45 Supplier billing (PE)",
+      "item": [
+        {
+          "name": "Run settlement pipeline (PE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Pipeline message present', () => { pm.expect(body).to.have.property('message'); });",
+                  "console.log('Settlement pipeline PE result:', JSON.stringify(body));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/run-settlement-pipeline?country_code=PE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills",
+                "run-settlement-pipeline"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "PE"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "10 Supplier menu (AR)",
       "description": "Upsert 5 AR restaurants (Microcentro CABA cluster), QR codes, 10 Argentine products, 10 plates, PKDs Mon-Fri, 1 AR plan. Plan: ARS 16000 / 20 credits = 800 ARS/credit. All plates 20-24% savings.",
       "item": [
         {
-          "name": "Upsert Restaurant — Parrilla La Lavalle",
+          "name": "Upsert Restaurant \u2014 Parrilla La Lavalle",
           "event": [
             {
               "listen": "test",
@@ -11271,7 +12092,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Pizzeria Don Vicente",
+          "name": "Upsert Restaurant \u2014 Pizzeria Don Vicente",
           "event": [
             {
               "listen": "test",
@@ -11315,7 +12136,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Cafe del Centro",
+          "name": "Upsert Restaurant \u2014 Cafe del Centro",
           "event": [
             {
               "listen": "test",
@@ -11359,7 +12180,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Bodegon San Martin",
+          "name": "Upsert Restaurant \u2014 Bodegon San Martin",
           "event": [
             {
               "listen": "test",
@@ -11403,7 +12224,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Empanadas de Florida",
+          "name": "Upsert Restaurant \u2014 Empanadas de Florida",
           "event": [
             {
               "listen": "test",
@@ -11447,7 +12268,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_AR_LA_LAVALLE",
+          "name": "Upsert QR \u2014 DEMO_QR_AR_LA_LAVALLE",
           "event": [
             {
               "listen": "prerequest",
@@ -11501,7 +12322,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_AR_DON_VICENTE",
+          "name": "Upsert QR \u2014 DEMO_QR_AR_DON_VICENTE",
           "event": [
             {
               "listen": "prerequest",
@@ -11555,7 +12376,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_AR_CAFE_DEL_CENTRO",
+          "name": "Upsert QR \u2014 DEMO_QR_AR_CAFE_DEL_CENTRO",
           "event": [
             {
               "listen": "prerequest",
@@ -11609,7 +12430,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_AR_BODEGON_SM",
+          "name": "Upsert QR \u2014 DEMO_QR_AR_BODEGON_SM",
           "event": [
             {
               "listen": "prerequest",
@@ -11663,7 +12484,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_AR_EMPANADAS_FLORIDA",
+          "name": "Upsert QR \u2014 DEMO_QR_AR_EMPANADAS_FLORIDA",
           "event": [
             {
               "listen": "prerequest",
@@ -11717,7 +12538,7 @@
           }
         },
         {
-          "name": "Upsert Product — Milanesa a la Napolitana",
+          "name": "Upsert Product \u2014 Milanesa a la Napolitana",
           "event": [
             {
               "listen": "test",
@@ -11759,7 +12580,7 @@
           }
         },
         {
-          "name": "Upsert Product — Asado de Tira con Chimichurri",
+          "name": "Upsert Product \u2014 Asado de Tira con Chimichurri",
           "event": [
             {
               "listen": "test",
@@ -11801,7 +12622,7 @@
           }
         },
         {
-          "name": "Upsert Product — Pizza Mozzarella",
+          "name": "Upsert Product \u2014 Pizza Mozzarella",
           "event": [
             {
               "listen": "test",
@@ -11843,7 +12664,7 @@
           }
         },
         {
-          "name": "Upsert Product — Fugazzeta Rellena",
+          "name": "Upsert Product \u2014 Fugazzeta Rellena",
           "event": [
             {
               "listen": "test",
@@ -11885,7 +12706,7 @@
           }
         },
         {
-          "name": "Upsert Product — Choripan con Chimichurri",
+          "name": "Upsert Product \u2014 Choripan con Chimichurri",
           "event": [
             {
               "listen": "test",
@@ -11927,7 +12748,7 @@
           }
         },
         {
-          "name": "Upsert Product — Provoleta con Oregano",
+          "name": "Upsert Product \u2014 Provoleta con Oregano",
           "event": [
             {
               "listen": "test",
@@ -11969,7 +12790,7 @@
           }
         },
         {
-          "name": "Upsert Product — Empanadas (6 unidades)",
+          "name": "Upsert Product \u2014 Empanadas (6 unidades)",
           "event": [
             {
               "listen": "test",
@@ -12011,7 +12832,7 @@
           }
         },
         {
-          "name": "Upsert Product — Noquis del 29 con Tuco",
+          "name": "Upsert Product \u2014 Noquis del 29 con Tuco",
           "event": [
             {
               "listen": "test",
@@ -12053,7 +12874,7 @@
           }
         },
         {
-          "name": "Upsert Product — Bondiola Braseada",
+          "name": "Upsert Product \u2014 Bondiola Braseada",
           "event": [
             {
               "listen": "test",
@@ -12095,7 +12916,7 @@
           }
         },
         {
-          "name": "Upsert Product — Lomo de Cerdo a la Criolla",
+          "name": "Upsert Product \u2014 Lomo de Cerdo a la Criolla",
           "event": [
             {
               "listen": "test",
@@ -12137,7 +12958,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R1_MILANESA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R1_MILANESA",
           "event": [
             {
               "listen": "prerequest",
@@ -12458,7 +13279,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R1_ASADO",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R1_ASADO",
           "event": [
             {
               "listen": "prerequest",
@@ -12779,7 +13600,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R2_PIZZA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R2_PIZZA",
           "event": [
             {
               "listen": "prerequest",
@@ -13100,7 +13921,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R2_FUGAZZETA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R2_FUGAZZETA",
           "event": [
             {
               "listen": "prerequest",
@@ -13421,7 +14242,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R3_CHORIPAN",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R3_CHORIPAN",
           "event": [
             {
               "listen": "prerequest",
@@ -13742,7 +14563,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R3_PROVOLETA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R3_PROVOLETA",
           "event": [
             {
               "listen": "prerequest",
@@ -14063,7 +14884,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R4_EMPANADAS",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R4_EMPANADAS",
           "event": [
             {
               "listen": "prerequest",
@@ -14384,7 +15205,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R4_NOQUI",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R4_NOQUI",
           "event": [
             {
               "listen": "prerequest",
@@ -14705,7 +15526,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R5_BONDIOLA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R5_BONDIOLA",
           "event": [
             {
               "listen": "prerequest",
@@ -15026,7 +15847,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_AR_R5_LOMO_CERDO",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R5_LOMO_CERDO",
           "event": [
             {
               "listen": "prerequest",
@@ -15347,7 +16168,7 @@
           }
         },
         {
-          "name": "Upsert Plan — Plan Estandar AR",
+          "name": "Upsert Plan \u2014 Plan Estandar AR",
           "event": [
             {
               "listen": "test",
@@ -15391,7 +16212,7 @@
           }
         },
         {
-          "name": "Activate Restaurant — Parrilla La Lavalle",
+          "name": "Activate Restaurant \u2014 Parrilla La Lavalle",
           "request": {
             "method": "PUT",
             "header": [],
@@ -15446,7 +16267,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Pizzeria Don Vicente",
+          "name": "Activate Restaurant \u2014 Pizzeria Don Vicente",
           "request": {
             "method": "PUT",
             "header": [],
@@ -15501,7 +16322,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Cafe del Centro",
+          "name": "Activate Restaurant \u2014 Cafe del Centro",
           "request": {
             "method": "PUT",
             "header": [],
@@ -15556,7 +16377,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Bodegon San Martin",
+          "name": "Activate Restaurant \u2014 Bodegon San Martin",
           "request": {
             "method": "PUT",
             "header": [],
@@ -15611,7 +16432,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Empanadas de Florida",
+          "name": "Activate Restaurant \u2014 Empanadas de Florida",
           "request": {
             "method": "PUT",
             "header": [],
@@ -15664,6 +16485,704 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "12 Secondary supplier (AR)",
+      "item": [
+        {
+          "name": "Upsert Institution \u2014 Cocina de Recoleta S.R.L. (AR secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_AR_COCINA_RECOLETA\",\n  \"name\": \"Cocina de Recoleta S.R.L.\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000002\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionAr2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionAr2Id', body.institution_id);",
+                  "console.log('AR secondary institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Institution Entity \u2014 Cocina de Recoleta S.R.L. (AR secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_AR2\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0021-0000-000000000001\",\n  \"tax_id\": \"30-89876543-0\",\n  \"name\": \"Cocina de Recoleta S.R.L.\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionAr2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEntityAr2Id', body.institution_entity_id);",
+                  "pm.environment.set('demoEntityAr2Id', body.institution_entity_id);",
+                  "console.log('AR secondary entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User \u2014 demo.proveedor.ar.02.admin@vianda.demo (AR secondary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR2_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.ar.02.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.ar.02.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Recoleta AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionAr2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('AR secondary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Restaurant \u2014 El Clasico de Recoleta (AR secondary, outlier)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_CLASICO_RECOLETA\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"institution_entity_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0021-0000-000000000002\",\n  \"name\": \"El Clasico de Recoleta\",\n  \"tagline\": \"La cocina argentina de siempre, en el barrio mas elegante\",\n  \"tagline_i18n\": {\n    \"en\": \"Classic Argentine cuisine in the most elegant neighborhood\",\n    \"es\": \"La cocina argentina de siempre, en el barrio mas elegante\"\n  },\n  \"pickup_instructions\": \"Ingreso por Av. Santa Fe. Mostrador de retiro junto a la entrada principal.\",\n  \"is_featured\": false,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionAr2Id');",
+                  "payload.institution_entity_id = pm.collectionVariables.get('demoEntityAr2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has restaurant_id', () => { pm.expect(body).to.have.property('restaurant_id'); });",
+                  "pm.collectionVariables.set('restaurantAr2R1Id', body.restaurant_id);",
+                  "pm.environment.set('restaurantAr2R1Id', body.restaurant_id);",
+                  "console.log('AR secondary restaurant DEMO_RESTAURANT_AR_CLASICO_RECOLETA:', body.restaurant_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert QR \u2014 DEMO_QR_AR2_RECOLETA",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_QR_AR2_RECOLETA\",\n  \"restaurant_id\": \"PLACEHOLDER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/qr-codes/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "qr-codes",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantAr2R1Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has qr_code_id', () => { pm.expect(body).to.have.property('qr_code_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Product \u2014 Noquis de Papa al Estofado (AR secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR2_NOQUIS_ESTOFADO\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"name\": \"Noquis de Papa al Estofado\",\n  \"description\": \"Noquis de papa artesanales con estofado de carne de res, cebolla y zanahoria. Tipico plato del 29.\",\n  \"ingredients\": \"papa, harina, huevo, carne res, cebolla, zanahoria, tomate, laurel\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionAr2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has product_id', () => { pm.expect(body).to.have.property('product_id'); });",
+                  "pm.collectionVariables.set('productAr2NoquisId', body.product_id);",
+                  "console.log('AR2 product DEMO_PRODUCT_AR2_NOQUIS_ESTOFADO:', body.product_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Plate \u2014 DEMO_PLATE_AR2_R1_NOQUIS_ESTOFADO",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PLATE_AR2_R1_NOQUIS_ESTOFADO\",\n  \"restaurant_id\": \"PLACEHOLDER\",\n  \"product_id\": \"PLACEHOLDER\",\n  \"price\": 21000,\n  \"credit\": 21,\n  \"delivery_time_minutes\": 12,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantAr2R1Id');",
+                  "payload.product_id = pm.collectionVariables.get('productAr2NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has plate_id', () => { pm.expect(body).to.have.property('plate_id'); });",
+                  "pm.collectionVariables.set('plateAr2R1NoquisId', body.plate_id);",
+                  "console.log('Plate DEMO_PLATE_AR2_R1_NOQUIS_ESTOFADO:', body.plate_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO Monday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO_MONDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"monday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateAr2R1NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD monday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO Tuesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO_TUESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"tuesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateAr2R1NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD tuesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO Wednesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO_WEDNESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"wednesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateAr2R1NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD wednesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO Thursday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO_THURSDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"thursday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateAr2R1NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD thursday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO Friday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_AR2_R1_NOQUIS_ESTOFADO_FRIDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"friday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateAr2R1NoquisId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD friday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate Restaurant \u2014 El Clasico de Recoleta (AR secondary)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});",
+                  "const restId = pm.collectionVariables.get('restaurantAr2R1Id');",
+                  "if (!restId) { pm.execution.skipRequest('No restaurant ID'); return; }",
+                  "const url = pm.request.url.toString();",
+                  "pm.request.url = url.replace('{{restaurantAr2R1Id}}', restId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Activate 200', () => { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"active\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantAr2R1Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "{{restaurantAr2R1Id}}"
+              ]
+            }
+          }
         }
       ]
     },
@@ -20951,11 +22470,74 @@
       ]
     },
     {
+      "name": "45 Supplier billing (AR)",
+      "item": [
+        {
+          "name": "Run settlement pipeline (AR)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Pipeline message present', () => { pm.expect(body).to.have.property('message'); });",
+                  "console.log('Settlement pipeline AR result:', JSON.stringify(body));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/run-settlement-pipeline?country_code=AR",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills",
+                "run-settlement-pipeline"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "AR"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "10 Supplier menu (US)",
       "description": "Upsert 5 US restaurants (Pike Place cluster Seattle), QR codes, 10 Pacific Northwest products, 10 plates, PKDs Mon-Fri, 1 US plan. Plan: $15 USD / 20 credits = $0.75/credit. All plates 18-21% savings.",
       "item": [
         {
-          "name": "Upsert Restaurant — Pike Place Chowder",
+          "name": "Upsert Restaurant \u2014 Pike Place Chowder",
           "event": [
             {
               "listen": "test",
@@ -20999,7 +22581,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Beecher's Deli",
+          "name": "Upsert Restaurant \u2014 Beecher's Deli",
           "event": [
             {
               "listen": "test",
@@ -21043,7 +22625,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Post Alley Pizza",
+          "name": "Upsert Restaurant \u2014 Post Alley Pizza",
           "event": [
             {
               "listen": "test",
@@ -21087,7 +22669,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Market Street Poke",
+          "name": "Upsert Restaurant \u2014 Market Street Poke",
           "event": [
             {
               "listen": "test",
@@ -21131,7 +22713,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant — Stewart Street Diner",
+          "name": "Upsert Restaurant \u2014 Stewart Street Diner",
           "event": [
             {
               "listen": "test",
@@ -21175,7 +22757,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_US_PIKE_CHOWDER",
+          "name": "Upsert QR \u2014 DEMO_QR_US_PIKE_CHOWDER",
           "event": [
             {
               "listen": "prerequest",
@@ -21229,7 +22811,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_US_BEECHERSELLI",
+          "name": "Upsert QR \u2014 DEMO_QR_US_BEECHERSELLI",
           "event": [
             {
               "listen": "prerequest",
@@ -21283,7 +22865,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_US_POST_ALLEY_PIZ",
+          "name": "Upsert QR \u2014 DEMO_QR_US_POST_ALLEY_PIZ",
           "event": [
             {
               "listen": "prerequest",
@@ -21337,7 +22919,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_US_MARKET_POKE",
+          "name": "Upsert QR \u2014 DEMO_QR_US_MARKET_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -21391,7 +22973,7 @@
           }
         },
         {
-          "name": "Upsert QR — DEMO_QR_US_STEWART_DINER",
+          "name": "Upsert QR \u2014 DEMO_QR_US_STEWART_DINER",
           "event": [
             {
               "listen": "prerequest",
@@ -21445,7 +23027,7 @@
           }
         },
         {
-          "name": "Upsert Product — Clam Chowder",
+          "name": "Upsert Product \u2014 Clam Chowder",
           "event": [
             {
               "listen": "test",
@@ -21487,7 +23069,7 @@
           }
         },
         {
-          "name": "Upsert Product — Fish and Chips",
+          "name": "Upsert Product \u2014 Fish and Chips",
           "event": [
             {
               "listen": "test",
@@ -21529,7 +23111,7 @@
           }
         },
         {
-          "name": "Upsert Product — Flagship Mac and Cheese",
+          "name": "Upsert Product \u2014 Flagship Mac and Cheese",
           "event": [
             {
               "listen": "test",
@@ -21571,7 +23153,7 @@
           }
         },
         {
-          "name": "Upsert Product — Grilled Cheese on Sourdough",
+          "name": "Upsert Product \u2014 Grilled Cheese on Sourdough",
           "event": [
             {
               "listen": "test",
@@ -21613,7 +23195,7 @@
           }
         },
         {
-          "name": "Upsert Product — Margherita Pizza Slice",
+          "name": "Upsert Product \u2014 Margherita Pizza Slice",
           "event": [
             {
               "listen": "test",
@@ -21655,7 +23237,7 @@
           }
         },
         {
-          "name": "Upsert Product — Pepperoni Pizza Slice",
+          "name": "Upsert Product \u2014 Pepperoni Pizza Slice",
           "event": [
             {
               "listen": "test",
@@ -21697,7 +23279,7 @@
           }
         },
         {
-          "name": "Upsert Product — Salmon Poke Bowl",
+          "name": "Upsert Product \u2014 Salmon Poke Bowl",
           "event": [
             {
               "listen": "test",
@@ -21739,7 +23321,7 @@
           }
         },
         {
-          "name": "Upsert Product — Ahi Tuna Poke Bowl",
+          "name": "Upsert Product \u2014 Ahi Tuna Poke Bowl",
           "event": [
             {
               "listen": "test",
@@ -21781,7 +23363,7 @@
           }
         },
         {
-          "name": "Upsert Product — Northwest Clam Bake Plate",
+          "name": "Upsert Product \u2014 Northwest Clam Bake Plate",
           "event": [
             {
               "listen": "test",
@@ -21823,7 +23405,7 @@
           }
         },
         {
-          "name": "Upsert Product — Turkey Club Sandwich",
+          "name": "Upsert Product \u2014 Turkey Club Sandwich",
           "event": [
             {
               "listen": "test",
@@ -21865,7 +23447,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R1_CHOWDER",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R1_CHOWDER",
           "event": [
             {
               "listen": "prerequest",
@@ -22186,7 +23768,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R1_FISH_CHIPS",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R1_FISH_CHIPS",
           "event": [
             {
               "listen": "prerequest",
@@ -22507,7 +24089,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R2_MAC_CHEESE",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R2_MAC_CHEESE",
           "event": [
             {
               "listen": "prerequest",
@@ -22828,7 +24410,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R2_GRILLED_CHEESE",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R2_GRILLED_CHEESE",
           "event": [
             {
               "listen": "prerequest",
@@ -23149,7 +24731,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R3_MARGHERITA",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R3_MARGHERITA",
           "event": [
             {
               "listen": "prerequest",
@@ -23470,7 +25052,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R3_PEPPERONI",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R3_PEPPERONI",
           "event": [
             {
               "listen": "prerequest",
@@ -23791,7 +25373,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R4_SALMON_POKE",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R4_SALMON_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -24112,7 +25694,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R4_TUNA_POKE",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R4_TUNA_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -24433,7 +26015,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R5_CLAMBAKE",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R5_CLAMBAKE",
           "event": [
             {
               "listen": "prerequest",
@@ -24754,7 +26336,7 @@
           }
         },
         {
-          "name": "Upsert Plate — DEMO_PLATE_US_R5_TURKEY_SANDWICH",
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R5_TURKEY_SANDWICH",
           "event": [
             {
               "listen": "prerequest",
@@ -25075,7 +26657,7 @@
           }
         },
         {
-          "name": "Upsert Plan — Standard Plan US",
+          "name": "Upsert Plan \u2014 Standard Plan US",
           "event": [
             {
               "listen": "test",
@@ -25119,7 +26701,7 @@
           }
         },
         {
-          "name": "Activate Restaurant — Pike Place Chowder",
+          "name": "Activate Restaurant \u2014 Pike Place Chowder",
           "request": {
             "method": "PUT",
             "header": [],
@@ -25174,7 +26756,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Pike St Comfort",
+          "name": "Activate Restaurant \u2014 Pike St Comfort",
           "request": {
             "method": "PUT",
             "header": [],
@@ -25229,7 +26811,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Italian Originals",
+          "name": "Activate Restaurant \u2014 Italian Originals",
           "request": {
             "method": "PUT",
             "header": [],
@@ -25284,7 +26866,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Pacific Poke",
+          "name": "Activate Restaurant \u2014 Pacific Poke",
           "request": {
             "method": "PUT",
             "header": [],
@@ -25339,7 +26921,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant — Puget Sound Classics",
+          "name": "Activate Restaurant \u2014 Puget Sound Classics",
           "request": {
             "method": "PUT",
             "header": [],
@@ -25392,6 +26974,704 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "12 Secondary supplier (US)",
+      "item": [
+        {
+          "name": "Upsert Institution \u2014 Capitol Hill Kitchen LLC (US secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_US_CAPITOL_HILL_KITCHEN\",\n  \"name\": \"Capitol Hill Kitchen LLC\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000004\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionUs2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionUs2Id', body.institution_id);",
+                  "console.log('US secondary institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Institution Entity \u2014 Capitol Hill Kitchen LLC (US secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_US2\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0031-0000-000000000001\",\n  \"tax_id\": \"47-8765432\",\n  \"name\": \"Capitol Hill Kitchen LLC\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionUs2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEntityUs2Id', body.institution_entity_id);",
+                  "pm.environment.set('demoEntityUs2Id', body.institution_entity_id);",
+                  "console.log('US secondary entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User \u2014 demo.proveedor.us.02.admin@vianda.demo (US secondary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US2_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.us.02.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.us.02.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Capitol Hill US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionUs2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('US secondary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Restaurant \u2014 Summit Bowl Capitol Hill (US secondary, outlier)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_SUMMIT_BOWL\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"institution_entity_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0031-0000-000000000002\",\n  \"name\": \"Summit Bowl Capitol Hill\",\n  \"tagline\": \"Bowls de granos frescos con ingredientes locales de Capitol Hill\",\n  \"tagline_i18n\": {\n    \"en\": \"Fresh grain bowls and local ingredients from Capitol Hill\",\n    \"es\": \"Bowls de granos frescos con ingredientes locales de Capitol Hill\"\n  },\n  \"pickup_instructions\": \"Enter from E Pike St. Pickup counter near the main entrance.\",\n  \"is_featured\": false,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionUs2Id');",
+                  "payload.institution_entity_id = pm.collectionVariables.get('demoEntityUs2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has restaurant_id', () => { pm.expect(body).to.have.property('restaurant_id'); });",
+                  "pm.collectionVariables.set('restaurantUs2R1Id', body.restaurant_id);",
+                  "pm.environment.set('restaurantUs2R1Id', body.restaurant_id);",
+                  "console.log('US secondary restaurant DEMO_RESTAURANT_US_SUMMIT_BOWL:', body.restaurant_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert QR \u2014 DEMO_QR_US2_BOWL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_QR_US2_BOWL\",\n  \"restaurant_id\": \"PLACEHOLDER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/qr-codes/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "qr-codes",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantUs2R1Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has qr_code_id', () => { pm.expect(body).to.have.property('qr_code_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Product \u2014 Grains and Greens Bowl (US secondary)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US2_GRAINS_GREENS_BOWL\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"name\": \"Grains and Greens Bowl\",\n  \"description\": \"Organic farro and quinoa bowl with seasonal greens, roasted vegetables, and tahini dressing.\",\n  \"ingredients\": \"farro, quinoa, kale, roasted butternut squash, chickpeas, tahini, lemon\",\n  \"dietary\": [\n    \"vegan\",\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionUs2Id');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has product_id', () => { pm.expect(body).to.have.property('product_id'); });",
+                  "pm.collectionVariables.set('productUs2GrainsBowlId', body.product_id);",
+                  "console.log('US2 product DEMO_PRODUCT_US2_GRAINS_GREENS_BOWL:', body.product_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert Plate \u2014 DEMO_PLATE_US2_R1_GRAINS_BOWL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PLATE_US2_R1_GRAINS_BOWL\",\n  \"restaurant_id\": \"PLACEHOLDER\",\n  \"product_id\": \"PLACEHOLDER\",\n  \"price\": 15,\n  \"credit\": 16,\n  \"delivery_time_minutes\": 12,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.restaurant_id = pm.collectionVariables.get('restaurantUs2R1Id');",
+                  "payload.product_id = pm.collectionVariables.get('productUs2GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has plate_id', () => { pm.expect(body).to.have.property('plate_id'); });",
+                  "pm.collectionVariables.set('plateUs2R1GrainsBowlId', body.plate_id);",
+                  "console.log('Plate DEMO_PLATE_US2_R1_GRAINS_BOWL:', body.plate_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_US2_R1_GRAINS_BOWL Monday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_US2_R1_GRAINS_BOWL_MONDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"monday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateUs2R1GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD monday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_US2_R1_GRAINS_BOWL Tuesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_US2_R1_GRAINS_BOWL_TUESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"tuesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateUs2R1GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD tuesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_US2_R1_GRAINS_BOWL Wednesday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_US2_R1_GRAINS_BOWL_WEDNESDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"wednesday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateUs2R1GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD wednesday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_US2_R1_GRAINS_BOWL Thursday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_US2_R1_GRAINS_BOWL_THURSDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"thursday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateUs2R1GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD thursday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert PKD DEMO_PKD_US2_R1_GRAINS_BOWL Friday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_PKD_US2_R1_GRAINS_BOWL_FRIDAY\",\n  \"plate_id\": \"PLACEHOLDER\",\n  \"kitchen_day\": \"friday\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-kitchen-days/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-kitchen-days",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.plate_id = pm.collectionVariables.get('plateUs2R1GrainsBowlId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PKD friday', () => { pm.expect(body).to.have.property('plate_kitchen_day_id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate Restaurant \u2014 Summit Bowl Capitol Hill (US secondary)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});",
+                  "const restId = pm.collectionVariables.get('restaurantUs2R1Id');",
+                  "if (!restId) { pm.execution.skipRequest('No restaurant ID'); return; }",
+                  "const url = pm.request.url.toString();",
+                  "pm.request.url = url.replace('{{restaurantUs2R1Id}}', restId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Activate 200', () => { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"active\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantUs2R1Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants",
+                "{{restaurantUs2R1Id}}"
+              ]
+            }
+          }
         }
       ]
     },
@@ -30671,6 +32951,69 @@
       ]
     },
     {
+      "name": "45 Supplier billing (US)",
+      "item": [
+        {
+          "name": "Run settlement pipeline (US)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Pipeline message present', () => { pm.expect(body).to.have.property('message'); });",
+                  "console.log('Settlement pipeline US result:', JSON.stringify(body));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/run-settlement-pipeline?country_code=US",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills",
+                "run-settlement-pipeline"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "US"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "99 Sanity checks",
       "description": "Read-only assertions. Verifies the demo dataset is complete.",
       "item": [
@@ -30724,9 +33067,9 @@
                   "const status = pm.response.code;",
                   "const body = pm.response.json();",
                   "// customerPe01Token must be set (from folder 20 C01 Login) for this check to return restaurants.",
-                  "// In a partial run (00+99 only), token is not in collection scope → by-city returns 401.",
+                  "// In a partial run (00+99 only), token is not in collection scope \u2192 by-city returns 401.",
                   "if (status === 401) {",
-                  "    pm.test('SKIPPED: customerPe01Token not in scope — run full collection for savings check', () => true);",
+                  "    pm.test('SKIPPED: customerPe01Token not in scope \u2014 run full collection for savings check', () => true);",
                   "    console.warn('Savings check skipped: 401 means customerPe01Token not set. Run the full collection (load_demo_data.sh) to verify savings.');",
                   "} else {",
                   "    pm.test('Status 200', () => { pm.response.to.have.status(200); });",
@@ -30756,7 +33099,7 @@
                   "// collection-level auth override when the static header resolves to empty Bearer.",
                   "const token = pm.collectionVariables.get('customerPe01Token');",
                   "if (!token) {",
-                  "    console.warn('WARN: customerPe01Token not set — collection-level admin auth will be used instead.');",
+                  "    console.warn('WARN: customerPe01Token not set \u2014 collection-level admin auth will be used instead.');",
                   "    console.warn('Run the full collection (load_demo_data.sh) for savings check to work correctly.');",
                   "} else {",
                   "    pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
@@ -30948,7 +33291,7 @@
                   "const active = subs.filter(s => s.status === 'active');",
                   "const activeOrPending = subs.filter(s => s.status === 'active' || s.status === 'pending');",
                   "pm.test('At least 5 active PE demo subscriptions (C01-C05)', () => { pm.expect(active.length).to.be.at.least(5); });",
-                  "pm.test('At least 6 subscriptions (active or pending) — C07 pending when API not in mock mode', () => { pm.expect(activeOrPending.length).to.be.at.least(6); });",
+                  "pm.test('At least 6 subscriptions (active or pending) \u2014 C07 pending when API not in mock mode', () => { pm.expect(activeOrPending.length).to.be.at.least(6); });",
                   "console.log('Active subscriptions:', active.length, 'Active+Pending:', activeOrPending.length);"
                 ],
                 "type": "text/javascript"
@@ -31328,7 +33671,7 @@
                   "    let allPlates = [];",
                   "    restaurants.forEach(r => { if (r.plates) allPlates = allPlates.concat(r.plates); });",
                   "    // by-city enriched response does not expose canonical_key; all plates returned",
-                  "    // for an AR customer querying Buenos Aires ARE demo AR plates — use allPlates directly.",
+                  "    // for an AR customer querying Buenos Aires ARE demo AR plates \u2014 use allPlates directly.",
                   "    pm.test('AR plates found in by-city response', () => { pm.expect(allPlates.length).to.be.greaterThan(0); });",
                   "    if (allPlates.length > 0) {",
                   "        const tooLow = allPlates.filter(p => p.savings < 15);",
@@ -31641,6 +33984,339 @@
               ]
             }
           }
+        },
+        {
+          "name": "Assert 2 PE demo suppliers exist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const demo = all.filter(r => r.institution_type === 'supplier' && Array.isArray(r.market_ids) && r.market_ids.includes('00000000-0000-0000-0000-000000000003') && r.canonical_key && r.canonical_key.startsWith('DEMO_'));",
+                  "pm.test('Exactly 2 PE demo supplier institutions', () => { pm.expect(demo.length).to.equal(2); });",
+                  "console.log('PE demo supplier institutions:', demo.length, demo.map(i => i.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert 2 AR demo suppliers exist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const demo = all.filter(r => r.institution_type === 'supplier' && Array.isArray(r.market_ids) && r.market_ids.includes('00000000-0000-0000-0000-000000000002') && r.canonical_key && r.canonical_key.startsWith('DEMO_'));",
+                  "pm.test('Exactly 2 AR demo supplier institutions', () => { pm.expect(demo.length).to.equal(2); });",
+                  "console.log('AR demo supplier institutions:', demo.length, demo.map(i => i.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert 2 US demo suppliers exist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const demo = all.filter(r => r.institution_type === 'supplier' && Array.isArray(r.market_ids) && r.market_ids.includes('00000000-0000-0000-0000-000000000004') && r.canonical_key && r.canonical_key.startsWith('DEMO_'));",
+                  "pm.test('Exactly 2 US demo supplier institutions', () => { pm.expect(demo.length).to.equal(2); });",
+                  "console.log('US demo supplier institutions:', demo.length, demo.map(i => i.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert PE secondary restaurant visible in by-city",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const secondary = all.filter(r => r.canonical_key === 'DEMO_RESTAURANT_PE_ALPACA_BARRANCO' && r.status === 'active');",
+                  "pm.test('PE secondary restaurant exists and is active', () => { pm.expect(secondary.length).to.equal(1); });",
+                  "console.log('PE secondary restaurant active:', secondary.length, secondary.map(r => r.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert AR secondary restaurant visible in by-city",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const secondary = all.filter(r => r.canonical_key === 'DEMO_RESTAURANT_AR_CLASICO_RECOLETA' && r.status === 'active');",
+                  "pm.test('AR secondary restaurant exists and is active', () => { pm.expect(secondary.length).to.equal(1); });",
+                  "console.log('AR secondary restaurant active:', secondary.length, secondary.map(r => r.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert US secondary restaurant visible in by-city",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restaurants"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const secondary = all.filter(r => r.canonical_key === 'DEMO_RESTAURANT_US_SUMMIT_BOWL' && r.status === 'active');",
+                  "pm.test('US secondary restaurant exists and is active', () => { pm.expect(secondary.length).to.equal(1); });",
+                  "console.log('US secondary restaurant active:', secondary.length, secondary.map(r => r.name));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assert PE billing rows exist (>=2 pipeline + 2 SQL backfill)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "pm.test('At least 2 PE billing rows from SQL backfill', () => { pm.expect(all.length).to.be.at.least(2); });",
+                  "console.log('PE billing rows total:', all.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assert AR billing rows exist (>=2 pipeline + 2 SQL backfill)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "pm.test('At least 2 AR billing rows from SQL backfill', () => { pm.expect(all.length).to.be.at.least(2); });",
+                  "console.log('AR billing rows total:', all.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assert US billing rows exist (>=2 pipeline + 2 SQL backfill)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('demoAdminToken') || pm.environment.get('demoAdminToken');",
+                  "if (adminToken) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + adminToken});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "pm.test('At least 2 US billing rows from SQL backfill', () => { pm.expect(all.length).to.be.at.least(2); });",
+                  "console.log('US billing rows total:', all.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-bills"
+              ]
+            }
+          }
         }
       ]
     }
@@ -31651,7 +34327,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// [demo loader] x-client-type bypass — captcha_guard exempts b2c-mobile",
+          "// [demo loader] x-client-type bypass \u2014 captcha_guard exempts b2c-mobile",
           "pm.request.headers.upsert({key: 'x-client-type', value: 'b2c-mobile'});",
           ""
         ]
