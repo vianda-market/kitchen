@@ -1,6 +1,6 @@
-# Demo Day Data Plan — PE Seed (v3)
+# Demo Day Data Plan — v5 (Employer flow — PE/AR/US)
 
-**Status:** active (v3 — cluster + savings expansion)
+**Status:** active (v5 — employer B2B subsidy demo per market)
 **Files in scope:**
 - `app/db/seed/demo_baseline.sql` — Layer A SQL seed (institutions, addresses, entity)
 - `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json` — Layer B API seed
@@ -141,3 +141,39 @@ C06 and C07 usernames (`demo.cliente.pe.06@vianda.demo`, `demo.cliente.pe.07@via
 - [x] Folder 99 updated: 5 restaurants, savings 15–30%, 7 customers, 6 active subs, C06/C07 state checks
 - [x] `load_demo_data.sh` credentials block updated (C06 + C07 with role labels)
 - [x] `purge_demo_data.sh` verified — existing LIKE pattern catches C06/C07
+
+---
+
+## v5 — Employer Flow (PE/AR/US)
+
+### New endpoints added
+
+- `PUT /api/v1/employer/program/by-key` — idempotent upsert for `core.employer_benefits_program`.
+  Canonical key stamped on the program row. Migration: `0017_employer_program_canonical_key.sql`.
+- `PUT /api/v1/employer/employee-link/by-key` — idempotent employer-sponsored subscription upsert
+  (equivalent to `POST /employer/employees/{id}/subscribe` but idempotent).
+  Canonical key stamped on `customer.subscription_info`. Migration: `0018_employer_employee_link_canonical_key.sql`.
+
+### Employer dataset (per market PE/AR/US)
+
+| Entity | Count | Canonical key pattern |
+|---|---|---|
+| Employer institution | 1 per market | `DEMO_INSTITUTION_{CC}_EMPLOYER` |
+| Employer entity | 1 per market | `DEMO_INSTITUTION_ENTITY_{CC}_EMPLOYER` |
+| Employer program | 1 per market | `DEMO_EMPLOYER_{CC}_PROGRAM` |
+| Employer admin user | 1 per market | `demo.empresa.{cc}.admin@vianda.demo` |
+| Employee users | 3 per market | `demo.empleado.{cc}.0N@vianda.demo` |
+| Employee links | 3 per market | `DEMO_EMPLOYER_{CC}_EE_DEMO_EMPLEADO_{CC}_0N_VIANDA_DEMO_LINK` |
+
+### v5 Checklist
+
+- [x] `PUT /employer/program/by-key` route + service + schema + migration 0017
+- [x] `PUT /employer/employee-link/by-key` route + service + schema + migration 0018
+- [x] `900_DEMO_DAY_SEED` — folders `15 Employer setup (PE/AR/US)` and `35 Employee links (PE/AR/US)` added
+- [x] `scripts/load_demo_data.sh` — employer admin + employee credentials blocks added for PE/AR/US
+- [x] `scripts/purge_demo_data.sh` — `demo.empleado.%` LIKE pattern added; employer entity + program + subscription_history tiers added
+- [x] `docs/api/internal/UPSERT_SEED_CONVENTION.md` — sections added for employer programs and employee links
+- [x] `CLAUDE_ARCHITECTURE.md` — employer routes, schemas, upsert services, DB columns updated
+- [x] `docs/internal/demo-day-buildup.md` — Section 10 (Employer flow) added; Section 11 = "What NOT to Do"
+- [x] Full load passes 1034/1034 assertions on first run
+- [x] Idempotency run: all employer steps idempotent (1 pre-existing failure on C01 signup POST, unrelated)

@@ -111,6 +111,8 @@ WHERE user_id IN (
        OR username LIKE 'demo.cliente.ar.%@vianda.demo'
        OR username LIKE 'demo.cliente.us.%@vianda.demo'
        OR username LIKE 'demo.proveedor.%@vianda.demo'
+       OR username LIKE 'demo.empresa.%@vianda.demo'
+       OR username LIKE 'demo.empleado.%@vianda.demo'
 );
 -- Also catch any review linked to a demo pickup regardless of user_id
 DELETE FROM customer.plate_review_info
@@ -253,17 +255,26 @@ WHERE subscription_id IN (
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
            OR username LIKE 'demo.cliente.ar.%@vianda.demo'
            OR username LIKE 'demo.cliente.us.%@vianda.demo'
+           OR username LIKE 'demo.empleado.%@vianda.demo'
     )
+)
+   OR subscription_id IN (
+    SELECT subscription_id FROM customer.subscription_info
+    WHERE canonical_key LIKE 'DEMO_EMPLOYER_%'
 );
 
--- Subscriptions
+-- Subscriptions (customers + enrolled employees)
 DELETE FROM customer.subscription_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
        OR username LIKE 'demo.cliente.ar.%@vianda.demo'
        OR username LIKE 'demo.cliente.us.%@vianda.demo'
+       OR username LIKE 'demo.empleado.%@vianda.demo'
 );
+-- Also catch any subscriptions with canonical_key DEMO_EMPLOYER_*
+DELETE FROM customer.subscription_info
+WHERE canonical_key LIKE 'DEMO_EMPLOYER_%';
 -- Also catch any dec0-prefixed subscription IDs from old approach
 DELETE FROM customer.subscription_info
 WHERE subscription_id::text LIKE 'dddddddd-dec0-%';
@@ -414,6 +425,21 @@ DELETE FROM ops.institution_entity_info
 WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%';
 
 -- -------------------------------------------------------------------------
+-- Tier 8b: Employer institution entities (depend on address; must precede
+-- address deletion because entity.address_id → address_info RESTRICT).
+-- -------------------------------------------------------------------------
+
+-- Entity history MUST be deleted before entity rows (RESTRICT FK)
+DELETE FROM audit.institution_entity_history
+WHERE institution_entity_id IN (
+    SELECT institution_entity_id FROM ops.institution_entity_info
+    WHERE canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%_EMPLOYER'
+);
+
+DELETE FROM ops.institution_entity_info
+WHERE canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%_EMPLOYER';
+
+-- -------------------------------------------------------------------------
 -- Tier 9: Addresses (depend on institution and city_metadata; user_info FK
 -- via created_by/modified_by RESTRICTs user_info delete, so addresses must
 -- go first.  Match on: dec0-prefixed seed rows, demo-supplier institution,
@@ -446,6 +472,37 @@ DELETE FROM core.address_info
 WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
 
 -- -------------------------------------------------------------------------
+-- Tier 9b: Employer benefits program (depends on institution + users)
+-- employer_benefits_program.institution_id → institution_info (RESTRICT)
+-- Must be deleted before institution and before employer admin users.
+-- -------------------------------------------------------------------------
+
+DELETE FROM audit.employer_benefits_program_history
+WHERE program_id IN (
+    SELECT program_id FROM core.employer_benefits_program
+    WHERE canonical_key LIKE 'DEMO_EMPLOYER_PROGRAM_%'
+);
+
+DELETE FROM core.employer_benefits_program
+WHERE canonical_key LIKE 'DEMO_EMPLOYER_PROGRAM_%';
+
+-- Purge employer institutions marked via canonical_key on institution_info
+-- (institution with canonical_key 'DEMO_INSTITUTION_*_EMPLOYER')
+-- Employer institution_entity_info already deleted in Tier 8b above.
+-- Audit history for employer institutions
+DELETE FROM audit.institution_history
+WHERE institution_id IN (
+    SELECT institution_id FROM core.institution_info
+    WHERE canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER'
+);
+
+DELETE FROM core.institution_market
+WHERE institution_id IN (
+    SELECT institution_id FROM core.institution_info
+    WHERE canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER'
+);
+
+-- -------------------------------------------------------------------------
 -- Tier 10: Institution cleanup
 -- Circular FK: institution_info.modified_by → user_info (RESTRICT, NOT NULL)
 --              user_info.institution_id → institution_info (RESTRICT)
@@ -456,13 +513,20 @@ WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
 -- Re-point modified_by to superadmin so demo-user deletion does not block
 UPDATE core.institution_info
 SET modified_by = (SELECT user_id FROM core.user_info WHERE username = 'superadmin' LIMIT 1)
-WHERE institution_id::text LIKE 'dddddddd-dec0-%'
-  AND modified_by IN (SELECT user_id FROM core.user_info WHERE user_id::text LIKE 'dddddddd-dec0-%');
+WHERE (institution_id::text LIKE 'dddddddd-dec0-%'
+   OR canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER')
+  AND modified_by IN (SELECT user_id FROM core.user_info
+                      WHERE user_id::text LIKE 'dddddddd-dec0-%'
+                         OR username LIKE 'demo.empresa.%@vianda.demo');
 
 -- institution_history (audit) also has modified_by → user_info (RESTRICT);
 -- delete institution audit rows before demo users.
 DELETE FROM audit.institution_history
-WHERE institution_id::text LIKE 'dddddddd-dec0-%';
+WHERE institution_id::text LIKE 'dddddddd-dec0-%'
+   OR institution_id IN (
+       SELECT institution_id FROM core.institution_info
+       WHERE canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER'
+   );
 
 -- -------------------------------------------------------------------------
 -- Tier 11: Demo users
@@ -475,7 +539,9 @@ WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
    OR username LIKE 'demo.cliente.us.%@vianda.demo'
-   OR username LIKE 'demo.proveedor.%@vianda.demo';
+   OR username LIKE 'demo.proveedor.%@vianda.demo'
+       OR username LIKE 'demo.empresa.%@vianda.demo'
+       OR username LIKE 'demo.empleado.%@vianda.demo';
 
 -- User market assignments
 DELETE FROM core.user_market_assignment
@@ -493,14 +559,18 @@ WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
    OR username LIKE 'demo.cliente.us.%@vianda.demo'
-   OR username LIKE 'demo.proveedor.%@vianda.demo';
+   OR username LIKE 'demo.proveedor.%@vianda.demo'
+       OR username LIKE 'demo.empresa.%@vianda.demo'
+       OR username LIKE 'demo.empleado.%@vianda.demo';
 
 DELETE FROM core.user_info
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
    OR username LIKE 'demo.cliente.us.%@vianda.demo'
-   OR username LIKE 'demo.proveedor.%@vianda.demo';
+   OR username LIKE 'demo.proveedor.%@vianda.demo'
+       OR username LIKE 'demo.empresa.%@vianda.demo'
+       OR username LIKE 'demo.empleado.%@vianda.demo';
 
 -- -------------------------------------------------------------------------
 -- Tier 12: Institution markets and institution
@@ -512,7 +582,8 @@ DELETE FROM core.institution_market
 WHERE institution_id::text LIKE 'dddddddd-dec0-%';
 
 DELETE FROM core.institution_info
-WHERE institution_id::text LIKE 'dddddddd-dec0-%';
+WHERE institution_id::text LIKE 'dddddddd-dec0-%'
+   OR canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER';
 
 -- -------------------------------------------------------------------------
 -- Final notice

@@ -1070,6 +1070,8 @@ CREATE TABLE IF NOT EXISTS core.employer_benefits_program (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
+    -- Idempotent upsert key (PUT /employer/program/by-key)
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -1136,6 +1138,15 @@ COMMENT ON COLUMN core.employer_benefits_program.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.employer_benefits_program.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.employer_benefits_program.canonical_key IS
+    'Stable human-readable key for idempotent upsert via PUT /employer/program/by-key. '
+    'NULL for programs created via POST /employer/program. '
+    'Convention: EMPLOYER_<INSTITUTION_SLUG>_PROGRAM[_ENTITY_<CC>].';
+
+-- Partial unique index on canonical_key (sparse: only indexed when non-null)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_employer_benefits_program_canonical_key
+    ON core.employer_benefits_program (canonical_key)
+    WHERE canonical_key IS NOT NULL;
 
 \echo 'Creating table: audit.employer_benefits_program_history'
 CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
@@ -1159,6 +1170,7 @@ CREATE TABLE IF NOT EXISTS audit.employer_benefits_program_history (
     is_active BOOLEAN NOT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
+    canonical_key VARCHAR(200) NULL,
     created_date TIMESTAMPTZ NOT NULL,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -4832,6 +4844,7 @@ CREATE TABLE IF NOT EXISTS customer.subscription_info (
     early_renewal_threshold INTEGER DEFAULT 10,  -- NULL = period-end only; >= 1 = early renew when balance below this
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'pending'::status_enum,  -- Keep for backward compatibility
+    canonical_key VARCHAR(200) NULL,             -- idempotent upsert via PUT /employer/employee-link/by-key
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     modified_by UUID NOT NULL,
@@ -4843,9 +4856,14 @@ CREATE TABLE IF NOT EXISTS customer.subscription_info (
 );
 
 -- Ensure one active subscription per user per market
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_market_active 
-    ON customer.subscription_info(user_id, market_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_market_active
+    ON customer.subscription_info(user_id, market_id)
     WHERE is_archived = FALSE;
+
+-- Partial unique index on canonical_key (sparse: only indexed when non-null)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subscription_canonical_key
+    ON customer.subscription_info (canonical_key)
+    WHERE canonical_key IS NOT NULL;
 
 -- Index for querying subscriptions by market
 CREATE INDEX IF NOT EXISTS idx_subscription_market

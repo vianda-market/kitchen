@@ -516,6 +516,7 @@ class EmployerBenefitsProgramDTO(BaseModel):
     is_active: bool = True
     is_archived: bool = False
     status: Status
+    canonical_key: str | None = None  # NULL for programs created via POST /employer/program
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
@@ -838,6 +839,7 @@ class SubscriptionDTO(BaseModel):
     hold_start_date: datetime | None = None  # When subscription was put on hold
     hold_end_date: datetime | None = None  # When subscription is expected to resume
     early_renewal_threshold: int | None = 10  # None = no early renewal; period-end only
+    canonical_key: str | None = None  # NULL for subscriptions created via normal flows
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID

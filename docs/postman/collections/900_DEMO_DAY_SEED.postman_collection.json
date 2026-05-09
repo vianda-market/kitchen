@@ -949,6 +949,102 @@
     {
       "key": "plateUs2R1GrainsBowlId",
       "value": ""
+    },
+    {
+      "key": "demoEmployerInstitutionPEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerEntityPEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminPEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminPEToken",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerProgramPEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe01PEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe02PEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe03PEId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerInstitutionARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerEntityARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminARToken",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerProgramARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe01ARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe02ARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe03ARId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerInstitutionUSId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerEntityUSId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminUSId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerAdminUSToken",
+      "value": ""
+    },
+    {
+      "key": "demoEmployerProgramUSId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe01USId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe02USId",
+      "value": ""
+    },
+    {
+      "key": "demoEmployeeEe03USId",
+      "value": ""
     }
   ],
   "item": [
@@ -5979,6 +6075,490 @@
       ]
     },
     {
+      "name": "15 Employer institution (PE)",
+      "item": [
+        {
+          "name": "Upsert Employer Institution (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_PE_EMPLOYER\",\n  \"name\": \"Empresa Demo Lima SAC\",\n  \"institution_type\": \"employer\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000003\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoEmployerInstitutionPEId', body.institution_id);",
+                  "pm.environment.set('demoEmployerInstitutionPEId', body.institution_id);",
+                  "console.log('PE employer institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Institution Entity (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_PE_EMPLOYER\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0060-0000-000000000001\",\n  \"tax_id\": \"20-60123456-1\",\n  \"name\": \"Empresa Demo Lima SAC\",\n  \"email_domain\": \"vianda-demo-pe.com\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEmployerEntityPEId', body.institution_entity_id);",
+                  "pm.environment.set('demoEmployerEntityPEId', body.institution_entity_id);",
+                  "console.log('PE employer entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Admin \u2014 demo.empresa.pe.admin@vianda.demo (EM01_PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE_EMPLOYER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"employer\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.empresa.pe.admin@vianda.demo\",\n  \"email\": \"demo.empresa.pe.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Empresa PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployerAdminPEId', body.user_id);",
+                  "pm.environment.set('demoEmployerAdminPEId', body.user_id);",
+                  "console.log('PE employer admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Benefits Program (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PROGRAM_PE\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"benefit_rate\": 100,\n  \"benefit_cap_period\": \"monthly\",\n  \"price_discount\": 0,\n  \"billing_cycle\": \"monthly\",\n  \"billing_day\": 1,\n  \"enrollment_mode\": \"managed\",\n  \"allow_early_renewal\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has program_id', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.collectionVariables.set('demoEmployerProgramPEId', body.program_id);",
+                  "pm.environment.set('demoEmployerProgramPEId', body.program_id);",
+                  "console.log('PE employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Resolve PE city_metadata_id (employer employees)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities?country_code=PE&exclude_global=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "PE"
+                },
+                {
+                  "key": "exclude_global",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const cities = pm.response.json();",
+                  "const existing = pm.collectionVariables.get('cityMetadataIdPE');",
+                  "if (existing && existing.length > 5) { console.log('Reusing cityMetadataIdPE:', existing); return; }",
+                  "if (!cities || !cities.length) { console.warn('No cities for PE'); return; }",
+                  "const city = cities[0];",
+                  "pm.collectionVariables.set('cityMetadataIdPE', city.city_metadata_id);",
+                  "console.log('Resolved cityMetadataIdPE:', city.city_metadata_id, city.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE01 \u2014 demo.empleado.pe.01@vianda.demo (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE_EMPLOYER_EE01\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.pe.01@vianda.demo\",\n  \"email\": \"demo.empleado.pe.01@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Ana\",\n  \"last_name\": \"Empleada PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdPE');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe01PEId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe01PEId', body.user_id);",
+                  "console.log('PE employee EE01:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE02 \u2014 demo.empleado.pe.02@vianda.demo (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE_EMPLOYER_EE02\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.pe.02@vianda.demo\",\n  \"email\": \"demo.empleado.pe.02@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Carlos\",\n  \"last_name\": \"Empleado PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdPE');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe02PEId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe02PEId', body.user_id);",
+                  "console.log('PE employee EE02:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE03 \u2014 demo.empleado.pe.03@vianda.demo (PE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE_EMPLOYER_EE03\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.pe.03@vianda.demo\",\n  \"email\": \"demo.empleado.pe.03@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Maria\",\n  \"last_name\": \"Empleada PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionPEId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdPE');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe03PEId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe03PEId', body.user_id);",
+                  "console.log('PE employee EE03:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "20 Customers (PE)",
       "description": "Sign up 7 PE demo customers via the verified email flow. C06 (no_plan) and C07 (no_orders) added. Shared password: {{customerSharedPassword}}.",
       "item": [
@@ -9845,6 +10425,200 @@
             },
             "description": "Polling logic lives in the test script via pm.sendRequest."
           },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "35 Employer subscriptions (PE)",
+      "item": [
+        {
+          "name": "Upsert Employee Link EE01 (PE) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PE_EE01_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe01PEId');",
+                  "payload.plan_id = pm.collectionVariables.get('planPeId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('PE EE01 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE02 (PE) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PE_EE02_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe02PEId');",
+                  "payload.plan_id = pm.collectionVariables.get('planPeId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('PE EE02 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE03 (PE) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PE_EE03_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe03PEId');",
+                  "payload.plan_id = pm.collectionVariables.get('planPeId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('PE EE03 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": []
         }
       ]
@@ -17187,6 +17961,490 @@
       ]
     },
     {
+      "name": "15 Employer institution (AR)",
+      "item": [
+        {
+          "name": "Upsert Employer Institution (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_AR_EMPLOYER\",\n  \"name\": \"Demo Argentina S.A.\",\n  \"institution_type\": \"employer\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000002\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoEmployerInstitutionARId', body.institution_id);",
+                  "pm.environment.set('demoEmployerInstitutionARId', body.institution_id);",
+                  "console.log('AR employer institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Institution Entity (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_AR_EMPLOYER\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0060-0000-000000000002\",\n  \"tax_id\": \"30-71234567-0\",\n  \"name\": \"Demo Argentina S.A.\",\n  \"email_domain\": \"vianda-demo-ar.com\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEmployerEntityARId', body.institution_entity_id);",
+                  "pm.environment.set('demoEmployerEntityARId', body.institution_entity_id);",
+                  "console.log('AR employer entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Admin \u2014 demo.empresa.ar.admin@vianda.demo (EM01_AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR_EMPLOYER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"employer\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.empresa.ar.admin@vianda.demo\",\n  \"email\": \"demo.empresa.ar.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Empresa AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployerAdminARId', body.user_id);",
+                  "pm.environment.set('demoEmployerAdminARId', body.user_id);",
+                  "console.log('AR employer admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Benefits Program (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PROGRAM_AR\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"benefit_rate\": 100,\n  \"benefit_cap_period\": \"monthly\",\n  \"price_discount\": 0,\n  \"billing_cycle\": \"monthly\",\n  \"billing_day\": 1,\n  \"enrollment_mode\": \"managed\",\n  \"allow_early_renewal\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has program_id', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.collectionVariables.set('demoEmployerProgramARId', body.program_id);",
+                  "pm.environment.set('demoEmployerProgramARId', body.program_id);",
+                  "console.log('AR employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Resolve AR city_metadata_id (employer employees)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities?country_code=AR&exclude_global=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "AR"
+                },
+                {
+                  "key": "exclude_global",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const cities = pm.response.json();",
+                  "const existing = pm.collectionVariables.get('cityMetadataIdAR');",
+                  "if (existing && existing.length > 5) { console.log('Reusing cityMetadataIdAR:', existing); return; }",
+                  "if (!cities || !cities.length) { console.warn('No cities for AR'); return; }",
+                  "const city = cities[0];",
+                  "pm.collectionVariables.set('cityMetadataIdAR', city.city_metadata_id);",
+                  "console.log('Resolved cityMetadataIdAR:', city.city_metadata_id, city.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE01 \u2014 demo.empleado.ar.01@vianda.demo (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR_EMPLOYER_EE01\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.ar.01@vianda.demo\",\n  \"email\": \"demo.empleado.ar.01@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Ana\",\n  \"last_name\": \"Empleada AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdAR');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe01ARId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe01ARId', body.user_id);",
+                  "console.log('AR employee EE01:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE02 \u2014 demo.empleado.ar.02@vianda.demo (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR_EMPLOYER_EE02\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.ar.02@vianda.demo\",\n  \"email\": \"demo.empleado.ar.02@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Carlos\",\n  \"last_name\": \"Empleado AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdAR');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe02ARId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe02ARId', body.user_id);",
+                  "console.log('AR employee EE02:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE03 \u2014 demo.empleado.ar.03@vianda.demo (AR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR_EMPLOYER_EE03\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.ar.03@vianda.demo\",\n  \"email\": \"demo.empleado.ar.03@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Maria\",\n  \"last_name\": \"Empleada AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionARId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdAR');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe03ARId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe03ARId', body.user_id);",
+                  "console.log('AR employee EE03:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "20 Customers (AR)",
       "description": "Sign up 7 AR demo customers via the verified email flow. C06 (no_plan) and C07 (no_orders) added.",
       "item": [
@@ -20175,6 +21433,200 @@
               ]
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "35 Employer subscriptions (AR)",
+      "item": [
+        {
+          "name": "Upsert Employee Link EE01 (AR) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_AR_EE01_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe01ARId');",
+                  "payload.plan_id = pm.collectionVariables.get('planArId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('AR EE01 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE02 (AR) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_AR_EE02_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe02ARId');",
+                  "payload.plan_id = pm.collectionVariables.get('planArId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('AR EE02 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE03 (AR) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_AR_EE03_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe03ARId');",
+                  "payload.plan_id = pm.collectionVariables.get('planArId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('AR EE03 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
         }
       ]
     },
@@ -27676,6 +29128,490 @@
       ]
     },
     {
+      "name": "15 Employer institution (US)",
+      "item": [
+        {
+          "name": "Upsert Employer Institution (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_US_EMPLOYER\",\n  \"name\": \"Demo Seattle Inc.\",\n  \"institution_type\": \"employer\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000004\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoEmployerInstitutionUSId', body.institution_id);",
+                  "pm.environment.set('demoEmployerInstitutionUSId', body.institution_id);",
+                  "console.log('US employer institution:', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Institution Entity (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_ENTITY_US_EMPLOYER\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"address_id\": \"dddddddd-dec0-0060-0000-000000000003\",\n  \"tax_id\": \"91-1234567\",\n  \"name\": \"Demo Seattle Inc.\",\n  \"email_domain\": \"vianda-demo-us.com\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institution-entities",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_entity_id', () => { pm.expect(body).to.have.property('institution_entity_id'); });",
+                  "pm.collectionVariables.set('demoEmployerEntityUSId', body.institution_entity_id);",
+                  "pm.environment.set('demoEmployerEntityUSId', body.institution_entity_id);",
+                  "console.log('US employer entity:', body.institution_entity_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Admin \u2014 demo.empresa.us.admin@vianda.demo (EM01_US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US_EMPLOYER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"employer\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.empresa.us.admin@vianda.demo\",\n  \"email\": \"demo.empresa.us.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Empresa US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployerAdminUSId', body.user_id);",
+                  "pm.environment.set('demoEmployerAdminUSId', body.user_id);",
+                  "console.log('US employer admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employer Benefits Program (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_PROGRAM_US\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"benefit_rate\": 100,\n  \"benefit_cap_period\": \"monthly\",\n  \"price_discount\": 0,\n  \"billing_cycle\": \"monthly\",\n  \"billing_day\": 1,\n  \"enrollment_mode\": \"managed\",\n  \"allow_early_renewal\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has program_id', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.collectionVariables.set('demoEmployerProgramUSId', body.program_id);",
+                  "pm.environment.set('demoEmployerProgramUSId', body.program_id);",
+                  "console.log('US employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Resolve US city_metadata_id (employer employees)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities?country_code=US&exclude_global=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "country_code",
+                  "value": "US"
+                },
+                {
+                  "key": "exclude_global",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const cities = pm.response.json();",
+                  "const existing = pm.collectionVariables.get('cityMetadataIdUS');",
+                  "if (existing && existing.length > 5) { console.log('Reusing cityMetadataIdUS:', existing); return; }",
+                  "if (!cities || !cities.length) { console.warn('No cities for US'); return; }",
+                  "const city = cities[0];",
+                  "pm.collectionVariables.set('cityMetadataIdUS', city.city_metadata_id);",
+                  "console.log('Resolved cityMetadataIdUS:', city.city_metadata_id, city.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE01 \u2014 demo.empleado.us.01@vianda.demo (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US_EMPLOYER_EE01\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.us.01@vianda.demo\",\n  \"email\": \"demo.empleado.us.01@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Ana\",\n  \"last_name\": \"Empleada US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdUS');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe01USId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe01USId', body.user_id);",
+                  "console.log('US employee EE01:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE02 \u2014 demo.empleado.us.02@vianda.demo (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US_EMPLOYER_EE02\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.us.02@vianda.demo\",\n  \"email\": \"demo.empleado.us.02@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Carlos\",\n  \"last_name\": \"Empleado US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdUS');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe02USId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe02USId', body.user_id);",
+                  "console.log('US employee EE02:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee EE03 \u2014 demo.empleado.us.03@vianda.demo (US)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US_EMPLOYER_EE03\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"customer\",\n  \"role_name\": \"comensal\",\n  \"username\": \"demo.empleado.us.03@vianda.demo\",\n  \"email\": \"demo.empleado.us.03@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Maria\",\n  \"last_name\": \"Empleada US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"city_metadata_id\": \"PLACEHOLDER_CITY\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoEmployerInstitutionUSId');",
+                  "payload.city_metadata_id = pm.collectionVariables.get('cityMetadataIdUS');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "pm.collectionVariables.set('demoEmployeeEe03USId', body.user_id);",
+                  "pm.environment.set('demoEmployeeEe03USId', body.user_id);",
+                  "console.log('US employee EE03:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "20 Customers (US)",
       "description": "Sign up 7 US demo customers via the verified email flow. C06 (no_plan) and C07 (no_orders) added.",
       "item": [
@@ -30656,6 +32592,200 @@
               ]
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "35 Employer subscriptions (US)",
+      "item": [
+        {
+          "name": "Upsert Employee Link EE01 (US) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_US_EE01_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe01USId');",
+                  "payload.plan_id = pm.collectionVariables.get('planUsId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('US EE01 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE02 (US) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_US_EE02_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe02USId');",
+                  "payload.plan_id = pm.collectionVariables.get('planUsId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('US EE02 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert Employee Link EE03 (US) \u2014 subscribe to plan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_EMPLOYER_US_EE03_LINK\",\n  \"user_id\": \"PLACEHOLDER\",\n  \"plan_id\": \"PLACEHOLDER_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employee-link/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employee-link",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.user_id = pm.collectionVariables.get('demoEmployeeEe03USId');",
+                  "payload.plan_id = pm.collectionVariables.get('planUsId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
+                  "pm.test('Subscription is active', () => { pm.expect(body.subscription_status).to.eql('active'); });",
+                  "console.log('US EE03 subscription:', body.subscription_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
         }
       ]
     },
@@ -34317,6 +36447,420 @@
               ]
             }
           }
+        },
+        {
+          "name": "Assert PE employer institution exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const employer = all.find(i => i.canonical_key === 'DEMO_INSTITUTION_PE_EMPLOYER');",
+                  "pm.test('PE employer institution exists', () => { pm.expect(employer).to.not.be.undefined; });",
+                  "if (employer) pm.test('type is employer', () => { pm.expect(employer.institution_type).to.eql('employer'); });",
+                  "console.log('PE employer institution:', employer ? employer.institution_id : 'NOT FOUND');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert PE employer program is active (benefit_rate=100)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('PE employer program returned', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.test('PE program is active', () => { pm.expect(body.is_active).to.be.true; });",
+                  "pm.test('PE benefit_rate=100', () => { pm.expect(body.benefit_rate).to.eql(100); });",
+                  "console.log('PE employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program?institution_id={{demoEmployerInstitutionPEId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionPEId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert PE 3 employees with active subscriptions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const employees = Array.isArray(body) ? body : [];",
+                  "const active = employees.filter(e => e.subscription_status === 'active');",
+                  "pm.test('PE at least 3 employees with active subscriptions', () => { pm.expect(active.length).to.be.at.least(3); });",
+                  "console.log('PE enrolled employees:', employees.length, 'active:', active.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{demoEmployerInstitutionPEId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionPEId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert AR employer institution exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const employer = all.find(i => i.canonical_key === 'DEMO_INSTITUTION_AR_EMPLOYER');",
+                  "pm.test('AR employer institution exists', () => { pm.expect(employer).to.not.be.undefined; });",
+                  "if (employer) pm.test('type is employer', () => { pm.expect(employer.institution_type).to.eql('employer'); });",
+                  "console.log('AR employer institution:', employer ? employer.institution_id : 'NOT FOUND');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert AR employer program is active (benefit_rate=100)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('AR employer program returned', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.test('AR program is active', () => { pm.expect(body.is_active).to.be.true; });",
+                  "pm.test('AR benefit_rate=100', () => { pm.expect(body.benefit_rate).to.eql(100); });",
+                  "console.log('AR employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program?institution_id={{demoEmployerInstitutionARId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionARId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert AR 3 employees with active subscriptions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const employees = Array.isArray(body) ? body : [];",
+                  "const active = employees.filter(e => e.subscription_status === 'active');",
+                  "pm.test('AR at least 3 employees with active subscriptions', () => { pm.expect(active.length).to.be.at.least(3); });",
+                  "console.log('AR enrolled employees:', employees.length, 'active:', active.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{demoEmployerInstitutionARId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionARId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert US employer institution exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const all = Array.isArray(body) ? body : (body.items || body.data || []);",
+                  "const employer = all.find(i => i.canonical_key === 'DEMO_INSTITUTION_US_EMPLOYER');",
+                  "pm.test('US employer institution exists', () => { pm.expect(employer).to.not.be.undefined; });",
+                  "if (employer) pm.test('type is employer', () => { pm.expect(employer.institution_type).to.eql('employer'); });",
+                  "console.log('US employer institution:', employer ? employer.institution_id : 'NOT FOUND');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert US employer program is active (benefit_rate=100)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('US employer program returned', () => { pm.expect(body).to.have.property('program_id'); });",
+                  "pm.test('US program is active', () => { pm.expect(body.is_active).to.be.true; });",
+                  "pm.test('US benefit_rate=100', () => { pm.expect(body.benefit_rate).to.eql(100); });",
+                  "console.log('US employer program:', body.program_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/program?institution_id={{demoEmployerInstitutionUSId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "program"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionUSId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert US 3 employees with active subscriptions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const employees = Array.isArray(body) ? body : [];",
+                  "const active = employees.filter(e => e.subscription_status === 'active');",
+                  "pm.test('US at least 3 employees with active subscriptions', () => { pm.expect(active.length).to.be.at.least(3); });",
+                  "console.log('US enrolled employees:', employees.length, 'active:', active.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employer/employees?institution_id={{demoEmployerInstitutionUSId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employer",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "institution_id",
+                  "value": "{{demoEmployerInstitutionUSId}}"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }

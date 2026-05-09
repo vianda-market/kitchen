@@ -264,6 +264,22 @@ Demo Customers (shared password: DemoPass1!):
 
   Secondary supplier (US):
     SUP02_US  demo.proveedor.us.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Capitol Hill Kitchen LLC)
+
+  Employer:
+    EM01_PE  demo.empresa.pe.admin@vianda.demo    DemoPass1!  (Employer Admin — Empresa Demo Lima SAC)
+    EE01_PE  demo.empleado.pe.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_PE  demo.empleado.pe.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_PE  demo.empleado.pe.03@vianda.demo      DemoPass1!  (Enrolled employee)
+
+    EM01_AR  demo.empresa.ar.admin@vianda.demo    DemoPass1!  (Employer Admin — Demo Argentina S.A.)
+    EE01_AR  demo.empleado.ar.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_AR  demo.empleado.ar.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_AR  demo.empleado.ar.03@vianda.demo      DemoPass1!  (Enrolled employee)
+
+    EM01_US  demo.empresa.us.admin@vianda.demo    DemoPass1!  (Employer Admin — Demo Seattle Inc.)
+    EE01_US  demo.empleado.us.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_US  demo.empleado.us.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_US  demo.empleado.us.03@vianda.demo      DemoPass1!  (Enrolled employee)
 ========================
 EARLYCREDS
 
@@ -374,6 +390,22 @@ Demo Customers (shared password: DemoPass1!):
 
   Secondary supplier (US):
     SUP02_US  demo.proveedor.us.02.admin@vianda.demo  DemoPass1!  (Supplier Admin — Capitol Hill Kitchen LLC)
+
+  Employer:
+    EM01_PE  demo.empresa.pe.admin@vianda.demo    DemoPass1!  (Employer Admin — Empresa Demo Lima SAC)
+    EE01_PE  demo.empleado.pe.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_PE  demo.empleado.pe.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_PE  demo.empleado.pe.03@vianda.demo      DemoPass1!  (Enrolled employee)
+
+    EM01_AR  demo.empresa.ar.admin@vianda.demo    DemoPass1!  (Employer Admin — Demo Argentina S.A.)
+    EE01_AR  demo.empleado.ar.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_AR  demo.empleado.ar.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_AR  demo.empleado.ar.03@vianda.demo      DemoPass1!  (Enrolled employee)
+
+    EM01_US  demo.empresa.us.admin@vianda.demo    DemoPass1!  (Employer Admin — Demo Seattle Inc.)
+    EE01_US  demo.empleado.us.01@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE02_US  demo.empleado.us.02@vianda.demo      DemoPass1!  (Enrolled employee)
+    EE03_US  demo.empleado.us.03@vianda.demo      DemoPass1!  (Enrolled employee)
 ========================
 
 NOTE: Re-running this loader on a previously-seeded DB will create duplicate

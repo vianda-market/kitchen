@@ -466,7 +466,123 @@ The institution bills purge uses `WHERE institution_entity_id::text LIKE 'dddddd
 
 ---
 
-## 10. What NOT to Do
+## 10. Employer Flow (B2B demo)
+
+Each market has one employer institution with an admin user and one or more
+employee users. The employer flow demonstrates the B2B subsidy model: the
+employer pays a configured benefit rate, and employees subscribe to plans at a
+reduced net cost.
+
+### 10.1 Data model overview
+
+Per market:
+- 1 employer institution (`institution_type = 'employer'`) — upserted via `PUT /institutions/by-key`.
+- 1 employer institution entity — upserted via `PUT /institution-entities/by-key`.
+- 1 employer benefits program — upserted via `PUT /employer/program/by-key`.
+- 1 employer admin user (`role_type = Employer`, `role_name = Admin`) — upserted via `PUT /users/by-key`.
+- N employee users (`role_type = Customer`, `role_name = Comensal`) — upserted via `PUT /users/by-key`.
+- N employer employee links — upserted via `PUT /employer/employee-link/by-key`.
+
+### 10.2 Canonical key conventions
+
+```
+DEMO_INSTITUTION_{CC}_EMPLOYER             — employer institution
+DEMO_INSTITUTION_ENTITY_{CC}_EMPLOYER      — employer entity
+DEMO_EMPLOYER_{CC}_PROGRAM                 — employer benefits program
+DEMO_USER_{CC}_EMPLOYER_ADMIN              — employer admin user
+DEMO_USER_{CC}_EMPLOYER_EE_01 ... N        — employee users
+DEMO_EMPLOYER_{CC}_EE_DEMO_EMPLEADO_{CC}_01_VIANDA_DEMO_LINK  — employee link
+```
+
+### 10.3 UUID sub-ranges for employer entities
+
+Employer institutions are API-created (via `PUT /by-key`) so they do not use
+deterministic dec0 UUIDs. The dec0 sub-range `0060` is reserved for
+employer-related SQL-seeded rows if ever needed:
+
+| Sub-range | Content |
+|---|---|
+| `dddddddd-dec0-0060-0000-000000000001` | Reserved — employer address PE (if SQL-seeded) |
+
+Currently all employer entities are API-created (no dec0 UUIDs). The employer
+institutions, entities, and program rows all get database-generated UUIDs and
+are tracked by canonical_key only.
+
+### 10.4 Folder layout in the Postman collection
+
+Employer setup runs as top-level folders numbered `15` (employer institution,
+entity, program, admin user) and `35` (employee users, employee links), nested
+between the existing customer (`20`) and subscribe (`30`) folders:
+
+```
+15 Employer setup (<CC>)     — institution + entity + program + admin user enrollment
+35 Employee links (<CC>)     — employee users (PUT /users/by-key) + PUT /employee-link/by-key
+```
+
+Execution ordering: folder 15 must run after folder 12 (secondary supplier) so
+the admin token is stable. Folder 35 must run after folder 30 (customer subscribe)
+so that `planId<CC>` collection variables are already set.
+
+### 10.5 Enrollment prerequisites in Postman
+
+`PUT /employer/employee-link/by-key` looks up the user's employer institution
+membership by checking `user_info.institution_id`. The employer admin user must
+be enrolled first — the admin enrollment step (`POST /employer/employees`) sets
+`user_info.institution_id` for the admin. Without this step, the employee link
+upsert returns 403 (`security.institution_type_mismatch`) because the employee's
+`institution_id` is still NULL.
+
+Order within folder 15:
+1. Upsert employer institution.
+2. Upsert employer entity.
+3. Login as demo admin (get admin token).
+4. Upsert employer benefits program.
+5. Upsert employer admin user (via `PUT /users/by-key`).
+6. Enroll employer admin (`POST /employer/employees` — sets `institution_id` on the admin user).
+
+Order within folder 35:
+1. Upsert employee user (via `PUT /users/by-key`).
+2. Upsert employee link (via `PUT /employer/employee-link/by-key`).
+
+### 10.6 Purge script additions for employer
+
+The purge handles employer entities in FK dependency order:
+
+1. `audit.subscription_history` — delete where `subscription_id IN (... canonical_key LIKE 'DEMO_EMPLOYER_%')`.
+2. `customer.subscription_info` — delete where `canonical_key LIKE 'DEMO_EMPLOYER_%'`.
+3. `audit.institution_entity_history` — delete where `canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%_EMPLOYER'`.
+4. `ops.institution_entity_info` — delete where `canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%_EMPLOYER'`.
+5. `core.employer_benefits_program` — delete where `canonical_key LIKE 'DEMO_EMPLOYER_%_PROGRAM'`.
+6. Users and institutions follow the standard username/canonical_key LIKE patterns.
+
+The employer entity delete (steps 3–4) must happen **before** the address deletion
+tier because `institution_entity_info.address_id → address_info` is RESTRICT.
+
+Employee users follow the same `demo.empleado.%@vianda.demo` username pattern;
+add this LIKE clause to every tier in the purge script alongside the
+`demo.cliente.<cc>.%@vianda.demo` clauses.
+
+### 10.7 Known gotchas
+
+**RoleType.value vs str(RoleType):** `str(RoleType.CUSTOMER)` returns
+`'RoleType.CUSTOMER'`, not `'customer'`. Use `.value` when comparing role types
+in Python: `role_attr.value if hasattr(role_attr, "value") else str(role_attr).lower()`.
+This was a silent bug in `enrollment_service.py` that caused all employee link
+upserts to return 403 before the fix.
+
+**model_dump(exclude_none=True) on the user upsert route:** `PUT /users/by-key`
+must use `model_dump(exclude_none=True)` so that optional schema fields absent
+from the request body (e.g. `city_metadata_id`) do not override the DB column's
+NOT NULL default. Without this, employer admin creation returned 500 due to a
+NOT NULL constraint violation on `city_metadata_id`.
+
+**subscription_history FK before subscription delete:** `audit.subscription_history`
+references `customer.subscription_info` with RESTRICT. Employee link rows have
+a `canonical_key` on `subscription_info`; purge must delete history before info.
+
+---
+
+## 11. What NOT to Do
 
 - Do not write raw SQL outside `demo_baseline.sql` to create demo entities.
 - Do not use `POST /<entity>` to create fixture entities. Use `PUT /<entity>/by-key`. The only POST calls in the collection are for transactional events: orders, reviews, favorites, subscriptions, and the customer signup flow (which has no by-key endpoint).
