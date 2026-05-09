@@ -24,8 +24,14 @@ def get_search_gateway():
     return get_mapbox_search_gateway()
 
 
-def get_geocoding_gateway():
+def get_geocoding_gateway(permanent: bool = False):
     """Return geocoding gateway based on ADDRESS_PROVIDER setting.
+
+    Args:
+        permanent: When True, return the permanent-storage gateway (passes
+            ``permanent=true`` to Mapbox v6 and uses the sk.* token).
+            Use this for any geocoding result that will be written to the DB.
+            Defaults to False (ephemeral / free-tier).
 
     Mapbox: MapboxGeocodingGateway (Geocoding API v6)
     Google: GoogleMapsGateway (Maps Geocoding API)
@@ -37,4 +43,4 @@ def get_geocoding_gateway():
         return get_google_maps_gateway()
     from app.gateways.mapbox_geocoding_gateway import get_mapbox_geocoding_gateway
 
-    return get_mapbox_geocoding_gateway()
+    return get_mapbox_geocoding_gateway(permanent=permanent)

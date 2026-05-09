@@ -7,7 +7,10 @@ Handles:
 - Structured geocoding: individual address fields -> coordinates
 
 Phase 1: Uses temporary (ephemeral) geocoding (permanent=false, the default).
-Phase 2: Will add permanent=true for DB storage.
+Phase 2: ``MapboxGeocodingGateway(permanent=True)`` — uses Mapbox v6 ``permanent=true``
+         parameter (mapbox.places-permanent equivalent for v6), the persistent-storage
+         token (sk.*), and a distinct cache key segment so ephemeral and permanent
+         responses never cross-contaminate the cache.
 
 In DEV_MODE: Uses mock responses from app/mocks/mapbox_geocoding_mocks.json
 In PROD_MODE: Makes real API calls. Requires Mapbox access token.
@@ -27,20 +30,28 @@ logger = logging.getLogger(__name__)
 class MapboxGeocodingGateway(BaseGateway):
     """Gateway for Mapbox Geocoding API v6.
 
+    Args:
+        permanent: When True, the gateway sends ``permanent=true`` in every geocoding
+            request (Mapbox v6 permanent-storage mode) and uses the persistent-storage
+            access token (sk.*).  Cache keys include ``permanent=true`` so responses
+            are isolated from the ephemeral cache entries.
+
     When access token is set: always uses live API (ignores DEV_MODE).
     When access token is missing and DEV_MODE: uses mock responses.
     """
 
     GEOCODE_BASE = "https://api.mapbox.com/search/geocode/v6"
 
-    def __init__(self):
+    def __init__(self, permanent: bool = False):
         super().__init__()
+        self._permanent = permanent
         from app.config.settings import get_mapbox_access_token
 
-        token = get_mapbox_access_token()
+        token = get_mapbox_access_token(permanent=permanent)
         if token:
             self.dev_mode = False
-            logger.info("Mapbox Geocoding Gateway using live API (token configured)")
+            mode_label = "permanent" if permanent else "ephemeral"
+            logger.info("Mapbox Geocoding Gateway using live API (token configured, mode=%s)", mode_label)
 
     @property
     def service_name(self) -> str:
@@ -56,7 +67,7 @@ class MapboxGeocodingGateway(BaseGateway):
         """
         from app.config.settings import get_mapbox_access_token
 
-        token = get_mapbox_access_token()
+        token = get_mapbox_access_token(permanent=self._permanent)
         if not token:
             raise ExternalServiceError(
                 "Mapbox access token required for geocoding. Set MAPBOX_ACCESS_TOKEN_DEV (or _STAGING/_PROD) in .env."
@@ -70,6 +81,8 @@ class MapboxGeocodingGateway(BaseGateway):
                 "q": query,
                 "access_token": token,
             }
+            if self._permanent:
+                params["permanent"] = "true"
             if kwargs.get("country"):
                 params["country"] = kwargs["country"].upper()
             if kwargs.get("language"):
@@ -94,6 +107,8 @@ class MapboxGeocodingGateway(BaseGateway):
                 "latitude": str(latitude),
                 "access_token": token,
             }
+            if self._permanent:
+                params["permanent"] = "true"
             if kwargs.get("language"):
                 params["language"] = kwargs["language"]
             resp = requests.get(
@@ -122,6 +137,10 @@ class MapboxGeocodingGateway(BaseGateway):
     def call(self, operation: str, **kwargs: Any) -> Any:
         """Override BaseGateway.call to add cache interception.
 
+        The ``permanent`` flag from this gateway instance is injected into every
+        cache-key derivation so ephemeral and permanent responses are stored under
+        separate keys.
+
         bypass  → skip cache entirely (prod live-only path).
         record  → cache hit returns stored response; miss calls Mapbox and writes cache.
         replay_only → cache hit returns stored response; miss raises MapboxCacheMiss.
@@ -135,7 +154,8 @@ class MapboxGeocodingGateway(BaseGateway):
         if mode == CacheMode.BYPASS:
             return super().call(operation, **kwargs)
 
-        key = make_cache_key(operation, **kwargs)
+        # Inject the permanent flag so ephemeral / permanent entries never share a key.
+        key = make_cache_key(operation, **{**kwargs, "permanent": self._permanent})
         hit = cache.get(key)
         if hit is not None:
             logger.info("mapbox_geocode_cache: hit for %r", key)
@@ -149,7 +169,7 @@ class MapboxGeocodingGateway(BaseGateway):
 
         # RECORD mode: call live API and persist response
         response = super().call(operation, **kwargs)
-        cache.set(key, response)
+        cache.set(key, response)  # key already has permanent injected
         return response
 
     # -------------------------------------------------------------------------
@@ -239,13 +259,25 @@ class MapboxGeocodingGateway(BaseGateway):
             return False
 
 
-# Singleton
-_mapbox_geocoding_gateway: MapboxGeocodingGateway | None = None
+# Two singletons — one per mode.  Keeping them separate avoids the risk of a
+# caller inadvertently sharing state between the ephemeral and permanent paths.
+_mapbox_geocoding_gateway_ephemeral: MapboxGeocodingGateway | None = None
+_mapbox_geocoding_gateway_permanent: MapboxGeocodingGateway | None = None
 
 
-def get_mapbox_geocoding_gateway() -> MapboxGeocodingGateway:
-    """Get the Mapbox Geocoding Gateway singleton instance."""
-    global _mapbox_geocoding_gateway
-    if _mapbox_geocoding_gateway is None:
-        _mapbox_geocoding_gateway = MapboxGeocodingGateway()
-    return _mapbox_geocoding_gateway
+def get_mapbox_geocoding_gateway(permanent: bool = False) -> MapboxGeocodingGateway:
+    """Return the singleton ``MapboxGeocodingGateway`` for the requested mode.
+
+    Args:
+        permanent: When True, return the persistent-storage gateway instance
+            (sends ``permanent=true`` to Mapbox and uses the sk.* token).
+            When False (default), return the ephemeral gateway (free-tier).
+    """
+    global _mapbox_geocoding_gateway_ephemeral, _mapbox_geocoding_gateway_permanent
+    if permanent:
+        if _mapbox_geocoding_gateway_permanent is None:
+            _mapbox_geocoding_gateway_permanent = MapboxGeocodingGateway(permanent=True)
+        return _mapbox_geocoding_gateway_permanent
+    if _mapbox_geocoding_gateway_ephemeral is None:
+        _mapbox_geocoding_gateway_ephemeral = MapboxGeocodingGateway(permanent=False)
+    return _mapbox_geocoding_gateway_ephemeral

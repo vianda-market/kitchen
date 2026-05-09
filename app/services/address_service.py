@@ -21,7 +21,7 @@ from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import address_service, geolocation_service
-from app.services.geolocation_service import call_geocode_api
+from app.services.geolocation_service import persistent_geolocation_service
 from app.utils.db import db_insert, db_read, db_update
 from app.utils.log import log_info, log_warning
 
@@ -510,9 +510,21 @@ class AddressBusinessService:
         address_types = address_data.get("address_type", [])
         address_type_str = ", ".join(address_types) if isinstance(address_types, list) else str(address_types)
 
+        # Short-circuit: if the address already has stored coordinates, skip Mapbox.
+        # This prevents re-paying for the permanent geocoding call on a row that was
+        # already geocoded (e.g. a duplicate creation attempt or a rebuild).
+        existing_geo = geolocation_service.get_by_address(address.address_id, db)
+        if existing_geo and existing_geo.latitude != 0 and existing_geo.longitude != 0:
+            log_info(
+                f"{address_type_str} address already has coordinates — skipping Mapbox call "
+                f"(lat={existing_geo.latitude}, lng={existing_geo.longitude})"
+            )
+            return
+
         try:
-            # Call geocoding API
-            geocode_result = call_geocode_api(full_address)
+            # Use the persistent-storage geocoding service so that lat/lng written to DB
+            # is retrieved via the permanent=true Mapbox v6 endpoint (sk.* token).
+            geocode_result = persistent_geolocation_service.geocode_address(full_address)
 
             # Validate geocoding result
             if not geocode_result or "latitude" not in geocode_result or "longitude" not in geocode_result:
@@ -521,11 +533,17 @@ class AddressBusinessService:
                 )
                 return  # Non-blocking: address is already created, just skip geocoding
 
-            # Create geolocation record
+            import re
+
+            normalized_address = re.sub(r"\s+", " ", full_address.strip().lower())
+
+            # Create geolocation record with permanent-geocoding tracking columns.
             geodata = {
                 "address_id": address.address_id,
                 "latitude": geocode_result["latitude"],
                 "longitude": geocode_result["longitude"],
+                "mapbox_geocoded_at": datetime.now(UTC),
+                "mapbox_normalized_address": normalized_address,
                 "is_archived": False,
                 "status": Status.ACTIVE,
                 "modified_by": current_user["user_id"],
@@ -823,13 +841,25 @@ class AddressBusinessService:
         # Build full address string for geocoding
         full_address = self._build_full_address_string(address_data)
 
-        # Call geocoding API
-        geocode_result = call_geocode_api(full_address)
+        # Short-circuit: if the address already has stored (non-zero) coordinates and
+        # the address string has not changed, skip the Mapbox call.  On an update we
+        # always re-geocode because the address fields may have changed.  However, if
+        # the address fields did not change the caller passes the same full_address that
+        # was originally geocoded, which means the same cache key is hit and no money
+        # is spent regardless of mode.
+
+        # Use the persistent-storage geocoding service for all DB writes.
+        geocode_result = persistent_geolocation_service.geocode_address(full_address)
 
         if geocode_result and "latitude" in geocode_result and "longitude" in geocode_result:
+            import re
+
+            normalized_address = re.sub(r"\s+", " ", full_address.strip().lower())
             geodata = {
                 "latitude": geocode_result["latitude"],
                 "longitude": geocode_result["longitude"],
+                "mapbox_geocoded_at": datetime.now(UTC),
+                "mapbox_normalized_address": normalized_address,
                 "modified_by": current_user["user_id"],
                 "modified_date": datetime.now(UTC),
             }

@@ -81,7 +81,7 @@ class TestAddressService:
             patch("app.services.geolocation_service.get_timezone_from_address") as mock_get_timezone,
             patch("app.services.address_service.update_address_type_from_linkages") as mock_derive,
             patch("app.services.market_service.market_service") as mock_market,
-            patch("app.services.address_service.call_geocode_api") as mock_geocode_api,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
             patch("app.services.address_service.geolocation_service") as mock_geo_service,
             patch("app.services.address_service.db_read") as mock_db_read,
             patch("app.services.address_service.db_insert") as mock_db_insert,
@@ -91,7 +91,9 @@ class TestAddressService:
             mock_get_timezone.return_value = "America/New_York"
             mock_derive.return_value = ["restaurant"]  # Derived from linkage
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
-            mock_geocode_api.return_value = {"latitude": 40.7128, "longitude": -74.0060}
+            # No existing geo → short-circuit disabled.
+            mock_geo_service.get_by_address.return_value = None
+            mock_pgs.geocode_address.return_value = {"latitude": 40.7128, "longitude": -74.0060}
             mock_geo_service.create.return_value = mock_geolocation
             mock_db_read.side_effect = lambda q, *a, **kw: (
                 {"tz": "America/New_York", "country_iso": "US"} if "city_metadata" in (q or "") else None
@@ -103,8 +105,8 @@ class TestAddressService:
                 restaurant_address_data, sample_current_user, mock_db
             )
 
-            # Assert
-            mock_geocode_api.assert_called_once()
+            # Assert: persistent geocoding service called (not the deprecated call_geocode_api).
+            mock_pgs.geocode_address.assert_called_once()
             mock_geo_service.create.assert_called_once()
             from app.config import Status
 
@@ -134,7 +136,8 @@ class TestAddressService:
             patch("app.services.geolocation_service.get_timezone_from_address") as mock_get_timezone,
             patch("app.services.address_service.update_address_type_from_linkages") as mock_derive,
             patch("app.services.market_service.market_service") as mock_market,
-            patch("app.services.address_service.call_geocode_api") as mock_geocode_api,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
+            patch("app.services.address_service.geolocation_service") as mock_geo_service,
             patch("app.services.address_service.db_read") as mock_db_read,
             patch("app.services.address_service.db_insert") as mock_db_insert,
         ):
@@ -143,7 +146,9 @@ class TestAddressService:
             mock_get_timezone.return_value = "America/New_York"
             mock_derive.return_value = ["restaurant"]
             mock_market.get_by_country_code.return_value = {"country_code": "US", "country_name": "United States"}
-            mock_geocode_api.return_value = None  # API failure
+            # No existing geo → short-circuit disabled.
+            mock_geo_service.get_by_address.return_value = None
+            mock_pgs.geocode_address.return_value = None  # Persistent geocoding failure
             mock_db_read.side_effect = lambda q, *a, **kw: (
                 {"tz": "America/New_York", "country_iso": "US"} if "city_metadata" in (q or "") else None
             )
@@ -156,7 +161,7 @@ class TestAddressService:
             assert result is not None
             assert result.address_id == mock_address.address_id
             mock_address_service.create.assert_called_once()
-            mock_geocode_api.assert_called_once()
+            mock_pgs.geocode_address.assert_called_once()
 
     def test_validate_address_data_checks_required_fields(self, mock_db):
         """Test that address validation checks required fields for restaurant addresses."""
@@ -370,3 +375,145 @@ class TestAddressService:
 
             assert exc_info.value.status_code == 404
             assert "Address not found" in str(exc_info.value.detail)
+
+
+class TestGeocodingShortCircuit:
+    """Short-circuit: rows with existing coordinates must not trigger a Mapbox call."""
+
+    def _make_address(self) -> Mock:
+        addr = Mock()
+        addr.address_id = uuid4()
+        addr.building_number = "500"
+        addr.street_name = "Defensa"
+        addr.city = "Buenos Aires"
+        addr.province = "Buenos Aires"
+        addr.country_code = "AR"
+        return addr
+
+    def _make_user(self) -> dict:
+        return {"user_id": str(uuid4()), "role_type": "internal", "role_name": "admin"}
+
+    def test_geocode_address_short_circuits_when_coords_exist(self, mock_db):
+        """If geolocation_info already has non-zero coords, Mapbox is NOT called."""
+        address = self._make_address()
+        existing_geo = Mock()
+        existing_geo.latitude = -34.62
+        existing_geo.longitude = -58.37
+
+        with (
+            patch("app.services.address_service.geolocation_service") as mock_geo_svc,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
+        ):
+            mock_geo_svc.get_by_address.return_value = existing_geo
+
+            address_business_service._geocode_address(
+                address,
+                {
+                    "building_number": "500",
+                    "street_name": "Defensa",
+                    "city": "Buenos Aires",
+                    "province": "Buenos Aires",
+                },
+                self._make_user(),
+                mock_db,
+            )
+
+            # Persistent geocoding service must NOT have been called.
+            mock_pgs.geocode_address.assert_not_called()
+
+    def test_geocode_address_calls_persistent_when_no_existing_geo(self, mock_db):
+        """If no existing geolocation, the persistent geocoding service IS called."""
+        address = self._make_address()
+
+        with (
+            patch("app.services.address_service.geolocation_service") as mock_geo_svc,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
+        ):
+            mock_geo_svc.get_by_address.return_value = None
+            mock_pgs.geocode_address.return_value = {
+                "latitude": -34.62,
+                "longitude": -58.37,
+                "formatted_address": "500 Defensa, Buenos Aires",
+            }
+            mock_geo_svc.create.return_value = Mock()
+
+            address_business_service._geocode_address(
+                address,
+                {
+                    "building_number": "500",
+                    "street_name": "Defensa",
+                    "city": "Buenos Aires",
+                    "province": "Buenos Aires",
+                },
+                self._make_user(),
+                mock_db,
+            )
+
+            mock_pgs.geocode_address.assert_called_once()
+
+    def test_geocode_address_writes_mapbox_tracking_columns(self, mock_db):
+        """When geocoding succeeds, mapbox_geocoded_at and mapbox_normalized_address are written."""
+        address = self._make_address()
+
+        with (
+            patch("app.services.address_service.geolocation_service") as mock_geo_svc,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
+        ):
+            mock_geo_svc.get_by_address.return_value = None
+            mock_pgs.geocode_address.return_value = {
+                "latitude": -34.62,
+                "longitude": -58.37,
+            }
+            mock_geo_svc.create.return_value = Mock()
+
+            address_business_service._geocode_address(
+                address,
+                {
+                    "building_number": "500",
+                    "street_name": "Defensa",
+                    "city": "Buenos Aires",
+                    "province": "Buenos Aires",
+                },
+                self._make_user(),
+                mock_db,
+            )
+
+            call_kwargs = mock_geo_svc.create.call_args[0][0]
+            assert "mapbox_geocoded_at" in call_kwargs
+            assert call_kwargs["mapbox_geocoded_at"] is not None
+            assert "mapbox_normalized_address" in call_kwargs
+            assert isinstance(call_kwargs["mapbox_normalized_address"], str)
+            assert len(call_kwargs["mapbox_normalized_address"]) > 0
+
+    def test_geocode_address_short_circuits_when_coords_are_zero(self, mock_db):
+        """A row with latitude=0, longitude=0 is NOT treated as having coordinates — proceeds to geocode."""
+        address = self._make_address()
+        zero_geo = Mock()
+        zero_geo.latitude = 0
+        zero_geo.longitude = 0
+
+        with (
+            patch("app.services.address_service.geolocation_service") as mock_geo_svc,
+            patch("app.services.address_service.persistent_geolocation_service") as mock_pgs,
+        ):
+            mock_geo_svc.get_by_address.return_value = zero_geo
+            mock_pgs.geocode_address.return_value = {
+                "latitude": -34.62,
+                "longitude": -58.37,
+            }
+            mock_geo_svc.create.return_value = Mock()
+
+            address_business_service._geocode_address(
+                address,
+                {
+                    "building_number": "500",
+                    "street_name": "Defensa",
+                    "city": "Buenos Aires",
+                    "province": "Buenos Aires",
+                },
+                self._make_user(),
+                mock_db,
+            )
+
+            # Zero coords are placeholder rows — must still geocode.
+            mock_pgs.geocode_address.assert_called_once()

@@ -93,8 +93,8 @@ class TestMapboxGeocodingGatewaySingleton:
         mock_settings.return_value = Mock(DEV_MODE=True)
         import app.gateways.mapbox_geocoding_gateway as mod
 
-        mod._mapbox_geocoding_gateway = None
+        mod._mapbox_geocoding_gateway_ephemeral = None
         gw1 = get_mapbox_geocoding_gateway()
         gw2 = get_mapbox_geocoding_gateway()
         assert gw1 is gw2
-        mod._mapbox_geocoding_gateway = None
+        mod._mapbox_geocoding_gateway_ephemeral = None

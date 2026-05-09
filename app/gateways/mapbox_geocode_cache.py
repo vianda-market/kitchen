@@ -38,17 +38,26 @@ def _normalize(text: str) -> str:
 
 
 def make_cache_key(operation: str, **kwargs: Any) -> str:
-    """Build a normalized cache key for a geocoding operation."""
+    """Build a normalized cache key for a geocoding operation.
+
+    The ``permanent`` flag is included in the key so that ephemeral and
+    permanent responses never cross-contaminate the cache.  Existing entries
+    keyed without the flag (i.e. ``permanent=False``) are preserved — the
+    default ``permanent`` value is ``False``, so the key segment reads
+    ``permanent=false`` for all previously-recorded ephemeral entries.
+    """
     if operation == "geocode":
         q = _normalize(kwargs.get("q", ""))
         country = _normalize(kwargs.get("country") or "")
         lang = _normalize(kwargs.get("language") or "")
-        return f"geocode|{q}|{country}|{lang}"
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"geocode|{q}|{country}|{lang}|permanent={permanent}"
     if operation == "reverse_geocode":
         lat = str(kwargs.get("latitude", ""))
         lng = str(kwargs.get("longitude", ""))
         lang = _normalize(kwargs.get("language") or "")
-        return f"reverse_geocode|{lat}|{lng}|{lang}"
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"reverse_geocode|{lat}|{lng}|{lang}|permanent={permanent}"
     # Fallback: include all kwargs sorted for determinism
     tail = "|".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
     return f"{operation}|{tail}"

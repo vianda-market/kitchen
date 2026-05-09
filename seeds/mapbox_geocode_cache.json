@@ -1,33 +1,24 @@
 {
-  "geocode|3200 santa fe, buenos aires, buenos aires, ar||es": {
-    "type": "FeatureCollection",
+  "geocode|3200 santa fe, buenos aires, buenos aires, ar||es|permanent=false": {
     "features": [
       {
-        "type": "Feature",
-        "id": "address.dev-palermo-santa-fe-3200",
         "geometry": {
-          "type": "Point",
           "coordinates": [
             -58.4352,
             -34.5854
-          ]
+          ],
+          "type": "Point"
         },
+        "id": "address.dev-palermo-santa-fe-3200",
         "properties": {
-          "mapbox_id": "dXJuOm1ieHBsYzpQYWxlcm1v",
-          "feature_type": "address",
-          "full_address": "Santa Fe 3200, Palermo, Buenos Aires, Argentina",
-          "name": "Santa Fe 3200",
-          "coordinates": {
-            "longitude": -58.4352,
-            "latitude": -34.5854
-          },
           "context": {
             "address": {
               "address_number": "3200",
               "street_name": "Santa Fe"
             },
-            "street": {
-              "name": "Avenida Santa Fe"
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
             },
             "neighborhood": {
               "name": "Palermo"
@@ -39,44 +30,93 @@
               "name": "Buenos Aires",
               "region_code": "B"
             },
-            "country": {
-              "name": "Argentina",
-              "country_code": "AR"
+            "street": {
+              "name": "Avenida Santa Fe"
             }
-          }
-        }
+          },
+          "coordinates": {
+            "latitude": -34.5854,
+            "longitude": -58.4352
+          },
+          "feature_type": "address",
+          "full_address": "Santa Fe 3200, Palermo, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpQYWxlcm1v",
+          "name": "Santa Fe 3200"
+        },
+        "type": "Feature"
       }
-    ]
+    ],
+    "type": "FeatureCollection"
   },
-  "geocode|500 defensa, buenos aires, buenos aires, ar||es": {
-    "type": "FeatureCollection",
+  "geocode|3200 santa fe, buenos aires, buenos aires, ar||es|permanent=true": {
     "features": [
       {
-        "type": "Feature",
-        "id": "address.dev-san-telmo-defensa-500",
         "geometry": {
-          "type": "Point",
+          "coordinates": [
+            -58.4352,
+            -34.5854
+          ],
+          "type": "Point"
+        },
+        "id": "address.dev-palermo-santa-fe-3200",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "3200",
+              "street_name": "Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
+            },
+            "neighborhood": {
+              "name": "Palermo"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "street": {
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "latitude": -34.5854,
+            "longitude": -58.4352
+          },
+          "feature_type": "address",
+          "full_address": "Santa Fe 3200, Palermo, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpQYWxlcm1v",
+          "name": "Santa Fe 3200"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "geocode|500 defensa, buenos aires, buenos aires, ar||es|permanent=false": {
+    "features": [
+      {
+        "geometry": {
           "coordinates": [
             -58.3701,
             -34.6226
-          ]
+          ],
+          "type": "Point"
         },
+        "id": "address.dev-san-telmo-defensa-500",
         "properties": {
-          "mapbox_id": "dXJuOm1ieHBsYzpTYW5UZWxtbw",
-          "feature_type": "address",
-          "full_address": "Defensa 500, San Telmo, Buenos Aires, Argentina",
-          "name": "Defensa 500",
-          "coordinates": {
-            "longitude": -58.3701,
-            "latitude": -34.6226
-          },
           "context": {
             "address": {
               "address_number": "500",
               "street_name": "Defensa"
             },
-            "street": {
-              "name": "Defensa"
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
             },
             "neighborhood": {
               "name": "San Telmo"
@@ -88,44 +128,93 @@
               "name": "Buenos Aires",
               "region_code": "B"
             },
-            "country": {
-              "name": "Argentina",
-              "country_code": "AR"
+            "street": {
+              "name": "Defensa"
             }
-          }
-        }
+          },
+          "coordinates": {
+            "latitude": -34.6226,
+            "longitude": -58.3701
+          },
+          "feature_type": "address",
+          "full_address": "Defensa 500, San Telmo, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpTYW5UZWxtbw",
+          "name": "Defensa 500"
+        },
+        "type": "Feature"
       }
-    ]
+    ],
+    "type": "FeatureCollection"
   },
-  "geocode|corrientes 1234, buenos aires, buenos Aires, ar||es": {
-    "type": "FeatureCollection",
+  "geocode|500 defensa, buenos aires, buenos aires, ar||es|permanent=true": {
     "features": [
       {
-        "type": "Feature",
-        "id": "address.dev-corrientes-1234",
         "geometry": {
-          "type": "Point",
+          "coordinates": [
+            -58.3701,
+            -34.6226
+          ],
+          "type": "Point"
+        },
+        "id": "address.dev-san-telmo-defensa-500",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "500",
+              "street_name": "Defensa"
+            },
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
+            },
+            "neighborhood": {
+              "name": "San Telmo"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "street": {
+              "name": "Defensa"
+            }
+          },
+          "coordinates": {
+            "latitude": -34.6226,
+            "longitude": -58.3701
+          },
+          "feature_type": "address",
+          "full_address": "Defensa 500, San Telmo, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpTYW5UZWxtbw",
+          "name": "Defensa 500"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "geocode|corrientes 1234, buenos aires, buenos Aires, ar||es|permanent=false": {
+    "features": [
+      {
+        "geometry": {
           "coordinates": [
             -58.3915,
             -34.6048
-          ]
+          ],
+          "type": "Point"
         },
+        "id": "address.dev-corrientes-1234",
         "properties": {
-          "mapbox_id": "dXJuOm1ieHBsYzpDb3JyaWVudGVz",
-          "feature_type": "address",
-          "full_address": "Avenida Corrientes 1234, Buenos Aires, Argentina",
-          "name": "Corrientes 1234",
-          "coordinates": {
-            "longitude": -58.3915,
-            "latitude": -34.6048
-          },
           "context": {
             "address": {
               "address_number": "1234",
               "street_name": "Corrientes"
             },
-            "street": {
-              "name": "Avenida Corrientes"
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
             },
             "neighborhood": {
               "name": "Centro"
@@ -137,13 +226,71 @@
               "name": "Buenos Aires",
               "region_code": "B"
             },
-            "country": {
-              "name": "Argentina",
-              "country_code": "AR"
+            "street": {
+              "name": "Avenida Corrientes"
             }
-          }
-        }
+          },
+          "coordinates": {
+            "latitude": -34.6048,
+            "longitude": -58.3915
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Corrientes 1234, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpDb3JyaWVudGVz",
+          "name": "Corrientes 1234"
+        },
+        "type": "Feature"
       }
-    ]
+    ],
+    "type": "FeatureCollection"
+  },
+  "geocode|corrientes 1234, buenos aires, buenos Aires, ar||es|permanent=true": {
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            -58.3915,
+            -34.6048
+          ],
+          "type": "Point"
+        },
+        "id": "address.dev-corrientes-1234",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "1234",
+              "street_name": "Corrientes"
+            },
+            "country": {
+              "country_code": "AR",
+              "name": "Argentina"
+            },
+            "neighborhood": {
+              "name": "Centro"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "street": {
+              "name": "Avenida Corrientes"
+            }
+          },
+          "coordinates": {
+            "latitude": -34.6048,
+            "longitude": -58.3915
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Corrientes 1234, Buenos Aires, Argentina",
+          "mapbox_id": "dXJuOm1ieHBsYzpDb3JyaWVudGVz",
+          "name": "Corrientes 1234"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
   }
 }

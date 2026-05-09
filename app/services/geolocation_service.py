@@ -5,6 +5,16 @@ Provides geocoding (address -> coordinates) and reverse geocoding
 (coordinates -> address) through the address provider abstraction.
 
 Provider is selected via ADDRESS_PROVIDER setting ("mapbox" or "google").
+
+Two-mode contract (Mapbox):
+  - Suggest / autocomplete  → ephemeral token, mapbox.places endpoint, no DB write.
+  - Geocode for DB storage  → permanent token (sk.*), permanent=true Mapbox v6 param,
+                               writes to DB, short-circuits on existing coords.
+
+The ``permanent`` constructor arg selects the mode.  The module-level singleton
+``geolocation_service`` uses ``permanent=False`` for backward-compat callers.
+The ``persistent_geolocation_service`` singleton (``permanent=True``) is used by
+``address_service._geocode_address()`` and ``_update_restaurant_geolocation()``.
 """
 
 from math import asin, cos, radians, sin, sqrt
@@ -19,14 +29,20 @@ class GeolocationService:
     """
     Service for geocoding and distance calculations.
 
+    Args:
+        permanent: When True, the underlying gateway uses Mapbox's permanent-storage
+            mode (``permanent=true`` API param + sk.* token).  Use this for any
+            geocoding that will be written to the DB.  Defaults to False.
+
     All external API calls are routed through the configured geocoding gateway for:
     - Development mode support (mock responses)
     - Centralized cost tracking
     - Consistent error handling
     """
 
-    def __init__(self):
-        self.gateway = get_geocoding_gateway()
+    def __init__(self, permanent: bool = False):
+        self._permanent = permanent
+        self.gateway = get_geocoding_gateway(permanent=permanent)
 
     def is_configured(self) -> bool:
         """Check if the geocoding provider is configured (API key/token present or dev mode)."""
@@ -38,7 +54,7 @@ class GeolocationService:
         provider = get_settings().ADDRESS_PROVIDER.lower()
         if provider == "google":
             return bool(get_google_api_key())
-        return bool(get_mapbox_access_token())
+        return bool(get_mapbox_access_token(permanent=self._permanent))
 
     def geocode_address(
         self,
@@ -78,7 +94,7 @@ class GeolocationService:
             # Returns: {'latitude': 37.423, 'longitude': -122.084, ...}
         """
         if not self.is_configured():
-            log_error("Cannot geocode: Google Maps API key not configured")
+            log_error("Cannot geocode: Mapbox access token not configured")
             return None
 
         # Build full address string
@@ -144,7 +160,7 @@ class GeolocationService:
             # Returns: {'formatted_address': '1600 Amphitheatre Parkway, ...', ...}
         """
         if not self.is_configured():
-            log_error("Cannot reverse geocode: Google Maps API key not configured")
+            log_error("Cannot reverse geocode: Mapbox access token not configured")
             return None
 
         try:
@@ -264,8 +280,12 @@ class GeolocationService:
         return None
 
 
-# Singleton instance
-geolocation_service = GeolocationService()
+# Singleton instances — one per mode.
+# geolocation_service: ephemeral (backward-compat, no DB write).
+# persistent_geolocation_service: permanent-storage (sk.* token, permanent=true),
+#   used by address_service for geocoding that writes to the DB.
+geolocation_service = GeolocationService(permanent=False)
+persistent_geolocation_service = GeolocationService(permanent=True)
 
 
 # Legacy function for backwards compatibility
