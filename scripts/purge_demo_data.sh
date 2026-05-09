@@ -39,7 +39,7 @@ esac
 
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-kitchen}"
-DB_USER="${DB_USER:-postgres}"
+DB_USER="${DB_USER:-$(whoami)}"
 
 PSQL_ARGS=(
   -h "${DB_HOST}"
@@ -74,8 +74,9 @@ DELETE FROM customer.plate_review_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE user_id::text LIKE 'dddddddd-dec0-%'
-       OR username LIKE '%@vianda.demo'
-       AND username LIKE 'demo.cliente.pe.%'
+       OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 -- Also catch any review linked to a demo pickup regardless of user_id
 DELETE FROM customer.plate_review_info
@@ -84,6 +85,8 @@ WHERE plate_pickup_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -92,6 +95,8 @@ DELETE FROM billing.client_transaction
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
 -- Billing: restaurant transactions linked to demo restaurant
@@ -101,6 +106,8 @@ WHERE plate_selection_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -112,6 +119,8 @@ WHERE client_bill_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -119,6 +128,8 @@ DELETE FROM billing.client_bill_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
 -- Capture payment_attempt_ids tied to demo subscriptions before deleting
@@ -133,6 +144,8 @@ WHERE payment_attempt_id IS NOT NULL
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
   );
 
@@ -143,6 +156,8 @@ WHERE subscription_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -160,6 +175,8 @@ WHERE plate_selection_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -170,6 +187,8 @@ WHERE plate_pickup_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -178,6 +197,8 @@ DELETE FROM customer.plate_pickup_live
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
 -- Plate selections (customer orders)
@@ -185,6 +206,8 @@ DELETE FROM customer.plate_selection_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
 -- Subscription history
@@ -194,6 +217,8 @@ WHERE subscription_id IN (
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 
@@ -202,6 +227,8 @@ DELETE FROM customer.subscription_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 -- Also catch any dec0-prefixed subscription IDs from old approach
 DELETE FROM customer.subscription_info
@@ -215,6 +242,8 @@ WHERE discretionary_id IN (
         SELECT user_id FROM core.user_info
         WHERE user_id::text LIKE 'dddddddd-dec0-%'
            OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 DELETE FROM audit.discretionary_history
@@ -224,6 +253,8 @@ WHERE discretionary_id IN (
         SELECT user_id FROM core.user_info
         WHERE user_id::text LIKE 'dddddddd-dec0-%'
            OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
 DELETE FROM billing.discretionary_info
@@ -231,6 +262,8 @@ WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE user_id::text LIKE 'dddddddd-dec0-%'
        OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+       OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+       OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
 -- -------------------------------------------------------------------------
@@ -361,11 +394,15 @@ WHERE address_id::text LIKE 'dddddddd-dec0-%'
        SELECT user_id FROM core.user_info
        WHERE user_id::text LIKE 'dddddddd-dec0-%'
           OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+          OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+          OR username LIKE 'demo.cliente.us.%@vianda.demo'
    )
    OR modified_by IN (
        SELECT user_id FROM core.user_info
        WHERE user_id::text LIKE 'dddddddd-dec0-%'
           OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+          OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+          OR username LIKE 'demo.cliente.us.%@vianda.demo'
    );
 
 DELETE FROM audit.address_history
@@ -378,11 +415,13 @@ WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
 -- Tier 10: Demo users (depend on institution)
 -- -------------------------------------------------------------------------
 
--- Capture all demo user_ids (dec0 prefix + customer username pattern)
+-- Capture all demo user_ids (dec0 prefix + customer username pattern for all markets)
 CREATE TEMP TABLE _demo_user_ids ON COMMIT DROP AS
 SELECT user_id FROM core.user_info
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
-   OR username LIKE 'demo.cliente.pe.%@vianda.demo';
+   OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+   OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+   OR username LIKE 'demo.cliente.us.%@vianda.demo';
 
 -- User market assignments
 DELETE FROM core.user_market_assignment
@@ -397,11 +436,15 @@ WHERE user_id IN (SELECT user_id FROM _demo_user_ids);
 
 DELETE FROM audit.user_history
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
-   OR username LIKE 'demo.cliente.pe.%@vianda.demo';
+   OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+   OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+   OR username LIKE 'demo.cliente.us.%@vianda.demo';
 
 DELETE FROM core.user_info
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
-   OR username LIKE 'demo.cliente.pe.%@vianda.demo';
+   OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+   OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+   OR username LIKE 'demo.cliente.us.%@vianda.demo';
 
 -- -------------------------------------------------------------------------
 -- Tier 11: Institution markets and institution

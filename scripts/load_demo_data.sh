@@ -156,7 +156,7 @@ fi
 
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-kitchen}"
-DB_USER="${DB_USER:-postgres}"
+DB_USER="${DB_USER:-$(whoami)}"
 
 PSQL_ARGS=(
   -h "${DB_HOST}"
@@ -228,13 +228,33 @@ Super Admin:
   password: ${DEMO_PASSWORD}
 
 Demo Customers (shared password: DemoPass1!):
+
+  --- Peru (PE) ---
   C01  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
   C02  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
   C03  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
   C04  demo.cliente.pe.04@vianda.demo  (PE — Surco)
   C05  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
-  C06  demo.cliente.pe.06.no_plan@vianda.demo   (NO PLAN — show purchase flow)
-  C07  demo.cliente.pe.07.no_orders@vianda.demo  (NO ORDERS — show ordering flow)
+  C06  demo.cliente.pe.06.no_plan@vianda.demo   (PE — NO PLAN — show purchase flow)
+  C07  demo.cliente.pe.07.no_orders@vianda.demo  (PE — NO ORDERS — show ordering flow)
+
+  --- Argentina (AR) ---
+  C01  demo.cliente.ar.01@vianda.demo  (AR — Recoleta)
+  C02  demo.cliente.ar.02@vianda.demo  (AR — Palermo)
+  C03  demo.cliente.ar.03@vianda.demo  (AR — Belgrano)
+  C04  demo.cliente.ar.04@vianda.demo  (AR — San Telmo)
+  C05  demo.cliente.ar.05@vianda.demo  (AR — Caballito)
+  C06  demo.cliente.ar.06.no_plan@vianda.demo   (AR — NO PLAN — show purchase flow)
+  C07  demo.cliente.ar.07.no_orders@vianda.demo  (AR — NO ORDERS — show ordering flow)
+
+  --- United States (US) ---
+  C01  demo.cliente.us.01@vianda.demo  (US — Capitol Hill)
+  C02  demo.cliente.us.02@vianda.demo  (US — Ballard)
+  C03  demo.cliente.us.03@vianda.demo  (US — Fremont)
+  C04  demo.cliente.us.04@vianda.demo  (US — Wallingford)
+  C05  demo.cliente.us.05@vianda.demo  (US — West Seattle)
+  C06  demo.cliente.us.06.no_plan@vianda.demo   (US — NO PLAN — show purchase flow)
+  C07  demo.cliente.us.07.no_orders@vianda.demo  (US — NO ORDERS — show ordering flow)
 ========================
 EARLYCREDS
 
@@ -309,13 +329,33 @@ Super Admin:
   password: ${DEMO_PASSWORD}
 
 Demo Customers (shared password: DemoPass1!):
+
+  --- Peru (PE) ---
   C01  demo.cliente.pe.01@vianda.demo  (PE — Miraflores)
   C02  demo.cliente.pe.02@vianda.demo  (PE — Barranco)
   C03  demo.cliente.pe.03@vianda.demo  (PE — San Isidro)
   C04  demo.cliente.pe.04@vianda.demo  (PE — Surco)
   C05  demo.cliente.pe.05@vianda.demo  (PE — Jesus Maria)
-  C06  demo.cliente.pe.06.no_plan@vianda.demo   (NO PLAN — show purchase flow)
-  C07  demo.cliente.pe.07.no_orders@vianda.demo  (NO ORDERS — show ordering flow)
+  C06  demo.cliente.pe.06.no_plan@vianda.demo   (PE — NO PLAN — show purchase flow)
+  C07  demo.cliente.pe.07.no_orders@vianda.demo  (PE — NO ORDERS — show ordering flow)
+
+  --- Argentina (AR) ---
+  C01  demo.cliente.ar.01@vianda.demo  (AR — Recoleta)
+  C02  demo.cliente.ar.02@vianda.demo  (AR — Palermo)
+  C03  demo.cliente.ar.03@vianda.demo  (AR — Belgrano)
+  C04  demo.cliente.ar.04@vianda.demo  (AR — San Telmo)
+  C05  demo.cliente.ar.05@vianda.demo  (AR — Caballito)
+  C06  demo.cliente.ar.06.no_plan@vianda.demo   (AR — NO PLAN — show purchase flow)
+  C07  demo.cliente.ar.07.no_orders@vianda.demo  (AR — NO ORDERS — show ordering flow)
+
+  --- United States (US) ---
+  C01  demo.cliente.us.01@vianda.demo  (US — Capitol Hill)
+  C02  demo.cliente.us.02@vianda.demo  (US — Ballard)
+  C03  demo.cliente.us.03@vianda.demo  (US — Fremont)
+  C04  demo.cliente.us.04@vianda.demo  (US — Wallingford)
+  C05  demo.cliente.us.05@vianda.demo  (US — West Seattle)
+  C06  demo.cliente.us.06.no_plan@vianda.demo   (US — NO PLAN — show purchase flow)
+  C07  demo.cliente.us.07.no_orders@vianda.demo  (US — NO ORDERS — show ordering flow)
 ========================
 
 NOTE: Re-running this loader on a previously-seeded DB will create duplicate
