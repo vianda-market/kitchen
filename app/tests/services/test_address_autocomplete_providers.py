@@ -384,6 +384,161 @@ class TestForwardSearchCacheReplay:
 
 
 # ---------------------------------------------------------------------------
+# Tests: seed-file replay (ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding, replay_only)
+# ---------------------------------------------------------------------------
+
+
+class TestSeedFileForwardSearchReplay:
+    """Verify that the committed seed file serves forward-search suggestions without live HTTP.
+
+    Uses the actual seeds/mapbox_geocode_cache.json file (committed to repo) so that
+    any accidental removal or corruption of the seed entries breaks this test immediately.
+
+    The HTTP transport (_make_request) is mocked to raise loudly — any live network
+    call is a test failure.
+    """
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_partial_query_3200_santa_fe_returns_suggestions_from_seed(self, mock_settings, _mock_token, monkeypatch):
+        """'3200 santa fe' partial query must be served from seed — no HTTP call."""
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
+
+        # Point the cache singleton at the real committed seed file.
+        seed_path = (
+            __import__("pathlib").Path(__file__).parent.parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+        )
+
+        from app.gateways import mapbox_geocode_cache as mod
+        from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
+
+        monkeypatch.setattr(mod, "_cache", MapboxGeocodeCache(path=seed_path))
+
+        gw = MapboxGeocodingGateway(permanent=True)
+
+        def _fail_if_called(*args, **kwargs):
+            raise AssertionError("_make_request was called — live HTTP must not be used in replay_only mode")
+
+        with patch.object(MapboxGeocodingGateway, "_make_request", side_effect=_fail_if_called):
+            result = gw.forward_search(query="3200 santa fe", country="AR", language="es", limit=5)
+
+        features = result.get("features", [])
+        assert len(features) > 0, "Expected at least one suggestion from seed for '3200 santa fe'"
+        # Each feature must have a mapbox_id and full_address (canonical shape requirement)
+        for feature in features:
+            props = feature.get("properties", {})
+            assert props.get("mapbox_id"), f"Feature missing mapbox_id: {feature}"
+            assert props.get("full_address") or props.get("name"), f"Feature missing display name: {feature}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_partial_query_500_defensa_returns_suggestions_from_seed(self, mock_settings, _mock_token, monkeypatch):
+        """'500 defensa' partial query must be served from seed — no HTTP call."""
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
+
+        seed_path = (
+            __import__("pathlib").Path(__file__).parent.parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+        )
+
+        from app.gateways import mapbox_geocode_cache as mod
+        from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
+
+        monkeypatch.setattr(mod, "_cache", MapboxGeocodeCache(path=seed_path))
+
+        gw = MapboxGeocodingGateway(permanent=True)
+
+        def _fail_if_called(*args, **kwargs):
+            raise AssertionError("_make_request was called — live HTTP must not be used in replay_only mode")
+
+        with patch.object(MapboxGeocodingGateway, "_make_request", side_effect=_fail_if_called):
+            result = gw.forward_search(query="500 defensa", country="AR", language="es", limit=5)
+
+        features = result.get("features", [])
+        assert len(features) > 0, "Expected at least one suggestion from seed for '500 defensa'"
+        for feature in features:
+            props = feature.get("properties", {})
+            assert props.get("mapbox_id"), f"Feature missing mapbox_id: {feature}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_partial_query_corrientes_1234_returns_suggestions_from_seed(self, mock_settings, _mock_token, monkeypatch):
+        """'corrientes 1234' full query must be served from seed — no HTTP call."""
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
+
+        seed_path = (
+            __import__("pathlib").Path(__file__).parent.parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+        )
+
+        from app.gateways import mapbox_geocode_cache as mod
+        from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
+
+        monkeypatch.setattr(mod, "_cache", MapboxGeocodeCache(path=seed_path))
+
+        gw = MapboxGeocodingGateway(permanent=True)
+
+        def _fail_if_called(*args, **kwargs):
+            raise AssertionError("_make_request was called — live HTTP must not be used in replay_only mode")
+
+        with patch.object(MapboxGeocodingGateway, "_make_request", side_effect=_fail_if_called):
+            result = gw.forward_search(query="corrientes 1234", country="AR", language="es", limit=5)
+
+        features = result.get("features", [])
+        assert len(features) > 0, "Expected at least one suggestion from seed for 'corrientes 1234'"
+        for feature in features:
+            props = feature.get("properties", {})
+            assert props.get("mapbox_id"), f"Feature missing mapbox_id: {feature}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_geocoding_provider_suggest_uses_seed_via_provider_interface(self, mock_settings, _mock_token, monkeypatch):
+        """End-to-end: GeocodingAutocompleteProvider.suggest() returns canonical suggestions
+        from seed — ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding, MAPBOX_CACHE_MODE=replay_only."""
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
+
+        seed_path = (
+            __import__("pathlib").Path(__file__).parent.parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+        )
+
+        from app.gateways import mapbox_geocode_cache as mod
+        from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
+
+        monkeypatch.setattr(mod, "_cache", MapboxGeocodeCache(path=seed_path))
+
+        # Build a fresh permanent gateway and inject into the provider directly.
+        gw = MapboxGeocodingGateway(permanent=True)
+
+        with patch(
+            "app.services.address_autocomplete_service.GeocodingAutocompleteProvider.__init__",
+            lambda self: None,
+        ):
+            provider = GeocodingAutocompleteProvider.__new__(GeocodingAutocompleteProvider)
+            provider._gateway = gw
+
+        def _fail_if_called(*args, **kwargs):
+            raise AssertionError("_make_request was called — live HTTP must not be used in replay_only mode")
+
+        with patch.object(MapboxGeocodingGateway, "_make_request", side_effect=_fail_if_called):
+            suggestions = provider.suggest(
+                query="500 defensa",
+                country="AR",
+                session_token=None,
+                limit=5,
+            )
+
+        assert len(suggestions) > 0, "Expected suggestions from seed"
+        # Each suggestion must match the canonical shape
+        for sug in suggestions:
+            assert "place_id" in sug, f"Missing place_id in suggestion: {sug}"
+            assert "display_text" in sug, f"Missing display_text in suggestion: {sug}"
+            assert sug["place_id"], "place_id must be non-empty"
+            assert sug["display_text"], "display_text must be non-empty"
+
+
+# ---------------------------------------------------------------------------
 # Tests: settings validation
 # ---------------------------------------------------------------------------
 
