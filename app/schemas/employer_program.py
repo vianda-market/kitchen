@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import Status
+from app.schemas.types import MoneyDecimal, NullableMoneyDecimal
 
 # =============================================================================
 # Program CRUD
@@ -59,10 +60,10 @@ class ProgramResponseSchema(BaseModel):
     institution_id: UUID
     institution_entity_id: UUID | None = None
     benefit_rate: int
-    benefit_cap: Decimal | None = None
+    benefit_cap: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     benefit_cap_period: str
     price_discount: int
-    minimum_monthly_fee: Decimal | None = None
+    minimum_monthly_fee: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     billing_cycle: str
     billing_day: int | None = None
     billing_day_of_week: int | None = None
@@ -161,7 +162,7 @@ class EmployerEmployeeLinkResponseSchema(BaseModel):
     user_id: UUID
     plan_id: UUID
     market_id: UUID
-    balance: Decimal
+    balance: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     renewal_date: datetime
     subscription_status: str | None = None
     canonical_key: str | None = None
@@ -207,7 +208,7 @@ class BenefitEmployeeResponseSchema(BaseModel):
     subscription_status: str | None = None
     plan_name: str | None = None
     plan_price: float | None = None
-    balance: Decimal | None = None
+    balance: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     renewal_date: datetime | None = None
     created_date: datetime
 
@@ -240,11 +241,11 @@ class EmployerBillResponseSchema(BaseModel):
     billing_period_end: date
     billing_cycle: str
     total_renewal_events: int
-    gross_employer_share: Decimal
+    gross_employer_share: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     price_discount: int
-    discounted_amount: Decimal
+    discounted_amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     minimum_fee_applied: bool
-    billed_amount: Decimal
+    billed_amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
     stripe_invoice_id: str | None = None
     payment_status: str
@@ -265,11 +266,11 @@ class EmployerBillLineResponseSchema(BaseModel):
     subscription_id: UUID
     user_id: UUID
     plan_id: UUID
-    plan_price: Decimal
+    plan_price: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     benefit_rate: int
-    benefit_cap: Decimal | None = None
+    benefit_cap: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     benefit_cap_period: str | None = None
-    employee_benefit: Decimal
+    employee_benefit: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     renewal_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -308,7 +309,7 @@ class BenefitPlanBreakdownSchema(BaseModel):
     employer_covers: float = Field(description="Amount employer covers")
     employee_pays: float = Field(description="Amount employee must pay")
     benefit_rate: int
-    benefit_cap: Decimal | None = None
+    benefit_cap: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     benefit_cap_period: str | None = None
     remaining_monthly_cap: float | None = Field(None, description="Remaining monthly cap budget")
     period_start: date = Field(..., description="Billing period start date")

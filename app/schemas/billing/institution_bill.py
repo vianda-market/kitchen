@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.config import Status
 from app.config.enums import BillResolution
+from app.schemas.types import NullableMoneyDecimal
 
 
 # --- For creating a new institution bill (one-off) ---
@@ -46,7 +47,7 @@ class InstitutionBillResponseSchema(BaseModel):
     institution_entity_id: UUID
     currency_metadata_id: UUID
     transaction_count: int | None = None
-    amount: Decimal | None = None
+    amount: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     currency_code: str | None = None
     period_start: datetime
     period_end: datetime
