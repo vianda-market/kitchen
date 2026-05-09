@@ -537,7 +537,10 @@ class AddressBusinessService:
 
             normalized_address = re.sub(r"\s+", " ", full_address.strip().lower())
 
-            # Create geolocation record with permanent-geocoding tracking columns.
+            # Q2 rule: persisted address fields must come from places-permanent
+            # Geocoding response, never from a Search Box retrieve response.
+            # See docs/plans/mapbox-integration-v2.md.
+            # All fields below originate from persistent_geolocation_service (places-permanent).
             geodata = {
                 "address_id": address.address_id,
                 "latitude": geocode_result["latitude"],
@@ -570,13 +573,20 @@ class AddressBusinessService:
     ) -> tuple:
         """
         Fetch address details for place_id/mapbox_id, map to address, validate geography.
-        Returns (address_data_with_mapped_fields, geoloc_dict_or_None).
-        geoloc_dict has place_id, viewport, formatted_address_google, latitude, longitude.
-        Raises HTTPException 400 if address is outside service area.
+        Returns (address_data_with_mapped_fields, None).
+
+        The second element is always None — this method intentionally does NOT return
+        a geoloc dict sourced from the Search Box retrieve response.
+
+        Q2 rule: persisted address fields must come from the places-permanent
+        Geocoding response, never from a Search Box retrieve response.
+        See docs/plans/mapbox-integration-v2.md.
+
+        Geolocation is resolved downstream by _geocode_address() via
+        persistent_geolocation_service (places-permanent endpoint).
         """
         from app.gateways.address_provider import get_search_gateway
         from app.services.address_autocomplete_mapping import (
-            extract_place_details_geolocation,
             get_city_candidates_from_place_details,
             map_place_details_to_address,
         )
@@ -610,16 +620,21 @@ class AddressBusinessService:
         mapped["city"] = city
 
         # Merge mapped address into address_data (preserve institution_id, user_id, etc.)
+        # formatted_address is excluded: it is a Search Box-sourced string and must not
+        # be persisted (Q2 rule). Coordinates and place_id are also NOT taken from the
+        # Search Box response — geolocation is resolved via places-permanent downstream.
         for k, v in mapped.items():
             if k != "formatted_address":
                 address_data[k] = v
         address_data["country_code"] = normalize_country_code(country_code) or country_code
         address_data.pop("place_id", None)
 
-        geoloc = extract_place_details_geolocation(details)
-        return address_data, geoloc if (
-            geoloc.get("latitude") is not None and geoloc.get("longitude") is not None
-        ) else None
+        # Q2 rule: persisted address fields must come from places-permanent
+        # Geocoding response, never from a Search Box retrieve response.
+        # See docs/plans/mapbox-integration-v2.md.
+        # Returning None causes _handle_geocoding to fall through to _geocode_address(),
+        # which resolves coordinates from the places-permanent endpoint.
+        return address_data, None
 
     def _create_geolocation_from_place_details(
         self,
@@ -629,7 +644,18 @@ class AddressBusinessService:
         db: psycopg2.extensions.connection,
         commit: bool = True,
     ) -> None:
-        """Create geolocation from Place Details (place_id, viewport, formatted_address_google, lat/lng)."""
+        """Create geolocation from Place Details (place_id, viewport, formatted_address_google, lat/lng).
+
+        NOTE: This method is only reachable when _resolve_address_from_place_id returns a non-None
+        geoloc dict. Under the Mapbox path that method always returns None (Q2 rule), so this
+        method is currently unreachable for Mapbox-backed flows. It remains for forward-compat
+        with any hypothetical non-Mapbox provider that supplies position data in its retrieve
+        response AND where storage of that data is explicitly permitted.
+
+        Q2 rule: persisted address fields must come from places-permanent
+        Geocoding response, never from a Search Box retrieve response.
+        See docs/plans/mapbox-integration-v2.md.
+        """
         geodata = {
             "address_id": address.address_id,
             "latitude": geoloc["latitude"],
@@ -855,6 +881,10 @@ class AddressBusinessService:
             import re
 
             normalized_address = re.sub(r"\s+", " ", full_address.strip().lower())
+            # Q2 rule: persisted address fields must come from places-permanent
+            # Geocoding response, never from a Search Box retrieve response.
+            # See docs/plans/mapbox-integration-v2.md.
+            # All fields below originate from persistent_geolocation_service (places-permanent).
             geodata = {
                 "latitude": geocode_result["latitude"],
                 "longitude": geocode_result["longitude"],
