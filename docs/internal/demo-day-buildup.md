@@ -5,6 +5,7 @@
 **Scope:** dev-only narrative data. Not a reference for production seed or migration procedures.
 
 Cross-reference: [docs/plans/demo_day_data.md](../plans/demo_day_data.md) — project tracker and decisions log.
+Related: [docs/guidelines/database/DEMO_DAY_DATASET.md](../guidelines/database/DEMO_DAY_DATASET.md) — permanent reference for what is in the dataset and how to log in.
 
 ---
 

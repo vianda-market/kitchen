@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "demo-day-seed-2026-v2",
     "name": "900_DEMO_DAY_SEED",
-    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.market\n  10 Supplier menu  \u2014 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      \u2014 Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
+    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          — Login as demo-admin@vianda.market\n  10 Supplier menu  — 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      — 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      — Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  — 5 customers x 5 orders each (plate-sel → QR → complete → review)\n  99 Sanity checks  — Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "auth": {
@@ -1050,7 +1050,7 @@
   "item": [
     {
       "name": "00 Setup",
-      "description": "Login as demo-admin@vianda.market (seeded by demo_baseline.sql). No creates \u2014 all SQL-only entities already exist.",
+      "description": "Login as demo-admin@vianda.market (seeded by demo_baseline.sql). No creates — all SQL-only entities already exist.",
       "item": [
         {
           "name": "Login Demo Admin",
@@ -1116,7 +1116,7 @@
       "description": "Upsert the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon-Fri, and 1 PE plan. All via PUT /by-key (idempotent). Auth: demo admin token.",
       "item": [
         {
-          "name": "Upsert Restaurant PE \u2014 Sabores del Pacifico",
+          "name": "Upsert Restaurant PE — Sabores del Pacifico",
           "event": [
             {
               "listen": "test",
@@ -1160,7 +1160,7 @@
           }
         },
         {
-          "name": "Upsert QR Code \u2014 PE Restaurant",
+          "name": "Upsert QR Code — PE Restaurant",
           "event": [
             {
               "listen": "prerequest",
@@ -1214,7 +1214,7 @@
           }
         },
         {
-          "name": "Upsert Product PE \u2014 Ceviche Clasico",
+          "name": "Upsert Product PE — Ceviche Clasico",
           "event": [
             {
               "listen": "test",
@@ -1256,7 +1256,7 @@
           }
         },
         {
-          "name": "Upsert Product PE \u2014 Lomo Saltado",
+          "name": "Upsert Product PE — Lomo Saltado",
           "event": [
             {
               "listen": "test",
@@ -1298,7 +1298,7 @@
           }
         },
         {
-          "name": "Upsert Product PE \u2014 Aji de Gallina",
+          "name": "Upsert Product PE — Aji de Gallina",
           "event": [
             {
               "listen": "test",
@@ -1340,7 +1340,7 @@
           }
         },
         {
-          "name": "Upsert Product PE \u2014 Causa Limena",
+          "name": "Upsert Product PE — Causa Limena",
           "event": [
             {
               "listen": "test",
@@ -1382,7 +1382,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE \u2014 Ceviche",
+          "name": "Upsert Plate PE — Ceviche",
           "event": [
             {
               "listen": "prerequest",
@@ -1436,7 +1436,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE \u2014 Lomo Saltado",
+          "name": "Upsert Plate PE — Lomo Saltado",
           "event": [
             {
               "listen": "prerequest",
@@ -1490,7 +1490,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE \u2014 Aji de Gallina",
+          "name": "Upsert Plate PE — Aji de Gallina",
           "event": [
             {
               "listen": "prerequest",
@@ -1544,7 +1544,7 @@
           }
         },
         {
-          "name": "Upsert Plate PE \u2014 Causa Limena",
+          "name": "Upsert Plate PE — Causa Limena",
           "event": [
             {
               "listen": "prerequest",
@@ -1598,7 +1598,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant PE \u2014 Do\u00f1a Lucha Sangucheria",
+          "name": "Upsert Restaurant PE — Doña Lucha Sangucheria",
           "event": [
             {
               "listen": "test",
@@ -1609,7 +1609,7 @@
                   "pm.test('Has restaurant_id', function () { pm.expect(body).to.have.property('restaurant_id'); });",
                   "pm.collectionVariables.set('restaurantPeR2Id', body.restaurant_id);",
                   "pm.environment.set('restaurantPeR2Id', body.restaurant_id);",
-                  "console.log('Do\u00f1a Lucha Sangucheria:', body.restaurant_id);"
+                  "console.log('Doña Lucha Sangucheria:', body.restaurant_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1643,7 +1643,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code \u2014 Do\u00f1a Lucha",
+          "name": "Upsert QR Code — Doña Lucha",
           "event": [
             {
               "listen": "prerequest",
@@ -1664,7 +1664,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has qr_code_id', function () { pm.expect(body).to.have.property('qr_code_id'); });",
                   "pm.collectionVariables.set('restaurantPeR2QrId', body.qr_code_id);",
-                  "console.log('Do\u00f1a Lucha QR:', body.qr_code_id);"
+                  "console.log('Doña Lucha QR:', body.qr_code_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1698,7 +1698,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Butifarra",
+          "name": "Upsert Product PE — Butifarra",
           "event": [
             {
               "listen": "test",
@@ -1741,7 +1741,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Pan con Chicharr\u00f3n",
+          "name": "Upsert Product PE — Pan con Chicharrón",
           "event": [
             {
               "listen": "test",
@@ -1784,7 +1784,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Butifarra (R2)",
+          "name": "Upsert Plate PE — Butifarra (R2)",
           "event": [
             {
               "listen": "prerequest",
@@ -1839,7 +1839,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Pan con Chicharr\u00f3n (R2)",
+          "name": "Upsert Plate PE — Pan con Chicharrón (R2)",
           "event": [
             {
               "listen": "prerequest",
@@ -1894,7 +1894,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE \u2014 Anticucher\u00eda Don Tom\u00e1s",
+          "name": "Upsert Restaurant PE — Anticuchería Don Tomás",
           "event": [
             {
               "listen": "test",
@@ -1905,7 +1905,7 @@
                   "pm.test('Has restaurant_id', function () { pm.expect(body).to.have.property('restaurant_id'); });",
                   "pm.collectionVariables.set('restaurantPeR3Id', body.restaurant_id);",
                   "pm.environment.set('restaurantPeR3Id', body.restaurant_id);",
-                  "console.log('Anticucher\u00eda Don Tom\u00e1s:', body.restaurant_id);"
+                  "console.log('Anticuchería Don Tomás:', body.restaurant_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1939,7 +1939,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code \u2014 Don Tom\u00e1s",
+          "name": "Upsert QR Code — Don Tomás",
           "event": [
             {
               "listen": "prerequest",
@@ -1960,7 +1960,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has qr_code_id', function () { pm.expect(body).to.have.property('qr_code_id'); });",
                   "pm.collectionVariables.set('restaurantPeR3QrId', body.qr_code_id);",
-                  "console.log('Don Tom\u00e1s QR:', body.qr_code_id);"
+                  "console.log('Don Tomás QR:', body.qr_code_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -1994,7 +1994,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Anticuchos de Res",
+          "name": "Upsert Product PE — Anticuchos de Res",
           "event": [
             {
               "listen": "test",
@@ -2037,7 +2037,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Anticuchos (R3)",
+          "name": "Upsert Plate PE — Anticuchos (R3)",
           "event": [
             {
               "listen": "prerequest",
@@ -2092,7 +2092,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE \u2014 La Esquina del Tiradito",
+          "name": "Upsert Restaurant PE — La Esquina del Tiradito",
           "event": [
             {
               "listen": "test",
@@ -2137,7 +2137,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code \u2014 La Esquina",
+          "name": "Upsert QR Code — La Esquina",
           "event": [
             {
               "listen": "prerequest",
@@ -2192,7 +2192,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Tiradito de Lenguado",
+          "name": "Upsert Product PE — Tiradito de Lenguado",
           "event": [
             {
               "listen": "test",
@@ -2235,7 +2235,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Pulpo al Olivo",
+          "name": "Upsert Product PE — Pulpo al Olivo",
           "event": [
             {
               "listen": "test",
@@ -2278,7 +2278,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Tiradito de Lenguado (R4)",
+          "name": "Upsert Plate PE — Tiradito de Lenguado (R4)",
           "event": [
             {
               "listen": "prerequest",
@@ -2333,7 +2333,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Pulpo al Olivo (R4)",
+          "name": "Upsert Plate PE — Pulpo al Olivo (R4)",
           "event": [
             {
               "listen": "prerequest",
@@ -2388,7 +2388,7 @@
           "response": []
         },
         {
-          "name": "Upsert Restaurant PE \u2014 Pollos a la Brasa Don Lucho",
+          "name": "Upsert Restaurant PE — Pollos a la Brasa Don Lucho",
           "event": [
             {
               "listen": "test",
@@ -2433,7 +2433,7 @@
           "response": []
         },
         {
-          "name": "Upsert QR Code \u2014 Don Lucho",
+          "name": "Upsert QR Code — Don Lucho",
           "event": [
             {
               "listen": "prerequest",
@@ -2488,7 +2488,7 @@
           "response": []
         },
         {
-          "name": "Upsert Product PE \u2014 Pollo a la Brasa (cuarto)",
+          "name": "Upsert Product PE — Pollo a la Brasa (cuarto)",
           "event": [
             {
               "listen": "test",
@@ -2531,7 +2531,7 @@
           "response": []
         },
         {
-          "name": "Upsert Plate PE \u2014 Pollo a la Brasa (R5)",
+          "name": "Upsert Plate PE — Pollo a la Brasa (R5)",
           "event": [
             {
               "listen": "prerequest",
@@ -2586,7 +2586,7 @@
           "response": []
         },
         {
-          "name": "Plate Kitchen Days \u2014 PE Plates",
+          "name": "Plate Kitchen Days — PE Plates",
           "item": [
             {
               "name": "PKD PE Ceviche Monday",
@@ -5121,7 +5121,7 @@
           ]
         },
         {
-          "name": "Upsert Plan PE \u2014 Estandar",
+          "name": "Upsert Plan PE — Estandar",
           "event": [
             {
               "listen": "test",
@@ -5207,7 +5207,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE \u2014 Do\u00f1a Lucha Sangucheria",
+          "name": "Activate Restaurant PE — Doña Lucha Sangucheria",
           "event": [
             {
               "listen": "test",
@@ -5249,7 +5249,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE \u2014 Anticucher\u00eda Don Tom\u00e1s",
+          "name": "Activate Restaurant PE — Anticuchería Don Tomás",
           "event": [
             {
               "listen": "test",
@@ -5291,7 +5291,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE \u2014 La Esquina del Tiradito",
+          "name": "Activate Restaurant PE — La Esquina del Tiradito",
           "event": [
             {
               "listen": "test",
@@ -5333,7 +5333,7 @@
           "response": []
         },
         {
-          "name": "Activate Restaurant PE \u2014 Pollos a la Brasa Don Lucho",
+          "name": "Activate Restaurant PE — Pollos a la Brasa Don Lucho",
           "event": [
             {
               "listen": "test",
@@ -5380,7 +5380,7 @@
       "name": "12 Secondary supplier (PE)",
       "item": [
         {
-          "name": "Upsert Institution \u2014 Cocina Andina S.A.C. (PE secondary)",
+          "name": "Upsert Institution — Cocina Andina S.A.C. (PE secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -5424,7 +5424,7 @@
           ]
         },
         {
-          "name": "Upsert Institution Entity \u2014 Cocina Andina S.A.C. (PE secondary)",
+          "name": "Upsert Institution Entity — Cocina Andina S.A.C. (PE secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -5480,7 +5480,61 @@
           ]
         },
         {
-          "name": "Upsert User \u2014 demo.proveedor.pe.02.admin@vianda.demo (PE secondary Supplier Admin)",
+          "name": "Upsert User — demo.proveedor.pe.01.admin@vianda.demo (PE primary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_PE1_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.pe.01.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.pe.01.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Vianda Demo PE\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000003\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('PE primary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User — demo.proveedor.pe.02.admin@vianda.demo (PE secondary Supplier Admin)",
           "request": {
             "method": "PUT",
             "header": [
@@ -5534,7 +5588,7 @@
           ]
         },
         {
-          "name": "Upsert Restaurant \u2014 La Alpaca Barranco (PE secondary, outlier)",
+          "name": "Upsert Restaurant — La Alpaca Barranco (PE secondary, outlier)",
           "request": {
             "method": "PUT",
             "header": [
@@ -5591,7 +5645,7 @@
           ]
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_PE2_BARRANCO",
+          "name": "Upsert QR — DEMO_QR_PE2_BARRANCO",
           "request": {
             "method": "PUT",
             "header": [
@@ -5644,7 +5698,7 @@
           ]
         },
         {
-          "name": "Upsert Product \u2014 Lomo Saltado de Alpaca (PE secondary)",
+          "name": "Upsert Product — Lomo Saltado de Alpaca (PE secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -5699,7 +5753,7 @@
           ]
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_PE2_R1_LOMO_SALTADO_ALPACA",
+          "name": "Upsert Plate — DEMO_PLATE_PE2_R1_LOMO_SALTADO_ALPACA",
           "request": {
             "method": "PUT",
             "header": [
@@ -6020,7 +6074,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 La Alpaca Barranco (PE secondary)",
+          "name": "Activate Restaurant — La Alpaca Barranco (PE secondary)",
           "event": [
             {
               "listen": "prerequest",
@@ -8717,7 +8771,7 @@
     },
     {
       "name": "30 Subscribe each customer",
-      "description": "POST /subscriptions/with-payment then POST /subscriptions/{id}/confirm-payment (mock) for each of the 5 PE demo customers. Requires PAYMENT_PROVIDER=mock in .env \u2014 loader enforces this upfront. The confirm-payment step gracefully skips with a warning if PAYMENT_PROVIDER is not mock. C07 (no_orders) also subscribes here. C06 (no_plan) is intentionally skipped.",
+      "description": "POST /subscriptions/with-payment then POST /subscriptions/{id}/confirm-payment (mock) for each of the 5 PE demo customers. Requires PAYMENT_PROVIDER=mock in .env — loader enforces this upfront. The confirm-payment step gracefully skips with a warning if PAYMENT_PROVIDER is not mock. C07 (no_orders) also subscribes here. C06 (no_plan) is intentionally skipped.",
       "item": [
         {
           "name": "C01 Create Subscription",
@@ -10625,13 +10679,13 @@
     },
     {
       "name": "40 Order history loop",
-      "description": "5 customers x 5 orders each = 25 completed orders. For each: plate-selection -> kitchen-start-promotion -> list-pending-qr -> qr-scan -> enriched-pickups -> complete -> review. Not idempotent \u2014 creates new rows each run. To reset: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh",
+      "description": "5 customers x 5 orders each = 25 completed orders. For each: plate-selection -> kitchen-start-promotion -> list-pending-qr -> qr-scan -> enriched-pickups -> complete -> review. Not idempotent — creates new rows each run. To reset: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh",
       "item": [
         {
-          "name": "Customer 01 \u2014 Camila Quispe",
+          "name": "Customer 01 — Camila Quispe",
           "item": [
             {
-              "name": "C01 Order1 \u2014 Plate Selection",
+              "name": "C01 Order1 — Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10639,7 +10693,7 @@
                     "exec": [
                       "// Customer 1 order 1",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -10698,7 +10752,7 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 Kitchen Start Promotion",
+              "name": "C01 Order1 — Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10751,7 +10805,7 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 List Pending QR",
+              "name": "C01 Order1 — List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10811,7 +10865,7 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 QR Scan",
+              "name": "C01 Order1 — QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10819,7 +10873,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe01O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe01O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -10878,7 +10932,7 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 Get Enriched Pickups",
+              "name": "C01 Order1 — Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -10932,14 +10986,14 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 Complete Order",
+              "name": "C01 Order1 — Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe01O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -10987,14 +11041,14 @@
               }
             },
             {
-              "name": "C01 Order1 \u2014 Plate Review (5 stars)",
+              "name": "C01 Order1 — Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe01O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe01Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11053,10 +11107,10 @@
           ]
         },
         {
-          "name": "Customer 02 \u2014 Sebastian Torres",
+          "name": "Customer 02 — Sebastian Torres",
           "item": [
             {
-              "name": "C02 Order1 \u2014 Plate Selection",
+              "name": "C02 Order1 — Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11064,7 +11118,7 @@
                     "exec": [
                       "// Customer 2 order 1",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -11123,7 +11177,7 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 Kitchen Start Promotion",
+              "name": "C02 Order1 — Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11176,7 +11230,7 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 List Pending QR",
+              "name": "C02 Order1 — List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11236,7 +11290,7 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 QR Scan",
+              "name": "C02 Order1 — QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11244,7 +11298,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe02O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe02O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11303,7 +11357,7 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 Get Enriched Pickups",
+              "name": "C02 Order1 — Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11357,14 +11411,14 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 Complete Order",
+              "name": "C02 Order1 — Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe02O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -11412,14 +11466,14 @@
               }
             },
             {
-              "name": "C02 Order1 \u2014 Plate Review (5 stars)",
+              "name": "C02 Order1 — Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe02O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe02Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11478,10 +11532,10 @@
           ]
         },
         {
-          "name": "Customer 03 \u2014 Valeria Mendoza",
+          "name": "Customer 03 — Valeria Mendoza",
           "item": [
             {
-              "name": "C03 Order1 \u2014 Plate Selection",
+              "name": "C03 Order1 — Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11489,7 +11543,7 @@
                     "exec": [
                       "// Customer 3 order 1",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -11548,7 +11602,7 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 Kitchen Start Promotion",
+              "name": "C03 Order1 — Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11601,7 +11655,7 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 List Pending QR",
+              "name": "C03 Order1 — List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11661,7 +11715,7 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 QR Scan",
+              "name": "C03 Order1 — QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11669,7 +11723,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe03O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe03O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11728,7 +11782,7 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 Get Enriched Pickups",
+              "name": "C03 Order1 — Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11782,14 +11836,14 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 Complete Order",
+              "name": "C03 Order1 — Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe03O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -11837,14 +11891,14 @@
               }
             },
             {
-              "name": "C03 Order1 \u2014 Plate Review (5 stars)",
+              "name": "C03 Order1 — Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe03O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe03Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -11903,10 +11957,10 @@
           ]
         },
         {
-          "name": "Customer 04 \u2014 Diego Ramirez",
+          "name": "Customer 04 — Diego Ramirez",
           "item": [
             {
-              "name": "C04 Order1 \u2014 Plate Selection",
+              "name": "C04 Order1 — Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -11914,7 +11968,7 @@
                     "exec": [
                       "// Customer 4 order 1",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -11973,7 +12027,7 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 Kitchen Start Promotion",
+              "name": "C04 Order1 — Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12026,7 +12080,7 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 List Pending QR",
+              "name": "C04 Order1 — List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12086,7 +12140,7 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 QR Scan",
+              "name": "C04 Order1 — QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12094,7 +12148,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe04O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe04O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -12153,7 +12207,7 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 Get Enriched Pickups",
+              "name": "C04 Order1 — Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12207,14 +12261,14 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 Complete Order",
+              "name": "C04 Order1 — Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe04O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -12262,14 +12316,14 @@
               }
             },
             {
-              "name": "C04 Order1 \u2014 Plate Review (5 stars)",
+              "name": "C04 Order1 — Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe04O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe04Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -12328,10 +12382,10 @@
           ]
         },
         {
-          "name": "Customer 05 \u2014 Andrea Flores",
+          "name": "Customer 05 — Andrea Flores",
           "item": [
             {
-              "name": "C05 Order1 \u2014 Plate Selection",
+              "name": "C05 Order1 — Plate Selection",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12339,7 +12393,7 @@
                     "exec": [
                       "// Customer 5 order 1",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
-                      "if (!token) { pm.execution.skipRequest('No customer token \u2014 run folder 20 first'); return; }",
+                      "if (!token) { pm.execution.skipRequest('No customer token — run folder 20 first'); return; }",
                       "pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
                       "let payload = JSON.parse(raw);",
@@ -12398,7 +12452,7 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 Kitchen Start Promotion",
+              "name": "C05 Order1 — Kitchen Start Promotion",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12451,7 +12505,7 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 List Pending QR",
+              "name": "C05 Order1 — List Pending QR",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12511,7 +12565,7 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 QR Scan",
+              "name": "C05 Order1 — QR Scan",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12519,7 +12573,7 @@
                     "exec": [
                       "const qrId = pm.collectionVariables.get('qrIdPe05O1');",
                       "const qrSig = pm.collectionVariables.get('qrSigPe05O1');",
-                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data \u2014 promotion may not have run or no active pickup'); return; }",
+                      "if (!qrId || !qrSig) { pm.execution.skipRequest('No QR code data — promotion may not have run or no active pickup'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -12578,7 +12632,7 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 Get Enriched Pickups",
+              "name": "C05 Order1 — Get Enriched Pickups",
               "event": [
                 {
                   "listen": "prerequest",
@@ -12632,14 +12686,14 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 Complete Order",
+              "name": "C05 Order1 — Complete Order",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe05O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping Complete order'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping Complete order'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "const baseUrl = pm.environment.get('baseUrl') || 'http://localhost:8000';",
                       "pm.request.url = baseUrl + '/api/v1/plate-pickup/' + pickupId + '/complete';",
@@ -12687,14 +12741,14 @@
               }
             },
             {
-              "name": "C05 Order1 \u2014 Plate Review (5 stars)",
+              "name": "C05 Order1 — Plate Review (5 stars)",
               "event": [
                 {
                   "listen": "prerequest",
                   "script": {
                     "exec": [
                       "const pickupId = pm.collectionVariables.get('platePickupPe05O1');",
-                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId \u2014 skipping review'); return; }",
+                      "if (!pickupId) { pm.execution.skipRequest('No platePickupId — skipping review'); return; }",
                       "const token = pm.collectionVariables.get('customerPe05Token');",
                       "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
                       "let raw = pm.request.body.raw;",
@@ -12822,7 +12876,7 @@
       "description": "Upsert 5 AR restaurants (Microcentro CABA cluster), QR codes, 10 Argentine products, 10 plates, PKDs Mon-Fri, 1 AR plan. Plan: ARS 16000 / 20 credits = 800 ARS/credit. All plates 20-24% savings.",
       "item": [
         {
-          "name": "Upsert Restaurant \u2014 Parrilla La Lavalle",
+          "name": "Upsert Restaurant — Parrilla La Lavalle",
           "event": [
             {
               "listen": "test",
@@ -12866,7 +12920,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Pizzeria Don Vicente",
+          "name": "Upsert Restaurant — Pizzeria Don Vicente",
           "event": [
             {
               "listen": "test",
@@ -12910,7 +12964,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Cafe del Centro",
+          "name": "Upsert Restaurant — Cafe del Centro",
           "event": [
             {
               "listen": "test",
@@ -12954,7 +13008,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Bodegon San Martin",
+          "name": "Upsert Restaurant — Bodegon San Martin",
           "event": [
             {
               "listen": "test",
@@ -12998,7 +13052,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Empanadas de Florida",
+          "name": "Upsert Restaurant — Empanadas de Florida",
           "event": [
             {
               "listen": "test",
@@ -13042,7 +13096,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR_LA_LAVALLE",
+          "name": "Upsert QR — DEMO_QR_AR_LA_LAVALLE",
           "event": [
             {
               "listen": "prerequest",
@@ -13096,7 +13150,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR_DON_VICENTE",
+          "name": "Upsert QR — DEMO_QR_AR_DON_VICENTE",
           "event": [
             {
               "listen": "prerequest",
@@ -13150,7 +13204,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR_CAFE_DEL_CENTRO",
+          "name": "Upsert QR — DEMO_QR_AR_CAFE_DEL_CENTRO",
           "event": [
             {
               "listen": "prerequest",
@@ -13204,7 +13258,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR_BODEGON_SM",
+          "name": "Upsert QR — DEMO_QR_AR_BODEGON_SM",
           "event": [
             {
               "listen": "prerequest",
@@ -13258,7 +13312,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR_EMPANADAS_FLORIDA",
+          "name": "Upsert QR — DEMO_QR_AR_EMPANADAS_FLORIDA",
           "event": [
             {
               "listen": "prerequest",
@@ -13312,7 +13366,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Milanesa a la Napolitana",
+          "name": "Upsert Product — Milanesa a la Napolitana",
           "event": [
             {
               "listen": "test",
@@ -13354,7 +13408,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Asado de Tira con Chimichurri",
+          "name": "Upsert Product — Asado de Tira con Chimichurri",
           "event": [
             {
               "listen": "test",
@@ -13396,7 +13450,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Pizza Mozzarella",
+          "name": "Upsert Product — Pizza Mozzarella",
           "event": [
             {
               "listen": "test",
@@ -13438,7 +13492,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Fugazzeta Rellena",
+          "name": "Upsert Product — Fugazzeta Rellena",
           "event": [
             {
               "listen": "test",
@@ -13480,7 +13534,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Choripan con Chimichurri",
+          "name": "Upsert Product — Choripan con Chimichurri",
           "event": [
             {
               "listen": "test",
@@ -13522,7 +13576,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Provoleta con Oregano",
+          "name": "Upsert Product — Provoleta con Oregano",
           "event": [
             {
               "listen": "test",
@@ -13564,7 +13618,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Empanadas (6 unidades)",
+          "name": "Upsert Product — Empanadas (6 unidades)",
           "event": [
             {
               "listen": "test",
@@ -13606,7 +13660,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Noquis del 29 con Tuco",
+          "name": "Upsert Product — Noquis del 29 con Tuco",
           "event": [
             {
               "listen": "test",
@@ -13648,7 +13702,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Bondiola Braseada",
+          "name": "Upsert Product — Bondiola Braseada",
           "event": [
             {
               "listen": "test",
@@ -13690,7 +13744,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Lomo de Cerdo a la Criolla",
+          "name": "Upsert Product — Lomo de Cerdo a la Criolla",
           "event": [
             {
               "listen": "test",
@@ -13732,7 +13786,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R1_MILANESA",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R1_MILANESA",
           "event": [
             {
               "listen": "prerequest",
@@ -14053,7 +14107,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R1_ASADO",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R1_ASADO",
           "event": [
             {
               "listen": "prerequest",
@@ -14374,7 +14428,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R2_PIZZA",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R2_PIZZA",
           "event": [
             {
               "listen": "prerequest",
@@ -14695,7 +14749,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R2_FUGAZZETA",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R2_FUGAZZETA",
           "event": [
             {
               "listen": "prerequest",
@@ -15016,7 +15070,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R3_CHORIPAN",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R3_CHORIPAN",
           "event": [
             {
               "listen": "prerequest",
@@ -15337,7 +15391,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R3_PROVOLETA",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R3_PROVOLETA",
           "event": [
             {
               "listen": "prerequest",
@@ -15658,7 +15712,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R4_EMPANADAS",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R4_EMPANADAS",
           "event": [
             {
               "listen": "prerequest",
@@ -15979,7 +16033,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R4_NOQUI",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R4_NOQUI",
           "event": [
             {
               "listen": "prerequest",
@@ -16300,7 +16354,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R5_BONDIOLA",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R5_BONDIOLA",
           "event": [
             {
               "listen": "prerequest",
@@ -16621,7 +16675,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR_R5_LOMO_CERDO",
+          "name": "Upsert Plate — DEMO_PLATE_AR_R5_LOMO_CERDO",
           "event": [
             {
               "listen": "prerequest",
@@ -16942,7 +16996,7 @@
           }
         },
         {
-          "name": "Upsert Plan \u2014 Plan Estandar AR",
+          "name": "Upsert Plan — Plan Estandar AR",
           "event": [
             {
               "listen": "test",
@@ -16986,7 +17040,7 @@
           }
         },
         {
-          "name": "Activate Restaurant \u2014 Parrilla La Lavalle",
+          "name": "Activate Restaurant — Parrilla La Lavalle",
           "request": {
             "method": "PUT",
             "header": [],
@@ -17041,7 +17095,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Pizzeria Don Vicente",
+          "name": "Activate Restaurant — Pizzeria Don Vicente",
           "request": {
             "method": "PUT",
             "header": [],
@@ -17096,7 +17150,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Cafe del Centro",
+          "name": "Activate Restaurant — Cafe del Centro",
           "request": {
             "method": "PUT",
             "header": [],
@@ -17151,7 +17205,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Bodegon San Martin",
+          "name": "Activate Restaurant — Bodegon San Martin",
           "request": {
             "method": "PUT",
             "header": [],
@@ -17206,7 +17260,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Empanadas de Florida",
+          "name": "Activate Restaurant — Empanadas de Florida",
           "request": {
             "method": "PUT",
             "header": [],
@@ -17266,7 +17320,7 @@
       "name": "12 Secondary supplier (AR)",
       "item": [
         {
-          "name": "Upsert Institution \u2014 Cocina de Recoleta S.R.L. (AR secondary)",
+          "name": "Upsert Institution — Cocina de Recoleta S.R.L. (AR secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -17310,7 +17364,7 @@
           ]
         },
         {
-          "name": "Upsert Institution Entity \u2014 Cocina de Recoleta S.R.L. (AR secondary)",
+          "name": "Upsert Institution Entity — Cocina de Recoleta S.R.L. (AR secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -17366,7 +17420,61 @@
           ]
         },
         {
-          "name": "Upsert User \u2014 demo.proveedor.ar.02.admin@vianda.demo (AR secondary Supplier Admin)",
+          "name": "Upsert User — demo.proveedor.ar.01.admin@vianda.demo (AR primary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_AR1_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.ar.01.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.ar.01.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Vianda Demo AR\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('AR primary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User — demo.proveedor.ar.02.admin@vianda.demo (AR secondary Supplier Admin)",
           "request": {
             "method": "PUT",
             "header": [
@@ -17420,7 +17528,7 @@
           ]
         },
         {
-          "name": "Upsert Restaurant \u2014 El Clasico de Recoleta (AR secondary, outlier)",
+          "name": "Upsert Restaurant — El Clasico de Recoleta (AR secondary, outlier)",
           "request": {
             "method": "PUT",
             "header": [
@@ -17477,7 +17585,7 @@
           ]
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_AR2_RECOLETA",
+          "name": "Upsert QR — DEMO_QR_AR2_RECOLETA",
           "request": {
             "method": "PUT",
             "header": [
@@ -17530,7 +17638,7 @@
           ]
         },
         {
-          "name": "Upsert Product \u2014 Noquis de Papa al Estofado (AR secondary)",
+          "name": "Upsert Product — Noquis de Papa al Estofado (AR secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -17585,7 +17693,7 @@
           ]
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_AR2_R1_NOQUIS_ESTOFADO",
+          "name": "Upsert Plate — DEMO_PLATE_AR2_R1_NOQUIS_ESTOFADO",
           "request": {
             "method": "PUT",
             "header": [
@@ -17906,7 +18014,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 El Clasico de Recoleta (AR secondary)",
+          "name": "Activate Restaurant — El Clasico de Recoleta (AR secondary)",
           "event": [
             {
               "listen": "prerequest",
@@ -23989,7 +24097,7 @@
       "description": "Upsert 5 US restaurants (Pike Place cluster Seattle), QR codes, 10 Pacific Northwest products, 10 plates, PKDs Mon-Fri, 1 US plan. Plan: $15 USD / 20 credits = $0.75/credit. All plates 18-21% savings.",
       "item": [
         {
-          "name": "Upsert Restaurant \u2014 Pike Place Chowder",
+          "name": "Upsert Restaurant — Pike Place Chowder",
           "event": [
             {
               "listen": "test",
@@ -24033,7 +24141,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Beecher's Deli",
+          "name": "Upsert Restaurant — Beecher's Deli",
           "event": [
             {
               "listen": "test",
@@ -24077,7 +24185,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Post Alley Pizza",
+          "name": "Upsert Restaurant — Post Alley Pizza",
           "event": [
             {
               "listen": "test",
@@ -24121,7 +24229,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Market Street Poke",
+          "name": "Upsert Restaurant — Market Street Poke",
           "event": [
             {
               "listen": "test",
@@ -24165,7 +24273,7 @@
           }
         },
         {
-          "name": "Upsert Restaurant \u2014 Stewart Street Diner",
+          "name": "Upsert Restaurant — Stewart Street Diner",
           "event": [
             {
               "listen": "test",
@@ -24209,7 +24317,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US_PIKE_CHOWDER",
+          "name": "Upsert QR — DEMO_QR_US_PIKE_CHOWDER",
           "event": [
             {
               "listen": "prerequest",
@@ -24263,7 +24371,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US_BEECHERSELLI",
+          "name": "Upsert QR — DEMO_QR_US_BEECHERSELLI",
           "event": [
             {
               "listen": "prerequest",
@@ -24317,7 +24425,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US_POST_ALLEY_PIZ",
+          "name": "Upsert QR — DEMO_QR_US_POST_ALLEY_PIZ",
           "event": [
             {
               "listen": "prerequest",
@@ -24371,7 +24479,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US_MARKET_POKE",
+          "name": "Upsert QR — DEMO_QR_US_MARKET_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -24425,7 +24533,7 @@
           }
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US_STEWART_DINER",
+          "name": "Upsert QR — DEMO_QR_US_STEWART_DINER",
           "event": [
             {
               "listen": "prerequest",
@@ -24479,7 +24587,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Clam Chowder",
+          "name": "Upsert Product — Clam Chowder",
           "event": [
             {
               "listen": "test",
@@ -24521,7 +24629,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Fish and Chips",
+          "name": "Upsert Product — Fish and Chips",
           "event": [
             {
               "listen": "test",
@@ -24563,7 +24671,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Flagship Mac and Cheese",
+          "name": "Upsert Product — Flagship Mac and Cheese",
           "event": [
             {
               "listen": "test",
@@ -24605,7 +24713,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Grilled Cheese on Sourdough",
+          "name": "Upsert Product — Grilled Cheese on Sourdough",
           "event": [
             {
               "listen": "test",
@@ -24647,7 +24755,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Margherita Pizza Slice",
+          "name": "Upsert Product — Margherita Pizza Slice",
           "event": [
             {
               "listen": "test",
@@ -24689,7 +24797,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Pepperoni Pizza Slice",
+          "name": "Upsert Product — Pepperoni Pizza Slice",
           "event": [
             {
               "listen": "test",
@@ -24731,7 +24839,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Salmon Poke Bowl",
+          "name": "Upsert Product — Salmon Poke Bowl",
           "event": [
             {
               "listen": "test",
@@ -24773,7 +24881,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Ahi Tuna Poke Bowl",
+          "name": "Upsert Product — Ahi Tuna Poke Bowl",
           "event": [
             {
               "listen": "test",
@@ -24815,7 +24923,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Northwest Clam Bake Plate",
+          "name": "Upsert Product — Northwest Clam Bake Plate",
           "event": [
             {
               "listen": "test",
@@ -24857,7 +24965,7 @@
           }
         },
         {
-          "name": "Upsert Product \u2014 Turkey Club Sandwich",
+          "name": "Upsert Product — Turkey Club Sandwich",
           "event": [
             {
               "listen": "test",
@@ -24899,7 +25007,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R1_CHOWDER",
+          "name": "Upsert Plate — DEMO_PLATE_US_R1_CHOWDER",
           "event": [
             {
               "listen": "prerequest",
@@ -25220,7 +25328,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R1_FISH_CHIPS",
+          "name": "Upsert Plate — DEMO_PLATE_US_R1_FISH_CHIPS",
           "event": [
             {
               "listen": "prerequest",
@@ -25541,7 +25649,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R2_MAC_CHEESE",
+          "name": "Upsert Plate — DEMO_PLATE_US_R2_MAC_CHEESE",
           "event": [
             {
               "listen": "prerequest",
@@ -25862,7 +25970,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R2_GRILLED_CHEESE",
+          "name": "Upsert Plate — DEMO_PLATE_US_R2_GRILLED_CHEESE",
           "event": [
             {
               "listen": "prerequest",
@@ -26183,7 +26291,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R3_MARGHERITA",
+          "name": "Upsert Plate — DEMO_PLATE_US_R3_MARGHERITA",
           "event": [
             {
               "listen": "prerequest",
@@ -26504,7 +26612,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R3_PEPPERONI",
+          "name": "Upsert Plate — DEMO_PLATE_US_R3_PEPPERONI",
           "event": [
             {
               "listen": "prerequest",
@@ -26825,7 +26933,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R4_SALMON_POKE",
+          "name": "Upsert Plate — DEMO_PLATE_US_R4_SALMON_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -27146,7 +27254,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R4_TUNA_POKE",
+          "name": "Upsert Plate — DEMO_PLATE_US_R4_TUNA_POKE",
           "event": [
             {
               "listen": "prerequest",
@@ -27467,7 +27575,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R5_CLAMBAKE",
+          "name": "Upsert Plate — DEMO_PLATE_US_R5_CLAMBAKE",
           "event": [
             {
               "listen": "prerequest",
@@ -27788,7 +27896,7 @@
           }
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US_R5_TURKEY_SANDWICH",
+          "name": "Upsert Plate — DEMO_PLATE_US_R5_TURKEY_SANDWICH",
           "event": [
             {
               "listen": "prerequest",
@@ -28109,7 +28217,7 @@
           }
         },
         {
-          "name": "Upsert Plan \u2014 Standard Plan US",
+          "name": "Upsert Plan — Standard Plan US",
           "event": [
             {
               "listen": "test",
@@ -28153,7 +28261,7 @@
           }
         },
         {
-          "name": "Activate Restaurant \u2014 Pike Place Chowder",
+          "name": "Activate Restaurant — Pike Place Chowder",
           "request": {
             "method": "PUT",
             "header": [],
@@ -28208,7 +28316,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Pike St Comfort",
+          "name": "Activate Restaurant — Pike St Comfort",
           "request": {
             "method": "PUT",
             "header": [],
@@ -28263,7 +28371,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Italian Originals",
+          "name": "Activate Restaurant — Italian Originals",
           "request": {
             "method": "PUT",
             "header": [],
@@ -28318,7 +28426,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Pacific Poke",
+          "name": "Activate Restaurant — Pacific Poke",
           "request": {
             "method": "PUT",
             "header": [],
@@ -28373,7 +28481,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Puget Sound Classics",
+          "name": "Activate Restaurant — Puget Sound Classics",
           "request": {
             "method": "PUT",
             "header": [],
@@ -28433,7 +28541,7 @@
       "name": "12 Secondary supplier (US)",
       "item": [
         {
-          "name": "Upsert Institution \u2014 Capitol Hill Kitchen LLC (US secondary)",
+          "name": "Upsert Institution — Capitol Hill Kitchen LLC (US secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -28477,7 +28585,7 @@
           ]
         },
         {
-          "name": "Upsert Institution Entity \u2014 Capitol Hill Kitchen LLC (US secondary)",
+          "name": "Upsert Institution Entity — Capitol Hill Kitchen LLC (US secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -28533,7 +28641,61 @@
           ]
         },
         {
-          "name": "Upsert User \u2014 demo.proveedor.us.02.admin@vianda.demo (US secondary Supplier Admin)",
+          "name": "Upsert User — demo.proveedor.us.01.admin@vianda.demo (US primary Supplier Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_USER_US1_SUPPLIER_ADMIN\",\n  \"institution_id\": \"PLACEHOLDER\",\n  \"role_type\": \"supplier\",\n  \"role_name\": \"admin\",\n  \"username\": \"demo.proveedor.us.01.admin@vianda.demo\",\n  \"email\": \"demo.proveedor.us.01.admin@vianda.demo\",\n  \"password\": \"DemoPass1!\",\n  \"first_name\": \"Admin\",\n  \"last_name\": \"Vianda Demo US\",\n  \"market_id\": \"00000000-0000-0000-0000-000000000004\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const payload = JSON.parse(pm.request.body.raw);",
+                  "payload.institution_id = pm.collectionVariables.get('demoInstitutionId');",
+                  "pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+                  "pm.request.body.update(JSON.stringify(payload));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has user_id', () => { pm.expect(body).to.have.property('user_id'); });",
+                  "console.log('US primary supplier admin user:', body.user_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upsert User — demo.proveedor.us.02.admin@vianda.demo (US secondary Supplier Admin)",
           "request": {
             "method": "PUT",
             "header": [
@@ -28587,7 +28749,7 @@
           ]
         },
         {
-          "name": "Upsert Restaurant \u2014 Summit Bowl Capitol Hill (US secondary, outlier)",
+          "name": "Upsert Restaurant — Summit Bowl Capitol Hill (US secondary, outlier)",
           "request": {
             "method": "PUT",
             "header": [
@@ -28644,7 +28806,7 @@
           ]
         },
         {
-          "name": "Upsert QR \u2014 DEMO_QR_US2_BOWL",
+          "name": "Upsert QR — DEMO_QR_US2_BOWL",
           "request": {
             "method": "PUT",
             "header": [
@@ -28697,7 +28859,7 @@
           ]
         },
         {
-          "name": "Upsert Product \u2014 Grains and Greens Bowl (US secondary)",
+          "name": "Upsert Product — Grains and Greens Bowl (US secondary)",
           "request": {
             "method": "PUT",
             "header": [
@@ -28752,7 +28914,7 @@
           ]
         },
         {
-          "name": "Upsert Plate \u2014 DEMO_PLATE_US2_R1_GRAINS_BOWL",
+          "name": "Upsert Plate — DEMO_PLATE_US2_R1_GRAINS_BOWL",
           "request": {
             "method": "PUT",
             "header": [
@@ -29073,7 +29235,7 @@
           ]
         },
         {
-          "name": "Activate Restaurant \u2014 Summit Bowl Capitol Hill (US secondary)",
+          "name": "Activate Restaurant — Summit Bowl Capitol Hill (US secondary)",
           "event": [
             {
               "listen": "prerequest",
@@ -35197,9 +35359,9 @@
                   "const status = pm.response.code;",
                   "const body = pm.response.json();",
                   "// customerPe01Token must be set (from folder 20 C01 Login) for this check to return restaurants.",
-                  "// In a partial run (00+99 only), token is not in collection scope \u2192 by-city returns 401.",
+                  "// In a partial run (00+99 only), token is not in collection scope → by-city returns 401.",
                   "if (status === 401) {",
-                  "    pm.test('SKIPPED: customerPe01Token not in scope \u2014 run full collection for savings check', () => true);",
+                  "    pm.test('SKIPPED: customerPe01Token not in scope — run full collection for savings check', () => true);",
                   "    console.warn('Savings check skipped: 401 means customerPe01Token not set. Run the full collection (load_demo_data.sh) to verify savings.');",
                   "} else {",
                   "    pm.test('Status 200', () => { pm.response.to.have.status(200); });",
@@ -35229,7 +35391,7 @@
                   "// collection-level auth override when the static header resolves to empty Bearer.",
                   "const token = pm.collectionVariables.get('customerPe01Token');",
                   "if (!token) {",
-                  "    console.warn('WARN: customerPe01Token not set \u2014 collection-level admin auth will be used instead.');",
+                  "    console.warn('WARN: customerPe01Token not set — collection-level admin auth will be used instead.');",
                   "    console.warn('Run the full collection (load_demo_data.sh) for savings check to work correctly.');",
                   "} else {",
                   "    pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
@@ -35421,7 +35583,7 @@
                   "const active = subs.filter(s => s.status === 'active');",
                   "const activeOrPending = subs.filter(s => s.status === 'active' || s.status === 'pending');",
                   "pm.test('At least 5 active PE demo subscriptions (C01-C05)', () => { pm.expect(active.length).to.be.at.least(5); });",
-                  "pm.test('At least 6 subscriptions (active or pending) \u2014 C07 pending when API not in mock mode', () => { pm.expect(activeOrPending.length).to.be.at.least(6); });",
+                  "pm.test('At least 6 subscriptions (active or pending) — C07 pending when API not in mock mode', () => { pm.expect(activeOrPending.length).to.be.at.least(6); });",
                   "console.log('Active subscriptions:', active.length, 'Active+Pending:', activeOrPending.length);"
                 ],
                 "type": "text/javascript"
@@ -35801,7 +35963,7 @@
                   "    let allPlates = [];",
                   "    restaurants.forEach(r => { if (r.plates) allPlates = allPlates.concat(r.plates); });",
                   "    // by-city enriched response does not expose canonical_key; all plates returned",
-                  "    // for an AR customer querying Buenos Aires ARE demo AR plates \u2014 use allPlates directly.",
+                  "    // for an AR customer querying Buenos Aires ARE demo AR plates — use allPlates directly.",
                   "    pm.test('AR plates found in by-city response', () => { pm.expect(allPlates.length).to.be.greaterThan(0); });",
                   "    if (allPlates.length > 0) {",
                   "        const tooLow = allPlates.filter(p => p.savings < 15);",
@@ -36861,6 +37023,171 @@
             }
           },
           "response": []
+        }        ,
+        {
+          "name": "Assert primary supplier admin exists (PE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const items = Array.isArray(body) ? body : (body.results || body.items || body.users || body.data || []);",
+                  "const match = items.filter(u => u.username === 'demo.proveedor.pe.01.admin@vianda.demo');",
+                  "pm.test('PE primary supplier admin user exists', () => {",
+                  "  pm.expect(match.length).to.equal(1, 'Expected 1 user with username demo.proveedor.pe.01.admin@vianda.demo');",
+                  "});",
+                  "if (match.length > 0) {",
+                  "  console.log('PE primary admin user_id:', match[0].user_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/search?q=demo.proveedor.pe.01.admin@vianda.demo&search_by=username",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "demo.proveedor.pe.01.admin@vianda.demo"
+                },
+                {
+                  "key": "search_by",
+                  "value": "username"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert primary supplier admin exists (AR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const items = Array.isArray(body) ? body : (body.results || body.items || body.users || body.data || []);",
+                  "const match = items.filter(u => u.username === 'demo.proveedor.ar.01.admin@vianda.demo');",
+                  "pm.test('AR primary supplier admin user exists', () => {",
+                  "  pm.expect(match.length).to.equal(1, 'Expected 1 user with username demo.proveedor.ar.01.admin@vianda.demo');",
+                  "});",
+                  "if (match.length > 0) {",
+                  "  console.log('AR primary admin user_id:', match[0].user_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/search?q=demo.proveedor.ar.01.admin@vianda.demo&search_by=username",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "demo.proveedor.ar.01.admin@vianda.demo"
+                },
+                {
+                  "key": "search_by",
+                  "value": "username"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assert primary supplier admin exists (US)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const items = Array.isArray(body) ? body : (body.results || body.items || body.users || body.data || []);",
+                  "const match = items.filter(u => u.username === 'demo.proveedor.us.01.admin@vianda.demo');",
+                  "pm.test('US primary supplier admin user exists', () => {",
+                  "  pm.expect(match.length).to.equal(1, 'Expected 1 user with username demo.proveedor.us.01.admin@vianda.demo');",
+                  "});",
+                  "if (match.length > 0) {",
+                  "  console.log('US primary admin user_id:', match[0].user_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/search?q=demo.proveedor.us.01.admin@vianda.demo&search_by=username",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "demo.proveedor.us.01.admin@vianda.demo"
+                },
+                {
+                  "key": "search_by",
+                  "value": "username"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
@@ -36871,7 +37198,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// [demo loader] x-client-type bypass \u2014 captcha_guard exempts b2c-mobile",
+          "// [demo loader] x-client-type bypass — captcha_guard exempts b2c-mobile",
           "pm.request.headers.upsert({key: 'x-client-type', value: 'b2c-mobile'});",
           ""
         ]

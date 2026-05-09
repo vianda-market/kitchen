@@ -210,11 +210,11 @@ bash scripts/load_demo_data.sh
 
 The loader runs two layers in order:
 1. **Layer A** — `demo_baseline.sql`: inserts the supplier institution, demo admin user, addresses, and institution entity directly via SQL (no API endpoint for these entities).
-2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts the PE restaurant, QR code, 4 Peruvian products, 4 plates, plate-kitchen-days Mon–Fri, 1 PE plan; signs up 5 PE customers via the verified email flow; subscribes each customer (mock payment for `local`, sandbox-confirmed PaymentIntent + webhook polling for `gcp-dev`); and runs 5 orders per customer (plate-selection → QR-scan → complete → review).
+2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts restaurants, QR codes, products, plates, plate-kitchen-days, and plans for all three markets (PE / AR / US); signs up and subscribes customers; sets up employer institutions and benefit-enrolled employees; runs one order per customer per market through the full pickup flow.
 
 At the end, credentials are printed to stdout and written to `.demo_credentials.local` (gitignored).
 
-**Scope (v1):** Peru only. One supplier, one restaurant in Miraflores, one plan, five customers in Lima, one active order per customer (5 orders total — the API enforces one plate-selection per customer per day, so we don't backdate). For the full narrative — what's in the dataset, who the customers are, what stakeholders see, and the running feedback log — read **`DEMO_DAY_DATASET.md`** in this same folder. That doc is the authoritative reference.
+For the full narrative — markets, institutions, restaurants, plates, savings math, all credential tables, and known workarounds — read **`DEMO_DAY_DATASET.md`** in this same folder. That doc is the authoritative reference.
 
 **Re-running:** Customer signups, subscriptions, and orders are NOT idempotent — they create new rows on each run. To reset: `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.
 

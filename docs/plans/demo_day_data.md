@@ -1,3 +1,6 @@
+> **Permanent reference:** see [`docs/guidelines/database/DEMO_DAY_DATASET.md`](../guidelines/database/DEMO_DAY_DATASET.md).
+> This plan doc tracks rollout state and implementation decisions. It is archived once the v5 dataset stabilises.
+
 # Demo Day Data Plan — v5 (Employer flow — PE/AR/US)
 
 **Status:** active (v5 — employer B2B subsidy demo per market)
