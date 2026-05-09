@@ -408,6 +408,103 @@ def subscribe_employee(
     return subscription
 
 
+def upsert_employee_link_by_canonical_key(
+    canonical_key: str,
+    user_id: UUID,
+    plan_id: UUID,
+    db: psycopg2.extensions.connection,
+    modified_by: UUID,
+    locale: str = "en",
+) -> Any:
+    """Idempotent upsert of an employer-sponsored subscription by canonical_key.
+
+    INTERNAL SEED/FIXTURE ONLY. No invite email is sent.
+
+    INSERT path: validates the user is a Customer Comensal in an employer
+    institution, resolves the effective program, and creates a fully-subsidized
+    active subscription. Stamps canonical_key on the new subscription row.
+
+    UPDATE path: finds the existing subscription by canonical_key and returns it.
+    No-op if the subscription is already active for the requested plan.
+
+    Raises 409 if the user already has a canonical subscription for a different
+    plan (the fixture must be updated to use the same plan).
+    """
+    from app.config.enums.subscription_status import SubscriptionStatus
+    from app.services.crud_service import plan_service
+
+    # Check for existing subscription by canonical_key
+    existing = db_read(
+        "SELECT * FROM subscription_info WHERE canonical_key = %s AND is_archived = FALSE",
+        (canonical_key,),
+        connection=db,
+        fetch_one=True,
+    )
+    if existing and isinstance(existing, dict):
+        log_info(
+            f"upsert_employee_link_by_canonical_key: found existing subscription {existing['subscription_id']} (key={canonical_key})"
+        )
+        return existing
+
+    # Validate user
+    user = user_service.get_by_id(user_id, db, scope=None)
+    if not user:
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="User")
+
+    role_attr = getattr(user, "role_type", "")
+    user_role_type = role_attr.value if hasattr(role_attr, "value") else str(role_attr).lower()
+    if user_role_type not in ("customer",):
+        raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_TYPE_MISMATCH, status=400, locale=locale)
+
+    institution_id = getattr(user, "institution_id", None)
+    if not institution_id:
+        raise envelope_exception(ErrorCode.SECURITY_FORBIDDEN, status=403, locale=locale)
+
+    employer_entity_id = getattr(user, "employer_entity_id", None)
+    program = resolve_effective_program(institution_id, employer_entity_id, db)
+    if not program or not program.is_active:
+        raise envelope_exception(ErrorCode.ENROLLMENT_NO_ACTIVE_PROGRAM, status=400, locale=locale)
+
+    plan = plan_service.get_by_id(plan_id, db)
+    if not plan:
+        raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Plan")
+
+    plan_price = float(getattr(plan, "price", 0))
+    benefit_rate = program.benefit_rate
+    rate_amount = plan_price * (benefit_rate / 100)
+    benefit_cap = float(program.benefit_cap) if program.benefit_cap is not None else None
+    employee_benefit = min(rate_amount, benefit_cap) if benefit_cap is not None else rate_amount
+    employee_share = plan_price - employee_benefit
+
+    if employee_share > 0:
+        raise envelope_exception(ErrorCode.ENROLLMENT_PARTIAL_SUBSIDY_REQUIRES_APP, status=400, locale=locale)
+
+    plan_credit = int(getattr(plan, "credit", 0))
+    market_id = str(getattr(plan, "market_id", ""))
+    early_threshold = None if not program.allow_early_renewal else 10
+
+    subscription_data = {
+        "user_id": str(user_id),
+        "plan_id": str(plan_id),
+        "market_id": market_id,
+        "balance": plan_credit,
+        "subscription_status": SubscriptionStatus.ACTIVE.value,
+        "status": "active",
+        "early_renewal_threshold": early_threshold,
+        "canonical_key": canonical_key,
+        "modified_by": str(modified_by),
+    }
+
+    subscription = subscription_service.create(subscription_data, db, scope=None)
+    if not subscription:
+        raise envelope_exception(ErrorCode.ENROLLMENT_SUBSCRIPTION_CREATION_FAILED, status=500, locale="en")
+    log_info(
+        f"upsert_employee_link_by_canonical_key: created subscription {subscription.subscription_id} "
+        f"for user {user_id} (key={canonical_key}, plan={plan_id})"
+    )
+    return subscription
+
+
 def migrate_existing_users_for_domain(
     domain: str,
     institution_id: UUID,

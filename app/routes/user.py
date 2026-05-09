@@ -1036,7 +1036,9 @@ def upsert_user_by_key(
     def _upsert() -> UserResponseSchema:
         key = upsert_data.canonical_key
         existing = find_user_by_canonical_key(key, db)
-        payload = upsert_data.model_dump()
+        # exclude_none=True: DB-defaulted NOT NULL columns (city_metadata_id,
+        # market_id) keep their defaults when not provided by the caller.
+        payload = upsert_data.model_dump(exclude_none=True)
 
         if existing is not None:
             # UPDATE path — strip fields that must not change and handle password

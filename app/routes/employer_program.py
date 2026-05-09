@@ -1,5 +1,6 @@
 """Employer Benefits Program routes — program config, enrollment, billing."""
 
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -7,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from app.auth.dependencies import get_current_user, get_employee_user, get_resolved_locale
 from app.dependencies.database import get_db
+from app.dto.models import EmployerBenefitsProgramDTO
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.schemas.employer_program import (
@@ -16,6 +18,9 @@ from app.schemas.employer_program import (
     EmployeeSubscribeSchema,
     EmployerBillDetailResponseSchema,
     EmployerBillResponseSchema,
+    EmployerEmployeeLinkResponseSchema,
+    EmployerEmployeeLinkUpsertSchema,
+    EmployerProgramUpsertSchema,
     GenerateBillRequestSchema,
     # Domain schemas REMOVED — email_domain is on institution_entity_info
     ProgramCreateSchema,
@@ -113,6 +118,31 @@ def update_program(
     updates = body.model_dump(exclude_unset=True)
     return program_service.update_program(
         program.program_id, updates, db, modified_by=current_user["user_id"], locale=locale
+    )
+
+
+@router.put("/program/by-key", response_model=ProgramResponseSchema, status_code=200)
+def upsert_program_by_key(
+    body: EmployerProgramUpsertSchema,
+    current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> EmployerBenefitsProgramDTO:
+    """Idempotent upsert an employer benefits program by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT ONLY — never use for production program
+    creation (use POST /employer/program instead).
+
+    If a program with the given canonical_key already exists it is updated
+    in-place; otherwise a new program is inserted. Running the same request
+    twice is a no-op (idempotent).
+
+    Auth: Internal only (get_employee_user). Returns 403 for non-Internal roles.
+    HTTP 200 on both insert and update.
+    """
+    data = body.model_dump(exclude={"canonical_key"})
+    return program_service.upsert_program_by_canonical_key(
+        body.canonical_key, data, db, modified_by=current_user["user_id"], locale=locale
     )
 
 
@@ -219,6 +249,40 @@ def deactivate_employee(
     enrollment_service.deactivate_employee(
         institution_id, user_id, db, modified_by=current_user["user_id"], locale=locale
     )
+
+
+@router.put("/employee-link/by-key", response_model=EmployerEmployeeLinkResponseSchema, status_code=200)
+def upsert_employee_link_by_key(
+    body: EmployerEmployeeLinkUpsertSchema,
+    current_user: dict = Depends(get_employee_user),
+    locale: str = Depends(get_resolved_locale),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> Any:
+    """Idempotent upsert an employer-sponsored subscription by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT ONLY. This endpoint idempotently creates an
+    employer-sponsored subscription (active, fully-subsidized) for a Customer
+    Comensal user in an employer institution. It is equivalent to POST
+    /employer/employees/{user_id}/subscribe but is idempotent and sends no
+    invite email.
+
+    Prerequisites:
+    - The user must already exist (via PUT /users/by-key or POST /employer/employees).
+    - The employer institution must have an active benefits program.
+    - The plan must be 100% employer-subsidized (benefit_rate=100 or no employee share).
+
+    Auth: Internal only (get_employee_user). Returns 403 for non-Internal roles.
+    HTTP 200 on both insert and update.
+    """
+    result = enrollment_service.upsert_employee_link_by_canonical_key(
+        body.canonical_key,
+        body.user_id,
+        body.plan_id,
+        db,
+        modified_by=current_user["user_id"],
+        locale=locale,
+    )
+    return result
 
 
 @router.post("/employees/{user_id}/subscribe", status_code=201)

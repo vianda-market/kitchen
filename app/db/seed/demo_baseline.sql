@@ -34,6 +34,7 @@
 --   0030  — US primary addresses  (1 office + 5 restaurants)
 --   0031  — US secondary addresses (1 office + 1 restaurant — Capitol Hill outlier)
 --   0050  — institution_bill_info rows (2 per market secondary supplier)
+--   0060  — Employer institution office addresses (N=1 PE Lima, N=2 AR Buenos Aires, N=3 US Seattle)
 --
 -- Secondary institution UUID map (0002 sub-range):
 --   dddddddd-dec0-0002-0000-000000000001  PE secondary institution (Cocina Andina S.A.C.)
@@ -1373,6 +1374,139 @@ ON CONFLICT (institution_bill_id) DO UPDATE SET
     resolution    = EXCLUDED.resolution,
     modified_by   = EXCLUDED.modified_by,
     modified_date = CURRENT_TIMESTAMP;
+
+-- =============================================================================
+-- SECTION 8 — Employer institution office addresses (sub-range 0060)
+--
+-- Three employer institutions (one per market) require a registered office
+-- address for their institution entity.  These addresses are deliberately in
+-- different neighborhoods from the restaurant cluster and secondary suppliers.
+--
+--   dddddddd-dec0-0060-0000-000000000001  PE employer office — San Isidro, Lima
+--   dddddddd-dec0-0060-0000-000000000002  AR employer office — Palermo, Buenos Aires
+--   dddddddd-dec0-0060-0000-000000000003  US employer office — South Lake Union, Seattle
+--
+-- These addresses are referenced by the Postman collection steps:
+--   PUT /institution-entities/by-key  (address_id for each employer entity)
+-- =============================================================================
+
+DO $$
+DECLARE
+    v_lima_city_id  UUID;
+    v_ba_city_id    UUID;
+    v_sea_city_id   UUID;
+    v_system        UUID := 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    v_vianda_inst   UUID := '11111111-1111-1111-1111-111111111111';  -- Vianda Enterprises (internal)
+BEGIN
+    -- Resolve Lima city_metadata_id
+    SELECT cm.city_metadata_id INTO v_lima_city_id
+    FROM core.city_metadata cm
+    JOIN external.geonames_city gc ON cm.geonames_id = gc.geonames_id
+    WHERE gc.ascii_name = 'Lima' AND cm.country_iso = 'PE'
+    LIMIT 1;
+
+    IF v_lima_city_id IS NULL THEN
+        RAISE EXCEPTION 'Lima city_metadata not found in SECTION 8';
+    END IF;
+
+    -- Resolve Buenos Aires city_metadata_id
+    SELECT cm.city_metadata_id INTO v_ba_city_id
+    FROM core.city_metadata cm
+    JOIN external.geonames_city gc ON cm.geonames_id = gc.geonames_id
+    WHERE gc.ascii_name = 'Buenos Aires' AND cm.country_iso = 'AR'
+    LIMIT 1;
+
+    IF v_ba_city_id IS NULL THEN
+        RAISE EXCEPTION 'Buenos Aires city_metadata not found in SECTION 8';
+    END IF;
+
+    -- Resolve Seattle city_metadata_id
+    SELECT cm.city_metadata_id INTO v_sea_city_id
+    FROM core.city_metadata cm
+    JOIN external.geonames_city gc ON cm.geonames_id = gc.geonames_id
+    WHERE gc.ascii_name = 'Seattle' AND cm.country_iso = 'US'
+    LIMIT 1;
+
+    IF v_sea_city_id IS NULL THEN
+        RAISE EXCEPTION 'Seattle city_metadata not found in SECTION 8';
+    END IF;
+
+    -- -------------------------------------------------------------------------
+    -- PE employer office — San Isidro, Lima (Av. El Derby 055, different block from restaurant cluster)
+    -- lat -12.0921, lon -76.9995 — San Isidro business district
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0060-0000-000000000001',
+        v_vianda_inst,
+        v_lima_city_id,
+        ARRAY['entity_address'::address_type_enum],
+        'PE', 'Lima', 'Lima', 'Lima 41',
+        'ave'::street_type_enum, 'El Derby', '055',
+        'America/Lima',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- AR employer office — Palermo, Buenos Aires (Thames 1620, distinct from Lavalle cluster)
+    -- lat -34.5880, lon -58.4290 — Palermo Soho
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0060-0000-000000000002',
+        v_vianda_inst,
+        v_ba_city_id,
+        ARRAY['entity_address'::address_type_enum],
+        'AR', 'Buenos Aires', 'Buenos Aires', 'C1414',
+        'st'::street_type_enum, 'Thames', '1620',
+        'America/Argentina/Buenos_Aires',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+    -- -------------------------------------------------------------------------
+    -- US employer office — South Lake Union, Seattle (Westlake Ave N 1920)
+    -- lat 47.6212, lon -122.3382 — distinct from Pike Place cluster
+    -- -------------------------------------------------------------------------
+    INSERT INTO core.address_info (
+        address_id, institution_id, city_metadata_id, address_type,
+        country_code, province, city, postal_code,
+        street_type, street_name, building_number,
+        timezone, is_archived, status,
+        created_by, modified_by
+    ) VALUES (
+        'dddddddd-dec0-0060-0000-000000000003',
+        v_vianda_inst,
+        v_sea_city_id,
+        ARRAY['entity_address'::address_type_enum],
+        'US', 'Washington', 'Seattle', '98109',
+        'ave'::street_type_enum, 'Westlake Ave N', '1920',
+        'America/Los_Angeles',
+        FALSE, 'active'::status_enum,
+        v_system, v_system
+    )
+    ON CONFLICT (address_id) DO UPDATE SET
+        modified_by   = v_system,
+        modified_date = CURRENT_TIMESTAMP;
+
+END $$;
 
 -- =============================================================================
 -- SUMMARY

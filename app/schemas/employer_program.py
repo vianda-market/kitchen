@@ -74,6 +74,97 @@ class ProgramResponseSchema(BaseModel):
     is_active: bool
     is_archived: bool
     status: Status
+    canonical_key: str | None = None
+    created_date: datetime
+    modified_date: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployerProgramUpsertSchema(BaseModel):
+    """Schema for idempotent employer benefits program upsert by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT ONLY. Use this endpoint for Postman seed runs
+    and demo fixture data — NEVER for production program creation (use POST
+    /employer/program instead).
+
+    If a program with the given canonical_key already exists it is updated in-place;
+    otherwise a new program is inserted. Running the same request twice is a no-op.
+
+    Auth: Internal only (get_employee_user). Returns 403 for non-Internal roles.
+    HTTP 200 on both insert and update (unlike POST which returns 201).
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description=(
+            "Stable identifier for this program fixture. "
+            "Convention: EMPLOYER_<INSTITUTION_SLUG>_PROGRAM[_ENTITY_<CC>]. "
+            "Once set, never rename."
+        ),
+    )
+    institution_id: UUID = Field(..., description="Employer institution ID (must be institution_type='Employer')")
+    institution_entity_id: UUID | None = Field(
+        None,
+        description="Entity ID for entity-level override. NULL = institution-level defaults.",
+    )
+    benefit_rate: int = Field(..., ge=0, le=100, description="Percentage of plan price employer covers (0-100)")
+    benefit_cap: Decimal | None = Field(None, ge=0, description="Max subsidy amount per cap period. NULL = no cap.")
+    benefit_cap_period: str = Field("monthly", description="'per_renewal' or 'monthly'")
+    price_discount: int = Field(0, ge=0, le=100, description="Negotiated discount on employer's bill (0-100)")
+    minimum_monthly_fee: Decimal | None = Field(None, ge=0, description="Floor for monthly charges. NULL = no floor.")
+    billing_cycle: str = Field("monthly", description="'daily', 'weekly', or 'monthly'")
+    billing_day: int | None = Field(1, ge=1, le=28, description="Day of month for monthly billing (1-28)")
+    enrollment_mode: str = Field("managed", description="'managed' or 'domain_gated'")
+    allow_early_renewal: bool = Field(False, description="Whether employees can trigger early renewal")
+
+
+class EmployerEmployeeLinkUpsertSchema(BaseModel):
+    """Schema for idempotent employer employee program-link upsert by canonical_key.
+
+    INTERNAL SEED/FIXTURE ENDPOINT ONLY. This endpoint idempotently creates an
+    employer-sponsored subscription for a Customer Comensal user in an employer
+    institution. It is equivalent to POST /employer/employees/{user_id}/subscribe
+    but is idempotent: if the user already has an active subscription to the
+    specified plan, it returns the existing subscription with HTTP 200.
+
+    Differences from POST /employer/employees/{user_id}/subscribe:
+    - No invite email is sent (the user must already exist via PUT /users/by-key).
+    - Idempotent: re-running with the same canonical_key is a no-op.
+    - The canonical_key is stamped on the subscription_info row.
+
+    Auth: Internal only (get_employee_user). Returns 403 for non-Internal roles.
+    HTTP 200 on both insert and update.
+    """
+
+    canonical_key: str = Field(
+        ...,
+        max_length=200,
+        description=(
+            "Stable identifier for this employee-program link fixture. "
+            "Convention: EMPLOYER_<INSTITUTION_SLUG>_EE_<USERNAME_SLUG>_LINK. "
+            "Once set, never rename."
+        ),
+    )
+    user_id: UUID = Field(
+        ...,
+        description="User ID of the employee (Customer Comensal in the employer institution).",
+    )
+    plan_id: UUID = Field(..., description="Plan to subscribe the employee to.")
+
+
+class EmployerEmployeeLinkResponseSchema(BaseModel):
+    """Response schema for employer employee-link upsert."""
+
+    subscription_id: UUID
+    user_id: UUID
+    plan_id: UUID
+    market_id: UUID
+    balance: Decimal
+    renewal_date: datetime
+    subscription_status: str | None = None
+    canonical_key: str | None = None
     created_date: datetime
     modified_date: datetime
 

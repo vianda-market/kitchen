@@ -1037,6 +1037,186 @@ pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });
 
 ---
 
+## Employer Benefits Programs — `PUT /api/v1/employer/program/by-key`
+
+```http
+PUT /api/v1/employer/program/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for production program creation
+(use `POST /employer/program` instead). Auth: Internal only. Returns 403 for
+Customer/Supplier/Employer roles.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier. Convention: `EMPLOYER_{INSTITUTION_SLUG}_PROGRAM[_ENTITY_{CC}]`. Once set, never rename. |
+| `institution_id` | UUID | yes | FK to `core.institution_info` (must have `institution_type = 'Employer'`). **Immutable after INSERT.** |
+| `institution_entity_id` | UUID | no | FK to `ops.institution_entity_info` for entity-level overrides. NULL = institution-level defaults. **Immutable after INSERT.** |
+| `benefit_rate` | int (0–100) | yes | Percentage of the plan price the employer covers. |
+| `benefit_cap` | decimal (>= 0) | no | Max subsidy amount per cap period. NULL = no cap. |
+| `benefit_cap_period` | string | no | `'per_renewal'` or `'monthly'` (default `'monthly'`). |
+| `price_discount` | int (0–100) | no | Negotiated discount on employer's bill (default `0`). |
+| `minimum_monthly_fee` | decimal (>= 0) | no | Floor for monthly employer charges. NULL = no minimum. |
+| `billing_cycle` | string | no | `'daily'`, `'weekly'`, or `'monthly'` (default `'monthly'`). |
+| `billing_day` | int (1–28) | no | Day of month for monthly billing (default `1`). |
+| `enrollment_mode` | string | no | `'managed'` or `'domain_gated'` (default `'managed'`). |
+| `allow_early_renewal` | bool | no | Whether employees can trigger early renewal (default `false`). |
+
+Response body is `ProgramResponseSchema` (same shape as `GET /api/v1/employer/program/{program_id}`), which includes `canonical_key`.
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: a new `core.employer_benefits_program` row is created with the given `canonical_key`. All mutable and immutable fields are set.
+- **UPDATE path**: only mutable fields (`benefit_rate`, `benefit_cap`, `benefit_cap_period`, `price_discount`, `minimum_monthly_fee`, `billing_cycle`, `billing_day`, `enrollment_mode`, `allow_early_renewal`) are updated. `institution_id` and `institution_entity_id` are immutable — any values sent on the update path are silently ignored.
+
+### Immutable fields on UPDATE
+
+The following fields are locked after INSERT:
+
+- `institution_id` — FK to the employer institution; cannot change after creation.
+- `institution_entity_id` — entity-level override; set at INSERT, immutable thereafter.
+
+### canonical_key convention for employer programs
+
+```
+DEMO_EMPLOYER_{MARKET}_PROGRAM
+DEMO_EMPLOYER_{MARKET}_PROGRAM_ENTITY_{CC}   # entity-level override variant
+```
+
+Where `MARKET` is the ISO alpha-2 country code uppercased and `CC` is the
+entity's country code or discriminator slug.
+
+Examples:
+- `DEMO_EMPLOYER_PE_PROGRAM` — institution-level program for the Peruvian demo employer
+- `DEMO_EMPLOYER_AR_PROGRAM` — institution-level program for the Argentine demo employer
+- `DEMO_EMPLOYER_US_PROGRAM` — institution-level program for the US demo employer
+
+### Postman pre-request script
+
+`PUT /employer/program/by-key` is Internal-only. Steps in the demo day seed
+collection (`900_DEMO_DAY_SEED`) run after an admin login, so the super-admin
+or internal token is already current in `pm.environment.get('authToken')`. No
+token swap is needed — the collection-level auth resolves to the admin token for
+the entire employer setup folder.
+
+### Schema Notes (employer programs)
+
+- `core.employer_benefits_program.canonical_key VARCHAR(200) NULL` — added in
+  migration `0017_employer_program_canonical_key.sql`.
+- Partial index `uq_employer_benefits_program_canonical_key` (sparse: only indexed when non-null).
+- `ProgramResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
+## Employer Employee Links — `PUT /api/v1/employer/employee-link/by-key`
+
+```http
+PUT /api/v1/employer/employee-link/by-key
+Authorization: Bearer {internal-token}
+Content-Type: application/json
+```
+
+**INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc employee
+subscription creation (use `POST /employer/employees/{user_id}/subscribe` instead).
+Auth: Internal only. Returns 403 for Customer/Supplier/Employer roles.
+
+This endpoint idempotently creates an employer-sponsored subscription for a
+Customer Comensal user. It is equivalent to
+`POST /employer/employees/{user_id}/subscribe` but:
+- no invite email is sent (the user must already exist, e.g. via `PUT /users/by-key`);
+- re-running with the same `canonical_key` is a no-op (idempotent);
+- the `canonical_key` is stamped on the `customer.subscription_info` row.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier. Convention: `DEMO_EMPLOYER_{MARKET}_EE_{USERNAME_SLUG}_LINK`. Once set, never rename. |
+| `user_id` | UUID | yes | User ID of the employee. Must be a Customer Comensal already enrolled in the employer institution. |
+| `plan_id` | UUID | yes | Plan to subscribe the employee to. |
+
+Response body is `EmployerEmployeeLinkResponseSchema`:
+
+| Field | Type | Description |
+|---|---|---|
+| `subscription_id` | UUID | Primary key of the subscription row. |
+| `user_id` | UUID | The subscribed employee. |
+| `plan_id` | UUID | The plan the employee was subscribed to. |
+| `market_id` | UUID | Resolved from the plan's market. |
+| `balance` | decimal | Starting credit balance (employer-funded). |
+| `renewal_date` | datetime | Next renewal timestamp. |
+| `subscription_status` | string | `active`, `inactive`, etc. |
+| `canonical_key` | string | The stamped canonical key (nullable). |
+| `created_date` | datetime | Row creation timestamp. |
+| `modified_date` | datetime | Last modification timestamp. |
+
+### INSERT vs UPDATE behaviour
+
+- **INSERT path**: looks up the user's employer institution membership, validates
+  the user is a Customer Comensal in an employer institution, then creates a
+  subscription via the standard enrollment pipeline and stamps `canonical_key`.
+- **UPDATE path (idempotent)**: if a subscription row already carries the given
+  `canonical_key`, it is returned immediately with HTTP 200. No duplicate
+  subscription is created.
+
+### Immutable fields on UPDATE
+
+All fields are effectively immutable after INSERT — the update path only returns
+the existing row. The subscription itself (plan, user, market) cannot be changed
+via this endpoint.
+
+### canonical_key convention for employee links
+
+```
+DEMO_EMPLOYER_{MARKET}_EE_{USERNAME_SLUG}_LINK
+```
+
+Where `MARKET` is the ISO alpha-2 country code uppercased and `USERNAME_SLUG`
+is a slug derived from the employee's username (replace `.` and `@` with `_`,
+uppercase).
+
+Examples:
+- `DEMO_EMPLOYER_PE_EE_DEMO_EMPLEADO_PE_01_VIANDA_DEMO_LINK`
+- `DEMO_EMPLOYER_AR_EE_DEMO_EMPLEADO_AR_01_VIANDA_DEMO_LINK`
+- `DEMO_EMPLOYER_US_EE_DEMO_EMPLEADO_US_01_VIANDA_DEMO_LINK`
+
+### Prerequisites
+
+The following must already exist before calling this endpoint:
+
+1. The employer institution — created via `PUT /institutions/by-key`.
+2. The employer entity — created via `PUT /institution-entities/by-key` (if entity-level enrollment is used).
+3. The employer program — created via `PUT /employer/program/by-key`.
+4. The admin user for the employer — created via `PUT /users/by-key`.
+5. The employee user — created via `PUT /users/by-key` (role `Customer`, role_name `Comensal`).
+
+The admin user must have been added to the employer institution before the
+employee can be linked (admin enrollment is a prerequisite for institution
+membership checks).
+
+### Postman pre-request script
+
+`PUT /employer/employee-link/by-key` is Internal-only. The 900 demo day seed
+collection runs this step after admin login — the admin token is already current
+in `pm.environment.get('authToken')`. No token swap is needed.
+
+The `user_id` and `plan_id` are resolved in the pre-request script from
+environment variables set earlier in the collection (e.g. `employeeUserId_PE_01`,
+`planIdPE`).
+
+### Schema Notes (employee links)
+
+- `customer.subscription_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0018_employer_employee_link_canonical_key.sql`.
+- Partial index `uq_subscription_info_canonical_key` (sparse: only indexed when non-null).
+- `EmployerEmployeeLinkResponseSchema` includes `canonical_key` (nullable string).
+
+---
+
 ## Shared Semantics (all entities)
 
 - If a row with the given `canonical_key` **does not exist**: a new row is

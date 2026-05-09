@@ -380,6 +380,21 @@ class UserUpsertByKeySchema(BaseModel):
     last_name: str | None = Field(None, max_length=50)
     mobile_number: str | None = Field(None, description="E.164 format, e.g. +15005550006")
     market_id: UUID | None = Field(None, description="Primary market ID for this user")
+    city_metadata_id: UUID | None = Field(
+        None,
+        description=(
+            "City metadata FK (core.city_metadata). Required for Customer Comensal users "
+            "to resolve timezone and city. Not required for Employer/Supplier/Internal users."
+        ),
+    )
+    employer_entity_id: UUID | None = Field(
+        None,
+        description=(
+            "Employer entity FK (ops.institution_entity_info). "
+            "For Customer Comensal users enrolled under an employer entity. "
+            "Not required for Employer Admin users (they are scoped by institution_id)."
+        ),
+    )
     status: Status = Status.ACTIVE
 
     @field_validator("username", "email", mode="before")

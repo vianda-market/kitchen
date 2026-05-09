@@ -1823,7 +1823,7 @@ BEGIN
         billing_cycle, billing_day, billing_day_of_week,
         enrollment_mode, allow_early_renewal,
         stripe_customer_id, stripe_payment_method_id, payment_method_type,
-        is_active, is_archived, status,
+        is_active, is_archived, status, canonical_key,
         created_date, created_by, modified_by, modified_date,
         is_current, valid_until
     )
@@ -1834,7 +1834,7 @@ BEGIN
         NEW.billing_cycle, NEW.billing_day, NEW.billing_day_of_week,
         NEW.enrollment_mode, NEW.allow_early_renewal,
         NEW.stripe_customer_id, NEW.stripe_payment_method_id, NEW.payment_method_type,
-        NEW.is_active, NEW.is_archived, NEW.status,
+        NEW.is_active, NEW.is_archived, NEW.status, NEW.canonical_key,
         NEW.created_date, NEW.created_by, NEW.modified_by, NEW.modified_date,
         TRUE, 'infinity'
     );
