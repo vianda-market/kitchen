@@ -69,6 +69,39 @@ SET search_path = core, ops, customer, billing, audit, public;
 -- Tier 1: Most granular child rows (reviews, billing, orders)
 -- -------------------------------------------------------------------------
 
+-- Institution settlements (run-settlement-pipeline results).
+-- institution_settlement.balance_event_id → restaurant_balance_history (RESTRICT)
+-- institution_settlement.institution_bill_id → institution_bill_info (RESTRICT)
+-- Must be deleted before both restaurant_balance_history and institution_bill_info.
+DELETE FROM audit.institution_settlement_history
+WHERE settlement_id IN (
+    SELECT settlement_id FROM billing.institution_settlement
+    WHERE restaurant_id IN (
+        SELECT restaurant_id FROM ops.restaurant_info
+        WHERE canonical_key LIKE 'DEMO_%'
+    )
+);
+
+DELETE FROM billing.institution_settlement
+WHERE restaurant_id IN (
+    SELECT restaurant_id FROM ops.restaurant_info
+    WHERE canonical_key LIKE 'DEMO_%'
+);
+
+-- Institution bills: audit history + bills for all demo entities.
+-- Covers:
+--   dec0-0050 sub-range: SQL-seeded secondary supplier bills
+--   dynamic UUIDs:       pipeline-generated bills for primary entities (dec0-0001,0002)
+-- Must go before institution_entity deletion (FK RESTRICT).
+DELETE FROM audit.institution_bill_history
+WHERE institution_bill_id IN (
+    SELECT institution_bill_id FROM billing.institution_bill_info
+    WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%'
+);
+
+DELETE FROM billing.institution_bill_info
+WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%';
+
 -- Plate reviews (linked to plate_pickup_live via plate_pickup_id)
 DELETE FROM customer.plate_review_info
 WHERE user_id IN (
@@ -77,6 +110,7 @@ WHERE user_id IN (
        OR username LIKE 'demo.cliente.pe.%@vianda.demo'
        OR username LIKE 'demo.cliente.ar.%@vianda.demo'
        OR username LIKE 'demo.cliente.us.%@vianda.demo'
+       OR username LIKE 'demo.proveedor.%@vianda.demo'
 );
 -- Also catch any review linked to a demo pickup regardless of user_id
 DELETE FROM customer.plate_review_info
@@ -412,16 +446,36 @@ DELETE FROM core.address_info
 WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
 
 -- -------------------------------------------------------------------------
--- Tier 10: Demo users (depend on institution)
+-- Tier 10: Institution cleanup
+-- Circular FK: institution_info.modified_by → user_info (RESTRICT, NOT NULL)
+--              user_info.institution_id → institution_info (RESTRICT)
+-- Resolution: re-point modified_by on demo institutions to the superadmin
+-- user (which is never deleted), then delete users, then delete institutions.
 -- -------------------------------------------------------------------------
 
--- Capture all demo user_ids (dec0 prefix + customer username pattern for all markets)
+-- Re-point modified_by to superadmin so demo-user deletion does not block
+UPDATE core.institution_info
+SET modified_by = (SELECT user_id FROM core.user_info WHERE username = 'superadmin' LIMIT 1)
+WHERE institution_id::text LIKE 'dddddddd-dec0-%'
+  AND modified_by IN (SELECT user_id FROM core.user_info WHERE user_id::text LIKE 'dddddddd-dec0-%');
+
+-- institution_history (audit) also has modified_by → user_info (RESTRICT);
+-- delete institution audit rows before demo users.
+DELETE FROM audit.institution_history
+WHERE institution_id::text LIKE 'dddddddd-dec0-%';
+
+-- -------------------------------------------------------------------------
+-- Tier 11: Demo users
+-- -------------------------------------------------------------------------
+
+-- Capture all demo user_ids (dec0 prefix + customer + supplier username patterns for all markets)
 CREATE TEMP TABLE _demo_user_ids ON COMMIT DROP AS
 SELECT user_id FROM core.user_info
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
-   OR username LIKE 'demo.cliente.us.%@vianda.demo';
+   OR username LIKE 'demo.cliente.us.%@vianda.demo'
+   OR username LIKE 'demo.proveedor.%@vianda.demo';
 
 -- User market assignments
 DELETE FROM core.user_market_assignment
@@ -438,22 +492,23 @@ DELETE FROM audit.user_history
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
-   OR username LIKE 'demo.cliente.us.%@vianda.demo';
+   OR username LIKE 'demo.cliente.us.%@vianda.demo'
+   OR username LIKE 'demo.proveedor.%@vianda.demo';
 
 DELETE FROM core.user_info
 WHERE user_id::text LIKE 'dddddddd-dec0-%'
    OR username LIKE 'demo.cliente.pe.%@vianda.demo'
    OR username LIKE 'demo.cliente.ar.%@vianda.demo'
-   OR username LIKE 'demo.cliente.us.%@vianda.demo';
+   OR username LIKE 'demo.cliente.us.%@vianda.demo'
+   OR username LIKE 'demo.proveedor.%@vianda.demo';
 
 -- -------------------------------------------------------------------------
--- Tier 11: Institution markets and institution
+-- Tier 12: Institution markets and institution
+-- (after users are gone, institution FK constraints are satisfied;
+-- institution_history already deleted in Tier 10 above)
 -- -------------------------------------------------------------------------
 
 DELETE FROM core.institution_market
-WHERE institution_id::text LIKE 'dddddddd-dec0-%';
-
-DELETE FROM audit.institution_history
 WHERE institution_id::text LIKE 'dddddddd-dec0-%';
 
 DELETE FROM core.institution_info
