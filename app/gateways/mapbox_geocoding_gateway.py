@@ -19,6 +19,7 @@ from typing import Any
 import requests
 
 from app.gateways.base_gateway import BaseGateway, ExternalServiceError
+from app.gateways.mapbox_geocode_cache import CacheMode, MapboxCacheMiss, get_geocode_cache, make_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,39 @@ class MapboxGeocodingGateway(BaseGateway):
         resp.raise_for_status()
         data = resp.json() if resp.content else {}
         return data
+
+    def call(self, operation: str, **kwargs: Any) -> Any:
+        """Override BaseGateway.call to add cache interception.
+
+        bypass  → skip cache entirely (prod live-only path).
+        record  → cache hit returns stored response; miss calls Mapbox and writes cache.
+        replay_only → cache hit returns stored response; miss raises MapboxCacheMiss.
+        """
+        if self.dev_mode:
+            return super().call(operation, **kwargs)
+
+        cache = get_geocode_cache()
+        mode = cache.mode
+
+        if mode == CacheMode.BYPASS:
+            return super().call(operation, **kwargs)
+
+        key = make_cache_key(operation, **kwargs)
+        hit = cache.get(key)
+        if hit is not None:
+            logger.info("mapbox_geocode_cache: hit for %r", key)
+            return hit
+
+        if mode == CacheMode.REPLAY_ONLY:
+            raise MapboxCacheMiss(
+                f"Mapbox geocode cache miss in replay_only mode (key={key!r}). "
+                "Set MAPBOX_CACHE_MODE=record and re-run to populate the cache."
+            )
+
+        # RECORD mode: call live API and persist response
+        response = super().call(operation, **kwargs)
+        cache.set(key, response)
+        return response
 
     # -------------------------------------------------------------------------
     # Public methods — signatures match GoogleMapsGateway for provider compat

@@ -676,6 +676,8 @@ class GeolocationDTO(BaseModel):
     place_id: str | None = None
     viewport: dict | None = None
     formatted_address_google: str | None = None
+    mapbox_geocoded_at: datetime | None = None
+    mapbox_normalized_address: str | None = None
     is_archived: bool = False
     status: Status
     created_date: datetime

@@ -2535,6 +2535,8 @@ CREATE TABLE IF NOT EXISTS core.geolocation_info (
     place_id VARCHAR(500) NULL,  -- Mapbox mapbox_id can exceed 255 chars
     viewport JSONB NULL,
     formatted_address_google VARCHAR(500) NULL,
+    mapbox_geocoded_at TIMESTAMPTZ NULL,
+    mapbox_normalized_address TEXT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2579,6 +2581,13 @@ COMMENT ON COLUMN core.geolocation_info.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.geolocation_info.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.geolocation_info.mapbox_geocoded_at IS
+    'UTC timestamp when coordinates were resolved via Mapbox geocoding '
+    '(live API in record mode, or cache replay in replay_only mode). '
+    'NULL for rows created before the cache system or not yet backfilled.';
+COMMENT ON COLUMN core.geolocation_info.mapbox_normalized_address IS
+    'Normalized address query string used as the seeds/mapbox_geocode_cache.json cache key. '
+    'Stored so the backfill script can re-derive the key without rebuilding the address string.';
 
 \echo 'Creating table: audit.geolocation_history'
 CREATE TABLE IF NOT EXISTS audit.geolocation_history (
@@ -2590,6 +2599,8 @@ CREATE TABLE IF NOT EXISTS audit.geolocation_history (
     place_id VARCHAR(500) NULL,  -- matches geolocation_info
     viewport JSONB NULL,
     formatted_address_google VARCHAR(500) NULL,
+    mapbox_geocoded_at TIMESTAMPTZ NULL,
+    mapbox_normalized_address TEXT NULL,
     is_archived BOOLEAN NOT NULL,
     status status_enum NOT NULL,
     created_date TIMESTAMP,

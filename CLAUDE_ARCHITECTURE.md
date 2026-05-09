@@ -40,8 +40,9 @@ app/
 ├── gateways/                # External service abstractions
 │   ├── base_gateway.py
 │   ├── address_provider.py       # Factory: get_search_gateway(), get_geocoding_gateway() — driven by ADDRESS_PROVIDER setting
+│   ├── mapbox_geocode_cache.py   # Geocoding cache: MapboxGeocodeCache, CacheMode (replay_only/record/bypass), make_cache_key
 │   ├── mapbox_search_gateway.py  # Mapbox Search Box API (suggest + retrieve) — default provider
-│   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse) — default provider
+│   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse); cache-aware via call() override
 │   ├── mapbox_static_gateway.py  # Mapbox Static Images API — generates static map PNGs with pin overlays
 │   ├── google_maps_gateway.py    # Google Maps Geocoding (fallback provider)
 │   ├── google_places_gateway.py  # Google Places API (fallback provider)

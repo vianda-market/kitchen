@@ -1,0 +1,149 @@
+{
+  "geocode|3200 santa fe, buenos aires, buenos aires, ar||es": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "address.dev-palermo-santa-fe-3200",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -58.4352,
+            -34.5854
+          ]
+        },
+        "properties": {
+          "mapbox_id": "dXJuOm1ieHBsYzpQYWxlcm1v",
+          "feature_type": "address",
+          "full_address": "Santa Fe 3200, Palermo, Buenos Aires, Argentina",
+          "name": "Santa Fe 3200",
+          "coordinates": {
+            "longitude": -58.4352,
+            "latitude": -34.5854
+          },
+          "context": {
+            "address": {
+              "address_number": "3200",
+              "street_name": "Santa Fe"
+            },
+            "street": {
+              "name": "Avenida Santa Fe"
+            },
+            "neighborhood": {
+              "name": "Palermo"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "country": {
+              "name": "Argentina",
+              "country_code": "AR"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "geocode|500 defensa, buenos aires, buenos aires, ar||es": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "address.dev-san-telmo-defensa-500",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -58.3701,
+            -34.6226
+          ]
+        },
+        "properties": {
+          "mapbox_id": "dXJuOm1ieHBsYzpTYW5UZWxtbw",
+          "feature_type": "address",
+          "full_address": "Defensa 500, San Telmo, Buenos Aires, Argentina",
+          "name": "Defensa 500",
+          "coordinates": {
+            "longitude": -58.3701,
+            "latitude": -34.6226
+          },
+          "context": {
+            "address": {
+              "address_number": "500",
+              "street_name": "Defensa"
+            },
+            "street": {
+              "name": "Defensa"
+            },
+            "neighborhood": {
+              "name": "San Telmo"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "country": {
+              "name": "Argentina",
+              "country_code": "AR"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "geocode|corrientes 1234, buenos aires, buenos Aires, ar||es": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "address.dev-corrientes-1234",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -58.3915,
+            -34.6048
+          ]
+        },
+        "properties": {
+          "mapbox_id": "dXJuOm1ieHBsYzpDb3JyaWVudGVz",
+          "feature_type": "address",
+          "full_address": "Avenida Corrientes 1234, Buenos Aires, Argentina",
+          "name": "Corrientes 1234",
+          "coordinates": {
+            "longitude": -58.3915,
+            "latitude": -34.6048
+          },
+          "context": {
+            "address": {
+              "address_number": "1234",
+              "street_name": "Corrientes"
+            },
+            "street": {
+              "name": "Avenida Corrientes"
+            },
+            "neighborhood": {
+              "name": "Centro"
+            },
+            "place": {
+              "name": "Buenos Aires"
+            },
+            "region": {
+              "name": "Buenos Aires",
+              "region_code": "B"
+            },
+            "country": {
+              "name": "Argentina",
+              "country_code": "AR"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

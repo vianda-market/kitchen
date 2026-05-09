@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # Address/geocoding provider: "mapbox" (default) or "google" (fallback)
     ADDRESS_PROVIDER: str = "mapbox"
 
+    # Mapbox geocoding cache mode: "replay_only" (default — cache miss raises, never calls Mapbox),
+    # "record" (cache miss calls Mapbox and writes entry), "bypass" (prod — always live, no cache).
+    MAPBOX_CACHE_MODE: str = "replay_only"
+
     # Mapbox Static Images — style IDs and pin appearance
     MAPBOX_STYLE_LIGHT: str = "mapbox/light-v11"
     MAPBOX_STYLE_DARK: str = "mapbox/dark-v11"
