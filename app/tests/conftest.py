@@ -5,6 +5,10 @@ This file contains common fixtures, mocks, and test utilities
 that are shared across all test modules.
 """
 
+import os
+
+os.environ.setdefault("MAPBOX_CACHE_MODE", "bypass")
+
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import Mock

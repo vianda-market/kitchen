@@ -126,6 +126,9 @@ class MapboxGeocodingGateway(BaseGateway):
         record  → cache hit returns stored response; miss calls Mapbox and writes cache.
         replay_only → cache hit returns stored response; miss raises MapboxCacheMiss.
         """
+        if self.dev_mode:
+            return super().call(operation, **kwargs)
+
         cache = get_geocode_cache()
         mode = cache.mode
 
