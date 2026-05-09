@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.config.enums import SupplierInvoiceStatus, SupplierInvoiceType
 from app.i18n.envelope import I18nValueError
+from app.schemas.types import MoneyDecimal, NullableMoneyDecimal
 
 # =============================================================================
 # Country-specific detail schemas (validated per-country)
@@ -135,10 +136,10 @@ class SupplierInvoiceResponseSchema(BaseModel):
     invoice_type: str
     external_invoice_number: str | None = None
     issued_date: date
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
-    tax_amount: Decimal | None = None
-    tax_rate: Decimal | None = None
+    tax_amount: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
+    tax_rate: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     # Document (signed URL, not storage path)
     document_url: str | None = None
     document_format: str | None = None
@@ -186,7 +187,7 @@ class BillInvoiceMatchResponseSchema(BaseModel):
     match_id: UUID
     institution_bill_id: UUID
     supplier_invoice_id: UUID
-    matched_amount: Decimal
+    matched_amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     matched_by: UUID
     matched_at: datetime
 

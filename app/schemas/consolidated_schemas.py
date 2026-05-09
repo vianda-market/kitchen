@@ -57,6 +57,7 @@ from app.config.enums import (
 )
 from app.config.settings import settings
 from app.i18n.envelope import I18nValueError
+from app.schemas.types import MoneyDecimal, NullableMoneyDecimal
 from app.utils.country import normalize_country_code
 from app.utils.phone import normalize_mobile_for_schema
 
@@ -1021,7 +1022,7 @@ class RestaurantResponseSchema(BaseModel):
     tagline_i18n: dict | None = None
     is_featured: bool = False
     cover_image_url: str | None = None
-    average_rating: Decimal | None = None
+    average_rating: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     review_count: int = 0
     verified_badge: bool = False
     spotlight_label: str | None = None
@@ -1262,11 +1263,11 @@ class PlateResponseSchema(BaseModel):
     plate_id: UUID
     product_id: UUID
     restaurant_id: UUID
-    price: Decimal
+    price: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
     credit: int
     # filter-registry:exempt reason="computed display value; not filterable"
-    expected_payout_local_currency: Decimal
+    expected_payout_local_currency: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     delivery_time_minutes: int
     is_archived: bool
     status: Status
@@ -1364,11 +1365,11 @@ class PlateEnrichedResponseSchema(BaseModel):
     # filter-registry:exempt reason="i18n translation payload; not filterable"
     description_i18n: dict | None = Field(None, exclude=True)
     # filter-registry:exempt reason="range-bound; use price_from / price_to filter params"
-    price: Decimal
+    price: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
     credit: int
     # filter-registry:exempt reason="computed display value; not filterable"
-    expected_payout_local_currency: Decimal
+    expected_payout_local_currency: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     # filter-registry:exempt reason="enriched join field; supplier_terms field, not independently filterable"
     no_show_discount: int | None = Field(None, description="From supplier_terms; null when no terms configured")
     # filter-registry:exempt reason="enriched join field; not independently filterable"
@@ -1779,8 +1780,8 @@ class CreditCurrencyResponseSchema(BaseModel):
     currency_metadata_id: UUID
     currency_name: str | None = None
     currency_code: str
-    credit_value_supplier_local: Decimal
-    currency_conversion_usd: Decimal
+    credit_value_supplier_local: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
+    currency_conversion_usd: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     is_archived: bool
     status: Status
     created_date: datetime
@@ -1830,8 +1831,8 @@ class CreditCurrencyEnrichedResponseSchema(BaseModel):
     currency_metadata_id: UUID
     currency_name: str
     currency_code: str
-    credit_value_supplier_local: Decimal
-    currency_conversion_usd: Decimal
+    credit_value_supplier_local: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
+    currency_conversion_usd: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     markets: list[CreditCurrencyMarketSchema] = Field(
         default_factory=list, description="Markets that use this currency"
     )
@@ -1953,7 +1954,7 @@ class PlanResponseSchema(BaseModel):
     credit_cost_usd: float
     status: Status
     rollover: bool
-    rollover_cap: Decimal | None
+    rollover_cap: NullableMoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     canonical_key: str | None = None
     is_archived: bool
     created_date: datetime
@@ -2000,7 +2001,7 @@ class PlanEnrichedResponseSchema(BaseModel):
     credit_cost_usd: float
     rollover: bool
     # filter-registry:exempt reason="only meaningful when rollover=true"
-    rollover_cap: Decimal | None
+    rollover_cap: NullableMoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     # filter-registry:exempt reason="soft-delete flag; server filters by default"
     is_archived: bool
     status: Status
@@ -2023,13 +2024,13 @@ class SubscriptionEnrichedResponseSchema(BaseModel):
     plan_credit: int
     plan_price: float
     plan_rollover: bool
-    plan_rollover_cap: Decimal | None
+    plan_rollover_cap: NullableMoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     plan_status: Status
     market_id: UUID  # Market (country) for this subscription
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
     renewal_date: datetime
-    balance: Decimal
+    balance: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     is_archived: bool
     status: Status
     subscription_status: str | None = None
@@ -2056,7 +2057,7 @@ class InstitutionBillEnrichedResponseSchema(BaseModel):
     market_name: str  # country_name from market_info
     country_code: str  # from market_info
     transaction_count: int | None = None
-    amount: Decimal | None = None
+    amount: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     currency_code: str | None = None
     period_start: datetime
     period_end: datetime
@@ -2375,7 +2376,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
     currency_metadata_id: UUID
     # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
-    market_credit_value_supplier_local: Decimal = Field(
+    market_credit_value_supplier_local: MoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         ...,
         description="Supplier credit value in local currency for this market (credit_value_supplier_local); use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_supplier_local)",
     )
@@ -2396,7 +2397,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     # filter-registry:exempt reason="computed URL; not independently filterable"
     cover_image_url: str | None = None
     # filter-registry:exempt reason="computed aggregate; not independently filterable"
-    average_rating: Decimal | None = None
+    average_rating: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     # filter-registry:exempt reason="computed aggregate; not independently filterable"
     review_count: int = 0
     # filter-registry:exempt reason="boolean display flag; not a filter dimension"
@@ -2445,7 +2446,7 @@ class RestaurantBalanceResponseSchema(BaseModel):
     restaurant_id: UUID
     currency_metadata_id: UUID
     transaction_count: int
-    balance: Decimal
+    balance: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
     is_archived: bool
     status: Status
@@ -2469,7 +2470,7 @@ class RestaurantBalanceEnrichedResponseSchema(BaseModel):
     country_code: str
     currency_metadata_id: UUID
     transaction_count: int
-    balance: Decimal
+    balance: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
     is_archived: bool
     status: Status
@@ -2495,10 +2496,10 @@ class RestaurantTransactionResponseSchema(BaseModel):
     completion_time: datetime | None
     expected_completion_time: datetime | None
     transaction_type: TransactionType
-    credit: Decimal
-    no_show_discount: Decimal | None
+    credit: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
+    no_show_discount: NullableMoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str | None
-    final_amount: Decimal
+    final_amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     is_archived: bool
     status: Status
     created_date: datetime
@@ -2532,9 +2533,9 @@ class RestaurantTransactionEnrichedResponseSchema(BaseModel):
     completion_time: datetime | None
     expected_completion_time: datetime | None
     transaction_type: TransactionType
-    credit: Decimal
-    no_show_discount: Decimal | None
-    final_amount: Decimal
+    credit: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
+    no_show_discount: NullableMoneyDecimal  # serialises as JSON number; see app/schemas/types.py
+    final_amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     is_archived: bool
     status: Status
     created_date: datetime
@@ -2819,7 +2820,7 @@ class DiscretionaryResponseSchema(BaseModel):
     approval_id: UUID | None
     category: DiscretionaryReason  # Classification enum
     reason: str | None  # Free-form explanation
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     comment: str | None
     is_archived: bool
     status: str = Field(..., description="DiscretionaryStatus: Pending, Cancelled, Approved, Rejected")
@@ -2849,7 +2850,7 @@ class DiscretionaryEnrichedResponseSchema(BaseModel):
     approval_id: UUID | None
     category: DiscretionaryReason  # Classification enum
     reason: str | None  # Free-form explanation
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     comment: str | None
     is_archived: bool
     status: str = Field(..., description="DiscretionaryStatus: Pending, Cancelled, Approved, Rejected")
@@ -2903,7 +2904,7 @@ class DiscretionarySummarySchema(BaseModel):
     restaurant_id: UUID | None = None  # NULL for Supplier requests, required for Client requests
     category: DiscretionaryReason  # Classification enum
     reason: str | None  # Free-form explanation
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     status: str = Field(..., description="DiscretionaryStatus: Pending, Cancelled, Approved, Rejected")
     created_date: datetime
     resolved_date: datetime | None = None
@@ -3112,7 +3113,7 @@ class InstitutionBillPayoutResponseSchema(BaseModel):
     institution_bill_id: UUID
     provider: str
     provider_transfer_id: str | None = None
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
     status: str
     created_at: datetime
@@ -3132,7 +3133,7 @@ class BillPayoutEnrichedResponseSchema(BaseModel):
     institution_entity_name: str
     provider: str
     provider_transfer_id: str | None = None
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
     billing_period_start: datetime
     billing_period_end: datetime
@@ -3203,10 +3204,10 @@ class SupplierInvoiceEnrichedResponseSchema(BaseModel):
     invoice_type: str
     external_invoice_number: str | None = None
     issued_date: date
-    amount: Decimal
+    amount: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     currency_code: str
-    tax_amount: Decimal | None = None
-    tax_rate: Decimal | None = None
+    tax_amount: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
+    tax_rate: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     # Document
     document_url: str | None = None
     document_format: str | None = None
@@ -3454,11 +3455,11 @@ class MarketResponseSchema(BaseModel):
     currency_metadata_id: UUID = Field(..., description="FK to currency_metadata")
     currency_code: str | None = Field(None, description="Currency code (enriched from JOIN)")
     currency_name: str | None = Field(None, description="Currency name (enriched from JOIN)")
-    credit_value_supplier_local: Decimal | None = Field(
+    credit_value_supplier_local: NullableMoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         None,
         description="Stable per-credit fiat payout to suppliers (from currency_metadata.credit_value_supplier_local). Use for plan form preview: credit_cost_local_currency = price / credit.",
     )
-    currency_conversion_usd: Decimal | None = Field(
+    currency_conversion_usd: NullableMoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         None,
         description="Local units per 1 USD (from currency_metadata). Use for plan form preview: credit_cost_usd = credit_cost_local_currency / currency_conversion_usd.",
     )
@@ -3490,7 +3491,7 @@ class MarketResponseSchema(BaseModel):
     tax_id_example: str | None = Field(
         None, description="Example tax ID in raw digits for placeholder text (e.g. '123456789')."
     )
-    min_credit_spread_pct: Decimal | None = Field(
+    min_credit_spread_pct: NullableMoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         None,
         description=(
             "Minimum % spread floor between the cheapest customer per-credit price and credit_value_supplier_local. "
@@ -3538,7 +3539,7 @@ class LeadsFeaturedRestaurantSchema(BaseModel):
     name: str
     cuisine_name: str | None = None
     tagline: str | None = None
-    average_rating: Decimal | None = None
+    average_rating: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     review_count: int = 0
     cover_image_url: str | None = None
     spotlight_label: str | None = None
@@ -3555,7 +3556,7 @@ class LeadsRestaurantSchema(BaseModel):
     name: str
     cuisine_name: str | None = None
     tagline: str | None = None
-    average_rating: Decimal | None = None
+    average_rating: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     review_count: int = 0
     cover_image_url: str | None = None
 
@@ -3979,21 +3980,21 @@ class SpreadReadoutResponseSchema(BaseModel):
     price and the supplier credit value, for finance/admin visibility.
     """
 
-    cheapest_plan_per_credit: Decimal | None = Field(
+    cheapest_plan_per_credit: NullableMoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         None,
         description="Cheapest per-credit price across active plans (min plan.price/plan.credit). "
         "Null when no active plans exist.",
     )
-    supplier_value: Decimal | None = Field(
+    supplier_value: NullableMoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         None,
         description="credit_value_supplier_local for the market. Null when market has no currency.",
     )
-    headroom_pct: Decimal = Field(
+    headroom_pct: MoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         ...,
         description="Observed spread percentage: min(plan.price/plan.credit)/credit_value_supplier_local - 1. "
         "Negative means below floor.",
     )
-    floor_pct: Decimal = Field(
+    floor_pct: MoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         ...,
         description="The market's min_credit_spread_pct (the required minimum spread).",
     )
@@ -4013,12 +4014,16 @@ class MarginReportPlanRow(BaseModel):
 
     plan_id: UUID
     plan_name: str
-    redemptions: Decimal = Field(..., description="Total credits redeemed by customers on this plan tier.")
-    margin_per_credit: Decimal = Field(
+    redemptions: MoneyDecimal = Field(
+        ..., description="Total credits redeemed by customers on this plan tier."
+    )  # serialises as JSON number; see app/schemas/types.py
+    margin_per_credit: MoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         ...,
         description="credit_cost_local_currency - credit_value_supplier_local for this plan tier.",
     )
-    margin_local: Decimal = Field(..., description="margin_per_credit × redemptions for this plan tier.")
+    margin_local: MoneyDecimal = Field(
+        ..., description="margin_per_credit × redemptions for this plan tier."
+    )  # serialises as JSON number; see app/schemas/types.py
 
 
 class MarginReportResponseSchema(BaseModel):
@@ -4030,8 +4035,12 @@ class MarginReportResponseSchema(BaseModel):
     market_id: UUID
     period_start: datetime
     period_end: datetime
-    total_margin_local: Decimal = Field(..., description="Total gross margin in local currency over the period.")
-    total_credits_redeemed: Decimal = Field(..., description="Total credits redeemed across all plan tiers.")
+    total_margin_local: MoneyDecimal = Field(
+        ..., description="Total gross margin in local currency over the period."
+    )  # serialises as JSON number; see app/schemas/types.py
+    total_credits_redeemed: MoneyDecimal = Field(
+        ..., description="Total credits redeemed across all plan tiers."
+    )  # serialises as JSON number; see app/schemas/types.py
     by_plan: list[MarginReportPlanRow] = Field(
         default_factory=list,
         description="Per-plan-tier margin breakdown.",
@@ -4225,9 +4234,9 @@ class ReferralConfigResponseSchema(BaseModel):
     market_id: UUID
     is_enabled: bool
     referrer_bonus_rate: int
-    referrer_bonus_cap: Decimal | None = None
+    referrer_bonus_cap: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     referrer_monthly_cap: int | None = None
-    min_plan_price_to_qualify: Decimal
+    min_plan_price_to_qualify: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     cooldown_days: int
     held_reward_expiry_hours: int
     pending_expiry_days: int
@@ -4248,9 +4257,9 @@ class ReferralConfigEnrichedResponseSchema(BaseModel):
     country_code: str
     is_enabled: bool
     referrer_bonus_rate: int
-    referrer_bonus_cap: Decimal | None = None
+    referrer_bonus_cap: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     referrer_monthly_cap: int | None = None
-    min_plan_price_to_qualify: Decimal
+    min_plan_price_to_qualify: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     cooldown_days: int
     held_reward_expiry_hours: int
     pending_expiry_days: int
@@ -4271,8 +4280,8 @@ class ReferralInfoResponseSchema(BaseModel):
     referral_code_used: str
     market_id: UUID
     referral_status: str
-    bonus_credits_awarded: Decimal | None = None
-    bonus_plan_price: Decimal | None = None
+    bonus_credits_awarded: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
+    bonus_plan_price: NullableMoneyDecimal = None  # serialises as JSON number; see app/schemas/types.py
     bonus_rate_applied: int | None = None
     qualified_date: datetime | None = None
     rewarded_date: datetime | None = None
@@ -4313,7 +4322,7 @@ class ReferralStatsResponseSchema(BaseModel):
     """Schema for referral stats summary"""
 
     total_referrals: int
-    total_credits_earned: Decimal
+    total_credits_earned: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
     pending_count: int
 
 

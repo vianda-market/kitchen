@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.config import Status
 from app.i18n.envelope import I18nValueError
+from app.schemas.types import MoneyDecimal
 
 
 class SubscriptionCreateSchema(BaseModel):
@@ -49,7 +50,7 @@ class SubscriptionResponseSchema(BaseModel):
     user_id: UUID
     plan_id: UUID
     renewal_date: datetime
-    balance: Decimal
+    balance: MoneyDecimal  # serialises as JSON number (float); see app/schemas/types.py
     is_archived: bool
     status: Status
     subscription_status: str | None = None

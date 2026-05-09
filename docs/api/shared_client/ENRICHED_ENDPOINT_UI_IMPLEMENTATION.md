@@ -191,6 +191,13 @@ Each subscription object includes:
 | **`balance`** | number | Customer's **current credits** (what they have available to spend now) |
 | **`plan_credit`** | number | Credits the plan adds **on each renewal** ("Credits on renewal: XX") |
 
+> **Wire-format note (fixed in `fix/decimal-response-serialization`):** `balance` was previously
+> serialised as a JSON string (e.g. `"5.00"`) due to Pydantic v2's default `Decimal` → string
+> behaviour. It is now correctly serialised as a JSON number (`5.0`). The documented contract
+> (`number`) was always correct; this was an implementation bug. Any i18n pluralisation that
+> relied on `balance` being a number (e.g. `balance_one` / `balance_other` in i18next) will work
+> correctly after this fix.
+
 Use both fields together in the subscription details modal:
 
 - **Balance:** Show `balance` — "You have X credits"
