@@ -384,6 +384,10 @@ Per market:
 - 1 plate with Mon–Fri PKDs (savings within 18–22 %)
 - 1 supplier admin user (`demo.proveedor.<cc>.02.admin@vianda.demo`)
 
+Each market also gets a **primary supplier admin** (`demo.proveedor.<cc>.01.admin@vianda.demo`)
+scoped to the shared primary institution (`demoInstitutionId`). This allows the demo operator to
+log in as a per-tenant primary cluster supplier admin. See Section 8.6.
+
 ### 8.2 Why entities are pre-seeded in demo_baseline.sql
 
 The restaurant activation gate (`restaurant.active_requires_entity_payouts`) checks `payout_onboarding_status`. The `PUT /institution-entities/by-key` upsert schema has `payout_onboarding_status` as optional (default `None`). If the upsert body omits it, the Postman update path would NULL out the field, blocking activation.
@@ -423,6 +427,26 @@ The secondary supplier folder follows the same canonical-key and prerequest patt
 Folder 99 now includes assertions:
 - **"Assert 2 <CC> demo suppliers exist"** — filters `GET /institutions` by `institution_type=supplier`, `market_ids` contains the market UUID, and `canonical_key.startsWith('DEMO_')`. The primary institution has `canonical_key = 'DEMO_INSTITUTION_PE_VIANDA_DEMO'` (PE-prefix only, but it covers all three markets). The secondary has `DEMO_INSTITUTION_<CC>_<NAME>`. Together: 2 per market.
 - **"Assert <CC> secondary restaurant visible in by-city"** — uses the pre-stored customer token (`customerXxN1Token`) because `GET /restaurants/by-city` is customer-scoped (admins see 0 restaurants). Filters by `name` in the response `restaurants` array.
+- **"Assert primary supplier admin exists (<CC>)"** — calls `GET /users/search?q=demo.proveedor.<cc>.01.admin@vianda.demo&search_by=username` authenticated as the demo admin. Verifies `username` matches and `institution_id` equals `demoInstitutionId`. Added in v4.
+
+### 8.6 Primary supplier admin (v4)
+
+Each market now has a dedicated primary supplier admin user created via `PUT /users/by-key` in
+folder `12 Secondary supplier (<CC>)` (inserted before the secondary admin upsert at position 2).
+
+| Key | Email | canonical_key | institution_id | market_id |
+|---|---|---|---|---|
+| SUP01_PE | `demo.proveedor.pe.01.admin@vianda.demo` | `DEMO_USER_PE1_SUPPLIER_ADMIN` | `{{demoInstitutionId}}` | PE |
+| SUP01_AR | `demo.proveedor.ar.01.admin@vianda.demo` | `DEMO_USER_AR1_SUPPLIER_ADMIN` | `{{demoInstitutionId}}` | AR |
+| SUP01_US | `demo.proveedor.us.01.admin@vianda.demo` | `DEMO_USER_US1_SUPPLIER_ADMIN` | `{{demoInstitutionId}}` | US |
+
+All three primary admins share `role_type=supplier`, `role_name=admin`, `password=DemoPass1!`.
+They are scoped to the single shared primary institution (`demoInstitutionId =
+dddddddd-dec0-0001-0000-000000000001`), which covers PE/AR/US restaurants via three institution
+entity rows (dec0-0001 sub-range items 3–5).
+
+**When adding a new market**, add a SUP01_<CC> row in the same pattern in the new market's folder
+12, and add a corresponding `Assert primary supplier admin exists (<CC>)` in folder 99.
 
 ---
 
