@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     MAPBOX_ACCESS_TOKEN_STAGING: str = ""
     MAPBOX_ACCESS_TOKEN_PROD: str = ""
 
+    # Persistent-storage Mapbox tokens (sk.*). Used by callsites that write lat/lng to DB.
+    # DEV's MAPBOX_CACHE_MODE defaults to replay_only, so the persistent token is only
+    # billed when a dev manually flips MAPBOX_CACHE_MODE to "record".
+    MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT: str | None = None
+    MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT: str | None = None
+    MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT: str | None = None
+
     # Address/geocoding provider: "mapbox" (default) or "google" (fallback)
     ADDRESS_PROVIDER: str = "mapbox"
 
@@ -309,9 +316,35 @@ def get_google_api_key() -> str:
     return (key or "").strip()
 
 
-def get_mapbox_access_token() -> str:
-    """Return env-specific Mapbox access token. local/dev -> DEV; staging -> STAGING; prod -> PROD."""
+def get_mapbox_access_token(permanent: bool = False) -> str:
+    """Return env-specific Mapbox access token. local/dev -> DEV; staging -> STAGING; prod -> PROD.
+
+    Args:
+        permanent: When True, return the persistent-storage token (sk.*) for the active
+            environment. The persistent token is required for callsites that write lat/lng
+            to the DB — using the ephemeral token for persisted-storage data violates Mapbox
+            TOS. Raises RuntimeError if the token is not configured. Defaults to False, which
+            preserves the original behavior (ephemeral token).
+    """
     env = (os.getenv("ENVIRONMENT") or "local").lower()
+    if permanent:
+        if env in ("local", "dev"):
+            key = settings.MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT
+        elif env == "staging":
+            key = settings.MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT
+        elif env == "prod":
+            key = settings.MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT
+        else:
+            key = settings.MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT
+        if not key or not key.strip():
+            raise RuntimeError(
+                f"MAPBOX_ACCESS_TOKEN_{env.upper()}_PERSISTENT is not set. "
+                "Callsites that write lat/lng to the DB must use the persistent-storage "
+                "token (sk.*). Configure it in GCP Secret Manager "
+                f"(vianda-{env}-mapbox-token-persistent) and expose it as the env var. "
+                "Do NOT fall back to the ephemeral token — that would violate Mapbox TOS."
+            )
+        return key.strip()
     if env in ("local", "dev"):
         key = settings.MAPBOX_ACCESS_TOKEN_DEV
     elif env == "staging":
