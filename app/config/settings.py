@@ -1,5 +1,6 @@
 # config/settings.py
 import os
+from typing import Literal
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -82,6 +83,14 @@ class Settings(BaseSettings):
 
     # Address/geocoding provider: "mapbox" (default) or "google" (fallback)
     ADDRESS_PROVIDER: str = "mapbox"
+
+    # Autocomplete provider for the /suggest endpoint.
+    # "geocoding" (default) — uses Mapbox Geocoding API v6 forward search with autocomplete=true
+    #   against the places-permanent dataset. One paid call per address. TOS-clean.
+    # "search_box" — uses Mapbox Search Box (ephemeral session) for richer partial/typo UX.
+    #   Two paid calls per address (suggest + final places-permanent resolve). Q2 rule still enforced.
+    # Flip at runtime via ADDRESS_AUTOCOMPLETE_PROVIDER env var; no redeploy required.
+    ADDRESS_AUTOCOMPLETE_PROVIDER: Literal["geocoding", "search_box"] = "geocoding"
 
     # Mapbox geocoding cache mode: "replay_only" (default — cache miss raises, never calls Mapbox),
     # "record" (cache miss calls Mapbox and writes entry), "bypass" (prod — always live, no cache).

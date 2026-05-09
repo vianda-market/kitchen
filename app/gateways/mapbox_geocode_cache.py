@@ -45,6 +45,10 @@ def make_cache_key(operation: str, **kwargs: Any) -> str:
     keyed without the flag (i.e. ``permanent=False``) are preserved — the
     default ``permanent`` value is ``False``, so the key segment reads
     ``permanent=false`` for all previously-recorded ephemeral entries.
+
+    The ``forward_search`` operation adds an ``op=forward_search`` segment so
+    that autocomplete cache entries never collide with geocode-resolution entries
+    that share the same normalized query string.
     """
     if operation == "geocode":
         q = _normalize(kwargs.get("q", ""))
@@ -52,6 +56,12 @@ def make_cache_key(operation: str, **kwargs: Any) -> str:
         lang = _normalize(kwargs.get("language") or "")
         permanent = str(kwargs.get("permanent", False)).lower()
         return f"geocode|{q}|{country}|{lang}|permanent={permanent}"
+    if operation == "forward_search":
+        q = _normalize(kwargs.get("q", ""))
+        country = _normalize(kwargs.get("country") or "")
+        lang = _normalize(kwargs.get("language") or "")
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"forward_search|{q}|{country}|{lang}|permanent={permanent}"
     if operation == "reverse_geocode":
         lat = str(kwargs.get("latitude", ""))
         lng = str(kwargs.get("longitude", ""))

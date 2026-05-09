@@ -86,6 +86,69 @@ class TestMapboxGeocodingGatewayGeocode:
         mock_get.assert_called_once()
 
 
+class TestMapboxGeocodingGatewayForwardSearch:
+    """Tests for the forward_search method (autocomplete-style partial-input search)."""
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_forward_search_calls_forward_search_operation(self, mock_settings, _mock_token, monkeypatch):
+        """forward_search delegates to call('forward_search', ...) so cache key is 'forward_search|...'."""
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "bypass")
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        gw = MapboxGeocodingGateway(permanent=True)
+
+        captured_ops = []
+
+        def fake_make_request(self_gw, operation, **kwargs):
+            captured_ops.append(operation)
+            return {"features": [], "type": "FeatureCollection"}
+
+        with patch.object(MapboxGeocodingGateway, "_make_request", fake_make_request):
+            gw.forward_search(query="av santa fe", country="AR", limit=5)
+
+        assert captured_ops == ["forward_search"]
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_forward_search_returns_features_dict(self, mock_settings, _mock_token, monkeypatch):
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "bypass")
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        mock_features = {"features": [{"id": "f1"}], "type": "FeatureCollection"}
+
+        gw = MapboxGeocodingGateway(permanent=True)
+        with patch.object(MapboxGeocodingGateway, "_make_request", return_value=mock_features):
+            result = gw.forward_search(query="test", country="AR", limit=3)
+
+        assert result == mock_features
+
+    @patch("requests.get")
+    @patch("app.config.settings.get_mapbox_access_token", return_value="sk.test")
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_forward_search_sends_autocomplete_true_in_request(self, mock_settings, _mock_token, mock_get, monkeypatch):
+        """HTTP request to Mapbox v6 must include autocomplete=true and permanent=true."""
+        monkeypatch.setenv("MAPBOX_CACHE_MODE", "bypass")
+        mock_settings.return_value = Mock(DEV_MODE=False)
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.content = b'{"features": [], "type": "FeatureCollection"}'
+        mock_response.json.return_value = {"features": [], "type": "FeatureCollection"}
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        gw = MapboxGeocodingGateway(permanent=True)
+        gw.forward_search(query="av santa fe", country="AR")
+
+        mock_get.assert_called_once()
+        call_kwargs = mock_get.call_args
+        url = call_kwargs[0][0] if call_kwargs[0] else call_kwargs[1].get("url", "")
+        # The URL should hit the /forward endpoint
+        assert "/forward" in url or "/forward" in str(call_kwargs)
+        # autocomplete and permanent flags must be present
+        all_args = str(call_kwargs)
+        assert "autocomplete" in all_args
+        assert "permanent" in all_args
+
+
 class TestMapboxGeocodingGatewaySingleton:
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")

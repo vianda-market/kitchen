@@ -60,10 +60,43 @@ class MapboxGeocodingGateway(BaseGateway):
     def _load_mock_responses(self) -> dict[str, Any]:
         return self._load_mock_file("mapbox_geocoding_mocks.json")
 
+    def _build_forward_params(self, token: str, **kwargs: Any) -> dict[str, str]:
+        """Build query params for a forward geocode or forward_search request."""
+        query = kwargs.get("q", "")
+        if not query:
+            raise ExternalServiceError("Missing 'q' for geocode/forward_search")
+        params: dict[str, str] = {"q": query, "access_token": token}
+        if self._permanent:
+            params["permanent"] = "true"
+        if kwargs.get("country"):
+            params["country"] = kwargs["country"].upper()
+        if kwargs.get("language"):
+            params["language"] = kwargs["language"]
+        if kwargs.get("limit"):
+            params["limit"] = str(kwargs["limit"])
+        return params
+
+    def _build_reverse_params(self, token: str, **kwargs: Any) -> dict[str, str]:
+        """Build query params for a reverse_geocode request."""
+        longitude = kwargs.get("longitude")
+        latitude = kwargs.get("latitude")
+        if longitude is None or latitude is None:
+            raise ExternalServiceError("Missing 'longitude' and/or 'latitude' for reverse_geocode")
+        params: dict[str, str] = {
+            "longitude": str(longitude),
+            "latitude": str(latitude),
+            "access_token": token,
+        }
+        if self._permanent:
+            params["permanent"] = "true"
+        if kwargs.get("language"):
+            params["language"] = kwargs["language"]
+        return params
+
     def _make_request(self, operation: str, **kwargs) -> Any:
         """
         Make actual API request to Mapbox Geocoding API v6.
-        operation: 'geocode' | 'reverse_geocode'
+        operation: 'geocode' | 'reverse_geocode' | 'forward_search'
         """
         from app.config.settings import get_mapbox_access_token
 
@@ -74,48 +107,24 @@ class MapboxGeocodingGateway(BaseGateway):
             )
 
         if operation == "geocode":
-            query = kwargs.get("q", "")
-            if not query:
-                raise ExternalServiceError("Missing 'q' for geocode")
-            params = {
-                "q": query,
-                "access_token": token,
-            }
-            if self._permanent:
-                params["permanent"] = "true"
-            if kwargs.get("country"):
-                params["country"] = kwargs["country"].upper()
-            if kwargs.get("language"):
-                params["language"] = kwargs["language"]
-            if kwargs.get("limit"):
-                params["limit"] = str(kwargs["limit"])
+            params = self._build_forward_params(token, **kwargs)
             if kwargs.get("types"):
                 params["types"] = kwargs["types"]
-            resp = requests.get(
-                f"{self.GEOCODE_BASE}/forward",
-                params=params,
-                timeout=10,
-            )
+            resp = requests.get(f"{self.GEOCODE_BASE}/forward", params=params, timeout=10)
+
+        elif operation == "forward_search":
+            # Autocomplete-style partial-input forward search (ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding).
+            # Uses autocomplete=true on the v6 forward endpoint to bias toward partial-match ranking.
+            # The permanent token and permanent=true param are passed when self._permanent is True,
+            # ensuring results come from the places-permanent dataset (TOS-clean for storage).
+            params = self._build_forward_params(token, **kwargs)
+            params["autocomplete"] = "true"
+            params.setdefault("types", "address")
+            resp = requests.get(f"{self.GEOCODE_BASE}/forward", params=params, timeout=10)
 
         elif operation == "reverse_geocode":
-            longitude = kwargs.get("longitude")
-            latitude = kwargs.get("latitude")
-            if longitude is None or latitude is None:
-                raise ExternalServiceError("Missing 'longitude' and/or 'latitude' for reverse_geocode")
-            params = {
-                "longitude": str(longitude),
-                "latitude": str(latitude),
-                "access_token": token,
-            }
-            if self._permanent:
-                params["permanent"] = "true"
-            if kwargs.get("language"):
-                params["language"] = kwargs["language"]
-            resp = requests.get(
-                f"{self.GEOCODE_BASE}/reverse",
-                params=params,
-                timeout=10,
-            )
+            params = self._build_reverse_params(token, **kwargs)
+            resp = requests.get(f"{self.GEOCODE_BASE}/reverse", params=params, timeout=10)
 
         else:
             raise ExternalServiceError(f"Unknown operation: {operation}")
@@ -249,6 +258,34 @@ class MapboxGeocodingGateway(BaseGateway):
         if context.get("district", {}).get("name"):
             components["sublocality_level_1"] = context["district"]["name"]
         return components
+
+    def forward_search(
+        self,
+        query: str,
+        country: str | None = None,
+        language: str = "es",
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Autocomplete-style partial-input forward search via Geocoding API v6.
+
+        Uses the ``forward_search`` operation (distinct from ``geocode``) so that
+        autocomplete cache entries never collide with geocode-resolution entries.
+        The cache key includes ``op=forward_search`` in addition to the permanent flag.
+
+        Passes ``autocomplete=true`` to Mapbox v6, which biases ranking toward
+        partial-match relevance (same behavior as Search Box suggest, but via the
+        Geocoding API).
+
+        When this gateway is constructed with ``permanent=True`` (which is the case
+        when ``ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding``), the persistent-storage token
+        and ``permanent=true`` param are included — making this TOS-clean for workflows
+        that ultimately persist the resolved address.
+
+        Returns the raw Mapbox v6 forward response dict (``{"features": [...], "type": "FeatureCollection"}``).
+        """
+        result: dict[str, Any] = self.call("forward_search", q=query, country=country, language=language, limit=limit)
+        return result
 
     def validate_address(self, address: str) -> bool:
         """Basic validation: try to geocode and return True if results found."""
