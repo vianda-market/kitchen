@@ -71,7 +71,10 @@ def upsert_institution_entity_by_key(
     def _upsert() -> InstitutionEntityResponseSchema:
         key = upsert_data.canonical_key
         existing = find_institution_entity_by_canonical_key(key, db)
-        payload = upsert_data.model_dump()
+        # exclude_none=True: optional fields not supplied by the caller must not
+        # overwrite existing DB values (e.g. payout_onboarding_status set by a
+        # prior SQL seed or Stripe webhook).
+        payload = upsert_data.model_dump(exclude_none=True)
         payload["modified_by"] = current_user["user_id"]
 
         if existing is not None:
