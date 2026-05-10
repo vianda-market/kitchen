@@ -291,6 +291,19 @@ WHERE discretionary_id IN (
            OR username LIKE 'demo.cliente.us.%@vianda.demo'
     )
 );
+-- Live discretionary_resolution_info rows RESTRICT discretionary_info delete.
+-- Must be deleted before billing.discretionary_info below.
+DELETE FROM billing.discretionary_resolution_info
+WHERE discretionary_id IN (
+    SELECT discretionary_id FROM billing.discretionary_info
+    WHERE user_id IN (
+        SELECT user_id FROM core.user_info
+        WHERE user_id::text LIKE 'dddddddd-dec0-%'
+           OR username LIKE 'demo.cliente.pe.%@vianda.demo'
+           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
+           OR username LIKE 'demo.cliente.us.%@vianda.demo'
+    )
+);
 DELETE FROM audit.discretionary_history
 WHERE discretionary_id IN (
     SELECT discretionary_id FROM billing.discretionary_info
@@ -580,6 +593,17 @@ WHERE user_id::text LIKE 'dddddddd-dec0-%'
 
 DELETE FROM core.institution_market
 WHERE institution_id::text LIKE 'dddddddd-dec0-%';
+
+-- Final audit-history sweep: triggers fired between Tier 9b/10 and here can
+-- re-insert audit.institution_history rows (e.g. user delete cascading audit
+-- writes). Re-run the delete just before institution_info DELETE so the
+-- RESTRICT FK is satisfied.
+DELETE FROM audit.institution_history
+WHERE institution_id::text LIKE 'dddddddd-dec0-%'
+   OR institution_id IN (
+       SELECT institution_id FROM core.institution_info
+       WHERE canonical_key LIKE 'DEMO_INSTITUTION_%_EMPLOYER'
+   );
 
 DELETE FROM core.institution_info
 WHERE institution_id::text LIKE 'dddddddd-dec0-%'
