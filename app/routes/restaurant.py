@@ -154,9 +154,18 @@ def create_restaurant(
 
             # Commit both operations atomically
             db.commit()
-            from app.services.address_service import update_address_type_from_linkages
+            from app.services.address_service import (
+                address_business_service,
+                update_address_type_from_linkages,
+            )
 
             update_address_type_from_linkages(restaurant.address_id, db)
+            # Geocode the restaurant address now that address_type = "restaurant" is set.
+            # Non-blocking: geocoding failures never prevent the restaurant from being created.
+            try:
+                address_business_service.geocode_address_if_required(restaurant.address_id, current_user, db)
+            except Exception as _geo_exc:
+                log_error(f"Geocoding failed for restaurant address {restaurant.address_id}: {_geo_exc}")
             log_info(
                 f"✅ Successfully created restaurant {restaurant.restaurant_id} with balance record (atomic transaction)"
             )
@@ -882,9 +891,18 @@ def upsert_restaurant_by_key(
             raise envelope_exception(ErrorCode.RESTAURANT_BALANCE_CREATION_FAILED, status=500, locale="en")
 
         db.commit()
-        from app.services.address_service import update_address_type_from_linkages
+        from app.services.address_service import (
+            address_business_service,
+            update_address_type_from_linkages,
+        )
 
         update_address_type_from_linkages(restaurant.address_id, db)
+        # Geocode the restaurant address now that address_type = "restaurant" is set.
+        # Non-blocking: geocoding failures never prevent the restaurant from being created.
+        try:
+            address_business_service.geocode_address_if_required(restaurant.address_id, current_user, db)
+        except Exception as _geo_exc:
+            log_error(f"Geocoding failed for restaurant address {restaurant.address_id}: {_geo_exc}")
         log_info(f"Upsert inserted restaurant {restaurant.restaurant_id} with canonical_key '{key}'")
         return RestaurantResponseSchema(**_restaurant_to_response(restaurant, db))
 
