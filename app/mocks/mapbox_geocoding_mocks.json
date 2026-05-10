@@ -23,6 +23,30 @@
       }
     ]
   },
+  "forward_search": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-58.4023328, -34.5880634]
+        },
+        "properties": {
+          "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjg",
+          "full_address": "Avenida Santa Fe 2567, Recoleta, Buenos Aires, C1425, Argentina",
+          "context": {
+            "country": { "country_code": "AR", "name": "Argentina" },
+            "region": { "name": "Buenos Aires" },
+            "place": { "name": "Buenos Aires" },
+            "postcode": { "name": "C1425" },
+            "street": { "name": "Avenida Santa Fe" },
+            "address": { "address_number": "2567" }
+          }
+        }
+      }
+    ]
+  },
   "reverse_geocode": {
     "type": "FeatureCollection",
     "features": [
