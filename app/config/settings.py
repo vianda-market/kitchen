@@ -346,6 +346,12 @@ def get_mapbox_access_token(permanent: bool = False) -> str:
         else:
             key = settings.MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT
         if not key or not key.strip():
+            # DEV_MODE uses mock responses — no real Mapbox call is made, so the TOS
+            # guardrail (persistent token required for DB writes) is a false positive.
+            # Return a stub so gateway construction succeeds and mocks are served.
+            # In production (DEV_MODE=False) the RuntimeError still guards the TOS rule.
+            if settings.DEV_MODE:
+                return "dev-mode-stub-token"
             raise RuntimeError(
                 f"MAPBOX_ACCESS_TOKEN_{env.upper()}_PERSISTENT is not set. "
                 "Callsites that write lat/lng to the DB must use the persistent-storage "
