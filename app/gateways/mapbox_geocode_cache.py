@@ -20,7 +20,37 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_CACHE_FILE = Path(__file__).parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+
+def _resolve_cache_file() -> Path:
+    """Resolve the seed cache file path robustly.
+
+    Resolution order:
+    1. ``MAPBOX_GEOCODE_CACHE_PATH`` env var — absolute override.
+    2. Relative to ``__file__`` (normal install, primary working tree).
+    3. Walk up from ``Path.cwd()`` looking for ``seeds/mapbox_geocode_cache.json``
+       — handles mutmut's ``mutants/`` relocation where ``__file__`` points to a
+       copy directory that has no ``seeds/`` sibling.
+    """
+    env_override = os.getenv("MAPBOX_GEOCODE_CACHE_PATH")
+    if env_override:
+        return Path(env_override)
+
+    # Primary: relative to this source file (correct in all normal layouts).
+    candidate = Path(__file__).parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+    if candidate.exists():
+        return candidate
+
+    # Fallback: walk up from CWD (catches mutmut's mutants/ relocation).
+    for parent in [Path.cwd(), *Path.cwd().parents]:
+        fallback = parent / "seeds" / "mapbox_geocode_cache.json"
+        if fallback.exists():
+            return fallback
+
+    # Nothing found — return the __file__-relative path and let callers handle the miss.
+    return candidate
+
+
+_CACHE_FILE = _resolve_cache_file()
 
 
 class CacheMode(str, Enum):
@@ -38,17 +68,36 @@ def _normalize(text: str) -> str:
 
 
 def make_cache_key(operation: str, **kwargs: Any) -> str:
-    """Build a normalized cache key for a geocoding operation."""
+    """Build a normalized cache key for a geocoding operation.
+
+    The ``permanent`` flag is included in the key so that ephemeral and
+    permanent responses never cross-contaminate the cache.  Existing entries
+    keyed without the flag (i.e. ``permanent=False``) are preserved — the
+    default ``permanent`` value is ``False``, so the key segment reads
+    ``permanent=false`` for all previously-recorded ephemeral entries.
+
+    The ``forward_search`` operation adds an ``op=forward_search`` segment so
+    that autocomplete cache entries never collide with geocode-resolution entries
+    that share the same normalized query string.
+    """
     if operation == "geocode":
         q = _normalize(kwargs.get("q", ""))
         country = _normalize(kwargs.get("country") or "")
         lang = _normalize(kwargs.get("language") or "")
-        return f"geocode|{q}|{country}|{lang}"
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"geocode|{q}|{country}|{lang}|permanent={permanent}"
+    if operation == "forward_search":
+        q = _normalize(kwargs.get("q", ""))
+        country = _normalize(kwargs.get("country") or "")
+        lang = _normalize(kwargs.get("language") or "")
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"forward_search|{q}|{country}|{lang}|permanent={permanent}"
     if operation == "reverse_geocode":
         lat = str(kwargs.get("latitude", ""))
         lng = str(kwargs.get("longitude", ""))
         lang = _normalize(kwargs.get("language") or "")
-        return f"reverse_geocode|{lat}|{lng}|{lang}"
+        permanent = str(kwargs.get("permanent", False)).lower()
+        return f"reverse_geocode|{lat}|{lng}|{lang}|permanent={permanent}"
     # Fallback: include all kwargs sorted for determinism
     tail = "|".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
     return f"{operation}|{tail}"

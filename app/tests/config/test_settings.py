@@ -1,10 +1,13 @@
 """
-Unit tests for settings env-file gating and get_google_api_key environment-based resolution.
+Unit tests for settings env-file gating and get_google_api_key / get_mapbox_access_token
+environment-based resolution.
 """
 
 from unittest.mock import patch
 
-from app.config.settings import get_google_api_key, settings
+import pytest
+
+from app.config.settings import get_google_api_key, get_mapbox_access_token, settings
 
 
 class TestEnvFileGating:
@@ -116,3 +119,108 @@ class TestGetGoogleApiKey:
             with patch.object(settings, "GOOGLE_API_KEY_STAGING", ""):
                 with patch.object(settings, "GOOGLE_API_KEY_PROD", ""):
                     assert get_google_api_key() == "key_with_spaces"
+
+
+class TestGetMapboxAccessTokenPersistent:
+    """Test get_mapbox_access_token(permanent=True) raises when token is unset
+    and returns the correct token when set, for each environment."""
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "local"}, clear=False)
+    def test_local_persistent_raises_when_unset(self):
+        """permanent=True with no token set raises RuntimeError for local env (DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_LOCAL_PERSISTENT"):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_dev_persistent_raises_when_unset(self):
+        """permanent=True with no token set raises RuntimeError for dev env (DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT"):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "staging"}, clear=False)
+    def test_staging_persistent_raises_when_unset(self):
+        """permanent=True with no token set raises RuntimeError for staging env (DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT"):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "prod"}, clear=False)
+    def test_prod_persistent_raises_when_unset(self):
+        """permanent=True with no token set raises RuntimeError for prod env (DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT"):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_dev_persistent_returns_token_when_set(self):
+        """permanent=True returns the DEV persistent token when configured."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", "sk.dev_persistent"):
+            assert get_mapbox_access_token(permanent=True) == "sk.dev_persistent"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "staging"}, clear=False)
+    def test_staging_persistent_returns_token_when_set(self):
+        """permanent=True returns the STAGING persistent token when configured."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT", "sk.staging_persistent"):
+            assert get_mapbox_access_token(permanent=True) == "sk.staging_persistent"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "prod"}, clear=False)
+    def test_prod_persistent_returns_token_when_set(self):
+        """permanent=True returns the PROD persistent token when configured."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT", "sk.prod_persistent"):
+            assert get_mapbox_access_token(permanent=True) == "sk.prod_persistent"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "custom"}, clear=False)
+    def test_unknown_env_persistent_raises_when_unset(self):
+        """Unknown ENVIRONMENT falls back to DEV persistent token; raises when unset (DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_persistent_raises_on_empty_string(self):
+        """permanent=True with empty string raises RuntimeError (not silently falsy, DEV_MODE=False)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", "   "):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError):
+                    get_mapbox_access_token(permanent=True)
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_persistent_strips_whitespace(self):
+        """persistent token is stripped of surrounding whitespace."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", "  sk.token  "):
+            assert get_mapbox_access_token(permanent=True) == "sk.token"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_default_permanent_false_preserves_ephemeral_behavior(self):
+        """permanent=False (default) returns the ephemeral token, not the persistent one."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV", "pk.ephemeral"):
+            with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", "sk.persistent"):
+                assert get_mapbox_access_token() == "pk.ephemeral"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_dev_mode_true_persistent_unset_returns_stub(self):
+        """permanent=True, persistent token unset, DEV_MODE=True -> returns stub (no RuntimeError).
+
+        DEV_MODE uses mock responses; no real Mapbox call is made, so the TOS guardrail
+        is a false positive. The stub allows gateway construction to succeed in CI where
+        no persistent token env var is provided.
+        """
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", True):
+                result = get_mapbox_access_token(permanent=True)
+        assert result == "dev-mode-stub-token"
+
+    @patch.dict("os.environ", {"ENVIRONMENT": "dev"}, clear=False)
+    def test_dev_mode_false_persistent_unset_still_raises(self):
+        """permanent=True, persistent token unset, DEV_MODE=False -> RuntimeError (TOS guardrail preserved)."""
+        with patch.object(settings, "MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT", None):
+            with patch.object(settings, "DEV_MODE", False):
+                with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT"):
+                    get_mapbox_access_token(permanent=True)

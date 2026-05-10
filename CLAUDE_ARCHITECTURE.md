@@ -39,10 +39,10 @@ app/
 │   └── dynamic_models.py    # Dynamic DTO generation
 ├── gateways/                # External service abstractions
 │   ├── base_gateway.py
-│   ├── address_provider.py       # Factory: get_search_gateway(), get_geocoding_gateway() — driven by ADDRESS_PROVIDER setting
-│   ├── mapbox_geocode_cache.py   # Geocoding cache: MapboxGeocodeCache, CacheMode (replay_only/record/bypass), make_cache_key
-│   ├── mapbox_search_gateway.py  # Mapbox Search Box API (suggest + retrieve) — default provider
-│   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse); cache-aware via call() override
+│   ├── address_provider.py       # Factory: get_search_gateway(), get_geocoding_gateway(permanent=False) — driven by ADDRESS_PROVIDER setting
+│   ├── mapbox_geocode_cache.py   # Geocoding cache: MapboxGeocodeCache, CacheMode (replay_only/record/bypass), make_cache_key; key includes permanent flag + op segment (geocode vs forward_search)
+│   ├── mapbox_search_gateway.py  # Mapbox Search Box API (suggest + retrieve) — Q2 fallback autocomplete provider
+│   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse + forward_search); two modes: permanent=False (ephemeral) / permanent=True (persistent-storage)
 │   ├── mapbox_static_gateway.py  # Mapbox Static Images API — generates static map PNGs with pin overlays
 │   ├── google_maps_gateway.py    # Google Maps Geocoding (fallback provider)
 │   ├── google_places_gateway.py  # Google Places API (fallback provider)
@@ -136,6 +136,86 @@ app/
 
 application.py               # FastAPI app, route registration, lifespan
 ```
+
+---
+
+## Mapbox Geocoding — Two-Mode Contract
+
+Mapbox Geocoding API v6 operates in two modes; **the mode must match the callsite's intent**.
+
+| Mode | Token | Mapbox param | Cache key suffix | When to use |
+|------|-------|-------------|-----------------|-------------|
+| Ephemeral (`permanent=False`) | `pk.*` (MAPBOX_ACCESS_TOKEN_DEV/STAGING/PROD) | _(none)_ | `\|permanent=false` | Autocomplete / suggest — result NOT written to DB |
+| Persistent (`permanent=True`) | `sk.*` (MAPBOX_ACCESS_TOKEN_DEV/STAGING/PROD_PERSISTENT) | `permanent=true` | `\|permanent=true` | Geocoding for DB storage — result written to `geolocation_info` |
+
+Storing Mapbox results obtained via the ephemeral endpoint violates Mapbox ToS.  Using the persistent token costs $5/1,000 geocode calls.
+
+### How the flag flows
+
+```
+get_geocoding_gateway(permanent=True)           # address_provider.py factory
+  → MapboxGeocodingGateway(permanent=True)      # mapbox_geocoding_gateway.py
+      → get_mapbox_access_token(permanent=True) # settings.py — sk.* token, raises RuntimeError if not set
+      → _make_request adds params["permanent"]="true" to Mapbox v6 URL
+      → call() injects permanent=True into make_cache_key() → key ends with |permanent=true
+```
+
+### Module-level singletons
+
+| Singleton | Exported from | Mode | Used by |
+|-----------|---------------|------|---------|
+| `geolocation_service` | `geolocation_service.py` | ephemeral | Backward-compat callers; does NOT write lat/lng to DB |
+| `persistent_geolocation_service` | `geolocation_service.py` | persistent | `address_service._geocode_address()`, `_update_restaurant_geolocation()` |
+| `get_mapbox_geocoding_gateway(permanent=False)` | `mapbox_geocoding_gateway.py` | ephemeral | Backfill script |
+| `get_mapbox_geocoding_gateway(permanent=True)` | `mapbox_geocoding_gateway.py` | persistent | `persistent_geolocation_service`, `GeocodingAutocompleteProvider` |
+
+### Short-circuit rule
+
+`address_service._geocode_address()` checks `geolocation_info` for existing non-zero coordinates **before** calling Mapbox.  If coordinates already exist, the function returns immediately (no Mapbox call, no cost).  Zero-coordinate placeholder rows (from Phase 1 ephemeral mode) are NOT treated as "existing coordinates" — they proceed to geocode.
+
+### Cache key format
+
+```
+geocode|{normalized_q}|{country}|{language}|permanent={true|false}
+forward_search|{normalized_q}|{country}|{language}|permanent={true|false}
+reverse_geocode|{lat}|{lng}|{language}|permanent={true|false}
+```
+
+`forward_search` keys (from `MapboxGeocodingGateway.forward_search()`) are distinct from `geocode` keys so that autocomplete partial-input entries never collide with geocode-resolution entries for the same query string. Both entry kinds can coexist in `seeds/mapbox_geocode_cache.json`.
+
+The `permanent` segment was added in Step 2.  The committed seed file (`seeds/mapbox_geocode_cache.json`) contains both `permanent=false` and `permanent=true` entries for every demo-day address so replay_only mode works for both gateway modes without any live Mapbox calls.
+
+### Autocomplete provider switch (ADDRESS_AUTOCOMPLETE_PROVIDER)
+
+Two-provider abstraction for the `/suggest` endpoint, selectable at runtime without redeploy.
+
+```
+ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding  (default)
+  → GeocodingAutocompleteProvider
+      → MapboxGeocodingGateway(permanent=True).forward_search(autocomplete=true)
+      → places-permanent dataset, one paid call per address, TOS-clean
+
+ADDRESS_AUTOCOMPLETE_PROVIDER=search_box  (Q2 fallback)
+  → SearchBoxAutocompleteProvider
+      → MapboxSearchGateway.suggest() (ephemeral session)
+      → two paid calls per address (suggest + resolve)
+```
+
+Both providers return the same canonical shape — `{"place_id": str, "display_text": str, "country_code": str (optional)}` — so the `/suggest` response contract is byte-identical regardless of the active provider. Frontends are unaffected by a flag flip.
+
+**Q2 rule (always enforced regardless of provider):** every persisted address field comes from `places-permanent` geocoding. `_resolve_address_from_place_id` in `address_service.py` always returns `None` for the geoloc tuple, forcing coordinates through `_geocode_address()` → `persistent_geolocation_service` → `places-permanent`.
+
+**place_id format compatibility:** Mapbox Search Box `mapbox_id` and Geocoding API `mapbox_id` are the same underlying entity-ID namespace. The downstream `_resolve_address_from_place_id` call (which uses Search Box `retrieve`) accepts IDs from either provider without modification.
+
+**Provider location:** `app/services/address_autocomplete_service.py` — `SearchBoxAutocompleteProvider`, `GeocodingAutocompleteProvider`, `get_autocomplete_provider()` factory.
+
+**Abort criteria:** flip to `search_box` immediately if real users report autocomplete failure on common partial inputs, typo tolerance becomes a measurable issue, or forward-endpoint latency exceeds 400ms p50.
+
+### DB tracking columns (migration 0019)
+
+`core.geolocation_info` columns written by the persistent geocoding path:
+- `mapbox_geocoded_at TIMESTAMPTZ` — timestamp of the geocoding call
+- `mapbox_normalized_address TEXT` — cache key query string stored for backfill re-derivation
 
 ---
 

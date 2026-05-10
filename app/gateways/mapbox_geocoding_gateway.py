@@ -7,7 +7,10 @@ Handles:
 - Structured geocoding: individual address fields -> coordinates
 
 Phase 1: Uses temporary (ephemeral) geocoding (permanent=false, the default).
-Phase 2: Will add permanent=true for DB storage.
+Phase 2: ``MapboxGeocodingGateway(permanent=True)`` — uses Mapbox v6 ``permanent=true``
+         parameter (mapbox.places-permanent equivalent for v6), the persistent-storage
+         token (sk.*), and a distinct cache key segment so ephemeral and permanent
+         responses never cross-contaminate the cache.
 
 In DEV_MODE: Uses mock responses from app/mocks/mapbox_geocoding_mocks.json
 In PROD_MODE: Makes real API calls. Requires Mapbox access token.
@@ -27,20 +30,28 @@ logger = logging.getLogger(__name__)
 class MapboxGeocodingGateway(BaseGateway):
     """Gateway for Mapbox Geocoding API v6.
 
+    Args:
+        permanent: When True, the gateway sends ``permanent=true`` in every geocoding
+            request (Mapbox v6 permanent-storage mode) and uses the persistent-storage
+            access token (sk.*).  Cache keys include ``permanent=true`` so responses
+            are isolated from the ephemeral cache entries.
+
     When access token is set: always uses live API (ignores DEV_MODE).
     When access token is missing and DEV_MODE: uses mock responses.
     """
 
     GEOCODE_BASE = "https://api.mapbox.com/search/geocode/v6"
 
-    def __init__(self):
+    def __init__(self, permanent: bool = False):
         super().__init__()
+        self._permanent = permanent
         from app.config.settings import get_mapbox_access_token
 
-        token = get_mapbox_access_token()
+        token = get_mapbox_access_token(permanent=permanent)
         if token:
             self.dev_mode = False
-            logger.info("Mapbox Geocoding Gateway using live API (token configured)")
+            mode_label = "permanent" if permanent else "ephemeral"
+            logger.info("Mapbox Geocoding Gateway using live API (token configured, mode=%s)", mode_label)
 
     @property
     def service_name(self) -> str:
@@ -49,58 +60,71 @@ class MapboxGeocodingGateway(BaseGateway):
     def _load_mock_responses(self) -> dict[str, Any]:
         return self._load_mock_file("mapbox_geocoding_mocks.json")
 
+    def _build_forward_params(self, token: str, **kwargs: Any) -> dict[str, str]:
+        """Build query params for a forward geocode or forward_search request."""
+        query = kwargs.get("q", "")
+        if not query:
+            raise ExternalServiceError("Missing 'q' for geocode/forward_search")
+        params: dict[str, str] = {"q": query, "access_token": token}
+        if self._permanent:
+            params["permanent"] = "true"
+        if kwargs.get("country"):
+            params["country"] = kwargs["country"].upper()
+        if kwargs.get("language"):
+            params["language"] = kwargs["language"]
+        if kwargs.get("limit"):
+            params["limit"] = str(kwargs["limit"])
+        return params
+
+    def _build_reverse_params(self, token: str, **kwargs: Any) -> dict[str, str]:
+        """Build query params for a reverse_geocode request."""
+        longitude = kwargs.get("longitude")
+        latitude = kwargs.get("latitude")
+        if longitude is None or latitude is None:
+            raise ExternalServiceError("Missing 'longitude' and/or 'latitude' for reverse_geocode")
+        params: dict[str, str] = {
+            "longitude": str(longitude),
+            "latitude": str(latitude),
+            "access_token": token,
+        }
+        if self._permanent:
+            params["permanent"] = "true"
+        if kwargs.get("language"):
+            params["language"] = kwargs["language"]
+        return params
+
     def _make_request(self, operation: str, **kwargs) -> Any:
         """
         Make actual API request to Mapbox Geocoding API v6.
-        operation: 'geocode' | 'reverse_geocode'
+        operation: 'geocode' | 'reverse_geocode' | 'forward_search'
         """
         from app.config.settings import get_mapbox_access_token
 
-        token = get_mapbox_access_token()
+        token = get_mapbox_access_token(permanent=self._permanent)
         if not token:
             raise ExternalServiceError(
                 "Mapbox access token required for geocoding. Set MAPBOX_ACCESS_TOKEN_DEV (or _STAGING/_PROD) in .env."
             )
 
         if operation == "geocode":
-            query = kwargs.get("q", "")
-            if not query:
-                raise ExternalServiceError("Missing 'q' for geocode")
-            params = {
-                "q": query,
-                "access_token": token,
-            }
-            if kwargs.get("country"):
-                params["country"] = kwargs["country"].upper()
-            if kwargs.get("language"):
-                params["language"] = kwargs["language"]
-            if kwargs.get("limit"):
-                params["limit"] = str(kwargs["limit"])
+            params = self._build_forward_params(token, **kwargs)
             if kwargs.get("types"):
                 params["types"] = kwargs["types"]
-            resp = requests.get(
-                f"{self.GEOCODE_BASE}/forward",
-                params=params,
-                timeout=10,
-            )
+            resp = requests.get(f"{self.GEOCODE_BASE}/forward", params=params, timeout=10)
+
+        elif operation == "forward_search":
+            # Autocomplete-style partial-input forward search (ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding).
+            # Uses autocomplete=true on the v6 forward endpoint to bias toward partial-match ranking.
+            # The permanent token and permanent=true param are passed when self._permanent is True,
+            # ensuring results come from the places-permanent dataset (TOS-clean for storage).
+            params = self._build_forward_params(token, **kwargs)
+            params["autocomplete"] = "true"
+            params.setdefault("types", "address")
+            resp = requests.get(f"{self.GEOCODE_BASE}/forward", params=params, timeout=10)
 
         elif operation == "reverse_geocode":
-            longitude = kwargs.get("longitude")
-            latitude = kwargs.get("latitude")
-            if longitude is None or latitude is None:
-                raise ExternalServiceError("Missing 'longitude' and/or 'latitude' for reverse_geocode")
-            params = {
-                "longitude": str(longitude),
-                "latitude": str(latitude),
-                "access_token": token,
-            }
-            if kwargs.get("language"):
-                params["language"] = kwargs["language"]
-            resp = requests.get(
-                f"{self.GEOCODE_BASE}/reverse",
-                params=params,
-                timeout=10,
-            )
+            params = self._build_reverse_params(token, **kwargs)
+            resp = requests.get(f"{self.GEOCODE_BASE}/reverse", params=params, timeout=10)
 
         else:
             raise ExternalServiceError(f"Unknown operation: {operation}")
@@ -122,6 +146,10 @@ class MapboxGeocodingGateway(BaseGateway):
     def call(self, operation: str, **kwargs: Any) -> Any:
         """Override BaseGateway.call to add cache interception.
 
+        The ``permanent`` flag from this gateway instance is injected into every
+        cache-key derivation so ephemeral and permanent responses are stored under
+        separate keys.
+
         bypass  → skip cache entirely (prod live-only path).
         record  → cache hit returns stored response; miss calls Mapbox and writes cache.
         replay_only → cache hit returns stored response; miss raises MapboxCacheMiss.
@@ -135,7 +163,8 @@ class MapboxGeocodingGateway(BaseGateway):
         if mode == CacheMode.BYPASS:
             return super().call(operation, **kwargs)
 
-        key = make_cache_key(operation, **kwargs)
+        # Inject the permanent flag so ephemeral / permanent entries never share a key.
+        key = make_cache_key(operation, **{**kwargs, "permanent": self._permanent})
         hit = cache.get(key)
         if hit is not None:
             logger.info("mapbox_geocode_cache: hit for %r", key)
@@ -149,7 +178,7 @@ class MapboxGeocodingGateway(BaseGateway):
 
         # RECORD mode: call live API and persist response
         response = super().call(operation, **kwargs)
-        cache.set(key, response)
+        cache.set(key, response)  # key already has permanent injected
         return response
 
     # -------------------------------------------------------------------------
@@ -230,6 +259,34 @@ class MapboxGeocodingGateway(BaseGateway):
             components["sublocality_level_1"] = context["district"]["name"]
         return components
 
+    def forward_search(
+        self,
+        query: str,
+        country: str | None = None,
+        language: str = "es",
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Autocomplete-style partial-input forward search via Geocoding API v6.
+
+        Uses the ``forward_search`` operation (distinct from ``geocode``) so that
+        autocomplete cache entries never collide with geocode-resolution entries.
+        The cache key includes ``op=forward_search`` in addition to the permanent flag.
+
+        Passes ``autocomplete=true`` to Mapbox v6, which biases ranking toward
+        partial-match relevance (same behavior as Search Box suggest, but via the
+        Geocoding API).
+
+        When this gateway is constructed with ``permanent=True`` (which is the case
+        when ``ADDRESS_AUTOCOMPLETE_PROVIDER=geocoding``), the persistent-storage token
+        and ``permanent=true`` param are included — making this TOS-clean for workflows
+        that ultimately persist the resolved address.
+
+        Returns the raw Mapbox v6 forward response dict (``{"features": [...], "type": "FeatureCollection"}``).
+        """
+        result: dict[str, Any] = self.call("forward_search", q=query, country=country, language=language, limit=limit)
+        return result
+
     def validate_address(self, address: str) -> bool:
         """Basic validation: try to geocode and return True if results found."""
         try:
@@ -239,13 +296,25 @@ class MapboxGeocodingGateway(BaseGateway):
             return False
 
 
-# Singleton
-_mapbox_geocoding_gateway: MapboxGeocodingGateway | None = None
+# Two singletons — one per mode.  Keeping them separate avoids the risk of a
+# caller inadvertently sharing state between the ephemeral and permanent paths.
+_mapbox_geocoding_gateway_ephemeral: MapboxGeocodingGateway | None = None
+_mapbox_geocoding_gateway_permanent: MapboxGeocodingGateway | None = None
 
 
-def get_mapbox_geocoding_gateway() -> MapboxGeocodingGateway:
-    """Get the Mapbox Geocoding Gateway singleton instance."""
-    global _mapbox_geocoding_gateway
-    if _mapbox_geocoding_gateway is None:
-        _mapbox_geocoding_gateway = MapboxGeocodingGateway()
-    return _mapbox_geocoding_gateway
+def get_mapbox_geocoding_gateway(permanent: bool = False) -> MapboxGeocodingGateway:
+    """Return the singleton ``MapboxGeocodingGateway`` for the requested mode.
+
+    Args:
+        permanent: When True, return the persistent-storage gateway instance
+            (sends ``permanent=true`` to Mapbox and uses the sk.* token).
+            When False (default), return the ephemeral gateway (free-tier).
+    """
+    global _mapbox_geocoding_gateway_ephemeral, _mapbox_geocoding_gateway_permanent
+    if permanent:
+        if _mapbox_geocoding_gateway_permanent is None:
+            _mapbox_geocoding_gateway_permanent = MapboxGeocodingGateway(permanent=True)
+        return _mapbox_geocoding_gateway_permanent
+    if _mapbox_geocoding_gateway_ephemeral is None:
+        _mapbox_geocoding_gateway_ephemeral = MapboxGeocodingGateway(permanent=False)
+    return _mapbox_geocoding_gateway_ephemeral

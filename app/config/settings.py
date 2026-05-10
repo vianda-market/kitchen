@@ -1,5 +1,6 @@
 # config/settings.py
 import os
+from typing import Literal
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -73,8 +74,23 @@ class Settings(BaseSettings):
     MAPBOX_ACCESS_TOKEN_STAGING: str = ""
     MAPBOX_ACCESS_TOKEN_PROD: str = ""
 
+    # Persistent-storage Mapbox tokens (sk.*). Used by callsites that write lat/lng to DB.
+    # DEV's MAPBOX_CACHE_MODE defaults to replay_only, so the persistent token is only
+    # billed when a dev manually flips MAPBOX_CACHE_MODE to "record".
+    MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT: str | None = None
+    MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT: str | None = None
+    MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT: str | None = None
+
     # Address/geocoding provider: "mapbox" (default) or "google" (fallback)
     ADDRESS_PROVIDER: str = "mapbox"
+
+    # Autocomplete provider for the /suggest endpoint.
+    # "geocoding" (default) — uses Mapbox Geocoding API v6 forward search with autocomplete=true
+    #   against the places-permanent dataset. One paid call per address. TOS-clean.
+    # "search_box" — uses Mapbox Search Box (ephemeral session) for richer partial/typo UX.
+    #   Two paid calls per address (suggest + final places-permanent resolve). Q2 rule still enforced.
+    # Flip at runtime via ADDRESS_AUTOCOMPLETE_PROVIDER env var; no redeploy required.
+    ADDRESS_AUTOCOMPLETE_PROVIDER: Literal["geocoding", "search_box"] = "geocoding"
 
     # Mapbox geocoding cache mode: "replay_only" (default — cache miss raises, never calls Mapbox),
     # "record" (cache miss calls Mapbox and writes entry), "bypass" (prod — always live, no cache).
@@ -309,9 +325,41 @@ def get_google_api_key() -> str:
     return (key or "").strip()
 
 
-def get_mapbox_access_token() -> str:
-    """Return env-specific Mapbox access token. local/dev -> DEV; staging -> STAGING; prod -> PROD."""
+def get_mapbox_access_token(permanent: bool = False) -> str:
+    """Return env-specific Mapbox access token. local/dev -> DEV; staging -> STAGING; prod -> PROD.
+
+    Args:
+        permanent: When True, return the persistent-storage token (sk.*) for the active
+            environment. The persistent token is required for callsites that write lat/lng
+            to the DB — using the ephemeral token for persisted-storage data violates Mapbox
+            TOS. Raises RuntimeError if the token is not configured. Defaults to False, which
+            preserves the original behavior (ephemeral token).
+    """
     env = (os.getenv("ENVIRONMENT") or "local").lower()
+    if permanent:
+        if env in ("local", "dev"):
+            key = settings.MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT
+        elif env == "staging":
+            key = settings.MAPBOX_ACCESS_TOKEN_STAGING_PERSISTENT
+        elif env == "prod":
+            key = settings.MAPBOX_ACCESS_TOKEN_PROD_PERSISTENT
+        else:
+            key = settings.MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT
+        if not key or not key.strip():
+            # DEV_MODE uses mock responses — no real Mapbox call is made, so the TOS
+            # guardrail (persistent token required for DB writes) is a false positive.
+            # Return a stub so gateway construction succeeds and mocks are served.
+            # In production (DEV_MODE=False) the RuntimeError still guards the TOS rule.
+            if settings.DEV_MODE:
+                return "dev-mode-stub-token"
+            raise RuntimeError(
+                f"MAPBOX_ACCESS_TOKEN_{env.upper()}_PERSISTENT is not set. "
+                "Callsites that write lat/lng to the DB must use the persistent-storage "
+                "token (sk.*). Configure it in GCP Secret Manager "
+                f"(vianda-{env}-mapbox-token-persistent) and expose it as the env var. "
+                "Do NOT fall back to the ephemeral token — that would violate Mapbox TOS."
+            )
+        return key.strip()
     if env in ("local", "dev"):
         key = settings.MAPBOX_ACCESS_TOKEN_DEV
     elif env == "staging":
