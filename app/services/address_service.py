@@ -472,7 +472,7 @@ class AddressBusinessService:
             return
         if not isinstance(derived_types, list):
             return
-        geocodable_types = {"restaurant", "customer_employer", "customer_home"}
+        geocodable_types = {"restaurant", "customer_employer", "customer_home", "entity_address"}
         if geocodable_types & set(derived_types):
             self._geocode_address(address, address_data, current_user, db, commit=commit, country_name=country_name)
 
@@ -915,8 +915,9 @@ class AddressBusinessService:
         commit: bool = True,
     ) -> None:
         """
-        If the address's derived type is Restaurant, Customer Employer, or Customer Home,
-        ensure it has geocoding. Used after linking (e.g. employer) when type becomes known.
+        If the address's derived type is Restaurant, Customer Employer, Customer Home, or
+        Entity Address (institution entity / supplier office), ensure it has geocoding.
+        Used after linking (e.g. restaurant, institution entity) when type becomes known.
         """
         address = address_service.get_by_id(address_id, db, scope=None)
         if not address:
@@ -924,7 +925,7 @@ class AddressBusinessService:
         types = getattr(address, "address_type", None) or []
         if not isinstance(types, list):
             types = [types] if types else []
-        if not any(t in types for t in ("restaurant", "customer_employer", "customer_home")):
+        if not any(t in types for t in ("restaurant", "customer_employer", "customer_home", "entity_address")):
             return
         addr_dict = {
             "building_number": address.building_number,

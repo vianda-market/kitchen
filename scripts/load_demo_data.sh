@@ -171,6 +171,7 @@ HEALTH_URL="${KITCHEN_API_BASE}/health"
 COLLECTION="docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json"
 ENVIRONMENT="docs/postman/environments/dev.postman_environment.json"
 CREDENTIALS_FILE=".demo_credentials.local"
+BILLING_BACKFILL="app/db/seed/demo_billing_backfill.sql"
 
 echo ""
 echo "=== DEMO DAY LOADER ==="
@@ -184,7 +185,7 @@ echo ""
 # Step 1 — Layer A: SQL baseline
 # ---------------------------------------------------------------------------
 
-echo "[1/4] Running Layer A: demo_baseline.sql..."
+echo "[1/5] Running Layer A: demo_baseline.sql..."
 psql "${PSQL_ARGS[@]}" -f app/db/seed/demo_baseline.sql
 echo "      Layer A complete."
 
@@ -193,7 +194,7 @@ echo "      Layer A complete."
 # ---------------------------------------------------------------------------
 
 echo ""
-echo "[2/4] Generating demo admin password and updating DB..."
+echo "[2/5] Generating demo admin password and updating DB..."
 
 DEMO_PASSWORD="$(openssl rand -base64 18)"
 
@@ -294,7 +295,7 @@ EARLYCREDS
 # ---------------------------------------------------------------------------
 
 echo ""
-echo "[3/4] Checking kitchen API health at ${HEALTH_URL}..."
+echo "[3/5] Checking kitchen API health at ${HEALTH_URL}..."
 
 API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${HEALTH_URL}" 2>/dev/null || true)
 
@@ -318,7 +319,7 @@ echo "      API is healthy (HTTP 200)."
 # ---------------------------------------------------------------------------
 
 echo ""
-echo "[4/4] Running Layer B: Newman demo collection..."
+echo "[4/5] Running Layer B: Newman demo collection..."
 
 if ! command -v newman >/dev/null 2>&1; then
   echo ""
@@ -344,6 +345,21 @@ fi
 newman "${NEWMAN_ARGS[@]}"
 
 echo "      Layer B complete."
+
+# ---------------------------------------------------------------------------
+# Step 5 — Layer C: Billing backfill (secondary suppliers)
+# ---------------------------------------------------------------------------
+#
+# Secondary suppliers have no orders, so the settlement pipeline produces no
+# bills for them.  We back-fill 2 rows per market (1 pending + 1 paid) here,
+# after Newman, because the secondary entity UUIDs are created dynamically in
+# Layer B and must be resolved via canonical_key.
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "[5/5] Running Layer C: demo_billing_backfill.sql..."
+psql "${PSQL_ARGS[@]}" -f "${BILLING_BACKFILL}"
+echo "      Layer C complete."
 
 # ---------------------------------------------------------------------------
 # Print credentials block

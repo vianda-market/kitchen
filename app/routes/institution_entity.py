@@ -65,8 +65,9 @@ def upsert_institution_entity_by_key(
 
     Returns HTTP 200 on both insert and update (unlike POST which returns 201).
     """
+    from app.services.address_service import address_business_service, update_address_type_from_linkages
     from app.services.entity_service import derive_currency_metadata_id_for_address
-    from app.utils.log import log_info
+    from app.utils.log import log_error, log_info
 
     def _upsert() -> InstitutionEntityResponseSchema:
         key = upsert_data.canonical_key
@@ -92,6 +93,7 @@ def upsert_institution_entity_by_key(
             if result is None:
                 raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
             log_info(f"Upsert updated institution entity {existing.institution_entity_id} with canonical_key '{key}'")
+            _geocode_entity_address(existing.address_id)
             return InstitutionEntityResponseSchema.model_validate(result)
 
         # INSERT path — derive currency_metadata_id from address country (mirrors POST /institution-entities).
@@ -116,7 +118,16 @@ def upsert_institution_entity_by_key(
         if not institution:
             raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
         log_info(f"Upsert inserted institution entity {institution.institution_entity_id} with canonical_key '{key}'")
+        _geocode_entity_address(institution.address_id)
         return InstitutionEntityResponseSchema.model_validate(institution)
+
+    def _geocode_entity_address(address_id: UUID) -> None:
+        """Trigger geocoding for the entity address after insert/update. Non-blocking."""
+        try:
+            update_address_type_from_linkages(address_id, db)
+            address_business_service.geocode_address_if_required(address_id, current_user, db)
+        except Exception as _geo_exc:
+            log_error(f"Geocoding failed for institution entity address {address_id}: {_geo_exc}")
 
     return handle_business_operation(_upsert, "institution entity upsert by canonical key")
 
