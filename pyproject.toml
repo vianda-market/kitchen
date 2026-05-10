@@ -203,6 +203,7 @@ also_copy = [
     "app/",
     "application.py",
     ".env",
+    "seeds/",
 ]
 pytest_add_cli_args = [
     "--no-header",
