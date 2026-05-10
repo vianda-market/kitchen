@@ -149,7 +149,7 @@ def main() -> int:
         )
         return 1
 
-    _log(f"Using persistent token (first 10 chars): {token[:10]}...")
+    _log("Persistent token loaded from environment.")
     _log(f"Total queries to record: {len(_QUERIES)} (≈ ${len(_QUERIES) * 0.005:.2f} estimated cost)")
 
     if len(_QUERIES) > 50:

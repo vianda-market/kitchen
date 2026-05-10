@@ -108,7 +108,7 @@ def main() -> int:
         )
         return 1
 
-    _log(f"Using persistent token (first 10 chars): {token[:10]}...")
+    _log("Persistent token loaded from environment.")
 
     # Addresses to record. Add new addresses here when the demo-day fixture set grows.
     # These are the normalized query strings used as cache keys (before the "geocode|" prefix).
