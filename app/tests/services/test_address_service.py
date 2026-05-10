@@ -587,7 +587,9 @@ class TestQ2PersistenceRule:
             patch("app.services.address_service.get_persistent_geolocation_service") as mock_pgs,
             patch("app.services.address_service.AddressBusinessService._resolve_city_metadata_and_timezone"),
             patch("app.services.address_service.AddressBusinessService.validate_address_data"),
+            patch("app.services.market_service.market_service") as mock_market,
         ):
+            mock_market.get_by_country_code.return_value = {"country_code": "AR", "country_name": "Argentina"}
             # _resolve_address_from_place_id now always returns None for geoloc (Q2 rule).
             # Simulate the actual post-fix behaviour: address_data is enriched, geoloc=None.
             def fake_resolve(place_id, addr_data, cu, session_token=None):
@@ -691,7 +693,9 @@ class TestQ2PersistenceRule:
             patch("app.services.address_service.AddressBusinessService._resolve_city_metadata_and_timezone"),
             patch("app.services.address_service.AddressBusinessService.validate_address_data"),
             patch("app.services.address_service.AddressBusinessService._resolve_address_from_place_id") as mock_resolve,
+            patch("app.services.market_service.market_service") as mock_market,
         ):
+            mock_market.get_by_country_code.return_value = {"country_code": "AR", "country_name": "Argentina"}
 
             def fake_resolve(place_id, addr_data, cu, session_token=None):
                 # Simulate a gateway that returns a poisoned Search Box response.
