@@ -284,8 +284,24 @@ class GeolocationService:
 # geolocation_service: ephemeral (backward-compat, no DB write).
 # persistent_geolocation_service: permanent-storage (sk.* token, permanent=true),
 #   used by address_service for geocoding that writes to the DB.
+# Lazy — constructed on first call so that importing this module without
+# MAPBOX_ACCESS_TOKEN_LOCAL_PERSISTENT set (e.g. CI without the secret) does
+# not raise RuntimeError at import time.
 geolocation_service = GeolocationService(permanent=False)
-persistent_geolocation_service = GeolocationService(permanent=True)
+
+_persistent_geolocation_service: GeolocationService | None = None
+
+
+def get_persistent_geolocation_service() -> GeolocationService:
+    """Return the module-level persistent GeolocationService singleton.
+
+    Constructed on first call so that importing this module without
+    ``MAPBOX_ACCESS_TOKEN_LOCAL_PERSISTENT`` set does not raise at import time.
+    """
+    global _persistent_geolocation_service
+    if _persistent_geolocation_service is None:
+        _persistent_geolocation_service = GeolocationService(permanent=True)
+    return _persistent_geolocation_service
 
 
 # Legacy function for backwards compatibility

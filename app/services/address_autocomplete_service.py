@@ -208,10 +208,19 @@ class AddressAutocompleteService:
     """Service for address suggest (autocomplete) from partial input."""
 
     def __init__(self, provider: AutocompleteProvider | None = None):
-        if provider is not None:
-            self._provider = provider
-        else:
+        # Store the injected provider (for tests / explicit override), or None
+        # to trigger lazy construction on the first .suggest() call.  Eager
+        # construction would invoke get_autocomplete_provider() → GeocodingAutocompleteProvider()
+        # → get_mapbox_geocoding_gateway(permanent=True) at import time, raising
+        # RuntimeError when MAPBOX_ACCESS_TOKEN_LOCAL_PERSISTENT is not set (e.g. CI).
+        self._provider: AutocompleteProvider | None = provider
+
+    @property
+    def _active_provider(self) -> AutocompleteProvider:
+        """Lazy-initialise the autocomplete provider on first access."""
+        if self._provider is None:
             self._provider = get_autocomplete_provider()
+        return self._provider
 
     def suggest(
         self,
@@ -255,7 +264,7 @@ class AddressAutocompleteService:
             session_token = str(uuid.uuid4())
 
         try:
-            out = self._provider.suggest(
+            out = self._active_provider.suggest(
                 query=input_text,
                 country=alpha2,
                 session_token=session_token,

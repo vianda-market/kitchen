@@ -21,7 +21,7 @@ from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import address_service, geolocation_service
-from app.services.geolocation_service import persistent_geolocation_service
+from app.services.geolocation_service import get_persistent_geolocation_service
 from app.utils.db import db_insert, db_read, db_update
 from app.utils.log import log_info, log_warning
 
@@ -524,7 +524,7 @@ class AddressBusinessService:
         try:
             # Use the persistent-storage geocoding service so that lat/lng written to DB
             # is retrieved via the permanent=true Mapbox v6 endpoint (sk.* token).
-            geocode_result = persistent_geolocation_service.geocode_address(full_address)
+            geocode_result = get_persistent_geolocation_service().geocode_address(full_address)
 
             # Validate geocoding result
             if not geocode_result or "latitude" not in geocode_result or "longitude" not in geocode_result:
@@ -875,7 +875,7 @@ class AddressBusinessService:
         # is spent regardless of mode.
 
         # Use the persistent-storage geocoding service for all DB writes.
-        geocode_result = persistent_geolocation_service.geocode_address(full_address)
+        geocode_result = get_persistent_geolocation_service().geocode_address(full_address)
 
         if geocode_result and "latitude" in geocode_result and "longitude" in geocode_result:
             import re
