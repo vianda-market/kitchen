@@ -590,6 +590,7 @@ class TestQ2PersistenceRule:
             patch("app.services.market_service.market_service") as mock_market,
         ):
             mock_market.get_by_country_code.return_value = {"country_code": "AR", "country_name": "Argentina"}
+
             # _resolve_address_from_place_id now always returns None for geoloc (Q2 rule).
             # Simulate the actual post-fix behaviour: address_data is enriched, geoloc=None.
             def fake_resolve(place_id, addr_data, cu, session_token=None):
