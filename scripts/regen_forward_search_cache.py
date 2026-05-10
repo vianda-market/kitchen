@@ -181,7 +181,7 @@ def main() -> int:
                 _log(f"  WARNING: no features returned for {query!r}", err=True)
             success += 1
         except Exception as exc:
-            _log(f"  ERROR for {query!r}: {exc}", err=True)
+            _log(f"  ERROR for {query!r}: {type(exc).__name__}", err=True)
 
     _log(f"Done. Recorded {success}/{len(_QUERIES)} forward_search entries (permanent=true).")
     _log("Commit seeds/mapbox_geocode_cache.json to capture the seeded entries.")

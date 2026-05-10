@@ -162,7 +162,7 @@ def main() -> int:
                 _log(f"  WARNING: no features returned for {q!r}", err=True)
             success += 1
         except Exception as exc:
-            _log(f"  ERROR for {q!r}: {exc}", err=True)
+            _log(f"  ERROR for {q!r}: {type(exc).__name__}", err=True)
 
     _log(f"Done. Recorded {success}/{len(addresses)} entries under permanent=true keys.")
     _log("Commit seeds/mapbox_geocode_cache.json to capture the regenerated entries.")
