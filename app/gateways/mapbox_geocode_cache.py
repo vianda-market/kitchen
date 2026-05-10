@@ -20,7 +20,37 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_CACHE_FILE = Path(__file__).parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+
+def _resolve_cache_file() -> Path:
+    """Resolve the seed cache file path robustly.
+
+    Resolution order:
+    1. ``MAPBOX_GEOCODE_CACHE_PATH`` env var — absolute override.
+    2. Relative to ``__file__`` (normal install, primary working tree).
+    3. Walk up from ``Path.cwd()`` looking for ``seeds/mapbox_geocode_cache.json``
+       — handles mutmut's ``mutants/`` relocation where ``__file__`` points to a
+       copy directory that has no ``seeds/`` sibling.
+    """
+    env_override = os.getenv("MAPBOX_GEOCODE_CACHE_PATH")
+    if env_override:
+        return Path(env_override)
+
+    # Primary: relative to this source file (correct in all normal layouts).
+    candidate = Path(__file__).parent.parent.parent / "seeds" / "mapbox_geocode_cache.json"
+    if candidate.exists():
+        return candidate
+
+    # Fallback: walk up from CWD (catches mutmut's mutants/ relocation).
+    for parent in [Path.cwd(), *Path.cwd().parents]:
+        fallback = parent / "seeds" / "mapbox_geocode_cache.json"
+        if fallback.exists():
+            return fallback
+
+    # Nothing found — return the __file__-relative path and let callers handle the miss.
+    return candidate
+
+
+_CACHE_FILE = _resolve_cache_file()
 
 
 class CacheMode(str, Enum):
