@@ -90,17 +90,30 @@ WHERE restaurant_id IN (
 
 -- Institution bills: audit history + bills for all demo entities.
 -- Covers:
---   dec0-0050 sub-range: SQL-seeded secondary supplier bills
---   dynamic UUIDs:       pipeline-generated bills for primary entities (dec0-0001,0002)
+--   dec0-0050 sub-range: Layer C billing backfill for secondary suppliers
+--                        (entity IDs are dynamic/non-dec0; matched by bill_id prefix)
+--   dynamic UUIDs:       pipeline-generated bills for primary entities that now
+--                        have DB-assigned UUIDs (matched by entity canonical_key)
+--   dec0-prefixed:       legacy/fixed entity IDs from the old seed approach
 -- Must go before institution_entity deletion (FK RESTRICT).
 DELETE FROM audit.institution_bill_history
 WHERE institution_bill_id IN (
     SELECT institution_bill_id FROM billing.institution_bill_info
     WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%'
+       OR institution_bill_id::text LIKE 'dddddddd-dec0-0050%'
+       OR institution_entity_id IN (
+           SELECT institution_entity_id FROM ops.institution_entity_info
+           WHERE canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%'
+       )
 );
 
 DELETE FROM billing.institution_bill_info
-WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%';
+WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%'
+   OR institution_bill_id::text LIKE 'dddddddd-dec0-0050%'
+   OR institution_entity_id IN (
+       SELECT institution_entity_id FROM ops.institution_entity_info
+       WHERE canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%'
+   );
 
 -- Plate reviews (linked to plate_pickup_live via plate_pickup_id)
 DELETE FROM customer.plate_review_info
@@ -438,7 +451,52 @@ DELETE FROM ops.institution_entity_info
 WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%';
 
 -- -------------------------------------------------------------------------
--- Tier 8b: Employer institution entities (depend on address; must precede
+-- Tier 8b: Secondary supplier institution entities — dynamically created by
+-- Newman (Layer B) using PUT /institution-entities/by-key.  They have
+-- DB-assigned UUIDs (not dec0-prefixed), so we match on canonical_key.
+-- -------------------------------------------------------------------------
+
+DELETE FROM audit.institution_entity_history
+WHERE institution_entity_id IN (
+    SELECT institution_entity_id FROM ops.institution_entity_info
+    WHERE canonical_key IN (
+        'DEMO_INSTITUTION_ENTITY_PE2',
+        'DEMO_INSTITUTION_ENTITY_AR2',
+        'DEMO_INSTITUTION_ENTITY_US2'
+    )
+);
+
+DELETE FROM ops.institution_entity_info
+WHERE canonical_key IN (
+    'DEMO_INSTITUTION_ENTITY_PE2',
+    'DEMO_INSTITUTION_ENTITY_AR2',
+    'DEMO_INSTITUTION_ENTITY_US2'
+);
+
+-- -------------------------------------------------------------------------
+-- Tier 8c: Primary institution entities — dynamically created by Newman
+-- (Layer B) with PUT /institution-entities/by-key.
+-- -------------------------------------------------------------------------
+
+DELETE FROM audit.institution_entity_history
+WHERE institution_entity_id IN (
+    SELECT institution_entity_id FROM ops.institution_entity_info
+    WHERE canonical_key IN (
+        'DEMO_INSTITUTION_ENTITY_PE',
+        'DEMO_INSTITUTION_ENTITY_AR',
+        'DEMO_INSTITUTION_ENTITY_US'
+    )
+);
+
+DELETE FROM ops.institution_entity_info
+WHERE canonical_key IN (
+    'DEMO_INSTITUTION_ENTITY_PE',
+    'DEMO_INSTITUTION_ENTITY_AR',
+    'DEMO_INSTITUTION_ENTITY_US'
+);
+
+-- -------------------------------------------------------------------------
+-- Tier 8d: Employer institution entities (depend on address; must precede
 -- address deletion because entity.address_id → address_info RESTRICT).
 -- -------------------------------------------------------------------------
 
@@ -477,6 +535,19 @@ WHERE address_id::text LIKE 'dddddddd-dec0-%'
           OR username LIKE 'demo.cliente.ar.%@vianda.demo'
           OR username LIKE 'demo.cliente.us.%@vianda.demo'
    );
+
+-- Geolocation audit rows must be deleted before geolocation_info, which in
+-- turn must be deleted before address_info (geolocation_info.address_id has
+-- ON DELETE CASCADE, but geolocation_history.geolocation_id is RESTRICT —
+-- so we must manually purge the audit trail first).
+DELETE FROM audit.geolocation_history
+WHERE geolocation_id IN (
+    SELECT geolocation_id FROM core.geolocation_info
+    WHERE address_id IN (SELECT address_id FROM _demo_address_ids)
+);
+
+DELETE FROM core.geolocation_info
+WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
 
 DELETE FROM audit.address_history
 WHERE address_id IN (SELECT address_id FROM _demo_address_ids);
