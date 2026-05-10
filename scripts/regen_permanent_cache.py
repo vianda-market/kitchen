@@ -66,7 +66,7 @@ def _remove_existing_permanent_entries(addresses: list[tuple[str, str | None, st
     for q, country, language in addresses:
         key = make_cache_key("geocode", q=q, country=country or "", language=language, permanent=True)
         if key in data:
-            _log(f"Removing stale entry: {key!r}")
+            _log(f"Removing stale entry: q={q!r} country={country!r}")
             del data[key]
             removed += 1
 
@@ -139,7 +139,7 @@ def main() -> int:
     success = 0
     for q, country, language in addresses:
         key = make_cache_key("geocode", q=q, country=country or "", language=language, permanent=True)
-        _log(f"Recording from live API: key={key!r}")
+        _log(f"Recording from live API: q={q!r} country={country!r}")
         try:
             # call() handles record mode: cache miss → live API → write cache.
             # Note: the permanent=true and permanent=false endpoints return identical

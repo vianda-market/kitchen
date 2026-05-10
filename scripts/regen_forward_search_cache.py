@@ -104,7 +104,7 @@ def _remove_existing_forward_search_entries(queries: list[tuple[str, str, str, s
             permanent=True,
         )
         if key in data:
-            _log(f"Removing stale entry: {key!r}")
+            _log(f"Removing stale entry: q={query!r} country={country!r}")
             del data[key]
             removed += 1
 
