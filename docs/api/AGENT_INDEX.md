@@ -200,7 +200,8 @@ _Routes: `/addresses/`, `/maps/`, `/cities/`, `/provinces/`, `/countries/`_
 | Audience | File | Description |
 |----------|------|-------------|
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/ADDRESSES_API_CLIENT.md` | Address autocomplete and creation with geolocation (Mapbox provider, session_token) |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` | Static map images for Explore tab — `GET /maps/city-snapshot` with pin pixel positions, center-of-gravity address selection, Mapbox SDK fallback plan |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/MAPS_API.md` | **Maps API** — `GET /maps/city-pins` (active, interactive Mapbox) + `GET /maps/city-snapshot` (dormant, static PNG). Start here for all map work. |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` | Static map images detail — pixel positions, tap target overlay, caching, dark mode. Dormant since #214 cutover; superseded by `MAPS_API.md` for new integrations. |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/PROVINCES_API_CLIENT.md` | Provinces for cascading country → province → city dropdowns |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/COUNTRY_CODE_API_CONTRACT.md` | Accept alpha-2 or alpha-3; always store and return alpha-2 |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/TIMEZONE_AUTO_DEDUCTION_UI_GUIDE.md` | Backend derives timezone from country/province — no client input needed |

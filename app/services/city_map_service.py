@@ -17,6 +17,7 @@ from app.gateways.mapbox_static_gateway import get_mapbox_static_gateway
 from app.utils.db import db_read
 from app.utils.log import log_info, log_warning
 from app.utils.map_projection import (
+    compute_bounding_box,
     distance_from_center,
     grid_cell,
     is_within_frame,
@@ -106,6 +107,29 @@ class CityMapService:
             "height": height,
             "retina": retina,
             "markers": visible_markers,
+        }
+
+    def get_pins(
+        self,
+        city: str,
+        country_code: str,
+        db: psycopg2.extensions.connection,
+    ) -> dict[str, Any]:
+        """
+        Lean pins-only response for the interactive Mapbox map.
+
+        Reuses _query_restaurants to fetch all active restaurants with
+        coordinates; computes a recommended NE/SW viewport so the client can
+        call fitBounds without its own projection math.
+
+        Returns dict matching CityPinsResponseSchema:
+        { markers: [...], recommended_viewport: {ne, sw} | None }
+        """
+        restaurants = self._query_restaurants(city, country_code, db)
+        viewport = compute_bounding_box(restaurants) if restaurants else None
+        return {
+            "markers": restaurants,
+            "recommended_viewport": viewport,
         }
 
     def _query_restaurants(

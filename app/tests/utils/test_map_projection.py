@@ -1,8 +1,12 @@
 """
-Unit tests for map projection utilities (Web Mercator, pixel conversion, grid cells).
+Unit tests for map projection utilities (Web Mercator, pixel conversion, grid cells, bounding box).
 """
 
+import pytest
+
 from app.utils.map_projection import (
+    _SINGLE_MARKER_EXPANSION_DEG,
+    compute_bounding_box,
     distance_from_center,
     grid_cell,
     is_within_frame,
@@ -104,3 +108,86 @@ class TestDistanceFromCenter:
         d1 = distance_from_center(-34.59, -58.40, -34.59, -58.41)
         d2 = distance_from_center(-34.59, -58.40, -34.59, -58.45)
         assert d1 < d2
+
+
+class TestComputeBoundingBox:
+    def test_empty_list_returns_none(self):
+        """Empty markers list must return None."""
+        assert compute_bounding_box([]) is None
+
+    def test_single_marker_returns_expanded_box(self):
+        """A single marker should produce a ±EXPANSION box around it."""
+        lat, lng = -12.046374, -77.042793  # Lima, Peru
+        result = compute_bounding_box([{"lat": lat, "lng": lng}])
+        assert result is not None
+        exp = _SINGLE_MARKER_EXPANSION_DEG
+        assert result["ne"]["lat"] == pytest.approx(lat + exp)
+        assert result["ne"]["lng"] == pytest.approx(lng + exp)
+        assert result["sw"]["lat"] == pytest.approx(lat - exp)
+        assert result["sw"]["lng"] == pytest.approx(lng - exp)
+
+    def test_single_marker_ne_is_greater_than_sw(self):
+        """NE coordinates must always be >= SW for a single marker."""
+        result = compute_bounding_box([{"lat": 0.0, "lng": 0.0}])
+        assert result is not None
+        assert result["ne"]["lat"] > result["sw"]["lat"]
+        assert result["ne"]["lng"] > result["sw"]["lng"]
+
+    def test_two_markers_tight_bbox(self):
+        """Two markers → bbox with no extra padding."""
+        markers = [
+            {"lat": -12.046374, "lng": -77.042793},
+            {"lat": -12.100000, "lng": -77.050000},
+        ]
+        result = compute_bounding_box(markers)
+        assert result is not None
+        assert result["ne"]["lat"] == pytest.approx(-12.046374)
+        assert result["ne"]["lng"] == pytest.approx(-77.042793)
+        assert result["sw"]["lat"] == pytest.approx(-12.100000)
+        assert result["sw"]["lng"] == pytest.approx(-77.050000)
+
+    def test_multi_marker_ne_sw_corners(self):
+        """ne = (max_lat, max_lng), sw = (min_lat, min_lng) over all markers."""
+        markers = [
+            {"lat": -34.5880, "lng": -58.4023},  # Buenos Aires cluster
+            {"lat": -34.6000, "lng": -58.4100},
+            {"lat": -34.5700, "lng": -58.3900},
+        ]
+        result = compute_bounding_box(markers)
+        assert result is not None
+        assert result["ne"]["lat"] == pytest.approx(-34.5700)
+        assert result["ne"]["lng"] == pytest.approx(-58.3900)
+        assert result["sw"]["lat"] == pytest.approx(-34.6000)
+        assert result["sw"]["lng"] == pytest.approx(-58.4100)
+
+    def test_ne_lat_always_gte_sw_lat(self):
+        """NE lat must always be >= SW lat for any valid input."""
+        markers = [
+            {"lat": 40.7128, "lng": -74.0060},  # New York
+            {"lat": 34.0522, "lng": -118.2437},  # Los Angeles
+        ]
+        result = compute_bounding_box(markers)
+        assert result is not None
+        assert result["ne"]["lat"] >= result["sw"]["lat"]
+
+    def test_single_marker_at_lat_lng_zero(self):
+        """Edge case: marker exactly at (0.0, 0.0) must not produce NaN or wrong signs."""
+        result = compute_bounding_box([{"lat": 0.0, "lng": 0.0}])
+        assert result is not None
+        exp = _SINGLE_MARKER_EXPANSION_DEG
+        assert result["ne"]["lat"] == pytest.approx(exp)
+        assert result["sw"]["lat"] == pytest.approx(-exp)
+        assert result["ne"]["lng"] == pytest.approx(exp)
+        assert result["sw"]["lng"] == pytest.approx(-exp)
+
+    def test_markers_with_identical_coordinates(self):
+        """Multiple markers at identical coordinates should produce the single-marker expansion."""
+        markers = [
+            {"lat": -12.046374, "lng": -77.042793},
+            {"lat": -12.046374, "lng": -77.042793},
+        ]
+        result = compute_bounding_box(markers)
+        assert result is not None
+        # min == max, so the box is a zero-width point (no expansion for N>1)
+        assert result["ne"]["lat"] == pytest.approx(-12.046374)
+        assert result["sw"]["lat"] == pytest.approx(-12.046374)

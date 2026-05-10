@@ -85,3 +85,49 @@ def distance_from_center(lat: float, lng: float, center_lat: float, center_lng: 
     Used for sorting restaurants by proximity to center (not for actual distance calculation).
     """
     return math.sqrt((lat - center_lat) ** 2 + (lng - center_lng) ** 2)
+
+
+# Expansion in degrees applied when only a single marker is present.
+# ±0.01° ≈ 1.1 km on each axis at the latitudes we serve — keeps the map
+# readable without zooming out too far for a lone restaurant.
+_SINGLE_MARKER_EXPANSION_DEG: float = 0.01
+
+
+def compute_bounding_box(
+    markers: list[dict],
+) -> dict[str, dict[str, float]] | None:
+    """
+    Return ``{"ne": {"lat": ..., "lng": ...}, "sw": {"lat": ..., "lng": ...}}``
+    enclosing every marker, or ``None`` when *markers* is empty.
+
+    For a single marker a small ±0.01° box is returned (roughly 1 km on each
+    axis at the latitudes we serve).  For two or more markers the tight bounding
+    box over all ``(lat, lng)`` pairs is returned with no extra padding — the
+    client adds UI-aware padding via ``fitBounds``.
+
+    Expected marker shape: each item must have float ``"lat"`` and ``"lng"``
+    keys.
+
+    Note: antimeridian crossing is explicitly out of scope.  We do not serve
+    cities whose restaurant cluster straddles the 180° meridian, so
+    ``max(lng) - min(lng)`` is always the correct west→east span.
+    """
+    if not markers:
+        return None
+
+    lats = [m["lat"] for m in markers]
+    lngs = [m["lng"] for m in markers]
+
+    min_lat, max_lat = min(lats), max(lats)
+    min_lng, max_lng = min(lngs), max(lngs)
+
+    if len(markers) == 1:
+        min_lat -= _SINGLE_MARKER_EXPANSION_DEG
+        max_lat += _SINGLE_MARKER_EXPANSION_DEG
+        min_lng -= _SINGLE_MARKER_EXPANSION_DEG
+        max_lng += _SINGLE_MARKER_EXPANSION_DEG
+
+    return {
+        "ne": {"lat": max_lat, "lng": max_lng},
+        "sw": {"lat": min_lat, "lng": min_lng},
+    }

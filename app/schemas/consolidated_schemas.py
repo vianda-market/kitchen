@@ -2348,6 +2348,50 @@ class CitySnapshotResponseSchema(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Interactive map — city pins (GET /api/v1/maps/city-pins)
+# ---------------------------------------------------------------------------
+
+
+class MapPinSchema(BaseModel):
+    """One restaurant pin for the interactive Mapbox map."""
+
+    restaurant_id: UUID
+    name: str
+    lat: float
+    lng: float
+
+
+class ViewportCornerSchema(BaseModel):
+    """A single lat/lng corner of a bounding-box viewport."""
+
+    lat: float
+    lng: float
+
+
+class ViewportSchema(BaseModel):
+    """NE + SW corners of a recommended camera viewport."""
+
+    ne: ViewportCornerSchema
+    sw: ViewportCornerSchema
+
+
+class CityPinsResponseSchema(BaseModel):
+    """Response for GET /api/v1/maps/city-pins. Lean marker list + recommended viewport."""
+
+    markers: list[MapPinSchema] = Field(
+        default_factory=list,
+        description="All active restaurants with coordinates in the requested city.",
+    )
+    recommended_viewport: ViewportSchema | None = Field(
+        None,
+        description=(
+            "NE/SW bounding box enclosing all markers. None when markers is empty. "
+            "Pass to fitBounds on the client; add UI-aware padding there."
+        ),
+    )
+
+
 class RestaurantEnrichedResponseSchema(BaseModel):
     """Schema for enriched restaurant response data with institution, entity, and address details"""
 

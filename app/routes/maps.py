@@ -1,15 +1,23 @@
 """
-Map endpoints — static map image generation for B2C Explore tab.
+Map endpoints — static map image generation and interactive pin data for B2C Explore tab.
 
-GET /maps/city-snapshot — returns a cached static map image URL with restaurant pin positions.
+GET /maps/city-snapshot — (dormant) returns a cached static map image URL with restaurant pin positions.
+GET /maps/city-pins    — (active)  returns restaurant markers + recommended viewport for interactive map.
 """
+
+from typing import Any
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user
 from app.dependencies.database import get_db
-from app.schemas.consolidated_schemas import CitySnapshotResponseSchema
+from app.i18n.envelope import envelope_exception
+from app.i18n.error_codes import ErrorCode
+from app.schemas.consolidated_schemas import (
+    CityPinsResponseSchema,
+    CitySnapshotResponseSchema,
+)
 from app.services.city_map_service import city_map_service
 
 router = APIRouter(prefix="/maps")
@@ -42,5 +50,36 @@ def get_city_map_snapshot(
         height=height,
         retina=retina,
         style=style if style in ("light", "dark") else "light",
+        db=db,
+    )
+
+
+@router.get("/city-pins", response_model=CityPinsResponseSchema)
+def get_city_pins(
+    city: str = Query(..., description="City name (same value used in GET /restaurants/by-city)"),
+    country_code: str = Query(..., description="ISO 3166-1 alpha-2 country code (e.g. PE, AR)"),
+    current_user: dict = Depends(get_current_user),
+    db: psycopg2.extensions.connection = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    Return all active restaurant pins for a city plus a recommended NE/SW viewport.
+
+    The viewport is computed server-side so the client can call fitBounds on first
+    paint without its own projection math.  When no restaurants have coordinates,
+    markers is [] and recommended_viewport is null.
+
+    No image is generated.  This endpoint does not call Mapbox — it is pure DB + math.
+    """
+    if len(country_code) != 2:
+        raise envelope_exception(
+            ErrorCode.VALIDATION_INVALID_FORMAT,
+            status=400,
+            locale="en",
+            field="country_code",
+        )
+
+    return city_map_service.get_pins(
+        city=city,
+        country_code=country_code.upper(),
         db=db,
     )
