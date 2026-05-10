@@ -134,11 +134,8 @@ def main() -> int:
     # Create a fresh permanent gateway (not the singleton, to avoid reuse of cached instance).
     gw = MapboxGeocodingGateway(permanent=True)
 
-    from app.gateways.mapbox_geocode_cache import make_cache_key
-
     success = 0
     for q, country, language in addresses:
-        key = make_cache_key("geocode", q=q, country=country or "", language=language, permanent=True)
         _log(f"Recording from live API: q={q!r} country={country!r}")
         try:
             # call() handles record mode: cache miss → live API → write cache.
