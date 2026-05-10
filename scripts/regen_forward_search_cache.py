@@ -65,6 +65,18 @@ _QUERIES: list[tuple[str, str, str, str]] = [
     ("corrientes 1234 [6]", "corrientes 1", "AR", "es"),
     ("corrientes 1234 [7]", "corrientes 12", "AR", "es"),
     ("corrientes 1234 [8]", "corrientes 1234", "AR", "es"),
+    # Postman /suggest queries (002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION + 000 E2E Plate Selection).
+    # These are the full query strings that Newman sends to /api/v1/addresses/suggest.
+    # country="" means no country filter (AddressAutocompleteService resolves alpha2=None).
+    # The E2E step in collection 002 hard-asserts at least one suggestion; the others are
+    # soft-checked (array shape only) but seeding them prevents MapboxCacheMiss in replay_only.
+    ("postman: Av. Corrientes no country", "Av. Corrientes", "", "es"),
+    ("postman: Santa Fe AR", "Santa Fe", "AR", "es"),
+    ("postman: Avenida Santa Fe 2567 AR", "Avenida Santa Fe 2567", "AR", "es"),
+    # Hard assertion in 002 E2E step 1 — must return at least one suggestion.
+    ("postman: Avenida Santa Fe 2567 Buenos Aires AR", "Avenida Santa Fe 2567 Buenos Aires", "AR", "es"),
+    # 000 E2E collection suggest step (soft check but seeds to avoid cache miss).
+    ("postman: Av. Santa Fe 2567 Buenos Aires AR", "Av. Santa Fe 2567 Buenos Aires", "AR", "es"),
 ]
 
 

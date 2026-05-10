@@ -6797,6 +6797,1317 @@
     "features": [],
     "type": "FeatureCollection"
   },
+  "forward_search|av. corrientes||es|permanent=true": {
+    "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+    "features": [],
+    "type": "FeatureCollection"
+  },
+  "forward_search|av. santa fe 2567 buenos aires|ar|es|permanent=true": {
+    "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            -58.403217,
+            -34.594206
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "locality": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBZ1VxQ3c",
+              "name": "Comuna 2",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Comuna 2"
+                }
+              }
+            },
+            "neighborhood": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBNHdM",
+              "name": "Recoleta",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Recoleta"
+                }
+              },
+              "wikidata_id": "Q1010253"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "short_code": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzppczRM",
+              "name": "C1425"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "region_code": "C",
+              "region_code_full": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhZdUlGTmhiblJoSUVabElESTFOamNnUW5WbGJtOXpJRUZwY21Weklpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOTow",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.594206,
+            "longitude": -58.403217,
+            "routable_points": [
+              {
+                "latitude": -34.594206,
+                "longitude": -58.403217,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Recoleta, Buenos Aires, C1425, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "matched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Recoleta, Buenos Aires, C1425, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.39084,
+            -34.680671
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBU2ZvQ3c",
+              "name": "Piñeyro",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Piñeyro"
+                }
+              },
+              "wikidata_id": "Q9060226"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpJcTRM",
+              "name": "B1868"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhZdUlGTmhiblJoSUVabElESTFOamNnUW5WbGJtOXpJRUZwY21Weklpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOTox",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.680671,
+            "longitude": -58.39084,
+            "routable_points": [
+              {
+                "latitude": -34.680671,
+                "longitude": -58.39084,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Piñeyro, Provincia de Buenos Aires, B1868, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Piñeyro, Provincia de Buenos Aires, B1868, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.498044,
+            -34.494447
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBUXFvQ3c",
+              "name": "Martínez",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Martínez"
+                }
+              },
+              "wikidata_id": "Q1840873"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpEaTRM",
+              "name": "B1640"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhZdUlGTmhiblJoSUVabElESTFOamNnUW5WbGJtOXpJRUZwY21Weklpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOToy",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.494447,
+            "longitude": -58.498044,
+            "routable_points": [
+              {
+                "latitude": -34.494447,
+                "longitude": -58.498044,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Martínez, Provincia de Buenos Aires, B1640, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Martínez, Provincia de Buenos Aires, B1640, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.596301,
+            -34.418045
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+              "name": "Avenida Santa María De Las Conchas 2567",
+              "street_name": "Avenida Santa María De Las Conchas"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBV1dvQ3c",
+              "name": "Tigre",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Tigre"
+                }
+              },
+              "wikidata_id": "Q54106"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpEeTRM",
+              "name": "B1648"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhZdUlGTmhiblJoSUVabElESTFOamNnUW5WbGJtOXpJRUZwY21Weklpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOToz",
+              "name": "Avenida Santa María De Las Conchas"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.418045,
+            "longitude": -58.596301,
+            "routable_points": [
+              {
+                "latitude": -34.418045,
+                "longitude": -58.596301,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa María De Las Conchas 2567, Tigre, Provincia de Buenos Aires, B1648, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFl1SUZOaGJuUmhJRVpsSURJMU5qY2dRblZsYm05eklFRnBjbVZ6SWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "unmatched"
+          },
+          "name": "Avenida Santa María De Las Conchas 2567",
+          "name_preferred": "Avenida Santa María De Las Conchas 2567",
+          "place_formatted": "Tigre, Provincia de Buenos Aires, B1648, Argentina"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "forward_search|avenida santa fe 2567 buenos aires|ar|es|permanent=true": {
+    "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            -58.403217,
+            -34.594206
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjA",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjA",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "locality": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBZ1VxQ3c",
+              "name": "Comuna 2",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Comuna 2"
+                }
+              }
+            },
+            "neighborhood": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBNHdM",
+              "name": "Recoleta",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Recoleta"
+                }
+              },
+              "wikidata_id": "Q1010253"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "short_code": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzppczRM",
+              "name": "C1425"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "region_code": "C",
+              "region_code_full": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lFSjFaVzV2Y3lCQmFYSmxjeUlzSW5CbGNtMWhibVZ1ZENJNkluUnlkV1VpTENKamIzVnVkSEo1SWpvaVFWSWlMQ0pzWVc1bmRXRm5aU0k2SW1Weklpd2liR2x0YVhRaU9pSTFJaXdpWVhWMGIyTnZiWEJzWlhSbElqb2lkSEoxWlNJc0luUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lJc0ltbHVZMngxWkdWZmJXRjBZMmhmWkdWMFlXbHNJam9pZEhKMVpTSXNJbTF2WkdVaU9pSm1iM0ozWVhKa0lpd2lkalowZVhCbGN5STZJbUZrWkhKbGMzTWlmUTow",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.594206,
+            "longitude": -58.403217,
+            "routable_points": [
+              {
+                "latitude": -34.594206,
+                "longitude": -58.403217,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Recoleta, Buenos Aires, C1425, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjA",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "matched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Recoleta, Buenos Aires, C1425, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.39084,
+            -34.680671
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjE",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjE",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBU2ZvQ3c",
+              "name": "Piñeyro",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Piñeyro"
+                }
+              },
+              "wikidata_id": "Q9060226"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpJcTRM",
+              "name": "B1868"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lFSjFaVzV2Y3lCQmFYSmxjeUlzSW5CbGNtMWhibVZ1ZENJNkluUnlkV1VpTENKamIzVnVkSEo1SWpvaVFWSWlMQ0pzWVc1bmRXRm5aU0k2SW1Weklpd2liR2x0YVhRaU9pSTFJaXdpWVhWMGIyTnZiWEJzWlhSbElqb2lkSEoxWlNJc0luUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lJc0ltbHVZMngxWkdWZmJXRjBZMmhmWkdWMFlXbHNJam9pZEhKMVpTSXNJbTF2WkdVaU9pSm1iM0ozWVhKa0lpd2lkalowZVhCbGN5STZJbUZrWkhKbGMzTWlmUTox",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.680671,
+            "longitude": -58.39084,
+            "routable_points": [
+              {
+                "latitude": -34.680671,
+                "longitude": -58.39084,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Piñeyro, Provincia de Buenos Aires, B1868, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjE",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Piñeyro, Provincia de Buenos Aires, B1868, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.498044,
+            -34.494447
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjI",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjI",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBUXFvQ3c",
+              "name": "Martínez",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Martínez"
+                }
+              },
+              "wikidata_id": "Q1840873"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpEaTRM",
+              "name": "B1640"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lFSjFaVzV2Y3lCQmFYSmxjeUlzSW5CbGNtMWhibVZ1ZENJNkluUnlkV1VpTENKamIzVnVkSEo1SWpvaVFWSWlMQ0pzWVc1bmRXRm5aU0k2SW1Weklpd2liR2x0YVhRaU9pSTFJaXdpWVhWMGIyTnZiWEJzWlhSbElqb2lkSEoxWlNJc0luUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lJc0ltbHVZMngxWkdWZmJXRjBZMmhmWkdWMFlXbHNJam9pZEhKMVpTSXNJbTF2WkdVaU9pSm1iM0ozWVhKa0lpd2lkalowZVhCbGN5STZJbUZrWkhKbGMzTWlmUToy",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.494447,
+            "longitude": -58.498044,
+            "routable_points": [
+              {
+                "latitude": -34.494447,
+                "longitude": -58.498044,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Martínez, Provincia de Buenos Aires, B1640, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjI",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Martínez, Provincia de Buenos Aires, B1640, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.596301,
+            -34.418045
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjM",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjM",
+              "name": "Avenida Santa María De Las Conchas 2567",
+              "street_name": "Avenida Santa María De Las Conchas"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBV1dvQ3c",
+              "name": "Tigre",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Tigre"
+                }
+              },
+              "wikidata_id": "Q54106"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpEeTRM",
+              "name": "B1648"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lFSjFaVzV2Y3lCQmFYSmxjeUlzSW5CbGNtMWhibVZ1ZENJNkluUnlkV1VpTENKamIzVnVkSEo1SWpvaVFWSWlMQ0pzWVc1bmRXRm5aU0k2SW1Weklpd2liR2x0YVhRaU9pSTFJaXdpWVhWMGIyTnZiWEJzWlhSbElqb2lkSEoxWlNJc0luUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lJc0ltbHVZMngxWkdWZmJXRjBZMmhmWkdWMFlXbHNJam9pZEhKMVpTSXNJbTF2WkdVaU9pSm1iM0ozWVhKa0lpd2lkalowZVhCbGN5STZJbUZrWkhKbGMzTWlmUToz",
+              "name": "Avenida Santa María De Las Conchas"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.418045,
+            "longitude": -58.596301,
+            "routable_points": [
+              {
+                "latitude": -34.418045,
+                "longitude": -58.596301,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa María De Las Conchas 2567, Tigre, Provincia de Buenos Aires, B1648, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSUVKMVpXNXZjeUJCYVhKbGN5SXNJbkJsY20xaGJtVnVkQ0k2SW5SeWRXVWlMQ0pqYjNWdWRISjVJam9pUVZJaUxDSnNZVzVuZFdGblpTSTZJbVZ6SWl3aWJHbHRhWFFpT2lJMUlpd2lZWFYwYjJOdmJYQnNaWFJsSWpvaWRISjFaU0lzSW5SNWNHVnpJam9pWVdSa2NtVnpjeUlzSW1sdVkyeDFaR1ZmYldGMFkyaGZaR1YwWVdsc0lqb2lkSEoxWlNJc0ltMXZaR1VpT2lKbWIzSjNZWEprSWl3aWRqWjBlWEJsY3lJNkltRmtaSEpsYzNNaWZROjM",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "unmatched"
+          },
+          "name": "Avenida Santa María De Las Conchas 2567",
+          "name_preferred": "Avenida Santa María De Las Conchas 2567",
+          "place_formatted": "Tigre, Provincia de Buenos Aires, B1648, Argentina"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "forward_search|avenida santa fe 2567|ar|es|permanent=true": {
+    "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            -58.403217,
+            -34.594206
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "locality": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBZ1VxQ3c",
+              "name": "Comuna 2",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Comuna 2"
+                }
+              }
+            },
+            "neighborhood": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBNHdM",
+              "name": "Recoleta",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Recoleta"
+                }
+              },
+              "wikidata_id": "Q1010253"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "short_code": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzppczRM",
+              "name": "C1425"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpKQXM",
+              "name": "Buenos Aires",
+              "region_code": "C",
+              "region_code_full": "AR-C",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q1486"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOTow",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.594206,
+            "longitude": -58.403217,
+            "routable_points": [
+              {
+                "latitude": -34.594206,
+                "longitude": -58.403217,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Recoleta, Buenos Aires, C1425, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjA",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Recoleta, Buenos Aires, C1425, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -58.39084,
+            -34.680671
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBU2ZvQ3c",
+              "name": "Piñeyro",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Piñeyro"
+                }
+              },
+              "wikidata_id": "Q9060226"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpJcTRM",
+              "name": "B1868"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpSQXM",
+              "name": "Provincia de Buenos Aires",
+              "region_code": "B",
+              "region_code_full": "AR-B",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Buenos Aires"
+                }
+              },
+              "wikidata_id": "Q44754"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOTox",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -34.680671,
+            "longitude": -58.39084,
+            "routable_points": [
+              {
+                "latitude": -34.680671,
+                "longitude": -58.39084,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Piñeyro, Provincia de Buenos Aires, B1868, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjE",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Piñeyro, Provincia de Buenos Aires, B1868, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -60.714597,
+            -32.851678
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzp5V2dM",
+              "name": "Granadero Baigorria",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Granadero Baigorria"
+                }
+              },
+              "wikidata_id": "Q5594127"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBUkt1Q3c",
+              "name": "S2152"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBb1FM",
+              "name": "Provincia de Santa Fe",
+              "region_code": "S",
+              "region_code_full": "AR-S",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Santa Fe"
+                }
+              },
+              "wikidata_id": "Q44823"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOToy",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -32.851678,
+            "longitude": -60.714597,
+            "routable_points": [
+              {
+                "latitude": -32.851678,
+                "longitude": -60.714597,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Granadero Baigorria, Provincia de Santa Fe, S2152, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjI",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Granadero Baigorria, Provincia de Santa Fe, S2152, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -60.821691,
+            -32.916315
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzp2b2dM",
+              "name": "Funes",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Funes"
+                }
+              },
+              "wikidata_id": "Q2370892"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBUkNPQ3c",
+              "name": "S2132"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBb1FM",
+              "name": "Provincia de Santa Fe",
+              "region_code": "S",
+              "region_code_full": "AR-S",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Santa Fe"
+                }
+              },
+              "wikidata_id": "Q44823"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOToz",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -32.916315,
+            "longitude": -60.821691,
+            "routable_points": [
+              {
+                "latitude": -32.916315,
+                "longitude": -60.821691,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Funes, Provincia de Santa Fe, S2132, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjM",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Funes, Provincia de Santa Fe, S2132, Argentina"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            -61.500022,
+            -33.460071
+          ],
+          "type": "Point"
+        },
+        "id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjQ",
+        "properties": {
+          "context": {
+            "address": {
+              "address_number": "2567",
+              "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjQ",
+              "name": "Avenida Santa Fe 2567",
+              "street_name": "Avenida Santa Fe"
+            },
+            "country": {
+              "country_code": "AR",
+              "country_code_alpha_3": "ARG",
+              "mapbox_id": "dXJuOm1ieHBsYzpJZ3M",
+              "name": "Argentina",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Argentina"
+                }
+              },
+              "wikidata_id": "Q414"
+            },
+            "place": {
+              "mapbox_id": "dXJuOm1ieHBsYzp1d2dM",
+              "name": "Firmat",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Firmat"
+                }
+              },
+              "wikidata_id": "Q677450"
+            },
+            "postcode": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBU011Q3c",
+              "name": "S2630"
+            },
+            "region": {
+              "mapbox_id": "dXJuOm1ieHBsYzpBb1FM",
+              "name": "Provincia de Santa Fe",
+              "region_code": "S",
+              "region_code_full": "AR-S",
+              "translations": {
+                "es": {
+                  "language": "es",
+                  "name": "Provincia de Santa Fe"
+                }
+              },
+              "wikidata_id": "Q44823"
+            },
+            "street": {
+              "mapbox_id": "dXJuOm1ieGFkci1zdHItaXRwOmV5SnhJam9pUVhabGJtbGtZU0JUWVc1MFlTQkdaU0F5TlRZM0lpd2ljR1Z5YldGdVpXNTBJam9pZEhKMVpTSXNJbU52ZFc1MGNua2lPaUpCVWlJc0lteGhibWQxWVdkbElqb2laWE1pTENKc2FXMXBkQ0k2SWpVaUxDSmhkWFJ2WTI5dGNHeGxkR1VpT2lKMGNuVmxJaXdpZEhsd1pYTWlPaUpoWkdSeVpYTnpJaXdpYVc1amJIVmtaVjl0WVhSamFGOWtaWFJoYVd3aU9pSjBjblZsSWl3aWJXOWtaU0k2SW1admNuZGhjbVFpTENKMk5uUjVjR1Z6SWpvaVlXUmtjbVZ6Y3lKOTo0",
+              "name": "Avenida Santa Fe"
+            }
+          },
+          "coordinates": {
+            "accuracy": "interpolated",
+            "latitude": -33.460071,
+            "longitude": -61.500022,
+            "routable_points": [
+              {
+                "latitude": -33.460071,
+                "longitude": -61.500022,
+                "name": "default"
+              }
+            ]
+          },
+          "feature_type": "address",
+          "full_address": "Avenida Santa Fe 2567, Firmat, Provincia de Santa Fe, S2630, Argentina",
+          "mapbox_id": "dXJuOm1ieGFkci1pdHA6ZXlKeElqb2lRWFpsYm1sa1lTQlRZVzUwWVNCR1pTQXlOVFkzSWl3aWNHVnliV0Z1Wlc1MElqb2lkSEoxWlNJc0ltTnZkVzUwY25raU9pSkJVaUlzSW14aGJtZDFZV2RsSWpvaVpYTWlMQ0pzYVcxcGRDSTZJalVpTENKaGRYUnZZMjl0Y0d4bGRHVWlPaUowY25WbElpd2lkSGx3WlhNaU9pSmhaR1J5WlhOeklpd2lhVzVqYkhWa1pWOXRZWFJqYUY5a1pYUmhhV3dpT2lKMGNuVmxJaXdpYlc5a1pTSTZJbVp2Y25kaGNtUWlMQ0oyTm5SNWNHVnpJam9pWVdSa2NtVnpjeUo5OjQ",
+          "match_code": {
+            "address_number": "plausible",
+            "confidence": "low",
+            "country": "inferred",
+            "locality": "not_applicable",
+            "place": "unmatched",
+            "postcode": "unmatched",
+            "region": "unmatched",
+            "street": "matched"
+          },
+          "name": "Avenida Santa Fe 2567",
+          "name_preferred": "Avenida Santa Fe 2567",
+          "place_formatted": "Firmat, Provincia de Santa Fe, S2630, Argentina"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
   "forward_search|corrientes 1234|ar|es|permanent=true": {
     "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
     "features": [
@@ -8246,6 +9557,11 @@
     "type": "FeatureCollection"
   },
   "forward_search|corr|ar|es|permanent=true": {
+    "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+    "features": [],
+    "type": "FeatureCollection"
+  },
+  "forward_search|santa fe|ar|es|permanent=true": {
     "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
     "features": [],
     "type": "FeatureCollection"
