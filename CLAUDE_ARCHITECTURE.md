@@ -219,6 +219,45 @@ Both providers return the same canonical shape — `{"place_id": str, "display_t
 
 ---
 
+## Maps Subsystem
+
+The kitchen exposes two map endpoints under `app/routes/maps.py` (router prefix `/maps`, registered as `/api/v1/maps/`):
+
+- `GET /api/v1/maps/city-pins` **(active)** — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. See `app/routes/maps.py` and `city_map_service.get_pins()`. No image generated; no Mapbox call made server-side. Pure DB query + `compute_bounding_box()`.
+- `GET /api/v1/maps/city-snapshot` **(dormant since #214 cutover)** — returns a Mapbox Static Images PNG cached in GCS with per-marker pixel positions for tap-target overlay. Preserved as a future cost optimization if interactive-map MAU economics deteriorate. Do not delete without operator review.
+
+### Key files
+
+| File | Purpose |
+|---|---|
+| `app/routes/maps.py` | Both endpoints: `/city-pins` (active) + `/city-snapshot` (dormant) |
+| `app/services/city_map_service.py` | `CityMapService.get_pins()` (active path), `get_snapshot()` (dormant path), `_query_restaurants()` (shared) |
+| `app/utils/map_projection.py` | `compute_bounding_box()` (new), `lat_lng_to_pixel()`, `grid_cell()`, `is_within_frame()`, `distance_from_center()`, `slugify_city()` |
+| `app/tests/utils/test_map_projection.py` | 28 pytest unit tests covering all `compute_bounding_box` branches plus legacy projection helpers |
+| `app/schemas/consolidated_schemas.py` | `MapPinSchema`, `ViewportCornerSchema`, `ViewportSchema`, `CityPinsResponseSchema` (new); `CitySnapshotResponseSchema`, `CitySnapshotMarkerSchema` (dormant) |
+| `app/gateways/mapbox_static_gateway.py` | Mapbox Static Images API — used only by the dormant `/city-snapshot` path |
+
+### `compute_bounding_box` contract
+
+- Empty list → `None` (caller returns `recommended_viewport: null`).
+- Single marker → `±0.01°` expansion on both axes (`_SINGLE_MARKER_EXPANSION_DEG` constant).
+- ≥ 2 markers → tight bounding box; no server-side padding (client adds via Mapbox `fitBounds` options).
+- Antimeridian crossing: explicitly out of scope; not served by any current market.
+
+### Auth
+
+Both endpoints require `get_current_user` (Bearer JWT). No role restriction — any authenticated user (Customer, Supplier, Employee) can call them.
+
+### Postman coverage
+
+`docs/postman/collections/022 MAPS_CITY_PINS.postman_collection.json` — 6 requests, 16 assertions covering happy path, empty city, missing param, invalid `country_code`, unauthorized.
+
+### Client integration doc
+
+`docs/api/b2c_client/MAPS_API.md`
+
+---
+
 ## Route Registration Flow
 
 1. **`application.py`** creates the app and registers all routers.

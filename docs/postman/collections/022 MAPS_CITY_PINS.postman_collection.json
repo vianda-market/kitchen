@@ -1,0 +1,271 @@
+{
+	"info": {
+		"_postman_id": "maps-city-pins-2026",
+		"name": "022 MAPS_CITY_PINS",
+		"description": "Tests for GET /api/v1/maps/city-pins — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. No Mapbox calls are made; this is pure DB + projection math.\n\nNote on single-marker case: server-side expansion for a single-coordinate city is covered exhaustively by pytest unit tests in app/tests/utils/test_map_projection.py (TestComputeBoundingBox). No Postman step is included here as finding a real single-restaurant city in seed data is brittle; the unit tests are the authoritative coverage for that path.\n\nRequires: demo seed data (900_DEMO_DAY_SEED) applied so that Lima/PE has active restaurants with coordinates.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8000" },
+		{ "key": "authToken", "value": "" }
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+					"if (t) pm.collectionVariables.set('authToken', t);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login OK', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.collectionVariables.set('authToken', r.access_token);",
+									"pm.environment.set('authToken', r.access_token);",
+									"pm.globals.set('authToken', r.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "username", "value": "{{superAdminUsername}}" },
+								{ "key": "password", "value": "{{superAdminPassword}}" }
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				}
+			]
+		},
+		{
+			"name": "City Pins",
+			"item": [
+				{
+					"name": "Happy path — Lima/PE returns markers and viewport",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('Response has markers array', function () {",
+									"    pm.expect(r).to.have.property('markers');",
+									"    pm.expect(r.markers).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Markers array is non-empty for Lima/PE (requires demo seed)', function () {",
+									"    pm.expect(r.markers.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"pm.test('Each marker has required fields', function () {",
+									"    r.markers.forEach(function (m) {",
+									"        pm.expect(m).to.have.property('restaurant_id');",
+									"        pm.expect(m).to.have.property('name');",
+									"        pm.expect(m).to.have.property('lat');",
+									"        pm.expect(m).to.have.property('lng');",
+									"        pm.expect(m.lat).to.be.a('number');",
+									"        pm.expect(m.lng).to.be.a('number');",
+									"    });",
+									"});",
+									"",
+									"pm.test('No pixel_x/pixel_y fields (city-pins is not a snapshot)', function () {",
+									"    r.markers.forEach(function (m) {",
+									"        pm.expect(m).to.not.have.property('pixel_x');",
+									"        pm.expect(m).to.not.have.property('pixel_y');",
+									"    });",
+									"});",
+									"",
+									"pm.test('recommended_viewport is present and has ne/sw corners', function () {",
+									"    pm.expect(r).to.have.property('recommended_viewport');",
+									"    pm.expect(r.recommended_viewport).to.not.be.null;",
+									"    pm.expect(r.recommended_viewport).to.have.property('ne');",
+									"    pm.expect(r.recommended_viewport).to.have.property('sw');",
+									"    pm.expect(r.recommended_viewport.ne).to.have.property('lat');",
+									"    pm.expect(r.recommended_viewport.ne).to.have.property('lng');",
+									"    pm.expect(r.recommended_viewport.sw).to.have.property('lat');",
+									"    pm.expect(r.recommended_viewport.sw).to.have.property('lng');",
+									"});",
+									"",
+									"pm.test('ne.lat >= sw.lat (valid bounding box)', function () {",
+									"    const vp = r.recommended_viewport;",
+									"    pm.expect(vp.ne.lat).to.be.at.least(vp.sw.lat);",
+									"});",
+									"",
+									"pm.test('ne.lng >= sw.lng (valid bounding box, no antimeridian crossing)', function () {",
+									"    const vp = r.recommended_viewport;",
+									"    pm.expect(vp.ne.lng).to.be.at.least(vp.sw.lng);",
+									"});",
+									"",
+									"console.log('markers:', r.markers.length, '| viewport ne:', JSON.stringify(r.recommended_viewport && r.recommended_viewport.ne));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Empty city — returns empty markers and null viewport",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('markers is empty array for unknown city', function () {",
+									"    pm.expect(r.markers).to.be.an('array').that.is.empty;",
+									"});",
+									"",
+									"pm.test('recommended_viewport is null when no markers', function () {",
+									"    pm.expect(r.recommended_viewport).to.be.null;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Nowhere&country_code=PE",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Nowhere" },
+								{ "key": "country_code", "value": "PE" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Missing country_code — returns 400 envelope error",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 422 (FastAPI missing required param)', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([400, 422]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Invalid country_code (3 chars) — returns 400 envelope error",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+									"",
+									"const r = pm.response.json();",
+									"pm.test('Response has envelope detail with code', function () {",
+									"    pm.expect(r).to.have.property('detail');",
+									"    pm.expect(r.detail).to.have.property('code');",
+									"    pm.expect(r.detail.code).to.include('validation');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=XYZ",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "XYZ" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Unauthorized — no token returns 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" }
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}
