@@ -658,6 +658,9 @@ class CityDTO(BaseModel):
     is_served: bool = False
     is_archived: bool = False
     status: Status
+    centroid_lat: float | None = None
+    centroid_lng: float | None = None
+    centroid_computed_at: datetime | None = None
     created_date: datetime
     created_by: UUID | None = None
     modified_by: UUID
