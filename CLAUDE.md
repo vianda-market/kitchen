@@ -40,7 +40,7 @@ Write a migration in `app/db/migrations/NNNN_description.sql`, then update `sche
 
 `migration` → `schema.sql` → `trigger.sql` → `seed/reference_data.sql` (if needed) → `app/dto/models.py` → `app/schemas/consolidated_schemas.py`
 
-Apply with `bash app/db/migrate.sh`. Full rebuild (`build_kitchen_db.sh`) is for fresh environments only — never use it on a database with test data you want to keep.
+Apply with `bash app/db/migrate.sh`. Full rebuild for fresh environments: `bash app/db/build_kitchen_db.sh` (primitive — schema only) or `bash app/db/build_dev_db.sh` (dev wrapper — primitive + demo_baseline + 900 seed). Never use either on a database with test data you want to keep. The GH Actions workflow `db-reset-dev.yml` runs `build_dev_db.sh --target=gcp-dev` against the dev Cloud SQL via IAP tunnel.
 
 - History tables (`audit.*`) must mirror their main table — triggers must INSERT the new column.
 - DTOs define which fields CRUDService writes — **missing field in DTO = silently dropped on insert**.
@@ -145,7 +145,7 @@ Worktree DB creation is via Postgres TEMPLATE clone (~1-2 seconds, not a full re
 - **DB files:** `app/db/schema.sql`, `trigger.sql`, `index.sql`
 - **Migrations:** `app/db/migrations/`
 - **Seed data:** `app/db/seed/reference_data.sql` (all envs), `app/db/seed/dev_fixtures.sql` (dev only)
-- **DB scripts:** `app/db/migrate.sh` (incremental), `app/db/build_kitchen_db.sh` (full rebuild)
+- **DB scripts:** `app/db/migrate.sh` (incremental), `app/db/build_kitchen_db.sh` (primitive: schema + reference + dev fixtures), `app/db/build_dev_db.sh` (dev wrapper: primitive + demo_baseline + Newman 900 seed via `load_demo_data.sh`)
 
 ---
 
