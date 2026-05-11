@@ -345,20 +345,23 @@ echo "→ search_path set on database ${DB_NAME}"
 
 if [ "${SKIP_PYTEST:-0}" != "1" ]; then
   if [ -f "venv/bin/activate" ]; then
-    _VENV="venv/bin/activate"
-  elif [ -f ".venv/bin/activate" ]; then
-    _VENV=".venv/bin/activate"
-  else
-    _VENV=""
-  fi
-  if [ -n "${_VENV}" ]; then
     echo "→ Running database tests with pytest…"
     # shellcheck source=/dev/null
-    source "${_VENV}"
+    source venv/bin/activate
     export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
     pytest app/tests/database/ -v --tb=short
+  elif [ -f ".venv/bin/activate" ]; then
+    echo "→ Running database tests with pytest…"
+    # shellcheck source=/dev/null
+    source .venv/bin/activate
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
+    pytest app/tests/database/ -v --tb=short
+  elif python3 -c "import pytest" 2>/dev/null; then
+    echo "→ Running database tests with system python3 (no venv found, deps importable)"
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
+    python3 -m pytest app/tests/database/ -v --tb=short
   else
-    echo "⚠️  Skipping pytest - venv not found. Set SKIP_PYTEST=1 to silence this, or create a venv."
+    echo "⚠️  Skipping pytest — neither venv nor system python3 has the required deps. Set SKIP_PYTEST=1 to silence, or create a venv."
   fi
 else
   echo "→ Skipping pytest (SKIP_PYTEST=1)"
@@ -388,21 +391,26 @@ fi
 
 if [ "${SKIP_POST_REBUILD_SYNC:-0}" != "1" ]; then
   if [ -f "venv/bin/activate" ]; then
-    _SYNC_VENV="venv/bin/activate"
-  elif [ -f ".venv/bin/activate" ]; then
-    _SYNC_VENV=".venv/bin/activate"
-  else
-    _SYNC_VENV=""
-  fi
-  if [ -n "${_SYNC_VENV}" ]; then
     echo "→ Post-rebuild external sync (FX + holidays)…"
     # shellcheck source=/dev/null
-    source "${_SYNC_VENV}"
+    source venv/bin/activate
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE DB_SSLMODE
+    export PYTHONPATH=.
+    python3 app/db/post_rebuild_external_sync.py
+  elif [ -f ".venv/bin/activate" ]; then
+    echo "→ Post-rebuild external sync (FX + holidays)…"
+    # shellcheck source=/dev/null
+    source .venv/bin/activate
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE DB_SSLMODE
+    export PYTHONPATH=.
+    python3 app/db/post_rebuild_external_sync.py
+  elif python3 -c "import httpx" 2>/dev/null; then
+    echo "→ Running post-rebuild sync with system python3 (no venv found, deps importable)"
     export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE DB_SSLMODE
     export PYTHONPATH=.
     python3 app/db/post_rebuild_external_sync.py
   else
-    echo "⚠️  Skipping post-rebuild sync - venv not found. Set SKIP_POST_REBUILD_SYNC=1 to silence, or create a venv."
+    echo "⚠️  Skipping post-rebuild sync — neither venv nor system python3 has the required deps. Set SKIP_POST_REBUILD_SYNC=1 to silence, or create a venv."
   fi
 else
   echo "→ Skipping post-rebuild sync (SKIP_POST_REBUILD_SYNC=1)"
@@ -414,23 +422,32 @@ fi
 #   MAPBOX_CACHE_MODE=record PYTHONPATH=. python3 scripts/backfill_mapbox_geocoding.py
 if [ "${SKIP_GEOCODE_BACKFILL:-0}" != "1" ]; then
   if [ -f "venv/bin/activate" ]; then
-    _BF_VENV="venv/bin/activate"
-  elif [ -f ".venv/bin/activate" ]; then
-    _BF_VENV=".venv/bin/activate"
-  else
-    _BF_VENV=""
-  fi
-  if [ -n "${_BF_VENV}" ]; then
     echo "→ Backfilling Mapbox geocoding from cache (replay_only, zero API calls)…"
     # shellcheck source=/dev/null
-    source "${_BF_VENV}"
+    source venv/bin/activate
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
+    export KITCHEN_DB_NAME="${_EFFECTIVE_DB_NAME}"
+    export MAPBOX_CACHE_MODE=replay_only
+    export PYTHONPATH=.
+    python3 scripts/backfill_mapbox_geocoding.py
+  elif [ -f ".venv/bin/activate" ]; then
+    echo "→ Backfilling Mapbox geocoding from cache (replay_only, zero API calls)…"
+    # shellcheck source=/dev/null
+    source .venv/bin/activate
+    export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
+    export KITCHEN_DB_NAME="${_EFFECTIVE_DB_NAME}"
+    export MAPBOX_CACHE_MODE=replay_only
+    export PYTHONPATH=.
+    python3 scripts/backfill_mapbox_geocoding.py
+  elif python3 -c "import psycopg2" 2>/dev/null; then
+    echo "→ Running geocode backfill with system python3 (no venv found, deps importable)"
     export DB_HOST DB_PORT DB_NAME DB_USER PGPASSWORD PGSSLMODE
     export KITCHEN_DB_NAME="${_EFFECTIVE_DB_NAME}"
     export MAPBOX_CACHE_MODE=replay_only
     export PYTHONPATH=.
     python3 scripts/backfill_mapbox_geocoding.py
   else
-    echo "⚠️  Skipping geocode backfill - venv not found. Set SKIP_GEOCODE_BACKFILL=1 to silence, or create a venv."
+    echo "⚠️  Skipping geocode backfill — neither venv nor system python3 has the required deps. Set SKIP_GEOCODE_BACKFILL=1 to silence, or create a venv."
   fi
 else
   echo "→ Skipping geocode backfill (SKIP_GEOCODE_BACKFILL=1)"
