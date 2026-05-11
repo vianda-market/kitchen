@@ -37,6 +37,12 @@ from app.utils.pagination import PaginatedList
 # Tables that use resolved_by/resolved_date instead of modified_by/modified_date (no created_by)
 TABLES_WITHOUT_MODIFIED_BY = ("discretionary_resolution_info",)
 TABLES_WITHOUT_MODIFIED_DATE = ("discretionary_resolution_info",)
+# Extension tables (1:1 PK FK to parent) that have no is_archived column
+TABLES_WITHOUT_IS_ARCHIVED = (
+    "supplier_invoice_ar",
+    "supplier_invoice_pe",
+    "supplier_invoice_us",
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -399,7 +405,9 @@ class CRUDService(Generic[T]):
                     result = db_read(query, tuple(values), connection=db, fetch_one=True)
                 else:
                     # Direct column scoping
-                    conditions = [f"{self.id_column} = %s", "is_archived = FALSE"]
+                    conditions = [f"{self.id_column} = %s"]
+                    if self.table_name not in TABLES_WITHOUT_IS_ARCHIVED:
+                        conditions.append("is_archived = FALSE")
                     values = [str(record_id)]
                     if scope and not scope.is_global and self.institution_column and scope.institution_id:
                         conditions.append(f"{self.institution_column} = %s")
