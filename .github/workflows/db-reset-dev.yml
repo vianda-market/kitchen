@@ -2,9 +2,10 @@ name: Rebuild Dev DB + Demo Data
 
 # DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema, then
 # loads the full demo-day dataset (Layer A SQL + Newman 900 collection via
-# Stripe sandbox + billing backfill), geocodes restaurant coordinates from the
-# committed Mapbox cache (replay_only, zero API calls), and syncs FX rates +
-# national holidays from public APIs (open.er-api.com, date.nager.at).
+# Stripe sandbox + billing backfill). build_kitchen_db.sh then geocodes
+# restaurant coordinates from the committed Mapbox cache (replay_only, zero
+# API calls) and syncs FX rates + national holidays from public APIs
+# (open.er-api.com, date.nager.at) via its system-python3 fallback path.
 #
 # Dev data is disposable; never run against staging or prod.
 #
@@ -108,10 +109,8 @@ jobs:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           # Skip pytest in CI — it requires a locally running API server and is
           # covered by the separate ci.yml gate. Post-rebuild sync and geocode
-          # backfill are enabled: sync hits public APIs (no auth required) and
-          # geocode backfill uses the committed Mapbox cache (replay_only mode,
-          # zero Mapbox API calls). Both run at the end of this step while the
-          # IAP tunnel + PGPASSWORD are still in scope.
+          # backfill run inside build_kitchen_db.sh via its system-python3 fallback
+          # (pip install above populates system Python with requirements.txt deps).
           SKIP_PYTEST: "1"
         run: |
           gcloud compute ssh vianda-dev-bastion \
@@ -131,31 +130,7 @@ jobs:
             IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
             KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
             STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
-            SKIP_POST_REBUILD_SYNC=1 \
-            SKIP_GEOCODE_BACKFILL=1 \
             bash app/db/build_dev_db.sh --target=gcp-dev
-
-          # ── Post-rebuild sync: FX rates + national holidays from public APIs.
-          # Runs directly (not via venv) since pip install above populates the
-          # system Python. Both endpoints are public; the script self-guards if
-          # either is unreachable (logs warning, continues). Non-blocking.
-          echo "→ Post-rebuild external sync (FX rates + national holidays)..."
-          DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
-            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" \
-            PYTHONPATH=. \
-            python3 app/db/post_rebuild_external_sync.py
-
-          # ── Geocode backfill: restores restaurant coordinates from the
-          # committed Mapbox cache (seeds/mapbox_geocode_cache.json).
-          # MAPBOX_CACHE_MODE=replay_only — zero live Mapbox API calls.
-          # Cache misses are logged and skipped (non-blocking).
-          echo "→ Backfilling Mapbox geocoding from committed cache (replay_only)..."
-          DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
-            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" \
-            KITCHEN_DB_NAME=kitchen \
-            MAPBOX_CACHE_MODE=replay_only \
-            PYTHONPATH=. \
-            python3 scripts/backfill_mapbox_geocoding.py
 
       # ── Upload demo credentials as an artifact so the demo admin password
       # can be retrieved without grepping the workflow log.
