@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "market-readiness-k123",
     "name": "019 MARKET_READINESS",
-    "description": "Kitchen #123 Option B — Verifies the computed is_ready_for_signup field on admin market enriched endpoints.\n\nTests:\n  1. Login as super admin to obtain auth token.\n  2. GET /api/v1/admin/markets/enriched — all markets have is_ready_for_signup as bool (not null).\n  3. Find a market with is_ready_for_signup=true and verify it has status=active.\n  4. Find a market with is_ready_for_signup=false (inactive or missing prerequisites) — assert false.\n  5. GET /api/v1/admin/markets/enriched/{market_id} — single market also returns is_ready_for_signup as bool.\n  6. GET /api/v1/admin/markets (plain, non-enriched) — is_ready_for_signup is null (not computed).\n  7. GET /api/v1/leads/markets — public endpoint returns NO is_ready_for_signup field (field absent or null) and still filters to only ready markets.\n\nPre-requisite: at least one market must exist in the DB (seeded via reference_data.sql).",
+    "description": "Kitchen #123 Option B — Verifies the computed is_ready_for_signup field on admin market enriched endpoints.\n\nTests:\n  1. Login as super admin to obtain auth token.\n  2. GET /api/v1/markets/enriched — all markets have is_ready_for_signup as bool (not null).\n  3. Find a market with is_ready_for_signup=true and verify it has status=active.\n  4. Find a market with is_ready_for_signup=false (inactive or missing prerequisites) — assert false.\n  5. GET /api/v1/markets/enriched/{market_id} — single market also returns is_ready_for_signup as bool.\n  6. GET /api/v1/markets (plain, non-enriched) — is_ready_for_signup is null (not computed).\n  7. GET /api/v1/leads/markets — public endpoint returns NO is_ready_for_signup field (field absent or null) and still filters to only ready markets.\n\nPre-requisite: at least one market must exist in the DB (seeded via reference_data.sql).",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "variable": [
@@ -34,7 +34,7 @@
         "body": {
           "mode": "urlencoded",
           "urlencoded": [
-            {"key": "username", "value": "{{superAdminEmail}}"},
+            {"key": "username", "value": "{{superAdminUsername}}"},
             {"key": "password", "value": "{{superAdminPassword}}"}
           ]
         },
@@ -73,7 +73,7 @@
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
-        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+        "url": "{{baseUrl}}/api/v1/markets/enriched"
       }
     },
     {
@@ -101,7 +101,7 @@
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
-        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+        "url": "{{baseUrl}}/api/v1/markets/enriched"
       }
     },
     {
@@ -129,7 +129,7 @@
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
-        "url": "{{baseUrl}}/api/v1/admin/markets/enriched"
+        "url": "{{baseUrl}}/api/v1/markets/enriched"
       }
     },
     {
@@ -155,7 +155,7 @@
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
-        "url": "{{baseUrl}}/api/v1/admin/markets/enriched/{{enrichedMarketId}}"
+        "url": "{{baseUrl}}/api/v1/markets/enriched/{{enrichedMarketId}}"
       }
     },
     {
@@ -182,7 +182,7 @@
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{superAdminAuthToken}}"}],
-        "url": "{{baseUrl}}/api/v1/admin/markets"
+        "url": "{{baseUrl}}/api/v1/markets"
       }
     },
     {

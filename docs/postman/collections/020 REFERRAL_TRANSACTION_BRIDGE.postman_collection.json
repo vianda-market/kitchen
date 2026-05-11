@@ -19,7 +19,8 @@
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "pm.test(\"Has access_token\", () => pm.expect(r).to.have.property('access_token'));",
-                  "pm.collectionVariables.set(\"superAdminToken\", r.access_token);"
+                  "pm.collectionVariables.set(\"superAdminToken\", r.access_token);",
+                  "pm.collectionVariables.set('testMarketId', '00000000-0000-0000-0000-000000000002');"
                 ],
                 "type": "text/javascript"
               }
