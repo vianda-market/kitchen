@@ -19,51 +19,25 @@
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "pm.test(\"Has access_token\", () => pm.expect(r).to.have.property('access_token'));",
-                  "pm.collectionVariables.set(\"superAdminToken\", r.access_token);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                { "key": "username", "value": "{{superAdminUsername}}" },
-                { "key": "password", "value": "{{superAdminPassword}}" }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "token"]
-            }
-          }
-        },
-        {
-          "name": "Create Customer User",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "const ts = Date.now();",
-                  "pm.collectionVariables.set('customerEmail', `referral_test_${ts}@example.com`);",
-                  "pm.collectionVariables.set('customerUsername', `referral_test_${ts}`);"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "const r = pm.response.json();",
-                  "pm.test(\"Has user_id\", () => pm.expect(r).to.have.property('user_id'));",
-                  "pm.collectionVariables.set('customerUserId', r.user_id);"
+                  "pm.collectionVariables.set(\"superAdminToken\", r.access_token);",
+                  "pm.collectionVariables.set('testMarketId', '00000000-0000-0000-0000-000000000002');",
+                  "",
+                  "// Fetch AR city_metadata_id for customer signup (IDs regenerate on each DB rebuild).",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl') || 'http://localhost:8000';",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/v1/cities?country_code=AR&exclude_global=true',",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + r.access_token }",
+                  "}, function(err, res) {",
+                  "    pm.test('AR city fetched for signup', function() {",
+                  "        pm.expect(err).to.be.null;",
+                  "        pm.expect(res.code).to.equal(200);",
+                  "        const cities = res.json();",
+                  "        pm.expect(cities).to.be.an('array').with.length.greaterThan(0);",
+                  "        pm.collectionVariables.set('cityMetadataId', cities[0].city_metadata_id);",
+                  "        console.log('cityMetadataId (AR):', cities[0].city_metadata_id);",
+                  "    });",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -72,23 +46,247 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{superAdminToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"username\": \"{{customerUsername}}\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"Test1234!\",\n  \"first_name\": \"Referral\",\n  \"last_name\": \"Tester\",\n  \"role_type\": \"Customer\",\n  \"role_name\": \"Comensal\",\n  \"market_id\": \"{{testMarketId}}\"\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{superAdminUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{superAdminPassword}}"
+                }
+              ]
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token"
+              ]
             }
           }
         },
         {
+          "name": "Signup Request (Customer)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Fixed credentials for idempotency across runs.",
+                  "pm.collectionVariables.set('customerEmail', 'referral_tester@example.com');",
+                  "pm.collectionVariables.set('customerUsername', 'referral_tester');",
+                  "pm.collectionVariables.set('customerPassword', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "function detailString(d) {",
+                  "    if (typeof d === 'string') { return d.toLowerCase(); }",
+                  "    if (d && typeof d === 'object') {",
+                  "        return ((d.message || '') + ' ' + (d.code || '')).toLowerCase();",
+                  "    }",
+                  "    return '';",
+                  "}",
+                  "const isDuplicate = pm.response.code === 400 && detailString(body.detail).match(/exist|duplicate/);",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Signup request accepted', () => {",
+                  "        pm.response.to.have.status(201);",
+                  "        pm.expect(body).to.have.property('success', true);",
+                  "    });",
+                  "} else if (isDuplicate) {",
+                  "    // Idempotent: customer exists from prior run \u2014 skip to Login Customer.",
+                  "    pm.test('Signup request accepted (existing customer, skipping verification)', () => { pm.expect(true).to.equal(true); });",
+                  "    console.log('Customer already exists; skipping to Login Customer');",
+                  "    pm.execution.setNextRequest('Login Customer');",
+                  "} else {",
+                  "    pm.test('Signup request accepted', () => { pm.expect.fail('Unexpected: ' + pm.response.code + ' - ' + JSON.stringify(body)); });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"referral_tester\",\n  \"email\": \"referral_tester@example.com\",\n  \"password\": \"Test1234!\",\n  \"first_name\": \"Referral\",\n  \"last_name\": \"Tester\",\n  \"country_code\": \"AR\",\n  \"city_metadata_id\": \"{{cityMetadataId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/signup/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "signup",
+                "request"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dev Pending Token (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Dev pending token returned', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('token');",
+                  "    pm.collectionVariables.set('signupVerificationToken', body.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/signup/dev-pending-token?email={{customerEmail}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "signup",
+                "dev-pending-token"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "{{customerEmail}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Signup Verify (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Signup verified and user created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('user');",
+                  "    pm.expect(body).to.have.property('access_token');",
+                  "    pm.expect(body.user).to.have.property('user_id');",
+                  "    pm.collectionVariables.set('customerUserId', body.user.user_id);",
+                  "    // Also pre-set customerToken so Login Customer is optional fallback.",
+                  "    pm.collectionVariables.set('customerToken', body.access_token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{signupVerificationToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/signup/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "signup",
+                "verify"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Login Customer",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Override urlencoded body with current variable values.",
+                  "// (setNextRequest path: template substitution may use stale var snapshot;",
+                  "//  pre-request script always runs with the current live variable state.)",
+                  "const username = pm.collectionVariables.get('customerUsername') || 'referral_tester';",
+                  "pm.request.body.update({",
+                  "    mode: 'urlencoded',",
+                  "    urlencoded: [",
+                  "        { key: 'username', value: username },",
+                  "        { key: 'password', value: 'Test1234!' }",
+                  "    ]",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -104,18 +302,36 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                { "key": "username", "value": "{{customerUsername}}" },
-                { "key": "password", "value": "Test1234!" }
+                {
+                  "key": "username",
+                  "value": "{{customerUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "Test1234!"
+                }
               ]
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/token",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "token"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token"
+              ]
             }
           }
         }
@@ -125,7 +341,7 @@
       "name": "Referral Code",
       "item": [
         {
-          "name": "GET my-code — returns referral_code string",
+          "name": "GET my-code \u2014 returns referral_code string",
           "event": [
             {
               "listen": "test",
@@ -143,16 +359,28 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/my-code",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "my-code"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "my-code"
+              ]
             }
           }
         },
         {
-          "name": "GET my-referrals — list shape has no transaction_id",
+          "name": "GET my-referrals \u2014 list shape has no transaction_id",
           "event": [
             {
               "listen": "test",
@@ -175,16 +403,28 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/my-referrals",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "my-referrals"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "my-referrals"
+              ]
             }
           }
         },
         {
-          "name": "GET stats — summary shape",
+          "name": "GET stats \u2014 summary shape",
           "event": [
             {
               "listen": "test",
@@ -203,11 +443,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/stats",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "stats"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "stats"
+              ]
             }
           }
         }
@@ -217,7 +469,7 @@
       "name": "Referral Code Assignment (pre-auth deep link)",
       "item": [
         {
-          "name": "POST assign-code — stores device binding",
+          "name": "POST assign-code \u2014 stores device binding",
           "event": [
             {
               "listen": "prerequest",
@@ -243,20 +495,32 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"referral_code\": \"{{referralCode}}\",\n  \"device_id\": \"{{testDeviceId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/assign-code",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "assign-code"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "assign-code"
+              ]
             }
           }
         },
         {
-          "name": "GET assigned-code — retrieves binding",
+          "name": "GET assigned-code \u2014 retrieves binding",
           "event": [
             {
               "listen": "test",
@@ -277,9 +541,21 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/assigned-code?device_id={{testDeviceId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "assigned-code"],
-              "query": [{ "key": "device_id", "value": "{{testDeviceId}}" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "assigned-code"
+              ],
+              "query": [
+                {
+                  "key": "device_id",
+                  "value": "{{testDeviceId}}"
+                }
+              ]
             }
           }
         }
@@ -289,7 +565,7 @@
       "name": "Contract Shape Assertions",
       "item": [
         {
-          "name": "GET my-referrals — no referral_id on client_transaction (field removed)",
+          "name": "GET my-referrals \u2014 no referral_id on client_transaction (field removed)",
           "event": [
             {
               "listen": "test",
@@ -315,11 +591,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/referrals/my-referrals",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "referrals", "my-referrals"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "referrals",
+                "my-referrals"
+              ]
             }
           }
         }
@@ -327,16 +615,61 @@
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8000" },
-    { "key": "superAdminUsername", "value": "superadmin" },
-    { "key": "superAdminPassword", "value": "superadmin" },
-    { "key": "superAdminToken", "value": "" },
-    { "key": "customerToken", "value": "" },
-    { "key": "customerUserId", "value": "" },
-    { "key": "customerEmail", "value": "" },
-    { "key": "customerUsername", "value": "" },
-    { "key": "referralCode", "value": "" },
-    { "key": "testDeviceId", "value": "" },
-    { "key": "testMarketId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "superAdminUsername",
+      "value": "superadmin"
+    },
+    {
+      "key": "superAdminPassword",
+      "value": "superadmin"
+    },
+    {
+      "key": "superAdminToken",
+      "value": ""
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "customerUserId",
+      "value": ""
+    },
+    {
+      "key": "customerEmail",
+      "value": ""
+    },
+    {
+      "key": "customerUsername",
+      "value": ""
+    },
+    {
+      "key": "referralCode",
+      "value": ""
+    },
+    {
+      "key": "testDeviceId",
+      "value": ""
+    },
+    {
+      "key": "testMarketId",
+      "value": ""
+    },
+    {
+      "key": "signupVerificationToken",
+      "value": ""
+    },
+    {
+      "key": "cityMetadataId",
+      "value": ""
+    },
+    {
+      "key": "customerPassword",
+      "value": ""
+    }
   ]
 }

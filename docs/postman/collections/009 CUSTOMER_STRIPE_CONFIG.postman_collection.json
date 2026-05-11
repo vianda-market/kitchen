@@ -270,7 +270,7 @@
                 "value": "Bearer {{customerAuthToken}}"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods{{paymentMethodId}}/default"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}/default"
           }
         },
         {
@@ -311,7 +311,7 @@
                 "value": "Bearer {{customerAuthToken}}"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/customer/payment-methods{{paymentMethodId}}"
+            "url": "{{baseUrl}}/api/v1/customer/payment-methods/{{paymentMethodId}}"
           }
         },
         {

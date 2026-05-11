@@ -120,7 +120,7 @@
                   "    pm.globals.set('username', 'admin');",
                   "    pm.globals.set('password', 'Admin123!');",
                   "    console.log('Admin user created: user_id=', r.user_id);",
-                  "} else if (pm.response.code === 400 && body.detail && (body.detail + '').toLowerCase().includes('exist')) {",
+                  "} else if (pm.response.code === 400 && body.detail && body.detail.code === 'user.duplicate_username') {",
                   "    // Idempotent fallback: admin user already exists from prior run. Look it up by username.",
                   "    const token = pm.collectionVariables.get('superAdminAuthToken') || pm.environment.get('superAdminAuthToken');",
                   "    const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl') || 'http://localhost:8000';",
