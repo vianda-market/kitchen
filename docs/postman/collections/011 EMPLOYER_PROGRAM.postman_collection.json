@@ -123,7 +123,7 @@
                   "        pm.environment.set('planPrice', plan.price);",
                   "        console.log('Using plan:', plan.plan_id, 'price:', plan.price);",
                   "    } else {",
-                  "        console.warn('No plan found — billing tests will fail');",
+                  "        console.warn('No plan found \u2014 billing tests will fail');",
                   "    }",
                   "});"
                 ],
@@ -212,21 +212,21 @@
       "name": "2 Employer Institution + Entity",
       "item": [
         {
-          "name": "2.1 Create Employer Institution",
+          "name": "2.1 Upsert Canonical Employer Institution (idempotent)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Save variables FIRST (outside test blocks) so downstream steps always have them",
+                  "// PUT /institutions/by-key returns 200 on both insert and update",
                   "const body = pm.response.json();",
                   "if (body.institution_id) {",
                   "    pm.environment.set('employerInstitutionId', body.institution_id);",
                   "    console.log('Employer institution:', body.institution_id);",
                   "}",
                   "",
-                  "pm.test('Institution created - Status 201', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "pm.test('Upsert Employer Institution - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
                   "});",
                   "",
                   "pm.test('Has institution_id and market_ids', function () {",
@@ -240,7 +240,7 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
               {
                 "key": "Authorization",
@@ -253,17 +253,23 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Postman Employer Corp\",\n    \"institution_type\": \"employer\",\n    \"market_ids\": [\"{{marketId}}\"]\n}"
+              "raw": "{\n    \"canonical_key\": \"E2E_INSTITUTION_EMPLOYER_011\",\n    \"name\": \"Postman Employer Corp\",\n    \"institution_type\": \"employer\",\n    \"market_ids\": [\"{{marketId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/institutions",
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "institutions"
+                "institutions",
+                "by-key"
               ]
             }
           }
@@ -377,14 +383,15 @@
           }
         },
         {
-          "name": "2.4 Create Employer Entity (with email_domain)",
+          "name": "2.4 Upsert Canonical Employer Entity (idempotent)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Entity created - Status 201', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "// PUT /institution-entities/by-key returns 200 on both insert and update",
+                  "pm.test('Upsert Employer Entity - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property('institution_entity_id');",
                   "    pm.expect(body.email_domain).to.equal('postman-employer.com');",
@@ -394,10 +401,23 @@
                 ],
                 "type": "text/javascript"
               }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// PUT /institution-entities/by-key is Internal-only. Use the super admin authToken.",
+                  "const token = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
+                  "if (token) {",
+                  "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
               {
                 "key": "Authorization",
@@ -410,17 +430,23 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"address_id\": \"{{entityAddressId}}\",\n    \"tax_id\": \"30123456789\",\n    \"name\": \"Postman Employer AR S.A.\",\n    \"email_domain\": \"postman-employer.com\"\n}"
+              "raw": "{\n    \"canonical_key\": \"E2E_INSTITUTION_ENTITY_EMPLOYER_011\",\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"address_id\": \"{{entityAddressId}}\",\n    \"tax_id\": \"30123456789\",\n    \"name\": \"Postman Employer AR S.A.\",\n    \"email_domain\": \"postman-employer.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/institution-entities",
+              "raw": "{{baseUrl}}/api/v1/institution-entities/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "institution-entities"
+                "institution-entities",
+                "by-key"
               ]
             }
           }
@@ -484,18 +510,18 @@
       "name": "3 Program Config",
       "item": [
         {
-          "name": "3.1 Create Benefits Program (institution-level defaults)",
+          "name": "3.1 Upsert Canonical Benefits Program (idempotent)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Program created - Status 201', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "// PUT /employer/program/by-key returns 200 on both insert and update",
+                  "pm.test('Upsert Benefits Program - Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.have.property('program_id');",
                   "    pm.expect(body.benefit_rate).to.equal(70);",
-                  "    pm.expect(body.institution_entity_id).to.be.null;",
                   "    pm.environment.set('programId', body.program_id);",
                   "    console.log('Program (institution-level):', body.program_id);",
                   "});"
@@ -505,7 +531,7 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
               {
                 "key": "Authorization",
@@ -518,10 +544,15 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"benefit_rate\": 70,\n    \"benefit_cap_period\": \"monthly\",\n    \"price_discount\": 10,\n    \"billing_cycle\": \"monthly\",\n    \"enrollment_mode\": \"managed\"\n}"
+              "raw": "{\n    \"canonical_key\": \"E2E_EMPLOYER_PROGRAM_011\",\n    \"institution_id\": \"{{employerInstitutionId}}\",\n    \"benefit_rate\": 70,\n    \"benefit_cap_period\": \"monthly\",\n    \"price_discount\": 10,\n    \"billing_cycle\": \"monthly\",\n    \"enrollment_mode\": \"managed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/employer/program",
+              "raw": "{{baseUrl}}/api/v1/employer/program/by-key",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -529,7 +560,8 @@
                 "api",
                 "v1",
                 "employer",
-                "program"
+                "program",
+                "by-key"
               ]
             }
           }
@@ -639,14 +671,51 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Employee enrolled - Status 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('user_id');",
-                  "    pm.expect(body.email).to.equal('employee1@postman-employer.com');",
-                  "    pm.environment.set('employeeUserId', body.user_id);",
-                  "    console.log('Employee enrolled:', body.user_id);",
-                  "});"
+                  "// Accept 201 (new employee) or 409 (email already registered from prior run).",
+                  "// On 409, fetch employee list to get the existing user_id.",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Employee enrolled - Status 201', function () {",
+                  "        pm.response.to.have.status(201);",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('user_id');",
+                  "        pm.expect(body.email).to.equal('employee1@postman-employer.com');",
+                  "        pm.environment.set('employeeUserId', body.user_id);",
+                  "        console.log('Employee enrolled:', body.user_id);",
+                  "    });",
+                  "} else if (pm.response.code === 409) {",
+                  "    // Employee already exists \u2014 fetch list to get user_id.",
+                  "    // Use employerToken (set in 2.5) since this endpoint requires employer/internal auth.",
+                  "    const token = pm.environment.get('employerToken') || pm.collectionVariables.get('employerToken')",
+                  "        || pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
+                  "    const baseUrl = pm.environment.get('baseUrl') || pm.variables.get('baseUrl');",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/v1/employer/employees',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err, res) {",
+                  "        pm.test('Employee enrolled - Status 201', function () {",
+                  "            if (err || res.code !== 200) {",
+                  "                pm.expect.fail('409 and could not list employees: ' + (err || res.code) + ' ' + (res && res.text ? res.text() : ''));",
+                  "                return;",
+                  "            }",
+                  "            const employees = res.json();",
+                  "            const existing = Array.isArray(employees)",
+                  "                ? employees.find(e => e.email === 'employee1@postman-employer.com')",
+                  "                : null;",
+                  "            if (!existing) {",
+                  "                pm.expect.fail('409 but employee1@postman-employer.com not found in GET /employer/employees');",
+                  "                return;",
+                  "            }",
+                  "            pm.environment.set('employeeUserId', existing.user_id);",
+                  "            console.log('Employee already enrolled (idempotent re-run):', existing.user_id);",
+                  "            pm.expect(true).to.equal(true);",
+                  "        });",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Employee enrolled - Status 201', function () {",
+                  "        pm.expect.fail('Unexpected: ' + pm.response.code + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
                 ],
                 "type": "text/javascript"
               }

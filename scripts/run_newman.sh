@@ -36,6 +36,8 @@ SKIPPED_COLLECTIONS=(
     # under kitchen#87 (post-sweep quality-debt cleanup).
     "008"  # ROLE AND FIELD ACCESS — assertion text-matches K7-generalized message
     "010"  # Permissions Testing - Employee-Only Access — same as 008
+    "900"  # DEMO_DAY_SEED — runs only via load_demo_data.sh; needs runtime demo-admin password not in CI env
+    "022"  # MAPS_CITY_PINS — depends on 900's demo data (Lima/PE restaurants); skip until 900 is seeded
 )
 
 is_skipped() {
@@ -51,6 +53,26 @@ export NEWMAN_BASE_URL="$BASE_URL"
 
 if ! command -v newman &>/dev/null; then
     echo "ERROR: newman not found. Install with: npm install -g newman" >&2
+    exit 1
+fi
+
+# Precondition: the API must be running with mock payment providers.
+# Stripe Connect steps in 012 assert strict 200; they return 400 under live
+# provider config. Read the values the API was started with from .env (the
+# canonical env file for this repo). If not mock, abort with a clear message.
+ENV_FILE_LOCAL=".env"
+if [ -f "$ENV_FILE_LOCAL" ]; then
+    _payment=$(grep -E '^PAYMENT_PROVIDER=' "$ENV_FILE_LOCAL" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+    _payout=$(grep -E '^SUPPLIER_PAYOUT_PROVIDER=' "$ENV_FILE_LOCAL" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+else
+    _payment="${PAYMENT_PROVIDER:-}"
+    _payout="${SUPPLIER_PAYOUT_PROVIDER:-}"
+fi
+
+if [ "$_payment" != "mock" ] || [ "$_payout" != "mock" ]; then
+    echo "ERROR: Newman suite requires PAYMENT_PROVIDER=mock and SUPPLIER_PAYOUT_PROVIDER=mock in the API env." >&2
+    echo "       Currently: PAYMENT_PROVIDER=${_payment:-<unset>}, SUPPLIER_PAYOUT_PROVIDER=${_payout:-<unset>}." >&2
+    echo "       Set these in kitchen/.env (or your dev env) and restart the API before re-running." >&2
     exit 1
 fi
 

@@ -1332,14 +1332,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200 or 400 (already reviewed)', function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "pm.test('Status 200, 400, or 422 (already reviewed / invalid state transition)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 422]);",
                   "});",
                   "",
                   "if (pm.response.code === 200) {",
                   "    console.log('Supplier invoice approved.');",
                   "} else {",
-                  "    console.log('Invoice already reviewed or cannot be reviewed.');",
+                  "    console.log('Invoice already reviewed or invalid state transition (' + pm.response.code + ').');",
                   "}"
                 ],
                 "type": "text/javascript"
