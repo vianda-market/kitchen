@@ -382,7 +382,7 @@ Other markets use a default order (street_name, building_number, street_type) if
 | `GET /plates/enriched/` and `GET /plates/enriched/{id}` | `latitude`, `longitude` |
 | `GET /restaurants/by-city` | `lat`, `lng` (per restaurant) |
 
-**B2C map integration:** The B2C app uses `latitude`/`longitude` from the user's selected address (home, work, or other) as `center_lat`/`center_lng` when calling `GET /api/v1/maps/city-snapshot`. See `docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` for the full static map integration guide.
+**B2C map integration:** The B2C app uses `latitude`/`longitude` from the user's selected address (home, work, or other) as `center_lat`/`center_lng` when calling `GET /api/v1/maps/city-snapshot`. See `docs/api/archived/STATIC_MAP_SNAPSHOT_B2C.md` for the archived static map integration guide (dormant since #214).
 
 **URL format** for opening a map link:
 
