@@ -56,3 +56,13 @@ e45c63a4c834ed54e45bc6ce8cd7f470f0669a80:docs/api/shared_client/ENUM_SERVICE_API
 e45c63a4c834ed54e45bc6ce8cd7f470f0669a80:docs/api/shared_client/ENUM_SERVICE_API.md:curl-auth-header:324
 e45c63a4c834ed54e45bc6ce8cd7f470f0669a80:docs/api/shared_client/ENUM_SERVICE_API.md:curl-auth-header:328
 
+# docs/zArchive/ — archived PASSWORD_RECOVERY_CLIENT.md (PR #278); same placeholder
+# `abc123...xyz789` URL-token examples that were allowlisted at the previous
+# docs/api/client/ path. False positive — clearly a doc example, not a real secret.
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:214
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:380
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:381
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1040
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1045
+bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1050
+
