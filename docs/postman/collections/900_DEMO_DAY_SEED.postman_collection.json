@@ -2684,6 +2684,55 @@
           "response": []
         },
         {
+          "name": "Upsert Institution \u2014 Cocina Andina S.A.C. (PE primary supplier, pre-restaurant)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_PE_COCINA_ANDINA\",\n  \"name\": \"Cocina Andina S.A.C.\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000003\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionPe2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionPe2Id', body.institution_id);",
+                  "console.log('PE supplier institution (Cocina Andina):', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "Upsert Restaurant PE \u2014 Sabores del Pacifico",
           "event": [
             {
@@ -2723,7 +2772,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_SABORES\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Sabores del Pacifico\",\n  \"tagline\": \"Cocina peruana de altura en Miraflores\",\n  \"tagline_i18n\": {\n    \"en\": \"Elevated Peruvian cuisine in Miraflores\",\n    \"es\": \"Cocina peruana de altura en Miraflores\"\n  },\n  \"pickup_instructions\": \"Larco Ave side entrance. Pickup counter is on the ground floor to the left.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=Sabores\",\n  \"spotlight_label\": \"Lima's Best\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Lima's Best\",\n    \"es\": \"Lo Mejor de Lima\"\n  },\n  \"member_perks\": [\n    \"Complimentary chicha morada\",\n    \"Weekend ceviche special\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha morada\",\n      \"Weekend ceviche special\"\n    ],\n    \"es\": [\n      \"Chicha morada gratis\",\n      \"Especial de ceviche los fines de semana\"\n    ]\n  },\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_SABORES\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Sabores del Pacifico\",\n  \"tagline\": \"Cocina peruana de altura en Miraflores\",\n  \"tagline_i18n\": {\n    \"en\": \"Elevated Peruvian cuisine in Miraflores\",\n    \"es\": \"Cocina peruana de altura en Miraflores\"\n  },\n  \"pickup_instructions\": \"Larco Ave side entrance. Pickup counter is on the ground floor to the left.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=Sabores\",\n  \"spotlight_label\": \"Lima's Best\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Lima's Best\",\n    \"es\": \"Lo Mejor de Lima\"\n  },\n  \"member_perks\": [\n    \"Complimentary chicha morada\",\n    \"Weekend ceviche special\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha morada\",\n      \"Weekend ceviche special\"\n    ],\n    \"es\": [\n      \"Chicha morada gratis\",\n      \"Especial de ceviche los fines de semana\"\n    ]\n  },\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -2819,7 +2868,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_CEVICHE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Ceviche Clasico\",\n  \"name_i18n\": {\n    \"en\": \"Classic Ceviche\",\n    \"es\": \"Ceviche Clasico\"\n  },\n  \"description\": \"Fresh sea bass marinated in lime, with red onion, cilantro, and leche de tigre.\",\n  \"description_i18n\": {\n    \"en\": \"Fresh sea bass marinated in lime, with red onion, cilantro, and leche de tigre.\",\n    \"es\": \"Corvina fresca marinada en limon, con cebolla morada, cilantro y leche de tigre.\"\n  },\n  \"ingredients\": \"sea bass, lime juice, red onion, cilantro, aji amarillo, sweet potato, cancha\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_CEVICHE\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Ceviche Clasico\",\n  \"name_i18n\": {\n    \"en\": \"Classic Ceviche\",\n    \"es\": \"Ceviche Clasico\"\n  },\n  \"description\": \"Fresh sea bass marinated in lime, with red onion, cilantro, and leche de tigre.\",\n  \"description_i18n\": {\n    \"en\": \"Fresh sea bass marinated in lime, with red onion, cilantro, and leche de tigre.\",\n    \"es\": \"Corvina fresca marinada en limon, con cebolla morada, cilantro y leche de tigre.\"\n  },\n  \"ingredients\": \"sea bass, lime juice, red onion, cilantro, aji amarillo, sweet potato, cancha\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -2861,7 +2910,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_LOMO_SALTADO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Lomo Saltado\",\n  \"name_i18n\": {\n    \"en\": \"Stir-Fried Beef Lomo Saltado\",\n    \"es\": \"Lomo Saltado\"\n  },\n  \"description\": \"Stir-fried beef sirloin with tomato, onion, soy sauce, and french fries, served with white rice.\",\n  \"description_i18n\": {\n    \"en\": \"Stir-fried beef sirloin with tomato, onion, soy sauce.\",\n    \"es\": \"Lomo de res salteado con tomate, cebolla, soya y papas fritas, con arroz blanco.\"\n  },\n  \"ingredients\": \"beef sirloin, tomato, red onion, soy sauce, oyster sauce, french fries, white rice, cilantro\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_LOMO_SALTADO\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Lomo Saltado\",\n  \"name_i18n\": {\n    \"en\": \"Stir-Fried Beef Lomo Saltado\",\n    \"es\": \"Lomo Saltado\"\n  },\n  \"description\": \"Stir-fried beef sirloin with tomato, onion, soy sauce, and french fries, served with white rice.\",\n  \"description_i18n\": {\n    \"en\": \"Stir-fried beef sirloin with tomato, onion, soy sauce.\",\n    \"es\": \"Lomo de res salteado con tomate, cebolla, soya y papas fritas, con arroz blanco.\"\n  },\n  \"ingredients\": \"beef sirloin, tomato, red onion, soy sauce, oyster sauce, french fries, white rice, cilantro\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -2903,7 +2952,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_AJI_GALLINA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Aji de Gallina\",\n  \"name_i18n\": {\n    \"en\": \"Creamy Chicken Aji\",\n    \"es\": \"Aji de Gallina\"\n  },\n  \"description\": \"Shredded chicken in creamy aji amarillo sauce, served with white rice and potatoes.\",\n  \"description_i18n\": {\n    \"en\": \"Shredded chicken in creamy aji amarillo sauce, served with white rice and potatoes.\",\n    \"es\": \"Pollo desmenuzado en crema de aji amarillo, servido con arroz blanco y papas.\"\n  },\n  \"ingredients\": \"chicken breast, aji amarillo, bread, milk, walnuts, parmesan, white rice, potato, egg\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_AJI_GALLINA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Aji de Gallina\",\n  \"name_i18n\": {\n    \"en\": \"Creamy Chicken Aji\",\n    \"es\": \"Aji de Gallina\"\n  },\n  \"description\": \"Shredded chicken in creamy aji amarillo sauce, served with white rice and potatoes.\",\n  \"description_i18n\": {\n    \"en\": \"Shredded chicken in creamy aji amarillo sauce, served with white rice and potatoes.\",\n    \"es\": \"Pollo desmenuzado en crema de aji amarillo, servido con arroz blanco y papas.\"\n  },\n  \"ingredients\": \"chicken breast, aji amarillo, bread, milk, walnuts, parmesan, white rice, potato, egg\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -2945,7 +2994,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_CAUSA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Causa Limena\",\n  \"name_i18n\": {\n    \"en\": \"Causa Limena\",\n    \"es\": \"Causa Limena\"\n  },\n  \"description\": \"Layers of yellow potato mixed with aji amarillo and lime, filled with tuna or chicken.\",\n  \"description_i18n\": {\n    \"en\": \"Layers of yellow potato mixed with aji amarillo and lime, filled with tuna or chicken.\",\n    \"es\": \"Capas de papa amarilla con aji amarillo y limon, rellenas de atun o pollo.\"\n  },\n  \"ingredients\": \"yellow potato, aji amarillo, lime, tuna, avocado, mayonnaise, olives\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_CAUSA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Causa Limena\",\n  \"name_i18n\": {\n    \"en\": \"Causa Limena\",\n    \"es\": \"Causa Limena\"\n  },\n  \"description\": \"Layers of yellow potato mixed with aji amarillo and lime, filled with tuna or chicken.\",\n  \"description_i18n\": {\n    \"en\": \"Layers of yellow potato mixed with aji amarillo and lime, filled with tuna or chicken.\",\n    \"es\": \"Capas de papa amarilla con aji amarillo y limon, rellenas de atun o pollo.\"\n  },\n  \"ingredients\": \"yellow potato, aji amarillo, lime, tuna, avocado, mayonnaise, olives\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -3217,7 +3266,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_DONA_LUCHA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Do\u00f1a Lucha Sangucheria\",\n  \"tagline\": \"Los mejores sanguchitos peruanos en San Isidro\",\n  \"tagline_i18n\": {\n    \"en\": \"Best Peruvian sandwiches in San Isidro\",\n    \"es\": \"Los mejores sanguchitos peruanos en San Isidro\"\n  },\n  \"pickup_instructions\": \"Miguel Dasso 137, ground floor. Pick up at the counter.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonaLucha\",\n  \"spotlight_label\": \"San Isidro Cl\u00e1sico\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"San Isidro Classic\",\n    \"es\": \"San Isidro Cl\u00e1sico\"\n  },\n  \"member_perks\": [\n    \"Chicha morada incluida\",\n    \"Pan reci\u00e9n horneado\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha morada\",\n      \"Freshly baked bread\"\n    ],\n    \"es\": [\n      \"Chicha morada incluida\",\n      \"Pan reci\u00e9n horneado\"\n    ]\n  },\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_DONA_LUCHA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Do\u00f1a Lucha Sangucheria\",\n  \"tagline\": \"Los mejores sanguchitos peruanos en San Isidro\",\n  \"tagline_i18n\": {\n    \"en\": \"Best Peruvian sandwiches in San Isidro\",\n    \"es\": \"Los mejores sanguchitos peruanos en San Isidro\"\n  },\n  \"pickup_instructions\": \"Miguel Dasso 137, ground floor. Pick up at the counter.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonaLucha\",\n  \"spotlight_label\": \"San Isidro Cl\u00e1sico\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"San Isidro Classic\",\n    \"es\": \"San Isidro Cl\u00e1sico\"\n  },\n  \"member_perks\": [\n    \"Chicha morada incluida\",\n    \"Pan reci\u00e9n horneado\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha morada\",\n      \"Freshly baked bread\"\n    ],\n    \"es\": [\n      \"Chicha morada incluida\",\n      \"Pan reci\u00e9n horneado\"\n    ]\n  },\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -3315,7 +3364,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_BUTIFARRA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Butifarra\",\n  \"name_i18n\": {\n    \"en\": \"Butifarra Sandwich\",\n    \"es\": \"Butifarra\"\n  },\n  \"description\": \"S\\u00e1ndwich peruano cl\\u00e1sico con jam\\u00f3n del pa\\u00eds, salsa criolla y aj\\u00ed amarillo en pan batido.\",\n  \"description_i18n\": {\n    \"en\": \"Classic Peruvian sandwich with country ham, criolla sauce, and aji amarillo on soft bread.\",\n    \"es\": \"S\\u00e1ndwich peruano cl\\u00e1sico con jam\\u00f3n del pa\\u00eds, salsa criolla y aj\\u00ed amarillo en pan batido.\"\n  },\n  \"ingredients\": \"pan batido, jam\\u00f3n del pa\\u00eds, cebolla morada, aj\\u00ed amarillo, lim\\u00f3n, perejil\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_BUTIFARRA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Butifarra\",\n  \"name_i18n\": {\n    \"en\": \"Butifarra Sandwich\",\n    \"es\": \"Butifarra\"\n  },\n  \"description\": \"S\\u00e1ndwich peruano cl\\u00e1sico con jam\\u00f3n del pa\\u00eds, salsa criolla y aj\\u00ed amarillo en pan batido.\",\n  \"description_i18n\": {\n    \"en\": \"Classic Peruvian sandwich with country ham, criolla sauce, and aji amarillo on soft bread.\",\n    \"es\": \"S\\u00e1ndwich peruano cl\\u00e1sico con jam\\u00f3n del pa\\u00eds, salsa criolla y aj\\u00ed amarillo en pan batido.\"\n  },\n  \"ingredients\": \"pan batido, jam\\u00f3n del pa\\u00eds, cebolla morada, aj\\u00ed amarillo, lim\\u00f3n, perejil\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -3358,7 +3407,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_PAN_CHICHARRON\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Pan con Chicharr\\u00f3n\",\n  \"name_i18n\": {\n    \"en\": \"Pan con Chicharron\",\n    \"es\": \"Pan con Chicharr\\u00f3n\"\n  },\n  \"description\": \"Chicharr\\u00f3n de cerdo crujiente con camote sancochado y salsa criolla en pan franc\\u00e9s.\",\n  \"description_i18n\": {\n    \"en\": \"Crispy pork chicharron with boiled sweet potato and criolla sauce on French bread.\",\n    \"es\": \"Chicharr\\u00f3n de cerdo crujiente con camote sancochado y salsa criolla en pan franc\\u00e9s.\"\n  },\n  \"ingredients\": \"cerdo, camote, cebolla morada, aj\\u00ed, perejil, pan franc\\u00e9s\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_PAN_CHICHARRON\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Pan con Chicharr\\u00f3n\",\n  \"name_i18n\": {\n    \"en\": \"Pan con Chicharron\",\n    \"es\": \"Pan con Chicharr\\u00f3n\"\n  },\n  \"description\": \"Chicharr\\u00f3n de cerdo crujiente con camote sancochado y salsa criolla en pan franc\\u00e9s.\",\n  \"description_i18n\": {\n    \"en\": \"Crispy pork chicharron with boiled sweet potato and criolla sauce on French bread.\",\n    \"es\": \"Chicharr\\u00f3n de cerdo crujiente con camote sancochado y salsa criolla en pan franc\\u00e9s.\"\n  },\n  \"ingredients\": \"cerdo, camote, cebolla morada, aj\\u00ed, perejil, pan franc\\u00e9s\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -3525,7 +3574,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_ANTICUCHERIA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Anticucher\u00eda Don Tom\u00e1s\",\n  \"tagline\": \"Anticuchos y parrilla peruana desde 1992\",\n  \"tagline_i18n\": {\n    \"en\": \"Peruvian anticuchos and grill since 1992\",\n    \"es\": \"Anticuchos y parrilla peruana desde 1992\"\n  },\n  \"pickup_instructions\": \"Coronel Andr\u00e9s Reyes 218, frente al parque. Pickup al fondo.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonTomas\",\n  \"spotlight_label\": \"Sabor de barrio\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Neighbourhood classic\",\n    \"es\": \"Sabor de barrio\"\n  },\n  \"member_perks\": [\n    \"Porci\u00f3n extra de papa a la huancaina\",\n    \"Cerveza artesanal de bienvenida\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Extra papa a la huancaina\",\n      \"Welcome craft beer\"\n    ],\n    \"es\": [\n      \"Porci\u00f3n extra de papa a la huancaina\",\n      \"Cerveza artesanal de bienvenida\"\n    ]\n  },\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_ANTICUCHERIA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Anticucher\u00eda Don Tom\u00e1s\",\n  \"tagline\": \"Anticuchos y parrilla peruana desde 1992\",\n  \"tagline_i18n\": {\n    \"en\": \"Peruvian anticuchos and grill since 1992\",\n    \"es\": \"Anticuchos y parrilla peruana desde 1992\"\n  },\n  \"pickup_instructions\": \"Coronel Andr\u00e9s Reyes 218, frente al parque. Pickup al fondo.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonTomas\",\n  \"spotlight_label\": \"Sabor de barrio\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Neighbourhood classic\",\n    \"es\": \"Sabor de barrio\"\n  },\n  \"member_perks\": [\n    \"Porci\u00f3n extra de papa a la huancaina\",\n    \"Cerveza artesanal de bienvenida\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Extra papa a la huancaina\",\n      \"Welcome craft beer\"\n    ],\n    \"es\": [\n      \"Porci\u00f3n extra de papa a la huancaina\",\n      \"Cerveza artesanal de bienvenida\"\n    ]\n  },\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -3623,7 +3672,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_ANTICUCHOS\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Anticuchos de Res\",\n  \"name_i18n\": {\n    \"en\": \"Beef Anticuchos\",\n    \"es\": \"Anticuchos de Res\"\n  },\n  \"description\": \"Brochetitas de coraz\\u00f3n de res marinadas en aj\\u00ed panca, servidas con papa y ch\\u00f3clo.\",\n  \"description_i18n\": {\n    \"en\": \"Marinated beef heart skewers with aji panca, served with potato and corn.\",\n    \"es\": \"Brochetitas de coraz\\u00f3n de res marinadas en aj\\u00ed panca, servidas con papa y ch\\u00f3clo.\"\n  },\n  \"ingredients\": \"coraz\\u00f3n de res, aj\\u00ed panca, cumin, vinagre, papa, ch\\u00f3clo, salsa huancaina\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_ANTICUCHOS\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Anticuchos de Res\",\n  \"name_i18n\": {\n    \"en\": \"Beef Anticuchos\",\n    \"es\": \"Anticuchos de Res\"\n  },\n  \"description\": \"Brochetitas de coraz\\u00f3n de res marinadas en aj\\u00ed panca, servidas con papa y ch\\u00f3clo.\",\n  \"description_i18n\": {\n    \"en\": \"Marinated beef heart skewers with aji panca, served with potato and corn.\",\n    \"es\": \"Brochetitas de coraz\\u00f3n de res marinadas en aj\\u00ed panca, servidas con papa y ch\\u00f3clo.\"\n  },\n  \"ingredients\": \"coraz\\u00f3n de res, aj\\u00ed panca, cumin, vinagre, papa, ch\\u00f3clo, salsa huancaina\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -3735,7 +3784,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_TIRADITO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"La Esquina del Tiradito\",\n  \"tagline\": \"Tiraditos y ceviches premium frente al parque\",\n  \"tagline_i18n\": {\n    \"en\": \"Premium tiraditos and ceviche with a park view\",\n    \"es\": \"Tiraditos y ceviches premium frente al parque\"\n  },\n  \"pickup_instructions\": \"Manuel Ba\u00f1\u00f3n 295, entrada lateral. Pickup counter visible desde la puerta.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=Tiradito\",\n  \"spotlight_label\": \"Premium marino\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Premium seafood\",\n    \"es\": \"Premium marino\"\n  },\n  \"member_perks\": [\n    \"Copa de chicha sour de cortesia\",\n    \"Lounge frente al parque\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha sour\",\n      \"Park-view lounge\"\n    ],\n    \"es\": [\n      \"Copa de chicha sour de cortesia\",\n      \"Lounge frente al parque\"\n    ]\n  },\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_TIRADITO\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"La Esquina del Tiradito\",\n  \"tagline\": \"Tiraditos y ceviches premium frente al parque\",\n  \"tagline_i18n\": {\n    \"en\": \"Premium tiraditos and ceviche with a park view\",\n    \"es\": \"Tiraditos y ceviches premium frente al parque\"\n  },\n  \"pickup_instructions\": \"Manuel Ba\u00f1\u00f3n 295, entrada lateral. Pickup counter visible desde la puerta.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=Tiradito\",\n  \"spotlight_label\": \"Premium marino\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Premium seafood\",\n    \"es\": \"Premium marino\"\n  },\n  \"member_perks\": [\n    \"Copa de chicha sour de cortesia\",\n    \"Lounge frente al parque\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Complimentary chicha sour\",\n      \"Park-view lounge\"\n    ],\n    \"es\": [\n      \"Copa de chicha sour de cortesia\",\n      \"Lounge frente al parque\"\n    ]\n  },\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -3833,7 +3882,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_TIRADITO_LENGUADO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Tiradito de Lenguado\",\n  \"name_i18n\": {\n    \"en\": \"Sole Tiradito\",\n    \"es\": \"Tiradito de Lenguado\"\n  },\n  \"description\": \"Finas l\\u00e1minas de lenguado en leche de tigre con aj\\u00ed amarillo, cancha y chips de cebolla.\",\n  \"description_i18n\": {\n    \"en\": \"Thin sole fillets in leche de tigre with aji amarillo, cancha, and crispy onion chips.\",\n    \"es\": \"Finas l\\u00e1minas de lenguado en leche de tigre con aj\\u00ed amarillo, cancha y chips de cebolla.\"\n  },\n  \"ingredients\": \"lenguado, limon, aj\\u00ed amarillo, cebolla, cancha, cilantro, sal\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_TIRADITO_LENGUADO\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Tiradito de Lenguado\",\n  \"name_i18n\": {\n    \"en\": \"Sole Tiradito\",\n    \"es\": \"Tiradito de Lenguado\"\n  },\n  \"description\": \"Finas l\\u00e1minas de lenguado en leche de tigre con aj\\u00ed amarillo, cancha y chips de cebolla.\",\n  \"description_i18n\": {\n    \"en\": \"Thin sole fillets in leche de tigre with aji amarillo, cancha, and crispy onion chips.\",\n    \"es\": \"Finas l\\u00e1minas de lenguado en leche de tigre con aj\\u00ed amarillo, cancha y chips de cebolla.\"\n  },\n  \"ingredients\": \"lenguado, limon, aj\\u00ed amarillo, cebolla, cancha, cilantro, sal\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -3876,7 +3925,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_PULPO_OLIVO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Pulpo al Olivo\",\n  \"name_i18n\": {\n    \"en\": \"Pulpo al Olivo\",\n    \"es\": \"Pulpo al Olivo\"\n  },\n  \"description\": \"Pulpo cocido con mayonesa de aceituna negra, camote amarillo y reducci\\u00f3n de lim\\u00f3n.\",\n  \"description_i18n\": {\n    \"en\": \"Cooked octopus with black olive mayonnaise, yellow sweet potato, and lemon reduction.\",\n    \"es\": \"Pulpo cocido con mayonesa de aceituna negra, camote amarillo y reducci\\u00f3n de lim\\u00f3n.\"\n  },\n  \"ingredients\": \"pulpo, aceituna negra, mayonesa, camote amarillo, limon, rocoto\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_PULPO_OLIVO\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Pulpo al Olivo\",\n  \"name_i18n\": {\n    \"en\": \"Pulpo al Olivo\",\n    \"es\": \"Pulpo al Olivo\"\n  },\n  \"description\": \"Pulpo cocido con mayonesa de aceituna negra, camote amarillo y reducci\\u00f3n de lim\\u00f3n.\",\n  \"description_i18n\": {\n    \"en\": \"Cooked octopus with black olive mayonnaise, yellow sweet potato, and lemon reduction.\",\n    \"es\": \"Pulpo cocido con mayonesa de aceituna negra, camote amarillo y reducci\\u00f3n de lim\\u00f3n.\"\n  },\n  \"ingredients\": \"pulpo, aceituna negra, mayonesa, camote amarillo, limon, rocoto\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -4043,7 +4092,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_POLLOS_BRASA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pollos a la Brasa Don Lucho\",\n  \"tagline\": \"Pollos a la brasa de le\u00f1a, desde hace 20 a\u00f1os en San Isidro\",\n  \"tagline_i18n\": {\n    \"en\": \"Wood-fired rotisserie chicken in San Isidro for 20 years\",\n    \"es\": \"Pollos a la brasa de le\u00f1a, desde hace 20 a\u00f1os en San Isidro\"\n  },\n  \"pickup_instructions\": \"Conquistadores 510, puerta principal. Pickup al ingreso a la derecha.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonLucho\",\n  \"spotlight_label\": \"Le\u00f1a y sabor\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Fire and flavour\",\n    \"es\": \"Le\u00f1a y sabor\"\n  },\n  \"member_perks\": [\n    \"Papa fritas extra incluidas\",\n    \"Salsa criolla y uchucuta\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Extra fries included\",\n      \"Criolla sauce and uchucuta\"\n    ],\n    \"es\": [\n      \"Papa fritas extra incluidas\",\n      \"Salsa criolla y uchucuta\"\n    ]\n  },\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_PE_POLLOS_BRASA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityId}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pollos a la Brasa Don Lucho\",\n  \"tagline\": \"Pollos a la brasa de le\u00f1a, desde hace 20 a\u00f1os en San Isidro\",\n  \"tagline_i18n\": {\n    \"en\": \"Wood-fired rotisserie chicken in San Isidro for 20 years\",\n    \"es\": \"Pollos a la brasa de le\u00f1a, desde hace 20 a\u00f1os en San Isidro\"\n  },\n  \"pickup_instructions\": \"Conquistadores 510, puerta principal. Pickup al ingreso a la derecha.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/c0392b/ffffff?text=DonLucho\",\n  \"spotlight_label\": \"Le\u00f1a y sabor\",\n  \"spotlight_label_i18n\": {\n    \"en\": \"Fire and flavour\",\n    \"es\": \"Le\u00f1a y sabor\"\n  },\n  \"member_perks\": [\n    \"Papa fritas extra incluidas\",\n    \"Salsa criolla y uchucuta\"\n  ],\n  \"member_perks_i18n\": {\n    \"en\": [\n      \"Extra fries included\",\n      \"Criolla sauce and uchucuta\"\n    ],\n    \"es\": [\n      \"Papa fritas extra incluidas\",\n      \"Salsa criolla y uchucuta\"\n    ]\n  },\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -4141,7 +4190,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_POLLO_BRASA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Pollo a la Brasa (cuarto)\",\n  \"name_i18n\": {\n    \"en\": \"Rotisserie Chicken (quarter)\",\n    \"es\": \"Pollo a la Brasa (cuarto)\"\n  },\n  \"description\": \"Cuarto de pollo a la brasa con papas fritas y ensalada.\",\n  \"description_i18n\": {\n    \"en\": \"Quarter rotisserie chicken with fries and salad.\",\n    \"es\": \"Cuarto de pollo a la brasa con papas fritas y ensalada.\"\n  },\n  \"ingredients\": \"pollo, papas, ensalada mixta, salsas uchucuta y criolla\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_PE_POLLO_BRASA\",\n  \"institution_id\": \"{{demoInstitutionPe2Id}}\",\n  \"name\": \"Pollo a la Brasa (cuarto)\",\n  \"name_i18n\": {\n    \"en\": \"Rotisserie Chicken (quarter)\",\n    \"es\": \"Pollo a la Brasa (cuarto)\"\n  },\n  \"description\": \"Cuarto de pollo a la brasa con papas fritas y ensalada.\",\n  \"description_i18n\": {\n    \"en\": \"Quarter rotisserie chicken with fries and salad.\",\n    \"es\": \"Cuarto de pollo a la brasa con papas fritas y ensalada.\"\n  },\n  \"ingredients\": \"pollo, papas, ensalada mixta, salsas uchucuta y criolla\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -16348,6 +16397,55 @@
           "response": []
         },
         {
+          "name": "Upsert Institution \u2014 Cocina de Recoleta S.R.L. (AR primary supplier, pre-restaurant)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_AR_COCINA_RECOLETA\",\n  \"name\": \"Cocina de Recoleta S.R.L.\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000002\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionAr2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionAr2Id', body.institution_id);",
+                  "console.log('AR supplier institution (Cocina de Recoleta):', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "Upsert Restaurant \u2014 Parrilla La Lavalle",
           "event": [
             {
@@ -16387,7 +16485,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_LA_LAVALLE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Parrilla La Lavalle\",\n  \"tagline\": \"La mejor parrilla del microcentro porteno\",\n  \"tagline_i18n\": {\n    \"en\": \"Best grill in Buenos Aires microcentro\",\n    \"es\": \"La mejor parrilla del microcentro porteno\"\n  },\n  \"pickup_instructions\": \"Ingreso por Lavalle. Mostrador de retiro en planta baja.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/a93226/ffffff?text=Parrilla+La+Lavalle\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_LA_LAVALLE\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Parrilla La Lavalle\",\n  \"tagline\": \"La mejor parrilla del microcentro porteno\",\n  \"tagline_i18n\": {\n    \"en\": \"Best grill in Buenos Aires microcentro\",\n    \"es\": \"La mejor parrilla del microcentro porteno\"\n  },\n  \"pickup_instructions\": \"Ingreso por Lavalle. Mostrador de retiro en planta baja.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/a93226/ffffff?text=Parrilla+La+Lavalle\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -16443,7 +16541,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_DON_VICENTE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pizzeria Don Vicente\",\n  \"tagline\": \"Pizza argentina de molde al estilo tradicional\",\n  \"tagline_i18n\": {\n    \"en\": \"Traditional Argentine tray-style pizza\",\n    \"es\": \"Pizza argentina de molde al estilo tradicional\"\n  },\n  \"pickup_instructions\": \"Reconquista, puerta principal. Mostrador al fondo.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/1a5276/ffffff?text=Pizzeria+Don+Vicente\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_DON_VICENTE\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pizzeria Don Vicente\",\n  \"tagline\": \"Pizza argentina de molde al estilo tradicional\",\n  \"tagline_i18n\": {\n    \"en\": \"Traditional Argentine tray-style pizza\",\n    \"es\": \"Pizza argentina de molde al estilo tradicional\"\n  },\n  \"pickup_instructions\": \"Reconquista, puerta principal. Mostrador al fondo.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/1a5276/ffffff?text=Pizzeria+Don+Vicente\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -16499,7 +16597,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_CAFE_DEL_CENTRO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Cafe del Centro\",\n  \"tagline\": \"Cafe y cocina rapida en pleno corazon de Florida\",\n  \"tagline_i18n\": {\n    \"en\": \"Coffee and quick food in the heart of Florida St\",\n    \"es\": \"Cafe y cocina rapida en pleno corazon de Florida\"\n  },\n  \"pickup_instructions\": \"Florida peatonal, planta baja del edificio.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/117a65/ffffff?text=Cafe+del+Centro\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_CAFE_DEL_CENTRO\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Cafe del Centro\",\n  \"tagline\": \"Cafe y cocina rapida en pleno corazon de Florida\",\n  \"tagline_i18n\": {\n    \"en\": \"Coffee and quick food in the heart of Florida St\",\n    \"es\": \"Cafe y cocina rapida en pleno corazon de Florida\"\n  },\n  \"pickup_instructions\": \"Florida peatonal, planta baja del edificio.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/117a65/ffffff?text=Cafe+del+Centro\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -16555,7 +16653,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_BODEGON_SM\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Bodegon San Martin\",\n  \"tagline\": \"Comida casera y bodegon autentico porteno\",\n  \"tagline_i18n\": {\n    \"en\": \"Authentic Buenos Aires home-style comfort food\",\n    \"es\": \"Comida casera y bodegon autentico porteno\"\n  },\n  \"pickup_instructions\": \"San Martin casi Lavalle. Mostrador lateral.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/7d6608/ffffff?text=Bodegon+San+Martin\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_BODEGON_SM\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Bodegon San Martin\",\n  \"tagline\": \"Comida casera y bodegon autentico porteno\",\n  \"tagline_i18n\": {\n    \"en\": \"Authentic Buenos Aires home-style comfort food\",\n    \"es\": \"Comida casera y bodegon autentico porteno\"\n  },\n  \"pickup_instructions\": \"San Martin casi Lavalle. Mostrador lateral.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/7d6608/ffffff?text=Bodegon+San+Martin\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -16611,7 +16709,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_EMPANADAS_FLORIDA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Empanadas de Florida\",\n  \"tagline\": \"Las mejores empanadas del microcentro, fritas y al horno\",\n  \"tagline_i18n\": {\n    \"en\": \"The best empanadas downtown, fried and baked\",\n    \"es\": \"Las mejores empanadas del microcentro, fritas y al horno\"\n  },\n  \"pickup_instructions\": \"25 de Mayo esquina Lavalle. Pedidos en caja.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/6e2f68/ffffff?text=Empanadas+de+Florida\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_AR_EMPANADAS_FLORIDA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdAR}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Empanadas de Florida\",\n  \"tagline\": \"Las mejores empanadas del microcentro, fritas y al horno\",\n  \"tagline_i18n\": {\n    \"en\": \"The best empanadas downtown, fried and baked\",\n    \"es\": \"Las mejores empanadas del microcentro, fritas y al horno\"\n  },\n  \"pickup_instructions\": \"25 de Mayo esquina Lavalle. Pedidos en caja.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/6e2f68/ffffff?text=Empanadas+de+Florida\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -16923,7 +17021,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_MILANESA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Milanesa a la Napolitana\",\n  \"description\": \"Milanesa de ternera con salsa de tomate, jamon y queso gratinado, con papas fritas.\",\n  \"ingredients\": \"ternera, pan rallado, tomate, jamon cocido, queso mozzarella, oregano\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_MILANESA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Milanesa a la Napolitana\",\n  \"description\": \"Milanesa de ternera con salsa de tomate, jamon y queso gratinado, con papas fritas.\",\n  \"ingredients\": \"ternera, pan rallado, tomate, jamon cocido, queso mozzarella, oregano\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -16965,7 +17063,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_ASADO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Asado de Tira con Chimichurri\",\n  \"description\": \"Costillas de res a la parrilla con chimichurri casero y ensalada mixta.\",\n  \"ingredients\": \"tira de asado, aji, perejil, oregano, ajo, vinagre, aceite\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_ASADO\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Asado de Tira con Chimichurri\",\n  \"description\": \"Costillas de res a la parrilla con chimichurri casero y ensalada mixta.\",\n  \"ingredients\": \"tira de asado, aji, perejil, oregano, ajo, vinagre, aceite\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17007,7 +17105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_PIZZA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Pizza Mozzarella\",\n  \"description\": \"Pizza de molde con salsa de tomate y abundante mozzarella.\",\n  \"ingredients\": \"harina, tomate, mozzarella, aceite de oliva, oregano\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_PIZZA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Pizza Mozzarella\",\n  \"description\": \"Pizza de molde con salsa de tomate y abundante mozzarella.\",\n  \"ingredients\": \"harina, tomate, mozzarella, aceite de oliva, oregano\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17049,7 +17147,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_FUGAZZETA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Fugazzeta Rellena\",\n  \"description\": \"Pizza de cebolla con doble mozzarella, la clasica porte\\u00f1a.\",\n  \"ingredients\": \"harina, cebolla, mozzarella, aceite, sal\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_FUGAZZETA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Fugazzeta Rellena\",\n  \"description\": \"Pizza de cebolla con doble mozzarella, la clasica porte\\u00f1a.\",\n  \"ingredients\": \"harina, cebolla, mozzarella, aceite, sal\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17091,7 +17189,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_CHORIPAN\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Choripan con Chimichurri\",\n  \"description\": \"Chorizo parrillero en pan de campo con chimichurri y salsa criolla.\",\n  \"ingredients\": \"chorizo, pan, perejil, ajo, aji, cebolla, tomate, vinagre\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_CHORIPAN\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Choripan con Chimichurri\",\n  \"description\": \"Chorizo parrillero en pan de campo con chimichurri y salsa criolla.\",\n  \"ingredients\": \"chorizo, pan, perejil, ajo, aji, cebolla, tomate, vinagre\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17133,7 +17231,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_PROVOLETA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Provoleta con Oregano\",\n  \"description\": \"Queso provolone a la parrilla con oregano y aceite de oliva.\",\n  \"ingredients\": \"provolone, oregano, aceite de oliva\",\n  \"dietary\": [\n    \"vegetarian\",\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_PROVOLETA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Provoleta con Oregano\",\n  \"description\": \"Queso provolone a la parrilla con oregano y aceite de oliva.\",\n  \"ingredients\": \"provolone, oregano, aceite de oliva\",\n  \"dietary\": [\n    \"vegetarian\",\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17175,7 +17273,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_EMPANADAS\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Empanadas (6 unidades)\",\n  \"description\": \"Seis empanadas mixtas: carne cortada a cuchillo, jamon y queso, y humita.\",\n  \"ingredients\": \"harina, carne vacuna, jamon, queso, choclo, cebolla, pimiento\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_EMPANADAS\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Empanadas (6 unidades)\",\n  \"description\": \"Seis empanadas mixtas: carne cortada a cuchillo, jamon y queso, y humita.\",\n  \"ingredients\": \"harina, carne vacuna, jamon, queso, choclo, cebolla, pimiento\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17217,7 +17315,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_NOQUI\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Noquis del 29 con Tuco\",\n  \"description\": \"Noquis de papa artesanales con tuco de carne y queso rallado.\",\n  \"ingredients\": \"papa, harina, huevo, carne molida, tomate, cebolla, zanahoria\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_NOQUI\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Noquis del 29 con Tuco\",\n  \"description\": \"Noquis de papa artesanales con tuco de carne y queso rallado.\",\n  \"ingredients\": \"papa, harina, huevo, carne molida, tomate, cebolla, zanahoria\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17259,7 +17357,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_BONDIOLA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Bondiola Braseada\",\n  \"description\": \"Bondiola de cerdo braseada con pure de batata y chimichurri.\",\n  \"ingredients\": \"bondiola, batata, ajo, tomillo, laurel, chimichurri\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_BONDIOLA\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Bondiola Braseada\",\n  \"description\": \"Bondiola de cerdo braseada con pure de batata y chimichurri.\",\n  \"ingredients\": \"bondiola, batata, ajo, tomillo, laurel, chimichurri\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -17301,7 +17399,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_LOMO_CERDO\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Lomo de Cerdo a la Criolla\",\n  \"description\": \"Lomo de cerdo con salsa criolla, arroz blanco y ensalada verde.\",\n  \"ingredients\": \"lomo de cerdo, tomate, cebolla, pimiento, arroz\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_AR_LOMO_CERDO\",\n  \"institution_id\": \"{{demoInstitutionAr2Id}}\",\n  \"name\": \"Lomo de Cerdo a la Criolla\",\n  \"description\": \"Lomo de cerdo con salsa criolla, arroz blanco y ensalada verde.\",\n  \"ingredients\": \"lomo de cerdo, tomate, cebolla, pimiento, arroz\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -29303,6 +29401,55 @@
           "response": []
         },
         {
+          "name": "Upsert Institution \u2014 Capitol Hill Kitchen LLC (US primary supplier, pre-restaurant)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canonical_key\": \"DEMO_INSTITUTION_US_CAPITOL_HILL_KITCHEN\",\n  \"name\": \"Capitol Hill Kitchen LLC\",\n  \"institution_type\": \"supplier\",\n  \"market_ids\": [\n    \"00000000-0000-0000-0000-000000000004\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institutions/by-key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "institutions",
+                "by-key"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Has institution_id', () => { pm.expect(body).to.have.property('institution_id'); });",
+                  "pm.collectionVariables.set('demoInstitutionUs2Id', body.institution_id);",
+                  "pm.environment.set('demoInstitutionUs2Id', body.institution_id);",
+                  "console.log('US supplier institution (Capitol Hill Kitchen):', body.institution_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "Upsert Restaurant \u2014 Pike Place Chowder",
           "event": [
             {
@@ -29342,7 +29489,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_PIKE_CHOWDER\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pike Place Chowder\",\n  \"tagline\": \"Award-winning clam chowder steps from Pike Place Market\",\n  \"tagline_i18n\": {\n    \"en\": \"Award-winning clam chowder steps from Pike Place Market\",\n    \"es\": \"Award-winning clam chowder steps from Pike Place Market\"\n  },\n  \"pickup_instructions\": \"Pike Place, main arcade entrance. Counter service, walk-in.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/1a5276/ffffff?text=Pike+Place+Chowder\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_PIKE_CHOWDER\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Pike Place Chowder\",\n  \"tagline\": \"Award-winning clam chowder steps from Pike Place Market\",\n  \"tagline_i18n\": {\n    \"en\": \"Award-winning clam chowder steps from Pike Place Market\",\n    \"es\": \"Award-winning clam chowder steps from Pike Place Market\"\n  },\n  \"pickup_instructions\": \"Pike Place, main arcade entrance. Counter service, walk-in.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/1a5276/ffffff?text=Pike+Place+Chowder\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -29398,7 +29545,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_BEECHERSELLI\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Beecher's Deli\",\n  \"tagline\": \"Handcrafted cheeses and made-from-scratch deli favorites\",\n  \"tagline_i18n\": {\n    \"en\": \"Handcrafted cheeses and made-from-scratch deli favorites\",\n    \"es\": \"Handcrafted cheeses and made-from-scratch deli favorites\"\n  },\n  \"pickup_instructions\": \"Pike Place, look for the cheese cave window. Pick up inside.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/117a65/ffffff?text=Beecher's+Deli\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_BEECHERSELLI\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Beecher's Deli\",\n  \"tagline\": \"Handcrafted cheeses and made-from-scratch deli favorites\",\n  \"tagline_i18n\": {\n    \"en\": \"Handcrafted cheeses and made-from-scratch deli favorites\",\n    \"es\": \"Handcrafted cheeses and made-from-scratch deli favorites\"\n  },\n  \"pickup_instructions\": \"Pike Place, look for the cheese cave window. Pick up inside.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/117a65/ffffff?text=Beecher's+Deli\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -29454,7 +29601,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_POST_ALLEY_PIZ\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Post Alley Pizza\",\n  \"tagline\": \"New York-style slices in the historic Post Alley\",\n  \"tagline_i18n\": {\n    \"en\": \"New York-style slices in the historic Post Alley\",\n    \"es\": \"New York-style slices in the historic Post Alley\"\n  },\n  \"pickup_instructions\": \"Enter from Post Alley. Pickup window on the alley side.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/7d6608/ffffff?text=Post+Alley+Pizza\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_POST_ALLEY_PIZ\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Post Alley Pizza\",\n  \"tagline\": \"New York-style slices in the historic Post Alley\",\n  \"tagline_i18n\": {\n    \"en\": \"New York-style slices in the historic Post Alley\",\n    \"es\": \"New York-style slices in the historic Post Alley\"\n  },\n  \"pickup_instructions\": \"Enter from Post Alley. Pickup window on the alley side.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/7d6608/ffffff?text=Post+Alley+Pizza\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -29510,7 +29657,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_MARKET_POKE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Market Street Poke\",\n  \"tagline\": \"Fresh Pacific poke bowls with Seattle-sourced fish\",\n  \"tagline_i18n\": {\n    \"en\": \"Fresh Pacific poke bowls with Seattle-sourced fish\",\n    \"es\": \"Fresh Pacific poke bowls with Seattle-sourced fish\"\n  },\n  \"pickup_instructions\": \"1st Ave near Pike. Order at the counter.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/a93226/ffffff?text=Market+Street+Poke\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_MARKET_POKE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Market Street Poke\",\n  \"tagline\": \"Fresh Pacific poke bowls with Seattle-sourced fish\",\n  \"tagline_i18n\": {\n    \"en\": \"Fresh Pacific poke bowls with Seattle-sourced fish\",\n    \"es\": \"Fresh Pacific poke bowls with Seattle-sourced fish\"\n  },\n  \"pickup_instructions\": \"1st Ave near Pike. Order at the counter.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/a93226/ffffff?text=Market+Street+Poke\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -29566,7 +29713,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_STEWART_DINER\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Stewart Street Diner\",\n  \"tagline\": \"Classic Seattle diner comfort food since 1987\",\n  \"tagline_i18n\": {\n    \"en\": \"Classic Seattle diner comfort food since 1987\",\n    \"es\": \"Classic Seattle diner comfort food since 1987\"\n  },\n  \"pickup_instructions\": \"Western Ave entrance. Dine-in and pickup.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/6e2f68/ffffff?text=Stewart+Street+Diner\",\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_RESTAURANT_US_STEWART_DINER\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"institution_entity_id\": \"{{demoEntityIdUS}}\",\n  \"address_id\": \"{{{{addr_var}}}}\",\n  \"name\": \"Stewart Street Diner\",\n  \"tagline\": \"Classic Seattle diner comfort food since 1987\",\n  \"tagline_i18n\": {\n    \"en\": \"Classic Seattle diner comfort food since 1987\",\n    \"es\": \"Classic Seattle diner comfort food since 1987\"\n  },\n  \"pickup_instructions\": \"Western Ave entrance. Dine-in and pickup.\",\n  \"is_featured\": true,\n  \"cover_image_url\": \"{{mediaBaseUrl}}/600x400/6e2f68/ffffff?text=Stewart+Street+Diner\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/restaurants/by-key",
@@ -29878,7 +30025,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_CLAM_CHOWDER\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Clam Chowder\",\n  \"description\": \"New England-style clam chowder with fresh Pacific clams, potatoes, and house-baked sourdough.\",\n  \"ingredients\": \"clams, potatoes, cream, bacon, onion, celery, sourdough bread\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_CLAM_CHOWDER\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Clam Chowder\",\n  \"description\": \"New England-style clam chowder with fresh Pacific clams, potatoes, and house-baked sourdough.\",\n  \"ingredients\": \"clams, potatoes, cream, bacon, onion, celery, sourdough bread\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -29920,7 +30067,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_FISH_CHIPS\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Fish and Chips\",\n  \"description\": \"Crispy beer-battered Pacific cod with hand-cut fries and house tartar sauce.\",\n  \"ingredients\": \"pacific cod, beer batter, potatoes, tartar sauce, lemon\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_FISH_CHIPS\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Fish and Chips\",\n  \"description\": \"Crispy beer-battered Pacific cod with hand-cut fries and house tartar sauce.\",\n  \"ingredients\": \"pacific cod, beer batter, potatoes, tartar sauce, lemon\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -29962,7 +30109,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_MAC_CHEESE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Flagship Mac and Cheese\",\n  \"description\": \"Beecher's Flagship cheddar mac, the original Seattle comfort food.\",\n  \"ingredients\": \"Beecher's Flagship cheese, penne pasta, milk, butter, jalapeno\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_MAC_CHEESE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Flagship Mac and Cheese\",\n  \"description\": \"Beecher's Flagship cheddar mac, the original Seattle comfort food.\",\n  \"ingredients\": \"Beecher's Flagship cheese, penne pasta, milk, butter, jalapeno\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30004,7 +30151,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_GRILLED_CHEESE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Grilled Cheese on Sourdough\",\n  \"description\": \"Triple cheese grilled sandwich on thick-cut Beecher's sourdough.\",\n  \"ingredients\": \"sourdough bread, Flagship cheddar, jack cheese, butter\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_GRILLED_CHEESE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Grilled Cheese on Sourdough\",\n  \"description\": \"Triple cheese grilled sandwich on thick-cut Beecher's sourdough.\",\n  \"ingredients\": \"sourdough bread, Flagship cheddar, jack cheese, butter\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30046,7 +30193,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_MARGHERITA\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Margherita Pizza Slice\",\n  \"description\": \"Hand-tossed New York-style margherita with San Marzano tomatoes and fresh mozzarella.\",\n  \"ingredients\": \"pizza dough, San Marzano tomatoes, mozzarella, basil, olive oil\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_MARGHERITA\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Margherita Pizza Slice\",\n  \"description\": \"Hand-tossed New York-style margherita with San Marzano tomatoes and fresh mozzarella.\",\n  \"ingredients\": \"pizza dough, San Marzano tomatoes, mozzarella, basil, olive oil\",\n  \"dietary\": [\n    \"vegetarian\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30088,7 +30235,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_PEPPERONI\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Pepperoni Pizza Slice\",\n  \"description\": \"Classic New York-style pepperoni slice with extra cheese.\",\n  \"ingredients\": \"pizza dough, tomato sauce, mozzarella, pepperoni\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_PEPPERONI\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Pepperoni Pizza Slice\",\n  \"description\": \"Classic New York-style pepperoni slice with extra cheese.\",\n  \"ingredients\": \"pizza dough, tomato sauce, mozzarella, pepperoni\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30130,7 +30277,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_SALMON_POKE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Salmon Poke Bowl\",\n  \"description\": \"Wild salmon over sushi rice with sesame, edamame, cucumber, and sriracha mayo.\",\n  \"ingredients\": \"wild salmon, sushi rice, edamame, cucumber, sesame, sriracha mayo, nori\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_SALMON_POKE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Salmon Poke Bowl\",\n  \"description\": \"Wild salmon over sushi rice with sesame, edamame, cucumber, and sriracha mayo.\",\n  \"ingredients\": \"wild salmon, sushi rice, edamame, cucumber, sesame, sriracha mayo, nori\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30172,7 +30319,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_TUNA_POKE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Ahi Tuna Poke Bowl\",\n  \"description\": \"Ahi tuna over sushi rice with avocado, mango, and ponzu.\",\n  \"ingredients\": \"ahi tuna, sushi rice, avocado, mango, ponzu, sesame, green onion\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_TUNA_POKE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Ahi Tuna Poke Bowl\",\n  \"description\": \"Ahi tuna over sushi rice with avocado, mango, and ponzu.\",\n  \"ingredients\": \"ahi tuna, sushi rice, avocado, mango, ponzu, sesame, green onion\",\n  \"dietary\": [\n    \"gluten_free\"\n  ],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30214,7 +30361,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_CLAMBAKE\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Northwest Clam Bake Plate\",\n  \"description\": \"Steamed clams, corn, and new potatoes with drawn butter and grilled baguette.\",\n  \"ingredients\": \"littleneck clams, corn, red potatoes, drawn butter, baguette, herbs\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_CLAMBAKE\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Northwest Clam Bake Plate\",\n  \"description\": \"Steamed clams, corn, and new potatoes with drawn butter and grilled baguette.\",\n  \"ingredients\": \"littleneck clams, corn, red potatoes, drawn butter, baguette, herbs\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
@@ -30256,7 +30403,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_TURKEY_SANDWICH\",\n  \"institution_id\": \"{{demoInstitutionId}}\",\n  \"name\": \"Turkey Club Sandwich\",\n  \"description\": \"Roast turkey, bacon, avocado, and heirloom tomato on toasted sourdough.\",\n  \"ingredients\": \"roast turkey, bacon, avocado, tomato, lettuce, mayo, sourdough\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
+              "raw": "{\n  \"canonical_key\": \"DEMO_PRODUCT_US_TURKEY_SANDWICH\",\n  \"institution_id\": \"{{demoInstitutionUs2Id}}\",\n  \"name\": \"Turkey Club Sandwich\",\n  \"description\": \"Roast turkey, bacon, avocado, and heirloom tomato on toasted sourdough.\",\n  \"ingredients\": \"roast turkey, bacon, avocado, tomato, lettuce, mayo, sourdough\",\n  \"dietary\": [],\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/products/by-key",
