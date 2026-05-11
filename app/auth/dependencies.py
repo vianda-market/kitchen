@@ -6,7 +6,10 @@ import psycopg2.extensions
 from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 
-from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. are defined
+from app.config.settings import (
+    _require_auth_settings,
+    settings,
+)  # Ensure settings.SECRET_KEY, ALGORITHM, etc. are defined
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -46,6 +49,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             "subscription_market_id": None,
         }
 
+    _require_auth_settings()
     try:
         # Remove "Bearer " prefix if present.
         if token.startswith("Bearer "):
@@ -108,6 +112,7 @@ def get_optional_user(
     if credentials is None or not credentials.credentials:
         return None
     token = credentials.credentials
+    _require_auth_settings()
     try:
         if token.startswith("Bearer "):
             token = token.split("Bearer ", 1)[1]

@@ -1,13 +1,19 @@
 """
 Unit tests for settings env-file gating and get_google_api_key / get_mapbox_access_token
-environment-based resolution.
+environment-based resolution, and sentinel-default / auth-guard behavior.
 """
 
 from unittest.mock import patch
 
 import pytest
 
-from app.config.settings import get_google_api_key, get_mapbox_access_token, settings
+from app.config.settings import (
+    _AUTH_SENTINEL,
+    _require_auth_settings,
+    get_google_api_key,
+    get_mapbox_access_token,
+    settings,
+)
 
 
 class TestEnvFileGating:
@@ -224,3 +230,89 @@ class TestGetMapboxAccessTokenPersistent:
             with patch.object(settings, "DEV_MODE", False):
                 with pytest.raises(RuntimeError, match="MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT"):
                     get_mapbox_access_token(permanent=True)
+
+
+class TestAuthSentinelDefaults:
+    """Verify Pattern A: sentinel defaults + _require_auth_settings() use-site guard.
+
+    These tests confirm three invariants:
+      (a) All three auth fields default to safe sentinel values when env vars are absent.
+      (b) _require_auth_settings() raises RuntimeError when sentinel values are present.
+      (c) _require_auth_settings() is a no-op when real values are present.
+
+    The companion tests in app/tests/auth/ cover the full call-site guard path for
+    create_access_token / verify_token / get_current_user.
+    """
+
+    def test_sentinel_constant_value(self):
+        """_AUTH_SENTINEL is the expected placeholder string."""
+        assert _AUTH_SENTINEL == "__UNSET_NOT_FOR_AUTH__"
+
+    def test_require_auth_settings_raises_on_sentinel_secret_key(self):
+        """_require_auth_settings raises RuntimeError when SECRET_KEY is the sentinel."""
+        with patch.object(settings, "SECRET_KEY", _AUTH_SENTINEL):
+            with patch.object(settings, "ALGORITHM", "HS256"):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30):
+                    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+                        _require_auth_settings()
+
+    def test_require_auth_settings_raises_on_sentinel_algorithm(self):
+        """_require_auth_settings raises RuntimeError when ALGORITHM is the sentinel."""
+        with patch.object(settings, "SECRET_KEY", "real-secret"):
+            with patch.object(settings, "ALGORITHM", _AUTH_SENTINEL):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30):
+                    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+                        _require_auth_settings()
+
+    def test_require_auth_settings_raises_on_zero_expiry(self):
+        """_require_auth_settings raises RuntimeError when ACCESS_TOKEN_EXPIRE_MINUTES is 0."""
+        with patch.object(settings, "SECRET_KEY", "real-secret"):
+            with patch.object(settings, "ALGORITHM", "HS256"):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 0):
+                    with pytest.raises(RuntimeError, match="ACCESS_TOKEN_EXPIRE_MINUTES"):
+                        _require_auth_settings()
+
+    def test_require_auth_settings_passes_with_real_values(self):
+        """_require_auth_settings does not raise when all three fields have real values."""
+        with patch.object(settings, "SECRET_KEY", "real-secret-key"):
+            with patch.object(settings, "ALGORITHM", "HS256"):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30):
+                    _require_auth_settings()  # must not raise
+
+
+class TestAuthGuardAtCallSite:
+    """Verify that create_access_token and verify_token raise before touching JWT when
+    sentinel values are present."""
+
+    def test_create_access_token_raises_with_sentinel(self):
+        """create_access_token raises RuntimeError (not a JWT error) when settings are unset."""
+        from app.auth.security import create_access_token
+
+        with patch.object(settings, "SECRET_KEY", _AUTH_SENTINEL):
+            with patch.object(settings, "ALGORITHM", _AUTH_SENTINEL):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 0):
+                    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+                        create_access_token({"sub": "user-id"})
+
+    def test_verify_token_raises_with_sentinel(self):
+        """verify_token raises RuntimeError (not a JWT error) when settings are unset."""
+        from app.auth.security import verify_token
+
+        with patch.object(settings, "SECRET_KEY", _AUTH_SENTINEL):
+            with patch.object(settings, "ALGORITHM", _AUTH_SENTINEL):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 0):
+                    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+                        verify_token("sometoken")
+
+    def test_create_access_token_works_with_real_values(self):
+        """create_access_token succeeds when SECRET_KEY, ALGORITHM, and expiry are set."""
+        from datetime import timedelta
+
+        from app.auth.security import create_access_token
+
+        with patch.object(settings, "SECRET_KEY", "test-real-secret"):
+            with patch.object(settings, "ALGORITHM", "HS256"):
+                with patch.object(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30):
+                    token = create_access_token({"sub": "abc"}, expires_delta=timedelta(minutes=5))
+        assert isinstance(token, str)
+        assert len(token) > 0
