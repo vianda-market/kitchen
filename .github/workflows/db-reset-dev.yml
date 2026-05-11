@@ -129,3 +129,27 @@ jobs:
             KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
             STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
             bash app/db/build_dev_db.sh --target=gcp-dev
+
+      # ── Upload demo credentials as an artifact so the demo admin password
+      # can be retrieved without grepping the workflow log.
+      # Retention: 90 days (explicit). if: always() captures credentials even
+      # when a later assertion in the main step fails partway through.
+      - name: Upload demo credentials artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: demo-credentials-${{ github.run_id }}
+          path: .demo_credentials.local
+          retention-days: 90
+
+      # ── Write a step summary with retrieval instructions so any operator
+      # can find the credentials without digging through run logs.
+      - name: Summary
+        if: always()
+        run: |
+          echo "Demo credentials uploaded as artifact \`demo-credentials-${{ github.run_id }}\`." >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Download via the Actions tab → this run → Artifacts, or:" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"
+          echo "gh run download ${{ github.run_id }} -R vianda-market/kitchen" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"
