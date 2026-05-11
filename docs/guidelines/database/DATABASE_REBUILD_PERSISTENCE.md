@@ -5,9 +5,10 @@
 | Path | Command | When to use |
 |------|---------|-------------|
 | **Migrate** | `bash app/db/migrate.sh` | Incremental schema changes — preserves existing data |
-| **Rebuild** | `bash app/db/build_kitchen_db.sh` | New dev machine, CI, or intentional clean reset |
+| **Dev full rebuild** | `bash app/db/build_dev_db.sh` | New dev machine, or full reset including demo-day data (dev only) |
+| **Primitive rebuild** | `bash app/db/build_kitchen_db.sh` | Schema + reference + dev fixtures only — no demo data; used by future staging/prod compositions |
 
-**Default to migrate.** Only rebuild when you need a fresh start.
+**Default to migrate.** Only rebuild when you need a fresh start. For dev, prefer `build_dev_db.sh` over `build_kitchen_db.sh` standalone — it includes the demo data that every dev session relies on.
 
 ## **Key Principle: All Changes Must Be in Repository Files**
 
@@ -22,7 +23,10 @@ app/db/
 ├── archival_config_table.sql       Archival config table
 ├── archival_indexes.sql            15 archival performance indexes
 ├── migrate.sh                      Apply pending migrations (incremental)
-├── build_kitchen_db.sh             Full tear-down and rebuild
+├── build_kitchen_db.sh             Primitive rebuild — schema + reference + dev fixtures only
+│                                   (used by CI and future staging/prod compositions; no demo data)
+├── build_dev_db.sh                 Dev daily driver — calls build_kitchen_db.sh, then
+│                                   scripts/load_demo_data.sh. Requires API running + PAYMENT_PROVIDER=mock.
 ├── post_rebuild_external_sync.py   Post-seed FX + holiday sync
 ├── seed.sql                        Shim that loads both seed files below
 ├── seed/
@@ -76,7 +80,28 @@ Environment modes (`ENV` variable):
 - `staging` — applies all migrations; rejects none (staging gets same schema as dev)
 - `production` — blocks destructive statements (DROP TABLE, TRUNCATE, ALTER TYPE)
 
-### **Full Rebuild (clean slate)**
+### **Full Rebuild (clean slate) — dev daily driver**
+
+```bash
+# Requires: API running (bash scripts/run_dev_quiet.sh in a separate terminal)
+#           PAYMENT_PROVIDER=mock in your .env
+PAYMENT_PROVIDER=mock bash app/db/build_dev_db.sh
+```
+
+`build_dev_db.sh` is the recommended rebuild command for local dev. It sequences two scripts:
+
+1. `build_kitchen_db.sh` — schema + reference + dev fixtures (the primitive, see below).
+2. `scripts/load_demo_data.sh` — demo-day dataset: `demo_baseline.sql` (Layer A) + Newman `900_DEMO_DAY_SEED` (Layer B) + billing backfill (Layer C).
+
+After `build_dev_db.sh` completes the DB contains everything the team expects during demos and local sessions: schema, reference data, dev fixtures, and all demo users, restaurants, plans, subscriptions, and order history.
+
+**Why demo data is part of the dev rebuild:** skipping the demo-data step after every schema reset is what caused the demo-day incident. Demo data is now canonical for dev. It is explicitly excluded from staging/prod (the primitive script enforces this).
+
+**Future staging/prod compositions** will call `build_kitchen_db.sh` directly (never `build_dev_db.sh`) and apply their own seed or data-migration steps separately.
+
+The GCP dev-rebuild workflow (forthcoming, separate PR in infra-kitchen-gcp) will call `build_dev_db.sh` for the dev environment.
+
+### **Primitive Rebuild (schema + reference + dev fixtures only)**
 
 ```bash
 bash app/db/build_kitchen_db.sh
@@ -89,7 +114,9 @@ archival_config_table.sql → archival_indexes.sql → seed/reference_data.sql
 → seed/dev_fixtures.sql (dev only) → baseline schema_migration rows
 ```
 
-The rebuild script accepts `ENV=staging` to skip dev fixtures.
+The primitive script is the reusable building block. It accepts `ENV=staging` to skip dev fixtures. Use it when:
+- You need schema + reference data without demo data (e.g., a worktree session, CI, or building a future staging/prod composition).
+- You are inside a worktree — the TEMPLATE-clone fast path skips Newman, which is not safe to run concurrently.
 
 Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `PGPASSWORD` for non-local targets (e.g. Cloud SQL). For CI/GCP without a venv or static assets, use `SKIP_PYTEST=1` and `SKIP_IMAGE_CLEANUP=1` (see comments in the script). Air-gapped CI or no outbound HTTP: set `SKIP_POST_REBUILD_SYNC=1` to skip FX and holiday API calls after the final seed.
 
@@ -197,16 +224,25 @@ Kitchen has a third seed layer on top of reference data and dev fixtures: an opt
 | Dev fixtures | `app/db/seed/dev_fixtures.sql` | dev only | `build_kitchen_db.sh` when `ENV=dev` |
 | **Demo (opt-in)** | `app/db/seed/demo_baseline.sql` + `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json` | dev only, opt-in | `bash scripts/load_demo_data.sh` |
 
-Demo data is **never** loaded by the default rebuild path. Neither `build_kitchen_db.sh` nor `migrate.sh` reference the demo files. Demo data does not affect the `kitchen_template` fingerprint used by worktree clones.
+Demo data is loaded by `build_dev_db.sh` (the dev daily driver) as its second step. It is **never** loaded by `build_kitchen_db.sh` or `migrate.sh`. Demo data does not affect the `kitchen_template` fingerprint used by worktree clones.
 
 ### Loading demo data
 
-The loader has two targets — `local` (default, mock payments) and `gcp-dev` (deployed dev API + Stripe sandbox). Operational details, prerequisites, and failure modes for each live in **`DEMO_DAY_DATASET.md`** in this same folder. Quick local-mode recipe:
+**Preferred (full rebuild + demo data in one command):**
+
+```bash
+# .env: PAYMENT_PROVIDER=mock + API running on :8000 (bash scripts/run_dev_quiet.sh)
+PAYMENT_PROVIDER=mock bash app/db/build_dev_db.sh
+```
+
+**Demo data only (on a DB that already has schema + reference + dev fixtures):**
 
 ```bash
 # .env: PAYMENT_PROVIDER=mock + API running on :8000
 bash scripts/load_demo_data.sh
 ```
+
+The loader has two targets — `local` (default, mock payments) and `gcp-dev` (deployed dev API + Stripe sandbox). Operational details, prerequisites, and failure modes for each live in **`DEMO_DAY_DATASET.md`** in this same folder.
 
 The loader runs two layers in order:
 1. **Layer A** — `demo_baseline.sql`: inserts the supplier institution, demo admin user, addresses, and institution entity directly via SQL (no API endpoint for these entities).
