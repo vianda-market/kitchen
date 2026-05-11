@@ -317,6 +317,7 @@ PRIMARY_KEY_MAPPING = {
     "client_bill_info": "client_bill_id",
     "payment_method": "payment_method_id",
     "external_payment_method": "external_payment_method_id",
+    "user_payment_provider": "user_payment_provider_id",
     "currency_metadata": "currency_metadata_id",
     "currency_rate_raw": "currency_rate_raw_id",
     "restaurant_transaction": "transaction_id",
