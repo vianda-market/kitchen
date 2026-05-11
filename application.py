@@ -440,19 +440,23 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _structured_rate_limit_handler)
 
-    # CORS: explicit allowlist from env, or allow all for local dev
+    # CORS: explicit allowlist from env, or allow all for local dev; optional regex for
+    # patterns the exact-match list can't express (e.g. Firebase preview-channel URLs).
     from app.config.settings import settings
 
     _raw_origins = settings.CORS_ALLOWED_ORIGINS.strip()
     _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else ["*"]
-    app.add_middleware(
-        CORSMiddleware,
+    _cors_kwargs: dict = dict(
         allow_origins=_allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["X-Total-Count"],
     )
+    _origin_regex = settings.CORS_ALLOWED_ORIGIN_REGEX.strip()
+    if _origin_regex:
+        _cors_kwargs["allow_origin_regex"] = _origin_regex
+    app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
     # Order: last registered runs first on the request.
     # Target: PermissionCache (outer) -> UserRateLimit -> ContentLanguage -> CORS -> app.
