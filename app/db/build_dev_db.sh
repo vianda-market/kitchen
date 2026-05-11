@@ -2,23 +2,34 @@
 # =============================================================================
 # build_dev_db.sh — Dev full-rebuild wrapper
 #
-# This is the daily driver for local dev environments. It runs two steps in
-# order:
+# This is the daily driver for local dev environments and the CI DB-reset
+# workflow. It runs two steps in order:
 #   1. bash app/db/build_kitchen_db.sh  — schema + reference data + dev
 #      fixtures (the reusable primitive shared with future staging/prod
 #      compositions; never modified by this wrapper).
 #   2. bash scripts/load_demo_data.sh   — demo-day dataset: demo_baseline.sql
 #      (Layer A) + 900 Newman collection (Layer B) + billing backfill (Layer C).
 #
-# After this script completes, the kitchen dev DB is fully populated: schema,
+# After this script completes, the dev DB is fully populated: schema,
 # reference data, dev fixtures, and all demo-day users, restaurants, plans,
 # subscriptions, and order history. This matches the state the team expects
 # during stakeholder demos and local development sessions.
+#
+# Targets:
+#   --target=local    (default) — laptop API, PAYMENT_PROVIDER=mock,
+#                                 confirms subscriptions via the kitchen
+#                                 mock-confirm endpoint. Fast, offline.
+#   --target=gcp-dev             — deployed GCP dev Cloud Run API + Cloud SQL,
+#                                 confirms PaymentIntents via Stripe sandbox,
+#                                 waits for Stripe webhook to activate
+#                                 subscriptions. Used by db-reset-dev.yml.
 #
 # When to use:
 #   - Setting up a new dev machine from scratch.
 #   - Resetting the dev DB to a known-good state after local experiments.
 #   - Before a demo: guarantees demo users, credentials, and order history exist.
+#   - From CI (db-reset-dev.yml) with --target=gcp-dev to reset Cloud SQL +
+#     load demo data via Stripe sandbox.
 #
 # When NOT to use:
 #   - Applying incremental schema changes to a DB you want to keep — use
@@ -34,27 +45,68 @@
 #   API. This script checks the health endpoint before delegating and will
 #   fail fast with a clear message if the API is not reachable.
 #
-#   Start the API first (in a separate terminal):
+#   --target=local: start the API first (in a separate terminal):
 #     bash scripts/run_dev_quiet.sh
 #
 #   The API requires PAYMENT_PROVIDER=mock for local demo loading. Set this in
 #   your .env file before starting the API.
 #
-# Usage (from repository root — required so \i app/db/... paths in psql resolve):
-#   PAYMENT_PROVIDER=mock bash app/db/build_dev_db.sh
+#   --target=gcp-dev: the CI workflow opens the IAP tunnel and sets all env
+#   vars before calling this script. No local API startup needed.
 #
-# Environment (forwarded to both child scripts; see each script's header):
+# Usage (from repository root — required so \i app/db/... paths in psql resolve):
+#   bash app/db/build_dev_db.sh                          # local target (default)
+#   PAYMENT_PROVIDER=mock bash app/db/build_dev_db.sh    # local + explicit mock
+#   bash app/db/build_dev_db.sh --target=gcp-dev         # GCP dev (CI use)
+#
+# Environment — local target:
 #   DB_HOST, DB_PORT, DB_NAME, DB_USER, PGPASSWORD — DB connection (default: local)
-#   PAYMENT_PROVIDER  must be "mock" for local target (enforced by load_demo_data.sh)
+#   PAYMENT_PROVIDER  must be "mock" (enforced by load_demo_data.sh)
 #   KITCHEN_API_PORT  API port (default: 8000)
 #   KITCHEN_API_BASE  API base URL (default: http://localhost:${KITCHEN_API_PORT})
 #   SKIP_PYTEST=1     Skip pytest after build_kitchen_db.sh (speeds up the run)
 #   SKIP_POST_REBUILD_SYNC=1  Skip FX/holiday sync (useful when firewalled)
 #   SKIP_GEOCODE_BACKFILL=1   Skip Mapbox geocode backfill
 #
+# Environment — gcp-dev target:
+#   DB_HOST, DB_PORT, DB_NAME, DB_USER, PGPASSWORD — tunneled Cloud SQL connection
+#   KITCHEN_API_BASE  deployed dev Cloud Run URL (https://...)
+#   STRIPE_SECRET_KEY Stripe sandbox test key (sk_test_...)
+#   SKIP_PYTEST=1, SKIP_POST_REBUILD_SYNC=1, SKIP_GEOCODE_BACKFILL=1 — same toggles
+#
 # =============================================================================
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Parse --target flag
+# ---------------------------------------------------------------------------
+
+TARGET="local"
+for arg in "$@"; do
+  case "${arg}" in
+    --target=*)
+      TARGET="${arg#--target=}"
+      ;;
+    --help|-h)
+      sed -n '2,80p' "$0"
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: ${arg}" >&2
+      echo "Usage: $0 [--target=local|gcp-dev]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "${TARGET}" in
+  local|gcp-dev) ;;
+  *)
+    echo "ERROR: --target must be 'local' or 'gcp-dev' (got: ${TARGET})" >&2
+    exit 1
+    ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Sanity: refuse to run in staging or production
@@ -93,36 +145,48 @@ fi
 
 # ---------------------------------------------------------------------------
 # Prerequisite: API must be running (load_demo_data.sh requires it for Newman)
+# Only checked for local target; for gcp-dev the loader validates its own
+# KITCHEN_API_BASE and the deployed API must already be up.
 # ---------------------------------------------------------------------------
 
-KITCHEN_API_PORT="${KITCHEN_API_PORT:-8000}"
-KITCHEN_API_BASE="${KITCHEN_API_BASE:-http://localhost:${KITCHEN_API_PORT}}"
-HEALTH_URL="${KITCHEN_API_BASE}/health"
+if [ "${TARGET}" = "local" ]; then
+  KITCHEN_API_PORT="${KITCHEN_API_PORT:-8000}"
+  KITCHEN_API_BASE="${KITCHEN_API_BASE:-http://localhost:${KITCHEN_API_PORT}}"
+  HEALTH_URL="${KITCHEN_API_BASE}/health"
+
+  echo ""
+  echo "[pre-check] Verifying kitchen API is reachable at ${HEALTH_URL}..."
+  API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${HEALTH_URL}" 2>/dev/null || true)
+  if [ "${API_STATUS}" != "200" ]; then
+    echo "" >&2
+    echo "ERROR: Kitchen API is not reachable (HTTP ${API_STATUS:-no response})." >&2
+    echo "" >&2
+    echo "  Start the API first (in a separate terminal):" >&2
+    echo "    bash scripts/run_dev_quiet.sh" >&2
+    echo "" >&2
+    echo "  Your .env must have PAYMENT_PROVIDER=mock for local demo loading." >&2
+    echo "" >&2
+    exit 1
+  fi
+  echo "[pre-check] API is healthy (HTTP 200). Proceeding."
+  echo ""
+fi
+
+# ---------------------------------------------------------------------------
+# Banner
+# ---------------------------------------------------------------------------
 
 echo ""
-echo "=== BUILD DEV DB ==="
+echo "=== BUILD DEV DB (target: ${TARGET}) ==="
 echo "  step 1: build_kitchen_db.sh (schema + reference + dev fixtures)"
 echo "  step 2: load_demo_data.sh   (demo-day data: SQL + Newman + billing)"
 echo ""
 
-echo "[pre-check] Verifying kitchen API is reachable at ${HEALTH_URL}..."
-API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${HEALTH_URL}" 2>/dev/null || true)
-if [ "${API_STATUS}" != "200" ]; then
-  echo "" >&2
-  echo "ERROR: Kitchen API is not reachable (HTTP ${API_STATUS:-no response})." >&2
-  echo "" >&2
-  echo "  Start the API first (in a separate terminal):" >&2
-  echo "    bash scripts/run_dev_quiet.sh" >&2
-  echo "" >&2
-  echo "  Your .env must have PAYMENT_PROVIDER=mock for local demo loading." >&2
-  echo "" >&2
-  exit 1
-fi
-echo "[pre-check] API is healthy (HTTP 200). Proceeding."
-echo ""
-
 # ---------------------------------------------------------------------------
 # Step 1 — Primitive rebuild: schema + reference data + dev fixtures
+# build_kitchen_db.sh picks up DB_HOST / DB_PORT / DB_USER / PGPASSWORD from
+# the environment, so no explicit forwarding is needed — CI sets them before
+# calling this wrapper.
 # ---------------------------------------------------------------------------
 
 echo "--- Step 1/2: build_kitchen_db.sh ---"
@@ -135,9 +199,8 @@ echo ""
 # Step 2 — Demo-day data: demo_baseline.sql + Newman 900 + billing backfill
 # ---------------------------------------------------------------------------
 
-echo "--- Step 2/2: load_demo_data.sh ---"
-export KITCHEN_API_BASE
-bash scripts/load_demo_data.sh --target=local
+echo "--- Step 2/2: load_demo_data.sh --target=${TARGET} ---"
+bash scripts/load_demo_data.sh --target="${TARGET}"
 echo ""
 echo "--- Step 2/2 complete ---"
 echo ""
@@ -147,8 +210,14 @@ echo ""
 # ---------------------------------------------------------------------------
 
 echo "======================================================================"
-echo "Dev DB ready (schema + reference + dev fixtures + demo-day data)."
+echo "Dev DB ready (target=${TARGET})."
+echo "Schema + reference + dev fixtures + demo-day data all loaded."
 echo ""
-echo "Credentials printed above and written to .demo_credentials.local"
-echo "(gitignored — do not commit)."
+if [ "${TARGET}" = "local" ]; then
+  echo "Credentials printed above and written to .demo_credentials.local"
+  echo "(gitignored — do not commit)."
+else
+  echo "Credentials printed above (also written to .demo_credentials.local"
+  echo "in the CI runner workspace — not persisted after the run)."
+fi
 echo "======================================================================"
