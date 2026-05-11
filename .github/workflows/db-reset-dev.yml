@@ -2,7 +2,10 @@ name: Rebuild Dev DB + Demo Data
 
 # DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema, then
 # loads the full demo-day dataset (Layer A SQL + Newman 900 collection via
-# Stripe sandbox + billing backfill).
+# Stripe sandbox + billing backfill). build_kitchen_db.sh then geocodes
+# restaurant coordinates from the committed Mapbox cache (replay_only, zero
+# API calls) and syncs FX rates + national holidays from public APIs
+# (open.er-api.com, date.nager.at) via its system-python3 fallback path.
 #
 # Dev data is disposable; never run against staging or prod.
 #
@@ -104,12 +107,11 @@ jobs:
           # Set as a GitHub repo secret (Settings → Secrets → Actions).
           # load_demo_data.sh refuses sk_live_ keys — sandbox only.
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          # Skip pytest and post-rebuild external syncs in CI — they require a
-          # locally reachable Python env + external APIs. The demo loader handles
-          # all required data setup via Newman + psql.
+          # Skip pytest in CI — it requires a locally running API server and is
+          # covered by the separate ci.yml gate. Post-rebuild sync and geocode
+          # backfill run inside build_kitchen_db.sh via its system-python3 fallback
+          # (pip install above populates system Python with requirements.txt deps).
           SKIP_PYTEST: "1"
-          SKIP_POST_REBUILD_SYNC: "1"
-          SKIP_GEOCODE_BACKFILL: "1"
         run: |
           gcloud compute ssh vianda-dev-bastion \
             --project="${GCP_PROJECT}" \
@@ -129,3 +131,27 @@ jobs:
             KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
             STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
             bash app/db/build_dev_db.sh --target=gcp-dev
+
+      # ── Upload demo credentials as an artifact so the demo admin password
+      # can be retrieved without grepping the workflow log.
+      # Retention: 90 days (explicit). if: always() captures credentials even
+      # when a later assertion in the main step fails partway through.
+      - name: Upload demo credentials artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: demo-credentials-${{ github.run_id }}
+          path: .demo_credentials.local
+          retention-days: 90
+
+      # ── Write a step summary with retrieval instructions so any operator
+      # can find the credentials without digging through run logs.
+      - name: Summary
+        if: always()
+        run: |
+          echo "Demo credentials uploaded as artifact \`demo-credentials-${{ github.run_id }}\`." >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Download via the Actions tab → this run → Artifacts, or:" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"
+          echo "gh run download ${{ github.run_id }} -R vianda-market/kitchen" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"
