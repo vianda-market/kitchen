@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from passlib.context import CryptContext
 
-from app.config.settings import settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. exist
+from app.config.settings import _require_auth_settings, settings  # Ensure settings.SECRET_KEY, ALGORITHM, etc. exist
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -29,6 +29,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
         - "role_type": high-level role (e.g., "client")
         - "institution_id": the institution identifier
     """
+    _require_auth_settings()
     to_encode = data.copy()
     expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -42,6 +43,7 @@ def verify_token(token: str):
     In this updated version, we return the full payload (a dict) so that downstream
     functions can access user_id, role_type, institution_id, etc.
     """
+    _require_auth_settings()
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # Ensure the required fields are present; raise an exception if not.

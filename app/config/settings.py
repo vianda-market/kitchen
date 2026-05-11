@@ -15,9 +15,20 @@ _ENV_FILE = ".env" if _ENVIRONMENT == "local" else None
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
-    SECRET_KEY: str
-    ALGORITHM: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    # Auth fields: required in every deployed environment (Cloud Run injects real values
+    # from Secret Manager).  Defaulted to sentinel strings so that DB/maintenance scripts
+    # (scripts/backfill_mapbox_geocoding.py, scripts/load_demo_data.sh) that transitively
+    # import this module — but never exercise auth code paths — can complete without
+    # ValidationError in CI runners that do not carry auth-specific env vars.
+    #
+    # Pattern A — sentinel default + use-site guard: any call to create_access_token,
+    # verify_token, or get_current_user with the sentinel value raises RuntimeError before
+    # a single byte is signed, so a misconfigured deployment fails loudly rather than
+    # silently issuing tokens with a known-bad key.  Prod/dev/staging are unaffected:
+    # Cloud Run's env block always supplies real values and the sentinel is never reached.
+    SECRET_KEY: str = "__UNSET_NOT_FOR_AUTH__"
+    ALGORITHM: str = "__UNSET_NOT_FOR_AUTH__"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 0
     DEV_OVERRIDE_DAY: str = ""  # Override current day for testing (e.g., "Monday")
     DEV_MODE: bool = True  # Enable to bypass external API calls and use mock responses
     # Set to True (or env DEBUG_PASSWORD_RECOVERY=1) to enable terminal debug logs for password/username recovery
@@ -271,6 +282,35 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+_AUTH_SENTINEL = "__UNSET_NOT_FOR_AUTH__"
+
+
+def _require_auth_settings() -> None:
+    """Raise RuntimeError if auth settings are still at their sentinel defaults.
+
+    Call this at the top of every function that reads SECRET_KEY, ALGORITHM, or
+    ACCESS_TOKEN_EXPIRE_MINUTES.  The guard ensures a misconfigured environment
+    fails loudly with a clear message rather than silently signing tokens with a
+    known-bad key or with a 0-minute expiry.
+
+    In prod/dev/staging, Cloud Run injects real values from Secret Manager before
+    any request is handled, so this guard never fires there.
+    """
+    if settings.SECRET_KEY == _AUTH_SENTINEL or settings.ALGORITHM == _AUTH_SENTINEL:
+        raise RuntimeError(
+            "SECRET_KEY and ALGORITHM must be set via environment variables before "
+            "any auth operation is performed.  In Cloud Run these come from Secret "
+            "Manager.  If you are running a local script that does not need auth, "
+            "this import is transitive — the script is safe, but you must not call "
+            "any auth function without the env vars present."
+        )
+    if settings.ACCESS_TOKEN_EXPIRE_MINUTES == 0:
+        raise RuntimeError(
+            "ACCESS_TOKEN_EXPIRE_MINUTES must be a positive integer set via "
+            "environment variables before any auth operation is performed."
+        )
+
 
 # Common email providers that cannot be registered as employer domains
 EMPLOYER_DOMAIN_BLACKLIST = {
