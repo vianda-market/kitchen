@@ -1,3 +1,9 @@
+> **ARCHIVED 2026-05-10 — dormant since the interactive-map cutover (vianda-app#214).**
+>
+> The active map doc is [`docs/api/b2c_client/MAPS_API.md`](../b2c_client/MAPS_API.md), which covers both `/maps/city-pins` (the live endpoint) and `/maps/city-snapshot` (the dormant endpoint this file documents in detail).
+>
+> This file is preserved as implementation reference if the static-image path is ever revived as a cost optimization. Do not delete without operator review.
+
 # Static Map Snapshot — B2C Client Guide
 
 **Document Version**: 1.0  

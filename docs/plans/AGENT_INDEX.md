@@ -44,7 +44,7 @@ These features have work items in multiple repos. Read the roadmap doc before st
 
 | File | What Is Planned |
 |------|-----------------|
-| _(Archived)_ `docs/zArchive/roadmap/STATIC_MAP_CITY_SNAPSHOT_ROADMAP.md` | Implemented — Static map images via `GET /maps/city-snapshot`. See `docs/api/b2c_client/STATIC_MAP_SNAPSHOT_B2C.md` for client guide |
+| _(Archived)_ `docs/zArchive/roadmap/STATIC_MAP_CITY_SNAPSHOT_ROADMAP.md` | Implemented — Static map images via `GET /maps/city-snapshot`. See `docs/api/archived/STATIC_MAP_SNAPSHOT_B2C.md` for client guide (dormant since #214). |
 | _(Deferred)_ `docs/plans/defer/B2C_EXPLORE_ZIPCODE.md` | Scope Explore to city, then refine search by zipcode (future enhancement) |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2c_client/EXPLORE_FILTERS_ROADMAP.md` | Radius, cuisine, and dietary filters on the restaurant Explore screen |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/b2c_client/ACCESSIBILITY_ROADMAP.md` | WCAG 2.1 AA accessibility standards for mobile |
