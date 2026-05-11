@@ -34,7 +34,7 @@ bandit>=1.9.0  # Security linting (baseline in .bandit-baseline.json)
 sqlfluff>=3.0.0  # SQL linting for migrations (config in .sqlfluff, baseline in .sqlfluff-baseline.txt)
 
 # Type stubs for mypy
-types-requests>=2.31.0
+types-requests>=2.33.0.20260508
 types-PyYAML>=6.0.0
 types-pytz>=2024.1
 types-python-dateutil>=2.9.0
