@@ -11598,7 +11598,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe01');",
                   "const token = pm.collectionVariables.get('customerPe01Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -11883,7 +11883,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe02');",
                   "const token = pm.collectionVariables.get('customerPe02Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -12168,7 +12168,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe03');",
                   "const token = pm.collectionVariables.get('customerPe03Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -12453,7 +12453,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe04');",
                   "const token = pm.collectionVariables.get('customerPe04Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -12738,7 +12738,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe05');",
                   "const token = pm.collectionVariables.get('customerPe05Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -13021,7 +13021,7 @@
                 "exec": [
                   "const subId = pm.collectionVariables.get('subIdPe07');",
                   "const token = pm.collectionVariables.get('customerPe07Token');",
-                  "const baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const baseUrl = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const maxAttempts = parseInt(pm.collectionVariables.get('subscriptionPollSeconds') || '30', 10);",
                   "let attempt = 0;",
                   "function check() {",
@@ -42044,7 +42044,7 @@
                   "// Refresh AR C01 token so credit_cost_local_currency reflects the active subscription.",
                   "// The token captured at signup-time is pre-subscription and carries null for that field,",
                   "// causing by-city to compute 0% savings instead of the actual 20-24%.",
-                  "const base = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+                  "const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const pw = pm.collectionVariables.get('customerSharedPassword') || pm.environment.get('customerSharedPassword');",
                   "pm.sendRequest({",
                   "    url: base + '/api/v1/auth/token',",
