@@ -115,7 +115,7 @@ pinsResp.markers.forEach(pin => {
 
 > This endpoint is preserved as a future cost optimization; the active path for clients is `/city-pins`. See plan: `~/learn/vianda/docs/plans/interactive-map-cluster-centering.md`.
 
-Full documentation for the static snapshot approach (pixel positions, tap target overlay, caching behavior, dark mode) is in [`STATIC_MAP_SNAPSHOT_B2C.md`](./STATIC_MAP_SNAPSHOT_B2C.md).
+Full documentation for the static snapshot approach (pixel positions, tap target overlay, caching behavior, dark mode) is in [`STATIC_MAP_SNAPSHOT_B2C.md`](../archived/STATIC_MAP_SNAPSHOT_B2C.md).
 
 **Do not call this endpoint in new client code.** It remains available on the server; resume it only if interactive-map MAU economics require it (operator decision).
 
