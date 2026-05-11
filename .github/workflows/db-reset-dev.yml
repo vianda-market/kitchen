@@ -17,7 +17,7 @@ name: Rebuild Dev DB + Demo Data
 #       GCP_PROJECT      — GCP project ID
 #       DB_PRIVATE_IP    — private IP of the dev Cloud SQL instance
 #       IAM_ADMIN_EMAIL  — (optional) Cloud SQL IAM read-only user
-#       KITCHEN_API_BASE — deployed dev Cloud Run URL, e.g. https://api.dev.vianda.market
+#       KITCHEN_API_BASE_DEV — deployed dev Cloud Run URL, e.g. https://api.dev.vianda.market
 #                          (must be HTTPS; Stripe webhooks must reach it)
 #   - GitHub repo secret: STRIPE_SECRET_KEY (sk_test_... test-mode key)
 #   - GCP secret: vianda-dev-db-password
@@ -94,11 +94,12 @@ jobs:
           DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
           GCP_PROJECT: ${{ vars.GCP_PROJECT }}
           IAM_ADMIN_EMAIL: ${{ vars.IAM_ADMIN_EMAIL }}
-          # KITCHEN_API_BASE: deployed dev Cloud Run URL (e.g. https://api.dev.vianda.market).
+          # KITCHEN_API_BASE_DEV: deployed dev Cloud Run URL (e.g. https://api.dev.vianda.market).
           # Set as a GitHub Environment variable under dev-destructive.
           # Must be HTTPS — load_demo_data.sh enforces this for gcp-dev target
           # (Stripe webhooks require a publicly reachable HTTPS endpoint).
-          KITCHEN_API_BASE: ${{ vars.KITCHEN_API_BASE }}
+          # Exported as KITCHEN_API_BASE for the loader (env-name agnostic to target).
+          KITCHEN_API_BASE: ${{ vars.KITCHEN_API_BASE_DEV }}
           # STRIPE_SECRET_KEY: Stripe sandbox test key (sk_test_...).
           # Set as a GitHub repo secret (Settings → Secrets → Actions).
           # load_demo_data.sh refuses sk_live_ keys — sandbox only.
