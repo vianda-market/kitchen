@@ -184,6 +184,7 @@ When completing a feature that affects other repos:
 
 - `docs/api/` — Permanent API integration docs (endpoints, contracts, auth). Indexed in `docs/api/AGENT_INDEX.md`. Source of truth for how the system works. Other repo agents read these to understand established functionality.
 - `docs/plans/` — Ephemeral feature plans and design decisions. Plans are consumed during implementation, then archived. Never reference old plans to understand how things work — that information belongs in `docs/api/` or `CLAUDE_ARCHITECTURE.md`. When completing a plan, summarize any long-term info (endpoint contracts, behaviors, constraints) into the appropriate `docs/api/` doc before archiving.
+- `docs/zArchive/` — Tracked historical record (post-implementation plans, old roadmaps, retired API docs, tech-debt notes, investigations). Subdirs mirror the active doc tree: `api/`, `database/`, `roadmap/`, `tech_debt/`, `investigations/`. Read only when researching past decisions ("why did we do X?"). The "never reference for current behavior" rule above still applies.
 - `CLAUDE_ARCHITECTURE.md` — System overview for cross-repo context.
 
 **Agent index files in other repos (read-only, for context):**

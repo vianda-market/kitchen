@@ -53,9 +53,6 @@ docs/local/
 # Local backup of .env taken before flipping PAYMENT_PROVIDER for demo loads
 .env.backup-pre-demo
 
-# Archived documentation (deprecated, kept out of version control)
-docs/zArchive/
-
 # macOS/Finder duplicate files (e.g. "File 2.ext")
 * 2.*
 * 2
