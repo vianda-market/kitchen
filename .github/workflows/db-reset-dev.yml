@@ -1,6 +1,9 @@
-name: Reset Dev Database
+name: Rebuild Dev DB + Demo Data
 
-# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema.
+# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema, then
+# loads the full demo-day dataset (Layer A SQL + Newman 900 collection via
+# Stripe sandbox + billing backfill).
+#
 # Dev data is disposable; never run against staging or prod.
 #
 # Requires:
@@ -8,7 +11,15 @@ name: Reset Dev Database
 #     Settings → Environments → dev-destructive → Required reviewers).
 #   - Operator must type "RESET-DEV-DB" in the `confirm` input to prevent
 #     fat-finger runs.
-#   - GitHub Environment vars: WIF_PROVIDER, DEPLOY_SA, GCP_PROJECT, DB_PRIVATE_IP.
+#   - GitHub Environment vars (dev-destructive):
+#       WIF_PROVIDER     — Workload Identity Federation provider resource name
+#       DEPLOY_SA        — deploy service account email
+#       GCP_PROJECT      — GCP project ID
+#       DB_PRIVATE_IP    — private IP of the dev Cloud SQL instance
+#       IAM_ADMIN_EMAIL  — (optional) Cloud SQL IAM read-only user
+#       KITCHEN_API_BASE_DEV — deployed dev Cloud Run URL, e.g. https://api.dev.vianda.market
+#                          (must be HTTPS; Stripe webhooks must reach it)
+#   - GitHub repo secret: STRIPE_SECRET_KEY (sk_test_... test-mode key)
 #   - GCP secret: vianda-dev-db-password
 #   - Bastion VM `vianda-dev-bastion` (zone us-central1-a) reachable via IAP.
 #   - Deploy SA has roles/iap.tunnelResourceAccessor + roles/compute.osLogin.
@@ -27,7 +38,7 @@ permissions:
 
 jobs:
   reset:
-    name: Wipe + rebuild dev DB schema
+    name: Wipe + rebuild dev DB schema + load demo data
     runs-on: ubuntu-latest
     environment: dev-destructive
     if: inputs.confirm == 'RESET-DEV-DB'
@@ -49,11 +60,56 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Open IAP SSH tunnel + rebuild schema
+      # ── Python: needed by load_demo_data.sh to hash the demo admin password
+      # via app.auth.security.hash_password (passlib + bcrypt).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # ── Newman: needed by load_demo_data.sh Layer B (900 demo collection).
+      # Mirrors the cache + install pattern from ci.yml acceptance job.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Cache newman global install
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: newman-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            newman-${{ runner.os }}-
+
+      - name: Install newman
+        run: npm install -g newman
+
+      - name: Open IAP SSH tunnel + rebuild DB + load demo data
         env:
           DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
           GCP_PROJECT: ${{ vars.GCP_PROJECT }}
           IAM_ADMIN_EMAIL: ${{ vars.IAM_ADMIN_EMAIL }}
+          # KITCHEN_API_BASE_DEV: deployed dev Cloud Run URL (e.g. https://api.dev.vianda.market).
+          # Set as a GitHub Environment variable under dev-destructive.
+          # Must be HTTPS — load_demo_data.sh enforces this for gcp-dev target
+          # (Stripe webhooks require a publicly reachable HTTPS endpoint).
+          # Exported as KITCHEN_API_BASE for the loader (env-name agnostic to target).
+          KITCHEN_API_BASE: ${{ vars.KITCHEN_API_BASE_DEV }}
+          # STRIPE_SECRET_KEY: Stripe sandbox test key (sk_test_...).
+          # Set as a GitHub repo secret (Settings → Secrets → Actions).
+          # load_demo_data.sh refuses sk_live_ keys — sandbox only.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # Skip pytest and post-rebuild external syncs in CI — they require a
+          # locally reachable Python env + external APIs. The demo loader handles
+          # all required data setup via Newman + psql.
+          SKIP_PYTEST: "1"
+          SKIP_POST_REBUILD_SYNC: "1"
+          SKIP_GEOCODE_BACKFILL: "1"
         run: |
           gcloud compute ssh vianda-dev-bastion \
             --project="${GCP_PROJECT}" \
@@ -70,4 +126,6 @@ jobs:
           DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
             DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
             IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
-            bash app/db/build_kitchen_db.sh
+            KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
+            STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
+            bash app/db/build_dev_db.sh --target=gcp-dev
