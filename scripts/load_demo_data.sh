@@ -199,13 +199,15 @@ echo "[2/5] Generating demo admin password and updating DB..."
 DEMO_PASSWORD="$(openssl rand -base64 18)"
 
 # Hash the password. Prefer kitchen's passlib helper when this script runs
-# from a checkout that has it on PYTHONPATH; otherwise fall back to passlib
-# directly so gcp-dev runs from any workstation.
+# from a checkout that has it on PYTHONPATH AND can load app.config.settings;
+# otherwise fall back to passlib directly. The broad except covers both
+# ImportError (no kitchen on PYTHONPATH) and pydantic ValidationError
+# (kitchen importable but app settings env not populated, e.g. CI runners).
 DEMO_HASH=$(PYTHONPATH=. python3 -c "
 try:
     from app.auth.security import hash_password
     print(hash_password('''${DEMO_PASSWORD}'''))
-except ImportError:
+except Exception:
     from passlib.context import CryptContext
     print(CryptContext(schemes=['bcrypt'], deprecated='auto').hash('''${DEMO_PASSWORD}'''))
 ")
