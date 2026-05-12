@@ -74,9 +74,7 @@ class MapboxSearchGateway(BaseGateway):
             country = (kwargs.get("country") or "").upper()
             country_key = f"suggest_{country}" if country else None
             if country_key and country_key in self._mock_data:
-                logger.info(
-                    f"Returning mock response for {self.service_name}.suggest (country={country})"
-                )
+                logger.info(f"Returning mock response for {self.service_name}.suggest (country={country})")
                 return self._mock_data[country_key]
             if "suggest" in self._mock_data:
                 logger.info(f"Returning mock response for {self.service_name}.suggest (generic fallback)")
