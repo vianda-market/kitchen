@@ -197,3 +197,7 @@ app.include_router(markets_router)
 ## Auto-Generated vs Manual Routes
 
 Use `create_crud_routes()` for standard CRUD with no custom logic. Write manual routes when you need custom filtering params, complex business logic, or non-standard operations.
+
+## Admin Route Handler Annotations
+
+Every admin route handler and every inner closure passed to `handle_business_operation` must carry explicit return type annotations. Use the `response_model` schema type when the handler explicitly constructs it; use `Any` when the handler returns a raw service result (DTO, raw dict) that FastAPI serializes via `response_model`. Annotate `current_user` as `dict[str, Any]`, not bare `dict`. Unannotated closures absorb `[no-untyped-def]` mypy baseline entries that accumulate silently — see issue #305.

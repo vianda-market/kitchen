@@ -22,7 +22,7 @@ router = APIRouter(prefix="/admin/archival", tags=["Admin - Archival"])
 
 
 @router.get("/stats", response_model=dict[str, Any])
-async def get_archival_statistics(current_user: dict = Depends(get_current_user)):
+async def get_archival_statistics(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Get comprehensive archival statistics across all entity types.
 
@@ -31,7 +31,7 @@ async def get_archival_statistics(current_user: dict = Depends(get_current_user)
     # TODO: Add admin role check
     # if current_user.get("role_type") != "Admin":
 
-    def _get_archival_statistics():
+    def _get_archival_statistics() -> dict[str, Any]:
         stats = ArchivalService.get_archival_stats()
         log_info(f"Archival stats requested by user {current_user['user_id']}")
         return {"status": "success", "data": stats, "requested_by": current_user["user_id"]}
@@ -40,7 +40,7 @@ async def get_archival_statistics(current_user: dict = Depends(get_current_user)
 
 
 @router.get("/dashboard", response_model=dict[str, Any])
-async def get_archival_dashboard_data(current_user: dict = Depends(get_current_user)):
+async def get_archival_dashboard_data(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Get archival dashboard with summary metrics and entity details.
 
@@ -48,7 +48,7 @@ async def get_archival_dashboard_data(current_user: dict = Depends(get_current_u
     """
 
     # TODO: Add admin role check
-    def _get_archival_dashboard():
+    def _get_archival_dashboard() -> dict[str, Any]:
         dashboard = get_archival_dashboard()
         log_info(f"Archival dashboard requested by user {current_user['user_id']}")
         return dashboard
@@ -57,7 +57,7 @@ async def get_archival_dashboard_data(current_user: dict = Depends(get_current_u
 
 
 @router.get("/validate", response_model=dict[str, Any])
-async def validate_archival_integrity(current_user: dict = Depends(get_current_user)):
+async def validate_archival_integrity(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Validate archival integrity across all entity types.
 
@@ -66,7 +66,7 @@ async def validate_archival_integrity(current_user: dict = Depends(get_current_u
     """
 
     # TODO: Add admin role check
-    def _validate_archival_integrity():
+    def _validate_archival_integrity() -> dict[str, Any]:
         validation_results = run_archival_validation()
         log_info(f"Archival validation requested by user {current_user['user_id']}")
         return validation_results
@@ -75,7 +75,7 @@ async def validate_archival_integrity(current_user: dict = Depends(get_current_u
 
 
 @router.post("/run-manual", response_model=dict[str, Any])
-async def run_manual_archival(current_user: dict = Depends(get_current_user)):
+async def run_manual_archival(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Manually trigger the archival process for all entity types.
 
@@ -84,7 +84,7 @@ async def run_manual_archival(current_user: dict = Depends(get_current_user)):
     """
 
     # TODO: Add admin role check
-    def _run_manual_archival():
+    def _run_manual_archival() -> dict[str, Any]:
         log_info(f"Manual archival triggered by user {current_user['user_id']}")
         results = run_daily_archival()
         return {"triggered_by": current_user["user_id"], **results}
@@ -93,7 +93,9 @@ async def run_manual_archival(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/eligible/{entity_type}", response_model=dict[str, Any])
-async def get_eligible_records(entity_type: str, current_user: dict = Depends(get_current_user)):
+async def get_eligible_records(
+    entity_type: str, current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
     """
     Get records eligible for archival for a specific entity type.
 
@@ -104,7 +106,7 @@ async def get_eligible_records(entity_type: str, current_user: dict = Depends(ge
     """
 
     # TODO: Add admin role check
-    def _get_eligible_records():
+    def _get_eligible_records() -> dict[str, Any]:
         eligible_records = ArchivalService.get_eligible_for_archival(entity_type)
         log_info(f"Eligible records for {entity_type} requested by user {current_user['user_id']}")
 
@@ -123,9 +125,9 @@ async def get_eligible_records(entity_type: str, current_user: dict = Depends(ge
 async def archive_specific_records(
     entity_type: str,
     record_ids: list[UUID],
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> dict[str, Any]:
     """
     Archive specific records for an entity type.
 
@@ -143,7 +145,7 @@ async def archive_specific_records(
         raise envelope_exception(ErrorCode.ARCHIVAL_TOO_MANY_RECORDS, status=400, locale=locale)
 
     # Archive specific records for an entity type
-    def _archive_specific_records():
+    def _archive_specific_records() -> dict[str, Any]:
         archived_count = ArchivalService.archive_records(entity_type, record_ids, current_user["user_id"])
 
         log_info(
@@ -162,7 +164,7 @@ async def archive_specific_records(
 
 
 @router.get("/retention-policy", response_model=dict[str, Any])
-async def get_retention_policy(current_user: dict = Depends(get_current_user)):
+async def get_retention_policy(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Get current retention policy configuration.
 
@@ -170,7 +172,7 @@ async def get_retention_policy(current_user: dict = Depends(get_current_user)):
     """
 
     # TODO: Add admin role check
-    def _get_retention_policy():
+    def _get_retention_policy() -> dict[str, Any]:
         from app.config.settings import settings
 
         policy = {
@@ -185,7 +187,7 @@ async def get_retention_policy(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/health", response_model=dict[str, Any])
-async def archival_health_check():
+async def archival_health_check() -> dict[str, Any]:
     """
     Health check endpoint for archival system.
 
@@ -194,7 +196,7 @@ async def archival_health_check():
     """
 
     # Health check endpoint for archival system
-    def _archival_health_check():
+    def _archival_health_check() -> dict[str, Any]:
         # Quick validation check
         validation_results = ArchivalService.validate_archival_integrity()
 

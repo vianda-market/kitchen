@@ -5,6 +5,7 @@ Internal-only endpoints for managing the canonical cuisine list
 and reviewing supplier suggestions.
 """
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -34,10 +35,10 @@ router = APIRouter(prefix="/admin/cuisines", tags=["Admin Cuisines"])
 @router.post("", response_model=CuisineDetailResponseSchema, status_code=201)
 def create_cuisine(
     data: CuisineCreateSchema,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """Create a new cuisine. Auto-generates slug from cuisine_name if not provided."""
     create_data = data.model_dump(exclude_unset=True)
     user_id = current_user["user_id"]
@@ -56,9 +57,9 @@ def create_cuisine(
 
 @router.get("", response_model=list[CuisineDetailResponseSchema])
 def list_all_cuisines(
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """List all cuisines including archived (admin view)."""
     rows = cuisine_service.search_cuisines(db, include_archived=True)
     return [CuisineDetailResponseSchema(**row) for row in rows]
@@ -66,9 +67,9 @@ def list_all_cuisines(
 
 @router.get("/suggestions", response_model=list[CuisineSuggestionResponseSchema])
 def list_pending_suggestions(
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """List all Pending cuisine suggestions awaiting review."""
     rows = cuisine_service.get_pending_suggestions(db)
     return [CuisineSuggestionResponseSchema(**row) for row in rows]
@@ -77,10 +78,10 @@ def list_pending_suggestions(
 @router.get("/{cuisine_id}", response_model=CuisineDetailResponseSchema)
 def get_cuisine(
     cuisine_id: UUID,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """Get a single cuisine with full detail."""
     result = cuisine_crud_service.get_by_id(cuisine_id, db)
     if not result:
@@ -92,10 +93,10 @@ def get_cuisine(
 def update_cuisine(
     cuisine_id: UUID,
     data: CuisineUpdateSchema,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """Update a cuisine (name, slug, parent, description, i18n, display_order)."""
     update_data = data.model_dump(exclude_unset=True)
     update_data["modified_by"] = current_user["user_id"]
@@ -108,10 +109,10 @@ def update_cuisine(
 @router.delete("/{cuisine_id}", response_model=CuisineDetailResponseSchema)
 def soft_delete_cuisine(
     cuisine_id: UUID,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """Soft-delete a cuisine (set is_archived=true). Use CRUDService.soft_delete because
     CRUDService.update() re-fetches via get_by_id() which filters is_archived=FALSE and
     would return None for a just-archived row → spurious 404."""
@@ -134,10 +135,10 @@ def soft_delete_cuisine(
 def approve_suggestion(
     suggestion_id: UUID,
     data: CuisineSuggestionApproveSchema,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> CuisineSuggestionResponseSchema:
     """
     Approve a Pending cuisine suggestion.
 
@@ -162,10 +163,10 @@ def approve_suggestion(
 def reject_suggestion(
     suggestion_id: UUID,
     data: CuisineSuggestionRejectSchema,
-    current_user: dict = Depends(get_admin_user),
+    current_user: dict[str, Any] = Depends(get_admin_user),
     locale: str = Depends(get_resolved_locale),
     db: connection = Depends(get_db),
-):
+) -> CuisineSuggestionResponseSchema:
     """Reject a Pending cuisine suggestion with optional review notes."""
     reviewer_id = UUID(str(current_user["user_id"]))
     result = cuisine_service.reject_suggestion(
