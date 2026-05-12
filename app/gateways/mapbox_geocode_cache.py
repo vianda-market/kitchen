@@ -67,40 +67,44 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
-def make_cache_key(operation: str, **kwargs: Any) -> str:
-    """Build a normalized cache key for a geocoding operation.
+def make_geocode_key(q: str, country: str, language: str, *, permanent: bool) -> str:
+    """Cache key for the ``geocode`` operation (address string → coordinates).
 
-    The ``permanent`` flag is included in the key so that ephemeral and
-    permanent responses never cross-contaminate the cache.  Existing entries
-    keyed without the flag (i.e. ``permanent=False``) are preserved — the
-    default ``permanent`` value is ``False``, so the key segment reads
-    ``permanent=false`` for all previously-recorded ephemeral entries.
-
-    The ``forward_search`` operation adds an ``op=forward_search`` segment so
-    that autocomplete cache entries never collide with geocode-resolution entries
-    that share the same normalized query string.
+    No lat/lng in the signature — CodeQL can verify the return value is taint-clean
+    with respect to ``py/clear-text-logging-sensitive-data``.
     """
-    if operation == "geocode":
-        q = _normalize(kwargs.get("q", ""))
-        country = _normalize(kwargs.get("country") or "")
-        lang = _normalize(kwargs.get("language") or "")
-        permanent = str(kwargs.get("permanent", False)).lower()
-        return f"geocode|{q}|{country}|{lang}|permanent={permanent}"
-    if operation == "forward_search":
-        q = _normalize(kwargs.get("q", ""))
-        country = _normalize(kwargs.get("country") or "")
-        lang = _normalize(kwargs.get("language") or "")
-        permanent = str(kwargs.get("permanent", False)).lower()
-        return f"forward_search|{q}|{country}|{lang}|permanent={permanent}"
-    if operation == "reverse_geocode":
-        lat = str(kwargs.get("latitude", ""))
-        lng = str(kwargs.get("longitude", ""))
-        lang = _normalize(kwargs.get("language") or "")
-        permanent = str(kwargs.get("permanent", False)).lower()
-        return f"reverse_geocode|{lat}|{lng}|{lang}|permanent={permanent}"
-    # Fallback: include all kwargs sorted for determinism
-    tail = "|".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
-    return f"{operation}|{tail}"
+    norm_q = _normalize(q)
+    norm_country = _normalize(country)
+    norm_lang = _normalize(language)
+    perm_str = str(permanent).lower()
+    return f"geocode|{norm_q}|{norm_country}|{norm_lang}|permanent={perm_str}"
+
+
+def make_forward_search_key(q: str, country: str, language: str, *, permanent: bool) -> str:
+    """Cache key for the ``forward_search`` operation (autocomplete partial input).
+
+    Distinct from ``make_geocode_key`` so that autocomplete entries never collide
+    with geocode-resolution entries that share the same normalized query string.
+
+    No lat/lng in the signature — CodeQL can verify the return value is taint-clean.
+    """
+    norm_q = _normalize(q)
+    norm_country = _normalize(country)
+    norm_lang = _normalize(language)
+    perm_str = str(permanent).lower()
+    return f"forward_search|{norm_q}|{norm_country}|{norm_lang}|permanent={perm_str}"
+
+
+def make_reverse_geocode_key(latitude: str, longitude: str, language: str, *, permanent: bool) -> str:
+    """Cache key for the ``reverse_geocode`` operation (coordinates → address string).
+
+    Accepts lat/lng as strings.  CodeQL will correctly flag any log line that
+    interpolates the *return value* of this function as potentially tainted.
+    Callers that only need to log the cache *hit* (not the key) should log
+    ``"cache hit for reverse_geocode"`` without interpolating the key string.
+    """
+    perm_str = str(permanent).lower()
+    return f"reverse_geocode|{latitude}|{longitude}|{_normalize(language)}|permanent={perm_str}"
 
 
 class MapboxGeocodeCache:

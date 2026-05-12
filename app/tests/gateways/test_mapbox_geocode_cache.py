@@ -9,38 +9,63 @@ from app.gateways.mapbox_geocode_cache import (
     CacheMode,
     MapboxCacheMiss,
     MapboxGeocodeCache,
-    make_cache_key,
+    make_forward_search_key,
+    make_geocode_key,
+    make_reverse_geocode_key,
 )
 from app.gateways.mapbox_geocoding_gateway import MapboxGeocodingGateway
 
 
-class TestMakeCacheKey:
-    def test_geocode_normalizes_query(self):
-        key = make_cache_key("geocode", q="  Av. Santa FE  2567 ", country="AR", language="ES")
+class TestMakeGeocodeKey:
+    def test_normalizes_query(self):
+        key = make_geocode_key(q="  Av. Santa FE  2567 ", country="AR", language="ES", permanent=False)
         assert key == "geocode|av. santa fe 2567|ar|es|permanent=false"
 
-    def test_geocode_with_missing_optional_fields(self):
-        key = make_cache_key("geocode", q="Test")
+    def test_missing_optional_fields(self):
+        key = make_geocode_key(q="Test", country="", language="", permanent=False)
         assert key == "geocode|test|||permanent=false"
 
-    def test_geocode_permanent_true_has_distinct_key(self):
-        ephemeral = make_cache_key("geocode", q="Test addr", country="AR", language="es", permanent=False)
-        permanent = make_cache_key("geocode", q="Test addr", country="AR", language="es", permanent=True)
+    def test_permanent_true_has_distinct_key(self):
+        ephemeral = make_geocode_key(q="Test addr", country="AR", language="es", permanent=False)
+        permanent = make_geocode_key(q="Test addr", country="AR", language="es", permanent=True)
         assert ephemeral != permanent
         assert ephemeral.endswith("|permanent=false")
         assert permanent.endswith("|permanent=true")
 
-    def test_reverse_geocode_uses_coordinates(self):
-        key = make_cache_key("reverse_geocode", latitude=-34.5, longitude=-58.4, language="es")
+
+class TestMakeForwardSearchKey:
+    def test_normalizes_query(self):
+        key = make_forward_search_key(q="  Av. Santa FE  ", country="AR", language="ES", permanent=False)
+        assert key == "forward_search|av. santa fe|ar|es|permanent=false"
+
+    def test_missing_optional_fields(self):
+        key = make_forward_search_key(q="Test", country="", language="", permanent=False)
+        assert key == "forward_search|test|||permanent=false"
+
+    def test_permanent_true_has_distinct_key(self):
+        ephemeral = make_forward_search_key(q="Test addr", country="AR", language="es", permanent=False)
+        permanent = make_forward_search_key(q="Test addr", country="AR", language="es", permanent=True)
+        assert ephemeral != permanent
+        assert ephemeral.endswith("|permanent=false")
+        assert permanent.endswith("|permanent=true")
+
+    def test_distinct_from_geocode_key(self):
+        """forward_search and geocode keys must never collide for the same query."""
+        fwd = make_forward_search_key(q="Santa Fe", country="AR", language="es", permanent=False)
+        geo = make_geocode_key(q="Santa Fe", country="AR", language="es", permanent=False)
+        assert fwd != geo
+        assert fwd.startswith("forward_search|")
+        assert geo.startswith("geocode|")
+
+
+class TestMakeReverseGeocodeKey:
+    def test_uses_coordinates(self):
+        key = make_reverse_geocode_key(latitude="-34.5", longitude="-58.4", language="es", permanent=False)
         assert key == "reverse_geocode|-34.5|-58.4|es|permanent=false"
 
-    def test_reverse_geocode_permanent_flag_in_key(self):
-        k = make_cache_key("reverse_geocode", latitude=-34.5, longitude=-58.4, language="es", permanent=True)
+    def test_permanent_flag_in_key(self):
+        k = make_reverse_geocode_key(latitude="-34.5", longitude="-58.4", language="es", permanent=True)
         assert k.endswith("|permanent=true")
-
-    def test_unknown_operation_falls_back_to_sorted_kwargs(self):
-        key = make_cache_key("custom_op", b=2, a=1)
-        assert key == "custom_op|a=1|b=2"
 
 
 class TestMapboxGeocodeCache:

@@ -40,7 +40,7 @@ app/
 ├── gateways/                # External service abstractions
 │   ├── base_gateway.py
 │   ├── address_provider.py       # Factory: get_search_gateway(), get_geocoding_gateway(permanent=False) — driven by ADDRESS_PROVIDER setting
-│   ├── mapbox_geocode_cache.py   # Geocoding cache: MapboxGeocodeCache, CacheMode (replay_only/record/bypass), make_cache_key; key includes permanent flag + op segment (geocode vs forward_search)
+│   ├── mapbox_geocode_cache.py   # Geocoding cache: MapboxGeocodeCache, CacheMode (replay_only/record/bypass), make_geocode_key / make_forward_search_key / make_reverse_geocode_key; key includes permanent flag + op segment (geocode vs forward_search)
 │   ├── mapbox_search_gateway.py  # Mapbox Search Box API (suggest + retrieve) — Q2 fallback autocomplete provider
 │   ├── mapbox_geocoding_gateway.py # Mapbox Geocoding API v6 (forward + reverse + forward_search); two modes: permanent=False (ephemeral) / permanent=True (persistent-storage)
 │   ├── mapbox_static_gateway.py  # Mapbox Static Images API — generates static map PNGs with pin overlays
@@ -157,7 +157,7 @@ get_geocoding_gateway(permanent=True)           # address_provider.py factory
   → MapboxGeocodingGateway(permanent=True)      # mapbox_geocoding_gateway.py
       → get_mapbox_access_token(permanent=True) # settings.py — sk.* token, raises RuntimeError if not set
       → _make_request adds params["permanent"]="true" to Mapbox v6 URL
-      → call() injects permanent=True into make_cache_key() → key ends with |permanent=true
+      → call() dispatches to make_geocode_key / make_forward_search_key / make_reverse_geocode_key → key ends with |permanent=true
 ```
 
 ### Module-level singletons
