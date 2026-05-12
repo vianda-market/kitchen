@@ -38,6 +38,7 @@ SKIPPED_COLLECTIONS=(
     "010"  # Permissions Testing - Employee-Only Access — same as 008
     "900"  # DEMO_DAY_SEED — runs only via load_demo_data.sh; needs runtime demo-admin password not in CI env
     "022"  # MAPS_CITY_PINS — depends on 900's demo data (Lima/PE restaurants); skip until 900 is seeded
+    "023"  # CITY_CENTROID_RECOMPUTE — depends on 900's demo data (cities with active restaurants); skip until 900 is seeded
 )
 
 is_skipped() {

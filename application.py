@@ -26,6 +26,7 @@ from app.routes.address import router as address_router
 # Admin routes
 from app.routes.admin.archival import router as archival_admin_router
 from app.routes.admin.archival_config import router as archival_config_admin_router
+from app.routes.admin.city_centroid import router as city_centroid_admin_router
 from app.routes.admin.cuisines import router as admin_cuisines_router
 from app.routes.admin.markets import router as markets_admin_router
 
@@ -787,6 +788,11 @@ def create_app() -> FastAPI:
     v1_archival_config_admin_router = create_versioned_router("api", ["Admin Archival Config"], APIVersion.V1)
     v1_archival_config_admin_router.include_router(archival_config_admin_router)
     app.include_router(v1_archival_config_admin_router)
+
+    # Admin city centroid routes (versioned) — manual trigger for the weekly centroid cron job
+    v1_city_centroid_admin_router = create_versioned_router("api", ["Admin City Centroid"], APIVersion.V1)
+    v1_city_centroid_admin_router.include_router(city_centroid_admin_router)
+    app.include_router(v1_city_centroid_admin_router)
 
     # Admin leads routes (versioned) — Internal-only lead interest dashboard
     from app.routes.admin.leads import router as admin_leads_router

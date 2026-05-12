@@ -902,6 +902,8 @@ app/routes/admin/archival.py:0: error: Function is missing a return type annotat
 app/routes/admin/archival.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/admin/archival.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/routes/admin/archival.py:0: error: Function is missing a return type annotation  [no-untyped-def]
+app/routes/admin/city_centroid.py:0: error: Function is missing a return type annotation  [no-untyped-def]
+app/routes/admin/city_centroid.py:0: error: Function is missing a return type annotation  [no-untyped-def]
 app/tests/services/test_crud_service.py:0: error: List item 0 has incompatible type "tuple[str, str, str, str]"; expected "tuple[str, str, str]"  [list-item]
 app/tests/services/test_crud_service.py:0: error: List item 0 has incompatible type "tuple[str, str, str, str]"; expected "tuple[str, str, str]"  [list-item]
 app/tests/services/test_crud_service.py:0: error: List item 1 has incompatible type "tuple[str, str, str, str]"; expected "tuple[str, str, str]"  [list-item]
