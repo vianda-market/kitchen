@@ -2376,12 +2376,28 @@ class ViewportSchema(BaseModel):
     sw: ViewportCornerSchema
 
 
+class CentroidSchema(BaseModel):
+    """Geographic anchor point returned alongside city-pins markers."""
+
+    lat: float = Field(description="Latitude of the camera anchor point.")
+    lng: float = Field(description="Longitude of the camera anchor point.")
+    source: Literal["user_nearest", "city", "city_fallback"] = Field(
+        description=(
+            "How the anchor was derived. "
+            "'user_nearest' — nearest restaurant to the user-supplied address. "
+            "'city' — precomputed city centroid (no user anchor supplied). "
+            "'city_fallback' — user anchor was >OUTLIER_DISTANCE_KM from every restaurant; "
+            "city centroid used instead."
+        )
+    )
+
+
 class CityPinsResponseSchema(BaseModel):
     """Response for GET /api/v1/maps/city-pins. Lean marker list + recommended viewport."""
 
     markers: list[MapPinSchema] = Field(
         default_factory=list,
-        description="All active restaurants with coordinates in the requested city.",
+        description="Active restaurants with coordinates in the requested city, ordered by distance from anchor.",
     )
     recommended_viewport: ViewportSchema | None = Field(
         None,
@@ -2389,6 +2405,18 @@ class CityPinsResponseSchema(BaseModel):
             "NE/SW bounding box enclosing all markers. None when markers is empty. "
             "Pass to fitBounds on the client; add UI-aware padding there."
         ),
+    )
+    centroid: CentroidSchema | None = Field(
+        None,
+        description="Camera anchor point. None only when the city has zero geocoded restaurants.",
+    )
+    more_available: bool = Field(
+        False,
+        description="True when the city has more restaurants than the returned limit.",
+    )
+    omitted_count: int = Field(
+        0,
+        description="Count of restaurants in the city that were not included in this response.",
     )
 
 
