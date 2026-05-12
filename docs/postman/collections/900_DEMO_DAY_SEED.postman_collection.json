@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "demo-day-seed-2026-v2",
     "name": "900_DEMO_DAY_SEED",
-    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.market\n  10 Supplier menu  \u2014 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      \u2014 Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
+    "description": "Demo-day narrative seed (Layer B). Run via scripts/load_demo_data.sh.\n\nPrerequsites: demo_baseline.sql applied (Layer A) and kitchen API up with PAYMENT_PROVIDER=mock.\n\nFOLDER STRUCTURE\n  00 Setup          \u2014 Login as demo-admin@vianda.market\n  10 Supplier menu  \u2014 5 PE restaurants (1 Miraflores + 4 San Isidro cluster), QR, 10 products,\n                       10 plates, PKDs Mon-Fri, 1 plan\n  20 Customers      \u2014 7 PE customers via verified signup flow (C06=no_plan, C07=no_orders)\n  30 Subscribe      \u2014 Subscribe C01-C05 + C07 to PE plan (C06 skipped)\n  40 Order history  \u2014 5 customers x 5 orders each (plate-sel \u2192 QR \u2192 complete \u2192 review)\n  99 Sanity checks  \u2014 Read-only assertions\n  A0 Recompute City Centroids \u2014 POST /admin/city-centroid/recompute after restaurants are seeded\n        so that GET /maps/city-pins immediately returns city-anchored centroid responses\n        without falling back to the inline-mean path.\n\nRerun: bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh\nPE only: no AR, no US.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "auth": {
@@ -43450,6 +43450,59 @@
                   "value": "username"
                 }
               ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "A0 Recompute City Centroids",
+      "item": [
+        {
+          "name": "POST city-centroid/recompute \u2014 populate centroids after seed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const r = pm.response.json();",
+                  "",
+                  "pm.test('success is true', function () {",
+                  "    pm.expect(r.success).to.equal(true);",
+                  "});",
+                  "",
+                  "pm.test('cities_updated >= 1 (seed has restaurants in at least one city)', function () {",
+                  "    pm.expect(r.cities_updated).to.be.a('number');",
+                  "    pm.expect(r.cities_updated).to.be.at.least(1);",
+                  "});",
+                  "",
+                  "pm.test('timestamp is a valid ISO 8601 string', function () {",
+                  "    pm.expect(r.timestamp).to.be.a('string');",
+                  "    const d = new Date(r.timestamp);",
+                  "    pm.expect(isNaN(d.getTime())).to.equal(false);",
+                  "});",
+                  "",
+                  "console.log('[A0] centroid recompute: cities_updated=' + r.cities_updated + ' timestamp=' + r.timestamp);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{demoAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/city-centroid/recompute",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "city-centroid", "recompute"]
             }
           },
           "response": []
