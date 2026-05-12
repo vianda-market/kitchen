@@ -223,18 +223,18 @@ Both providers return the same canonical shape — `{"place_id": str, "display_t
 
 The kitchen exposes two map endpoints under `app/routes/maps.py` (router prefix `/maps`, registered as `/api/v1/maps/`):
 
-- `GET /api/v1/maps/city-pins` **(active)** — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. See `app/routes/maps.py` and `city_map_service.get_pins()`. No image generated; no Mapbox call made server-side. Pure DB query + `compute_bounding_box()`.
+- `GET /api/v1/maps/city-pins` **(active)** — returns restaurant markers + recommended NE/SW viewport + centroid anchor for client-side interactive Mapbox rendering. Accepts optional `center_lat`/`center_lng` (user address anchor) and `limit` (1–50). Three-branch algorithm: user-anchor inside cluster (`centroid.source="user_nearest"`), user-anchor outlier >10 km (`centroid.source="city_fallback"`), no anchor (`centroid.source="city"`). Also returns `more_available` and `omitted_count` for overflow chip. See `app/routes/maps.py` and `city_map_service.get_pins()`. No image generated; no Mapbox call made server-side.
 - `GET /api/v1/maps/city-snapshot` **(dormant since #214 cutover)** — returns a Mapbox Static Images PNG cached in GCS with per-marker pixel positions for tap-target overlay. Preserved as a future cost optimization if interactive-map MAU economics deteriorate. Do not delete without operator review.
 
 ### Key files
 
 | File | Purpose |
 |---|---|
-| `app/routes/maps.py` | Both endpoints: `/city-pins` (active) + `/city-snapshot` (dormant) |
-| `app/services/city_map_service.py` | `CityMapService.get_pins()` (active path), `get_snapshot()` (dormant path), `_query_restaurants()` (shared) |
-| `app/utils/map_projection.py` | `compute_bounding_box()` (new), `lat_lng_to_pixel()`, `grid_cell()`, `is_within_frame()`, `distance_from_center()`, `slugify_city()` |
+| `app/routes/maps.py` | Both endpoints: `/city-pins` (active, with centroid + user-anchor params) + `/city-snapshot` (dormant) |
+| `app/services/city_map_service.py` | `CityMapService.get_pins()` (three-branch centroid logic), `get_snapshot()` (dormant path), `_query_restaurants()` (unordered, snapshot path), `_query_restaurants_ordered()` (haversine ORDER BY, city-pins path), `_get_city_centroid()` (reads `core.city_metadata.centroid_lat/lng`) |
+| `app/utils/map_projection.py` | `compute_bounding_box()`, `lat_lng_to_pixel()`, `grid_cell()`, `is_within_frame()`, `distance_from_center()`, `slugify_city()` |
 | `app/tests/utils/test_map_projection.py` | 28 pytest unit tests covering all `compute_bounding_box` branches plus legacy projection helpers |
-| `app/schemas/consolidated_schemas.py` | `MapPinSchema`, `ViewportCornerSchema`, `ViewportSchema`, `CityPinsResponseSchema` (new); `CitySnapshotResponseSchema`, `CitySnapshotMarkerSchema` (dormant) |
+| `app/schemas/consolidated_schemas.py` | `MapPinSchema`, `ViewportCornerSchema`, `ViewportSchema`, `CentroidSchema` (source enum: user_nearest/city/city_fallback), `CityPinsResponseSchema` (extended with centroid, more_available, omitted_count); `CitySnapshotResponseSchema`, `CitySnapshotMarkerSchema` (dormant) |
 | `app/gateways/mapbox_static_gateway.py` | Mapbox Static Images API — used only by the dormant `/city-snapshot` path |
 
 ### `compute_bounding_box` contract
