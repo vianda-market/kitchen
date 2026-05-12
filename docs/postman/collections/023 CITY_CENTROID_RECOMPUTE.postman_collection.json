@@ -1,0 +1,183 @@
+{
+	"info": {
+		"_postman_id": "city-centroid-recompute-2026",
+		"name": "023 CITY_CENTROID_RECOMPUTE",
+		"description": "Tests for POST /api/v1/admin/city-centroid/recompute — manually triggers the weekly city centroid computation job.\n\nCovers: happy path (cities_updated, success flag, timestamp), idempotency (same city set updated twice, timestamp advances), auth-required gate.\n\nNote: centroid persistence via a city-detail GET endpoint is not tested here — the /cities endpoint does not expose centroid_lat/centroid_lng/centroid_computed_at fields. If a city-detail endpoint is added in a future PR, add a test 5 at that time.\n\nRequires: demo seed data (900_DEMO_DAY_SEED) applied so that at least one city has active geocoded restaurants.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8000" },
+		{ "key": "authToken", "value": "" },
+		{ "key": "firstCitiesUpdated", "value": "" },
+		{ "key": "firstTimestamp", "value": "" }
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"const t = pm.environment.get('authToken') || pm.globals.get('authToken') || pm.environment.get('adminAuthToken') || pm.globals.get('adminAuthToken');",
+					"if (t) pm.collectionVariables.set('authToken', t);"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login as super admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login OK', function () { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.collectionVariables.set('authToken', r.access_token);",
+									"pm.environment.set('authToken', r.access_token);",
+									"pm.globals.set('authToken', r.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "username", "value": "{{superAdminUsername}}" },
+								{ "key": "password", "value": "{{superAdminPassword}}" }
+							]
+						},
+						"url": "{{baseUrl}}/api/v1/auth/token"
+					}
+				}
+			]
+		},
+		{
+			"name": "Recompute — happy path",
+			"item": [
+				{
+					"name": "POST recompute — success=true, cities_updated>=1",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('success is true', function () {",
+									"    pm.expect(r.success).to.equal(true);",
+									"});",
+									"",
+									"pm.test('cities_updated is >= 1 (seed has at least one city with restaurants)', function () {",
+									"    pm.expect(r.cities_updated).to.be.a('number');",
+									"    pm.expect(r.cities_updated).to.be.at.least(1);",
+									"});",
+									"",
+									"pm.test('cities_skipped_no_restaurants is >= 0', function () {",
+									"    pm.expect(r.cities_skipped_no_restaurants).to.be.a('number');",
+									"    pm.expect(r.cities_skipped_no_restaurants).to.be.at.least(0);",
+									"});",
+									"",
+									"pm.test('timestamp is a valid ISO 8601 string', function () {",
+									"    pm.expect(r.timestamp).to.be.a('string');",
+									"    const d = new Date(r.timestamp);",
+									"    pm.expect(isNaN(d.getTime())).to.equal(false);",
+									"});",
+									"",
+									"// Capture for idempotency test",
+									"pm.collectionVariables.set('firstCitiesUpdated', r.cities_updated);",
+									"pm.collectionVariables.set('firstTimestamp', r.timestamp);",
+									"",
+									"console.log('Recompute result: cities_updated=' + r.cities_updated + ' skipped=' + r.cities_skipped_no_restaurants + ' ts=' + r.timestamp);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": "{{baseUrl}}/api/v1/admin/city-centroid/recompute"
+					}
+				}
+			]
+		},
+		{
+			"name": "Idempotency",
+			"item": [
+				{
+					"name": "POST recompute again — same cities_updated, later timestamp",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('success is true', function () {",
+									"    pm.expect(r.success).to.equal(true);",
+									"});",
+									"",
+									"pm.test('cities_updated equals first run (same restaurant set)', function () {",
+									"    const first = parseInt(pm.collectionVariables.get('firstCitiesUpdated'), 10);",
+									"    pm.expect(r.cities_updated).to.equal(first);",
+									"});",
+									"",
+									"pm.test('timestamp is strictly later than first run (job is not a no-op)', function () {",
+									"    const firstTs = pm.collectionVariables.get('firstTimestamp');",
+									"    pm.expect(new Date(r.timestamp).getTime()).to.be.above(new Date(firstTs).getTime());",
+									"});",
+									"",
+									"console.log('Idempotency: first_ts=' + pm.collectionVariables.get('firstTimestamp') + ' second_ts=' + r.timestamp);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": "{{baseUrl}}/api/v1/admin/city-centroid/recompute"
+					}
+				}
+			]
+		},
+		{
+			"name": "Auth required",
+			"item": [
+				{
+					"name": "POST recompute — no token returns 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 401 when no Authorization header', function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": "{{baseUrl}}/api/v1/admin/city-centroid/recompute"
+					}
+				}
+			]
+		}
+	]
+}

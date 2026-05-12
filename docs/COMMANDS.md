@@ -16,6 +16,7 @@ Quick-reference for every command an executor or contributor needs. CLAUDE.md li
 |---|---|
 | `bash app/db/migrate.sh` | Apply migrations incrementally — preserves data. |
 | `bash app/db/build_kitchen_db.sh` | Full tear-down + rebuild. Fresh environments only — never on a DB with test data you want to keep. |
+| `bash app/db/build_dev_db.sh [--target=local\|gcp-dev]` | Dev wrapper around `build_kitchen_db.sh`: rebuilds DB then runs `load_demo_data.sh` to seed `demo_baseline.sql` + Newman 900 collection. `--target=local` (default) hits laptop API on `:8000` with `PAYMENT_PROVIDER=mock`. `--target=gcp-dev` hits deployed dev Cloud Run with `STRIPE_SECRET_KEY` (sandbox). |
 
 ## Tests
 

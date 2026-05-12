@@ -212,6 +212,11 @@ class Settings(BaseSettings):
 
     # CORS: comma-separated allowed origins. Empty = allow all (local dev convenience).
     CORS_ALLOWED_ORIGINS: str = ""
+    # CORS regex: optional Python regex matched against the request Origin header.
+    # Used to allow patterns the exact-match CORS_ALLOWED_ORIGINS list can't express
+    # (e.g. Firebase preview channels like https://vianda-home-dev--pr-<N>-<hash>.web.app).
+    # Empty = no regex matching (only the exact-match list applies).
+    CORS_ALLOWED_ORIGIN_REGEX: str = ""
 
     # reCAPTCHA v3: bot protection for public /leads/* endpoints. Empty = disabled (local dev).
     RECAPTCHA_SECRET_KEY: str = ""

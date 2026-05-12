@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "maps-city-pins-2026",
 		"name": "022 MAPS_CITY_PINS",
-		"description": "Tests for GET /api/v1/maps/city-pins — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. No Mapbox calls are made; this is pure DB + projection math.\n\nNote on single-marker case: server-side expansion for a single-coordinate city is covered exhaustively by pytest unit tests in app/tests/utils/test_map_projection.py (TestComputeBoundingBox). No Postman step is included here as finding a real single-restaurant city in seed data is brittle; the unit tests are the authoritative coverage for that path.\n\nRequires: demo seed data (900_DEMO_DAY_SEED) applied so that Lima/PE has active restaurants with coordinates.",
+		"description": "Tests for GET /api/v1/maps/city-pins — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. No Mapbox calls are made; this is pure DB + projection math.\n\nCovers: city-anchored (no center params, centroid.source='city'), user-anchor inside cluster (centroid.source='user_nearest'), user-anchor outlier >10 km (centroid.source='city_fallback'), only one center param → 400, limit clamp → 422, overflow chip data (more_available+omitted_count).\n\nNote on single-marker case: server-side expansion for a single-coordinate city is covered exhaustively by pytest unit tests in app/tests/utils/test_map_projection.py (TestComputeBoundingBox). No Postman step is included here as finding a real single-restaurant city in seed data is brittle; the unit tests are the authoritative coverage for that path.\n\nRequires: demo seed data (900_DEMO_DAY_SEED) applied so that Lima/PE has active restaurants with coordinates.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
 	},
 	"variable": [
@@ -61,7 +61,7 @@
 			"name": "City Pins",
 			"item": [
 				{
-					"name": "Happy path — Lima/PE returns markers and viewport",
+					"name": "City-anchored (no center params) — centroid.source is city",
 					"event": [
 						{
 							"listen": "test",
@@ -119,7 +119,33 @@
 									"    pm.expect(vp.ne.lng).to.be.at.least(vp.sw.lng);",
 									"});",
 									"",
-									"console.log('markers:', r.markers.length, '| viewport ne:', JSON.stringify(r.recommended_viewport && r.recommended_viewport.ne));"
+									"pm.test('centroid is present with lat, lng and source', function () {",
+									"    pm.expect(r).to.have.property('centroid');",
+									"    pm.expect(r.centroid).to.not.be.null;",
+									"    pm.expect(r.centroid).to.have.property('lat');",
+									"    pm.expect(r.centroid).to.have.property('lng');",
+									"    pm.expect(r.centroid).to.have.property('source');",
+									"    pm.expect(r.centroid.lat).to.be.a('number');",
+									"    pm.expect(r.centroid.lng).to.be.a('number');",
+									"});",
+									"",
+									"pm.test('centroid.source is city (no user anchor provided)', function () {",
+									"    pm.expect(r.centroid.source).to.equal('city');",
+									"});",
+									"",
+									"pm.test('more_available and omitted_count are present', function () {",
+									"    pm.expect(r).to.have.property('more_available');",
+									"    pm.expect(r).to.have.property('omitted_count');",
+									"    pm.expect(r.more_available).to.be.a('boolean');",
+									"    pm.expect(r.omitted_count).to.be.a('number');",
+									"    pm.expect(r.omitted_count).to.be.at.least(0);",
+									"});",
+									"",
+									"pm.test('markers.length <= default limit (20)', function () {",
+									"    pm.expect(r.markers.length).to.be.at.most(20);",
+									"});",
+									"",
+									"console.log('city-anchored: markers=' + r.markers.length + ' centroid.source=' + r.centroid.source + ' more_available=' + r.more_available + ' omitted_count=' + r.omitted_count);"
 								],
 								"type": "text/javascript"
 							}
@@ -135,6 +161,227 @@
 							"query": [
 								{ "key": "city", "value": "Lima" },
 								{ "key": "country_code", "value": "PE" }
+							]
+						}
+					}
+				},
+				{
+					"name": "User-anchor inside cluster (Miraflores) — centroid.source is user_nearest",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('markers is non-empty', function () {",
+									"    pm.expect(r.markers.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"pm.test('centroid is present', function () {",
+									"    pm.expect(r.centroid).to.not.be.null;",
+									"    pm.expect(r.centroid).to.have.property('lat');",
+									"    pm.expect(r.centroid).to.have.property('lng');",
+									"    pm.expect(r.centroid).to.have.property('source');",
+									"});",
+									"",
+									"pm.test('centroid.source is user_nearest (anchor near Miraflores restaurants)', function () {",
+									"    pm.expect(r.centroid.source).to.equal('user_nearest');",
+									"});",
+									"",
+									"pm.test('centroid.lat matches first marker lat within 1e-6', function () {",
+									"    pm.expect(Math.abs(r.centroid.lat - r.markers[0].lat)).to.be.below(1e-6);",
+									"});",
+									"",
+									"pm.test('centroid.lng matches first marker lng within 1e-6', function () {",
+									"    pm.expect(Math.abs(r.centroid.lng - r.markers[0].lng)).to.be.below(1e-6);",
+									"});",
+									"",
+									"pm.test('recommended_viewport is non-null', function () {",
+									"    pm.expect(r.recommended_viewport).to.not.be.null;",
+									"});",
+									"",
+									"console.log('user-anchor inside cluster: markers=' + r.markers.length + ' centroid=' + JSON.stringify(r.centroid) + ' first_marker_lat=' + r.markers[0].lat);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE&center_lat=-12.12&center_lng=-77.03",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" },
+								{ "key": "center_lat", "value": "-12.12" },
+								{ "key": "center_lng", "value": "-77.03" }
+							]
+						}
+					}
+				},
+				{
+					"name": "User-anchor outlier (>10 km from any restaurant) — centroid.source is city_fallback",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('markers is non-empty (fallback to city centroid, still shows restaurants)', function () {",
+									"    pm.expect(r.markers.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"pm.test('centroid is present', function () {",
+									"    pm.expect(r.centroid).to.not.be.null;",
+									"    pm.expect(r.centroid).to.have.property('source');",
+									"});",
+									"",
+									"pm.test('centroid.source is city_fallback (anchor was >10 km from all restaurants)', function () {",
+									"    pm.expect(r.centroid.source).to.equal('city_fallback');",
+									"});",
+									"",
+									"pm.test('recommended_viewport is non-null (restaurants returned even on fallback)', function () {",
+									"    pm.expect(r.recommended_viewport).to.not.be.null;",
+									"});",
+									"",
+									"console.log('outlier fallback: markers=' + r.markers.length + ' centroid.source=' + r.centroid.source);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE&center_lat=0&center_lng=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" },
+								{ "key": "center_lat", "value": "0" },
+								{ "key": "center_lng", "value": "0" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Only center_lat (no center_lng) — returns 400",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 400 (center params must be provided together)', function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"const r = pm.response.json();",
+									"pm.test('Response has envelope detail with code', function () {",
+									"    pm.expect(r).to.have.property('detail');",
+									"    pm.expect(r.detail).to.have.property('code');",
+									"    pm.expect(r.detail.code).to.include('validation');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE&center_lat=-12.12",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" },
+								{ "key": "center_lat", "value": "-12.12" }
+							]
+						}
+					}
+				},
+				{
+					"name": "limit=100 — returns 422 (FastAPI validation, cap is 50)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 422 (limit exceeds max=50)', function () {",
+									"    pm.response.to.have.status(422);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE&limit=100",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" },
+								{ "key": "limit", "value": "100" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Overflow chip — limit=2 on Lima/PE returns more_available=true",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+									"",
+									"const r = pm.response.json();",
+									"",
+									"pm.test('markers.length is at most 2 (limit enforced)', function () {",
+									"    pm.expect(r.markers.length).to.be.at.most(2);",
+									"});",
+									"",
+									"pm.test('more_available is true (Lima has >2 restaurants in seed)', function () {",
+									"    pm.expect(r.more_available).to.equal(true);",
+									"});",
+									"",
+									"pm.test('omitted_count is >= 1', function () {",
+									"    pm.expect(r.omitted_count).to.be.at.least(1);",
+									"});",
+									"",
+									"console.log('overflow: markers=' + r.markers.length + ' more_available=' + r.more_available + ' omitted_count=' + r.omitted_count);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maps/city-pins?city=Lima&country_code=PE&limit=2",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maps", "city-pins"],
+							"query": [
+								{ "key": "city", "value": "Lima" },
+								{ "key": "country_code", "value": "PE" },
+								{ "key": "limit", "value": "2" }
 							]
 						}
 					}
@@ -156,6 +403,18 @@
 									"",
 									"pm.test('recommended_viewport is null when no markers', function () {",
 									"    pm.expect(r.recommended_viewport).to.be.null;",
+									"});",
+									"",
+									"pm.test('centroid is null when no restaurants in city', function () {",
+									"    pm.expect(r.centroid).to.be.null;",
+									"});",
+									"",
+									"pm.test('more_available is false for empty city', function () {",
+									"    pm.expect(r.more_available).to.equal(false);",
+									"});",
+									"",
+									"pm.test('omitted_count is 0 for empty city', function () {",
+									"    pm.expect(r.omitted_count).to.equal(0);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -177,7 +436,7 @@
 					}
 				},
 				{
-					"name": "Missing country_code — returns 400 envelope error",
+					"name": "Missing country_code — returns 400 or 422",
 					"event": [
 						{
 							"listen": "test",

@@ -26,6 +26,7 @@ from app.routes.address import router as address_router
 # Admin routes
 from app.routes.admin.archival import router as archival_admin_router
 from app.routes.admin.archival_config import router as archival_config_admin_router
+from app.routes.admin.city_centroid import router as city_centroid_admin_router
 from app.routes.admin.cuisines import router as admin_cuisines_router
 from app.routes.admin.markets import router as markets_admin_router
 
@@ -440,19 +441,23 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _structured_rate_limit_handler)
 
-    # CORS: explicit allowlist from env, or allow all for local dev
+    # CORS: explicit allowlist from env, or allow all for local dev; optional regex for
+    # patterns the exact-match list can't express (e.g. Firebase preview-channel URLs).
     from app.config.settings import settings
 
     _raw_origins = settings.CORS_ALLOWED_ORIGINS.strip()
     _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else ["*"]
-    app.add_middleware(
-        CORSMiddleware,
+    _cors_kwargs: dict = dict(
         allow_origins=_allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["X-Total-Count"],
     )
+    _origin_regex = settings.CORS_ALLOWED_ORIGIN_REGEX.strip()
+    if _origin_regex:
+        _cors_kwargs["allow_origin_regex"] = _origin_regex
+    app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
     # Order: last registered runs first on the request.
     # Target: PermissionCache (outer) -> UserRateLimit -> ContentLanguage -> CORS -> app.
@@ -783,6 +788,11 @@ def create_app() -> FastAPI:
     v1_archival_config_admin_router = create_versioned_router("api", ["Admin Archival Config"], APIVersion.V1)
     v1_archival_config_admin_router.include_router(archival_config_admin_router)
     app.include_router(v1_archival_config_admin_router)
+
+    # Admin city centroid routes (versioned) — manual trigger for the weekly centroid cron job
+    v1_city_centroid_admin_router = create_versioned_router("api", ["Admin City Centroid"], APIVersion.V1)
+    v1_city_centroid_admin_router.include_router(city_centroid_admin_router)
+    app.include_router(v1_city_centroid_admin_router)
 
     # Admin leads routes (versioned) — Internal-only lead interest dashboard
     from app.routes.admin.leads import router as admin_leads_router
