@@ -58,7 +58,6 @@ class TestMapboxSearchGatewaySuggest:
         assert call_args[1]["params"]["country"] == "AR"
         assert call_args[1]["params"]["session_token"] == "tok-123"
 
-
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)
     @patch("app.gateways.base_gateway.get_settings")
     def test_dev_mode_suggest_routes_by_country_pe(self, mock_settings, _mock_token):
@@ -68,12 +67,7 @@ class TestMapboxSearchGatewaySuggest:
         result = gw.suggest(query="Grau 323, Barranco, Lima", country="PE")
         assert "suggestions" in result
         assert len(result["suggestions"]) > 0
-        country_code = (
-            result["suggestions"][0]
-            .get("context", {})
-            .get("country", {})
-            .get("country_code", "")
-        )
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
         assert country_code == "PE", f"Expected PE, got {country_code}"
 
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)
@@ -84,12 +78,7 @@ class TestMapboxSearchGatewaySuggest:
         gw = MapboxSearchGateway()
         result = gw.suggest(query="Pike Street, Seattle", country="US")
         assert "suggestions" in result
-        country_code = (
-            result["suggestions"][0]
-            .get("context", {})
-            .get("country", {})
-            .get("country_code", "")
-        )
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
         assert country_code == "US", f"Expected US, got {country_code}"
 
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)
@@ -101,12 +90,7 @@ class TestMapboxSearchGatewaySuggest:
         result = gw.suggest(query="some address")
         assert "suggestions" in result
         # Generic fallback is AR data
-        country_code = (
-            result["suggestions"][0]
-            .get("context", {})
-            .get("country", {})
-            .get("country_code", "")
-        )
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
         assert country_code == "AR", f"Expected AR fallback, got {country_code}"
 
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)
@@ -119,12 +103,7 @@ class TestMapboxSearchGatewaySuggest:
         pe_place_id = "dXJuOm1ieGFkcjowNjFhMjM5Ni02ZDAyLTRmMDItYmU0OS0zNTQ0YzFkYWUyMTQ"
         result = gw.retrieve(mapbox_id=pe_place_id)
         assert result.get("type") == "Feature"
-        country_code = (
-            result.get("properties", {})
-            .get("context", {})
-            .get("country", {})
-            .get("country_code", "")
-        )
+        country_code = result.get("properties", {}).get("context", {}).get("country", {}).get("country_code", "")
         assert country_code == "PE", f"Expected PE, got {country_code}"
 
 
