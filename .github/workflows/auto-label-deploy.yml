@@ -1,0 +1,52 @@
+name: Auto-label deploy-affecting PRs
+
+# Companion to deploy.yml's `Require deploy:dev label` guardrail.
+# The guardrail fails PRs that forget the label; this workflow removes the need
+# to remember in the first place by auto-applying `deploy:dev` when a PR is
+# opened/reopened against deploy-affecting paths.
+#
+# Why only `opened` and `reopened` (not `synchronize`):
+#   A maintainer may intentionally remove the label to defer a deploy past a
+#   maintenance window or to land code without applying. Re-adding it on every
+#   push would clobber that intent. The guardrail still catches genuinely
+#   forgotten labels at merge time.
+#
+# Paths mirror deploy.yml's `detect-changes` filter exactly. Keep them in sync
+# when adding new deploy-affecting roots.
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  label:
+    name: Auto-apply deploy:dev label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            relevant:
+              - "app/**"
+              - "application.py"
+              - "requirements*.txt"
+              - "requirements*.lock"
+              - "Dockerfile"
+              - "scripts/**"
+              - "docs/postman/**"
+              - ".github/workflows/deploy.yml"
+      - name: Add deploy:dev label
+        if: steps.filter.outputs.relevant == 'true' && !contains(github.event.pull_request.labels.*.name, 'deploy:dev')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --add-label deploy:dev

@@ -21,9 +21,18 @@ name: Deploy Kitchen Backend
 #   - WIF pool/provider provisioned on infra dev stack (`pulumi up` on dev).
 
 on:
+  # PR triggers cover two concerns:
+  #   - opened/synchronize/reopened/labeled/unlabeled → run detect-changes +
+  #     require-deploy-label so a PR touching deploy-affecting paths without
+  #     the deploy:dev label fails CI before merge.
+  #   - closed → run the deploy job iff merged + deploy:dev label.
+  # No top-level paths filter — branch protection requires
+  # `Require deploy:dev label` by NAME, and `paths-ignore` would leave the
+  # check pending forever on excluded PRs (the trap CLAUDE.md warns about).
+  # Path filtering is handled inside detect-changes via dorny/paths-filter.
   pull_request:
     branches: [main]
-    types: [closed]
+    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
   workflow_dispatch:
     inputs:
       reason:
@@ -53,11 +62,83 @@ env:
   REGION: us-central1
 
 jobs:
+  # Detects whether this PR touches deploy-affecting paths. Skipped on `closed`
+  # — the deploy job uses the label as opt-in, not path detection. Used by the
+  # require-deploy-label guardrail below.
+  detect-changes:
+    name: Detect deploy-affecting path changes
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check for deploy-affecting paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            relevant:
+              - "app/**"
+              - "application.py"
+              - "requirements*.txt"
+              - "requirements*.lock"
+              - "Dockerfile"
+              - "scripts/**"
+              - "docs/postman/**"
+              - ".github/workflows/deploy.yml"
+
+  # Guardrail: PRs that touch deploy-affecting paths MUST carry the
+  # `deploy:dev` label. Mirrors `infra-kitchen-gcp/.github/workflows/deploy.yml`.
+  # Docs-only PRs pass without the label automatically.
+  #
+  # Promote to a required check via Settings → Branches → main → Require status
+  # checks → "Require deploy:dev label" once seen green on a docs PR and red on
+  # a forgotten-label PR.
+  require-deploy-label:
+    name: Require deploy:dev label
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    needs: [detect-changes]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check label
+        env:
+          RELEVANT: ${{ needs.detect-changes.outputs.relevant }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEVANT" != "true" ]; then
+            echo "PR touches no deploy-affecting paths — deploy:dev label not required."
+            exit 0
+          fi
+          # Query labels at job runtime, not from the trigger payload, because
+          # auto-label-deploy.yml runs in parallel and mutates labels via the API
+          # after the trigger fires; reading github.event.pull_request.labels
+          # here races auto-apply and falsely fails on first PR open.
+          LABELS=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --jq '[.[].name]')
+          if echo "$LABELS" | grep -q '"deploy:dev"'; then
+            echo "deploy:dev label present — Cloud Run dev deploy will run on merge."
+            exit 0
+          fi
+          echo "::error::This PR touches deploy-affecting paths (app/, application.py, requirements*, Dockerfile, scripts/, docs/postman/, deploy.yml) but is missing the 'deploy:dev' label."
+          echo "::error::Either (a) add the deploy:dev label so the dev deploy runs on merge, or (b) split the deploy-affecting changes out if this should be docs-only."
+          echo "::error::Add the label with: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --add-label deploy:dev"
+          exit 1
+
   deploy:
     name: Build + Deploy to dev
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
+      (github.event.action == 'closed' &&
+       github.event.pull_request.merged == true &&
        contains(github.event.pull_request.labels.*.name, 'deploy:dev'))
     runs-on: ubuntu-latest
     environment: dev
@@ -147,8 +228,11 @@ jobs:
             DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" \
             bash app/db/migrate.sh
 
-      # ───── Final PR marker (success or failure) ─────
-      - name: Post final deploy marker
+      # ───── Intermediate PR marker (deploy stage finished, smoke pending) ─────
+      # On deploy failure this is the final word — smoke won't run. On deploy
+      # success the marker says "smoke pending" and the notify-finish job below
+      # overwrites it once smoke completes.
+      - name: Post deploy-stage marker
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
@@ -158,7 +242,7 @@ jobs:
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const tag = '${{ steps.build.outputs.tag }}';
             const body = ok
-              ? `${marker}\n✅ Deployed to dev — image tag \`${tag}\` ([view run](${runUrl}))`
+              ? `${marker}\n🟡 Deployed to dev — image tag \`${tag}\` ([view run](${runUrl})) · smoke check running…`
               : `${marker}\n❌ Deploy to dev failed ([view run](${runUrl}))`;
             const prNumber = context.payload.pull_request.number;
             const { data: comments } = await github.rest.issues.listComments({
@@ -241,3 +325,48 @@ jobs:
           if [ "$docs_status" != "200" ]; then echo "::error::/docs returned $docs_status"; exit 1; fi
           if [ "$openapi_status" != "200" ]; then echo "::error::/openapi.json returned $openapi_status"; exit 1; fi
           echo "All smoke checks passed."
+
+  # Finalize the PR marker once smoke has resolved. Without this job the
+  # deploy-stage marker would stay "smoke check running…" forever (success) or
+  # falsely claim ✅ when smoke failed. Only runs when smoke actually ran —
+  # i.e. when deploy succeeded; the deploy-stage marker already covers
+  # deploy-failed cases. Workflow_dispatch is skipped because the deploy job's
+  # PR-comment steps already gate on github.event_name == 'pull_request'.
+  notify-finish:
+    name: Finalize PR deploy marker
+    needs: [deploy, smoke]
+    if: always() && github.event_name == 'pull_request' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Update final marker with smoke result
+        uses: actions/github-script@v9
+        env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        with:
+          script: |
+            const marker = '<!-- cloud-run-deploy-dev -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const smoke = process.env.SMOKE_RESULT;
+            const prNumber = context.payload.pull_request.number;
+            let line;
+            if (smoke === 'success') {
+              line = `✅ Deployed to dev — smoke checks passed ([view run](${runUrl}))`;
+            } else if (smoke === 'failure') {
+              line = `❌ Deployed to dev — smoke checks FAILED ([view run](${runUrl}))`;
+            } else {
+              line = `⚠️ Deployed to dev — smoke result \`${smoke}\` ([view run](${runUrl}))`;
+            }
+            const body = `${marker}\n${line}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
+            }
