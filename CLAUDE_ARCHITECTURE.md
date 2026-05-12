@@ -100,7 +100,7 @@ app/
 │   ├── route_factory.py     # create_crud_routes, create_*_routes()
 │   ├── versioned_route_factory.py
 │   ├── billing/             # client_bill, institution_billing, supplier_invoice_service, tax_doc_service
-│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, etc.
+│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, city_centroid_job (weekly — recomputes centroid_lat/lng on core.city_metadata), etc.
 │   ├── leads_public_service.py # Public restaurant/plan projections, lead interest CRUD, cuisine/range enums
 │   ├── ingredient_service.py # OFF-backed search, custom ingredient creation, product ingredient management
 │   ├── onboarding_service.py # Supplier/employer onboarding checklist, status, admin summary
