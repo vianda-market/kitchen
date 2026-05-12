@@ -2015,6 +2015,9 @@ CREATE TABLE IF NOT EXISTS core.city_metadata (
     is_served              BOOLEAN NOT NULL DEFAULT FALSE,  -- derived flag: ≥1 active restaurant w/ plates + QR
     is_archived            BOOLEAN NOT NULL DEFAULT FALSE,
     status                 status_enum NOT NULL DEFAULT 'pending'::status_enum,  -- 'pending' until first restaurant lands here
+    centroid_lat           NUMERIC(9,6) NULL,
+    centroid_lng           NUMERIC(9,6) NULL,
+    centroid_computed_at   TIMESTAMPTZ NULL,
     created_date           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by             UUID NULL,
     modified_by            UUID NOT NULL,
@@ -2077,6 +2080,17 @@ COMMENT ON COLUMN core.city_metadata.modified_by IS
     'UUID of the last user to modify this row. FK to core.user_info.';
 COMMENT ON COLUMN core.city_metadata.modified_date IS
     'UTC timestamp of the most recent update.';
+COMMENT ON COLUMN core.city_metadata.centroid_lat IS
+    'Arithmetic mean of active geocoded restaurant coordinates for this city, in WGS84 decimal degrees. '
+    'Refreshed weekly by app/services/cron/city_centroid_job.weekly_entry() (added in a separate PR). '
+    'NULL until the first cron run; the city-pins service computes the mean inline as a fallback when NULL.';
+COMMENT ON COLUMN core.city_metadata.centroid_lng IS
+    'Arithmetic mean of active geocoded restaurant coordinates for this city, in WGS84 decimal degrees. '
+    'Refreshed weekly by app/services/cron/city_centroid_job.weekly_entry() (added in a separate PR). '
+    'NULL until the first cron run; the city-pins service computes the mean inline as a fallback when NULL.';
+COMMENT ON COLUMN core.city_metadata.centroid_computed_at IS
+    'UTC timestamp of the most recent centroid recomputation. '
+    'NULL until first cron run. Used to alarm on stale centroids (>14 days).';
 
 \echo 'Creating table: audit.city_metadata_history'
 CREATE TABLE IF NOT EXISTS audit.city_metadata_history (
@@ -2092,6 +2106,9 @@ CREATE TABLE IF NOT EXISTS audit.city_metadata_history (
     is_served              BOOLEAN NOT NULL,
     is_archived            BOOLEAN NOT NULL,
     status                 status_enum NOT NULL,
+    centroid_lat           NUMERIC(9,6) NULL,
+    centroid_lng           NUMERIC(9,6) NULL,
+    centroid_computed_at   TIMESTAMPTZ NULL,
     created_date           TIMESTAMPTZ NOT NULL,
     created_by             UUID NULL,
     modified_by            UUID NOT NULL,
@@ -2109,6 +2126,12 @@ COMMENT ON COLUMN audit.city_metadata_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
 COMMENT ON COLUMN audit.city_metadata_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
+COMMENT ON COLUMN audit.city_metadata_history.centroid_lat IS
+    'Mirrored from core.city_metadata.centroid_lat. See that column for semantics.';
+COMMENT ON COLUMN audit.city_metadata_history.centroid_lng IS
+    'Mirrored from core.city_metadata.centroid_lng. See that column for semantics.';
+COMMENT ON COLUMN audit.city_metadata_history.centroid_computed_at IS
+    'Mirrored from core.city_metadata.centroid_computed_at. See that column for semantics.';
 
 -- core.currency_metadata + audit moved above core.market_info (market_info FKs it inline).
 

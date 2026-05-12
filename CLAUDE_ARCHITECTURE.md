@@ -100,7 +100,7 @@ app/
 │   ├── route_factory.py     # create_crud_routes, create_*_routes()
 │   ├── versioned_route_factory.py
 │   ├── billing/             # client_bill, institution_billing, supplier_invoice_service, tax_doc_service
-│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, etc.
+│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, city_centroid_job (weekly — recomputes centroid_lat/lng on core.city_metadata), etc.
 │   ├── leads_public_service.py # Public restaurant/plan projections, lead interest CRUD, cuisine/range enums
 │   ├── ingredient_service.py # OFF-backed search, custom ingredient creation, product ingredient management
 │   ├── onboarding_service.py # Supplier/employer onboarding checklist, status, admin summary
@@ -223,18 +223,18 @@ Both providers return the same canonical shape — `{"place_id": str, "display_t
 
 The kitchen exposes two map endpoints under `app/routes/maps.py` (router prefix `/maps`, registered as `/api/v1/maps/`):
 
-- `GET /api/v1/maps/city-pins` **(active)** — returns restaurant markers + recommended NE/SW viewport for client-side interactive Mapbox rendering. See `app/routes/maps.py` and `city_map_service.get_pins()`. No image generated; no Mapbox call made server-side. Pure DB query + `compute_bounding_box()`.
+- `GET /api/v1/maps/city-pins` **(active)** — returns restaurant markers + recommended NE/SW viewport + centroid anchor for client-side interactive Mapbox rendering. Accepts optional `center_lat`/`center_lng` (user address anchor) and `limit` (1–50). Three-branch algorithm: user-anchor inside cluster (`centroid.source="user_nearest"`), user-anchor outlier >10 km (`centroid.source="city_fallback"`), no anchor (`centroid.source="city"`). Also returns `more_available` and `omitted_count` for overflow chip. See `app/routes/maps.py` and `city_map_service.get_pins()`. No image generated; no Mapbox call made server-side.
 - `GET /api/v1/maps/city-snapshot` **(dormant since #214 cutover)** — returns a Mapbox Static Images PNG cached in GCS with per-marker pixel positions for tap-target overlay. Preserved as a future cost optimization if interactive-map MAU economics deteriorate. Do not delete without operator review.
 
 ### Key files
 
 | File | Purpose |
 |---|---|
-| `app/routes/maps.py` | Both endpoints: `/city-pins` (active) + `/city-snapshot` (dormant) |
-| `app/services/city_map_service.py` | `CityMapService.get_pins()` (active path), `get_snapshot()` (dormant path), `_query_restaurants()` (shared) |
-| `app/utils/map_projection.py` | `compute_bounding_box()` (new), `lat_lng_to_pixel()`, `grid_cell()`, `is_within_frame()`, `distance_from_center()`, `slugify_city()` |
+| `app/routes/maps.py` | Both endpoints: `/city-pins` (active, with centroid + user-anchor params) + `/city-snapshot` (dormant) |
+| `app/services/city_map_service.py` | `CityMapService.get_pins()` (three-branch centroid logic), `get_snapshot()` (dormant path), `_query_restaurants()` (unordered, snapshot path), `_query_restaurants_ordered()` (haversine ORDER BY, city-pins path), `_get_city_centroid()` (reads `core.city_metadata.centroid_lat/lng`) |
+| `app/utils/map_projection.py` | `compute_bounding_box()`, `lat_lng_to_pixel()`, `grid_cell()`, `is_within_frame()`, `distance_from_center()`, `slugify_city()` |
 | `app/tests/utils/test_map_projection.py` | 28 pytest unit tests covering all `compute_bounding_box` branches plus legacy projection helpers |
-| `app/schemas/consolidated_schemas.py` | `MapPinSchema`, `ViewportCornerSchema`, `ViewportSchema`, `CityPinsResponseSchema` (new); `CitySnapshotResponseSchema`, `CitySnapshotMarkerSchema` (dormant) |
+| `app/schemas/consolidated_schemas.py` | `MapPinSchema`, `ViewportCornerSchema`, `ViewportSchema`, `CentroidSchema` (source enum: user_nearest/city/city_fallback), `CityPinsResponseSchema` (extended with centroid, more_available, omitted_count); `CitySnapshotResponseSchema`, `CitySnapshotMarkerSchema` (dormant) |
 | `app/gateways/mapbox_static_gateway.py` | Mapbox Static Images API — used only by the dormant `/city-snapshot` path |
 
 ### `compute_bounding_box` contract
@@ -266,7 +266,7 @@ Both endpoints require `get_current_user` (Bearer JWT). No role restriction — 
    - **`crud_routes.py`** → Admin/System CRUD (no user context): Product, Plan, Restaurant, CreditCurrency, Institution, Plate, Geolocation, InstitutionEntity.
    - **`crud_routes_user.py`** → User CRUD (user_id from `current_user`): Subscription, PaymentMethod; includes subscription_payment (with-payment, confirm-payment) before generic CRUD.
 4. **Route factory** (`app/services/route_factory.py`) generates standard CRUD routes via `create_plan_routes()`, `create_product_routes()`, etc.
-5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads. (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
+5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads, admin city_centroid (POST /admin/city-centroid/recompute — manual trigger for weekly centroid cron job). (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
 6. **Registration order:** Institution entities router registered before CRUD so `/enriched` matches before `/{entity_id}`. Manual/custom routes must be registered before auto-generated if they share paths (FastAPI matches first).
 7. **Composite-create pattern:** When an entity spans multiple tables by lifecycle, `POST` accepts optional embedded sub-resource blocks in a single transaction (`commit=False` chaining). Updates stay granular per sub-resource. Applied to: institutions (+ supplier_terms + institution_market), products (+ ingredient_ids), markets (+ billing_config). See `docs/api/internal/COMPOSITE_CREATE_PATTERN.md`.
 
@@ -310,7 +310,7 @@ Request
 |----------|---------|------|
 | Infrastructure | `/health`, `/pool-stats` | `/health` none; `/pool-stats` JWT |
 | Versioned v1 | `/api/v1/plans/`, `/api/v1/restaurants/` | JWT |
-| Admin (versioned) | `/api/v1/admin/archival/*`, `/api/v1/admin/archival-config/*`, `/api/v1/admin/discretionary/*`, `/api/v1/admin/markets/*`, `/api/v1/admin/leads/*` | Internal |
+| Admin (versioned) | `/api/v1/admin/archival/*`, `/api/v1/admin/archival-config/*`, `/api/v1/admin/city-centroid/*`, `/api/v1/admin/discretionary/*`, `/api/v1/admin/markets/*`, `/api/v1/admin/leads/*` | Internal |
 | Super-Admin (versioned) | `/api/v1/super-admin/discretionary/*` | Super Admin only |
 | Webhooks | `/api/v1/webhooks/*` | Stripe signature |
 | Leads | `/api/v1/leads/*` | None, rate-limited, reCAPTCHA v3 required (exempt for b2c-mobile, **also exempt for `/leads/countries` and `/leads/supplier-countries`** — navbar-load fetches) |
@@ -335,6 +335,12 @@ Request
 - **Institution market boundary:** `core.institution_market` junction controls which markets an institution can operate in. Entity creation validates the entity's address country is in an assigned market. User market assignments validate against `institution_market` (Supplier/Employer only; Internal bypasses).
 - **EntityScopingService** (`app/security/entity_scoping.py`) maps entity types to scope logic for both base and enriched endpoints. Use `EntityScopingService.get_scope_for_entity(entity_type, current_user)` in routes.
 - **InstitutionScope** and **UserScope** live in `app/security/scoping.py`; `institution_scope.py` re-exports for backward compatibility.
+
+---
+
+## Auth Settings Safe Defaults
+
+`app/config/settings.py` declares `SECRET_KEY`, `ALGORITHM`, and `ACCESS_TOKEN_EXPIRE_MINUTES` with the sentinel default `__UNSET_NOT_FOR_AUTH__`, so maintenance scripts (e.g., `scripts/backfill_mapbox_geocoding.py`) can import `app.config.settings` in CI runners that don't have those env vars set without crashing on Pydantic validation. The use sites (`create_access_token`, `verify_token`, `get_current_user`, `get_optional_user`) call `_require_auth_settings()` before any JWT operation; if the sentinel is still present at use time the guard raises clearly. Deployed environments (Cloud Run) inject real values via Secret Manager, so the defaults never fire there.
 
 ---
 
@@ -820,6 +826,7 @@ Three-layer dataset (PE + AR + US) that populates a narrative demo for stakehold
 - **Layer A — `app/db/seed/demo_baseline.sql`:** SQL-only entities that must pre-exist before the API starts: the primary demo supplier institution (PE/AR/US markets, shared), three secondary supplier institutions (one per market), and the demo super-admin user (`demo-admin@vianda.market`). All rows use the `dddddddd-dec0-` UUID prefix and are idempotent (`ON CONFLICT ... DO UPDATE`). Does NOT create addresses, institution entities, or restaurants — those live in Layer B so they pass through Mapbox geocoding.
 - **Layer B — `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`:** Newman collection (~900+ requests, PE + AR + US) running the full mock-Stripe happy path across all three markets. Per-market flow: Mapbox suggest→create for supplier office address → Mapbox suggest→create for each restaurant address → upsert institution entities by `canonical_key` → upsert restaurants → products/plates/PKDs → plan → 7 customer signups (email-verified, neighborhood addresses via Mapbox) → 5–7 subscriptions → order loops → reviews. Additionally seeds employer institutions (3 markets), employer entities/offices (Mapbox addresses), employee signups, enrolments, and secondary supplier institutions (canonical_key entity upsert). Settlement pipeline runs in folder 45 for primary suppliers.
 - **Layer C — `app/db/seed/demo_billing_backfill.sql`:** SQL run after Newman. Inserts 2 billing rows per secondary supplier (1 pending + 1 paid) to populate vianda-platform Billing/Invoices/Payouts pages. Secondary supplier entity UUIDs are DB-assigned at Newman runtime; Layer C resolves them by `canonical_key` (`DEMO_INSTITUTION_ENTITY_PE2/AR2/US2`). Will raise an error if Layer B has not run.
+- **Dev wrapper — `app/db/build_dev_db.sh`:** One-command dev-rebuild driver above the demo loader. Calls `build_kitchen_db.sh` (schema + reference + dev fixtures) then `load_demo_data.sh` (demo_baseline.sql + 900 Newman seed). Pass `--target=local|gcp-dev` (forwarded to the loader). Used by the `db-reset-dev.yml` GH Actions workflow (`--target=gcp-dev`) and by devs locally (default `--target=local`). `build_kitchen_db.sh` itself stays the primitive — staging/prod composition (when those envs exist) will compose from it without the demo layer.
 - **Loader — `scripts/load_demo_data.sh`:** Runs Layer A [1/5], generates and hashes a random demo-admin password [2/5], probes the API health endpoint [3/5], runs Newman [4/5], and runs Layer C billing backfill [5/5]. Prints credentials to stdout and `.demo_credentials.local` (gitignored). Two targets: `--target=local` (default; requires `PAYMENT_PROVIDER=mock`, runs against laptop API on `:8000`) and `--target=gcp-dev` (drives the deployed dev API, confirms PaymentIntents directly against Stripe sandbox using `STRIPE_SECRET_KEY` test key). Always refuses on non-`dev` ENV or staging/prod-smelling hosts.
 - **GCP wrapper — `scripts/load_demo_data_gcp.sh`:** Convenience wrapper for the `gcp-dev` target. Discovers project/region/Cloud Run URL/Cloud SQL instance from gcloud; starts `cloud-sql-proxy` in the background (trap-cleaned on exit); pulls `STRIPE_SECRET_KEY` and the dev DB password from Secret Manager; execs the underlying loader. Accepts `--purge` and `--purge-only` for one-command resets. Refuses any stack other than `dev`.
 - **Purge — `scripts/purge_demo_data.sh`:** Deletes all demo rows in child-first dependency order, wrapped in a single transaction. Matches: UUID prefix `dddddddd-dec0-` (institutions, admin user, dec0-prefixed entities), canonical key `DEMO_*` (restaurants, plates, plans, employer entities, Newman-created supplier entities), username patterns (`demo.cliente.%@vianda.demo` etc.), and `dddddddd-dec0-0050%` bill IDs (Layer C billing rows whose entity FKs are dynamic). Transactional descendants (subscriptions, orders, reviews, pipeline billing rows) carry system-generated UUIDs and are matched via FK chains.
