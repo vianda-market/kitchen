@@ -31,6 +31,60 @@
       }
     ]
   },
+  "suggest_AR": {
+    "suggestions": [
+      {
+        "name": "Avenida Santa Fe 2567",
+        "mapbox_id": "dXJuOm1ieHBsYzo0NTk2Mjg",
+        "full_address": "Avenida Santa Fe 2567, C1425 Buenos Aires, Argentina",
+        "place_formatted": "C1425 Buenos Aires, Argentina",
+        "context": {
+          "country": {"country_code": "AR", "name": "Argentina"},
+          "region": {"name": "Buenos Aires"},
+          "place": {"name": "Buenos Aires"},
+          "postcode": {"name": "C1425"},
+          "street": {"name": "Avenida Santa Fe"},
+          "address": {"address_number": "2567"}
+        }
+      }
+    ]
+  },
+  "suggest_PE": {
+    "suggestions": [
+      {
+        "name": "Larco 345",
+        "mapbox_id": "dXJuOm1ieGFkcjowYTA3NTBiZS1kYmYyLTQxOGItYWI5Yy1iNTQ2ZDE3MzRlMDk",
+        "full_address": "Larco 345, Miraflores, Lima, Peru",
+        "place_formatted": "Miraflores, Lima, Peru",
+        "context": {
+          "country": {"country_code": "PE", "name": "Peru"},
+          "region": {"name": "Lima"},
+          "place": {"name": "Lima"},
+          "postcode": {"name": "15074"},
+          "street": {"name": "Larco"},
+          "address": {"address_number": "345"}
+        }
+      }
+    ]
+  },
+  "suggest_US": {
+    "suggestions": [
+      {
+        "name": "Pine Street 401",
+        "mapbox_id": "dXJuOm1ieGFkcjo5OWNlMTlmYi1jMzMwLTQ0YzMtODVmNS1hZWRmOTFlMmYxNzk",
+        "full_address": "401 Pine Street, Seattle, WA 98101, United States",
+        "place_formatted": "Seattle, WA 98101, United States",
+        "context": {
+          "country": {"country_code": "US", "name": "United States"},
+          "region": {"name": "Washington"},
+          "place": {"name": "Seattle"},
+          "postcode": {"name": "98101"},
+          "street": {"name": "Pine Street"},
+          "address": {"address_number": "401"}
+        }
+      }
+    ]
+  },
   "retrieve": {
     "dXJuOm1ieHBsYzo0NTk2Mjg": {
       "type": "Feature",
@@ -67,6 +121,44 @@
           "postcode": {"name": "C1043"},
           "street": {"name": "Avenida Corrientes"},
           "address": {"address_number": "1234"}
+        }
+      }
+    },
+    "dXJuOm1ieGFkcjowYTA3NTBiZS1kYmYyLTQxOGItYWI5Yy1iNTQ2ZDE3MzRlMDk": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-77.0282, -12.1191]
+      },
+      "properties": {
+        "mapbox_id": "dXJuOm1ieGFkcjowYTA3NTBiZS1kYmYyLTQxOGItYWI5Yy1iNTQ2ZDE3MzRlMDk",
+        "full_address": "Larco 345, Miraflores, Lima, Peru",
+        "context": {
+          "country": {"country_code": "PE", "name": "Peru"},
+          "region": {"name": "Lima"},
+          "place": {"name": "Lima"},
+          "postcode": {"name": "15074"},
+          "street": {"name": "Larco"},
+          "address": {"address_number": "345"}
+        }
+      }
+    },
+    "dXJuOm1ieGFkcjo5OWNlMTlmYi1jMzMwLTQ0YzMtODVmNS1hZWRmOTFlMmYxNzk": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3357, 47.6101]
+      },
+      "properties": {
+        "mapbox_id": "dXJuOm1ieGFkcjo5OWNlMTlmYi1jMzMwLTQ0YzMtODVmNS1hZWRmOTFlMmYxNzk",
+        "full_address": "401 Pine Street, Seattle, WA 98101, United States",
+        "context": {
+          "country": {"country_code": "US", "name": "United States"},
+          "region": {"name": "Washington"},
+          "place": {"name": "Seattle"},
+          "postcode": {"name": "98101"},
+          "street": {"name": "Pine Street"},
+          "address": {"address_number": "401"}
         }
       }
     }
