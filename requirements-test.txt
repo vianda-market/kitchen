@@ -37,4 +37,4 @@ sqlfluff>=3.0.0  # SQL linting for migrations (config in .sqlfluff, baseline in 
 types-requests>=2.31.0
 types-PyYAML>=6.0.0
 types-pytz>=2024.1
-types-python-dateutil>=2.9.0
+types-python-dateutil>=2.9.0.20260508
