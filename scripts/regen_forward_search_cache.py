@@ -11,7 +11,7 @@ Requires MAPBOX_ACCESS_TOKEN_DEV_PERSISTENT to be set in .env or environment.
 
 Cost estimate: 24 calls × $5/1000 ≈ $0.12 total.
 
-Cache key format (from mapbox_geocode_cache.make_cache_key):
+Cache key format (from mapbox_geocode_cache.make_forward_search_key):
   forward_search|<normalized_q>|<country>|<language>|permanent=true
 
 Provider parameters (from GeocodingAutocompleteProvider.suggest):
@@ -87,7 +87,7 @@ def _log(msg: str, *, err: bool = False) -> None:
 
 def _remove_existing_forward_search_entries(queries: list[tuple[str, str, str, str]]) -> None:
     """Remove pre-existing forward_search cache entries so record mode hits the live API."""
-    from app.gateways.mapbox_geocode_cache import make_cache_key
+    from app.gateways.mapbox_geocode_cache import make_forward_search_key
 
     if not _CACHE_FILE.exists():
         return
@@ -96,15 +96,14 @@ def _remove_existing_forward_search_entries(queries: list[tuple[str, str, str, s
 
     removed = 0
     for _label, query, country, language in queries:
-        key = make_cache_key(
-            "forward_search",
+        key = make_forward_search_key(
             q=query,
             country=country.lower(),
             language=language,
             permanent=True,
         )
         if key in data:
-            _log(f"Removing stale entry: q={query!r} country={country!r}")
+            _log(f"Removing stale entry: {key!r}")
             del data[key]
             removed += 1
 

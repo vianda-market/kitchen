@@ -55,7 +55,7 @@ def _log(msg: str, *, err: bool = False) -> None:
 
 def _remove_existing_permanent_entries(addresses: list[tuple[str, str | None, str]]) -> None:
     """Remove pre-existing permanent=true cache entries so record mode hits the live API."""
-    from app.gateways.mapbox_geocode_cache import make_cache_key
+    from app.gateways.mapbox_geocode_cache import make_geocode_key
 
     if not _CACHE_FILE.exists():
         return
@@ -64,9 +64,9 @@ def _remove_existing_permanent_entries(addresses: list[tuple[str, str | None, st
 
     removed = 0
     for q, country, language in addresses:
-        key = make_cache_key("geocode", q=q, country=country or "", language=language, permanent=True)
+        key = make_geocode_key(q=q, country=country or "", language=language, permanent=True)
         if key in data:
-            _log(f"Removing stale entry: q={q!r} country={country!r}")
+            _log(f"Removing stale entry: {key!r}")
             del data[key]
             removed += 1
 
@@ -134,9 +134,12 @@ def main() -> int:
     # Create a fresh permanent gateway (not the singleton, to avoid reuse of cached instance).
     gw = MapboxGeocodingGateway(permanent=True)
 
+    from app.gateways.mapbox_geocode_cache import make_geocode_key
+
     success = 0
     for q, country, language in addresses:
-        _log(f"Recording from live API: q={q!r} country={country!r}")
+        key = make_geocode_key(q=q, country=country or "", language=language, permanent=True)
+        _log(f"Recording from live API: key={key!r}")
         try:
             # call() handles record mode: cache miss → live API → write cache.
             # Note: the permanent=true and permanent=false endpoints return identical
