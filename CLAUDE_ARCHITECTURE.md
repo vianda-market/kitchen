@@ -100,7 +100,7 @@ app/
 │   ├── route_factory.py     # create_crud_routes, create_*_routes()
 │   ├── versioned_route_factory.py
 │   ├── billing/             # client_bill, institution_billing, supplier_invoice_service, tax_doc_service
-│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, etc.
+│   ├── cron/                # billing_events, currency_refresh, holiday_refresh, wikidata_enrichment, supplier_stall_detection, city_centroid_job (weekly — recomputes centroid_lat/lng on core.city_metadata), etc.
 │   ├── leads_public_service.py # Public restaurant/plan projections, lead interest CRUD, cuisine/range enums
 │   ├── ingredient_service.py # OFF-backed search, custom ingredient creation, product ingredient management
 │   ├── onboarding_service.py # Supplier/employer onboarding checklist, status, admin summary
@@ -266,7 +266,7 @@ Both endpoints require `get_current_user` (Bearer JWT). No role restriction — 
    - **`crud_routes.py`** → Admin/System CRUD (no user context): Product, Plan, Restaurant, CreditCurrency, Institution, Plate, Geolocation, InstitutionEntity.
    - **`crud_routes_user.py`** → User CRUD (user_id from `current_user`): Subscription, PaymentMethod; includes subscription_payment (with-payment, confirm-payment) before generic CRUD.
 4. **Route factory** (`app/services/route_factory.py`) generates standard CRUD routes via `create_plan_routes()`, `create_product_routes()`, etc.
-5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads. (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
+5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads, admin city_centroid (POST /admin/city-centroid/recompute — manual trigger for weekly centroid cron job). (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
 6. **Registration order:** Institution entities router registered before CRUD so `/enriched` matches before `/{entity_id}`. Manual/custom routes must be registered before auto-generated if they share paths (FastAPI matches first).
 7. **Composite-create pattern:** When an entity spans multiple tables by lifecycle, `POST` accepts optional embedded sub-resource blocks in a single transaction (`commit=False` chaining). Updates stay granular per sub-resource. Applied to: institutions (+ supplier_terms + institution_market), products (+ ingredient_ids), markets (+ billing_config). See `docs/api/internal/COMPOSITE_CREATE_PATTERN.md`.
 
@@ -310,7 +310,7 @@ Request
 |----------|---------|------|
 | Infrastructure | `/health`, `/pool-stats` | `/health` none; `/pool-stats` JWT |
 | Versioned v1 | `/api/v1/plans/`, `/api/v1/restaurants/` | JWT |
-| Admin (versioned) | `/api/v1/admin/archival/*`, `/api/v1/admin/archival-config/*`, `/api/v1/admin/discretionary/*`, `/api/v1/admin/markets/*`, `/api/v1/admin/leads/*` | Internal |
+| Admin (versioned) | `/api/v1/admin/archival/*`, `/api/v1/admin/archival-config/*`, `/api/v1/admin/city-centroid/*`, `/api/v1/admin/discretionary/*`, `/api/v1/admin/markets/*`, `/api/v1/admin/leads/*` | Internal |
 | Super-Admin (versioned) | `/api/v1/super-admin/discretionary/*` | Super Admin only |
 | Webhooks | `/api/v1/webhooks/*` | Stripe signature |
 | Leads | `/api/v1/leads/*` | None, rate-limited, reCAPTCHA v3 required (exempt for b2c-mobile, **also exempt for `/leads/countries` and `/leads/supplier-countries`** — navbar-load fetches) |
