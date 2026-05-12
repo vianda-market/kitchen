@@ -4,6 +4,7 @@ Admin Discretionary Credit Routes
 Routes for kitchen administrators to create and manage discretionary credit requests.
 """
 
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -30,10 +31,10 @@ discretionary_service = DiscretionaryService()
 @router.post("/requests", response_model=DiscretionaryResponseSchema)
 def create_discretionary_request(
     request: DiscretionaryCreateSchema,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """
     Create a discretionary credit request.
 
@@ -53,8 +54,8 @@ def create_discretionary_request(
 
 @router.get("/requests", response_model=list[DiscretionaryResponseSchema])
 def get_discretionary_requests(
-    current_user: dict = Depends(get_employee_user), db: psycopg2.extensions.connection = Depends(get_db)
-):
+    current_user: dict[str, Any] = Depends(get_employee_user), db: psycopg2.extensions.connection = Depends(get_db)
+) -> Any:
     """
     Get all discretionary requests created by the current admin.
 
@@ -71,10 +72,10 @@ def get_discretionary_requests(
 @router.get("/requests/{request_id}", response_model=DiscretionaryResponseSchema)
 def get_discretionary_request(
     request_id: UUID,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """
     Get a specific discretionary request by ID.
 
@@ -96,10 +97,10 @@ def get_discretionary_request(
 def update_discretionary_request(
     request_id: UUID,
     request_update: DiscretionaryUpdateSchema,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """
     Update a discretionary request (only if still pending).
 
@@ -133,9 +134,9 @@ def update_discretionary_request(
 
 @router.get("/pending-requests", response_model=list[DiscretionarySummarySchema])
 def get_pending_discretionary_requests(
-    current_user: dict = Depends(get_admin_user),  # Admin and Super Admin can view
+    current_user: dict[str, Any] = Depends(get_admin_user),  # Admin and Super Admin can view
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> list[DiscretionarySummarySchema]:  # explicitly constructs DiscretionarySummarySchema below
     """
     Get all pending discretionary requests for admin dashboard.
 

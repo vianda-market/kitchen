@@ -5,6 +5,8 @@ Read-only endpoints for the superadmin city/country promotion UI.
 Queries raw GeoNames tables in the `external` schema.
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from psycopg2.extensions import connection
 from pydantic import BaseModel
@@ -53,9 +55,9 @@ class GeonamesCityResponse(BaseModel):
 
 @router.get("/countries", response_model=list[GeonamesCountryResponse])
 async def list_geonames_countries(
-    current_user: dict = Depends(get_super_admin_user),
+    current_user: dict[str, Any] = Depends(get_super_admin_user),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """
     List all countries from external.geonames_country.
 
@@ -75,9 +77,9 @@ async def list_geonames_countries(
 @router.get("/provinces", response_model=list[GeonamesProvinceResponse])
 async def list_geonames_provinces(
     country_iso: str = Query(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 country code"),
-    current_user: dict = Depends(get_super_admin_user),
+    current_user: dict[str, Any] = Depends(get_super_admin_user),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """
     List admin1 provinces for a given country from external.geonames_admin1.
 
@@ -101,9 +103,9 @@ async def list_geonames_cities(
     country_iso: str = Query(..., min_length=2, max_length=2, description="ISO 3166-1 alpha-2 country code"),
     admin1_code: str | None = Query(None, description="Admin1 code to filter provinces"),
     q: str | None = Query(None, description="Search string (matches ascii_name, case-insensitive)"),
-    current_user: dict = Depends(get_super_admin_user),
+    current_user: dict[str, Any] = Depends(get_super_admin_user),
     db: connection = Depends(get_db),
-):
+) -> Any:
     """
     List cities for a given country from external.geonames_city.
 

@@ -6,6 +6,7 @@ Routes for internal administrators to manage referral program configuration per 
 and trigger the referral cron job.
 """
 
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -32,9 +33,9 @@ router = APIRouter(
 
 @router.get("", response_model=list[ReferralConfigResponseSchema])
 def list_referral_configs(
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """List all referral configurations (one per market)."""
     configs = referral_config_service.get_all(db, include_archived=False)
     return configs
@@ -42,9 +43,9 @@ def list_referral_configs(
 
 @router.get("/enriched", response_model=list[ReferralConfigEnrichedResponseSchema])
 def list_referral_configs_enriched(
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """List all referral configurations with market name and country code."""
     rows = db_read(
         """
@@ -68,10 +69,10 @@ def list_referral_configs_enriched(
 @router.get("/{market_id}", response_model=ReferralConfigResponseSchema)
 def get_referral_config_by_market(
     market_id: UUID,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """Get referral configuration for a specific market."""
     rows = db_read(
         "SELECT * FROM referral_config WHERE market_id = %s AND is_archived = FALSE",
@@ -87,10 +88,10 @@ def get_referral_config_by_market(
 def update_referral_config(
     market_id: UUID,
     update: ReferralConfigUpdateSchema,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """Update referral configuration for a market."""
     rows = db_read(
         "SELECT referral_config_id FROM referral_config WHERE market_id = %s AND is_archived = FALSE",
@@ -113,8 +114,8 @@ def update_referral_config(
 
 @router.post("/run-cron", status_code=200)
 def run_referral_cron_endpoint(
-    current_user: dict = Depends(get_employee_user),
-):
+    current_user: dict[str, Any] = Depends(get_employee_user),
+) -> dict[str, Any]:
     """Run the referral cron job. Internal only."""
     from app.services.cron.referral_cron import run_referral_cron
 

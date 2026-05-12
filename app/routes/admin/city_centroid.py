@@ -18,7 +18,7 @@ router = APIRouter(prefix="/admin/city-centroid", tags=["Admin - City Centroid"]
 
 
 @router.post("/recompute", response_model=dict[str, Any])
-async def recompute_city_centroids(current_user: dict = Depends(get_current_user)):
+async def recompute_city_centroids(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """
     Manually trigger city centroid recomputation for all active cities.
 
@@ -35,7 +35,7 @@ async def recompute_city_centroids(current_user: dict = Depends(get_current_user
     Requires authentication (any authenticated user).
     """
 
-    def _recompute():
+    def _recompute() -> dict[str, Any]:
         log_info(f"[city-centroid] Manual recompute triggered by user {current_user['user_id']}")
         result = weekly_entry()
         if not result.get("success"):
