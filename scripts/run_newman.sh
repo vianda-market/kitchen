@@ -36,9 +36,11 @@ SKIPPED_COLLECTIONS=(
     # under kitchen#87 (post-sweep quality-debt cleanup).
     "008"  # ROLE AND FIELD ACCESS — assertion text-matches K7-generalized message
     "010"  # Permissions Testing - Employee-Only Access — same as 008
-    "900"  # DEMO_DAY_SEED — runs only via load_demo_data.sh; needs runtime demo-admin password not in CI env
-    "022"  # MAPS_CITY_PINS — depends on 900's demo data (Lima/PE restaurants); skip until 900 is seeded
-    "023"  # CITY_CENTROID_RECOMPUTE — depends on 900's demo data (cities with active restaurants); skip until 900 is seeded
+    "900"  # DEMO_DAY_SEED — invoked by load_demo_data.sh with runtime-generated password;
+           # cannot run standalone via run_newman.sh (no demoAdminPassword in env).
+           # In CI, ci.yml's "Seed demo data" step runs it before the Newman gate.
+    # 022 MAPS_CITY_PINS — restored in kitchen#306: ci.yml now seeds demo data first.
+    # 023 CITY_CENTROID_RECOMPUTE — restored in kitchen#306: ci.yml now seeds demo data first.
 )
 
 is_skipped() {

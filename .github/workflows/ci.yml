@@ -480,10 +480,12 @@ jobs:
           done
           curl -sf http://localhost:8000/docs > /dev/null || { echo "Server failed to start"; exit 1; }
 
-      - name: Run Postman collections
-        # Only collections that pass on current main. Others are a known backlog:
-        # NOTE: 010 archives the customer at the end (by design — see its description),
-        # so it must run after every collection that needs customer login (011-014).
+      - name: Run Postman collections (main suite)
+        # Run all main collections BEFORE the demo-data seed to avoid DB-state
+        # cross-contamination. The seed's settlement pipeline creates currency/
+        # billing data that shifts spread-floor validation and breaks plan upserts
+        # in collection 000 and login flows in 013/014 when run post-seed.
+        # 010 archives the customer at the end (by design), so it runs last.
         # TODO: re-enable 009 — POST /customer/payment-methods/setup-session returns 500 in CI
         # (mock provider) for the fresh 000-created customer. Does not reproduce locally even
         # with PAYMENT_PROVIDER=mock. Likely a backend bug in _ensure_stripe_customer_for_mock
@@ -493,6 +495,19 @@ jobs:
         # supplier_invoice_service.get_by_id returns None immediately after insert+commit.
         # The rest of 012 runs cleanly; re-enable after this backend bug is fixed.
         run: bash scripts/run_newman.sh 000 001 002 003 004 005 006 007 008 011 013 014 015 016 017 018 010
+
+      - name: Seed demo data (900_DEMO_DAY_SEED + billing backfill)
+        # load_demo_data.sh generates its own random password, bcrypt-hashes it,
+        # updates demo-admin@vianda.market in the DB, then runs collection 900 via
+        # newman with that password injected at runtime. No GH secret is needed.
+        # Runs AFTER the main suite so settlement pipeline data doesn't contaminate
+        # main-suite plan/auth assertions.
+        run: bash scripts/load_demo_data.sh --target=local
+
+      - name: Run demo-dependent collections (022 and 023)
+        # 022 MAPS_CITY_PINS and 023 CITY_CENTROID_RECOMPUTE depend on demo restaurants
+        # and city centroids created by the 900 seed above.
+        run: bash scripts/run_newman.sh 022 023
 
       - name: Stop server
         if: always()

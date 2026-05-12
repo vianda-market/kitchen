@@ -58,6 +58,54 @@ class TestMapboxSearchGatewaySuggest:
         assert call_args[1]["params"]["country"] == "AR"
         assert call_args[1]["params"]["session_token"] == "tok-123"
 
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_dev_mode_suggest_routes_by_country_pe(self, mock_settings, _mock_token):
+        """suggest(country='PE') returns the suggest_PE mock entry, not the generic AR one."""
+        mock_settings.return_value = Mock(DEV_MODE=True)
+        gw = MapboxSearchGateway()
+        result = gw.suggest(query="Grau 323, Barranco, Lima", country="PE")
+        assert "suggestions" in result
+        assert len(result["suggestions"]) > 0
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
+        assert country_code == "PE", f"Expected PE, got {country_code}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_dev_mode_suggest_routes_by_country_us(self, mock_settings, _mock_token):
+        """suggest(country='US') returns the suggest_US mock entry."""
+        mock_settings.return_value = Mock(DEV_MODE=True)
+        gw = MapboxSearchGateway()
+        result = gw.suggest(query="Pike Street, Seattle", country="US")
+        assert "suggestions" in result
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
+        assert country_code == "US", f"Expected US, got {country_code}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_dev_mode_suggest_falls_back_to_generic_when_no_country(self, mock_settings, _mock_token):
+        """suggest with no country falls back to the generic 'suggest' key (AR data)."""
+        mock_settings.return_value = Mock(DEV_MODE=True)
+        gw = MapboxSearchGateway()
+        result = gw.suggest(query="some address")
+        assert "suggestions" in result
+        # Generic fallback is AR data
+        country_code = result["suggestions"][0].get("context", {}).get("country", {}).get("country_code", "")
+        assert country_code == "AR", f"Expected AR fallback, got {country_code}"
+
+    @patch("app.config.settings.get_mapbox_access_token", return_value=None)
+    @patch("app.gateways.base_gateway.get_settings")
+    def test_dev_mode_retrieve_pe_place_id_returns_pe_feature(self, mock_settings, _mock_token):
+        """retrieve with a PE geocoding-cache place_id returns a PE Feature."""
+        mock_settings.return_value = Mock(DEV_MODE=True)
+        gw = MapboxSearchGateway()
+        # This place_id comes from the geocoding cache (Grau 323, Barranco, Lima)
+        pe_place_id = "dXJuOm1ieGFkcjowNjFhMjM5Ni02ZDAyLTRmMDItYmU0OS0zNTQ0YzFkYWUyMTQ"
+        result = gw.retrieve(mapbox_id=pe_place_id)
+        assert result.get("type") == "Feature"
+        country_code = result.get("properties", {}).get("context", {}).get("country", {}).get("country_code", "")
+        assert country_code == "PE", f"Expected PE, got {country_code}"
+
 
 class TestMapboxSearchGatewaySingleton:
     @patch("app.config.settings.get_mapbox_access_token", return_value=None)

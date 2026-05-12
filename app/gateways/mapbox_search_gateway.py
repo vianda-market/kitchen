@@ -49,7 +49,13 @@ class MapboxSearchGateway(BaseGateway):
         return self._load_mock_file("mapbox_search_mocks.json")
 
     def _get_mock_response(self, operation: str, **kwargs) -> Any:
-        """Override to support retrieve keyed by mapbox_id."""
+        """Override to support retrieve keyed by mapbox_id and suggest keyed by country.
+
+        For 'suggest': if the mock file has a top-level key matching the requested
+        country code (e.g. 'suggest_PE', 'suggest_US'), that entry is returned.
+        Falls back to the generic 'suggest' key when no country-specific entry exists.
+        This lets CI seed multi-country demo data without a live Mapbox token.
+        """
         if not self._mock_data:
             raise ExternalServiceError("Mock data not loaded")
         if operation == "retrieve":
@@ -64,6 +70,16 @@ class MapboxSearchGateway(BaseGateway):
                     logger.info(f"Returning mock response for {self.service_name}.{operation} (fallback)")
                     return data[first_key]
             raise ExternalServiceError(f"Mock response not configured for operation '{operation}' with mapbox_id")
+        if operation == "suggest":
+            country = (kwargs.get("country") or "").upper()
+            country_key = f"suggest_{country}" if country else None
+            if country_key and country_key in self._mock_data:
+                logger.info(f"Returning mock response for {self.service_name}.suggest (country={country})")
+                return self._mock_data[country_key]
+            if "suggest" in self._mock_data:
+                logger.info(f"Returning mock response for {self.service_name}.suggest (generic fallback)")
+                return self._mock_data["suggest"]
+            raise ExternalServiceError("Mock response not configured for operation 'suggest'")
         if operation not in self._mock_data:
             raise ExternalServiceError(
                 f"Mock response not configured for operation '{operation}'. Available: {list(self._mock_data.keys())}"
