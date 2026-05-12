@@ -740,10 +740,10 @@ class TestPermanentCacheShortCircuit:
 
     def test_permanent_cache_key_is_distinct_from_ephemeral(self):
         """permanent=true and permanent=false produce different cache keys."""
-        from app.gateways.mapbox_geocode_cache import make_cache_key
+        from app.gateways.mapbox_geocode_cache import make_geocode_key
 
-        eph = make_cache_key("geocode", q="500 defensa, buenos aires, ar", language="es", permanent=False)
-        perm = make_cache_key("geocode", q="500 defensa, buenos aires, ar", language="es", permanent=True)
+        eph = make_geocode_key(q="500 defensa, buenos aires, ar", country="", language="es", permanent=False)
+        perm = make_geocode_key(q="500 defensa, buenos aires, ar", country="", language="es", permanent=True)
         assert eph != perm
         assert eph.endswith("|permanent=false")
         assert perm.endswith("|permanent=true")

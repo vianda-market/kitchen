@@ -22,7 +22,14 @@ from typing import Any
 import requests
 
 from app.gateways.base_gateway import BaseGateway, ExternalServiceError
-from app.gateways.mapbox_geocode_cache import CacheMode, MapboxCacheMiss, get_geocode_cache, make_cache_key
+from app.gateways.mapbox_geocode_cache import (
+    CacheMode,
+    MapboxCacheMiss,
+    get_geocode_cache,
+    make_forward_search_key,
+    make_geocode_key,
+    make_reverse_geocode_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +171,32 @@ class MapboxGeocodingGateway(BaseGateway):
             return super().call(operation, **kwargs)
 
         # Inject the permanent flag so ephemeral / permanent entries never share a key.
-        key = make_cache_key(operation, **{**kwargs, "permanent": self._permanent})
+        perm = self._permanent
+        if operation == "geocode":
+            key = make_geocode_key(
+                q=kwargs.get("q", ""),
+                country=kwargs.get("country") or "",
+                language=kwargs.get("language") or "",
+                permanent=perm,
+            )
+        elif operation == "forward_search":
+            key = make_forward_search_key(
+                q=kwargs.get("q", ""),
+                country=kwargs.get("country") or "",
+                language=kwargs.get("language") or "",
+                permanent=perm,
+            )
+        elif operation == "reverse_geocode":
+            key = make_reverse_geocode_key(
+                latitude=str(kwargs.get("latitude", "")),
+                longitude=str(kwargs.get("longitude", "")),
+                language=kwargs.get("language") or "",
+                permanent=perm,
+            )
+        else:
+            # Unknown operation: fall back to a deterministic key without taint concern.
+            tail = "|".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
+            key = f"{operation}|{tail}"
         hit = cache.get(key)
         if hit is not None:
             logger.info("mapbox_geocode_cache: hit for %r", key)

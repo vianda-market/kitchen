@@ -21,7 +21,8 @@ import pytest
 from app.gateways.mapbox_geocode_cache import (
     MapboxCacheMiss,
     MapboxGeocodeCache,
-    make_cache_key,
+    make_forward_search_key,
+    make_geocode_key,
 )
 from app.services.address_autocomplete_service import (
     GeocodingAutocompleteProvider,
@@ -251,29 +252,29 @@ class TestGeocodingAutocompleteProvider:
 
 class TestForwardSearchCacheKey:
     def test_forward_search_key_differs_from_geocode_key(self):
-        geo_key = make_cache_key("geocode", q="av santa fe 2567", country="ar", language="es", permanent=True)
-        fwd_key = make_cache_key("forward_search", q="av santa fe 2567", country="ar", language="es", permanent=True)
+        geo_key = make_geocode_key(q="av santa fe 2567", country="ar", language="es", permanent=True)
+        fwd_key = make_forward_search_key(q="av santa fe 2567", country="ar", language="es", permanent=True)
         assert geo_key != fwd_key
         assert fwd_key.startswith("forward_search|")
         assert geo_key.startswith("geocode|")
 
     def test_forward_search_key_includes_permanent_flag(self):
-        k_false = make_cache_key("forward_search", q="test", country="ar", language="es", permanent=False)
-        k_true = make_cache_key("forward_search", q="test", country="ar", language="es", permanent=True)
+        k_false = make_forward_search_key(q="test", country="ar", language="es", permanent=False)
+        k_true = make_forward_search_key(q="test", country="ar", language="es", permanent=True)
         assert k_false != k_true
         assert k_false.endswith("|permanent=false")
         assert k_true.endswith("|permanent=true")
 
     def test_forward_search_key_normalizes_query(self):
-        k1 = make_cache_key("forward_search", q="  Av. Santa FE ", language="es")
-        k2 = make_cache_key("forward_search", q="av. santa fe", language="es")
+        k1 = make_forward_search_key(q="  Av. Santa FE ", country="", language="es", permanent=False)
+        k2 = make_forward_search_key(q="av. santa fe", country="", language="es", permanent=False)
         assert k1 == k2
 
     def test_forward_search_and_geocode_can_coexist_in_cache(self, tmp_path):
         """Both entry kinds can live in the same cache file without collision."""
         cache_path = tmp_path / "cache.json"
-        geocode_key = make_cache_key("geocode", q="av santa fe 2567", country="ar", language="es", permanent=True)
-        fwd_key = make_cache_key("forward_search", q="av santa fe", country="ar", language="es", permanent=True)
+        geocode_key = make_geocode_key(q="av santa fe 2567", country="ar", language="es", permanent=True)
+        fwd_key = make_forward_search_key(q="av santa fe", country="ar", language="es", permanent=True)
         assert geocode_key != fwd_key
 
         cache = MapboxGeocodeCache(path=cache_path)
@@ -298,7 +299,7 @@ class TestForwardSearchCacheReplay:
         mock_settings.return_value = Mock(DEV_MODE=False)
         monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
 
-        fwd_key = make_cache_key("forward_search", q="av santa fe", country="ar", language="es", permanent=True)
+        fwd_key = make_forward_search_key(q="av santa fe", country="ar", language="es", permanent=True)
         cached_response = {"features": [GEOCODING_FEATURE], "type": "FeatureCollection"}
         cache_path = tmp_path / "c.json"
         cache_path.write_text(json.dumps({fwd_key: cached_response}))
@@ -338,11 +339,11 @@ class TestForwardSearchCacheReplay:
         mock_settings.return_value = Mock(DEV_MODE=False)
         monkeypatch.setenv("MAPBOX_CACHE_MODE", "replay_only")
 
-        # Use the exact normalized query that make_cache_key will produce for each operation
+        # Use the exact normalized query that each key function will produce for each operation
         query_full = "av santa fe 2567"
         query_partial = "av santa fe"
-        geocode_key = make_cache_key("geocode", q=query_full, country="ar", language="es", permanent=True)
-        fwd_key = make_cache_key("forward_search", q=query_partial, country="ar", language="es", permanent=True)
+        geocode_key = make_geocode_key(q=query_full, country="ar", language="es", permanent=True)
+        fwd_key = make_forward_search_key(q=query_partial, country="ar", language="es", permanent=True)
         # Verify keys are distinct
         assert geocode_key != fwd_key
 
