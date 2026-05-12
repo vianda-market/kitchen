@@ -1,5 +1,7 @@
 # Kitchen
 
+> **Style:** each entry = short imperative header (or bullet) + ≤3 sentences (action + minimum context). Playbook, not tutorial. Match this density when adding new rules.
+
 Vianda marketplace backend — PostgreSQL + FastAPI. Multi-market B2B/B2C food subscription platform.
 
 Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flow. Update it after adding new modules, tables, services, routes, or subsystems.
@@ -20,6 +22,8 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 - Never manually "fix" the `application.py:0` WebSocket baseline entry. Starlette stub versions render `WebSocket` vs `WebSocket[State]` differently, so local mypy disagrees with CI on this single line. Whatever's on `origin/main` is the form CI accepts. If `git diff origin/main -- mypy-baseline.txt` shows that line diverging, run `git checkout origin/main -- mypy-baseline.txt` for it and commit. Modify only when your code change actually touches `application.py:0`.
 - Never merge a kitchen PR without the `deploy:dev` label. `.github/workflows/deploy.yml` triggers on PR-merge ONLY when the label is present; without it the workflow short-circuits with `skipped` and code lands on main but does NOT ship to dev. Add via `gh pr edit <number> --repo vianda-market/kitchen --add-label deploy:dev` before merging. To deploy already-merged code that missed the label: Actions tab → "Deploy Kitchen Backend" → "Run workflow". Verify deploys with `gh run list --repo vianda-market/kitchen --workflow=deploy.yml --limit 5 --json conclusion,event,headBranch,createdAt`.
 - Never add a top-level `paths:` / `paths-ignore:` filter to a required-check workflow (currently `ci.yml`, `mutation.yml` — branch protection requires `CI`, `Mutation Tests (Tier 1)`). The check stays "expected, never reported" on PRs the filter excludes, blocking the PR forever with no recourse short of admin override. Filter *inside* the job with `dorny/paths-filter@v4`, and end the job with an unconditional `if: always()` step whose job `name:` matches the required-check context. `ci.yml`'s top-of-file comment already documents this trap explicitly — preserve it.
+- Never tighten `Settings extra="ignore"` in `app/config/settings.py` without a coordinated cross-repo plan. The flag is what makes kitchen ↔ infra-kitchen-gcp env-var migrations order-independent; tightening turns every new env var into a strict deploy ordering.
+- Never seed multi-country fixtures under a single shared institution. The `restaurant → institution → institution_market → market.country_code` JOIN leaks across countries; use one demo-supplier institution per country, scoped to that country's `market_id`.
 
 ---
 
