@@ -6,6 +6,7 @@ CRUD for geographic ad zones + flywheel state transitions.
 Zones are the targeting unit for the geographic flywheel engine.
 """
 
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -37,9 +38,9 @@ router = APIRouter(prefix="/admin/ad-zones", tags=["Admin Ad Zones"])
 async def create_ad_zone(
     body: AdZoneCreateSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Create a new ad zone for the geographic flywheel.
 
@@ -70,8 +71,8 @@ async def list_ad_zones(
     country_code: str | None = Query(None, min_length=2, max_length=2),
     flywheel_state: str | None = Query(None),
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
-):
+    current_user: dict[str, Any] = Depends(get_employee_user),
+) -> Any:
     """
     List ad zones with optional filters.
 
@@ -84,9 +85,9 @@ async def list_ad_zones(
 async def get_ad_zone(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Get a single ad zone by ID.
 
@@ -103,9 +104,9 @@ async def update_ad_zone(
     zone_id: UUID,
     body: AdZoneUpdateSchema,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Update zone fields (name, neighborhood, budget, radius).
 
@@ -132,9 +133,9 @@ async def transition_ad_zone_state(
     zone_id: UUID,
     new_state: str = Query(..., description="Target flywheel state"),
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Transition a zone's flywheel state.
 
@@ -156,9 +157,9 @@ async def transition_ad_zone_state(
 async def check_ad_zone_overlaps(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> dict[str, Any]:
     """
     Check if a zone overlaps with other active zones.
 
@@ -183,9 +184,9 @@ async def check_ad_zone_overlaps(
 async def delete_ad_zone(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> None:
     """
     Delete an ad zone.
 
@@ -204,8 +205,8 @@ async def delete_ad_zone(
 @router.post("/sync-metrics")
 async def sync_all_zone_metrics(
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
-):
+    current_user: dict[str, Any] = Depends(get_employee_user),
+) -> Any:
     """
     Refresh metrics for all active zones (notify-me leads, restaurants, subscribers).
 
@@ -224,9 +225,9 @@ async def sync_all_zone_metrics(
 async def sync_zone_metrics(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Refresh metrics for a single zone.
 
@@ -244,9 +245,9 @@ async def sync_zone_metrics(
 async def get_zone_audience(
     zone_id: UUID,
     db: psycopg2.extensions.connection = Depends(get_db),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> dict[str, Any]:
     """
     Export hashed notify-me email list for Custom Audience upload.
 

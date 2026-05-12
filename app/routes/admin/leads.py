@@ -5,10 +5,12 @@ Read-only for Phase 1. Future: mark as contacted, bulk export, aggregate charts.
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import get_employee_user
 from app.dependencies.database import get_db
@@ -30,9 +32,9 @@ async def list_lead_interests(
     created_before: datetime | None = Query(None, description="Filter: created on or before this date (ISO 8601)"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Results per page"),
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> JSONResponse:
     """
     List lead interest records with optional filters. Internal employees only.
 
@@ -53,7 +55,6 @@ async def list_lead_interests(
     )
     # Total count as response header for pagination
     from fastapi.encoders import jsonable_encoder
-    from fastapi.responses import JSONResponse
 
     response = JSONResponse(
         content=jsonable_encoder([LeadInterestResponseSchema(**r) for r in rows]),

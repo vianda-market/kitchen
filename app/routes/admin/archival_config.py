@@ -49,11 +49,11 @@ class ArchivalConfigResponse(BaseModel):
 
 @router.get("", response_model=list[ArchivalConfigResponse])
 async def get_all_archival_configs(
-    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
-):
+    current_user: dict[str, Any] = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+) -> list[ArchivalConfigResponse]:
     """Get all archival configurations"""
 
-    def _get_all_archival_configs():
+    def _get_all_archival_configs() -> list[ArchivalConfigResponse]:
         query = """
         SELECT config_id, table_name, category, retention_days, grace_period_days,
                priority, description, is_active, effective_date, modified_by, modified_date
@@ -91,12 +91,12 @@ async def get_all_archival_configs(
 @router.get("/table/{table_name}", response_model=dict[str, Any])
 async def get_table_config(
     table_name: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Get archival configuration for a specific table"""
 
-    def _get_table_config():
+    def _get_table_config() -> dict[str, Any]:
         config = get_table_archival_config(table_name)
         return {
             "table_name": table_name,
@@ -114,13 +114,13 @@ async def get_table_config(
 @router.post("", response_model=dict[str, Any])
 async def create_archival_config(
     config: ArchivalConfigRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Create a new archival configuration"""
 
-    def _create_archival_config():
+    def _create_archival_config() -> dict[str, Any]:
         # Check if configuration already exists
         existing_query = """
         SELECT config_id FROM archival_config WHERE table_name = %s
@@ -165,13 +165,13 @@ async def create_archival_config(
 async def update_archival_config(
     config_id: UUID,
     config: ArchivalConfigRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Update an existing archival configuration"""
 
-    def _update_archival_config():
+    def _update_archival_config() -> dict[str, Any]:
         # Check if configuration exists
         existing_query = """
         SELECT config_id FROM archival_config WHERE config_id = %s
@@ -215,13 +215,13 @@ async def update_archival_config(
 @router.delete("/{config_id}", response_model=dict[str, Any])
 async def delete_archival_config(
     config_id: UUID,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Delete an archival configuration"""
 
-    def _delete_archival_config():
+    def _delete_archival_config() -> dict[str, Any]:
         # Check if configuration exists
         existing_query = """
         SELECT config_id FROM archival_config WHERE config_id = %s
@@ -251,11 +251,11 @@ async def delete_archival_config(
 
 @router.post("/refresh-cache", response_model=dict[str, Any])
 async def refresh_archival_cache(
-    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
-):
+    current_user: dict[str, Any] = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+) -> dict[str, Any]:
     """Refresh the archival configuration cache"""
 
-    def _refresh_archival_cache():
+    def _refresh_archival_cache() -> dict[str, Any]:
         refresh_config_cache()
         return {
             "message": "Archival configuration cache refreshed successfully",
@@ -267,11 +267,11 @@ async def refresh_archival_cache(
 
 @router.get("/priority-order", response_model=list[str])
 async def get_priority_order(
-    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
-):
+    current_user: dict[str, Any] = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+) -> list[str]:
     """Get the current archival priority order"""
 
-    def _get_priority_order():
+    def _get_priority_order() -> list[str]:
         priority_order = get_archival_priority_order()
         return priority_order
 
@@ -280,11 +280,11 @@ async def get_priority_order(
 
 @router.get("/categories", response_model=dict[str, Any])
 async def get_archival_categories(
-    current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
-):
+    current_user: dict[str, Any] = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
+) -> dict[str, Any]:
     """Get available archival categories"""
 
-    def _get_archival_categories():
+    def _get_archival_categories() -> dict[str, Any]:
         categories = []
         for category in ArchivalCategory:
             categories.append(
@@ -303,12 +303,12 @@ async def get_archival_categories(
 @router.get("/history/{config_id}", response_model=list[dict[str, Any]])
 async def get_config_history(
     config_id: UUID,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> list[dict[str, Any]]:
     """Get change history for a specific configuration"""
 
-    def _get_config_history():
+    def _get_config_history() -> list[dict[str, Any]]:
         query = """
         SELECT event_id, table_name, category, retention_days, grace_period_days,
                priority, description, is_active, effective_date, modified_by,

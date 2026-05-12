@@ -5,6 +5,7 @@ API endpoints for managing markets (country-based subscription regions).
 Markets define the countries where the platform operates.
 """
 
+from typing import Any
 from uuid import UUID
 
 import psycopg2.extensions
@@ -39,8 +40,9 @@ router = APIRouter(prefix="/markets", tags=["Markets"])
 
 @router.get("", response_model=list[MarketResponseSchema])
 async def list_markets(
-    status: Status | None = Query(None, description="Filter by status"), current_user: dict = Depends(get_current_user)
-):
+    status: Status | None = Query(None, description="Filter by status"),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> Any:
     """
     List all markets. Non-archived only.
 
@@ -69,10 +71,10 @@ async def list_markets(
 async def list_enriched_markets(
     response: Response,
     pagination: PaginationParams | None = Depends(get_pagination_params),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> list[MarketResponseSchema]:
     """
     List all markets with enriched data (currency details). Non-archived only.
 
@@ -110,10 +112,10 @@ async def list_enriched_markets(
 @router.get("/enriched/{market_id}", response_model=MarketResponseSchema)
 async def get_enriched_market(
     market_id: UUID,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> MarketResponseSchema:
     """
     Get a specific market by ID with enriched data (currency details). Non-archived only.
 
@@ -151,9 +153,9 @@ async def get_enriched_market(
 @router.get("/{market_id}", response_model=MarketResponseSchema)
 async def get_market(
     market_id: UUID,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> Any:
     """
     Get a specific market by ID.
 
@@ -176,7 +178,9 @@ async def get_market(
 
 
 @router.post("", response_model=MarketResponseSchema, status_code=201)
-async def create_market(market_data: MarketCreateSchema, current_user: dict = Depends(get_employee_user)):
+async def create_market(
+    market_data: MarketCreateSchema, current_user: dict[str, Any] = Depends(get_employee_user)
+) -> Any:
     """
     Create a new market.
 
@@ -332,10 +336,10 @@ def upsert_market_by_key(
 async def update_market(
     market_id: UUID,
     market_data: MarketUpdateSchema,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """
     Update an existing market.
 
@@ -522,9 +526,9 @@ def get_market_spread_readout(
 @router.delete("/{market_id}", status_code=204)
 async def archive_market(
     market_id: UUID,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
-):
+) -> None:
     """
     Archive a market (soft delete).
 
@@ -560,10 +564,10 @@ async def archive_market(
 @router.get("/{market_id}/billing-config", response_model=MarketPayoutAggregatorResponseSchema)
 def get_market_billing_config(
     market_id: UUID,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """Get billing configuration for a market. Internal only."""
     config = market_service.get_billing_config(market_id, db)
     if not config:
@@ -575,10 +579,10 @@ def get_market_billing_config(
 def update_market_billing_config(
     market_id: UUID,
     data: MarketBillingConfigUpdateSchema,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """Update billing configuration for a market. Internal only."""
     updated = market_service.update_billing_config(
         market_id,
@@ -594,12 +598,12 @@ def update_market_billing_config(
 @router.get("/{market_id}/billing-config/propagation-preview")
 def preview_billing_propagation(
     market_id: UUID,
-    current_user: dict = Depends(get_employee_user),
+    current_user: dict[str, Any] = Depends(get_employee_user),
     db: psycopg2.extensions.connection = Depends(get_db),
-):
+) -> Any:
     """Preview which suppliers inherit billing defaults from this market. Read-only. Internal only."""
 
-    def _preview():
+    def _preview() -> Any:
         return market_service.get_billing_propagation_preview(market_id, db)
 
     return handle_business_operation(_preview, "billing propagation preview")
