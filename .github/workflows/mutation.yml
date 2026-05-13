@@ -100,11 +100,15 @@ jobs:
           # `mutants/` directory. The mutmut-2 name `.mutmut-cache/` is
           # obsolete and caused silent "Path does not exist" warnings on
           # the first main run — cache was never written.
+          # Cache key bumped to v2 after the plate→vianda rename (kitchen#273):
+          # stale main-branch caches still contained `mutants/app/tests/services/
+          # test_plate_pickup_service.py` that ImportError'd against the renamed
+          # source. The bump invalidates pre-rename caches across all branches.
           path: mutants
-          key: mutmut-${{ github.ref }}-${{ github.sha }}
+          key: mutmut-v2-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            mutmut-${{ github.ref }}-
-            mutmut-refs/heads/main-
+            mutmut-v2-${{ github.ref }}-
+            mutmut-v2-refs/heads/main-
 
       - name: Run mutation tests
         # mutmut run is incremental by default: files it has already seen
