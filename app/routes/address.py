@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.auth.dependencies import get_current_user, oauth2_scheme
 from app.config.address_autocomplete_config import get_address_autocomplete_config
+from app.config.enums.address_types import AddressType
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -92,11 +93,18 @@ def address_suggest(
 def list_enriched_addresses(
     response: Response,
     institution_id: UUID | None = institution_filter(),
+    address_type: list[AddressType] | None = Query(
+        None,
+        description=(
+            "Filter by address type(s). Repeated param: ?address_type=restaurant&address_type=entity_billing. "
+            "Uses array-overlap semantics — returns addresses whose address_type array includes any of the given values."
+        ),
+    ),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Internal dropdown scoping). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
+    """List all addresses with enriched data (institution_name, user_username, user_first_name, user_last_name). Optional institution_id filters by institution (B2B Internal dropdown scoping). Optional address_type filters by address type (array-overlap). Customers: home/billing = created by user; employer = only assigned employer_address_id. Non-archived only."""
     if current_user.get("role_type") == "customer":
         user_scope = get_user_scope(current_user)
 
@@ -115,6 +123,8 @@ def list_enriched_addresses(
 
     scope = EntityScopingService.get_scope_for_entity(ENTITY_ADDRESS, current_user)
     effective_institution_id = resolve_institution_filter(institution_id, scope)
+    # Coerce AddressType enum values to plain strings for the service layer.
+    address_type_strs = [at.value for at in address_type] if address_type else None
 
     def _get_enriched_addresses():
         return get_enriched_addresses(
@@ -122,6 +132,7 @@ def list_enriched_addresses(
             scope=scope,
             include_archived=False,
             institution_id=effective_institution_id,
+            address_type=address_type_strs,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )
