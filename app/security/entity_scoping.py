@@ -8,7 +8,7 @@ and provides a single source of truth for entity-specific scoping logic.
 Usage:
     from app.security.entity_scoping import EntityScopingService
 
-    scope = EntityScopingService.get_scope_for_entity("plate_kitchen_days", current_user)
+    scope = EntityScopingService.get_scope_for_entity("vianda_kitchen_days", current_user)
     # Use scope for both base and enriched endpoints
 """
 
@@ -19,13 +19,13 @@ from app.i18n.error_codes import ErrorCode
 from app.security.scoping import InstitutionScope, get_institution_scope
 
 # Entity Type Constants
-ENTITY_PLATE_KITCHEN_DAYS = "plate_kitchen_days"
+ENTITY_VIANDA_KITCHEN_DAYS = "vianda_kitchen_days"
 ENTITY_RESTAURANT_BALANCE = "restaurant_balance"
 ENTITY_RESTAURANT_TRANSACTION = "restaurant_transaction"
-ENTITY_PLATE_PICKUP_LIVE = "plate_pickup_live"
+ENTITY_VIANDA_PICKUP_LIVE = "vianda_pickup_live"
 ENTITY_QR_CODE = "qr_code"
 ENTITY_RESTAURANT = "restaurant"
-ENTITY_PLATE = "plate"
+ENTITY_VIANDA = "vianda"
 ENTITY_PRODUCT = "product"
 ENTITY_INSTITUTION_ENTITY = "institution_entity"
 ENTITY_INSTITUTION_BILL = "institution_bill"
@@ -45,13 +45,13 @@ class EntityScopingService:
 
     # Registry of entity-specific scoping rules
     _SCOPING_RULES = {
-        ENTITY_PLATE_KITCHEN_DAYS: "_scope_plate_kitchen_days",
+        ENTITY_VIANDA_KITCHEN_DAYS: "_scope_vianda_kitchen_days",
         ENTITY_RESTAURANT_BALANCE: "_scope_restaurant_balance",
         ENTITY_RESTAURANT_TRANSACTION: "_scope_restaurant_transaction",
-        ENTITY_PLATE_PICKUP_LIVE: "_scope_plate_pickup_live",
+        ENTITY_VIANDA_PICKUP_LIVE: "_scope_vianda_pickup_live",
         ENTITY_QR_CODE: "_scope_qr_code",
         ENTITY_RESTAURANT: "_scope_restaurant",
-        ENTITY_PLATE: "_scope_plate",
+        ENTITY_VIANDA: "_scope_vianda",
         ENTITY_PRODUCT: "_scope_product",
         ENTITY_INSTITUTION_ENTITY: "_scope_institution_entity",
         ENTITY_INSTITUTION_BILL: "_scope_institution_bill",
@@ -84,7 +84,7 @@ class EntityScopingService:
 
         Example:
             scope = EntityScopingService.get_scope_for_entity(
-                EntityScopingService.ENTITY_PLATE_KITCHEN_DAYS,
+                EntityScopingService.ENTITY_VIANDA_KITCHEN_DAYS,
                 current_user
             )
         """
@@ -100,9 +100,9 @@ class EntityScopingService:
         return EntityScopingService._scope_default(current_user, **kwargs)
 
     @staticmethod
-    def _scope_plate_kitchen_days(current_user: dict, **kwargs) -> InstitutionScope | None:
+    def _scope_vianda_kitchen_days(current_user: dict, **kwargs) -> InstitutionScope | None:
         """
-        Scoping rules for plate_kitchen_days.
+        Scoping rules for vianda_kitchen_days.
 
         Rules:
         - Customers: Blocked (403 Forbidden)
@@ -175,9 +175,9 @@ class EntityScopingService:
         return get_institution_scope(current_user)
 
     @staticmethod
-    def _scope_plate_pickup_live(current_user: dict, **kwargs) -> InstitutionScope | None:
+    def _scope_vianda_pickup_live(current_user: dict, **kwargs) -> InstitutionScope | None:
         """
-        Scoping rules for plate_pickup_live.
+        Scoping rules for vianda_pickup_live.
 
         Rules:
         - Internal Admin/Super Admin: Global access (None)
@@ -223,20 +223,20 @@ class EntityScopingService:
         return get_institution_scope(current_user)
 
     @staticmethod
-    def _scope_plate(current_user: dict, **kwargs) -> InstitutionScope | None:
+    def _scope_vianda(current_user: dict, **kwargs) -> InstitutionScope | None:
         """
-        Scoping rules for plate.
+        Scoping rules for vianda.
 
         Rules:
         - Internal Admin/Super Admin: Global access (None)
         - Internal Management: Institution-scoped
         - Internal Operator: Institution-scoped (limited access)
         - Suppliers, Employer: Institution-scoped
-        - Customers: No scoping (can view all plates)
+        - Customers: No scoping (can view all viandas)
         """
         role_type = current_user.get("role_type")
 
-        # Customers: no scoping (can view all plates)
+        # Customers: no scoping (can view all viandas)
         if role_type == "customer":
             return None
 

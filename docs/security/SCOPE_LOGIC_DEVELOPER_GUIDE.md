@@ -109,7 +109,7 @@ def update(
 
 ### Pattern 2: Routes with Institution Scoping Only
 
-**Use Case**: Routes that manage institution-level resources (restaurants, products, plates, etc.)
+**Use Case**: Routes that manage institution-level resources (restaurants, products, viandas, etc.)
 
 **Example**: `GET /restaurants/`
 

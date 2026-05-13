@@ -13,7 +13,7 @@ class InsufficientCreditsResponseSchema(BaseModel):
     error_type: str = Field(default="insufficient_credits", description="Type of error")
     message: str = Field(..., description="User-friendly error message")
     current_balance: float = Field(..., ge=0, description="User's current credit balance")
-    required_credits: float = Field(..., gt=0, description="Credits required for the plate")
+    required_credits: float = Field(..., gt=0, description="Credits required for the vianda")
     shortfall: float = Field(..., ge=0, description="Additional credits needed")
     payment_instructions: str = Field(..., description="Instructions for adding credits")
     retry_after_payment: bool = Field(default=True, description="Whether user can retry after payment")
@@ -22,11 +22,11 @@ class InsufficientCreditsResponseSchema(BaseModel):
         json_schema_extra={
             "example": {
                 "error_type": "insufficient_credits",
-                "message": "You have 2.0 credits, but this plate costs 5.0 credits. You need 3.0 more credits.",
+                "message": "You have 2.0 credits, but this vianda costs 5.0 credits. You need 3.0 more credits.",
                 "current_balance": 2.0,
                 "required_credits": 5.0,
                 "shortfall": 3.0,
-                "payment_instructions": "To add 3.0 credits to your account:\n1. Visit the payment page and scan the QR code\n2. Complete your payment\n3. Return here to retry your plate selection\nYour order will be available immediately after payment.",
+                "payment_instructions": "To add 3.0 credits to your account:\n1. Visit the payment page and scan the QR code\n2. Complete your payment\n3. Return here to retry your vianda selection\nYour order will be available immediately after payment.",
                 "retry_after_payment": True,
             }
         }

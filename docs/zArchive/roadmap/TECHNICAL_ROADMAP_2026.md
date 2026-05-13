@@ -31,7 +31,7 @@ kitchen/ (monorepo)
 ### Completed Features ✅
 - ✅ User authentication (JWT, ABAC policies)
 - ✅ Restaurant management
-- ✅ Plate selection & pickup
+- ✅ Vianda selection & pickup
 - ✅ Credit currency system
 - ✅ Subscription billing
 - ✅ QR code generation
@@ -44,7 +44,7 @@ kitchen/ (monorepo)
 ### Known Limitations ⚠️
 - 🔴 Password recovery (DB tables exist, no API/service logic)
 - 🔴 Geolocation (placeholder, needs Google Maps API)
-- 🔴 Plate recommendation engine (no ML, manual filtering only)
+- 🔴 Vianda recommendation engine (no ML, manual filtering only)
 - 🔴 MercadoPago (QR code only, no full integration - permissions issue)
 - 🟡 AWS deployment (infrastructure ready, not deployed)
 - 🟡 Email service (needs Gmail SMTP or AWS SES setup)
@@ -124,17 +124,17 @@ SMTP_PASSWORD = "app-specific-password"  # From Google Account settings
 
 ---
 
-#### 1.3 Plate Recommendation Engine (MVP) 🟡 MEDIUM PRIORITY
+#### 1.3 Vianda Recommendation Engine (MVP) 🟡 MEDIUM PRIORITY
 **Status**: Manual filtering only, needs basic recommendation logic
 
 **MVP Approach** (Simple, no ML):
 ```python
-def recommend_plates(user_id, max_distance_km=5):
+def recommend_viandas(user_id, max_distance_km=5):
     """
     Simple recommendation:
     1. Get user's last order location
-    2. Filter plates within distance
-    3. Prioritize latest plates (last 7 days)
+    2. Filter viandas within distance
+    3. Prioritize latest viandas (last 7 days)
     4. Return top 10
     """
     pass
@@ -144,19 +144,19 @@ def recommend_plates(user_id, max_distance_km=5):
 - [ ] Create `app/services/recommendation_service.py`
 - [ ] Implement distance-based filtering:
   - Get user's last order address
-  - Calculate distance to all restaurants with today's plates
+  - Calculate distance to all restaurants with today's viandas
   - Filter by max distance (5km default)
 - [ ] Add recency scoring:
-  - Plates from last 7 days get priority
-  - User's previously ordered plates get slight boost
-- [ ] Add route: `GET /api/v1/plates/recommended`
-- [ ] Index `plate_selection(user_id, created_date)` for performance
+  - Viandas from last 7 days get priority
+  - User's previously ordered viandas get slight boost
+- [ ] Add route: `GET /api/v1/viandas/recommended`
+- [ ] Index `vianda_selection(user_id, created_date)` for performance
 - [ ] Unit tests
 
 **Estimated Effort**: 2 days
 
 **Future Enhancement** (Post-UAT - ML-Powered):
-- **Ingredient-based recommendations:** Recommend plates that share a significant overlap of ingredients with plates the user has favorited (e.g. user favorites plates with tomato, basil, mozzarella → boost plates with similar ingredient profiles). **Prerequisite:** Option A tabular schema (`ingredient_info`, `product_ingredient`) — see Phase 3.2.
+- **Ingredient-based recommendations:** Recommend viandas that share a significant overlap of ingredients with viandas the user has favorited (e.g. user favorites viandas with tomato, basil, mozzarella → boost viandas with similar ingredient profiles). **Prerequisite:** Option A tabular schema (`ingredient_info`, `product_ingredient`) — see Phase 3.2.
 - NoSQL DB (DynamoDB) for user preferences:
   - Cuisine preferences
   - Ingredient preferences
@@ -174,14 +174,14 @@ def recommend_plates(user_id, max_distance_km=5):
 > "As a user, I want to indicate if I'm walking or riding a bike/scooter so I can see restaurants within my travel range and estimated time to destination."
 
 **Tasks**:
-- [ ] Add `transport_mode` to plate filtering:
+- [ ] Add `transport_mode` to vianda filtering:
   - `walk` (max 1.5 km)
   - `bike` (max 5 km)
   - `scooter` (max 10 km)
 - [ ] Integrate Google Distance Matrix API:
   - Get estimated travel time
   - Return to client for display
-- [ ] Update `GET /api/v1/plates/` query params:
+- [ ] Update `GET /api/v1/viandas/` query params:
   - `?transport_mode=walk&max_distance=1.5`
 - [ ] Client-side filtering (stateless service)
 
@@ -305,7 +305,7 @@ cd infra
   - Create `ingredient_info` and `product_ingredient` tables
   - Build ETL/cron to parse existing `product_info.ingredients` (comma-separated) and populate junction table (with normalization: lowercase, singular/plural handling)
   - Add admin UI or API for suppliers to manage product-ingredient links (optional; can start with ETL-only)
-  - Update recommendation service to query `product_ingredient` for overlap scoring (e.g. `WHERE ingredient_id IN (SELECT ingredient_id FROM product_ingredient WHERE product_id IN (user_favorited_plate_products))`)
+  - Update recommendation service to query `product_ingredient` for overlap scoring (e.g. `WHERE ingredient_id IN (SELECT ingredient_id FROM product_ingredient WHERE product_id IN (user_favorited_vianda_products))`)
   - Keep `product_info.ingredients` for backward compatibility and display; ML reads from tabular tables
 - [ ] Build cuisine database (NoSQL):
   - Cuisine categories
@@ -325,7 +325,7 @@ cd infra
 **Status**: Basic functionality exists
 
 **Tasks**:
-- [ ] Index `plate_selection(user_id, created_date)` for efficient querying
+- [ ] Index `vianda_selection(user_id, created_date)` for efficient querying
 - [ ] Implement pagination for order history API
 - [ ] Time-based filtering:
   - UI: Show last 3 months by default
@@ -479,7 +479,7 @@ cd infra
 - [x] 322 unit tests passing
 - [ ] Password recovery functional
 - [ ] Geolocation returning real data (not placeholder)
-- [ ] Basic plate recommendations working
+- [ ] Basic vianda recommendations working
 - [ ] 50+ Postman tests passing
 - [ ] No critical bugs in E2E tests
 

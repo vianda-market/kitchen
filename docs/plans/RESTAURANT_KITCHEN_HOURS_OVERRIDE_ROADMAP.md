@@ -30,7 +30,7 @@ Restaurants need to define their own operating hours within the market's envelop
 
 - **Market config:** `app/config/market_config.py` — `business_hours` per weekday (open/close) for each market.
 - **Pickup windows:** `get_pickup_windows_for_kitchen_day()` uses market `business_hours` only.
-- **Plate selection:** `pickup_time_range` validation uses market windows.
+- **Vianda selection:** `pickup_time_range` validation uses market windows.
 - **Billing cron:** uses the market kitchen-day boundary; must remain unchanged by this work.
 
 ---
@@ -72,7 +72,7 @@ Mirror into `audit.restaurant_kitchen_hours_history` and `audit.market_history` 
 - `GET /api/v1/restaurants/{id}/kitchen-hours` — returns the 7-day matrix (effective values, with `source: "override" | "market"` per row).
 - `PUT /api/v1/restaurants/{id}/kitchen-hours` — Supplier-scoped (restaurant owner) or Internal Admin. Validates against the market envelope; rejects out-of-bounds with `envelope_exception` (`hours.out_of_envelope`).
 - `/pickup-windows` route accepts optional `restaurant_id`.
-- Plate-selection validation pulls from effective hours when a restaurant context is present.
+- Vianda-selection validation pulls from effective hours when a restaurant context is present.
 
 ### Phase 4: Frontend
 

@@ -74,10 +74,10 @@ class TestResolveRule:
         assert rule.max_requests == 20
         assert rule.matched_prefix == "/restaurants/explorer"
 
-    def test_free_plate_selections_override(self):
-        rule = resolve_rule(TIER_FREE, "/api/v1/plate-selections/some-id", "GET")
+    def test_free_vianda_selections_override(self):
+        rule = resolve_rule(TIER_FREE, "/api/v1/vianda-selections/some-id", "GET")
         assert rule.max_requests == 30
-        assert rule.matched_prefix == "/plate-selections/"
+        assert rule.matched_prefix == "/vianda-selections/"
 
     def test_free_cuisines_override(self):
         rule = resolve_rule(TIER_FREE, "/api/v1/cuisines/enriched", "GET")

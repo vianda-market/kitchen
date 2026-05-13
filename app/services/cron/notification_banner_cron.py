@@ -21,27 +21,27 @@ from app.utils.log import log_error, log_info, log_warning
 
 def _generate_reservation_reminders(connection) -> int:
     """
-    Find active plate selections with a pickup window starting within the next
+    Find active vianda selections with a pickup window starting within the next
     hour and create reservation_reminder notifications for each.
 
-    The query joins plate_selection_info with product_info, restaurant_info, and
+    The query joins vianda_selection_info with product_info, restaurant_info, and
     the restaurant's address_info to use the **restaurant's** local timezone
     (where the pickup physically happens). This is more accurate than the
     customer's market timezone for multi-TZ countries (US, AR, BR, MX).
 
-    Dedup key ensures each (plate_selection_id, pickup_date) pair only
+    Dedup key ensures each (vianda_selection_id, pickup_date) pair only
     generates one notification.
     """
     sql = """
         SELECT
-            ps.plate_selection_id,
+            ps.vianda_selection_id,
             ps.user_id,
             ps.pickup_date,
             ps.pickup_time_range,
-            p.name  AS plate_name,
+            p.name  AS vianda_name,
             r.name  AS restaurant_name,
             a.timezone
-        FROM customer.plate_selection_info ps
+        FROM customer.vianda_selection_info ps
         JOIN ops.product_info p   ON p.product_id = ps.product_id
         JOIN ops.restaurant_info r ON r.restaurant_id = ps.restaurant_id
         JOIN core.address_info a  ON a.address_id = r.address_id
@@ -73,22 +73,22 @@ def _generate_reservation_reminders(connection) -> int:
                 notification_type="reservation_reminder",
                 priority="normal",
                 payload={
-                    "plate_name": row["plate_name"],
+                    "vianda_name": row["vianda_name"],
                     "restaurant_name": row["restaurant_name"],
                     "pickup_window": pickup_window,
-                    "plate_selection_id": str(row["plate_selection_id"]),
+                    "vianda_selection_id": str(row["vianda_selection_id"]),
                 },
                 action_type="view_reservation",
                 action_label="View details",
                 client_types=["b2c-mobile", "b2c-web"],
                 expires_at=local_expires,
-                dedup_key=f"reservation_reminder:{row['plate_selection_id']}:{pickup_date}",
+                dedup_key=f"reservation_reminder:{row['vianda_selection_id']}:{pickup_date}",
                 db=connection,
             )
             if result:
                 created_count += 1
         except Exception as e:
-            log_warning(f"Failed to create reservation reminder for selection {row['plate_selection_id']}: {e}")
+            log_warning(f"Failed to create reservation reminder for selection {row['vianda_selection_id']}: {e}")
 
     return created_count
 

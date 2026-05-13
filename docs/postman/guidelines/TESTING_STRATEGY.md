@@ -1,4 +1,4 @@
-# E2E Plate Selection - Testing Strategy & Improvements
+# E2E Vianda Selection - Testing Strategy & Improvements
 
 ## Current State Analysis
 - **Total Requests**: ~45+ requests
@@ -305,8 +305,8 @@ pm.test("Enriched data includes related entities", function () {
 ### 9. **Business Logic Validation**
 
 ```javascript
-// Example: Plate Selection
-pm.test("Plate selection validates credit availability", function () {
+// Example: Vianda Selection
+pm.test("Vianda selection validates credit availability", function () {
     const body = pm.response.json();
     const userCredit = pm.collectionVariables.get("userCreditBalance");
     const plateCost = pm.collectionVariables.get("plateCreditCost");
@@ -314,7 +314,7 @@ pm.test("Plate selection validates credit availability", function () {
     pm.expect(userCredit).to.be.at.least(plateCost);
 });
 
-// For no_show_discount validation, use enriched plate or institution endpoints.
+// For no_show_discount validation, use enriched vianda or institution endpoints.
 pm.test("Price and credit values are positive", function () {
     const body = pm.response.json();
     pm.expect(body.price).to.be.above(0);
@@ -450,7 +450,7 @@ pm.test("Database query is efficient (check response headers)", function () {
    - Get Bills
 
 5. **Add validation tests to business-critical operations**:
-   - Register plate selection
+   - Register vianda selection
    - Post QR Code Scan
    - Generate Daily Bills
    - Issue bills
@@ -462,18 +462,18 @@ pm.test("Database query is efficient (check response headers)", function () {
 
 ### Folder Structure
 ```
-E2E Plate Selection/
+E2E Vianda Selection/
 ├── 🔐 Authentication & Setup/
 │   └── (Add status + token validation to all)
 ├── 🏢 Supplier Setup/
 │   └── (Add creation validation to all)
 ├── 🍽️ Supplier Menu Setup/
-│   └── (Add product/plate validation)
+│   └── (Add product/vianda validation)
 ├── 👤 Client Setup/
 │   └── (Add user + subscription validation)
 ├── 💳 Payment Flow/
 │   └── (Add payment validation)
-├── 🍽️ Plate Selection & Pickup/
+├── 🍽️ Vianda Selection & Pickup/
 │   └── (Add selection + pickup validation)
 ├── 💰 Billing & Settlement/
 │   └── (Add billing validation)

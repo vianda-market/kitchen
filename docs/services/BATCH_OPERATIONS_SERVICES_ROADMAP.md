@@ -8,9 +8,9 @@ This roadmap tracks the adoption of batch database operations across services in
 
 ### ✅ Completed Implementations
 
-1. **Plate Kitchen Days Service** (`app/routes/plate_kitchen_days.py`)
+1. **Vianda Kitchen Days Service** (`app/routes/vianda_kitchen_days.py`)
    - **Operation**: Batch Insert
-   - **Use Case**: Creating multiple kitchen day assignments for a plate
+   - **Use Case**: Creating multiple kitchen day assignments for a vianda
    - **Status**: ✅ Implemented
    - **Benefits**: Atomic creation of multiple days, single transaction
 

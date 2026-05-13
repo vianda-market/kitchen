@@ -93,8 +93,8 @@ TABLE_CATEGORY_MAPPING: dict[str, ArchivalCategory] = {
     "subscription_info": ArchivalCategory.FINANCIAL_OPERATIONAL,
     "payment_method": ArchivalCategory.FINANCIAL_OPERATIONAL,
     # CUSTOMER SERVICE (3 months - support window)
-    "plate_pickup_live": ArchivalCategory.CUSTOMER_SERVICE,
-    "plate_selection_info": ArchivalCategory.CUSTOMER_SERVICE,
+    "vianda_pickup_live": ArchivalCategory.CUSTOMER_SERVICE,
+    "vianda_selection_info": ArchivalCategory.CUSTOMER_SERVICE,
     "restaurant_holidays": ArchivalCategory.CUSTOMER_SERVICE,
     "credential_recovery": ArchivalCategory.CUSTOMER_SERVICE,
     "email_change_request": ArchivalCategory.CUSTOMER_SERVICE,
@@ -113,11 +113,11 @@ TABLE_CATEGORY_MAPPING: dict[str, ArchivalCategory] = {
     "discretionary_resolution_history": ArchivalCategory.OPERATIONAL_DATA,
     # REFERENCE DATA (2 years - product/catalog data)
     "product_info": ArchivalCategory.REFERENCE_DATA,
-    "plate_info": ArchivalCategory.REFERENCE_DATA,
+    "vianda_info": ArchivalCategory.REFERENCE_DATA,
     "plan_info": ArchivalCategory.REFERENCE_DATA,
     "qr_code": ArchivalCategory.REFERENCE_DATA,
     "currency_metadata": ArchivalCategory.REFERENCE_DATA,
-    "plate_kitchen_days": ArchivalCategory.REFERENCE_DATA,
+    "vianda_kitchen_days": ArchivalCategory.REFERENCE_DATA,
     "external_payment_method": ArchivalCategory.REFERENCE_DATA,
     # SYSTEM CONFIGURATION (never archived)
     # role_info, status_info, transaction_type_info removed - enums stored directly on entities
@@ -129,8 +129,8 @@ TABLE_CATEGORY_MAPPING: dict[str, ArchivalCategory] = {
     "institution_entity_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "institution_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "plan_history": ArchivalCategory.SYSTEM_CONFIGURATION,
-    "plate_history": ArchivalCategory.SYSTEM_CONFIGURATION,
-    "plate_kitchen_days_history": ArchivalCategory.SYSTEM_CONFIGURATION,
+    "vianda_history": ArchivalCategory.SYSTEM_CONFIGURATION,
+    "vianda_kitchen_days_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     "product_history": ArchivalCategory.SYSTEM_CONFIGURATION,
     # Removed qr_code_history since we removed the history table
     "restaurant_balance_history": ArchivalCategory.SYSTEM_CONFIGURATION,

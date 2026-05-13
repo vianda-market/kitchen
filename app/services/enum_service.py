@@ -61,7 +61,7 @@ class EnumService:
             "status_user": Status.get_by_context("user"),
             "status_restaurant": Status.get_by_context("restaurant"),
             "status_discretionary": DiscretionaryStatus.values(),
-            "status_plate_pickup": Status.get_by_context("plate_pickup"),
+            "status_vianda_pickup": Status.get_by_context("vianda_pickup"),
             "status_bill": Status.get_by_context("bill"),
             "address_type": AddressType.values(),
             "role_type": [rt.value for rt in RoleType],  # User role_type: Internal, Supplier, Customer, Employer
@@ -107,7 +107,7 @@ class EnumService:
         Args:
             enum_name: Name of the enum type (e.g., 'status', 'role_type')
             current_user: Optional authenticated user; Customers get error for role enums
-            context: Optional context for status enum (e.g. 'user', 'discretionary', 'plate_pickup', 'bill')
+            context: Optional context for status enum (e.g. 'user', 'discretionary', 'vianda_pickup', 'bill')
 
         Returns:
             List of valid values for the enum

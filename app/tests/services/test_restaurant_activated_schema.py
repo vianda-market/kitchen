@@ -3,7 +3,7 @@ Unit tests for RestaurantActivatedSchema and the response schemas that embed it.
 
 Validates:
   - RestaurantActivatedSchema shape (id: UUID, name: str)
-  - PlateKitchenDayCreateResponseSchema wraps items + optional restaurant_activated
+  - ViandaKitchenDayCreateResponseSchema wraps items + optional restaurant_activated
   - QRCodeResponseSchema has optional restaurant_activated field
   - restaurant_activated=None is serialized as explicit null (not omitted)
 """
@@ -15,10 +15,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.consolidated_schemas import (
-    PlateKitchenDayCreateResponseSchema,
-    PlateKitchenDayResponseSchema,
     QRCodeResponseSchema,
     RestaurantActivatedSchema,
+    ViandaKitchenDayCreateResponseSchema,
+    ViandaKitchenDayResponseSchema,
 )
 
 # ---------------------------------------------------------------------------
@@ -54,14 +54,14 @@ class TestRestaurantActivatedSchema:
 
 
 # ---------------------------------------------------------------------------
-# PlateKitchenDayCreateResponseSchema
+# ViandaKitchenDayCreateResponseSchema
 # ---------------------------------------------------------------------------
 
 
-def _make_pkd_response(**overrides) -> PlateKitchenDayResponseSchema:
+def _make_vkd_response(**overrides) -> ViandaKitchenDayResponseSchema:
     defaults = {
-        "plate_kitchen_day_id": uuid4(),
-        "plate_id": uuid4(),
+        "vianda_kitchen_day_id": uuid4(),
+        "vianda_id": uuid4(),
         "kitchen_day": "monday",
         "status": "active",
         "is_archived": False,
@@ -70,52 +70,52 @@ def _make_pkd_response(**overrides) -> PlateKitchenDayResponseSchema:
         "modified_date": datetime.utcnow(),
     }
     defaults.update(overrides)
-    return PlateKitchenDayResponseSchema(**defaults)  # type: ignore[arg-type]
+    return ViandaKitchenDayResponseSchema(**defaults)  # type: ignore[arg-type]
 
 
-class TestPlateKitchenDayCreateResponseSchema:
+class TestViandaKitchenDayCreateResponseSchema:
     def test_valid_with_no_activation(self):
-        item = _make_pkd_response()
-        schema = PlateKitchenDayCreateResponseSchema(items=[item], restaurant_activated=None)
+        item = _make_vkd_response()
+        schema = ViandaKitchenDayCreateResponseSchema(items=[item], restaurant_activated=None)
         assert schema.restaurant_activated is None
         assert len(schema.items) == 1
 
     def test_valid_with_activation(self):
-        item = _make_pkd_response()
+        item = _make_vkd_response()
         activated = RestaurantActivatedSchema(restaurant_id=uuid4(), name="My Restaurant")
-        schema = PlateKitchenDayCreateResponseSchema(items=[item], restaurant_activated=activated)
+        schema = ViandaKitchenDayCreateResponseSchema(items=[item], restaurant_activated=activated)
         assert schema.restaurant_activated is not None
         assert schema.restaurant_activated.name == "My Restaurant"
 
     def test_restaurant_activated_defaults_to_none(self):
-        item = _make_pkd_response()
-        schema = PlateKitchenDayCreateResponseSchema(items=[item])
+        item = _make_vkd_response()
+        schema = ViandaKitchenDayCreateResponseSchema(items=[item])
         assert schema.restaurant_activated is None
 
     def test_restaurant_activated_present_in_serialization_when_none(self):
         """restaurant_activated must appear as null in JSON, not be omitted."""
-        item = _make_pkd_response()
-        schema = PlateKitchenDayCreateResponseSchema(items=[item])
+        item = _make_vkd_response()
+        schema = ViandaKitchenDayCreateResponseSchema(items=[item])
         dumped = schema.model_dump(mode="json")
         assert "restaurant_activated" in dumped
         assert dumped["restaurant_activated"] is None
 
     def test_restaurant_activated_present_in_serialization_when_set(self):
-        item = _make_pkd_response()
+        item = _make_vkd_response()
         rid = uuid4()
         activated = RestaurantActivatedSchema(restaurant_id=rid, name="Activated")
-        schema = PlateKitchenDayCreateResponseSchema(items=[item], restaurant_activated=activated)
+        schema = ViandaKitchenDayCreateResponseSchema(items=[item], restaurant_activated=activated)
         dumped = schema.model_dump(mode="json")
         assert dumped["restaurant_activated"] is not None
         assert UUID(dumped["restaurant_activated"]["restaurant_id"]) == rid
 
     def test_items_can_be_multiple(self):
-        items = [_make_pkd_response() for _ in range(3)]
-        schema = PlateKitchenDayCreateResponseSchema(items=items)
+        items = [_make_vkd_response() for _ in range(3)]
+        schema = ViandaKitchenDayCreateResponseSchema(items=items)
         assert len(schema.items) == 3
 
     def test_items_empty_list_is_valid(self):
-        schema = PlateKitchenDayCreateResponseSchema(items=[])
+        schema = ViandaKitchenDayCreateResponseSchema(items=[])
         assert schema.items == []
 
 

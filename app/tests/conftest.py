@@ -149,18 +149,18 @@ def sample_customer_user():
 
 
 # =============================================================================
-# Plate Pickup Fixtures
+# Vianda Pickup Fixtures
 # =============================================================================
 
 
 @pytest.fixture
 def sample_pickup_record():
-    """Sample PlatePickupLiveDTO for testing."""
-    from app.dto.models import PlatePickupLiveDTO
+    """Sample ViandaPickupLiveDTO for testing."""
+    from app.dto.models import ViandaPickupLiveDTO
 
-    return PlatePickupLiveDTO(
-        plate_pickup_id=uuid4(),
-        plate_selection_id=uuid4(),
+    return ViandaPickupLiveDTO(
+        vianda_pickup_id=uuid4(),
+        vianda_selection_id=uuid4(),
         user_id=uuid4(),
         restaurant_id=uuid4(),
         product_id=uuid4(),
@@ -211,15 +211,15 @@ def sample_restaurant():
 
 
 @pytest.fixture
-def sample_plate_selection():
-    """Sample PlateSelectionDTO for testing."""
+def sample_vianda_selection():
+    """Sample ViandaSelectionDTO for testing."""
     from app.config import Status
-    from app.dto.models import PlateSelectionDTO
+    from app.dto.models import ViandaSelectionDTO
 
-    return PlateSelectionDTO(
-        plate_selection_id=uuid4(),
+    return ViandaSelectionDTO(
+        vianda_selection_id=uuid4(),
         user_id=uuid4(),
-        plate_id=uuid4(),
+        vianda_id=uuid4(),
         restaurant_id=uuid4(),
         product_id=uuid4(),
         qr_code_id=uuid4(),
@@ -237,13 +237,13 @@ def sample_plate_selection():
 
 
 @pytest.fixture
-def sample_plate():
-    """Sample PlateDTO for testing."""
+def sample_vianda():
+    """Sample ViandaDTO for testing."""
     from app.config import Status
-    from app.dto.models import PlateDTO
+    from app.dto.models import ViandaDTO
 
-    return PlateDTO(
-        plate_id=uuid4(),
+    return ViandaDTO(
+        vianda_id=uuid4(),
         product_id=uuid4(),
         restaurant_id=uuid4(),
         price=Decimal("10.0"),
@@ -266,7 +266,7 @@ def sample_restaurant_transaction():
     return RestaurantTransactionDTO(
         transaction_id=uuid4(),
         restaurant_id=uuid4(),
-        plate_selection_id=None,
+        vianda_selection_id=None,
         discretionary_id=None,
         currency_metadata_id=uuid4(),
         was_collected=False,
@@ -387,8 +387,8 @@ def mock_geolocation_service():
 
 
 @pytest.fixture
-def mock_plate_pickup_live_service():
-    """Mock plate pickup live service for testing."""
+def mock_vianda_pickup_live_service():
+    """Mock vianda pickup live service for testing."""
     return Mock()
 
 

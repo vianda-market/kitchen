@@ -35,9 +35,9 @@ Unchanged auth and query params. Response shape enhanced:
       "pickup_window_end": "13:30",
       "orders": [
         {
-          "plate_pickup_id": "uuid",
+          "vianda_pickup_id": "uuid",
           "customer_name": "M.G.",
-          "plate_name": "Grilled Chicken",
+          "vianda_name": "Grilled Chicken",
           "confirmation_code": "482951",
           "status": "Arrived",
           "arrival_time": "2026-04-04T12:02:00Z",
@@ -60,7 +60,7 @@ Unchanged auth and query params. Response shape enhanced:
         "completed": 5,
         "no_show": 0
       },
-      "reservations_by_plate": [...],
+      "reservations_by_vianda": [...],
       "live_locked_count": 10
     }
   ]
@@ -71,13 +71,13 @@ Unchanged auth and query params. Response shape enhanced:
 
 | Field | Type | Description |
 |---|---|---|
-| `plate_pickup_id` | UUID | Use for `POST /plate-pickup/{id}/hand-out` and `/complete` |
+| `vianda_pickup_id` | UUID | Use for `POST /vianda-pickup/{id}/hand-out` and `/complete` |
 | `confirmation_code` | string | 6-digit numeric code. Display alongside each queue entry for visual matching. |
 | `expected_completion_time` | datetime/null | Authoritative pickup deadline. Compute remaining: `expected_completion_time - server_time` |
 | `completion_time` | datetime/null | When order was completed |
 | `countdown_seconds` | int | Server-configured timer duration (currently 300s) |
 | `extensions_used` | int | Timer extensions used (currently always 0, scaffolding) |
-| `was_collected` | bool | Whether plate was actually picked up |
+| `was_collected` | bool | Whether vianda was actually picked up |
 | `pickup_type` | string/null | `self` / `offer` / `request` from pickup preferences |
 | `is_no_show` | bool | `true` when status is Pending and the order's `pickup_time_range` end has passed. Use to filter no-shows out of the active queue and into a "No-Show" dashboard section. |
 
@@ -113,7 +113,7 @@ Pending → Arrived → Handed Out → Completed
 |---|---|---|
 | `Pending` | Customer hasn't scanned QR | Show in "Expected" section |
 | `Arrived` | Customer scanned QR, timer running | Show in live queue with count-up timer |
-| `Handed Out` | Restaurant gave the plate | Show in "Served" section |
+| `Handed Out` | Restaurant gave the vianda | Show in "Served" section |
 | `Completed` | Customer confirmed or auto-completed | Show in "Done" section or fade out |
 
 ---
@@ -141,8 +141,8 @@ Code must be exactly 6 numeric digits.
 {
   "match": true,
   "customer_initials": "M.G.",
-  "plate_pickup_ids": ["uuid1"],
-  "plates": [{ "plate_name": "Grilled Chicken", "quantity": 1 }],
+  "vianda_pickup_ids": ["uuid1"],
+  "viandas": [{ "vianda_name": "Grilled Chicken", "quantity": 1 }],
   "status": "Handed Out",
   "arrival_time": "2026-04-04T12:02:00Z",
   "expected_completion_time": "2026-04-04T12:07:00Z",
@@ -168,7 +168,7 @@ Auth: Supplier (any role, scoped to institution) or Internal.
 
 ## 4. Manual Hand Out (Layer 1)
 
-`POST /api/v1/plate-pickup/{plate_pickup_id}/hand-out`
+`POST /api/v1/vianda-pickup/{vianda_pickup_id}/hand-out`
 
 One-tap handoff. Transitions Arrived → Handed Out. No code required.
 
@@ -180,7 +180,7 @@ Auth: Supplier (any role, scoped) or Internal.
 
 ## 5. Mark Complete
 
-`POST /api/v1/plate-pickup/{plate_pickup_id}/complete`
+`POST /api/v1/vianda-pickup/{vianda_pickup_id}/complete`
 
 Existing endpoint, updated with new `completion_type` values:
 
@@ -216,11 +216,11 @@ Operators are kiosk-focused. They are blocked from all CRUD management routes.
 |---|---|---|---|
 | `GET /restaurant-staff/daily-orders` | Yes | Yes | **Yes** |
 | `POST /restaurant-staff/verify-and-handoff` | Yes | Yes | **Yes** |
-| `POST /plate-pickup/{id}/hand-out` | Yes | Yes | **Yes** |
-| `POST /plate-pickup/{id}/complete` | Yes | Yes | **Yes** |
-| `GET /plate-reviews/by-institution/enriched` | Yes | Yes | **Yes** |
+| `POST /vianda-pickup/{id}/hand-out` | Yes | Yes | **Yes** |
+| `POST /vianda-pickup/{id}/complete` | Yes | Yes | **Yes** |
+| `GET /vianda-reviews/by-institution/enriched` | Yes | Yes | **Yes** |
 | `GET /users/me`, `PUT /users/me` | Yes | Yes | **Yes** |
-| All CRUD routes (products, plans, plates, restaurants, etc.) | Yes | Yes | **No (403)** |
+| All CRUD routes (products, plans, viandas, restaurants, etc.) | Yes | Yes | **No (403)** |
 | Create/edit/delete users | Yes | Yes | **No (403)** |
 | Create/edit/delete addresses | Yes | Yes | **No (403)** |
 | Toggle `require_kiosk_code_verification` | Yes | No | **No** |
@@ -229,7 +229,7 @@ Operators are kiosk-focused. They are blocked from all CRUD management routes.
 
 ## 8. Portion Complaint
 
-`POST /api/v1/plate-reviews/{plate_review_id}/portion-complaint`
+`POST /api/v1/vianda-reviews/{vianda_review_id}/portion-complaint`
 
 Customer-only (B2C). Filed when customer rates portion size as 1 and taps "File complaint." Accepts multipart photo + text.
 

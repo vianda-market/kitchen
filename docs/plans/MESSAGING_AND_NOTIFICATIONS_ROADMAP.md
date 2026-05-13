@@ -15,18 +15,18 @@ Users can configure messaging preferences via `GET/PUT /api/v1/users/me/messagin
 
 | # | Preference | Description | Sender | Current Status |
 |---|------------|-------------|--------|----------------|
-| 1 | Coworker volunteering pickup alert | Push when a coworker offers to pick up your plate (same restaurant, same time) | App (volunteer action) | Config only; no delivery |
-| 2 | Vianda plate readiness alert | Push when the restaurant signals the plate is ready | Restaurant (supplier app/API) | Not implemented |
+| 1 | Coworker volunteering pickup alert | Push when a coworker offers to pick up your vianda (same restaurant, same time) | App (volunteer action) | Config only; no delivery |
+| 2 | Vianda vianda readiness alert | Push when the restaurant signals the vianda is ready | Restaurant (supplier app/API) | Not implemented |
 | 3 | Vianda promotions and marketing push | In-app push for promotions, new restaurants, campaigns | Vianda employees (admin tool) | Not implemented |
 | 4 | Vianda promotions and marketing emails | Email campaigns (newsletters, offers) | Vianda employees (marketing) | Not implemented |
-| 5 | Kitchen start pickup alert | Push when plate becomes available for pickup at kitchen start (11:30) | System (promotion cron) | Not implemented |
+| 5 | Kitchen start pickup alert | Push when vianda becomes available for pickup at kitchen start (11:30) | System (promotion cron) | Not implemented |
 
 ---
 
 ## 1. Coworker Volunteering Pickup Alert
 
 **What exists today:**
-- `POST /api/v1/plate-selections/{id}/notify-coworkers` inserts into `coworker_pickup_notification` (records that user A notified user B).
+- `POST /api/v1/vianda-selections/{id}/notify-coworkers` inserts into `coworker_pickup_notification` (records that user A notified user B).
 - No actual push delivery.
 - No preference check before recording.
 
@@ -37,14 +37,14 @@ Users can configure messaging preferences via `GET/PUT /api/v1/users/me/messagin
 
 ---
 
-## 2. Vianda Plate Readiness Alert
+## 2. Vianda Vianda Readiness Alert
 
 **What exists today:** Nothing.
 
 **Future phases:**
-1. **Restaurant/supplier action:** Define how the supplier app or API signals "plate is ready" (e.g., status change on `restaurant_transaction` or dedicated event).
+1. **Restaurant/supplier action:** Define how the supplier app or API signals "vianda is ready" (e.g., status change on `restaurant_transaction` or dedicated event).
 2. **Backend event:** On readiness signal, determine affected users and their preferences.
-3. **Push delivery:** Send push to customers with `notify_plate_readiness_alert = true`.
+3. **Push delivery:** Send push to customers with `notify_vianda_readiness_alert = true`.
 
 ---
 
@@ -74,16 +74,16 @@ Users can configure messaging preferences via `GET/PUT /api/v1/users/me/messagin
 
 **What exists today:** B2C client has added a toggle in Settings > Notifications and forwards `notify_kitchen_start_pickup_alert` on PUT. Backend does not yet store or use it.
 
-**Trigger:** When the kitchen start promotion cron runs (11:30 AM local per market), plates are promoted from `plate_selection_info` to `plate_pickup_live`. For each user whose plate was just promoted:
+**Trigger:** When the kitchen start promotion cron runs (11:30 AM local per market), viandas are promoted from `vianda_selection_info` to `vianda_pickup_live`. For each user whose vianda was just promoted:
 
 - If `notify_kitchen_start_pickup_alert` is true (or unset, treat as true): send a push notification.
 - Otherwise: do not send.
 
 **Future phases:**
 1. **Preference field:** Add `notify_kitchen_start_pickup_alert` to `user_messaging_preferences` (or equivalent) and to `GET/PUT /api/v1/users/me/messaging-preferences`. Default: true.
-2. **Promotion cron hook:** In `plate_selection_promotion_service` (or kitchen_start_promotion cron), after promoting each selection, enqueue or send push for users with the preference enabled.
+2. **Promotion cron hook:** In `vianda_selection_promotion_service` (or kitchen_start_promotion cron), after promoting each selection, enqueue or send push for users with the preference enabled.
 3. **Push provider integration:** Same as #1; ensure device tokens are available.
-4. **Content (suggested):** "Your plate is ready for pickup at [restaurant name]"
+4. **Content (suggested):** "Your vianda is ready for pickup at [restaurant name]"
 
 **Reference:** [feedback_kitchen_start_pickup_notification.md](../api/b2c_client/feedback_kitchen_start_pickup_notification.md)
 
@@ -93,7 +93,7 @@ Users can configure messaging preferences via `GET/PUT /api/v1/users/me/messagin
 
 - **Device tokens:** Required for push (#1, #2, #3). Need endpoints or flows to register/update tokens per user and platform.
 - **Email address:** Already stored in `user_info.email`; used for #4.
-- **Preference storage:** Done. `user_messaging_preferences` table holds the preference toggles (coworker pickup, plate readiness, promotions push, promotions email; kitchen start pickup to be added).
+- **Preference storage:** Done. `user_messaging_preferences` table holds the preference toggles (coworker pickup, vianda readiness, promotions push, promotions email; kitchen start pickup to be added).
 
 ---
 

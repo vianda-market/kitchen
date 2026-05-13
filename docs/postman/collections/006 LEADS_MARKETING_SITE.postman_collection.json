@@ -956,7 +956,7 @@
 								{"key": "mode", "value": "coverage"}
 							]
 						},
-						"description": "mode=coverage returns [{city, restaurant_count}] objects. Service excludes cities with zero active plate coverage (restaurant_count >= 1). Port of test_coverage_mode_returns_city_with_count_objects + test_coverage_mode_excludes_zero_count_cities."
+						"description": "mode=coverage returns [{city, restaurant_count}] objects. Service excludes cities with zero active vianda coverage (restaurant_count >= 1). Port of test_coverage_mode_returns_city_with_count_objects + test_coverage_mode_excludes_zero_count_cities."
 					}
 				},
 				{
@@ -992,7 +992,7 @@
 		},
 		{
 			"name": "Markets has_active_kitchens field (/leads/markets)",
-			"description": "GET /api/v1/leads/markets — has_active_kitchens field assertions. No auth. Ported from app/tests/routes/test_leads.py::TestLeadsMarketsHasActiveKitchens.\n\nDivergence note — archived-plate false case: the original pytest mocks get_coverage_flags_for_markets to return an empty set and asserts has_active_kitchens=false. End-to-end this depends on live DB state (all plates archived for a specific country). The Postman test instead verifies that has_active_kitchens is present and is a boolean in supplier mode, without asserting a specific true/false for a specific country.",
+			"description": "GET /api/v1/leads/markets — has_active_kitchens field assertions. No auth. Ported from app/tests/routes/test_leads.py::TestLeadsMarketsHasActiveKitchens.\n\nDivergence note — archived-vianda false case: the original pytest mocks get_coverage_flags_for_markets to return an empty set and asserts has_active_kitchens=false. End-to-end this depends on live DB state (all viandas archived for a specific country). The Postman test instead verifies that has_active_kitchens is present and is a boolean in supplier mode, without asserting a specific true/false for a specific country.",
 			"item": [
 				{
 					"name": "GET /leads/markets (default/customer mode) — has_active_kitchens is true",
@@ -1058,10 +1058,10 @@
 									"// market_id comparison working correctly with the DB-returned type. We verify the",
 									"// field shape rather than asserting XG exclusion, which is a unit-level concern.",
 									"// NOTE: asserting specific true/false per country is not reliable end-to-end",
-									"// because it depends on live DB state (archived vs active plates).",
+									"// because it depends on live DB state (archived vs active viandas).",
 									"// The test verifies the field is present and boolean for all returned markets.",
 									"// Port of test_supplier_mode_has_active_kitchens_reflects_coverage +",
-									"// test_supplier_mode_archived_plate_yields_false (diverged)."
+									"// test_supplier_mode_archived_vianda_yields_false (diverged)."
 								]
 							}
 						}
@@ -1075,7 +1075,7 @@
 							"path": ["api", "v1", "leads", "markets"],
 							"query": [{"key": "audience", "value": "supplier"}]
 						},
-						"description": "Supplier audience: returns all non-global markets with has_active_kitchens reflecting coverage. Field is true when the market has active restaurant/plate/kitchen-day chain, false otherwise. Global Marketplace (XG) is excluded. Divergence: the specific false-for-archived-plates case is not asserted end-to-end (requires DB state with all plates archived). Port of test_supplier_mode_has_active_kitchens_reflects_coverage + test_supplier_mode_archived_plate_yields_false (diverged)."
+						"description": "Supplier audience: returns all non-global markets with has_active_kitchens reflecting coverage. Field is true when the market has active restaurant/vianda/kitchen-day chain, false otherwise. Global Marketplace (XG) is excluded. Divergence: the specific false-for-archived-viandas case is not asserted end-to-end (requires DB state with all viandas archived). Port of test_supplier_mode_has_active_kitchens_reflects_coverage + test_supplier_mode_archived_vianda_yields_false (diverged)."
 					}
 				},
 				{
@@ -1255,7 +1255,7 @@
 									"if (pm.response.code === 400) {",
 									"    const body = pm.response.json();",
 									"    pm.test('400 detail mentions Cannot activate', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('Cannot activate'));",
-									"    pm.test('400 detail explains coverage requirement', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/plate|coverage|kitchen-day/));",
+									"    pm.test('400 detail explains coverage requirement', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/vianda|coverage|kitchen-day/));",
 									"}"
 								]
 							}
@@ -1289,7 +1289,7 @@
 								"{{testMarketId}}"
 							]
 						},
-						"description": "Admin guardrail: `status='active'` is refused when the market has no active restaurant \u2192 plate \u2192 plate_kitchen_days chain. The 30-day forward window tightening is deferred to the cron (`docs/plans/market-status-cron.md`)."
+						"description": "Admin guardrail: `status='active'` is refused when the market has no active restaurant \u2192 vianda \u2192 vianda_kitchen_days chain. The 30-day forward window tightening is deferred to the cron (`docs/plans/market-status-cron.md`)."
 					}
 				},
 				{
@@ -1304,7 +1304,7 @@
 									"",
 									"if (pm.response.code === 409) {",
 									"    const body = pm.response.json();",
-									"    pm.test('409 detail mentions active plate coverage', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/active plate coverage|confirm_deactivate/));",
+									"    pm.test('409 detail mentions active vianda coverage', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.match(/active vianda coverage|confirm_deactivate/));",
 									"    pm.test('409 detail names confirm_deactivate as the unlock', () => pm.expect((typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) || '')).to.include('confirm_deactivate'));",
 									"    pm.collectionVariables.set('marketHasCoverage', 'true');",
 									"} else {",
@@ -1342,7 +1342,7 @@
 								"{{testMarketId}}"
 							]
 						},
-						"description": "Deactivation warning: when the market has active plate coverage, the backend refuses without `confirm_deactivate: true`."
+						"description": "Deactivation warning: when the market has active vianda coverage, the backend refuses without `confirm_deactivate: true`."
 					}
 				},
 				{

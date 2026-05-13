@@ -40,9 +40,9 @@ class TestCoworkerServiceIneligibilityReason:
         }
 
     def test_eligible_coworker_returns_ineligibility_reason_null(self, mock_db):
-        """Eligible coworker (no existing plate_selection) has ineligibility_reason null."""
+        """Eligible coworker (no existing vianda_selection) has ineligibility_reason null."""
         current_user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
         coworker_id = uuid4()
         restaurant_id = uuid4()
 
@@ -53,7 +53,7 @@ class TestCoworkerServiceIneligibilityReason:
         )
         owner_check = self._make_owner_check(current_user_id)
         coworkers = [self._make_coworker(user_id=coworker_id)]
-        # No existing plate_selection for coworker -> eligible
+        # No existing vianda_selection for coworker -> eligible
         existing = None
 
         call_count = [0]
@@ -61,9 +61,9 @@ class TestCoworkerServiceIneligibilityReason:
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             call_count[0] += 1
             if fetch_one:
-                if "plate_selection_info ps" in sql and "JOIN user_info" in sql:
+                if "vianda_selection_info ps" in sql and "JOIN user_info" in sql:
                     return ps_row
-                if "user_id FROM plate_selection_info" in sql and "plate_selection_id" in sql:
+                if "user_id FROM vianda_selection_info" in sql and "vianda_selection_id" in sql:
                     return owner_check
                 if "user_id = %s AND kitchen_day = %s" in sql:
                     return existing
@@ -72,7 +72,7 @@ class TestCoworkerServiceIneligibilityReason:
             return None
 
         with patch("app.services.coworker_service.db_read", side_effect=db_read_side_effect):
-            result = get_coworkers_with_eligibility(plate_selection_id, current_user_id, mock_db)
+            result = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, mock_db)
 
         assert len(result) == 1
         assert result[0]["eligible"] is True
@@ -81,7 +81,7 @@ class TestCoworkerServiceIneligibilityReason:
     def test_different_restaurant_returns_already_ordered_different_restaurant(self, mock_db):
         """Ineligible coworker (different restaurant) has ineligibility_reason already_ordered_different_restaurant."""
         current_user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
         coworker_id = uuid4()
         restaurant_a = uuid4()
         restaurant_b = uuid4()
@@ -92,9 +92,9 @@ class TestCoworkerServiceIneligibilityReason:
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:
-                if "plate_selection_info ps" in sql and "JOIN user_info" in sql:
+                if "vianda_selection_info ps" in sql and "JOIN user_info" in sql:
                     return ps_row
-                if "user_id FROM plate_selection_info" in sql and "plate_selection_id" in sql:
+                if "user_id FROM vianda_selection_info" in sql and "vianda_selection_id" in sql:
                     return owner_check
                 if "user_id = %s AND kitchen_day = %s" in sql:
                     return {"restaurant_id": restaurant_b, "pickup_time_range": "12:00-12:15"}
@@ -103,7 +103,7 @@ class TestCoworkerServiceIneligibilityReason:
             return None
 
         with patch("app.services.coworker_service.db_read", side_effect=db_read_side_effect):
-            result = get_coworkers_with_eligibility(plate_selection_id, current_user_id, mock_db)
+            result = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, mock_db)
 
         assert len(result) == 1
         assert result[0]["eligible"] is False
@@ -112,7 +112,7 @@ class TestCoworkerServiceIneligibilityReason:
     def test_different_pickup_time_returns_already_ordered_different_pickup_time(self, mock_db):
         """Ineligible coworker (same restaurant, different time) has ineligibility_reason already_ordered_different_pickup_time."""
         current_user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
         coworker_id = uuid4()
         restaurant_id = uuid4()
 
@@ -126,9 +126,9 @@ class TestCoworkerServiceIneligibilityReason:
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:
-                if "plate_selection_info ps" in sql and "JOIN user_info" in sql:
+                if "vianda_selection_info ps" in sql and "JOIN user_info" in sql:
                     return ps_row
-                if "user_id FROM plate_selection_info" in sql and "plate_selection_id" in sql:
+                if "user_id FROM vianda_selection_info" in sql and "vianda_selection_id" in sql:
                     return owner_check
                 if "user_id = %s AND kitchen_day = %s" in sql:
                     return existing
@@ -137,7 +137,7 @@ class TestCoworkerServiceIneligibilityReason:
             return None
 
         with patch("app.services.coworker_service.db_read", side_effect=db_read_side_effect):
-            result = get_coworkers_with_eligibility(plate_selection_id, current_user_id, mock_db)
+            result = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, mock_db)
 
         assert len(result) == 1
         assert result[0]["eligible"] is False
@@ -146,7 +146,7 @@ class TestCoworkerServiceIneligibilityReason:
     def test_different_restaurant_and_time_returns_already_ordered_different_restaurant(self, mock_db):
         """Ineligible coworker (different restaurant and time) returns already_ordered_different_restaurant as primary."""
         current_user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
         coworker_id = uuid4()
         restaurant_a = uuid4()
         restaurant_b = uuid4()
@@ -158,9 +158,9 @@ class TestCoworkerServiceIneligibilityReason:
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:
-                if "plate_selection_info ps" in sql and "JOIN user_info" in sql:
+                if "vianda_selection_info ps" in sql and "JOIN user_info" in sql:
                     return ps_row
-                if "user_id FROM plate_selection_info" in sql and "plate_selection_id" in sql:
+                if "user_id FROM vianda_selection_info" in sql and "vianda_selection_id" in sql:
                     return owner_check
                 if "user_id = %s AND kitchen_day = %s" in sql:
                     return existing
@@ -169,16 +169,16 @@ class TestCoworkerServiceIneligibilityReason:
             return None
 
         with patch("app.services.coworker_service.db_read", side_effect=db_read_side_effect):
-            result = get_coworkers_with_eligibility(plate_selection_id, current_user_id, mock_db)
+            result = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, mock_db)
 
         assert len(result) == 1
         assert result[0]["eligible"] is False
         assert result[0]["ineligibility_reason"] == "already_ordered_different_restaurant"
 
     def test_coworkers_with_can_participate_false_excluded_from_list(self, mock_db):
-        """Coworkers with can_participate_in_plate_pickups=false are excluded from the list."""
+        """Coworkers with can_participate_in_vianda_pickups=false are excluded from the list."""
         current_user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
         employer_entity_id = uuid4()
         employer_address_id = uuid4()
 
@@ -192,9 +192,9 @@ class TestCoworkerServiceIneligibilityReason:
 
         def db_read_side_effect(sql, params, *, connection=None, fetch_one=False):
             if fetch_one:
-                if "plate_selection_info ps" in sql and "JOIN user_info" in sql:
+                if "vianda_selection_info ps" in sql and "JOIN user_info" in sql:
                     return ps_row
-                if "user_id FROM plate_selection_info" in sql and "plate_selection_id" in sql:
+                if "user_id FROM vianda_selection_info" in sql and "vianda_selection_id" in sql:
                     return owner_check
                 if "user_id = %s AND kitchen_day = %s" in sql:
                     return None
@@ -203,6 +203,6 @@ class TestCoworkerServiceIneligibilityReason:
             return None
 
         with patch("app.services.coworker_service.db_read", side_effect=db_read_side_effect):
-            result = get_coworkers_with_eligibility(plate_selection_id, current_user_id, mock_db)
+            result = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, mock_db)
 
         assert len(result) == 0

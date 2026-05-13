@@ -21,8 +21,8 @@ Status legend:
 
 ## `pickups`
 
-**Endpoint:** `/api/v1/plate-pickup/enriched`  
-**Response model:** `PlatePickupEnrichedResponseSchema`
+**Endpoint:** `/api/v1/vianda-pickup/enriched`  
+**Response model:** `ViandaPickupEnrichedResponseSchema`
 
 | Field | Status | Exempt reason |
 |-------|--------|---------------|
@@ -35,8 +35,6 @@ Status legend:
 | `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
 | `expected_completion_time` | exempt | "computed projection; clients display only" |
 | `is_archived` | exempt | "soft-delete flag; server filters by default" |
-| `plate_pickup_id` | exempt | "primary key" |
-| `plate_selection_id` | exempt | "FK; not a filter dimension" |
 | `postal_code` | exempt | "address; restaurant scope handles location filtering" |
 | `product_name` | exempt | "free-text label" |
 | `province` | exempt | "address; restaurant scope handles location filtering" |
@@ -44,6 +42,8 @@ Status legend:
 | `qr_code_payload` | exempt | "kiosk QR data; not a filter dimension" |
 | `restaurant_name` | exempt | "free-text label" |
 | `user_id` | exempt | "auth-scoped via JWT; not a user-input filter" |
+| `vianda_pickup_id` | exempt | "primary key" |
+| `vianda_selection_id` | exempt | "FK; not a filter dimension" |
 | `window_end` | exempt | "range-bound; use window_from / window_to filter params (deferred to follow-up)" |
 | `window_start` | exempt | "range-bound; use window_from / window_to filter params (deferred to follow-up)" |
 
@@ -71,48 +71,6 @@ Status legend:
 | `plan_id` | exempt | "primary key" |
 | `price` | exempt | "range-bound; use price_from / price_to filter params" |
 | `rollover_cap` | exempt | "only meaningful when rollover=true" |
-
-## `plates`
-
-**Endpoint:** `/api/v1/plates/enriched`  
-**Response model:** `PlateEnrichedResponseSchema`
-
-| Field | Status | Exempt reason |
-|-------|--------|---------------|
-| `address_display` | exempt | "enriched join field; computed display field, not independently filterable" |
-| `average_portion_size` | exempt | "computed aggregate; use portion_size for filtering" |
-| `average_stars` | exempt | "computed aggregate; not independently filterable" |
-| `building_number` | exempt | "enriched join field; address subfield, not independently filterable" |
-| `city` | exempt | "enriched join field; address subfield, not independently filterable" |
-| `country_code` | exempt | "enriched join field; address join country; not registered for plate-level filtering" |
-| `country_name` | exempt | "enriched join field; country_code is registered instead" |
-| `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
-| `cuisine_name` | exempt | "enriched join field; filter by cuisine_id instead" |
-| `cuisine_name_i18n` | exempt | "i18n translation payload; not filterable" |
-| `delivery_time_minutes` | exempt | "enriched join field; not independently filterable" |
-| `description` | exempt | "enriched join field; free-text, not independently filterable" |
-| `description_i18n` | exempt | "i18n translation payload; not filterable" |
-| `expected_payout_local_currency` | exempt | "computed display value; not filterable" |
-| `has_coworker_offer` | exempt | "Python-computed contextual flag; not a DB column" |
-| `has_coworker_request` | exempt | "Python-computed contextual flag; not a DB column" |
-| `ingredients` | exempt | "enriched join field; free-text, not independently filterable" |
-| `ingredients_i18n` | exempt | "i18n translation payload; not filterable" |
-| `institution_name` | exempt | "enriched join field; filter by restaurant_id instead" |
-| `is_archived` | exempt | "status field used in restaurant scoping; not a plate filter dimension" |
-| `latitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
-| `longitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
-| `no_show_discount` | exempt | "enriched join field; supplier_terms field, not independently filterable" |
-| `pickup_instructions` | exempt | "enriched join field; filter by restaurant_id instead" |
-| `plate_id` | exempt | "enriched join field; not a direct column on plate_info" |
-| `price` | exempt | "range-bound; use price_from / price_to filter params" |
-| `product_id` | exempt | "enriched join field; product_id is a join key, not a filterable dimension" |
-| `product_name` | exempt | "enriched join field; filter by plate_id instead" |
-| `product_name_i18n` | exempt | "i18n translation payload; not filterable" |
-| `province` | exempt | "enriched join field; address subfield, not independently filterable" |
-| `restaurant_name` | exempt | "enriched join field; filter by restaurant_id instead" |
-| `review_count` | exempt | "computed aggregate; not independently filterable" |
-| `street_name` | exempt | "enriched join field; address subfield, not independently filterable" |
-| `street_type` | exempt | "enriched join field; address subfield, not independently filterable" |
 
 ## `restaurants`
 
@@ -149,3 +107,45 @@ Status legend:
 | `tagline` | exempt | "free-text display field; not independently filterable" |
 | `tagline_i18n` | exempt | "i18n translation payload; not filterable" |
 | `verified_badge` | exempt | "boolean display flag; not a filter dimension" |
+
+## `viandas`
+
+**Endpoint:** `/api/v1/viandas/enriched`  
+**Response model:** `ViandaEnrichedResponseSchema`
+
+| Field | Status | Exempt reason |
+|-------|--------|---------------|
+| `address_display` | exempt | "enriched join field; computed display field, not independently filterable" |
+| `average_portion_size` | exempt | "computed aggregate; use portion_size for filtering" |
+| `average_stars` | exempt | "computed aggregate; not independently filterable" |
+| `building_number` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `city` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `country_code` | exempt | "enriched join field; address join country; not registered for vianda-level filtering" |
+| `country_name` | exempt | "enriched join field; country_code is registered instead" |
+| `credit` | exempt | "range-bound; use credit_from / credit_to filter params" |
+| `cuisine_name` | exempt | "enriched join field; filter by cuisine_id instead" |
+| `cuisine_name_i18n` | exempt | "i18n translation payload; not filterable" |
+| `delivery_time_minutes` | exempt | "enriched join field; not independently filterable" |
+| `description` | exempt | "enriched join field; free-text, not independently filterable" |
+| `description_i18n` | exempt | "i18n translation payload; not filterable" |
+| `expected_payout_local_currency` | exempt | "computed display value; not filterable" |
+| `has_coworker_offer` | exempt | "Python-computed contextual flag; not a DB column" |
+| `has_coworker_request` | exempt | "Python-computed contextual flag; not a DB column" |
+| `ingredients` | exempt | "enriched join field; free-text, not independently filterable" |
+| `ingredients_i18n` | exempt | "i18n translation payload; not filterable" |
+| `institution_name` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `is_archived` | exempt | "status field used in restaurant scoping; not a vianda filter dimension" |
+| `latitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
+| `longitude` | exempt | "enriched join field; geo filtering handled by geo op if needed" |
+| `no_show_discount` | exempt | "enriched join field; supplier_terms field, not independently filterable" |
+| `pickup_instructions` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `price` | exempt | "range-bound; use price_from / price_to filter params" |
+| `product_id` | exempt | "enriched join field; product_id is a join key, not a filterable dimension" |
+| `product_name` | exempt | "enriched join field; filter by vianda_id instead" |
+| `product_name_i18n` | exempt | "i18n translation payload; not filterable" |
+| `province` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `restaurant_name` | exempt | "enriched join field; filter by restaurant_id instead" |
+| `review_count` | exempt | "computed aggregate; not independently filterable" |
+| `street_name` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `street_type` | exempt | "enriched join field; address subfield, not independently filterable" |
+| `vianda_id` | exempt | "enriched join field; not a direct column on vianda_info" |

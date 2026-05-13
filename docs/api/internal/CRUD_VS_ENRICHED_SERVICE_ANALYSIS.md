@@ -10,7 +10,7 @@ Now that `CRUDService` supports JOIN-based scoping, should we merge `EnrichedSer
 
 **Key Characteristics**:
 - Returns **DTOs** (Data Transfer Objects) matching the base table structure
-- Example: `PlateKitchenDaysDTO` with fields: `plate_kitchen_day_id`, `plate_id`, `kitchen_day`, `is_archived`, etc.
+- Example: `ViandaKitchenDaysDTO` with fields: `vianda_kitchen_day_id`, `vianda_id`, `kitchen_day`, `is_archived`, etc.
 - JOINs are used **ONLY for WHERE clause filtering** (institution scoping)
 - SELECT clause: `SELECT {table_name}.*` (only base table columns)
 - Used for operations that need to create/update/delete records
@@ -18,39 +18,39 @@ Now that `CRUDService` supports JOIN-based scoping, should we merge `EnrichedSer
 
 **Example Query**:
 ```sql
-SELECT plate_kitchen_days.*
-FROM plate_kitchen_days
-INNER JOIN plate_info p ON plate_kitchen_days.plate_id = p.plate_id
+SELECT vianda_kitchen_days.*
+FROM vianda_kitchen_days
+INNER JOIN vianda_info p ON vianda_kitchen_days.vianda_id = p.vianda_id
 INNER JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
 WHERE r.institution_id = %s::uuid  -- JOIN used for filtering only
-  AND plate_kitchen_days.is_archived = FALSE
+  AND vianda_kitchen_days.is_archived = FALSE
 ```
 
-**Returns**: `PlateKitchenDaysDTO` with only base table fields
+**Returns**: `ViandaKitchenDaysDTO` with only base table fields
 
 ### EnrichedService
 **Purpose**: Read-only enriched queries with denormalized data
 
 **Key Characteristics**:
 - Returns **EnrichedResponseSchemas** with denormalized data from multiple tables
-- Example: `PlateKitchenDayEnrichedResponseSchema` with fields: `plate_kitchen_day_id`, `plate_id`, `kitchen_day`, `plate_name`, `restaurant_name`, `institution_name`, `dietary`, etc.
+- Example: `ViandaKitchenDayEnrichedResponseSchema` with fields: `vianda_kitchen_day_id`, `vianda_id`, `kitchen_day`, `vianda_name`, `restaurant_name`, `institution_name`, `dietary`, etc.
 - JOINs are used for **BOTH WHERE filtering AND SELECT enrichment**
-- SELECT clause: Custom fields from multiple tables (e.g., `p.plate_name`, `r.restaurant_name`, `i.institution_name`)
+- SELECT clause: Custom fields from multiple tables (e.g., `p.vianda_name`, `r.restaurant_name`, `i.institution_name`)
 - Read-only (no create/update/delete methods)
 - Returns denormalized data optimized for UI display
 
 **Example Query**:
 ```sql
 SELECT 
-    pkd.plate_kitchen_day_id,
-    pkd.plate_id,
+    pkd.vianda_kitchen_day_id,
+    pkd.vianda_id,
     pkd.kitchen_day,
-    p.plate_name,              -- From joined table
+    p.vianda_name,              -- From joined table
     r.restaurant_name,          -- From joined table
     i.institution_name,        -- From joined table
     pr.dietary                 -- From joined table
-FROM plate_kitchen_days pkd
-INNER JOIN plate_info p ON pkd.plate_id = p.plate_id
+FROM vianda_kitchen_days pkd
+INNER JOIN vianda_info p ON pkd.vianda_id = p.vianda_id
 INNER JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
 INNER JOIN institution_info i ON r.institution_id = i.institution_id
 INNER JOIN product_info pr ON p.product_id = pr.product_id
@@ -58,7 +58,7 @@ WHERE r.institution_id = %s::uuid  -- JOIN used for filtering
   AND pkd.is_archived = FALSE
 ```
 
-**Returns**: `PlateKitchenDayEnrichedResponseSchema` with denormalized fields
+**Returns**: `ViandaKitchenDayEnrichedResponseSchema` with denormalized fields
 
 ## Key Differences
 
@@ -96,7 +96,7 @@ WHERE r.institution_id = %s::uuid  -- JOIN used for filtering
 4. ❌ **Different Query Patterns**:
    - CRUDService JOINs: Minimal (only for scoping)
    - EnrichedService JOINs: Extensive (for data enrichment)
-   - Example: `plate_kitchen_days` enriched needs 4-5 JOINs, CRUD only needs 2 for scoping
+   - Example: `vianda_kitchen_days` enriched needs 4-5 JOINs, CRUD only needs 2 for scoping
 
 5. ❌ **Performance Considerations**:
    - CRUDService: Optimized for write operations (minimal JOINs)

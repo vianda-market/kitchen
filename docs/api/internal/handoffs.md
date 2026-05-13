@@ -35,7 +35,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/types.ts
 ## Per-Repo Expectations
 
 - **kitchen-web** (B2B): Auth, CRUD, enriched endpoints, institution-scoped, discretionary, archival, markets. Docs: [b2b_client/](./b2b_client/README.md)
-- **kitchen-mobile** (B2C): Auth, signup, plans, subscriptions, payment methods, plates, plate selection, plate pickup, addresses, client bills, markets, enums. Docs: [b2c_client/](./b2c_client/README.md)
+- **kitchen-mobile** (B2C): Auth, signup, plans, subscriptions, payment methods, viandas, vianda selection, vianda pickup, addresses, client bills, markets, enums. Docs: [b2c_client/](./b2c_client/README.md)
 
 ## Pre-Deploy Checklist
 

@@ -112,8 +112,8 @@ Exploration revealed the current architecture is closer to right than I expected
 
 - **`core.address_info.timezone VARCHAR(50) NOT NULL` already exists** (`app/db/schema.sql:524`). Addresses already carry their own timezone.
 - **`ops.institution_entity_info.address_id UUID NOT NULL FK` already exists** (`app/db/schema.sql:1183`). The entity that owns billing already has its own home address — no schema addition needed to give billing a proper timezone.
-- **Runtime consumers already read `address_info.timezone`**, not `market_info.timezone`: `app/services/plate_pickup_service.py`, `app/services/cron/kitchen_start_promotion.py`, and `app/services/cron/billing_events.py` all reach through to address-level timezone.
-- `market_info.timezone` is consumed in only **4 files**: `app/routes/admin/markets.py`, `app/config/market_config.py`, `app/services/plate_selection_service.py`, `app/services/timezone_service.py`.
+- **Runtime consumers already read `address_info.timezone`**, not `market_info.timezone`: `app/services/vianda_pickup_service.py`, `app/services/cron/kitchen_start_promotion.py`, and `app/services/cron/billing_events.py` all reach through to address-level timezone.
+- `market_info.timezone` is consumed in only **4 files**: `app/routes/admin/markets.py`, `app/config/market_config.py`, `app/services/vianda_selection_service.py`, `app/services/timezone_service.py`.
 
 ### What's broken
 
@@ -152,7 +152,7 @@ In the tear-down-rebuild schema:
 
 - **`core.market_info.timezone` — DROP.** No longer load-bearing. Analytics that need a per-market reference timezone should anchor on an **institution entity** (`institution_entity_info.address_id → address.timezone`) — e.g. roll up the market's suppliers grouped by their own local day — or use UTC for tz-neutral reports. There is deliberately **no** "country capital tz" shortcut; anchoring on a real supplier's address is more meaningful and avoids inventing fictional market-wide wall clocks.
 - **`core.market_info.kitchen_close_time` and `core.market_info.kitchen_open_time` — KEEP as market-level *onboarding templates*, not runtime policy.** Both are Postgres `TIME` values, which are deliberately **naive wall-clock times with no timezone attached**. "13:30" means "1:30 in whatever local timezone applies when the value is interpreted." At the market level the value is interpreted nowhere — it's just a placeholder that gets copied into new restaurant rows. "Every Argentinian kitchen defaults to 09:00 open and 13:30 close" is the intent, where "09:00" means "09:00 local for whichever specific city the restaurant lives in."
-- **`ops.restaurant_info.kitchen_open_time TIME NOT NULL` and `ops.restaurant_info.kitchen_close_time TIME NOT NULL` — NEW.** Both are copied from the market row at restaurant-create time (same naive `TIME` values). `restaurant_info` owns the values thereafter. Matches the Copy-vs-Reference principle exactly: operational policy is copied once from a template, then owned. No runtime fallback lookup through the market row, no `COALESCE` chain, no per-restaurant-override flag. Changing the market template does **not** affect existing restaurants; it only affects the defaults applied to future restaurant creation. Supports earlier-plate restaurants (open at 07:00) without any special casing.
+- **`ops.restaurant_info.kitchen_open_time TIME NOT NULL` and `ops.restaurant_info.kitchen_close_time TIME NOT NULL` — NEW.** Both are copied from the market row at restaurant-create time (same naive `TIME` values). `restaurant_info` owns the values thereafter. Matches the Copy-vs-Reference principle exactly: operational policy is copied once from a template, then owned. No runtime fallback lookup through the market row, no `COALESCE` chain, no per-restaurant-override flag. Changing the market template does **not** affect existing restaurants; it only affects the defaults applied to future restaurant creation. Supports earlier-vianda restaurants (open at 07:00) without any special casing.
 
 **Concretely, the "abstract wall clock" resolution flow:**
 
@@ -174,7 +174,7 @@ So "the market timezone" never exists as a thing — the market template is a pa
 - **`app/services/kitchen_day_service.get_effective_current_day`** — currently takes `(timezone_str, country_code)`. New signature: `(address_id, db)` or `(restaurant_id, db)`, resolving the tz + close time internally. Callers pass the restaurant/address they're computing for, not a raw tz string — removes a class of "passed the wrong timezone" bugs.
 - **`app/services/cron/kitchen_start_promotion.py`** — already iterates per-restaurant with address tz per the current grep. Verify during implementation that no residual `market.timezone` reads remain; delete them if found.
 - **`app/services/cron/billing_events.py`** — already uses address tz per the current grep. Verify that the address it uses is the **institution_entity's** address (for billing period boundaries), not a restaurant address or a market-level default. If not, fix.
-- **`app/services/plate_selection_service.py`** — flagged as a current `market.timezone` reader. Needs audit during implementation: figure out what it's using timezone for, and route it through either the restaurant's address tz (if it's doing restaurant-scoped work) or the capital-city lookup helper (if it's doing market-wide analytics).
+- **`app/services/vianda_selection_service.py`** — flagged as a current `market.timezone` reader. Needs audit during implementation: figure out what it's using timezone for, and route it through either the restaurant's address tz (if it's doing restaurant-scoped work) or the capital-city lookup helper (if it's doing market-wide analytics).
 - **`app/routes/admin/markets.py`** — admin Create/Edit Market form loses the `timezone` field. Replaced by the GeoNames country picker which already makes tz-per-market moot.
 - **`app/config/market_config.py`** — currently holds per-country configuration including kitchen_close hints. Audit for any timezone constants and remove; any useful per-market defaults migrate to the DB column.
 
@@ -185,7 +185,7 @@ Three-layer rule:
 | Operation | Whose timezone? | Via which FK chain |
 |---|---|---|
 | Kitchen-day open / close | Restaurant's own | `restaurant_info.address_id → address_info.timezone` |
-| Plate pickup windows, order cutoffs | Restaurant's own | same |
+| Vianda pickup windows, order cutoffs | Restaurant's own | same |
 | Per-restaurant daily balance closeout | Restaurant's own | same |
 | Monthly billing period boundary (institution-entity-scoped) | Institution entity's home address | `institution_entity_info.address_id → address_info.timezone` |
 | Institution-level payout aggregation | Institution entity's home address | same |
@@ -204,9 +204,9 @@ A transaction's `event_time_utc` is stored canonically in UTC. Which billing per
 
 ### Decisions locked in for this section
 
-1. **Kitchen hours on restaurant_info** — both `kitchen_open_time` and `kitchen_close_time` live on `restaurant_info` as NOT NULL columns, copied from the market template at restaurant-create time. No `_override` suffix, no runtime fallback through market. Market columns become pure onboarding templates. Earlier-opening plates supported out of the box (any restaurant can have `kitchen_open_time = 07:00`).
+1. **Kitchen hours on restaurant_info** — both `kitchen_open_time` and `kitchen_close_time` live on `restaurant_info` as NOT NULL columns, copied from the market template at restaurant-create time. No `_override` suffix, no runtime fallback through market. Market columns become pure onboarding templates. Earlier-opening viandas supported out of the box (any restaurant can have `kitchen_open_time = 07:00`).
 2. **`get_effective_current_day` signature** — changes to `(restaurant_id, db)` (or the lower-level `(address_id, db)`). Resolution happens inside the service, callers can't pass the wrong timezone.
-3. **`plate_selection_service` market.timezone usage** — TBD until a code read during implementation. Once we see what it's actually computing, route it through either the restaurant's address tz or UTC.
+3. **`vianda_selection_service` market.timezone usage** — TBD until a code read during implementation. Once we see what it's actually computing, route it through either the restaurant's address tz or UTC.
 4. **`timezone_service.py`** — **deleted entirely** during the rebuild. `PROVINCE_TIMEZONE_MAPPING` gone. Failing call sites surface during E2E testing and get migrated to the new resolver.
 5. **`app/config/market_config.py` `MarketConfiguration.kitchen_day_config`** — deleted. Any service that was relying on it gets migrated to the new `restaurant_info.kitchen_open_time`/`kitchen_close_time` columns.
 
@@ -509,7 +509,7 @@ CREATE TABLE IF NOT EXISTS core.city_metadata (
     show_in_signup_picker BOOLEAN NOT NULL DEFAULT FALSE,  -- replaces city_info's canonical role
     show_in_supplier_form BOOLEAN NOT NULL DEFAULT FALSE,
     show_in_customer_form BOOLEAN NOT NULL DEFAULT FALSE,
-    is_served             BOOLEAN NOT NULL DEFAULT FALSE,  -- derived: ≥1 active restaurant w/ plates + QR
+    is_served             BOOLEAN NOT NULL DEFAULT FALSE,  -- derived: ≥1 active restaurant w/ viandas + QR
     is_archived           BOOLEAN NOT NULL DEFAULT FALSE,
     status                status_enum NOT NULL DEFAULT 'active'::status_enum,
     created_date          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -825,7 +825,7 @@ Since this is the specific question you raised:
 - `app/services/kitchen_day_service.py` — `_get_kitchen_close_time` signature changes from `(country_code, day_name)` to a restaurant-scoped lookup with `COALESCE(restaurant.kitchen_close_time_override, market.kitchen_close_time)` fallback. `get_effective_current_day` takes a restaurant/address identifier instead of a raw tz string.
 - `app/services/cron/kitchen_start_promotion.py` — audit for residual `market.timezone` reads; expected to already iterate per-restaurant via address tz, so the diff should be small.
 - `app/services/cron/billing_events.py` — verify that billing closeout uses `institution_entity.address.timezone` (via `institution_entity_info.address_id → address_info.timezone`), not restaurant address or market default.
-- `app/services/plate_selection_service.py` — currently reads `market.timezone`; audit what it uses it for and route through either restaurant address tz or the capital-city helper.
+- `app/services/vianda_selection_service.py` — currently reads `market.timezone`; audit what it uses it for and route through either restaurant address tz or the capital-city helper.
 - `app/routes/admin/markets.py` — admin Create/Edit Market form drops the `timezone` field (and `country_name`, which is now derived).
 - `app/config/market_config.py` — audit for timezone-related constants (`MarketConfiguration.kitchen_day_config`); delete anything now redundant with the DB + per-restaurant override.
 - `app/services/user_service.py`, signup / pending-signup services — accept `city_metadata_id` from frontend; drop city_name string lookup
@@ -868,7 +868,7 @@ Since this is the specific question you raised:
 7. **Pytest:** `pytest app/tests/` green.
 8. **Grep for dead references:** `grep -r "city_info" app/` returns zero non-comment matches.
 9. **Frontend smoke** (after deploy): vianda-home "Apply to Partner" flow populates cities for an unserved country; vianda-app signup flow picks a city and completes.
-10. **Multi-timezone kitchen day:** create two US restaurants — one with an NYC address (`city_metadata_id` for New York), one with an LA address (`city_metadata_id` for Los Angeles) — both under the same market. Set `market.kitchen_close_time = 13:30`. Invoke `get_effective_current_day` / `_get_kitchen_close_time` for each. Expect: NY restaurant cuts over at `13:30 America/New_York`, LA restaurant cuts over at `13:30 America/Los_Angeles` — a 3-hour wall-clock gap. Verify no residual `market.timezone` references remain in `plate_selection_service` or anywhere else in the restaurant code path.
+10. **Multi-timezone kitchen day:** create two US restaurants — one with an NYC address (`city_metadata_id` for New York), one with an LA address (`city_metadata_id` for Los Angeles) — both under the same market. Set `market.kitchen_close_time = 13:30`. Invoke `get_effective_current_day` / `_get_kitchen_close_time` for each. Expect: NY restaurant cuts over at `13:30 America/New_York`, LA restaurant cuts over at `13:30 America/Los_Angeles` — a 3-hour wall-clock gap. Verify no residual `market.timezone` references remain in `vianda_selection_service` or anywhere else in the restaurant code path.
 11. **Multi-timezone billing:** create an `institution_entity` with an Austin address and two restaurants (one in New York, one in Los Angeles). Fabricate transactions near a month boundary from both restaurants. Run the monthly billing closeout. Expect: the period boundary is interpreted in `America/Chicago` (Austin tz, from `institution_entity.address.timezone`), and transactions fall into the correct billing period regardless of which restaurant they came from.
 12. **Timezone service retirement check:** `grep -r "PROVINCE_TIMEZONE_MAPPING" app/` returns zero matches. `grep -r "market.*\.timezone\b" app/` returns zero matches (the column no longer exists). `grep -r "from app.services.timezone_service" app/` returns zero matches (or only the retired-shim warning).
 13. **Superadmin promotion flow:** starting from a clean DB, create a new market for Colombia via the admin endpoint. Expect: `country_metadata` row exists with `status='pending'`, `is_supplier_audience=TRUE`. Call `promote_supplier_cities('CO', top_n=50)`. Expect: 50 `city_metadata` rows with `show_in_supplier_form=TRUE`, `status='pending'`. Call `GET /leads/cities?country_code=CO&audience=supplier`. Expect: 50 cities in the response. Register a real supplier lead converting to a restaurant in Bogotá. Expect: `country_metadata('CO').status` flips to `active` via the service hook, and `city_metadata(Bogotá).status` flips to `active`.
@@ -973,7 +973,7 @@ Touches billing and kitchen-day code paths. Highest-risk PR on the branch.
 - `app/services/kitchen_day_service.py` — new signatures: `(restaurant_id, db)` / `(address_id, db)`. Reads `restaurant.kitchen_open_time`/`kitchen_close_time` directly, no fallback through market.
 - `app/services/cron/kitchen_start_promotion.py` — verify address-tz usage, delete any residual market.timezone reads.
 - `app/services/cron/billing_events.py` — verify `institution_entity.address.timezone` is the source of tz for billing period boundaries. Fix if not.
-- `app/services/plate_selection_service.py` — audit the current `market.timezone` usage, route through either the restaurant's address tz or UTC depending on what it's computing.
+- `app/services/vianda_selection_service.py` — audit the current `market.timezone` usage, route through either the restaurant's address tz or UTC depending on what it's computing.
 - `app/routes/admin/markets.py` — drop timezone and country_name from the admin form.
 - **Integration tests** (new):
   - Multi-tz kitchen day: two US restaurants in NY + LA under the same market, assert 3-hour wall-clock gap in close events.

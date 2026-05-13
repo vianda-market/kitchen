@@ -14,19 +14,19 @@ This audit catalogs existing bulk APIs, current UI integration status, and candi
 
 ## Already Implemented (Backend)
 
-### 1. Plate Kitchen Days
+### 1. Vianda Kitchen Days
 
 | Attribute | Value |
 |-----------|-------|
-| **Endpoint** | `POST /api/v1/plate-kitchen-days/` |
+| **Endpoint** | `POST /api/v1/vianda-kitchen-days/` |
 | **Pattern** | Array in POST body (`kitchen_days: string[]`) |
 | **Access** | Suppliers (institution-scoped), Employees (global) |
-| **UI integration** | In progress — Kitchen Days create form will use multi-select (checkbox_group) instead of single-day select. See Bulk Plate Kitchen Days UI plan. |
+| **UI integration** | In progress — Kitchen Days create form will use multi-select (checkbox_group) instead of single-day select. See Bulk Vianda Kitchen Days UI plan. |
 
 **Request**:
 ```json
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
   "status": "Active"
 }
@@ -76,7 +76,7 @@ This audit catalogs existing bulk APIs, current UI integration status, and candi
 
 | Entity | Use Case | Suggested Pattern | Notes |
 |--------|----------|-------------------|-------|
-| **Plates** | Create multiple plates for same product across restaurants (or same restaurant with variants) | `POST /plates/bulk` or `{ plates: [...] }` | Product → Plate setup; reduce N round-trips |
+| **Viandas** | Create multiple viandas for same product across restaurants (or same restaurant with variants) | `POST /viandas/bulk` or `{ viandas: [...] }` | Product → Vianda setup; reduce N round-trips |
 | **Addresses** | Add multiple address types for institution entity (Restaurant, Entity Billing, etc.) | Array in body or compound endpoint | Address form has `address_type` checkbox_group; backend may accept multiple |
 | **QR codes** | Generate multiple QR codes for a restaurant (e.g. one per table/zone) | `POST /qr-codes/bulk` with `restaurant_id` + count | Currently one at a time |
 | **Credit currencies** | Create multiple credit currencies for a market | `POST /credit-currencies/bulk` | Lower frequency; market setup |
@@ -100,7 +100,7 @@ Use these when prioritizing bulk operations:
 
 | Criterion | Description |
 |-----------|-------------|
-| **Atomicity needs** | Must all succeed or all fail? (e.g. restaurant activation requires plates + kitchen days + QR) |
+| **Atomicity needs** | Must all succeed or all fail? (e.g. restaurant activation requires viandas + kitchen days + QR) |
 | **Typical batch size** | 2–5 (kitchen days), 5–20 (holidays), 50+ (import)? |
 | **Role/permission alignment** | Employee vs Supplier vs Customer; institution scoping |
 | **UX impact** | How much friction does one-by-one create today? |
@@ -116,7 +116,7 @@ From [BULK_API_PATTERN.md](../backend/shared_client/BULK_API_PATTERN.md):
 ### Pattern 1: Array in POST Body
 
 - Single endpoint accepts array field in body.
-- Example: `plate-kitchen-days` with `kitchen_days: ["Monday", ...]`.
+- Example: `vianda-kitchen-days` with `kitchen_days: ["Monday", ...]`.
 - Response: Always array of created records.
 
 ### Pattern 2: Separate Bulk Endpoint
@@ -129,9 +129,9 @@ From [BULK_API_PATTERN.md](../backend/shared_client/BULK_API_PATTERN.md):
 
 | Use case | Prefer |
 |---------|--------|
-| Same entity, multiple values (e.g. days for one plate) | Pattern 1 (array in body) |
+| Same entity, multiple values (e.g. days for one vianda) | Pattern 1 (array in body) |
 | Multiple unrelated records (e.g. holidays for country) | Pattern 2 (separate endpoint) |
-| Compound create (e.g. restaurant + plates + QR) | New compound endpoint or wizard with sequential calls |
+| Compound create (e.g. restaurant + viandas + QR) | New compound endpoint or wizard with sequential calls |
 
 ---
 
@@ -166,10 +166,10 @@ When proposing a new bulk operation:
 
 | Entity | Backend | UI | Priority |
 |--------|---------|-----|----------|
-| Plate kitchen days | ✅ | In progress | P0 |
+| Vianda kitchen days | ✅ | In progress | P0 |
 | National holidays | ✅ | ❌ | P1 |
 | Restaurant holidays | ❌ | — | P2 |
-| Plates | ❌ | — | P2 |
+| Viandas | ❌ | — | P2 |
 | Addresses | ? | — | P3 |
 | QR codes | ❌ | — | P3 |
 | Credit currencies | ❌ | — | P4 |

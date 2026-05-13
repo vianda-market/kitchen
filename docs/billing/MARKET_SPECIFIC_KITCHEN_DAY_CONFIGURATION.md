@@ -148,7 +148,7 @@ python app/services/cron/billing_events.py multi_market US-Pacific
 
 ### **Kitchen Start Promotion (Lock-at-Kitchen-Start)**
 
-Promotes locked plate selections to live (creates plate_pickup_live + restaurant_transaction) at kitchen start (11:30 AM local). Run every 5–15 minutes during business hours. Uses **location_id** (filters by address.timezone):
+Promotes locked vianda selections to live (creates vianda_pickup_live + restaurant_transaction) at kitchen start (11:30 AM local). Run every 5–15 minutes during business hours. Uses **location_id** (filters by address.timezone):
 
 ```bash
 # All locations

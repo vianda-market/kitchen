@@ -19,7 +19,7 @@ This document connects the credit/currency model to the actual restaurant paymen
          ┌──────────────────────────────┼──────────────────────────────┐
          ▼                              ▼                              ▼
 ┌────────────────────┐    ┌────────────────────────┐    ┌────────────────────────────────────────┐
-│ plate_info         │    │ plan_info               │    │ restaurant_transaction (order flow)      │
+│ vianda_info         │    │ plan_info               │    │ restaurant_transaction (order flow)      │
 │ expected_payout_   │    │ credit_cost_local_     │    │ final_amount = credit × (no-show disc)   │
 │ local_currency =   │    │ currency, credit_cost_  │    │ (see Investigation section below)       │
 │ credit × cv_local  │    │ usd (trigger-set)      │    │                                          │
@@ -69,7 +69,7 @@ This document connects the credit/currency model to the actual restaurant paymen
 | Update credit currency | `PUT /api/v1/credit-currencies/{id}` |
 | Plan form preview | `GET /api/v1/markets/enriched/` (includes `credit_value_local_currency`, `currency_conversion_usd`) |
 | Plans (with credit costs) | `GET /api/v1/plans/`, `GET /api/v1/plans/enriched/` |
-| Plate payout preview | `GET /api/v1/restaurants/enriched/` (`market_credit_value_local_currency`) |
+| Vianda payout preview | `GET /api/v1/restaurants/enriched/` (`market_credit_value_local_currency`) |
 
 ---
 
@@ -77,7 +77,7 @@ This document connects the credit/currency model to the actual restaurant paymen
 
 | Purpose | API | Notes |
 |---------|-----|-------|
-| **Add to balance** (customer arrival) | `POST /api/v1/plate-pickup/scan-qr` | Body: `{ "qr_code_payload": "..." }`. Triggers `_update_restaurant_transaction_arrival` → `update_balance_on_arrival`. |
+| **Add to balance** (customer arrival) | `POST /api/v1/vianda-pickup/scan-qr` | Body: `{ "qr_code_payload": "..." }`. Triggers `_update_restaurant_transaction_arrival` → `update_balance_on_arrival`. |
 | **Read restaurant balance** | `GET /api/v1/restaurant-balances/`, `GET /api/v1/restaurant-balances/{restaurant_id}`, `GET /api/v1/restaurant-balances/enriched` | Read-only. |
 | **Run settlement → bill → payout** | `POST /api/v1/institution-bills/run-settlement-pipeline?bill_date=YYYY-MM-DD&country_code=XX` | Phase 1: settlements from balances; Phase 2: one bill per entity; tax doc; payout; `mark_paid`. |
 | **Alternative pipeline entry** | `POST /api/v1/institution-bills/generate-daily-bills?bill_date=...&country_code=...` | Same pipeline as above. |
@@ -93,7 +93,7 @@ This document connects the credit/currency model to the actual restaurant paymen
 End-to-end flow:
 
 1. **Credit definition** (`credit_currency_info`): `credit_value_local_currency` defines local $ per credit.
-2. **Balance accrual** (QR scan): `POST /plate-pickup/scan-qr` → `_update_restaurant_transaction_arrival` → `update_balance_on_arrival(restaurant_id, credit_difference, db)`.
+2. **Balance accrual** (QR scan): `POST /vianda-pickup/scan-qr` → `_update_restaurant_transaction_arrival` → `update_balance_on_arrival(restaurant_id, credit_difference, db)`.
 3. **Balance store** (`restaurant_balance_info`): `balance` is the amount that feeds settlements.
 4. **Settlement** (Phase 1): For each restaurant with `balance > 0`, create settlement with `amount = balance`, then reset balance.
 5. **Bill** (Phase 2): One `institution_bill_info` per entity; `amount = sum(settlement.amount)` for that entity.
@@ -148,7 +148,7 @@ So `restaurant_balance_info.balance` should be in **local currency** (e.g. ARS, 
 
 In the promotion/arrival flow:
 
-- **`plate_selection_promotion_service._create_restaurant_transaction_for_promotion`**  
+- **`vianda_selection_promotion_service._create_restaurant_transaction_for_promotion`**  
   - `final_amount = credit_decimal * discount_multiplier` (e.g. 8 credits × 0.8 = 6.4 credits for 20% no-show discount).  
   - `final_amount` is in **credits**, not local currency.
 
@@ -156,7 +156,7 @@ In the promotion/arrival flow:
   - Passes `transaction.final_amount` to `update_balance_on_transaction_creation`.  
   - No multiplication by `credit_value_local_currency` in this path.
 
-- **`plate_pickup_service._update_restaurant_transaction_arrival`**  
+- **`vianda_pickup_service._update_restaurant_transaction_arrival`**  
   - Uses `credit_difference = float(credit_amount - current_final_amount)` (credits).  
   - Calls `update_balance_on_arrival(restaurant_id, credit_difference, db)` — again, credits, not local currency.
 
@@ -197,8 +197,8 @@ To resolve this, verify:
 
 | Area | File / function |
 |------|------------------|
-| Promotion transaction creation | `app/services/plate_selection_promotion_service.py` — `_create_restaurant_transaction_for_promotion` |
-| Arrival balance update | `app/services/plate_pickup_service.py` — `_update_restaurant_transaction_arrival` |
+| Promotion transaction creation | `app/services/vianda_selection_promotion_service.py` — `_create_restaurant_transaction_for_promotion` |
+| Arrival balance update | `app/services/vianda_pickup_service.py` — `_update_restaurant_transaction_arrival` |
 | Balance update helpers | `app/services/crud_service.py` — `update_balance_on_arrival`, `update_balance_on_transaction_creation`, `create_with_conservative_balance_update` |
 | Credit loading | `app/services/credit_loading_service.py` |
 | Settlement creation | `app/services/billing/institution_billing.py` — Phase 1 uses `balance_record.balance` for `settlement_data["amount"]` |
@@ -220,7 +220,7 @@ If balance is currently stored in credits instead of local currency:
 
 | Concept | Location |
 |---------|----------|
-| QR scan → balance update | `app/routes/plate_pickup.py` (scan-qr), `plate_pickup_service._update_restaurant_transaction_arrival` |
+| QR scan → balance update | `app/routes/vianda_pickup.py` (scan-qr), `vianda_pickup_service._update_restaurant_transaction_arrival` |
 | Balance update | `app/services/crud_service.py` — `update_balance_on_arrival` |
 | Settlement pipeline | `app/services/billing/institution_billing.py` — `run_phase1_settlements`, `run_phase2_bills_and_payout`, `run_daily_settlement_bill_and_payout` |
 | Bill creation | Same file — Phase 2 creates `institution_bill_info`, links settlements |
@@ -231,5 +231,5 @@ If balance is currently stored in credits instead of local currency:
 
 ## 7. Related docs
 
-- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — Credit values, plan pricing, plate payouts, B2C savings
+- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — Credit values, plan pricing, vianda payouts, B2C savings
 - [SUPPLIER_INSTITUTION_PAYMENT.md](SUPPLIER_INSTITUTION_PAYMENT.md) — Settlement → bill → payout pipeline, cron, configuration

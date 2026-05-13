@@ -19,7 +19,7 @@
 
 | Function | Purpose |
 |----------|---------|
-| `get_by_plate_selection_id()` | Transaction by plate selection |
+| `get_by_vianda_selection_id()` | Transaction by vianda selection |
 | `mark_collected()` | Mark transaction collected |
 | `update_final_amount()` | Update transaction amount |
 | `update_transaction_arrival_time()` | Update arrival time |

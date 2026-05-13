@@ -2,8 +2,8 @@
 """
 Cursor-based pagination for the explore endpoint (restaurants-by-city).
 
-Pagination unit is **plates**, not restaurants. A restaurant is never split
-across pages — if any of its plates fit in the current page, all of them are
+Pagination unit is **viandas**, not restaurants. A restaurant is never split
+across pages — if any of its viandas fit in the current page, all of them are
 included (the page may slightly exceed `limit`).
 
 Cursors are opaque base64-encoded JSON. The frontend must never parse or
@@ -13,7 +13,7 @@ construct them; the backend is free to change the encoding at any time.
 import base64
 import json
 
-# Defaults and bounds for the `limit` query param (plate count per page).
+# Defaults and bounds for the `limit` query param (vianda count per page).
 DEFAULT_LIMIT = 20
 MIN_LIMIT = 10
 MAX_LIMIT = 50
@@ -60,11 +60,11 @@ def slice_restaurants_by_cursor(
     ----------
     restaurants:
         The full, already-sorted list of restaurant dicts (each with a
-        ``plates`` list or ``None``).
+        ``viandas`` list or ``None``).
     cursor:
         Opaque cursor from a previous response, or ``None`` for page 1.
     limit:
-        Maximum number of **plates** to include.  Clamped to
+        Maximum number of **viandas** to include.  Clamped to
         [MIN_LIMIT, MAX_LIMIT]; ``None`` → DEFAULT_LIMIT.
 
     Returns
@@ -88,24 +88,24 @@ def slice_restaurants_by_cursor(
     effective_limit = clamp_limit(limit)
 
     page: list[dict] = []
-    plate_count = 0
+    vianda_count = 0
     idx = start
 
     while idx < len(restaurants):
         r = restaurants[idx]
-        r_plates = len(r.get("plates") or [])
+        r_viandas = len(r.get("viandas") or [])
 
         # Always include at least one restaurant per page (even if it alone
         # exceeds the limit) so pagination always makes progress.
-        if plate_count > 0 and plate_count + r_plates > effective_limit:
+        if vianda_count > 0 and vianda_count + r_viandas > effective_limit:
             break
 
         page.append(r)
-        plate_count += r_plates
+        vianda_count += r_viandas
         idx += 1
 
         # Stop once we've met or exceeded the limit.
-        if plate_count >= effective_limit:
+        if vianda_count >= effective_limit:
             break
 
     has_more = idx < len(restaurants)

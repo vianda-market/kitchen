@@ -96,8 +96,8 @@ def client_bill_not_found(bill_id: UUID | None = None, locale: str = "en") -> HT
     return entity_not_found("Client bill", bill_id, locale=locale)
 
 
-def plate_selection_not_found(selection_id: UUID | None = None, locale: str = "en") -> HTTPException:
-    return entity_not_found("Plate selection", selection_id, locale=locale)
+def vianda_selection_not_found(selection_id: UUID | None = None, locale: str = "en") -> HTTPException:
+    return entity_not_found("Vianda selection", selection_id, locale=locale)
 
 
 def pickup_record_not_found(pickup_id: UUID | None = None, locale: str = "en") -> HTTPException:
@@ -116,8 +116,8 @@ def credit_currency_not_found(currency_id: UUID | None = None, locale: str = "en
     return entity_not_found("Credit currency", currency_id, locale=locale)
 
 
-def plate_not_found(plate_id: UUID | None = None, locale: str = "en") -> HTTPException:
-    return entity_not_found("Plate", plate_id, locale=locale)
+def vianda_not_found(vianda_id: UUID | None = None, locale: str = "en") -> HTTPException:
+    return entity_not_found("Vianda", vianda_id, locale=locale)
 
 
 # =============================================================================

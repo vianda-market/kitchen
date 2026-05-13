@@ -38,7 +38,7 @@ def get_margin_report(
     grouped by plan tier. Margin varies by tier: high-tier plans (cheaper per credit for
     customers) yield narrower margin; low-tier plans yield wider margin.
 
-    Only redemption transactions (restaurant_transaction rows with a linked plate_selection)
+    Only redemption transactions (restaurant_transaction rows with a linked vianda_selection)
     are counted. Discretionary transactions are excluded.
 
     **Query Parameters**:

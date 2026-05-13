@@ -15,7 +15,7 @@ The `is_archived` field is a critical component of our data lifecycle management
 
 | Entity Type | Retention Period | Reason |
 |-------------|------------------|--------|
-| `plate_pickup_live` | 30 days | Customer service, order issues |
+| `vianda_pickup_live` | 30 days | Customer service, order issues |
 | `restaurant_transaction` | 90 days | Financial disputes, reconciliation |
 | `client_transaction` | 90 days | Payment disputes, refunds |
 | `subscription_info` | 365 days | Billing cycles, annual reports |
@@ -53,7 +53,7 @@ def complete_order():
 ### 4. **Immediate Changes Required**
 
 #### **A. Fix Current Immediate Archival**
-- [ ] Update `plate_pickup_live` completion logic
+- [ ] Update `vianda_pickup_live` completion logic
 - [ ] Update `client_transaction` completion logic  
 - [ ] Update `restaurant_transaction` completion logic
 
@@ -65,7 +65,7 @@ def complete_order():
 #### **C. Database Indexes for Archival**
 ```sql
 -- Efficient archival queries
-CREATE INDEX idx_orders_archival ON plate_pickup_live(status, completion_time, is_archived);
+CREATE INDEX idx_orders_archival ON vianda_pickup_live(status, completion_time, is_archived);
 CREATE INDEX idx_transactions_archival ON restaurant_transaction(status, completion_time, is_archived);
 CREATE INDEX idx_client_transactions_archival ON client_transaction(status, completion_time, is_archived);
 ```
@@ -110,13 +110,13 @@ class ArchivalService:
 #### **Standard Operations** (Default: Show Active Only)
 ```python
 # Most common queries exclude archived automatically
-active_orders = PlatePickupLive.get_by_user_and_status(user_id, "Complete", is_archived=False)
+active_orders = ViandaPickupLive.get_by_user_and_status(user_id, "Complete", is_archived=False)
 ```
 
 #### **Customer Service** (Include Recent Archived)
 ```python
 # Last 90 days including archived for customer service
-recent_orders = PlatePickupLive.get_recent_for_support(user_id, days=90)
+recent_orders = ViandaPickupLive.get_recent_for_support(user_id, days=90)
 ```
 
 #### **Compliance/Reporting** (Include All)
@@ -300,8 +300,8 @@ CREATE INDEX idx_table_id_archived ON table(record_id, is_archived);
 - ✅ `institution_payment_attempt` - Soft delete implemented
 - ✅ `institution_bill` - Soft delete implemented  
 - ✅ `client_payment_attempt` - Soft delete implemented
-- ✅ `plate_pickup` - Soft delete implemented
-- ✅ `plate_selection` - Soft delete implemented
+- ✅ `vianda_pickup` - Soft delete implemented
+- ✅ `vianda_selection` - Soft delete implemented
 - ✅ All other routes - Already had DELETE endpoints
 
 ### **Next Steps:**

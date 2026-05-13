@@ -31,7 +31,7 @@
 | Filter | Source | Notes |
 |--------|--------|-------|
 | **Cuisine** | `GET /api/v1/cuisines/` | Already exists. Restaurants have `cuisine` field. |
-| **Dietary** | TBD | Plates/restaurants may have dietary info (see PLATE_API_CLIENT: `dietary` on plate). Backend must define: (a) enum or list of supported dietary attributes, (b) where they live (plate, restaurant, or both), (c) filtering logic (e.g. show restaurants that have at least one plate with selected dietary). |
+| **Dietary** | TBD | Viandas/restaurants may have dietary info (see VIANDA_API_CLIENT: `dietary` on vianda). Backend must define: (a) enum or list of supported dietary attributes, (b) where they live (vianda, restaurant, or both), (c) filtering logic (e.g. show restaurants that have at least one vianda with selected dietary). |
 | **Radius** | Computed | Backend computes distance from focus address; filters restaurants by `radius_miles`. |
 
 ### Endpoint changes
@@ -49,12 +49,12 @@
 **Logic (backend)**:
 - **Radius**: Haversine or PostGIS distance from focus address; exclude restaurants beyond `radius_miles`.
 - **Cuisine**: Filter restaurants where `cuisine` matches (exact or in list).
-- **Dietary**: Filter restaurants/plates that have the selected dietary attribute(s). Backend defines whether filter is at restaurant level (restaurant has any plate with dietary) or plate level (only show restaurants that have plates matching all selected dietary).
+- **Dietary**: Filter restaurants/viandas that have the selected dietary attribute(s). Backend defines whether filter is at restaurant level (restaurant has any vianda with dietary) or vianda level (only show restaurants that have viandas matching all selected dietary).
 
 ### Questions for backend
 
-- [ ] **Dietary attributes**: Where are they stored? Enum? Separate table? Existing `dietary` field on plate — what values are valid?
-- [ ] **Dietary filter semantics**: Filter by restaurants that have at least one plate with selected dietary? Or require all selected dietary attributes to match?
+- [ ] **Dietary attributes**: Where are they stored? Enum? Separate table? Existing `dietary` field on vianda — what values are valid?
+- [ ] **Dietary filter semantics**: Filter by restaurants that have at least one vianda with selected dietary? Or require all selected dietary attributes to match?
 - [ ] **Radius options**: What values should we support (5, 10, 15, 25 miles)? Should these be configurable (e.g. market-specific)?
 - [ ] **Filter persistence**: Should we persist user's last filter selections (e.g. in user preferences or `address_info`) so they persist across sessions? Or always start with defaults?
 
@@ -95,4 +95,4 @@
 
 - [RESTAURANT_EXPLORE_B2C.md](../api/backend/b2c_client/RESTAURANT_EXPLORE_B2C.md)
 - [CUISINES_API_CLIENT.md](../api/backend/shared_client/CUISINES_API_CLIENT.md)
-- [PLATE_API_CLIENT.md](../api/backend/shared_client/PLATE_API_CLIENT.md) — dietary field on plate
+- [VIANDA_API_CLIENT.md](../api/backend/shared_client/VIANDA_API_CLIENT.md) — dietary field on vianda

@@ -38,7 +38,7 @@ All scoping classes, functions, and access control patterns are centralized in:
 
 ### 1. InstitutionScope
 
-**Purpose**: Restricts access to resources that belong to institutions (restaurants, products, plates, QR codes, etc.)
+**Purpose**: Restricts access to resources that belong to institutions (restaurants, products, viandas, QR codes, etc.)
 
 **Behavior by Role**:
 - **Employees**: Global access (can see all institutions)
@@ -174,8 +174,8 @@ def get_enriched_entity_by_id(
 - ✅ Subscriptions
 - 🔄 Payment Methods (user-owned)
 - 🔄 Client Bills (user-owned)
-- 🔄 Plate Selections (user-owned)
-- 🔄 Plate Pickups (user-owned, but may have company matching)
+- 🔄 Vianda Selections (user-owned)
+- 🔄 Vianda Pickups (user-owned, but may have company matching)
 - 🔄 Client Payment Attempts (user-owned)
 
 ---
@@ -196,13 +196,13 @@ scope = EntityScopingService.get_scope_for_entity(ENTITY_SUBSCRIPTION, current_u
 ```
 
 **Entity Types**:
-- `ENTITY_PLATE_KITCHEN_DAYS`
+- `ENTITY_VIANDA_KITCHEN_DAYS`
 - `ENTITY_RESTAURANT_BALANCE`
 - `ENTITY_RESTAURANT_TRANSACTION`
-- `ENTITY_PLATE_PICKUP_LIVE`
+- `ENTITY_VIANDA_PICKUP_LIVE`
 - `ENTITY_QR_CODE`
 - `ENTITY_RESTAURANT`
-- `ENTITY_PLATE`
+- `ENTITY_VIANDA`
 - `ENTITY_PRODUCT`
 - `ENTITY_INSTITUTION_ENTITY`
 - `ENTITY_INSTITUTION_BANK_ACCOUNT`
@@ -348,7 +348,7 @@ If a user tries to access data outside their scope, the backend will return a `4
 **Resources**:
 - Restaurants
 - Products
-- Plates (for Suppliers - see special case below)
+- Viandas (for Suppliers - see special case below)
 - QR Codes
 - Institution Entities
 - Institution Bank Accounts
@@ -357,8 +357,8 @@ If a user tries to access data outside their scope, the backend will return a `4
 - Restaurant Balance Info
 
 **Example**:
-- A Supplier from "Acme Restaurant" can only see restaurants, products, and plates from "Acme Restaurant"
-- An Employee can see restaurants, products, and plates from all institutions
+- A Supplier from "Acme Restaurant" can only see restaurants, products, and viandas from "Acme Restaurant"
+- An Employee can see restaurants, products, and viandas from all institutions
 
 #### User-Scoped Resources
 
@@ -381,8 +381,8 @@ If a user tries to access data outside their scope, the backend will return a `4
 - Subscriptions
 - Payment Methods
 - Client Bills
-- Plate Selections
-- Plate Pickups
+- Vianda Selections
+- Vianda Pickups
 - Client Payment Attempts
 
 **Example**:
@@ -392,14 +392,14 @@ If a user tries to access data outside their scope, the backend will return a `4
 
 ### Special Cases
 
-#### Plates API
+#### Viandas API
 
 **Behavior**: 
-- **Customers**: Can GET all plates (no scoping) to browse available meals, but cannot create/modify them
-- **Suppliers**: Can only see plates from their institution's restaurants
-- **Employees**: Can see all plates
+- **Customers**: Can GET all viandas (no scoping) to browse available meals, but cannot create/modify them
+- **Suppliers**: Can only see viandas from their institution's restaurants
+- **Employees**: Can see all viandas
 
-**Why**: Customers need to browse all available meals to make selections, but they cannot create or modify plates.
+**Why**: Customers need to browse all available meals to make selections, but they cannot create or modify viandas.
 
 #### Addresses API
 

@@ -8,14 +8,14 @@ Subscriptions remain in `Pending` status even after credits are added through:
 
 Subscriptions should automatically transition from `Pending` → `Active` when:
 - Balance becomes > 0 (from payment or discretionary credit)
-- This allows customers to make plate reservations
+- This allows customers to make vianda reservations
 
 ## Current State Analysis
 
 ### ✅ Assumptions Verified
 
 1. **Subscription starts as `Pending`**: ✅ Confirmed - Default status in schema
-2. **Balance = 0 prevents plate reservations**: ✅ Confirmed - Credit validation checks balance
+2. **Balance = 0 prevents vianda reservations**: ✅ Confirmed - Credit validation checks balance
 3. **Only credit additions possible when balance = 0**: ✅ Confirmed - Deductions require positive balance
 4. **Transactions for subscriptions with balance 0 are credit additions**: ✅ Confirmed
 
@@ -109,11 +109,11 @@ def update_balance(subscription_id: UUID, balance_change: float, db: psycopg2.ex
 
 **Problem**: If we check subscription status on every transaction (including deductions), we add:
 - Extra database queries (fetch subscription, check status, update if needed)
-- Compute overhead on high-frequency operations (plate selections = deductions)
+- Compute overhead on high-frequency operations (vianda selections = deductions)
 - Unnecessary work for transactions that don't change status
 
 **Impact**: 
-- Plate selections happen frequently (deductions)
+- Vianda selections happen frequently (deductions)
 - Status only needs to change once (first credit addition)
 - Checking on every transaction = wasted compute
 
@@ -182,7 +182,7 @@ EXECUTE FUNCTION subscription_status_activation_trigger();
 **Cons**:
 - ⚠️ Requires checking subscription status on every balance update (including deductions)
 - ⚠️ Extra database query to fetch current subscription state
-- ⚠️ Performance overhead on high-frequency operations (plate selections)
+- ⚠️ Performance overhead on high-frequency operations (vianda selections)
 
 **Implementation**:
 ```python
@@ -288,7 +288,7 @@ def activate_subscription_if_pending(subscription_id: UUID, db: psycopg2.extensi
 3. **Test scenarios**:
    - Payment processing → balance 0 → positive → status Active
    - Discretionary credit → balance 0 → positive → status Active
-   - Plate selection (deduction) → balance positive → negative → status stays Active (no change)
+   - Vianda selection (deduction) → balance positive → negative → status stays Active (no change)
    - Already Active subscription → balance update → status stays Active
 
 #### Phase 2: Clean Up Existing Logic (Optional)
@@ -310,7 +310,7 @@ def activate_subscription_if_pending(subscription_id: UUID, db: psycopg2.extensi
    - Any other credit addition mechanisms
 
 2. **Verify performance**:
-   - No performance degradation on plate selections (deductions)
+   - No performance degradation on vianda selections (deductions)
    - Trigger only fires when conditions are met
 
 3. **Monitor logs**:
@@ -352,7 +352,7 @@ If using Option 2 or 3, update these locations:
    - If yes: Add status activation call
    - If no: Add balance update + status activation
 
-4. ✅ `app/services/plate_selection_service.py::_create_client_transaction_and_update_balance()`
+4. ✅ `app/services/vianda_selection_service.py::_create_client_transaction_and_update_balance()`
    - **No change needed** - This is for deductions (balance goes down)
    - Deductions should NOT activate subscriptions
 
@@ -384,10 +384,10 @@ If using Option 2 or 3, update these locations:
 ### Integration Tests
 - Payment processing → verify status activation
 - Discretionary credit → verify status activation
-- Plate selection (deduction) → verify status unchanged
+- Vianda selection (deduction) → verify status unchanged
 
 ### Performance Tests
-- Measure overhead on high-frequency operations (plate selections)
+- Measure overhead on high-frequency operations (vianda selections)
 - Verify trigger/function doesn't impact transaction performance
 
 ## Migration Strategy

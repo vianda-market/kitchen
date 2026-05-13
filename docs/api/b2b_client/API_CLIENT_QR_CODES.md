@@ -2,7 +2,7 @@
 
 **Audience:** B2B clients (Restaurant + Employee roles)
 
-This document describes how to create and display QR codes for restaurant plate pickup. QR codes let customers scan to confirm arrival when picking up plates.
+This document describes how to create and display QR codes for restaurant vianda pickup. QR codes let customers scan to confirm arrival when picking up viandas.
 
 ## Create flow
 
@@ -67,7 +67,7 @@ const handlePrint = async (qrCodeId: string) => {
 ## Relationship to restaurant activation
 
 A restaurant can be set to **Active** only when:
-1. It has at least one non-archived plate with at least one **active** plate_kitchen_days row, **and**
+1. It has at least one non-archived vianda with at least one **active** vianda_kitchen_days row, **and**
 2. It has at least one non-archived QR code with **status = 'Active'**.
 
 If a restaurant has no active QR code, `PUT /api/v1/restaurants/{id}` with `{"status": "Active"}` returns **400** with:
@@ -75,4 +75,4 @@ If a restaurant has no active QR code, `PUT /api/v1/restaurants/{id}` with `{"st
 
 When the last active QR code is archived, deleted, or set to Inactive, the system automatically sets the restaurant to **Inactive**.
 
-See [RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md](../shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md) for the full activation checklist.
+See [RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md](../shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md) for the full activation checklist.

@@ -118,7 +118,7 @@ Single-phase, clean cut. No backward compatibility — old columns removed in th
 - Removed all `no_show_discount` logic from institution create/update in `route_factory.py`
 
 **Pipeline wiring:**
-- `no_show_discount` → plate enriched queries JOIN `supplier_terms`; promotion service reads from `supplier_terms`
+- `no_show_discount` → vianda enriched queries JOIN `supplier_terms`; promotion service reads from `supplier_terms`
 - `payment_frequency` → `_is_supplier_payout_due()` in `institution_billing.py` gates bill creation (settlements accumulate daily; bills created only when due)
 - `require_invoice` + `invoice_hold_days` → `_check_invoice_compliance()` in `institution_billing.py` gates payout execution (checks for unmatched bills older than threshold)
 - Effective value resolution → `app/services/billing/supplier_terms_resolution.py` (shared by API route and billing pipeline)
@@ -135,7 +135,7 @@ All under `/api/v1/`. Scoped by institution — Supplier Admin sees own, Interna
 | `PUT` | `/supplier-terms/{institution_id}` | Internal Admin / Super Admin | Create or update terms |
 | `GET` | `/supplier-terms` | Internal only | List all supplier terms (admin view) |
 
-**Note**: `no_show_discount` continues to appear in plate/transaction response schemas — the field name stays the same, but the source changes from `institution_info` JOIN to `supplier_terms` JOIN.
+**Note**: `no_show_discount` continues to appear in vianda/transaction response schemas — the field name stays the same, but the source changes from `institution_info` JOIN to `supplier_terms` JOIN.
 
 ---
 
@@ -191,7 +191,7 @@ The `effective_*` fields in the GET response are computed by the backend (suppli
 
 - **Remove**: `no_show_discount` field from Institution Create and Institution Edit forms — this field no longer exists on the institution payload
 - **Add**: Supplier Terms section/tab on Institution Detail (Supplier type only)
-- **Keep**: `no_show_discount` in plate and transaction response display (field name unchanged, source changes server-side)
+- **Keep**: `no_show_discount` in vianda and transaction response display (field name unchanged, source changes server-side)
 - **Breaking change**: Institution create for Suppliers no longer accepts `no_show_discount`. The B2B UI must call `PUT /supplier-terms/{institution_id}` after creating the institution, or the create flow should be a two-step wizard (create institution, then configure terms)
 
 ### Relevant B2B docs
@@ -225,8 +225,8 @@ The `effective_*` fields in the GET response are computed by the backend (suppli
 | Registration | `application.py` | Registered supplier_terms router |
 | Resolution | `app/services/billing/supplier_terms_resolution.py` (new) | `resolve_effective_invoice_config()`, `get_supplier_payment_frequency()` — shared by route and billing pipeline |
 | Billing | `app/services/billing/institution_billing.py` | Added `_is_supplier_payout_due()` (frequency gate), `_check_invoice_compliance()` (invoice gate) |
-| Service | `app/services/plate_selection_promotion_service.py` | Reads `no_show_discount` from `supplier_terms` |
-| Service | `app/services/entity_service.py` | Plate queries JOIN `supplier_terms`; removed `invoice_hold_override_days` from entity queries |
+| Service | `app/services/vianda_selection_promotion_service.py` | Reads `no_show_discount` from `supplier_terms` |
+| Service | `app/services/entity_service.py` | Vianda queries JOIN `supplier_terms`; removed `invoice_hold_override_days` from entity queries |
 | Service | `app/services/route_factory.py` | Removed all `no_show_discount` stripping/clearing logic |
 | Security | `app/security/field_policies.py` | Replaced `ensure_can_edit_institution_no_show_discount` with `ensure_can_edit_supplier_terms` |
 | Tests | `app/tests/routes/test_institution_no_show_discount.py` | Deleted |

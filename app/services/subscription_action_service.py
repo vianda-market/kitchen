@@ -4,7 +4,7 @@ Business logic for B2C subscription actions: cancel, put on hold, resume.
 Also reconciles subscriptions that have passed hold_end_date (On Hold -> Active).
 
 Archived subscriptions (is_archived=True) are treated as cancelled: not billed,
-not usable for plate collection, and excluded from get_by_id (404). On cancel we
+not usable for vianda collection, and excluded from get_by_id (404). On cancel we
 set subscription_status = Cancelled, status = Cancelled, and is_archived = True,
 so the user can re-subscribe in the same market (unique index is WHERE is_archived = FALSE).
 """

@@ -76,8 +76,8 @@ _Routes: `/leads/`, `/markets/`, `/enums/`, `/institutions/{id}/onboarding-statu
 Computed at read time on admin enriched endpoints. No DB column. No DB constraint. Rules may evolve without a migration.
 
 **Restaurant level** (`GET /api/v1/restaurants/enriched`, `GET /api/v1/restaurants/enriched/{id}`):
-- `is_ready_for_signup: bool | null` — `true` when `restaurant.status='active'`, not archived, ≥1 active `plate_kitchen_days`, active QR code.
-- `missing: list[str] | null` — subset of `["status_active", "not_archived", "plate_kitchen_days", "qr"]`.
+- `is_ready_for_signup: bool | null` — `true` when `restaurant.status='active'`, not archived, ≥1 active `vianda_kitchen_days`, active QR code.
+- `missing: list[str] | null` — subset of `["status_active", "not_archived", "vianda_kitchen_days", "qr"]`.
 - Plain CRUD endpoints (`GET /api/v1/restaurants`, `GET /api/v1/restaurants/{id}`) return `null` for both fields.
 
 **Market level** (`GET /api/v1/admin/markets/enriched`, `GET /api/v1/admin/markets/enriched/{market_id}`):
@@ -85,13 +85,13 @@ Computed at read time on admin enriched endpoints. No DB column. No DB constrain
 - `missing: list[str] | null` — `["ready_restaurant"]` when no ready restaurant; `[]` when ready.
 - Plain market endpoints return `null` for both fields.
 
-**Lazy restaurant activation (one-way, silent):** When `plate_kitchen_days` is created OR a QR code is provisioned for a `pending` restaurant, and all prereqs are met, the backend auto-promotes `restaurant.status: pending → active`. No event, no email, no audit row. No auto-demotion.
+**Lazy restaurant activation (one-way, silent):** When `vianda_kitchen_days` is created OR a QR code is provisioned for a `pending` restaurant, and all prereqs are met, the backend auto-promotes `restaurant.status: pending → active`. No event, no email, no audit row. No auto-demotion.
 
 **`market.active = true` does NOT imply readiness.** Use `is_ready_for_signup` for admin UI readiness indicators.
 
 **Leading public endpoints are unaffected:** `/api/v1/leads/markets` and `/api/v1/leads/cities` continue to filter out non-ready records silently. They do not expose the new fields.
 
-**Full contract doc:** `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md`
+**Full contract doc:** `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md`
 
 **Postman coverage:** `docs/postman/collections/019 MARKET_READINESS.postman_collection.json`
 
@@ -135,38 +135,38 @@ _Routes: `/user-payment-summary`_
 ---
 
 ## Restaurants & Menu
-_Routes: `/restaurants/`, `/plates/`, `/plate-kitchen-days/`, `/cuisines/`, `/qr-codes/`, `/restaurant-holidays/`_
+_Routes: `/restaurants/`, `/viandas/`, `/vianda-kitchen-days/`, `/cuisines/`, `/qr-codes/`, `/restaurant-holidays/`_
 
 | Audience | File | Description |
 |----------|------|-------------|
-| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation — status logic and kitchen day requirements |
-| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/PLATE_API_CLIENT.md` | Plate CRUD, enriched endpoints, bulk kitchen day assignment |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md` | Restaurant activation — status logic and kitchen day requirements |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/VIANDA_API_CLIENT.md` | Vianda CRUD, enriched endpoints, bulk kitchen day assignment |
 | Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/CUISINES_API_CLIENT.md` | List supported cuisines for restaurant dropdown validation |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_PRODUCTS.md` | Product CRUD and enriched endpoints (image upload is a separate pipeline) |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_UPLOADS.md` | Image upload pipeline — `POST/GET/DELETE /api/v1/uploads`, async SafeSearch + pyvips pipeline, state machine, polling guidance |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_NATIONAL_HOLIDAYS.md` | Manage country-scoped holiday calendar |
-| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md` | Restaurant activation logic with status and kitchen day requirements |
+| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md` | Restaurant activation logic with status and kitchen day requirements |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/SUPPLIER_DASHBOARD_METRICS_B2B.md` | Metrics and APIs for supplier/restaurant dashboard |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/PORTION_SIZE_DISPLAY_B2B.md` | Show portion feedback from reviews to restaurant staff |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PORTION_SIZE_DISPLAY_B2C.md` | Show portion feedback from customer reviews on plate cards |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PORTION_SIZE_DISPLAY_B2C.md` | Show portion feedback from customer reviews on vianda cards |
 
 ---
 
-## Plate Selection & Pickup (Customer)
-_Routes: `/plate-selections/`, `/plate-pickup/`, `/favorites/`_
+## Vianda Selection & Pickup (Customer)
+_Routes: `/vianda-selections/`, `/vianda-pickup/`, `/favorites/`_
 
 | Audience | File | Description |
 |----------|------|-------------|
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/EXPLORE_KITCHEN_DAY_B2C.md` | Enforce kitchen day requirement in the restaurant explore flow |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PLATE_ALREADY_RESERVED_EXPLORE_UI.md` | Show alternative action buttons when a plate is already reserved |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PLATE_SELECTION_DUPLICATE_REPLACE.md` | Handle 409 conflict when the same plate is reserved twice in a day |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md` | Recommendation badges and favorite hearts on plate cards |
-| Shared | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/EXPLORE_SORTING_AND_PAGINATION.md` | Explore plate sorting logic, cursor-based infinite scroll pagination, FAQ |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/VIANDA_ALREADY_RESERVED_EXPLORE_UI.md` | Show alternative action buttons when a vianda is already reserved |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/VIANDA_SELECTION_DUPLICATE_REPLACE.md` | Handle 409 conflict when the same vianda is reserved twice in a day |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/VIANDA_RECOMMENDATION_AND_FAVORITES_B2C.md` | Recommendation badges and favorite hearts on vianda cards |
+| Shared | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/shared_client/EXPLORE_SORTING_AND_PAGINATION.md` | Explore vianda sorting logic, cursor-based infinite scroll pagination, FAQ |
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/POST_RESERVATION_PICKUP_B2C.md` | Post-reservation pickup intent and coworker matching flow |
-| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PICKUP_AVAILABILITY_AT_KITCHEN_START.md` | Show when a reserved plate is ready for pickup |
+| B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PICKUP_AVAILABILITY_AT_KITCHEN_START.md` | Show when a reserved vianda is ready for pickup |
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/POST_PICKUP_FLOW_API.md` | Signed QR codes, enhanced scan-qr, completion tracking, extended reviews |
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/PUSH_NOTIFICATIONS_API.md` | FCM token registration, push on Handed Out, timer sync fields, portion complaint field names |
-| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/PLATE_REVIEW_FEEDBACK_B2B.md` | Customer review comments and feedback for restaurant dashboard |
+| B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/VIANDA_REVIEW_FEEDBACK_B2B.md` | Customer review comments and feedback for restaurant dashboard |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/KIOSK_MODE_API.md` | Kiosk mode — daily orders, verify-and-handoff, hand-out, timer sync, Operator access matrix |
 
 ---
@@ -355,10 +355,10 @@ _Architecture decisions, design patterns, and implementation guides for agents w
 |------|-------------|
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/KITCHEN_DAY_SERVICE.md` | Centralized kitchen day service eliminating duplicate day calculations |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/KITCHEN_DAY_SLA.md` | Kitchen day cutoff at 1:30 PM and billing/reservation timing specifications |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/RESTAURANT_STATUS_VALIDATION.md` | Validation preventing plate bookings from inactive or holiday-closed restaurants |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/RESTAURANT_VALIDATION.md` | Restaurant validation in plate selection — non-operational restaurant rules |
+| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/RESTAURANT_STATUS_VALIDATION.md` | Validation preventing vianda bookings from inactive or holiday-closed restaurants |
+| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/RESTAURANT_VALIDATION.md` | Restaurant validation in vianda selection — non-operational restaurant rules |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/HOLIDAY_TABLES_ANALYSIS.md` | Two separate holiday tables: national holidays and restaurant-specific closures |
-| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/PLATE_PICKUP_PENDING_API.md` | Pending order endpoint returns a single group or null — not an array |
+| `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/VIANDA_PICKUP_PENDING_API.md` | Pending order endpoint returns a single group or null — not an array |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/MARKETS_API.md` | Markets API for country-based subscription regions with currency and timezone |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/GEOLOCATION.md` | Google Maps API integration for address geocoding and reverse geocoding |
 | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/PASSWORD_RECOVERY.md` | Password recovery — reset via email token flow |

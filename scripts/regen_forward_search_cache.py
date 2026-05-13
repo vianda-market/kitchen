@@ -65,7 +65,7 @@ _QUERIES: list[tuple[str, str, str, str]] = [
     ("corrientes 1234 [6]", "corrientes 1", "AR", "es"),
     ("corrientes 1234 [7]", "corrientes 12", "AR", "es"),
     ("corrientes 1234 [8]", "corrientes 1234", "AR", "es"),
-    # Postman /suggest queries (002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION + 000 E2E Plate Selection).
+    # Postman /suggest queries (002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION + 000 E2E Vianda Selection).
     # These are the full query strings that Newman sends to /api/v1/addresses/suggest.
     # country="" means no country filter (AddressAutocompleteService resolves alpha2=None).
     # The E2E step in collection 002 hard-asserts at least one suggestion; the others are

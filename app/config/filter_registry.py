@@ -68,8 +68,8 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "city": {"col": "city", "alias": "a", "op": "eq", "cast": "text"},
         # market_id is on market_info, alias "m" (joined via address.country_code = market.country_code)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
-        # kitchen_day lives on ops.plate_kitchen_days (alias "pkd"), which is joined via
-        # ops.plate_info (alias "pi") in get_enriched_restaurants. The join is filter-only
+        # kitchen_day lives on ops.vianda_kitchen_days (alias "pkd"), which is joined via
+        # ops.vianda_info (alias "pi") in get_enriched_restaurants. The join is filter-only
         # (pkd.kitchen_day is not in the SELECT list); duplicate rows are eliminated by
         # distinct=True in the enriched service call.
         "kitchen_day": {"col": "kitchen_day", "alias": "pkd", "op": "eq", "cast": "text", "enum": "KitchenDay"},
@@ -104,21 +104,21 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         # institution_entity_id: multi-select on restaurant_info alias "r"
         "institution_entity_id": {"col": "institution_entity_id", "alias": "r", "op": "in", "cast": "uuid"},
     },
-    "plates": {
-        # status is on plate_info, alias "p"
-        # context="plate" scopes valid values to catalog visibility subset
+    "viandas": {
+        # status is on vianda_info, alias "p"
+        # context="vianda" scopes valid values to catalog visibility subset
         # (active, inactive) -- pickup-lifecycle states do not apply here.
-        "status": {"col": "status", "alias": "p", "op": "eq", "cast": "text", "enum": "Status", "context": "plate"},
+        "status": {"col": "status", "alias": "p", "op": "eq", "cast": "text", "enum": "Status", "context": "vianda"},
         # market_id is on market_info, alias "m" (joined via restaurant -> address -> market)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
-        # restaurant_id is on plate_info, alias "p"
+        # restaurant_id is on vianda_info, alias "p"
         "restaurant_id": {"col": "restaurant_id", "alias": "p", "op": "eq", "cast": "uuid"},
-        # plate_selection_info.pickup_date is the actual service date (DATE) for a plate reservation.
-        # get_enriched_plates joins customer.plate_selection_info (alias "psi") as a filter-only join
+        # vianda_selection_info.pickup_date is the actual service date (DATE) for a vianda reservation.
+        # get_enriched_viandas joins customer.vianda_selection_info (alias "psi") as a filter-only join
         # (psi.pickup_date is not in the SELECT list); distinct=True prevents row inflation from the
-        # 1:N plate_info → plate_selection_info relationship.
-        "plate_date_from": {"col": "pickup_date", "alias": "psi", "op": "gte", "cast": "date"},
-        "plate_date_to": {"col": "pickup_date", "alias": "psi", "op": "lte", "cast": "date"},
+        # 1:N vianda_info → vianda_selection_info relationship.
+        "vianda_date_from": {"col": "pickup_date", "alias": "psi", "op": "gte", "cast": "date"},
+        "vianda_date_to": {"col": "pickup_date", "alias": "psi", "op": "lte", "cast": "date"},
         # Pass 5 register-adds:
         # cuisine_id: multi-select on cuisine table alias "cu" (joined via r.cuisine_id = cu.cuisine_id)
         "cuisine_id": {"col": "cuisine_id", "alias": "cu", "op": "in", "cast": "uuid"},
@@ -154,8 +154,8 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         },
     },
     "pickups": {
-        # status is on plate_pickup_live, alias "ppl"
-        # context="plate_pickup" scopes valid values to the pickup lifecycle subset
+        # status is on vianda_pickup_live, alias "ppl"
+        # context="vianda_pickup" scopes valid values to the pickup lifecycle subset
         # (pending, arrived, handed_out, completed, cancelled) -- not the full Status enum.
         "status": {
             "col": "status",
@@ -163,13 +163,13 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
             "op": "eq",
             "cast": "text",
             "enum": "Status",
-            "context": "plate_pickup",
+            "context": "vianda_pickup",
         },
         # market_id is on market_info, alias "m" (joined via restaurant -> address -> market)
         "market_id": {"col": "market_id", "alias": "m", "op": "eq", "cast": "uuid"},
         # expected_from / expected_to filter by expected_completion_time (TIMESTAMPTZ).
         # Named after the actual column they bind to — there are no window_start/window_end
-        # columns on plate_pickup_live. If operators need a true pickup-window filter, schema
+        # columns on vianda_pickup_live. If operators need a true pickup-window filter, schema
         # work is required (deferred; see #58 and the follow-up issue).
         "expected_from": {"col": "expected_completion_time", "alias": "ppl", "op": "gte", "cast": "timestamptz"},
         "expected_to": {"col": "expected_completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
@@ -182,13 +182,13 @@ FILTER_REGISTRY: dict[str, dict[str, dict]] = {
         "completion_time_to": {"col": "completion_time", "alias": "ppl", "op": "lte", "cast": "timestamptz"},
         # was_collected: toggle (bool)
         "was_collected": {"col": "was_collected", "alias": "ppl", "op": "bool", "cast": "bool"},
-        # credit: range-bound (int) -- from plate_info alias "p" (joined in get_enriched_plate_pickups)
+        # credit: range-bound (int) -- from vianda_info alias "p" (joined in get_enriched_vianda_pickups)
         "credit_from": {"col": "credit", "alias": "p", "op": "gte", "cast": "int"},
         "credit_to": {"col": "credit", "alias": "p", "op": "lte", "cast": "int"},
-        # restaurant_id: multi-select on plate_pickup_live alias "ppl"
+        # restaurant_id: multi-select on vianda_pickup_live alias "ppl"
         "restaurant_id": {"col": "restaurant_id", "alias": "ppl", "op": "in", "cast": "uuid"},
-        # plate_id: multi-select on plate_pickup_live alias "ppl"
-        "plate_id": {"col": "plate_id", "alias": "ppl", "op": "in", "cast": "uuid"},
+        # vianda_id: multi-select on vianda_pickup_live alias "ppl"
+        "vianda_id": {"col": "vianda_id", "alias": "ppl", "op": "in", "cast": "uuid"},
     },
     "national_holidays": {
         # country_code is on national_holidays table, alias "nh".

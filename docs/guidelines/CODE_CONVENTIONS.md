@@ -19,7 +19,7 @@ Detailed patterns and examples for this codebase. See CLAUDE.md for the one-line
 
 ```python
 # ✅ Good
-get_plates_by_restaurant_address()
+get_viandas_by_restaurant_address()
 get_payment_attempts_by_institution_entity()
 get_institution_entities_by_institution()
 

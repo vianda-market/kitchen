@@ -40,8 +40,8 @@ from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.security.entity_scoping import (
     ENTITY_INSTITUTION_ENTITY,
-    ENTITY_PLATE,
     ENTITY_PRODUCT,
+    ENTITY_VIANDA,
     EntityScopingService,
 )
 from app.security.institution_scope import get_institution_scope
@@ -1082,7 +1082,7 @@ def create_credit_currency_routes() -> APIRouter:
     # Create router without generic routes to avoid route conflicts
     router = APIRouter(prefix=config.prefix, tags=config.tags, dependencies=[Depends(oauth2_scheme)])
 
-    # Define all endpoints with Internal-only access (Suppliers use credit_currency data via plates, but can't access API directly)
+    # Define all endpoints with Internal-only access (Suppliers use credit_currency data via viandas, but can't access API directly)
     @router.get("", response_model=list[CreditCurrencyResponseSchema])
     def get_all_credit_currencies(
         current_user: dict = Depends(get_employee_user),  # Internal-only
@@ -2229,93 +2229,93 @@ def create_payment_method_routes() -> APIRouter:
     return router
 
 
-def create_plate_routes() -> APIRouter:
-    """Create routes for Plate entity"""
+def create_vianda_routes() -> APIRouter:
+    """Create routes for Vianda entity"""
 
     from app.schemas.consolidated_schemas import (
-        PlateCreateSchema,
-        PlateEnrichedResponseSchema,
-        PlateResponseSchema,
-        PlateUpdateSchema,
-        PlateUpsertByKeySchema,
+        ViandaCreateSchema,
+        ViandaEnrichedResponseSchema,
+        ViandaResponseSchema,
+        ViandaUpdateSchema,
+        ViandaUpsertByKeySchema,
     )
-    from app.services.crud_service import plate_service
-    from app.services.entity_service import get_enriched_plate_by_id, get_enriched_plates
+    from app.services.crud_service import vianda_service
+    from app.services.entity_service import get_enriched_vianda_by_id, get_enriched_viandas
     from app.services.error_handling import handle_get_all, handle_get_by_id
     from app.utils.error_messages import entity_not_found
     from app.utils.filter_builder import build_filter_conditions
     from app.utils.log import log_error
 
     config = RouteConfig(
-        prefix="/plates",
-        tags=["Plates"],
-        entity_name="plate",
-        entity_name_plural="plates",
+        prefix="/viandas",
+        tags=["Viandas"],
+        entity_name="vianda",
+        entity_name_plural="viandas",
         institution_scoped=True,
-        entity_type=ENTITY_PLATE,
+        entity_type=ENTITY_VIANDA,
         paginatable=True,
     )
 
-    def _plate_custom_routes(router: APIRouter) -> None:
-        @router.get("", response_model=list[PlateResponseSchema])
-        def get_all_plates(
+    def _vianda_custom_routes(router: APIRouter) -> None:
+        @router.get("", response_model=list[ViandaResponseSchema])
+        def get_all_viandas(
             current_user: dict = Depends(get_current_user), db: psycopg2.extensions.connection = Depends(get_db)
         ):
-            """Get all plates - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
+            """Get all viandas - Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "customer":
                 scope = None
             else:
-                scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+                scope = EntityScopingService.get_scope_for_entity(ENTITY_VIANDA, current_user)
 
             def service_callable(connection: psycopg2.extensions.connection):
-                return plate_service.get_all(connection, scope=scope, include_archived=False)
+                return vianda_service.get_all(connection, scope=scope, include_archived=False)
 
-            return handle_get_all(service_callable, db, "plates")
+            return handle_get_all(service_callable, db, "viandas")
 
-        # Enriched routes MUST be before /{plate_id} so /enriched is not parsed as plate_id
-        @router.get("/enriched", response_model=list[PlateEnrichedResponseSchema])
-        def list_enriched_plates(  # noqa: PLR0913
+        # Enriched routes MUST be before /{vianda_id} so /enriched is not parsed as vianda_id
+        @router.get("/enriched", response_model=list[ViandaEnrichedResponseSchema])
+        def list_enriched_viandas(  # noqa: PLR0913
             response: Response,
-            status: str | None = Query(None, description="Filter by plate status (e.g. active, inactive)"),
+            status: str | None = Query(None, description="Filter by vianda status (e.g. active, inactive)"),
             market_id: UUID | None = Query(None, description="Filter by market ID"),
             restaurant_id: UUID | None = Query(None, description="Filter by restaurant ID"),
-            plate_date_from: str | None = Query(
-                None, description="Filter plates created on or after this date (YYYY-MM-DD)"
+            vianda_date_from: str | None = Query(
+                None, description="Filter viandas created on or after this date (YYYY-MM-DD)"
             ),
-            plate_date_to: str | None = Query(
-                None, description="Filter plates created on or before this date (YYYY-MM-DD)"
+            vianda_date_to: str | None = Query(
+                None, description="Filter viandas created on or before this date (YYYY-MM-DD)"
             ),
             cuisine_id: list[UUID] | None = Query(None, description="Filter by cuisine ID(s) (multi-select)"),
             dietary: list[str] | None = Query(
                 None, description="Filter by dietary flag(s) (multi-select, e.g. vegan, vegetarian)"
             ),
-            price_from: int | None = Query(None, description="Filter plates with price >= this value"),
-            price_to: int | None = Query(None, description="Filter plates with price <= this value"),
-            credit_from: int | None = Query(None, description="Filter plates with credit >= this value"),
-            credit_to: int | None = Query(None, description="Filter plates with credit <= this value"),
+            price_from: int | None = Query(None, description="Filter viandas with price >= this value"),
+            price_to: int | None = Query(None, description="Filter viandas with price <= this value"),
+            credit_from: int | None = Query(None, description="Filter viandas with credit >= this value"),
+            credit_to: int | None = Query(None, description="Filter viandas with credit <= this value"),
             pagination: PaginationParams | None = Depends(get_pagination_params),
             current_user: dict = Depends(get_current_user),
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """List plates with enriched data. Optional filters: status, market_id, restaurant_id, plate_date_from/to, cuisine_id, dietary, price_from/to, credit_from/to. Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
+            """List viandas with enriched data. Optional filters: status, market_id, restaurant_id, vianda_date_from/to, cuisine_id, dietary, price_from/to, credit_from/to. Customers: all. Internal/Suppliers: institution-scoped. Non-archived only."""
             try:
                 from app.i18n.locale_names import resolve_cuisine_name
 
                 if current_user.get("role_type") == "customer":
                     scope = None
                 else:
-                    scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+                    scope = EntityScopingService.get_scope_for_entity(ENTITY_VIANDA, current_user)
                 try:
                     filter_conditions = list(
                         build_filter_conditions(
-                            "plates",
+                            "viandas",
                             {
                                 "status": status,
                                 "market_id": market_id,
                                 "restaurant_id": restaurant_id,
-                                "plate_date_from": plate_date_from,
-                                "plate_date_to": plate_date_to,
+                                "vianda_date_from": vianda_date_from,
+                                "vianda_date_to": vianda_date_to,
                                 "cuisine_id": [str(c) for c in cuisine_id] if cuisine_id else None,
                                 "price_from": price_from,
                                 "price_to": price_to,
@@ -2332,7 +2332,7 @@ def create_plate_routes() -> APIRouter:
                         filter_conditions.append(("pr.dietary && %s::text[]", [dietary]))
                 except ValueError as exc:
                     raise HTTPException(status_code=400, detail=str(exc)) from None
-                plates = get_enriched_plates(
+                viandas = get_enriched_viandas(
                     db,
                     scope=scope,
                     include_archived=False,
@@ -2343,22 +2343,22 @@ def create_plate_routes() -> APIRouter:
                 if locale != "en":
                     from app.i18n.locale_names import resolve_i18n_field, resolve_i18n_field_aliased
 
-                    for p in plates:
+                    for p in viandas:
                         resolve_cuisine_name(p, locale)
                         resolve_i18n_field_aliased(p, "product_name", "product_name_i18n", locale)
                         resolve_i18n_field(p, "ingredients", locale)
                         resolve_i18n_field(p, "description", locale)
-                set_pagination_headers(response, plates)
-                return plates
+                set_pagination_headers(response, viandas)
+                return viandas
             except HTTPException:
                 raise
             except Exception as e:
-                log_error(f"Error getting enriched plates: {e}")
-                raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale=locale) from None
+                log_error(f"Error getting enriched viandas: {e}")
+                raise envelope_exception(ErrorCode.SERVICE_VIANDA_LIST_FAILED, status=500, locale=locale) from None
 
-        @router.get("/enriched/{plate_id}", response_model=PlateEnrichedResponseSchema)
-        def get_enriched_plate_by_id_route(
-            plate_id: UUID,
+        @router.get("/enriched/{vianda_id}", response_model=ViandaEnrichedResponseSchema)
+        def get_enriched_vianda_by_id_route(
+            vianda_id: UUID,
             kitchen_day: str | None = Query(
                 None,
                 description="When provided with user having employer, includes has_coworker_offer, has_coworker_request",
@@ -2367,12 +2367,12 @@ def create_plate_routes() -> APIRouter:
             locale: str = Depends(get_resolved_locale),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """Get plate by ID with enriched data. Non-archived only."""
+            """Get vianda by ID with enriched data. Non-archived only."""
             try:
                 if current_user.get("role_type") == "customer":
                     scope = None
                 else:
-                    scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+                    scope = EntityScopingService.get_scope_for_entity(ENTITY_VIANDA, current_user)
                 employer_entity_id = None
                 employer_address_id = None
                 user_id = None
@@ -2393,8 +2393,8 @@ def create_plate_routes() -> APIRouter:
                     if user_row and user_row.get("employer_entity_id"):
                         employer_entity_id = user_row["employer_entity_id"]
                         employer_address_id = user_row.get("employer_address_id")
-                enriched_plate = get_enriched_plate_by_id(
-                    plate_id,
+                enriched_vianda = get_enriched_vianda_by_id(
+                    vianda_id,
                     db,
                     scope=scope,
                     include_archived=False,
@@ -2403,8 +2403,8 @@ def create_plate_routes() -> APIRouter:
                     employer_address_id=employer_address_id,
                     user_id=user_id,
                 )
-                if not enriched_plate:
-                    raise entity_not_found("Plate", plate_id, locale=locale)
+                if not enriched_vianda:
+                    raise entity_not_found("Vianda", vianda_id, locale=locale)
                 if locale != "en":
                     from app.i18n.locale_names import (
                         resolve_cuisine_name,
@@ -2412,51 +2412,51 @@ def create_plate_routes() -> APIRouter:
                         resolve_i18n_field_aliased,
                     )
 
-                    resolve_cuisine_name(enriched_plate, locale)
-                    resolve_i18n_field_aliased(enriched_plate, "product_name", "product_name_i18n", locale)
-                    resolve_i18n_field(enriched_plate, "ingredients", locale)
-                    resolve_i18n_field(enriched_plate, "description", locale)
-                return enriched_plate
+                    resolve_cuisine_name(enriched_vianda, locale)
+                    resolve_i18n_field_aliased(enriched_vianda, "product_name", "product_name_i18n", locale)
+                    resolve_i18n_field(enriched_vianda, "ingredients", locale)
+                    resolve_i18n_field(enriched_vianda, "description", locale)
+                return enriched_vianda
             except HTTPException:
                 raise
             except Exception as e:
-                log_error(f"Error getting enriched plate {plate_id}: {e}")
-                raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale=locale) from None
+                log_error(f"Error getting enriched vianda {vianda_id}: {e}")
+                raise envelope_exception(ErrorCode.SERVICE_VIANDA_LIST_FAILED, status=500, locale=locale) from None
 
-        # /by-key MUST be registered before /{plate_id} so the static segment wins
+        # /by-key MUST be registered before /{vianda_id} so the static segment wins
         # over the UUID path parameter (FastAPI evaluates in registration order).
-        @router.put("/by-key", response_model=PlateResponseSchema, status_code=200)
-        def upsert_plate_by_key(
-            upsert_data: PlateUpsertByKeySchema,
+        @router.put("/by-key", response_model=ViandaResponseSchema, status_code=200)
+        def upsert_vianda_by_key(
+            upsert_data: ViandaUpsertByKeySchema,
             current_user: dict = Depends(get_employee_user),  # Internal-only
             db: psycopg2.extensions.connection = Depends(get_db),
         ) -> Any:
-            """Idempotent upsert a plate by canonical_key.
+            """Idempotent upsert a vianda by canonical_key.
 
-            If a plate with this canonical_key already exists it is updated in-place;
-            otherwise a new plate is inserted.  Intended for Postman seed runs and
+            If a vianda with this canonical_key already exists it is updated in-place;
+            otherwise a new vianda is inserted.  Intended for Postman seed runs and
             fixture data.  Running twice with the same payload is a no-op.
 
-            Auth: Internal only (same as POST /plates).
+            Auth: Internal only (same as POST /viandas).
 
-            Returns the plate row (insert or update).  HTTP 200 on both insert and
+            Returns the vianda row (insert or update).  HTTP 200 on both insert and
             update (unlike POST which returns 201) — callers should not depend on
             distinguishing the two outcomes.
             """
-            from app.services.crud_service import find_plate_by_canonical_key
+            from app.services.crud_service import find_vianda_by_canonical_key
 
             def _upsert() -> Any:
                 key = upsert_data.canonical_key
-                existing = find_plate_by_canonical_key(key, db)
+                existing = find_vianda_by_canonical_key(key, db)
                 payload = upsert_data.model_dump()
                 payload["modified_by"] = current_user["user_id"]
 
                 if existing is not None:
                     # Update: strip fields that must not change during update
                     update_payload = {k: v for k, v in payload.items() if k != "canonical_key"}
-                    result = plate_service.update(existing.plate_id, update_payload, db)
+                    result = vianda_service.update(existing.vianda_id, update_payload, db)
                 else:
-                    result = plate_service.create(payload, db)
+                    result = vianda_service.create(payload, db)
 
                 if result is None:
                     raise envelope_exception(ErrorCode.SERVER_INTERNAL_ERROR, status=500, locale="en")
@@ -2464,30 +2464,30 @@ def create_plate_routes() -> APIRouter:
 
             from app.services.error_handling import handle_business_operation
 
-            return handle_business_operation(_upsert, "plate upsert by canonical key")
+            return handle_business_operation(_upsert, "vianda upsert by canonical key")
 
-        @router.get("/{plate_id}", response_model=PlateResponseSchema)
-        def get_plate(
-            plate_id: UUID,
+        @router.get("/{vianda_id}", response_model=ViandaResponseSchema)
+        def get_vianda(
+            vianda_id: UUID,
             current_user: dict = Depends(get_current_user),
             db: psycopg2.extensions.connection = Depends(get_db),
         ):
-            """Get plate by ID - Customers: any. Internal/Suppliers: institution-scoped. Non-archived only."""
+            """Get vianda by ID - Customers: any. Internal/Suppliers: institution-scoped. Non-archived only."""
             if current_user.get("role_type") == "customer":
                 scope = None
             else:
-                scope = EntityScopingService.get_scope_for_entity(ENTITY_PLATE, current_user)
+                scope = EntityScopingService.get_scope_for_entity(ENTITY_VIANDA, current_user)
             return handle_get_by_id(
-                plate_service.get_by_id, plate_id, db, "plate", extra_kwargs={"scope": scope} if scope else None
+                vianda_service.get_by_id, vianda_id, db, "vianda", extra_kwargs={"scope": scope} if scope else None
             )
 
     router = create_crud_routes(
         config=config,
-        service=plate_service,
-        create_schema=PlateCreateSchema,
-        update_schema=PlateUpdateSchema,
-        response_schema=PlateResponseSchema,
-        custom_routes_first=_plate_custom_routes,
+        service=vianda_service,
+        create_schema=ViandaCreateSchema,
+        update_schema=ViandaUpdateSchema,
+        response_schema=ViandaResponseSchema,
+        custom_routes_first=_vianda_custom_routes,
     )
     return router
 
@@ -2604,25 +2604,25 @@ def create_institution_entity_routes() -> APIRouter:
 # Note: create_payment_method_routes() is defined above with enriched endpoints
 
 
-def create_plate_selection_routes() -> APIRouter:
-    """Create routes for PlateSelection entity (user-dependent)"""
-    from app.schemas.consolidated_schemas import PlateSelectionCreateSchema, PlateSelectionResponseSchema
-    from app.services.crud_service import plate_selection_service
+def create_vianda_selection_routes() -> APIRouter:
+    """Create routes for ViandaSelection entity (user-dependent)"""
+    from app.schemas.consolidated_schemas import ViandaSelectionCreateSchema, ViandaSelectionResponseSchema
+    from app.services.crud_service import vianda_selection_service
 
     config = RouteConfig(
-        prefix="/plate-selections",
-        tags=["Plate Selections"],
-        entity_name="plate selection",
-        entity_name_plural="plate selections",
+        prefix="/vianda-selections",
+        tags=["Vianda Selections"],
+        entity_name="vianda selection",
+        entity_name_plural="vianda selections",
         paginatable=True,
     )
 
     return create_crud_routes(
         config=config,
-        service=plate_selection_service,
-        create_schema=PlateSelectionCreateSchema,
-        update_schema=PlateSelectionCreateSchema,  # Using same schema for update
-        response_schema=PlateSelectionResponseSchema,
+        service=vianda_selection_service,
+        create_schema=ViandaSelectionCreateSchema,
+        update_schema=ViandaSelectionCreateSchema,  # Using same schema for update
+        response_schema=ViandaSelectionResponseSchema,
         requires_user_context=True,  # ← KEY: This entity requires user_id
     )
 

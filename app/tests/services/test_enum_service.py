@@ -116,7 +116,7 @@ class TestEnumService(unittest.TestCase):
             "status_user",
             "status_restaurant",
             "status_discretionary",
-            "status_plate_pickup",
+            "status_vianda_pickup",
             "status_bill",
             "address_type",
             "role_type",

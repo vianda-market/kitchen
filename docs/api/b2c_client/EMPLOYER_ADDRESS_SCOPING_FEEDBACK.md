@@ -7,11 +7,11 @@
 
 ## Problem
 
-Currently, coworker search (GET /plate-selections/{id}/coworkers) filters by **employer_id** only. Users at the same employer but in far-away offices (e.g. different city locations, different buildings in the same city) are all listed as potential coworkers. This is undesirable: a user in Office A should not expect someone in Office B to pick up plates for them.
+Currently, coworker search (GET /vianda-selections/{id}/coworkers) filters by **employer_id** only. Users at the same employer but in far-away offices (e.g. different city locations, different buildings in the same city) are all listed as potential coworkers. This is undesirable: a user in Office A should not expect someone in Office B to pick up viandas for them.
 
 **Desired behavior:** Scope coworkers by **employer + same office**. Users in the same building/office should be grouped; users in different offices should not see each other.
 
-**Additional constraint:** Avoid multiplying `employer_address_id` when only floor or apartment unit differs. People in the same building (e.g. 3rd floor vs 5th floor) should still be matched — they can meet at the lobby to collect plates. For employer addresses, floor and apartment unit are not relevant for "same office" grouping.
+**Additional constraint:** Avoid multiplying `employer_address_id` when only floor or apartment unit differs. People in the same building (e.g. 3rd floor vs 5th floor) should still be matched — they can meet at the lobby to collect viandas. For employer addresses, floor and apartment unit are not relevant for "same office" grouping.
 
 ---
 

@@ -31,11 +31,11 @@ For authenticated flows needing `market_id`, timezone, or currency: use `GET /ap
 **Auth**: None. **Response fields**: `country_code`, `country_name`, `language`, `locale`, `phone_dial_code`, `phone_local_digits`, `has_active_kitchens`.
 
 **`has_active_kitchens`** — `true` when the market has at least one active
-`institution -> restaurant -> plate -> plate_kitchen_days` chain. Derived from live data;
+`institution -> restaurant -> vianda -> vianda_kitchen_days` chain. Derived from live data;
 NOT the hand-toggled `market_info.status` column.
 Use this flag to gate which countries appear as subscribable on the marketing site.
 
-- **Default (no param)**: markets that pass the active-plate chain — all have `has_active_kitchens: true`.
+- **Default (no param)**: markets that pass the active-vianda chain — all have `has_active_kitchens: true`.
 - **`?audience=supplier`**: all active non-global markets; `has_active_kitchens` batch-checked in one query.
 - **`?language=es`** or `Accept-Language: es`: localize country names.
 
@@ -57,8 +57,8 @@ Use case: city picker for signup; send `city_name` in signup body.
 Response: `[{ "city": "Buenos Aires", "restaurant_count": 12 }, ...]` — sorted alphabetically.
 
 Only cities in `city_metadata` (`show_in_signup_picker = TRUE`) with >= 1 active restaurant
-with `plate_kitchen_days` + QR code are included. Single JOIN query — no N+1.
-Readiness derived from the same active-plate chain as `GET /leads/markets`.
+with `vianda_kitchen_days` + QR code are included. Single JOIN query — no N+1.
+Readiness derived from the same active-vianda chain as `GET /leads/markets`.
 
 Use case: vianda-home multi-country landing page — show cities with real food coverage
 and an accurate restaurant count badge.
@@ -94,13 +94,13 @@ Use case: after city/zipcode step, route user to login vs signup.
 
 ## Coverage readiness — hard rule
 
-All market/city readiness signals on `/leads/*` derive from the live **active-plate chain**:
+All market/city readiness signals on `/leads/*` derive from the live **active-vianda chain**:
 
 ```
 institution (active, not archived)
   -> restaurant (active, not archived)
-    -> plate (not archived)
-      -> plate_kitchen_days (active, not archived)
+    -> vianda (not archived)
+      -> vianda_kitchen_days (active, not archived)
 ```
 
 The hand-toggled `market_info.status` / `is_archived` columns are **not** used as the

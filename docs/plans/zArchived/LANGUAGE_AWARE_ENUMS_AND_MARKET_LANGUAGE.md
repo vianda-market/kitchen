@@ -103,11 +103,11 @@ cuisine_name_i18n JSONB,                 -- { "en": "Italian", "es": "Italiana",
 **Implementation** (owned by cuisine management roadmap, Phase 4):
 - Seed records ship with `cuisine_name_i18n` for `en` + `es` + `pt` (covers the continent: US, AR, PE, BR)
 - `GET /api/v1/cuisines/?language=es` resolves `cuisine_name_i18n->>'es'` with fallback to `cuisine_name`
-- Enriched endpoints (`/leads/restaurants`, `/leads/featured-restaurant`, plate endpoints) resolve via `Accept-Language` header
+- Enriched endpoints (`/leads/restaurants`, `/leads/featured-restaurant`, vianda endpoints) resolve via `Accept-Language` header
 - Admin CRUD accepts full locale map for authoring translations
 - Supplier-submitted cuisines start with `cuisine_name_i18n = NULL`; Internal admins add translations after approval
 
-**Gap**: When Phase 4 (translation storage for admin-authored content) ships JSONB locale maps on other entities (restaurant tagline, plan name, plate description), the `cuisine_name_i18n` column already follows the same pattern — no additional migration needed.
+**Gap**: When Phase 4 (translation storage for admin-authored content) ships JSONB locale maps on other entities (restaurant tagline, plan name, vianda description), the `cuisine_name_i18n` column already follows the same pattern — no additional migration needed.
 
 - Apply to: `/leads/restaurants`, `/leads/featured-restaurant`, enriched restaurant endpoints, `/api/v1/cuisines/`
 - **Requested by:** vianda-home (Section 4), vianda-app (endorsed cross-client #5)
@@ -126,9 +126,9 @@ cuisine_name_i18n JSONB,                 -- { "en": "Italian", "es": "Italiana",
 | Restaurant | `tagline` | B2B admin (Supplier) | vianda-home, vianda-app |
 | Plan | `name`, `marketing_description`, `features[]`, `cta_label` | B2B admin (Internal) | vianda-home, vianda-app |
 | Featured restaurant | `spotlight_label`, `member_perks[]` | B2B admin (Internal) | vianda-home, vianda-app |
-| Plate | `name`, `description`, `ingredients` | B2B admin (Supplier) | vianda-app |
+| Vianda | `name`, `description`, `ingredients` | B2B admin (Supplier) | vianda-app |
 
-**Note on Plates:** vianda-app identifies Plate fields as the **primary content users interact with daily** — these must not be overlooked despite not appearing on vianda-home today.
+**Note on Viandas:** vianda-app identifies Vianda fields as the **primary content users interact with daily** — these must not be overlooked despite not appearing on vianda-home today.
 
 #### 4.2 Storage pattern — JSON column with locale keys
 
@@ -170,7 +170,7 @@ The same fields must serve two different shapes depending on the consumer:
 1. **Restaurant** (`tagline`) — smallest surface area, good test case
 2. **Plan** (`name`, `marketing_description`, `features[]`, `cta_label`) — high visibility on vianda-home
 3. **Featured restaurant** (`spotlight_label`, `member_perks[]`)
-4. **Plate** (`name`, `description`, `ingredients`) — highest volume, impacts daily B2C experience
+4. **Vianda** (`name`, `description`, `ingredients`) — highest volume, impacts daily B2C experience
 
 #### 4.5 Migration strategy for existing data
 
@@ -222,7 +222,7 @@ B2C push notifications are currently English-only server-generated strings. When
 
 **Notification types requiring localization:**
 - Reservation reminders ("Your pickup window opens in 30 minutes")
-- Plate availability alerts
+- Vianda availability alerts
 - Subscription renewal reminders
 - Coworker pickup coordination
 
@@ -328,7 +328,7 @@ Enable localized content across **all user-facing messages** sent to the UI: enu
 - **Enum display labels** (e.g. "Calle" vs "Street" for street types) — **Done**
 - **Error messages** (validation errors, HTTP error details, `detail` in 4xx/5xx responses)
 - **Alerts and notifications** (success toasts, warning banners, push notifications)
-- **Admin-authored content** (restaurant taglines, plan names, plate descriptions) — **New, from frontend requirements**
+- **Admin-authored content** (restaurant taglines, plan names, vianda descriptions) — **New, from frontend requirements**
 - **Market metadata** (country names, currency names) — **New, from frontend requirements**
 - **Any message sent to the UI** (confirmation text, field hints, empty-state copy)
 
@@ -446,7 +446,7 @@ X-Content-Language: es
 
 ### 3.4 Admin-authored content (NEW)
 
-- **Entities**: Restaurant, Plan, Featured restaurant, Plate (see Phase 4 for full field inventory)
+- **Entities**: Restaurant, Plan, Featured restaurant, Vianda (see Phase 4 for full field inventory)
 - **Storage**: JSONB columns with locale keys (`{ "en": "...", "es": "..." }`)
 - **Display contract**: Enriched/leads endpoints resolve to single value via `Accept-Language`; edit endpoints return full locale map
 - **Write contract**: PUT/POST accepts full locale map; missing locales fall back to `en`
@@ -482,7 +482,7 @@ X-Content-Language: es
 ### Hybrid approach (recommended)
 
 - **System messages** (errors, alerts, notifications): Static Python dicts (Option A) → DB table (Option B) in Phase 9
-- **Admin-authored content** (restaurant taglines, plan names, plate descriptions): JSONB columns (Option C) in Phase 4
+- **Admin-authored content** (restaurant taglines, plan names, vianda descriptions): JSONB columns (Option C) in Phase 4
 
 ---
 

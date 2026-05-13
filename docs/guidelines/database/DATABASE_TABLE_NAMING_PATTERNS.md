@@ -36,7 +36,7 @@ These tables support full CRUD operations and have history tracking:
 | `geolocation_info` | Geographic location data | `geolocation_history` |
 | `restaurant_info` | Restaurant details | `restaurant_history` |
 | `product_info` | Product catalog | `product_history` |
-| `plate_info` | Plate/menu item details | `plate_history` |
+| `vianda_info` | Vianda/menu item details | `vianda_history` |
 | `plan_info` | Subscription plans | `plan_history` |
 | `subscription_info` | User subscriptions | `subscription_history` |
 | `client_bill_info` | Client billing records | `client_bill_history` |
@@ -44,11 +44,11 @@ These tables support full CRUD operations and have history tracking:
 | `institution_bill_info` | Institution billing records | `institution_bill_history` |
 | `credit_currency_info` | Credit currency definitions | `credit_currency_history` |
 | `market_info` | Market definitions | `market_history` |
-| `plate_selection_info` | Customer plate selections | `plate_selection_history` |
+| `vianda_selection_info` | Customer vianda selections | `vianda_selection_history` |
 | `discretionary_info` | Discretionary credit requests | `discretionary_history` |
 | `discretionary_resolution_info` | Discretionary resolution records | `discretionary_resolution_history` |
 
-**`_info` tables without history tables** (no triggers): `city_info`, `plate_review_info`, `user_favorite_info`
+**`_info` tables without history tables** (no triggers): `city_info`, `vianda_review_info`, `user_favorite_info`
 
 **Note:** `discretionary_info` and `discretionary_resolution_info` are `_info` tables with history but are **immutable** (created once, archived when resolved — no field updates).
 
@@ -79,12 +79,12 @@ These tables allow updates to specific fields only:
 
 | Table Name | Description | Editable Fields | History Table |
 |------------|-------------|-----------------|---------------|
-| `plate_pickup_live` | Live pickup tracking | `status`, `arrival_time`, `completion_time`, `was_collected` | *(none)* |
+| `vianda_pickup_live` | Live pickup tracking | `status`, `arrival_time`, `completion_time`, `was_collected` | *(none)* |
 | `client_transaction` | Client transaction records | `status`, `collected_timestamp`, `was_collected` | *(none)* |
 | `restaurant_transaction` | Restaurant transaction records | `status`, `arrival_time`, `completion_time`, `was_collected` | *(none)* |
 | `payment_method` | User payment methods | `status`, `modified_date` | *(none)* |
 | `external_payment_method` | External/linked payment methods | `status`, `modified_date` | *(none)* |
-| `plate_kitchen_days` | Plate availability days | `is_archived`, `modified_by` | `plate_kitchen_days_history` |
+| `vianda_kitchen_days` | Vianda availability days | `is_archived`, `modified_by` | `vianda_kitchen_days_history` |
 | `restaurant_holidays` | Restaurant holiday schedule | `is_archived`, `modified_by` | `restaurant_holidays_history` |
 | `institution_settlement` | Institution settlement records | Various | `institution_settlement_history` |
 
@@ -137,7 +137,7 @@ create_crud_routes(
 
 ## History Tables
 
-Most `_info` tables have corresponding `_history` tables that automatically track changes via triggers. Exceptions: `city_info`, `plate_review_info`, `user_favorite_info` have no history tables. Some non-`_info` tables (e.g. `plate_kitchen_days`, `restaurant_holidays`, `institution_settlement`) also have history tables. History tables are not directly accessible via API but provide audit trails for compliance and debugging.
+Most `_info` tables have corresponding `_history` tables that automatically track changes via triggers. Exceptions: `city_info`, `vianda_review_info`, `user_favorite_info` have no history tables. Some non-`_info` tables (e.g. `vianda_kitchen_days`, `restaurant_holidays`, `institution_settlement`) also have history tables. History tables are not directly accessible via API but provide audit trails for compliance and debugging.
 
 ## Best Practices
 

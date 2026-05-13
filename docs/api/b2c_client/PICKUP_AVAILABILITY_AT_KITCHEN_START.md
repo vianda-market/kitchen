@@ -1,13 +1,13 @@
 # Pickup Availability: "Available at 11:30" vs "Ready for Pickup"
 
 **Audience:** B2C app developers  
-**Purpose:** How to show users when their reserved plate is available for pickup, plus charging/refund mechanics
+**Purpose:** How to show users when their reserved vianda is available for pickup, plus charging/refund mechanics
 
 ---
 
 ## Overview
 
-Plates are **promoted to live** at **kitchen start** (e.g. 11:30 AM local, per market). Until then, the reservation exists but the plate does not appear in the pending-pickup flow. The B2C client should distinguish:
+Viandas are **promoted to live** at **kitchen start** (e.g. 11:30 AM local, per market). Until then, the reservation exists but the vianda does not appear in the pending-pickup flow. The B2C client should distinguish:
 
 1. **Reserved, not yet available** – "Available for pickup at 11:30 AM"
 2. **Ready for pickup** – User can open camera, scan QR, and pick up
@@ -44,56 +44,56 @@ Plates are **promoted to live** at **kitchen start** (e.g. 11:30 AM local, per m
 |------|-------|-------------|
 | After reservation, before 11:30 | Reserved | "Available for pickup at 11:30 AM" |
 | 11:30 onwards | Ready | "Ready for pickup" / show QR scan |
-| After scan | Arrived | Show confirmation + plates to restaurant |
+| After scan | Arrived | Show confirmation + viandas to restaurant |
 
 ---
 
 ## API usage
 
-### 1. Plate selections for today
+### 1. Vianda selections for today
 
-**Endpoint:** `GET /api/v1/plate-selections/`
+**Endpoint:** `GET /api/v1/vianda-selections/`
 
 Filter items where:
 - `pickup_date` = today (in user's market timezone)
 - `kitchen_day` = today's kitchen day
 
 For each such selection:
-- If `plate_pickup_id` is **null** → not yet promoted → show "Available for pickup at 11:30 AM" (or market-specific `business_hours.open`)
-- If `plate_pickup_id` is **present** → promoted → show "Ready for pickup" and enable QR scan
+- If `vianda_pickup_id` is **null** → not yet promoted → show "Available for pickup at 11:30 AM" (or market-specific `business_hours.open`)
+- If `vianda_pickup_id` is **present** → promoted → show "Ready for pickup" and enable QR scan
 
 ### 2. Pending pickup
 
-**Endpoint:** `GET /api/v1/plate-pickup/pending`
+**Endpoint:** `GET /api/v1/vianda-pickup/pending`
 
-Returns only **live** (promoted) plates. Before 11:30, this may be empty for today's reservations. Use `GET /api/v1/plate-selections/` to show today's reservations with availability state.
+Returns only **live** (promoted) viandas. Before 11:30, this may be empty for today's reservations. Use `GET /api/v1/vianda-selections/` to show today's reservations with availability state.
 
 ### 3. QR scan
 
-**Endpoint:** `POST /api/v1/plate-pickup/scan-qr`
+**Endpoint:** `POST /api/v1/vianda-pickup/scan-qr`
 
 On success, the response includes:
 - `confirmation_code` – show to restaurant staff
-- `plates` – `[{plate_name, quantity, plate_pickup_id}]` – what the user can pickup, for the "show to restaurant" screen
+- `viandas` – `[{vianda_name, quantity, vianda_pickup_id}]` – what the user can pickup, for the "show to restaurant" screen
 
 ### 4. Pickup outside intended time range
 
-Once the plate is promoted (kitchen started), the user can pick up **any time** that day, even outside the chosen pickup window (e.g. 11:30–13:30). Availability is gated only by kitchen start, not by time range.
+Once the vianda is promoted (kitchen started), the user can pick up **any time** that day, even outside the chosen pickup window (e.g. 11:30–13:30). Availability is gated only by kitchen start, not by time range.
 
 ---
 
 ## UI flow
 
 1. **My reservations / Today tab**
-   - List today's plate selections from `GET /plate-selections/`
-   - For each: show `plate_pickup_id ? "Ready for pickup" : "Available at 11:30 AM"` (or market open time)
+   - List today's vianda selections from `GET /vianda-selections/`
+   - For each: show `vianda_pickup_id ? "Ready for pickup" : "Available at 11:30 AM"` (or market open time)
 
 2. **Ready for pickup**
    - Show "Scan QR at restaurant" button
-   - Open camera, call `POST /plate-pickup/scan-qr` with payload from QR
+   - Open camera, call `POST /vianda-pickup/scan-qr` with payload from QR
 
 3. **After scan**
-   - Show confirmation code and `plates` list
+   - Show confirmation code and `viandas` list
    - User shows this screen to restaurant staff
    - Restaurant marks complete via their flow
 

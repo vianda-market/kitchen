@@ -10,11 +10,11 @@ Single reference for the financial data model — from customer pickup to suppli
 ## Data Flow
 
 ```
-Customer picks up plate
+Customer picks up vianda
         │
         ▼
 ┌─────────────────────┐
-│  Transaction         │  plate_pickup_live — one per pickup event
+│  Transaction         │  vianda_pickup_live — one per pickup event
 │  Level: Restaurant   │  Records credit deduction and restaurant credit
 └────────┬────────────┘
          │ accumulates into
@@ -55,7 +55,7 @@ Customer picks up plate
 
 | Layer | Table | Schema | Level | Primary Key | Key FKs |
 |-------|-------|--------|-------|-------------|---------|
-| Transaction | `plate_pickup_live` | `ops` | Restaurant | `plate_pickup_id` | `restaurant_id`, `user_id`, `subscription_id` |
+| Transaction | `vianda_pickup_live` | `ops` | Restaurant | `vianda_pickup_id` | `restaurant_id`, `user_id`, `subscription_id` |
 | Balance | `restaurant_balance_info` | `ops` | Restaurant | `restaurant_balance_id` | `restaurant_id` |
 | Settlement | `institution_settlement` | `billing` | Restaurant | `settlement_id` | `restaurant_id`, `institution_entity_id`, `institution_bill_id`, `settlement_run_id` |
 | Bill | `institution_bill_info` | `billing` | Entity | `institution_bill_id` | `institution_id`, `institution_entity_id`, `credit_currency_id` |

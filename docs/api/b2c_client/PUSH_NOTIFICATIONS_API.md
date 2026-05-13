@@ -36,23 +36,23 @@ Response: `200 OK` with `{ "detail": "Deleted N FCM token(s)" }`
 
 ## 2. Push on Handed Out
 
-When a restaurant clerk marks an order as Handed Out (via `POST /plate-pickup/{id}/hand-out` or `POST /restaurant-staff/verify-and-handoff`), the backend sends an FCM push to the customer.
+When a restaurant clerk marks an order as Handed Out (via `POST /vianda-pickup/{id}/hand-out` or `POST /restaurant-staff/verify-and-handoff`), the backend sends an FCM push to the customer.
 
 ### Prerequisites
 - Customer has registered an FCM token
-- Customer's `notify_plate_readiness_alert` messaging preference is `true` (default)
+- Customer's `notify_vianda_readiness_alert` messaging preference is `true` (default)
 
 ### FCM Payload
 
 ```json
 {
   "notification": {
-    "title": "Plate ready",
-    "body": "Did you receive your plate from La Cocina?"
+    "title": "Vianda ready",
+    "body": "Did you receive your vianda from La Cocina?"
   },
   "data": {
     "type": "pickup_handed_out",
-    "plate_pickup_id": "uuid",
+    "vianda_pickup_id": "uuid",
     "restaurant_name": "La Cocina"
   }
 }
@@ -60,7 +60,7 @@ When a restaurant clerk marks an order as Handed Out (via `POST /plate-pickup/{i
 
 - `notification`: shown by OS when app is backgrounded
 - `data.type`: `"pickup_handed_out"` — use this to trigger the receipt confirmation modal in the foreground listener
-- `data.plate_pickup_id`: the pickup to confirm/dispute via `POST /plate-pickup/{id}/complete`
+- `data.vianda_pickup_id`: the pickup to confirm/dispute via `POST /vianda-pickup/{id}/complete`
 
 ---
 
@@ -77,7 +77,7 @@ When a restaurant clerk marks an order as Handed Out (via `POST /plate-pickup/{i
 
 ## 4. Multipart Field Names (Portion Complaint)
 
-For `POST /plate-reviews/{id}/portion-complaint`:
+For `POST /vianda-reviews/{id}/portion-complaint`:
 - Photo field: `photo` (UploadFile)
 - Text field: `complaint_text` (Form field)
 
@@ -85,7 +85,7 @@ For `POST /plate-reviews/{id}/portion-complaint`:
 
 ## 5. scan-qr Timer Fields
 
-`POST /plate-pickup/scan-qr` now returns `arrival_time` and `server_time`:
+`POST /vianda-pickup/scan-qr` now returns `arrival_time` and `server_time`:
 
 ```
 drift = Date.now() - new Date(server_time).getTime()

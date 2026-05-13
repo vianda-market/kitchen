@@ -88,13 +88,13 @@ All routes below must change from trailing-slash to no-trailing-slash form.
 | `"/search/"` | `"/search"` |
 | `"/enriched/"` | `"/enriched"` |
 
-#### 4. [app/routes/plate_selection.py](app/routes/plate_selection.py)
+#### 4. [app/routes/vianda_selection.py](app/routes/vianda_selection.py)
 | From | To |
 |------|-----|
 | `"/"` (POST create) | `""` |
 | `"/"` (GET list) | `""` |
 
-#### 5. [app/routes/plate_review.py](app/routes/plate_review.py)
+#### 5. [app/routes/vianda_review.py](app/routes/vianda_review.py)
 | From | To |
 |------|-----|
 | `"/"` (POST) | `""` |
@@ -135,7 +135,7 @@ All routes below must change from trailing-slash to no-trailing-slash form.
 | `"/"` (GET, POST) | `""` |
 | `"/enriched/"` | `"/enriched"` |
 
-#### 12. [app/routes/plate_kitchen_days.py](app/routes/plate_kitchen_days.py)
+#### 12. [app/routes/vianda_kitchen_days.py](app/routes/vianda_kitchen_days.py)
 | From | To |
 |------|-----|
 | `"/"` (GET, POST) | `""` |
@@ -230,7 +230,7 @@ All routes below must change from trailing-slash to no-trailing-slash form.
 - Subscriptions: `"/"` GET, `"/enriched/"` → `""`, `"/enriched"`
 - Institutions: `"/"` GET/POST — change to `""`, **remove** `get_all_institutions_no_trailing` alias
 - Payment methods: `"/"` POST — change to `""`, **remove** `create_payment_method_no_trailing_slash` alias
-- Plates: `"/"` GET, `"/enriched/"` → `""`, `"/enriched"`
+- Viandas: `"/"` GET, `"/enriched/"` → `""`, `"/enriched"`
 
 #### 29. [app/services/versioned_route_factory.py](app/services/versioned_route_factory.py)
 | From | To |
@@ -261,7 +261,7 @@ Update API docs to reflect canonical form (no trailing slash):
 Postman collections reference `/api/v1/employers/` and similar. Update to canonical form:
 
 - [docs/postman/collections/010 Permissions Testing - Employee-Only Access.postman_collection.json](docs/postman/collections/010%20Permissions%20Testing%20-%20Employee-Only%20Access.postman_collection.json)
-- [docs/postman/collections/000 E2E Plate Selection.postman_collection.json](docs/postman/collections/000%20E2E%20Plate%20Selection.postman_collection.json)
+- [docs/postman/collections/000 E2E Vianda Selection.postman_collection.json](docs/postman/collections/000%20E2E%20Plate%20Selection.postman_collection.json)
 - Any other collections under `docs/postman/collections/`
 
 ---

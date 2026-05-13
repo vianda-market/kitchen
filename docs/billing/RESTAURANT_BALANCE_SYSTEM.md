@@ -37,7 +37,7 @@ Monetary Amount = Credits × Credit Value
 
 ### Transaction Flow
 
-#### 1. Order Placement (via `plate_selection.py`)
+#### 1. Order Placement (via `vianda_selection.py`)
 ```python
 RestaurantTransaction.create(transaction_data)
 ```
@@ -47,7 +47,7 @@ RestaurantTransaction.create(transaction_data)
 2. **NO restaurant balance update yet** - restaurant doesn't get paid until customer shows up
 3. Transaction waits for customer arrival (QR scan)
 
-#### 2. Customer Arrival - QR Scan (via `plate_pickup.py`)
+#### 2. Customer Arrival - QR Scan (via `vianda_pickup.py`)
 ```python
 RestaurantTransaction.update_balance_on_arrival(transaction_id, arrival_time, user_id)
 ```
@@ -58,7 +58,7 @@ RestaurantTransaction.update_balance_on_arrival(transaction_id, arrival_time, us
 3. **Restaurant balance updated with FULL amount**: `credits × credit_value_local_currency`
 4. Restaurant gets paid because customer actually showed up
 
-#### 3. Order Completion (via `plate_pickup.py`)
+#### 3. Order Completion (via `vianda_pickup.py`)
 ```python
 RestaurantTransaction.mark_collected_with_balance_update(
     transaction_id, completion_time, user_id, update_balance=True
@@ -105,7 +105,7 @@ CREATE TABLE restaurant_balance_info (
 ```python
 from app.models.restaurant_transaction import RestaurantTransaction
 
-# Data structure (from plate selection)
+# Data structure (from vianda selection)
 transaction_data = {
     "transaction_id": pickup_id,
     "restaurant_id": restaurant_id,
@@ -202,11 +202,11 @@ balance_record = RestaurantBalance.get_by_restaurant(restaurant_id)
 
 ### Current Integration Points
 
-1. **Order Placement** (`app/routes/plate_selection.py`)
+1. **Order Placement** (`app/routes/vianda_selection.py`)
    - Line ~147: Now uses `create_with_balance_update()`
    - Automatically calculates and updates restaurant balance
 
-2. **Order Completion** (`app/routes/plate_pickup.py`)
+2. **Order Completion** (`app/routes/vianda_pickup.py`)
    - Line ~239: Now uses `mark_collected_with_balance_update()`
    - Handles final amount adjustments for accurate balances
 
@@ -230,7 +230,7 @@ The system has been tested for:
 - [x] Primary key mapping updated in `app/utils/db.py`
 - [x] RestaurantBalance model implements BaseModelCRUD
 - [x] Enhanced RestaurantTransaction methods available
-- [x] Integration points updated (plate_selection.py, plate_pickup.py)
+- [x] Integration points updated (vianda_selection.py, vianda_pickup.py)
 - [x] Archival system includes restaurant balance records
 - [x] Comprehensive testing completed
 

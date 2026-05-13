@@ -1,8 +1,8 @@
 """
-Kitchen Start Promotion Cron - Promote locked plate selections to live at kitchen start.
+Kitchen Start Promotion Cron - Promote locked vianda selections to live at kitchen start.
 
 Runs periodically (e.g. every 5-15 min). For each location where kitchen has started
-(business_hours.open passed), promotes plate_selection_info rows to plate_pickup_live
+(business_hours.open passed), promotes vianda_selection_info rows to vianda_pickup_live
 and restaurant_transaction. Idempotent.
 """
 
@@ -15,7 +15,7 @@ import pytz
 from app.config.location_config import get_all_locations, get_location_config
 from app.config.market_config import MarketConfiguration
 from app.services.kitchen_day_service import get_kitchen_day_for_date
-from app.services.plate_selection_promotion_service import promote_plate_selection_to_live
+from app.services.vianda_selection_promotion_service import promote_vianda_selection_to_live
 from app.utils.db import close_db_connection, db_read, get_db_connection
 from app.utils.log import log_error, log_info, log_warning
 
@@ -24,12 +24,12 @@ SYSTEM_USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
 def run_kitchen_start_promotion(location_id: str | None = None) -> dict[str, Any]:
     """
-    Promote locked plate selections to live for locations where kitchen has started.
+    Promote locked vianda selections to live for locations where kitchen has started.
 
     For each location (or single location if location_id provided):
     - If now >= business_hours[kitchen_day].open in location timezone for today
-    - Find plate_selection_info: kitchen_day, pickup_date=today, is_archived=false,
-      NOT EXISTS in plate_pickup_live, address.timezone matches location
+    - Find vianda_selection_info: kitchen_day, pickup_date=today, is_archived=false,
+      NOT EXISTS in vianda_pickup_live, address.timezone matches location
     - Promote each to live
 
     Args:
@@ -124,21 +124,21 @@ def _promote_for_location(
         if _dev_mode:
             # DEV_MODE: skip kitchen_day and timezone filters — promote any selection for today
             query = """
-                SELECT ps.plate_selection_id
-                FROM plate_selection_info ps
+                SELECT ps.vianda_selection_id
+                FROM vianda_selection_info ps
                 WHERE ps.pickup_date = %s
                   AND ps.is_archived = FALSE
                   AND NOT EXISTS (
-                      SELECT 1 FROM plate_pickup_live ppl
-                      WHERE ppl.plate_selection_id = ps.plate_selection_id
+                      SELECT 1 FROM vianda_pickup_live ppl
+                      WHERE ppl.vianda_selection_id = ps.vianda_selection_id
                         AND ppl.is_archived = FALSE
                   )
             """
             rows = db_read(query, (today.isoformat(),), connection=conn)
         else:
             query = """
-                SELECT ps.plate_selection_id
-                FROM plate_selection_info ps
+                SELECT ps.vianda_selection_id
+                FROM vianda_selection_info ps
                 JOIN restaurant_info r ON ps.restaurant_id = r.restaurant_id
                 JOIN address_info a ON r.address_id = a.address_id
                 WHERE ps.kitchen_day = %s
@@ -146,8 +146,8 @@ def _promote_for_location(
                   AND ps.is_archived = FALSE
                   AND TRIM(COALESCE(a.timezone, '')) = %s
                   AND NOT EXISTS (
-                      SELECT 1 FROM plate_pickup_live ppl
-                      WHERE ppl.plate_selection_id = ps.plate_selection_id
+                      SELECT 1 FROM vianda_pickup_live ppl
+                      WHERE ppl.vianda_selection_id = ps.vianda_selection_id
                         AND ppl.is_archived = FALSE
                   )
             """
@@ -160,13 +160,13 @@ def _promote_for_location(
         promoted = 0
         for row in rows:
             try:
-                plate_selection_id = UUID(str(row["plate_selection_id"]))
-                pid = promote_plate_selection_to_live(plate_selection_id, system_user_id, conn, commit=False)
+                vianda_selection_id = UUID(str(row["vianda_selection_id"]))
+                pid = promote_vianda_selection_to_live(vianda_selection_id, system_user_id, conn, commit=False)
                 if pid:
                     promoted += 1
                     conn.commit()
             except Exception as e:
-                log_error(f"Failed to promote {row['plate_selection_id']}: {e}")
+                log_error(f"Failed to promote {row['vianda_selection_id']}: {e}")
                 conn.rollback()
         return promoted
     finally:

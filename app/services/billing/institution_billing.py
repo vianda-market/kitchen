@@ -29,9 +29,9 @@ from app.services.crud_service import (
     institution_bill_service,
     institution_settlement_service,
     is_holiday,
-    plate_pickup_live_service,
     restaurant_balance_service,
     restaurant_transaction_service,
+    vianda_pickup_live_service,
 )
 from app.utils.db import close_db_connection, db_read, get_db_connection
 from app.utils.log import log_error, log_info, log_warning
@@ -228,13 +228,13 @@ class InstitutionBillingService:
 
     @staticmethod
     def _close_pickup_record(
-        plate_selection_id: UUID, system_user_id: UUID, connection, *, commit: bool = False
+        vianda_selection_id: UUID, system_user_id: UUID, connection, *, commit: bool = False
     ) -> bool:
         """
         Close a pickup record that was not collected (prevent claiming after hours).
 
         Args:
-            plate_selection_id: Plate selection ID to find the pickup record
+            vianda_selection_id: Vianda selection ID to find the pickup record
             system_user_id: System user ID for modification tracking
             connection: Database connection
             commit: Whether to commit immediately (default: False for atomic transactions)
@@ -243,24 +243,24 @@ class InstitutionBillingService:
             True if pickup record closed successfully, False otherwise
         """
         try:
-            # Find pickup record by plate_selection_id
+            # Find pickup record by vianda_selection_id
             # Use tuple for IN clause with psycopg2
             query = """
-                SELECT * FROM plate_pickup_live
-                WHERE plate_selection_id = %s
+                SELECT * FROM vianda_pickup_live
+                WHERE vianda_selection_id = %s
                 AND is_archived = FALSE
                 AND status = ANY(%s)
             """
             pickup_results = db_read(
-                query, (str(plate_selection_id), [Status.PENDING.value, Status.ARRIVED.value]), connection=connection
+                query, (str(vianda_selection_id), [Status.PENDING.value, Status.ARRIVED.value]), connection=connection
             )
 
             if not pickup_results:
-                log_warning(f"No uncollected pickup record found for plate_selection_id {plate_selection_id}")
+                log_warning(f"No uncollected pickup record found for vianda_selection_id {vianda_selection_id}")
                 return True  # Not an error - may have already been closed
 
             pickup_data = pickup_results[0]
-            pickup_id = UUID(pickup_data["plate_pickup_id"])
+            pickup_id = UUID(pickup_data["vianda_pickup_id"])
 
             # Update pickup record to closed status
             update_data = {
@@ -269,17 +269,17 @@ class InstitutionBillingService:
                 "modified_by": system_user_id,
             }
 
-            success = plate_pickup_live_service.update(pickup_id, update_data, connection, commit=commit)
+            success = vianda_pickup_live_service.update(pickup_id, update_data, connection, commit=commit)
             if success:
                 log_info(
-                    f"Closed pickup record {pickup_id} for plate_selection {plate_selection_id} (commit={'immediate' if commit else 'deferred'})"
+                    f"Closed pickup record {pickup_id} for vianda_selection {vianda_selection_id} (commit={'immediate' if commit else 'deferred'})"
                 )
             else:
-                log_warning(f"Failed to close pickup record {pickup_id} for plate_selection {plate_selection_id}")
+                log_warning(f"Failed to close pickup record {pickup_id} for vianda_selection {vianda_selection_id}")
 
             return success
         except Exception as e:
-            log_error(f"Error closing pickup record for plate_selection_id {plate_selection_id}: {e}")
+            log_error(f"Error closing pickup record for vianda_selection_id {vianda_selection_id}: {e}")
             return False
 
     @staticmethod
@@ -360,9 +360,9 @@ class InstitutionBillingService:
                 restaurant_id, period_start, period_end, connection
             )
             for transaction in uncollected_transactions:
-                if transaction.plate_selection_id:
+                if transaction.vianda_selection_id:
                     success = InstitutionBillingService._close_pickup_record(
-                        transaction.plate_selection_id, system_user_id, connection, commit=False
+                        transaction.vianda_selection_id, system_user_id, connection, commit=False
                     )
                     if not success:
                         connection.rollback()

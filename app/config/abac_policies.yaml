@@ -11,7 +11,7 @@ policies:
 
   - name: "Client Comprehensive Data Access"
     description: >
-      Allows registered clients to view products, restaurants, plates, and qr_code,
+      Allows registered clients to view products, restaurants, viandas, and qr_code,
       and view addresses only when the address_type is 'restaurant'.
     condition:
       # Verify the request comes from an authenticated client.
@@ -21,7 +21,7 @@ policies:
       resource_type:
         - "products"
         - "restaurants"
-        - "plates"
+        - "viandas"
         - "qr_code"
         - "addresses"
       # For addresses, add an extra condition that address_type must be 'restaurant'.

@@ -78,7 +78,7 @@ If a future "unsubscribe from emails" feature is added, it will only affect emai
 |----------|----------|---------------|
 | `GET /content/faq` | Low (Phase 2) | Not started. Response shape from B2C feedback doc is accepted — will implement when content management is prioritized. |
 | `GET /content/tutorials` | Low (Phase 2) | Not started. Same — accepted shape, will implement when ready. |
-| `GET /users/me/milestones` | Low (Phase 3) | Not started. Auto-computed from existing data (plate_selections, pickups). Will implement when Phase 3 is prioritized. |
+| `GET /users/me/milestones` | Low (Phase 3) | Not started. Auto-computed from existing data (vianda_selections, pickups). Will implement when Phase 3 is prioritized. |
 
 The B2C app should ship with hardcoded content for MVP. Backend endpoints will be built when the content needs to be admin-managed or when milestone tracking becomes critical.
 

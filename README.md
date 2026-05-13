@@ -1,6 +1,6 @@
 # Kitchen API
 
-FastAPI + PostgreSQL backend for the Kitchen platform. Manages restaurants, plate selection, subscriptions, billing, and multi-tenant institution scoping.
+FastAPI + PostgreSQL backend for the Kitchen platform. Manages restaurants, vianda selection, subscriptions, billing, and multi-tenant institution scoping.
 
 ## Quick Start
 

@@ -1,8 +1,8 @@
 """
 Favorite Service
 
-Business logic for user favorites (plates and restaurants).
-Users can flag plates and restaurants as favorites; favorites are surfaced at the top of explore results.
+Business logic for user favorites (viandas and restaurants).
+Users can flag viandas and restaurants as favorites; favorites are surfaced at the top of explore results.
 """
 
 from uuid import UUID
@@ -24,12 +24,12 @@ def add_favorite(
     db: psycopg2.extensions.connection,
 ) -> UserFavoriteDTO:
     """
-    Add a favorite. Validates that the plate or restaurant exists.
+    Add a favorite. Validates that the vianda or restaurant exists.
 
     Args:
         user_id: Current user (Customer)
-        entity_type: 'plate' or 'restaurant'
-        entity_id: plate_id or restaurant_id
+        entity_type: 'vianda' or 'restaurant'
+        entity_id: vianda_id or restaurant_id
         db: Database connection
 
     Returns:
@@ -42,9 +42,9 @@ def add_favorite(
         raise envelope_exception(ErrorCode.FAVORITE_ENTITY_TYPE_INVALID, status=400, locale="en")
 
     # Validate entity exists
-    if entity_type == "plate":
+    if entity_type == "vianda":
         row = db_read(
-            "SELECT plate_id FROM plate_info WHERE plate_id = %s AND is_archived = FALSE",
+            "SELECT vianda_id FROM vianda_info WHERE vianda_id = %s AND is_archived = FALSE",
             (str(entity_id),),
             connection=db,
             fetch_one=True,
@@ -105,8 +105,8 @@ def remove_favorite(
 
     Args:
         user_id: Current user (Customer)
-        entity_type: 'plate' or 'restaurant'
-        entity_id: plate_id or restaurant_id
+        entity_type: 'vianda' or 'restaurant'
+        entity_id: vianda_id or restaurant_id
         db: Database connection
     """
     if not FavoriteEntityType.is_valid(entity_type):
@@ -132,7 +132,7 @@ def get_favorite_ids(
     Get favorite IDs for fast lookup (sorting, is_favorite flags).
 
     Returns:
-        {"plate_ids": [...], "restaurant_ids": [...]}
+        {"vianda_ids": [...], "restaurant_ids": [...]}
     """
     rows = (
         db_read(
@@ -147,15 +147,15 @@ def get_favorite_ids(
         )
         or []
     )
-    plate_ids = []
+    vianda_ids = []
     restaurant_ids = []
     for r in rows:
         eid = r["entity_id"]
-        if r["entity_type"] == "plate":
-            plate_ids.append(eid)
+        if r["entity_type"] == "vianda":
+            vianda_ids.append(eid)
         else:
             restaurant_ids.append(eid)
-    return {"plate_ids": plate_ids, "restaurant_ids": restaurant_ids}
+    return {"vianda_ids": vianda_ids, "restaurant_ids": restaurant_ids}
 
 
 def get_favorites_by_user(
@@ -170,7 +170,7 @@ def get_favorites_by_user(
     Args:
         user_id: Current user (Customer)
         db: Database connection
-        entity_type: Optional 'plate' or 'restaurant' to filter
+        entity_type: Optional 'vianda' or 'restaurant' to filter
 
     Returns:
         List of UserFavoriteDTO

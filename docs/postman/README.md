@@ -8,7 +8,7 @@ This directory contains Postman collections for API testing and their associated
 All importable Postman collections live here:
 - **`Permissions Testing - Employee-Only Access.postman_collection.json`** - Comprehensive permissions testing for all role combinations
 - **`DISCRETIONARY_CREDIT_SYSTEM.postman_collection.json`** - End-to-end testing for discretionary credit system
-- **`E2E Plate Selection.postman_collection.json`** - Complete plate selection workflow testing
+- **`E2E Vianda Selection.postman_collection.json`** - Complete vianda selection workflow testing
 - **`INSTITUTION_BANK_ACCOUNT_POSTMAN_COLLECTION.json`** - Institution bank account API testing
 - **`RESTAURANT_EXPLORER_B2C.postman_collection.json`** - B2C restaurant explorer: GET /restaurants/cities (dropdown) and GET /restaurants/by-city (list/map). Bearer auth required; run Login first.
 - **`ROLE_AND_FIELD_ACCESS.postman_collection.json`** - Role and field access: address_type (Supplier allowed/disallowed), user role_type (Supplier cannot create Customer), Customer cannot create users. Run with Supplier and Customer credentials (see collection variables).
@@ -69,7 +69,7 @@ All collections use **ISO 3166-1 alpha-2** for `country_code` (e.g. `AR`, `US`, 
 
 ## Minimal DB + E2E flow
 
-**Tear down and rebuild DB** → seed is minimal: one super_admin (superadmin / SuperAdmin1!), two institutions (Vianda Enterprises, Vianda Customers), one market (Global). **Run the E2E Plate Selection collection** to test all APIs: super admin logs in, creates one credit currency and one local market via API, then one plan, one supplier institution, one restaurant, and the rest of the flow. Postman is for testing APIs, not for populating extra data.
+**Tear down and rebuild DB** → seed is minimal: one super_admin (superadmin / SuperAdmin1!), two institutions (Vianda Enterprises, Vianda Customers), one market (Global). **Run the E2E Vianda Selection collection** to test all APIs: super admin logs in, creates one credit currency and one local market via API, then one plan, one supplier institution, one restaurant, and the rest of the flow. Postman is for testing APIs, not for populating extra data.
 
 ## 🚀 Quick Start
 
@@ -89,7 +89,7 @@ All collections use **ISO 3166-1 alpha-2** for `country_code` (e.g. `AR`, `US`, 
 - **Quick Setup**: `guidelines/QUICK_SETUP_GUIDE.md`
 - **Purpose**: End-to-end testing of discretionary credit workflows
 
-### E2E Plate Selection Collection
+### E2E Vianda Selection Collection
 - **Purpose**: Minimal run to test each API (credit currencies, markets, plans, supplier setup, restaurant, client flow, billing). Seed is minimal; super admin creates localized markets/currencies via API in this collection.
 - **Flow**: After DB rebuild, run the full collection; no manual data prep.
 - **Variables**: `baseUrl` (default `http://localhost:8000`), `adminUsername=superadmin`, `adminPassword=SuperAdmin1!`. If you use an environment, set `baseUrl` there to override (e.g. `https://your-api.example.com`).

@@ -7,12 +7,12 @@ All tables with a `status` field now follow a consistent pattern for managing re
 2. **On Completion**: Status updated to `'Complete'` after downstream processing
 3. **API Control**: Status field is removed from API input - controlled by system only
 
-## Complete Flow Example: Plate Selection
+## Complete Flow Example: Vianda Selection
 
 ### **🔄 Full Transaction Lifecycle:**
 
-1. **Customer selects plate** → Creates `plate_selection` ✅
-2. **System creates** `plate_pickup_live` with status 'Pending' ✅  
+1. **Customer selects vianda** → Creates `vianda_selection` ✅
+2. **System creates** `vianda_pickup_live` with status 'Pending' ✅  
 3. **System creates** `client_transaction` with status 'Pending' ✅
 4. **🆕 System updates** subscription balance (deducts credits) ✅
 5. **System marks** transaction as 'Complete' ✅
@@ -23,7 +23,7 @@ All tables with a `status` field now follow a consistent pattern for managing re
 # 1. Create transaction (Pending)
 transaction_data = {
     "user_id": user_id,
-    "source": "plate_selection",
+    "source": "vianda_selection",
     "credit": -8,  # Negative = deduction
     # ... other fields (status omitted)
 }
@@ -61,7 +61,7 @@ ClientTransaction.mark_complete(transaction_id, user_id)
 # Before (status field required in API)
 transaction_data = {
     "user_id": user_id,
-    "source": "plate_selection",
+    "source": "vianda_selection",
     "status": "Pending",  # ❌ No longer needed
     # ... other fields
 }
@@ -69,7 +69,7 @@ transaction_data = {
 # After (status automatically set)
 transaction_data = {
     "user_id": user_id,
-    "source": "plate_selection",
+    "source": "vianda_selection",
     # ... other fields (status omitted)
 }
 # ✅ Status automatically set to 'Pending'
@@ -115,15 +115,15 @@ The `client_transaction` table now includes a `modified_date` field that automat
 | **Simple Status Changes** | `modified_date` only | `client_transaction` (Pending→Complete) |
 | **Complex State Machines** | History table | `subscription_info` (multiple statuses, balance changes) |
 | **Audit Requirements** | History table | `user_info` (regulatory compliance) |
-| **Performance Monitoring** | `modified_date` + metrics | `plate_pickup_live` (timing analysis) |
+| **Performance Monitoring** | `modified_date` + metrics | `vianda_pickup_live` (timing analysis) |
 
 ### **Note for Development**
 
 Since this is a local development environment, the `modified_date` column is included in the main schema file and will be automatically created when building the database from scratch.
 
 - `client_transaction` - Credit transactions (Pending → Complete)
-- `plate_pickup_live` - Plate pickup tracking (Pending → Complete)
-- `plate_selection` - Customer plate selections (Pending → Complete)
+- `vianda_pickup_live` - Vianda pickup tracking (Pending → Complete)
+- `vianda_selection` - Customer vianda selections (Pending → Complete)
 - Any other table with a `status` field
 
 ## Migration Notes

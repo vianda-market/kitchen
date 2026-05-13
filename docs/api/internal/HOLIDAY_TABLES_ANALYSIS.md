@@ -10,7 +10,7 @@ Two separate tables: **national** (country-wide, often from Nager.Date import) a
 
 ## `national_holidays`
 
-**Purpose**: Country-scoped holidays (plate selection, billing skips, B2B CRUD).
+**Purpose**: Country-scoped holidays (vianda selection, billing skips, B2B CRUD).
 
 **Key columns** (see `app/db/schema.sql` for full definition):
 
@@ -75,7 +75,7 @@ CHECK (
 
 | Area | National | Restaurant |
 |------|----------|------------|
-| Plate selection / kitchen day helpers | `_is_date_national_holiday` in `plate_selection_validation.py` (exact date + recurring month/day) | `_is_date_restaurant_holiday` (exact date + recurring **integers**) |
+| Vianda selection / kitchen day helpers | `_is_date_national_holiday` in `vianda_selection_validation.py` (exact date + recurring month/day) | `_is_date_restaurant_holiday` (exact date + recurring **integers**) |
 | Enriched list | `get_enriched_restaurant_holidays` in `entity_service.py` — national branch selects `recurring_month`, `recurring_day`, `source` | Restaurant branch selects `country_code`, `recurring_month`, `recurring_day`, `source` |
 | B2B national CRUD | `app/routes/national_holidays.py` | — |
 | Supplier restaurant CRUD | — | `app/routes/restaurant_holidays.py` |

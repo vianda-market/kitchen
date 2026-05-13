@@ -340,7 +340,7 @@ def _log_deprecated_endpoint_usage(endpoint: str, user_id: UUID, role_type: str)
 ## Postman Collection Updates
 
 ### Collections to Update
-- [ ] `E2E Plate Selection.postman_collection.json`
+- [ ] `E2E Vianda Selection.postman_collection.json`
 - [ ] `Permissions Testing - Employee-Only Access.postman_collection.json`
 - [ ] `DISCRETIONARY_CREDIT_SYSTEM.postman_collection.json`
 - [ ] Any other collections using user update endpoints

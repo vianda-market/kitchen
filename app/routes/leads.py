@@ -141,14 +141,14 @@ async def list_leads_markets(
     ),
     audience: str = Query(
         None,
-        description="Optional. Pass 'supplier' to get all active markets (for interest forms). Default returns only markets with plate coverage.",
+        description="Optional. Pass 'supplier' to get all active markets (for interest forms). Default returns only markets with vianda coverage.",
     ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
     Public (no auth) list of active markets for UI dropdown.
 
-    Default (no param): only markets with active plate coverage — for B2C app + customer flows.
+    Default (no param): only markets with active vianda coverage — for B2C app + customer flows.
     ?audience=supplier: all active non-global markets — for supplier/employer interest forms.
 
     Pass `?language=es` or send `Accept-Language: es` to get localized country names.
@@ -277,7 +277,7 @@ async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query param
         description=(
             "Optional. Pass 'supplier' for the broader lead-capture dropdown (includes all "
             "cities in markets that accept supplier interest, from GeoNames + curated + crowd-sourced). "
-            "Default returns only served cities (active restaurants with plates + QR)."
+            "Default returns only served cities (active restaurants with viandas + QR)."
         ),
     ),
     mode: str = Query(
@@ -293,7 +293,7 @@ async def get_leads_cities(  # noqa: PLR0913 — declarative FastAPI Query param
     """
     List city names for lead forms. No auth; rate-limited per IP.
 
-    Default (no audience): cities with >=1 active restaurant with plate_kitchen_days + QR.
+    Default (no audience): cities with >=1 active restaurant with vianda_kitchen_days + QR.
     ?audience=supplier: all cities in supplier-audience countries (GeoNames u city_metadata u ops.restaurant_lead).
     ?mode=coverage: returns [{city, restaurant_count}] -- coverage-filtered with counts, for marketing site.
 

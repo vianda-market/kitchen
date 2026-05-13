@@ -14,7 +14,7 @@ All collections use `{{baseUrl}}` from either collection variables or a Postman 
 
 | # | Collection | Tests | Key Endpoints |
 |---|---|---|---|
-| 000 | E2E Plate Selection | Full E2E: auth, supplier setup, menu, customer signup, subscription, plate selection, QR, pickup, reviews, billing settlement | `/auth/token`, `/addresses`, `/markets`, `/plans`, `/institutions`, `/restaurants`, `/products`, `/plates`, `/kitchen-days`, `/users`, `/subscriptions`, `/plate-selections`, `/qr-codes`, `/pickups`, `/reviews`, `/billing` |
+| 000 | E2E Vianda Selection | Full E2E: auth, supplier setup, menu, customer signup, subscription, vianda selection, QR, pickup, reviews, billing settlement | `/auth/token`, `/addresses`, `/markets`, `/plans`, `/institutions`, `/restaurants`, `/products`, `/viandas`, `/kitchen-days`, `/users`, `/subscriptions`, `/vianda-selections`, `/qr-codes`, `/pickups`, `/reviews`, `/billing` |
 | 001 | Discretionary Credit System | Admin creates credit requests, super-admin approves/rejects, request lifecycle | `/auth/token`, `/admin/discretionary-credits`, `/super-admin/discretionary-credits` |
 | 002 | Address Autocomplete & Validation | Address suggest, structured creation, country/city filtering | `/auth/token`, `/addresses/suggest`, `/addresses` |
 | 003 | Enum Service | All enums with labels, individual enums, cuisines, customer access | `/auth/token`, `/enums`, `/cuisines` |
@@ -28,7 +28,7 @@ All collections use `{{baseUrl}}` from either collection variables or a Postman 
 | 011 | Employer Program | Full employer lifecycle: institution, entity CRUD, program config, employee enrollment (single + bulk CSV), domain management, billing generation, cron | `/auth/token`, `/institutions`, `/employers`, `/employer/program`, `/employer/employees`, `/employer/domains`, `/employer/billing` |
 | 012 | Billing, Payout & Stripe Connect | Institution bills (CRUD, settlement pipeline, summary), client bills, supplier invoices (create, review, match), W-9, Stripe Connect (onboarding, status, payout), enriched payouts | `/institution-bills`, `/client-bills`, `/supplier-invoices`, `/supplier-w9`, `/institution-entities/{id}/stripe-connect/*`, `/payouts` |
 | 013 | Subscription Actions | Payment details, confirm, hold/resume, cancel, renewal preferences, enriched views | `/subscriptions/{id}/hold`, `/subscriptions/{id}/resume`, `/subscriptions/{id}/cancel`, `/subscriptions/me/renewal-preferences`, `/subscriptions/enriched` |
-| 014 | Ingredients & Favorites | Ingredient search (local + OFF), custom ingredient creation, favorite CRUD (plate + restaurant) | `/ingredients/search`, `/ingredients/custom`, `/favorites`, `/favorites/me`, `/favorites/me/ids` |
+| 014 | Ingredients & Favorites | Ingredient search (local + OFF), custom ingredient creation, favorite CRUD (vianda + restaurant) | `/ingredients/search`, `/ingredients/custom`, `/favorites`, `/favorites/me`, `/favorites/me/ids` |
 
 ---
 
@@ -61,5 +61,5 @@ Services tested only via Postman (per CLAUDE.md) that currently **lack** dedicat
 All collections now use environment variables for credentials. No hardcoded passwords remain in collection variables.
 - **Super Admin:** `{{superAdminUsername}}` / `{{superAdminPassword}}` — set in `local` and `gcp_kitchen_dev` environments
 - **Admin:** `{{adminUsername}}` / `{{adminPassword}}` — created by 000 "Register Admin User" request (Internal/Admin at Vianda Enterprises). Used by 001, 008, 010 for permissions testing
-- **Customer/Supplier:** `{{customerUsername}}` / `{{supplierUsername}}` etc. — set by 000 E2E Plate Selection run
+- **Customer/Supplier:** `{{customerUsername}}` / `{{supplierUsername}}` etc. — set by 000 E2E Vianda Selection run
 - Collections 002, 003, 004, 005, 007 switched from admin to superAdmin credentials (admin was only used for generic auth)

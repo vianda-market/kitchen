@@ -58,7 +58,7 @@ GET /api/v1/cuisines?search=ita&language=es
 | `description` | string? | Optional description |
 | `display_order` | int? | Sort order hint |
 
-**Localization behavior**: Enriched restaurant and plate endpoints also resolve `cuisine_name` per the user's locale (via `Accept-Language` header). The localized name appears wherever cuisine is displayed — no client-side resolution needed.
+**Localization behavior**: Enriched restaurant and vianda endpoints also resolve `cuisine_name` per the user's locale (via `Accept-Language` header). The localized name appears wherever cuisine is displayed — no client-side resolution needed.
 
 ---
 

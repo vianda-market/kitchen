@@ -2,76 +2,76 @@
 
 ## Summary
 
-**Endpoints that can be deleted**: 2 legacy endpoints in `plate_selection.py`
-**Postman collections that need updates**: 1 collection (E2E Plate Selection)
+**Endpoints that can be deleted**: 2 legacy endpoints in `vianda_selection.py`
+**Postman collections that need updates**: 1 collection (E2E Vianda Selection)
 
 ---
 
 ## Endpoints to Delete
 
-### 1. `POST /plate-selections/kitchen-days/{plate_id}` ❌ DELETE
-**Location**: `app/routes/plate_selection.py:82-153`
+### 1. `POST /vianda-selections/kitchen-days/{vianda_id}` ❌ DELETE
+**Location**: `app/routes/vianda_selection.py:82-153`
 
 **Status**: ✅ **DEPRECATED** (marked in code)
 
-**Replacement**: Use `/plate-kitchen-days/` endpoints instead
+**Replacement**: Use `/vianda-kitchen-days/` endpoints instead
 
 **Current Behavior**:
-- Hard deletes ALL existing kitchen days for a plate
+- Hard deletes ALL existing kitchen days for a vianda
 - Creates new kitchen days in batch
 - Returns list of created kitchen days
 
 **Replacement Strategy**:
-The new `/plate-kitchen-days/` endpoints provide granular control:
-- `POST /plate-kitchen-days/` - Create individual kitchen day
-- `PUT /plate-kitchen-days/{kitchen_day_id}` - Update individual kitchen day
-- `DELETE /plate-kitchen-days/{kitchen_day_id}` - Delete individual kitchen day
+The new `/vianda-kitchen-days/` endpoints provide granular control:
+- `POST /vianda-kitchen-days/` - Create individual kitchen day
+- `PUT /vianda-kitchen-days/{kitchen_day_id}` - Update individual kitchen day
+- `DELETE /vianda-kitchen-days/{kitchen_day_id}` - Delete individual kitchen day
 
 **Migration Path**:
 To replace the batch operation, you would:
-1. Get all existing kitchen days: `GET /plate-kitchen-days/?plate_id={plate_id}` (filter client-side)
-2. Delete each one: `DELETE /plate-kitchen-days/{kitchen_day_id}` (for each)
-3. Create new ones: `POST /plate-kitchen-days/` (for each day)
+1. Get all existing kitchen days: `GET /vianda-kitchen-days/?vianda_id={vianda_id}` (filter client-side)
+2. Delete each one: `DELETE /vianda-kitchen-days/{kitchen_day_id}` (for each)
+3. Create new ones: `POST /vianda-kitchen-days/` (for each day)
 
-**Alternative**: Create a batch endpoint in `/plate-kitchen-days/` if batch operations are needed.
+**Alternative**: Create a batch endpoint in `/vianda-kitchen-days/` if batch operations are needed.
 
 ---
 
-### 2. `GET /plate-selections/kitchen-days/{plate_id}` ❌ DELETE
-**Location**: `app/routes/plate_selection.py:155-188`
+### 2. `GET /vianda-selections/kitchen-days/{vianda_id}` ❌ DELETE
+**Location**: `app/routes/vianda_selection.py:155-188`
 
 **Status**: ✅ **DEPRECATED** (marked in code)
 
-**Replacement**: Use `/plate-kitchen-days/` endpoints instead
+**Replacement**: Use `/vianda-kitchen-days/` endpoints instead
 
 **Current Behavior**:
-- Gets all kitchen days for a specific plate
-- Returns simplified format: `{"plate_id": "...", "kitchen_days": ["Monday", "Tuesday"]}`
+- Gets all kitchen days for a specific vianda
+- Returns simplified format: `{"vianda_id": "...", "kitchen_days": ["Monday", "Tuesday"]}`
 
 **Replacement Strategy**:
 Use the new endpoint:
-- `GET /plate-kitchen-days/` - List all kitchen days (filter by `plate_id` client-side or add query param)
-- `GET /plate-kitchen-days/enriched/` - List with enriched data
+- `GET /vianda-kitchen-days/` - List all kitchen days (filter by `vianda_id` client-side or add query param)
+- `GET /vianda-kitchen-days/enriched/` - List with enriched data
 
 **Migration Path**:
-1. Call `GET /plate-kitchen-days/` (or add `?plate_id={plate_id}` query param)
-2. Filter results client-side by `plate_id`
+1. Call `GET /vianda-kitchen-days/` (or add `?vianda_id={vianda_id}` query param)
+2. Filter results client-side by `vianda_id`
 3. Extract `kitchen_day` values from results
 
-**Note**: The new endpoint returns full `PlateKitchenDayResponseSchema` objects, not just day names.
+**Note**: The new endpoint returns full `ViandaKitchenDayResponseSchema` objects, not just day names.
 
 ---
 
 ## Postman Collections That Need Updates
 
-### 1. **E2E Plate Selection Collection** ⚠️ REQUIRES UPDATE
+### 1. **E2E Vianda Selection Collection** ⚠️ REQUIRES UPDATE
 
-**File**: `docs/postman/collections/E2E Plate Selection.postman_collection.json`
+**File**: `docs/postman/collections/E2E Vianda Selection.postman_collection.json`
 
 **Current Usage**:
-- **Request**: `POST /plate-selections/kitchen-days/{{plateId}}`
+- **Request**: `POST /vianda-selections/kitchen-days/{{plateId}}`
 - **Location**: Line 1122
-- **Request Name**: "Register Supplier Plate Kitchen Days"
+- **Request Name**: "Register Supplier Vianda Kitchen Days"
 
 **Required Changes**:
 
@@ -80,26 +80,26 @@ Replace the single batch call with individual calls:
 
 1. **Get existing kitchen days** (optional, for cleanup):
    ```
-   GET /plate-kitchen-days/?plate_id={{plateId}}
+   GET /vianda-kitchen-days/?vianda_id={{plateId}}
    ```
    Then delete each one if needed.
 
 2. **Create new kitchen days** (one per day):
    ```
-   POST /plate-kitchen-days/
+   POST /vianda-kitchen-days/
    Body: {
-     "plate_id": "{{plateId}}",
+     "vianda_id": "{{plateId}}",
      "kitchen_day": "Monday"
    }
    ```
    Repeat for each day: Tuesday, Wednesday, Thursday, Friday
 
 #### Option B: Add Batch Endpoint (Future Enhancement)
-Create a new batch endpoint in `/plate-kitchen-days/`:
+Create a new batch endpoint in `/vianda-kitchen-days/`:
 ```
-POST /plate-kitchen-days/batch
+POST /vianda-kitchen-days/batch
 Body: {
-  "plate_id": "{{plateId}}",
+  "vianda_id": "{{plateId}}",
   "kitchen_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
   "replace_existing": true
 }
@@ -112,11 +112,11 @@ Body: {
 ## Impact Analysis
 
 ### Code to Delete
-- **File**: `app/routes/plate_selection.py`
+- **File**: `app/routes/vianda_selection.py`
 - **Lines**: 82-188 (2 functions, ~106 lines)
 - **Functions**:
-  - `assign_kitchen_days_to_plate()` (lines 82-153)
-  - `get_plate_kitchen_days()` (lines 155-188)
+  - `assign_kitchen_days_to_vianda()` (lines 82-153)
+  - `get_vianda_kitchen_days()` (lines 155-188)
 
 ### Benefits of Deletion
 1. ✅ **Reduces code duplication** - Single source of truth for kitchen days API
@@ -136,23 +136,23 @@ Body: {
 
 ### Before Deleting Endpoints
 
-1. ✅ **Update E2E Plate Selection Postman Collection**
-   - Replace `POST /plate-selections/kitchen-days/{{plateId}}` with multiple `POST /plate-kitchen-days/` calls
+1. ✅ **Update E2E Vianda Selection Postman Collection**
+   - Replace `POST /vianda-selections/kitchen-days/{{plateId}}` with multiple `POST /vianda-kitchen-days/` calls
    - Update test scripts to handle multiple responses
    - Verify collection still works end-to-end
 
 2. ⚠️ **Check for other usages** (if any)
-   - Search codebase for `/plate-selections/kitchen-days`
+   - Search codebase for `/vianda-selections/kitchen-days`
    - Check if any client applications use these endpoints
    - Check API documentation
 
 3. ⚠️ **Consider batch endpoint** (optional)
-   - If batch operations are common, consider adding `POST /plate-kitchen-days/batch`
+   - If batch operations are common, consider adding `POST /vianda-kitchen-days/batch`
    - This would provide a direct replacement for the legacy endpoint
 
 ### After Deleting Endpoints
 
-1. ✅ **Remove code** from `app/routes/plate_selection.py`
+1. ✅ **Remove code** from `app/routes/vianda_selection.py`
 2. ✅ **Update API documentation** (if any)
 3. ✅ **Update route registration** (if needed)
 4. ✅ **Test E2E collection** to ensure it still works
@@ -171,7 +171,7 @@ The legacy endpoints are:
 
 **Suggested Timeline**:
 1. **Now**: Update E2E Postman collection to use new endpoints
-2. **After testing**: Delete legacy endpoints from `plate_selection.py`
+2. **After testing**: Delete legacy endpoints from `vianda_selection.py`
 3. **Future** (optional): Add batch endpoint if batch operations are needed frequently
 
 ---
@@ -181,6 +181,6 @@ The legacy endpoints are:
 The following endpoints are **NOT deprecated** and should **NOT** be deleted:
 - ✅ `/restaurant-balances/` - New read-only endpoints (not replacing anything)
 - ✅ `/restaurant-transactions/` - New read-only endpoints (not replacing anything)
-- ✅ `/plate-kitchen-days/` - New dedicated endpoints (replacing legacy ones)
-- ✅ All other endpoints in `plate_selection.py` - Still in active use
+- ✅ `/vianda-kitchen-days/` - New dedicated endpoints (replacing legacy ones)
+- ✅ All other endpoints in `vianda_selection.py` - Still in active use
 

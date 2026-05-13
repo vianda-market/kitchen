@@ -74,7 +74,7 @@ Updated all admin discretionary endpoints to use `/api/v1/` prefix:
 - `/api/v1/admin/discretionary/` - Admin discretionary credit management
 - `/api/v1/super-admin/discretionary/` - Super-Admin discretionary approval
 - `/api/v1/restaurants/` - Restaurant management
-- `/api/v1/plates/` - Plate management
+- `/api/v1/viandas/` - Vianda management
 - All other business endpoints
 
 ## Benefits

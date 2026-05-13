@@ -12,7 +12,7 @@ The old `employer_info` table served two unrelated purposes:
 
 1. **Employer Benefits Program** (B2B) — billing, tax entities, employee benefits. Now handled by `institution_info` (type=employer) + `institution_entity_info`. Heavy, admin-managed.
 
-2. **Coworker Pickup Coordination** (B2C) — lightweight grouping so customers at the same office can see each other's orders, volunteer to pick up for coworkers, or request someone else pick up their plate. Customer-created, no billing involvement.
+2. **Coworker Pickup Coordination** (B2C) — lightweight grouping so customers at the same office can see each other's orders, volunteer to pick up for coworkers, or request someone else pick up their vianda. Customer-created, no billing involvement.
 
 When we removed `employer_info` during the multinational institutions refactor, we lost #2. This plan restores it as a **purpose-built, lightweight model** separate from the employer billing system.
 

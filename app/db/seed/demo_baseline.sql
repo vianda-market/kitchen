@@ -13,7 +13,7 @@
 -- via the production Mapbox suggest → create flow, exercising live geocoding
 -- and the MapboxGeocodeCache (seeds/mapbox_geocode_cache.json).
 --
--- Everything else (restaurant, products, plates, plans, customers,
+-- Everything else (restaurant, products, viandas, plans, customers,
 -- subscriptions, orders, reviews) also goes through the API in Layer B.
 --
 -- Secondary supplier billing backfill lives in Layer C (demo_billing_backfill.sql),

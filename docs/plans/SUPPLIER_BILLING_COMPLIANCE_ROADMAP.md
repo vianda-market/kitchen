@@ -23,7 +23,7 @@ As vianda expands into Argentina, Peru, and USA, each market has distinct legal 
 
 These user stories drive the implementation across all phases:
 
-1. **Existing payout flow untouched** — The daily flow (`plate_selection → restaurant_transaction → restaurant_balance → bill_info → bill_payout`) continues operating as designed. Daily outbound payments keep supplier cashflow healthy.
+1. **Existing payout flow untouched** — The daily flow (`vianda_selection → restaurant_transaction → restaurant_balance → bill_info → bill_payout`) continues operating as designed. Daily outbound payments keep supplier cashflow healthy.
 
 2. **Invoice registration with bill matching** — Either a Supplier user or an Internal Operator (Clerk) registers invoices via the B2B Vianda Platform UI. The UI provides a way to select which bills the invoice covers, creating structured `bill_invoice_match` records. This ensures no gaps between invoices and related bills.
 

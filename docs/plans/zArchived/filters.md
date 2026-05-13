@@ -69,7 +69,7 @@ Migrate the `plans` entry to the new shape at the same time; keep tuple-form sup
 Register, in this order (each can be a separate PR once 3.1 lands):
 
 - **`restaurants`** — keys: `city`, `kitchen_day`, `market_id`, `cuisine` (multi-select), `search` (name + description). Drives vianda-app Explore list + map.
-- **`plates`** — keys: `status`, `market_id`, `restaurant_id`, `plate_date_from`, `plate_date_to`. Drives vianda-platform CRUD.
+- **`viandas`** — keys: `status`, `market_id`, `restaurant_id`, `vianda_date_from`, `vianda_date_to`. Drives vianda-platform CRUD.
 - **`pickups`** — keys: `status`, `market_id`, `window_from`, `window_to`. Drives vianda-platform Kiosk (static filters only; live/stream is parent plan §9.2 follow-up).
 
 For each: wire through the relevant list endpoint (enriched or CRUD) in `route_factory.py` or the route module; confirm `X-Total-Count` still sets correctly with pagination; add a Postman collection case per entity under `docs/postman/collections/`.
@@ -110,7 +110,7 @@ Index it in `docs/api/AGENT_INDEX.md`.
 
 ## 4. Acceptance criteria
 
-- [ ] All three new entities (`restaurants`, `plates`, `pickups`) are filterable through their list endpoints with the keys listed in §3.2.
+- [ ] All three new entities (`restaurants`, `viandas`, `pickups`) are filterable through their list endpoints with the keys listed in §3.2.
 - [ ] `plans/enriched` still passes its existing Postman tests (no regression from registry shape change).
 - [ ] `filters.json` exists, is generated from the registry, and matches the live behavior for at least one key per op type.
 - [ ] pytest unit coverage on `build_filter_conditions` for every op.

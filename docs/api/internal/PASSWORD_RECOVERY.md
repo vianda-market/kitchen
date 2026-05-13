@@ -238,7 +238,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 
 ### Postman Collection
 
-See `docs/postman/collections/E2E Plate Selection.postman_collection.json`:
+See `docs/postman/collections/E2E Vianda Selection.postman_collection.json`:
 - "Forgot Password" request
 - "Reset Password" request
 

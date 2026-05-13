@@ -192,8 +192,8 @@ The handler `isinstance`-checks `ctx["error"]` for `I18nValueError` and extracts
 | `validation.address.country_required` | `AddressCreateSchema` | country_code or country required when place_id absent |
 | `validation.address.field_required` | `AddressCreateSchema` | address field required when place_id absent; `params.address_field` names the field |
 | `validation.address.city_metadata_id_required` | `AddressCreateSchema` | city_metadata_id required when place_id absent |
-| `validation.plate.kitchen_days_empty` | `PlateKitchenDayCreateSchema` | kitchen_days list is empty |
-| `validation.plate.kitchen_days_duplicate` | `PlateKitchenDayCreateSchema` | duplicate days in kitchen_days |
+| `validation.vianda.kitchen_days_empty` | `ViandaKitchenDayCreateSchema` | kitchen_days list is empty |
+| `validation.vianda.kitchen_days_duplicate` | `ViandaKitchenDayCreateSchema` | duplicate days in kitchen_days |
 | `validation.discretionary.recipient_required` | `DiscretionaryCreateSchema` | user_id or restaurant_id required |
 | `validation.discretionary.conflicting_recipients` | `DiscretionaryCreateSchema` | both user_id and restaurant_id given |
 | `validation.discretionary.restaurant_required` | `DiscretionaryCreateSchema` | category requires restaurant_id |
@@ -320,7 +320,7 @@ These sites are deliberately left as bare 5xx f-strings per Decision 3. Do not m
 | `app/services/enriched_service.py` | 353 | `"Failed to get enriched {self.base_table}: {str(e)}"` |
 | `app/services/market_service.py` | 252 | `"Error retrieving markets: {str(e)}"` |
 | `app/services/market_service.py` | 560 | `"Error updating market: {str(e)}"` |
-| `app/services/entity_service.py` | 3777 | `"Failed to get enriched plate pickups: {error_msg}"` |
+| `app/services/entity_service.py` | 3777 | `"Failed to get enriched vianda pickups: {error_msg}"` |
 | `app/services/entity_service.py` | 4108–4109 | `"Failed to retrieve enriched restaurant holidays: {str(e)}"` |
 
 If lines shift during future refactors, re-anchor against the function names rather than line numbers.

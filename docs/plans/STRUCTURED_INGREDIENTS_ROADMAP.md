@@ -12,7 +12,7 @@
 
 - Display ingredients consistently in the vianda-app (React Native B2C)
 - Cross-reference the same ingredient across different suppliers and markets
-- Power a recommendation engine ("user likes plates with carrots → suggest other carrot plates")
+- Power a recommendation engine ("user likes viandas with carrots → suggest other carrot viandas")
 - Support allergen filtering or dietary warnings down the line
 
 ---
@@ -418,12 +418,12 @@ The `product_ingredient` table is the data foundation for future recommendation 
 
 **Signal path:**
 ```
-User likes plate → product_id
+User likes vianda → product_id
   → JOIN product_ingredient → ingredient_ids
   → Store as user_preference_signal(user_id, ingredient_id, weight)
 
 Candidate scoring:
-  → For a new plate, fetch its ingredient_ids
+  → For a new vianda, fetch its ingredient_ids
   → Score = sum of user's preference weight for each matching ingredient_id
   → Rank candidates by score → return as /recommendations
 ```
@@ -501,7 +501,7 @@ What Phase 5 adds (code only, no schema change):
 | **3 — Product ingredient endpoints** | `GET/POST /products/{id}/ingredients` |
 | **4 — Supplier UI** | vianda-platform: multi-select tag component (react-select); debounce 300ms; generic food icon for unenriched entries; dialect alias resolved from supplier's market |
 | **5 — Image enrichment cron** | Wikidata P18 (image) → Wikimedia Commons URL; `image_enriched` / `image_skipped` flags; CC licensed, permanent storage |
-| **6 — B2C display** | vianda-app: ingredient chips with Wikidata thumbnails on plate detail; generic icon while `image_enriched=false` |
+| **6 — B2C display** | vianda-app: ingredient chips with Wikidata thumbnails on vianda detail; generic icon while `image_enriched=false` |
 | **7 — USDA nutrition enrichment** | USDA FoodData Central cron: `usda_fdc_id`, `food_group`, `ingredient_nutrition` table; CC0, permanent storage |
 | **8 — Dialect aliases** | `ingredient_alias` table; alias-aware search; alias display driven by `market_id` |
 | **9 — Dedup admin tooling** | vianda-platform internal view: `image_skipped=true` and duplicate-taxonomy queues; merge workflow |
@@ -534,7 +534,7 @@ What Phase 5 adds (code only, no schema change):
 - `app/db/schema.sql` — `ops.product_info` (current `ingredients VARCHAR(255)` field)
 - `docs/guidelines/SCHEMA_CHANGE_GUIDE.md` — required sync order for schema additions
 - `docs/api/b2b_client/API_CLIENT_PRODUCTS.md` — existing product CRUD endpoints
-- `docs/api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md` — existing favorites signal
+- `docs/api/b2c_client/VIANDA_RECOMMENDATION_AND_FAVORITES_B2C.md` — existing favorites signal
 - Open Food Facts taxonomy API: https://wiki.openfoodfacts.org/API
 - Open Food Facts ODbL license: https://opendatacommons.org/licenses/odbl/
 - Spoonacular autocomplete: https://spoonacular.com/food-api/docs#Autocomplete-Ingredient-Search

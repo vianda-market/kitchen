@@ -51,7 +51,7 @@
       "completion_percentage": 42,
       "days_since_creation": 30,
       "days_since_last_activity": 14,
-      "missing_steps": ["entity_payout_setup", "restaurant", "plate", "kitchen_day", "qr_code"],
+      "missing_steps": ["entity_payout_setup", "restaurant", "vianda", "kitchen_day", "qr_code"],
       "created_date": "2026-03-04T10:00:00Z"
     }
   ]
@@ -90,7 +90,7 @@
 - **Archival** — `CRUDService.soft_delete()` sets `modified_date`
 - **New resource creation** — `created_date` = `modified_date` on INSERT
 
-The onboarding service computes `last_activity_date` as `GREATEST(MAX(modified_date))` across all 7 related tables (address, entity, restaurant, product, plate, kitchen_day, qr_code). No separate `institution_last_activity_date` column is needed — the computed approach is always accurate and requires no triggers.
+The onboarding service computes `last_activity_date` as `GREATEST(MAX(modified_date))` across all 7 related tables (address, entity, restaurant, product, vianda, kitchen_day, qr_code). No separate `institution_last_activity_date` column is needed — the computed approach is always accurate and requires no triggers.
 
 ---
 
@@ -116,7 +116,7 @@ Default is **7 days** for the `stalled` status in the API. Configurable per requ
 Gmail SMTP is active (`hello@vianda.market` via Google Workspace). SendGrid is provisioned and ready — infra flips `EMAIL_PROVIDER=sendgrid` when volume justifies the cost. Provider abstraction handles the switch with zero code changes. Email templates use Jinja2 with locale-specific files (en/es/pt).
 
 ### 3. next_step ordering
-Canonical dependency order: address → entity_payout_setup → restaurant → product → plate → kitchen_day → qr_code. Product comes **after** restaurant in the chain. While products can be created independently, `next_step` follows the canonical order because the guided setup wizard should direct suppliers through the recommended sequence.
+Canonical dependency order: address → entity_payout_setup → restaurant → product → vianda → kitchen_day → qr_code. Product comes **after** restaurant in the chain. While products can be created independently, `next_step` follows the canonical order because the guided setup wizard should direct suppliers through the recommended sequence.
 
 ### 4. Caching
 Computed on every request. The EXISTS subqueries are index-backed and fast. The summary endpoint uses correlated subqueries that execute in a single database round-trip. No caching needed at current scale. If performance degrades with hundreds of institutions, we can add a materialized view or Redis cache.

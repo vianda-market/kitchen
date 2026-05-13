@@ -16,11 +16,11 @@ BASE_TABLES = [
     "institution_entity_info",
     "restaurant_info",
     "product_info",
-    "plate_info",
+    "vianda_info",
     "plan_info",
     "payment_method",
     "qr_code",
-    "plate_selection_info",
+    "vianda_selection_info",
     "client_bill_info",
     "subscription_info",
     "institution_bill_info",
@@ -43,7 +43,7 @@ HISTORY_TABLES = [
     "address_history",
     "restaurant_history",
     "product_history",
-    "plate_history",
+    "vianda_history",
     "plan_history",
     "currency_metadata_history",  # replaces retired credit_currency_history
     "country_metadata_history",  # new
@@ -57,8 +57,8 @@ HISTORY_TABLES = [
     "discretionary_resolution_history",
     "national_holidays_history",
     "restaurant_holidays_history",
-    "plate_kitchen_days_history",
-    "plate_selection_history",
+    "vianda_kitchen_days_history",
+    "vianda_selection_history",
     "cuisine_history",
 ]
 
@@ -71,11 +71,11 @@ CHILD_TABLES = [
     "restaurant_transaction",
     "discretionary_info",
     "client_transaction",
-    "plate_pickup_live",
-    "plate_review_info",
+    "vianda_pickup_live",
+    "vianda_review_info",
     "pickup_preferences",
     "restaurant_holidays",
-    "plate_kitchen_days",
+    "vianda_kitchen_days",
     "coworker_pickup_notification",
     "user_messaging_preferences",
 ]

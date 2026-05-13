@@ -1,9 +1,9 @@
 """
 Tests for restaurant status validation:
 - Cannot activate without entity Stripe Connect payouts (422)
-- Cannot activate without active plate_kitchen_days (400)
+- Cannot activate without active vianda_kitchen_days (400)
 - Cannot activate without active QR code (400)
-- Succeeds when entity payouts + plate_kitchen_days + QR code are all present (200)
+- Succeeds when entity payouts + vianda_kitchen_days + QR code are all present (200)
 """
 
 from datetime import UTC, datetime
@@ -50,18 +50,18 @@ def client_with_auth(mock_current_user):
 
 
 class TestRestaurantActivationPayoutsGate:
-    """PUT /api/v1/restaurants/{id} status=Active — payouts gate runs LAST (after plate_kitchen_days + QR checks)."""
+    """PUT /api/v1/restaurants/{id} status=Active — payouts gate runs LAST (after vianda_kitchen_days + QR checks)."""
 
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_returns_422_when_entity_payouts_not_complete(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
         """Activation fails 422 with entity_payouts_required error code when Stripe Connect is incomplete.
 
-        Plate/QR checks pass so the chain reaches the payouts gate (which fires last).
+        Vianda/QR checks pass so the chain reaches the payouts gate (which fires last).
         """
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
@@ -83,11 +83,11 @@ class TestRestaurantActivationPayoutsGate:
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_payouts_check_runs_after_setup_checks(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """Payouts gate fires AFTER plate/QR checks pass — both plate and QR must be called first."""
+        """Payouts gate fires AFTER vianda/QR checks pass — both vianda and QR must be called first."""
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_has_pkd.return_value = True
@@ -101,7 +101,7 @@ class TestRestaurantActivationPayoutsGate:
         assert resp.status_code == 422
         raw = resp.json().get("detail", {})
         assert raw.get("code") == "restaurant.active_requires_entity_payouts"
-        # plate/QR checks must have been called — they fire before payouts
+        # vianda/QR checks must have been called — they fire before payouts
         mock_has_pkd.assert_called_once()
         mock_has_qr.assert_called_once()
 
@@ -109,7 +109,7 @@ class TestRestaurantActivationPayoutsGate:
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_succeeds_when_payouts_and_setup_complete(  # noqa: PLR0913
         self,
         mock_has_pkd,
@@ -119,7 +119,7 @@ class TestRestaurantActivationPayoutsGate:
         mock_get_credit_currency,
         client_with_auth,
     ):
-        """Activation succeeds when entity has payouts, plate_kitchen_days, and QR code."""
+        """Activation succeeds when entity has payouts, vianda_kitchen_days, and QR code."""
         restaurant_id = uuid4()
         inst_entity_id = uuid4()
         inst_id = uuid4()
@@ -178,11 +178,11 @@ class TestRestaurantStatusRequiresActiveQRCode:
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_returns_400_when_no_active_qr_code(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """When entity has payouts, restaurant has plate_kitchen_days but no active QR code, return 400."""
+        """When entity has payouts, restaurant has vianda_kitchen_days but no active QR code, return 400."""
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_payouts.return_value = True
@@ -203,11 +203,11 @@ class TestRestaurantStatusRequiresActiveQRCode:
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
-    def test_returns_400_when_no_plate_kitchen_days(
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
+    def test_returns_400_when_no_vianda_kitchen_days(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """When entity has payouts, restaurant has QR code but no plate_kitchen_days, return 400."""
+        """When entity has payouts, restaurant has QR code but no vianda_kitchen_days, return 400."""
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_payouts.return_value = True
@@ -222,17 +222,17 @@ class TestRestaurantStatusRequiresActiveQRCode:
         # K3+: detail is now an envelope dict; extract message for string checks.
         raw = resp.json().get("detail", "")
         detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
-        assert "plate_kitchen_days" in detail_str
+        assert "vianda_kitchen_days" in detail_str
         mock_has_pkd.assert_called_once()
 
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_returns_400_when_both_missing(
         self, mock_has_pkd, mock_has_qr, mock_payouts, mock_restaurant_service, client_with_auth
     ):
-        """When entity has payouts but restaurant has neither plate_kitchen_days nor QR code, return 400."""
+        """When entity has payouts but restaurant has neither vianda_kitchen_days nor QR code, return 400."""
         restaurant_id = uuid4()
         mock_restaurant_service.get_by_id.return_value = MagicMock(restaurant_id=restaurant_id, institution_id=uuid4())
         mock_payouts.return_value = True
@@ -247,13 +247,13 @@ class TestRestaurantStatusRequiresActiveQRCode:
         # K3+: detail is now an envelope dict; extract message for string checks.
         raw = resp.json().get("detail", "")
         detail_str = raw.get("message", "") if isinstance(raw, dict) else str(raw)
-        assert "plate_kitchen_days" in detail_str or "QR code" in detail_str
+        assert "vianda_kitchen_days" in detail_str or "QR code" in detail_str
 
     @patch("app.routes.restaurant.get_currency_metadata_id_for_restaurant")
     @patch("app.routes.restaurant.restaurant_service")
     @patch("app.routes.restaurant.restaurant_entity_has_payouts_enabled")
     @patch("app.routes.restaurant.restaurant_has_active_qr_code")
-    @patch("app.routes.restaurant.restaurant_has_active_plate_kitchen_days")
+    @patch("app.routes.restaurant.restaurant_has_active_vianda_kitchen_days")
     def test_succeeds_when_both_present(  # noqa: PLR0913
         self,
         mock_has_pkd,
@@ -263,7 +263,7 @@ class TestRestaurantStatusRequiresActiveQRCode:
         mock_get_credit_currency,
         client_with_auth,
     ):
-        """When entity has payouts, plate_kitchen_days, and QR code, status update succeeds."""
+        """When entity has payouts, vianda_kitchen_days, and QR code, status update succeeds."""
         restaurant_id = uuid4()
         inst_entity_id = uuid4()
         inst_id = uuid4()

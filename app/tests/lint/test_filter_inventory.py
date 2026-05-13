@@ -30,7 +30,7 @@ if str(_REPO_ROOT) not in sys.path:
 _JSON_ARTIFACT = _REPO_ROOT / "docs" / "api" / "filters_inventory.json"
 _MD_ARTIFACT = _REPO_ROOT / "docs" / "api" / "filters_inventory.md"
 
-_EXPECTED_ENTITIES = {"national_holidays", "pickups", "plates", "plans", "restaurants"}
+_EXPECTED_ENTITIES = {"national_holidays", "pickups", "viandas", "plans", "restaurants"}
 _REQUIRED_ROW_KEYS = {"entity", "endpoint", "model", "field", "status"}
 _VALID_STATUSES = {"unfiltered", "exempt"}
 

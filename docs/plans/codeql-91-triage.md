@@ -100,7 +100,7 @@ All 8 are at return/response lines inside `handle_business_operation` call sites
 | # | File:line | Rule | Bucket | Proposed fix |
 |---|-----------|------|--------|--------------|
 | 51 | `app/routes/national_holidays.py:63` (issue: 137) | `py/stack-trace-exposure` | FALSE-POSITIVE | Sink is `return result` after `handle_business_operation`. Exception trace is logged internally; response is sanitized. |
-| 151 | `app/routes/plate_pickup.py:233` (issue: 202) | `py/stack-trace-exposure` | FALSE-POSITIVE | Same pattern. `set_pagination_headers(response, result); return result`. |
+| 151 | `app/routes/vianda_pickup.py:233` (issue: 202) | `py/stack-trace-exposure` | FALSE-POSITIVE | Same pattern. `set_pagination_headers(response, result); return result`. |
 | 121 | `app/routes/user.py:1085` (issue: 1080) | `py/stack-trace-exposure` | FALSE-POSITIVE | `return handle_business_operation(_update_user, ...)`. Wrapper sanitizes. |
 | 123 | `app/routes/user.py:1251` (issue: 1247) | `py/stack-trace-exposure` | FALSE-POSITIVE | `return handle_business_operation(_delete_user, ...)`. Wrapper sanitizes. |
 | 124 | `app/routes/workplace_group.py:83` (issue: 81) | `py/stack-trace-exposure` | FALSE-POSITIVE | `return handle_business_operation(_create, ...)`. Wrapper sanitizes. |

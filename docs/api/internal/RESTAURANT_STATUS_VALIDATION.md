@@ -1,8 +1,8 @@
-# Restaurant Validation in Plate Selection
+# Restaurant Validation in Vianda Selection
 
 ## Overview
 
-Restaurant validation has been added to the plate selection flow to prevent customers from booking plates from restaurants that are not currently operational. This includes:
+Restaurant validation has been added to the vianda selection flow to prevent customers from booking viandas from restaurants that are not currently operational. This includes:
 
 1. **Restaurant Status** - Restaurant must be 'Active' to accept orders
 2. **Holiday Validation** - Restaurant cannot accept orders on holidays (national and restaurant-specific) - *See Future Considerations*
@@ -11,14 +11,14 @@ Restaurant validation has been added to the plate selection flow to prevent cust
 
 ### Restaurant Validation Function
 
-**Location**: `app/services/plate_selection_validation.py`
+**Location**: `app/services/vianda_selection_validation.py`
 
 **Function**: `validate_restaurant_status(restaurant: RestaurantDTO) -> None`
 
-**Purpose**: Validates that a restaurant is available for plate selection. Currently implements status validation; holiday validation is planned for future implementation.
+**Purpose**: Validates that a restaurant is available for vianda selection. Currently implements status validation; holiday validation is planned for future implementation.
 
 **Behavior**:
-- Only restaurants with status `'Active'` can accept plate selections
+- Only restaurants with status `'Active'` can accept vianda selections
 - Restaurants with other statuses (e.g., 'Inactive', 'Closed', 'Suspended', 'Maintenance') are blocked
 - Raises `HTTPException` with status code `403 Forbidden` if restaurant is not active
 - Provides user-friendly error messages based on the restaurant's status
@@ -32,19 +32,19 @@ Restaurant validation has been added to the plate selection flow to prevent cust
 
 ### Integration Point
 
-**Location**: `app/services/plate_selection_service.py`
+**Location**: `app/services/vianda_selection_service.py`
 
-**Function**: `_fetch_plate_selection_context()`
+**Function**: `_fetch_vianda_selection_context()`
 
 **Integration**: Restaurant status validation is called immediately after fetching the restaurant and before any other operations:
 
 ```python
 # Fetch restaurant
-restaurant = restaurant_service.get_by_id(plate.restaurant_id, db)
+restaurant = restaurant_service.get_by_id(vianda.restaurant_id, db)
 if not restaurant:
     raise HTTPException(status_code=404, detail=f"Restaurant not found...")
 
-# Validate restaurant status - must be 'Active' to accept plate selections
+# Validate restaurant status - must be 'Active' to accept vianda selections
 validate_restaurant_status(restaurant)  # ← NEW VALIDATION
 
 # Continue with other validations...
@@ -52,9 +52,9 @@ validate_restaurant_status(restaurant)  # ← NEW VALIDATION
 
 ### Validation Flow
 
-1. **Route**: `POST /plate-selections/` receives plate selection request
-2. **Service**: `create_plate_selection_with_transactions()` orchestrates the process
-3. **Context Fetching**: `_fetch_plate_selection_context()` fetches all required data
+1. **Route**: `POST /vianda-selections/` receives vianda selection request
+2. **Service**: `create_vianda_selection_with_transactions()` orchestrates the process
+3. **Context Fetching**: `_fetch_vianda_selection_context()` fetches all required data
 4. **Restaurant Status Check**: `validate_restaurant_status()` validates restaurant is 'Active'
 5. **Early Exit**: If restaurant is not 'Active', validation fails before any records are created
 
@@ -62,7 +62,7 @@ validate_restaurant_status(restaurant)  # ← NEW VALIDATION
 
 1. **Early Validation**: Restaurant status is checked before any database writes, preventing partial state
 2. **User-Friendly Messages**: Clear error messages explain why the restaurant cannot accept orders
-3. **Consistent Behavior**: All plate selections go through the same validation path
+3. **Consistent Behavior**: All vianda selections go through the same validation path
 4. **Logging**: Failed attempts are logged with restaurant ID and name for monitoring
 5. **Extensible**: Ready for holiday validation integration when restaurant holidays API is implemented
 
@@ -77,11 +77,11 @@ The `restaurant_info` table has a `status VARCHAR(20) NOT NULL DEFAULT 'Active'`
 - `'Suspended'` - Restaurant is suspended ❌
 - `'Maintenance'` - Restaurant is under maintenance ❌
 
-**Note**: Only `'Active'` status allows plate selections. All other statuses block plate selection.
+**Note**: Only `'Active'` status allows vianda selections. All other statuses block vianda selection.
 
 ### Error Response
 
-When a customer tries to select a plate from a non-active restaurant:
+When a customer tries to select a vianda from a non-active restaurant:
 
 **HTTP Status**: `403 Forbidden`
 
@@ -94,7 +94,7 @@ When a customer tries to select a plate from a non-active restaurant:
 
 ### Testing Scenarios
 
-1. **Active Restaurant**: ✅ Plate selection succeeds
+1. **Active Restaurant**: ✅ Vianda selection succeeds
 2. **Inactive Restaurant**: ❌ Returns 403 with appropriate message
 3. **Closed Restaurant**: ❌ Returns 403 with appropriate message
 4. **Suspended Restaurant**: ❌ Returns 403 with appropriate message
@@ -103,11 +103,11 @@ When a customer tries to select a plate from a non-active restaurant:
 
 ### Related Validations
 
-This validation works alongside other plate selection validations:
+This validation works alongside other vianda selection validations:
 
 1. **Restaurant Status** (NEW) - Restaurant must be 'Active'
-2. **Plate Availability** - Plate must exist and not be archived
-3. **Kitchen Days** - Plate must be available on the target day
+2. **Vianda Availability** - Vianda must exist and not be archived
+3. **Kitchen Days** - Vianda must be available on the target day
 4. **National Holidays** - Target day must not be a national holiday
 5. **Credit Balance** - Customer must have sufficient credits
 6. **Order Window** - Orders allowed up to 1 week ahead (today through today+7 days)
@@ -116,14 +116,14 @@ This validation works alongside other plate selection validations:
 
 ### National Holidays
 
-National holidays are currently checked during kitchen day selection (see `_find_next_available_kitchen_day_in_week()` in `plate_selection_validation.py`), which skips holidays when finding the next available day. However, restaurant-specific holiday validation is not yet implemented.
+National holidays are currently checked during kitchen day selection (see `_find_next_available_kitchen_day_in_week()` in `vianda_selection_validation.py`), which skips holidays when finding the next available day. However, restaurant-specific holiday validation is not yet implemented.
 
 **Current Behavior**:
 - National holidays are considered when determining the next available kitchen day
 - If a target day falls on a national holiday, the system automatically skips to the next available day
-- This prevents customers from selecting plates on national holidays
+- This prevents customers from selecting viandas on national holidays
 
-**Location**: `app/services/plate_selection_validation.py` → `_find_next_available_kitchen_day_in_week()`
+**Location**: `app/services/vianda_selection_validation.py` → `_find_next_available_kitchen_day_in_week()`
 
 ### Restaurant Holidays (Planned)
 

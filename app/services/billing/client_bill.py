@@ -43,7 +43,7 @@ def apply_subscription_renewal(
 ) -> None:
     """
     Apply renewal logic without a bill: set balance = rolled + plan.credit, renewal_date += 30 days.
-    Caller is responsible for when to call (e.g. cron when renewal_date <= now, or plate selection when balance < threshold and renewal_date in future).
+    Caller is responsible for when to call (e.g. cron when renewal_date <= now, or vianda selection when balance < threshold and renewal_date in future).
     """
     subscription = subscription_service.get_by_id(subscription_id, db, scope=None)
     if not subscription:

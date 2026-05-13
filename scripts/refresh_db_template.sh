@@ -49,7 +49,7 @@ set -euo pipefail
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-cdeachaval}"
-TEMPLATE_DB="kitchen_template"
+TEMVIANDA_DB="kitchen_template"
 FINGERPRINT_FILE=".kitchen-template-fingerprint"
 FORCE=0
 
@@ -117,7 +117,7 @@ _template_exists() {
     -U "${DB_USER}" \
     -d postgres \
     -tAX \
-    -c "SELECT 1 FROM pg_database WHERE datname = '${TEMPLATE_DB}';" 2>/dev/null | grep -q "^1$"
+    -c "SELECT 1 FROM pg_database WHERE datname = '${TEMVIANDA_DB}';" 2>/dev/null | grep -q "^1$"
 }
 
 # ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ _drop_clone_dbs() {
 # Full template rebuild
 # ---------------------------------------------------------------------------
 _build_template() {
-  echo "refresh_db_template: building ${TEMPLATE_DB}…"
+  echo "refresh_db_template: building ${TEMVIANDA_DB}…"
 
   # Drop stale clones first (they'd be connected to the old template schema).
   _drop_clone_dbs
@@ -165,41 +165,41 @@ _build_template() {
     -U "${DB_USER}" \
     -d postgres \
     -tAX \
-    -c "SELECT 1 FROM pg_database WHERE datname = '${TEMPLATE_DB}';" 2>/dev/null || echo "")
+    -c "SELECT 1 FROM pg_database WHERE datname = '${TEMVIANDA_DB}';" 2>/dev/null || echo "")
   if [ -n "${template_exists}" ]; then
-    echo "  unmarking and dropping old ${TEMPLATE_DB}…"
+    echo "  unmarking and dropping old ${TEMVIANDA_DB}…"
     psql \
       -h "${DB_HOST}" \
       -p "${DB_PORT}" \
       -U "${DB_USER}" \
       -d postgres \
       -q -X \
-      -c "UPDATE pg_database SET datistemplate = FALSE WHERE datname = '${TEMPLATE_DB}';" || true
+      -c "UPDATE pg_database SET datistemplate = FALSE WHERE datname = '${TEMVIANDA_DB}';" || true
     psql \
       -h "${DB_HOST}" \
       -p "${DB_PORT}" \
       -U "${DB_USER}" \
       -d postgres \
       -q -X \
-      -c "DROP DATABASE IF EXISTS \"${TEMPLATE_DB}\";" || true
+      -c "DROP DATABASE IF EXISTS \"${TEMVIANDA_DB}\";" || true
   fi
 
   # Create fresh DB from template0 (cleanest possible base).
-  echo "  creating ${TEMPLATE_DB} from template0…"
+  echo "  creating ${TEMVIANDA_DB} from template0…"
   psql \
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
     -d postgres \
     -q -X -v ON_ERROR_STOP=1 \
-    -c "CREATE DATABASE \"${TEMPLATE_DB}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';" 2>/dev/null || \
+    -c "CREATE DATABASE \"${TEMVIANDA_DB}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';" 2>/dev/null || \
   psql \
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
     -d postgres \
     -q -X -v ON_ERROR_STOP=1 \
-    -c "CREATE DATABASE \"${TEMPLATE_DB}\" TEMPLATE template0;"
+    -c "CREATE DATABASE \"${TEMVIANDA_DB}\" TEMPLATE template0;"
 
   # Set PGSSLMODE for subsequent connections.
   case "${DB_HOST}" in
@@ -213,12 +213,12 @@ _build_template() {
   export PGOPTIONS='--client-min-messages=warning'
 
   # Load schema + seed into template DB (mirrors build_kitchen_db.sh's psql block).
-  echo "  loading schema + seed into ${TEMPLATE_DB}…"
+  echo "  loading schema + seed into ${TEMVIANDA_DB}…"
   psql \
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
-    -d "${TEMPLATE_DB}" \
+    -d "${TEMVIANDA_DB}" \
     -q -X -v ON_ERROR_STOP=1 <<'SQL'
 DROP SCHEMA IF EXISTS core     CASCADE;
 DROP SCHEMA IF EXISTS ops      CASCADE;
@@ -242,7 +242,7 @@ SQL
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
-    -d "${TEMPLATE_DB}" \
+    -d "${TEMVIANDA_DB}" \
     -q -X -v ON_ERROR_STOP=1 \
     -f app/db/seed/dev_fixtures.sql
 
@@ -261,7 +261,7 @@ SQL
       -h "${DB_HOST}" \
       -p "${DB_PORT}" \
       -U "${DB_USER}" \
-      -d "${TEMPLATE_DB}" \
+      -d "${TEMVIANDA_DB}" \
       -q -X -v ON_ERROR_STOP=1 \
       -c "INSERT INTO core.schema_migration (version, name, applied_at, checksum) VALUES (${version}, '${name}', now(), '${checksum}') ON CONFLICT (version) DO NOTHING;"
   done
@@ -271,9 +271,9 @@ SQL
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
-    -d "${TEMPLATE_DB}" \
+    -d "${TEMVIANDA_DB}" \
     -q -X -v ON_ERROR_STOP=1 \
-    -c "ALTER DATABASE \"${TEMPLATE_DB}\" SET search_path = core, ops, customer, billing, audit, public;"
+    -c "ALTER DATABASE \"${TEMVIANDA_DB}\" SET search_path = core, ops, customer, billing, audit, public;"
 
   # Post-rebuild upstream sync: FX rates + national holidays.
   # This runs ONCE here; all per-worktree clones inherit the synced data for free.
@@ -291,7 +291,7 @@ SQL
       source "${_SYNC_VENV}"
       export DB_HOST DB_PORT DB_USER PGPASSWORD PGSSLMODE
       # Override DB_NAME so post_rebuild_external_sync.py targets the template DB.
-      DB_NAME="${TEMPLATE_DB}" DB_SSLMODE="${PGSSLMODE}" PYTHONPATH=. \
+      DB_NAME="${TEMVIANDA_DB}" DB_SSLMODE="${PGSSLMODE}" PYTHONPATH=. \
         python3 app/db/post_rebuild_external_sync.py
     else
       echo "  WARNING: venv not found — skipping FX/holiday sync. Set SKIP_POST_REBUILD_SYNC=1 to silence."
@@ -301,16 +301,16 @@ SQL
   fi
 
   # Mark as Postgres template — no new connections allowed; cloneable instantly.
-  echo "  marking ${TEMPLATE_DB} IS_TEMPLATE TRUE…"
+  echo "  marking ${TEMVIANDA_DB} IS_TEMPLATE TRUE…"
   psql \
     -h "${DB_HOST}" \
     -p "${DB_PORT}" \
     -U "${DB_USER}" \
     -d postgres \
     -q -X -v ON_ERROR_STOP=1 \
-    -c "UPDATE pg_database SET datistemplate = TRUE WHERE datname = '${TEMPLATE_DB}';"
+    -c "UPDATE pg_database SET datistemplate = TRUE WHERE datname = '${TEMVIANDA_DB}';"
 
-  echo "refresh_db_template: ${TEMPLATE_DB} built and marked as template."
+  echo "refresh_db_template: ${TEMVIANDA_DB} built and marked as template."
 }
 
 # ---------------------------------------------------------------------------
@@ -326,13 +326,13 @@ if [ "${FORCE}" -eq 1 ]; then
   _build_template
   echo "${CURRENT_FP}" > "${FINGERPRINT_FILE}"
 elif [ "${CURRENT_FP}" = "${STORED_FP}" ] && _template_exists; then
-  echo "refresh_db_template: fingerprint matches and ${TEMPLATE_DB} exists — no-op."
+  echo "refresh_db_template: fingerprint matches and ${TEMVIANDA_DB} exists — no-op."
   exit 0
 else
   if [ "${CURRENT_FP}" != "${STORED_FP}" ]; then
     echo "refresh_db_template: fingerprint changed (${STORED_FP:-<none>} → ${CURRENT_FP}) — rebuilding."
   else
-    echo "refresh_db_template: ${TEMPLATE_DB} not found — building."
+    echo "refresh_db_template: ${TEMVIANDA_DB} not found — building."
   fi
   _build_template
   echo "${CURRENT_FP}" > "${FINGERPRINT_FILE}"

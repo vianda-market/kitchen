@@ -1,7 +1,7 @@
 """
 Favorite API routes.
 
-Customer-only: add, remove, and list favorites (plates and restaurants).
+Customer-only: add, remove, and list favorites (viandas and restaurants).
 """
 
 from uuid import UUID
@@ -38,7 +38,7 @@ def create_favorite(
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """Add a favorite (plate or restaurant). Customer-only."""
+    """Add a favorite (vianda or restaurant). Customer-only."""
     try:
         user_id = current_user["user_id"]
         if isinstance(user_id, str):
@@ -92,7 +92,7 @@ def delete_favorite(
 
 @router.get("/me", response_model=list[FavoriteResponseSchema])
 def list_my_favorites(
-    entity_type: str | None = Query(None, description="Filter by 'plate' or 'restaurant'"),
+    entity_type: str | None = Query(None, description="Filter by 'vianda' or 'restaurant'"),
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -118,12 +118,12 @@ def get_my_favorite_ids(
     current_user: dict = Depends(get_client_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
-    """Lightweight: return plate_ids and restaurant_ids for client sorting/highlighting. Customer-only."""
+    """Lightweight: return vianda_ids and restaurant_ids for client sorting/highlighting. Customer-only."""
     user_id = current_user["user_id"]
     if isinstance(user_id, str):
         user_id = UUID(user_id)
     ids = get_favorite_ids(user_id, db)
     return FavoriteIdsResponseSchema(
-        plate_ids=ids["plate_ids"],
+        vianda_ids=ids["vianda_ids"],
         restaurant_ids=ids["restaurant_ids"],
     )

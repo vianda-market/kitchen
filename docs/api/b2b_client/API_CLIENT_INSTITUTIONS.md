@@ -131,11 +131,11 @@ Same response shape, single entity by ID.
 
 An entity **cannot be archived** if it has:
 1. Active restaurants (`is_archived = FALSE`) — archive restaurants first
-2. Active plate pickups (pending/active status) via its restaurants — complete or cancel pickups first
+2. Active vianda pickups (pending/active status) via its restaurants — complete or cancel pickups first
 
 Archiving an entity that still has active dependencies returns **409 Conflict** with a descriptive message listing what must be resolved first.
 
-A restaurant **cannot be archived** if it has pending or active plate pickups.
+A restaurant **cannot be archived** if it has pending or active vianda pickups.
 
 ---
 

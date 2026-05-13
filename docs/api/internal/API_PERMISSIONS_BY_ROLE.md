@@ -60,7 +60,7 @@ This document provides a comprehensive reference for API endpoint permissions or
 
 **Notes**:
 - All operations Employee-only (system configuration)
-- Backend can still cross-query credit_currency for plate calculations, but Suppliers cannot directly access the API
+- Backend can still cross-query credit_currency for vianda calculations, but Suppliers cannot directly access the API
 
 **Dependencies**: `get_employee_user()` for all operations
 
@@ -210,9 +210,9 @@ This document provides a comprehensive reference for API endpoint permissions or
 
 ---
 
-## 7. Plates API (`/plates/`)
+## 7. Viandas API (`/viandas/`)
 
-**Description**: Plate (meal) offerings management.
+**Description**: Vianda (meal) offerings management.
 
 | Role | GET | POST | PUT | DELETE |
 |------|-----|------|-----|--------|
@@ -221,10 +221,10 @@ This document provides a comprehensive reference for API endpoint permissions or
 | **Supplier** | ✅* | ✅* | ✅* | ✅* |
 
 **Notes**:
-- **Customers**: Can GET plates to browse and book meals (no scoping - can see all available plates)
-- **Suppliers**: Can access plates within their institution (institution scoping)
+- **Customers**: Can GET viandas to browse and book meals (no scoping - can see all available viandas)
+- **Suppliers**: Can access viandas within their institution (institution scoping)
 - **Employees**: Have global access
-- POST/PUT/DELETE restricted to Suppliers and Employees (plate management)
+- POST/PUT/DELETE restricted to Suppliers and Employees (vianda management)
 
 **Dependencies**: `get_client_or_employee_user()` for GET, `get_current_user()` with institution scoping for POST/PUT/DELETE
 
@@ -243,7 +243,7 @@ This document provides a comprehensive reference for API endpoint permissions or
 **Notes**:
 - Institution scoping applies: Suppliers can only access QR codes within their institution
 - Employees have global access
-- Customers cannot access QR code management API (they scan QR codes via plate pickup API)
+- Customers cannot access QR code management API (they scan QR codes via vianda pickup API)
 
 **Dependencies**: `get_current_user()` with institution scoping
 
@@ -325,9 +325,9 @@ This document provides a comprehensive reference for API endpoint permissions or
 
 ---
 
-## 12. Plate Selection API (`/plate-selection/`)
+## 12. Vianda Selection API (`/vianda-selection/`)
 
-**Description**: Customer plate selection and ordering.
+**Description**: Customer vianda selection and ordering.
 
 | Role | GET | POST | PUT | DELETE |
 |------|-----|------|-----|--------|
@@ -336,15 +336,15 @@ This document provides a comprehensive reference for API endpoint permissions or
 | **Supplier** | ❌ | ❌ | ❌ | ❌ |
 
 **Notes**:
-- Customers and Employees can view and create plate selections
-- Plate selections are immutable (no PUT/DELETE)
-- Suppliers cannot access plate selection API
+- Customers and Employees can view and create vianda selections
+- Vianda selections are immutable (no PUT/DELETE)
+- Suppliers cannot access vianda selection API
 
 **Dependencies**: `get_current_user()` with user context
 
 ---
 
-## 13. Plate Pickup API (`/plate-pickup/`)
+## 13. Vianda Pickup API (`/vianda-pickup/`)
 
 **Description**: QR code scanning and pickup confirmation.
 
@@ -446,7 +446,7 @@ This document provides a comprehensive reference for API endpoint permissions or
 | **Users** | ✅ (Global) | ✅ (Own) | Admin/Manager: full; Operator: read-only |
 | **Restaurants** | ✅ (Global) | ❌ | ✅ (Scoped) |
 | **Products** | ✅ (Global) | ❌ | ✅ (Scoped) |
-| **Plates** | ✅ (Global) | ✅ (View All) | ✅ (Scoped) |
+| **Viandas** | ✅ (Global) | ✅ (View All) | ✅ (Scoped) |
 | **QR Codes** | ✅ (Global) | ❌ | ✅ (Scoped) |
 | **Addresses** | ✅ (Global) | ✅ (Own) | Admin/Manager: full; Operator: read-only |
 | **Institution Entities** | ✅ (Admin/Super Admin) | ❌ | Supplier Admin (full); Manager/Operator: 403 |
@@ -458,7 +458,7 @@ This document provides a comprehensive reference for API endpoint permissions or
 |-----|----------|---------|----------|
 | **Subscriptions** | ✅ (Global) | ✅ (Own) | ❌ |
 | **Payment Methods** | ✅ (Global) | ✅ (Own) | ❌ |
-| **Plate Selection** | ✅ | ✅ | ❌ |
+| **Vianda Selection** | ✅ | ✅ | ❌ |
 
 ---
 
@@ -490,7 +490,7 @@ Access control is enforced through a centralized scoping system. See [SCOPING_SY
 
 Applied via `InstitutionScope` service, which restricts Suppliers to their `institution_id` while allowing Employees global access.
 
-**Usage**: For institution-scoped resources (restaurants, products, plates, QR codes, etc.)
+**Usage**: For institution-scoped resources (restaurants, products, viandas, QR codes, etc.)
 
 **Behavior**:
 - **Employees**: Global access (can see all institutions)
@@ -533,7 +533,7 @@ Applied via `UserScope` service, which restricts Customers to their own `user_id
   - **Admin** cannot edit (update, password reset, or delete) **Super Admin** (403 Forbidden).
 - **Institution Entities**: **Supplier Admin** and **Employee Admin/Super Admin** can access (GET, POST, PUT, DELETE). **Supplier Manager**, **Supplier Operator**, **Employee Manager/Operator**, and **Customers** receive 403 on all endpoints.
 - **Institution Creation and Management**: Only **Employee Admin** and **Super Admin** can create, update, or delete institutions. Suppliers, Employee Manager, and Employee Operator are read-only (GET only) for institutions.
-- **Plate Browsing**: Customers can GET all plates (no scoping) to browse available meals for booking. They use the Plate Selection API to actually book plates.
+- **Vianda Browsing**: Customers can GET all viandas (no scoping) to browse available meals for booking. They use the Vianda Selection API to actually book viandas.
 - **Super Admin**: Super Admin is NOT a separate role type. Super Admins have `role_type='Employee'` (from `role_type_enum`) and `role_name='Super Admin'` (from `role_name_enum`).
 - **Admin vs Super Admin (Employee)**: 
   - **Admin** (`role_type='Employee'`, `role_name='Admin'`): Can view and create discretionary requests, manage system configuration

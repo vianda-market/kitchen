@@ -44,7 +44,7 @@ Pagination is **opt-in per endpoint**. Not all list endpoints accept `page`/`pag
 | Endpoint | Paginated |
 |----------|-----------|
 | `/products` | Yes |
-| `/plates` | Yes |
+| `/viandas` | Yes |
 | `/plans` | Yes |
 | `/subscriptions` | Yes |
 | `/institutions` | Yes |
@@ -53,7 +53,7 @@ Pagination is **opt-in per endpoint**. Not all list endpoints accept `page`/`pag
 | `/payment-methods` | Yes |
 | `/qr-codes` | Yes |
 | `/geolocations` | Yes |
-| `/plate-selections` | Yes |
+| `/vianda-selections` | Yes |
 | `/countries` | No — small reference data |
 | `/currencies` | No — small reference data |
 | `/cities` | No — small reference data |
@@ -71,7 +71,7 @@ Pagination is **opt-in per endpoint**. Not all list endpoints accept `page`/`pag
 | `/addresses/enriched/search` | Yes |
 | `/restaurants/enriched` | Yes |
 | `/qr-codes/enriched` | Yes |
-| `/plate-kitchen-days/enriched` | Yes |
+| `/vianda-kitchen-days/enriched` | Yes |
 | `/restaurant-balances/enriched` | Yes |
 | `/restaurant-transactions/enriched` | Yes |
 | `/employers/enriched` | Yes |

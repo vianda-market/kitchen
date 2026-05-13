@@ -81,9 +81,9 @@ class CRUDService(Generic[T]):
                                   institution_column="institution_id")
 
             # JOIN-based scoping (institution_id on joined table)
-            service = CRUDService("plate_kitchen_days", PlateKitchenDaysDTO, "kitchen_day_id",
+            service = CRUDService("vianda_kitchen_days", ViandaKitchenDaysDTO, "kitchen_day_id",
                                   institution_join_path=[
-                                      ("INNER", "plate_info", "p", "pkd.plate_id = p.plate_id"),
+                                      ("INNER", "vianda_info", "p", "pkd.vianda_id = p.vianda_id"),
                                       ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id")
                                   ],
                                   institution_table_alias="r")
@@ -262,12 +262,12 @@ class CRUDService(Generic[T]):
         Validate that a foreign key relationship leads to an institution that matches the scope.
 
         This is used for JOIN-based scoping where we need to validate that a foreign key
-        (e.g., plate_id) points to a resource (e.g., plate) that belongs to the correct institution.
+        (e.g., vianda_id) points to a resource (e.g., vianda) that belongs to the correct institution.
 
         Args:
             db: Database connection
             scope: Institution scope to validate against
-            foreign_key_field: Name of the foreign key field (e.g., "plate_id")
+            foreign_key_field: Name of the foreign key field (e.g., "vianda_id")
             foreign_key_value: Value of the foreign key
 
         Raises:
@@ -281,21 +281,21 @@ class CRUDService(Generic[T]):
 
         # Build a query to check if the foreign key leads to the correct institution
         # We'll use the first JOIN in the path to validate
-        # For plate_kitchen_days: plate_id -> plate_info -> restaurant_info -> institution_id
+        # For vianda_kitchen_days: vianda_id -> vianda_info -> restaurant_info -> institution_id
         from app.utils.db import db_read
 
         # Find the first JOIN that connects to the foreign key
-        # For plate_kitchen_days: plate_id connects to plate_info
+        # For vianda_kitchen_days: vianda_id connects to vianda_info
         # We need to trace through the JOINs to find institution_id
         if len(self.institution_join_path) >= 1:
             # Build a validation query
-            # Example: SELECT r.institution_id FROM plate_info p INNER JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE p.plate_id = %s
+            # Example: SELECT r.institution_id FROM vianda_info p INNER JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE p.vianda_id = %s
             first_join = self.institution_join_path[0]
-            join_table = first_join[1]  # e.g., "plate_info"
+            join_table = first_join[1]  # e.g., "vianda_info"
             join_alias = first_join[2]  # e.g., "p"
-            first_join[3]  # e.g., "pkd.plate_id = p.plate_id"
+            first_join[3]  # e.g., "pkd.vianda_id = p.vianda_id"
 
-            # Extract the foreign key field from join_condition (e.g., "pkd.plate_id" -> "plate_id")
+            # Extract the foreign key field from join_condition (e.g., "pkd.vianda_id" -> "vianda_id")
             fk_field = foreign_key_field
 
             # Build query to check institution_id
@@ -345,8 +345,8 @@ class CRUDService(Generic[T]):
         elif self.institution_join_path and db:
             # Determine which foreign key to validate based on entity type
             # This is entity-specific, so we'll check common patterns
-            if "plate_id" in data:
-                self._validate_join_based_scope(db, scope, "plate_id", data.get("plate_id"))
+            if "vianda_id" in data:
+                self._validate_join_based_scope(db, scope, "vianda_id", data.get("vianda_id"))
             elif "restaurant_id" in data:
                 # For restaurant_holidays: restaurant_id -> restaurant_info -> institution_id
                 self._validate_join_based_scope(db, scope, "restaurant_id", data.get("restaurant_id"))
@@ -921,8 +921,8 @@ class CRUDService(Generic[T]):
                         raise envelope_exception(ErrorCode.SECURITY_INSTITUTION_MISMATCH, status=403, locale="en")
             elif scope and not scope.is_global and self.institution_join_path:
                 # JOIN-based scoping: validate foreign key changes
-                if "plate_id" in data:
-                    self._validate_join_based_scope(db, scope, "plate_id", data.get("plate_id"))
+                if "vianda_id" in data:
+                    self._validate_join_based_scope(db, scope, "vianda_id", data.get("vianda_id"))
                 # Add more foreign key validations as needed
 
             # Add modification timestamp only if table supports it
@@ -1321,13 +1321,13 @@ class CRUDService(Generic[T]):
     # These methods are specific to restaurant transactions and extend the
     # generic CRUD operations.
 
-    def get_by_plate_selection(self, plate_selection_id: UUID, db: psycopg2.extensions.connection) -> T | None:
-        """Get transaction by plate selection ID.
+    def get_by_vianda_selection(self, vianda_selection_id: UUID, db: psycopg2.extensions.connection) -> T | None:
+        """Get transaction by vianda selection ID.
 
         This method is specific to restaurant_transaction_service.
 
         Args:
-            plate_selection_id: Plate selection UUID
+            vianda_selection_id: Vianda selection UUID
             db: Database connection
 
         Returns:
@@ -1335,9 +1335,9 @@ class CRUDService(Generic[T]):
         """
         query = f"""
             SELECT * FROM {self.table_name}
-            WHERE plate_selection_id = %s AND is_archived = FALSE
+            WHERE vianda_selection_id = %s AND is_archived = FALSE
         """
-        result = db_read(query, (str(plate_selection_id),), connection=db, fetch_one=True)
+        result = db_read(query, (str(vianda_selection_id),), connection=db, fetch_one=True)
         return self.dto_class(**result) if result else None
 
     def mark_collected(
@@ -1553,10 +1553,6 @@ from app.dto.models import (
     PaymentMethodDTO,
     PickupPreferencesDTO,
     PlanDTO,
-    PlateDTO,
-    PlateKitchenDaysDTO,
-    PlatePickupLiveDTO,
-    PlateSelectionDTO,
     ProductDTO,
     QRCodeDTO,
     ReferralConfigDTO,
@@ -1574,6 +1570,10 @@ from app.dto.models import (
     SupplierTermsDTO,
     SupplierW9DTO,
     UserDTO,
+    ViandaDTO,
+    ViandaKitchenDaysDTO,
+    ViandaPickupLiveDTO,
+    ViandaSelectionDTO,
     WorkplaceGroupDTO,
 )
 
@@ -1584,7 +1584,7 @@ institution_service = CRUDService(
 )
 # role_service removed - role_info table deprecated, roles stored directly on user_info as enums
 product_service = CRUDService("product_info", ProductDTO, "product_id", institution_column="institution_id")
-plate_service = CRUDService("plate_info", PlateDTO, "plate_id")
+vianda_service = CRUDService("vianda_info", ViandaDTO, "vianda_id")
 restaurant_service = CRUDService("restaurant_info", RestaurantDTO, "restaurant_id", institution_column="institution_id")
 
 # Billing services
@@ -1644,22 +1644,22 @@ restaurant_transaction_service = CRUDService(
 client_transaction_service = CRUDService("client_transaction", ClientTransactionDTO, "transaction_id")
 
 
-def get_client_charge_by_plate_selection(
-    plate_selection_id: UUID, db: psycopg2.extensions.connection
+def get_client_charge_by_vianda_selection(
+    vianda_selection_id: UUID, db: psycopg2.extensions.connection
 ) -> ClientTransactionDTO | None:
-    """Get the charge transaction (source='plate_selection') for a plate selection, if promoted. Returns None if not yet charged."""
+    """Get the charge transaction (source='vianda_selection') for a vianda selection, if promoted. Returns None if not yet charged."""
     result = db_read(
         """SELECT * FROM client_transaction
-           WHERE plate_selection_id = %s AND source = 'plate_selection' AND is_archived = FALSE""",
-        (str(plate_selection_id),),
+           WHERE vianda_selection_id = %s AND source = 'vianda_selection' AND is_archived = FALSE""",
+        (str(vianda_selection_id),),
         connection=db,
         fetch_one=True,
     )
     return ClientTransactionDTO(**result) if result else None
 
 
-# Plate selection and pickup services
-plate_selection_service = CRUDService("plate_selection_info", PlateSelectionDTO, "plate_selection_id")
+# Vianda selection and pickup services
+vianda_selection_service = CRUDService("vianda_selection_info", ViandaSelectionDTO, "vianda_selection_id")
 pickup_preferences_service = CRUDService("pickup_preferences_info", PickupPreferencesDTO, "preference_id")
 
 # Subscription and plan services
@@ -1677,7 +1677,7 @@ institution_entity_service = CRUDService(
 payment_method_service = CRUDService("payment_method", PaymentMethodDTO, "payment_method_id")
 qr_code_service = CRUDService("qr_code", QRCodeDTO, "qr_code_id")
 
-# Restaurant and plate services
+# Restaurant and vianda services
 restaurant_balance_service = CRUDService(
     "restaurant_balance_info",
     RestaurantBalanceDTO,
@@ -1695,42 +1695,42 @@ restaurant_holidays_service = CRUDService(
     institution_table_alias="r",
 )
 national_holiday_service = CRUDService("national_holidays", NationalHolidayDTO, "holiday_id")
-plate_kitchen_days_service = CRUDService(
-    "plate_kitchen_days",
-    PlateKitchenDaysDTO,
-    "plate_kitchen_day_id",
+vianda_kitchen_days_service = CRUDService(
+    "vianda_kitchen_days",
+    ViandaKitchenDaysDTO,
+    "vianda_kitchen_day_id",
     institution_join_path=[
-        ("INNER", "plate_info", "p", "plate_kitchen_days.plate_id = p.plate_id"),
+        ("INNER", "vianda_info", "p", "vianda_kitchen_days.vianda_id = p.vianda_id"),
         ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
     ],
     institution_table_alias="r",
 )
-plate_pickup_live_service = CRUDService("plate_pickup_live", PlatePickupLiveDTO, "plate_pickup_id")
+vianda_pickup_live_service = CRUDService("vianda_pickup_live", ViandaPickupLiveDTO, "vianda_pickup_id")
 
 
-def get_plate_pickup_id_for_selection(plate_selection_id: UUID, db: psycopg2.extensions.connection) -> UUID | None:
-    """Get plate_pickup_id for a plate selection if it has been promoted to live. Returns None if not yet promoted."""
+def get_vianda_pickup_id_for_selection(vianda_selection_id: UUID, db: psycopg2.extensions.connection) -> UUID | None:
+    """Get vianda_pickup_id for a vianda selection if it has been promoted to live. Returns None if not yet promoted."""
     row = db_read(
-        "SELECT plate_pickup_id FROM plate_pickup_live WHERE plate_selection_id = %s AND is_archived = FALSE",
-        (str(plate_selection_id),),
+        "SELECT vianda_pickup_id FROM vianda_pickup_live WHERE vianda_selection_id = %s AND is_archived = FALSE",
+        (str(vianda_selection_id),),
         connection=db,
         fetch_one=True,
     )
-    return UUID(str(row["plate_pickup_id"])) if row else None
+    return UUID(str(row["vianda_pickup_id"])) if row else None
 
 
-def soft_delete_plate_pickups_by_plate_selection(
-    plate_selection_id: UUID, modified_by: UUID, db: psycopg2.extensions.connection
+def soft_delete_vianda_pickups_by_vianda_selection(
+    vianda_selection_id: UUID, modified_by: UUID, db: psycopg2.extensions.connection
 ) -> int:
-    """Soft-delete all plate_pickup_live records for the given plate_selection_id. Returns count deleted."""
+    """Soft-delete all vianda_pickup_live records for the given vianda_selection_id. Returns count deleted."""
     rows = db_read(
-        "SELECT plate_pickup_id FROM plate_pickup_live WHERE plate_selection_id = %s AND is_archived = FALSE",
-        (str(plate_selection_id),),
+        "SELECT vianda_pickup_id FROM vianda_pickup_live WHERE vianda_selection_id = %s AND is_archived = FALSE",
+        (str(vianda_selection_id),),
         connection=db,
     )
     count = 0
     for row in rows or []:
-        plate_pickup_live_service.soft_delete(row["plate_pickup_id"], modified_by, db)
+        vianda_pickup_live_service.soft_delete(row["vianda_pickup_id"], modified_by, db)
         count += 1
     return count
 
@@ -1917,29 +1917,29 @@ def get_by_institution_and_period(
     return institution_bill_service.get_by_institution_and_period(institution_id, period_start, period_end, connection)
 
 
-# Additional methods for plate_service
-def get_plates_by_restaurant_address(address_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
-    """Get all plates for restaurants at this address"""
+# Additional methods for vianda_service
+def get_viandas_by_restaurant_address(address_id: UUID, db: psycopg2.extensions.connection) -> list[ViandaDTO]:
+    """Get all viandas for restaurants at this address"""
     query = """
-        SELECT p.* FROM plate_info p
+        SELECT p.* FROM vianda_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
         WHERE a.address_id = %s AND p.is_archived = FALSE
         ORDER BY p.name
     """
     results = db_read(query, (str(address_id),), connection=db)
-    return [PlateDTO(**row) for row in results]
+    return [ViandaDTO(**row) for row in results]
 
 
-def get_active_plates_today_by_restaurant_address(
+def get_active_viandas_today_by_restaurant_address(
     address_id: UUID, db: psycopg2.extensions.connection
-) -> list[PlateDTO]:
-    """Get active plates for today at restaurant address"""
+) -> list[ViandaDTO]:
+    """Get active viandas for today at restaurant address"""
     query = """
-        SELECT DISTINCT p.* FROM plate_info p
+        SELECT DISTINCT p.* FROM vianda_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
-        JOIN plate_kitchen_days pkd ON p.plate_id = pkd.plate_id
+        JOIN vianda_kitchen_days pkd ON p.vianda_id = pkd.vianda_id
         WHERE a.address_id = %s
         AND p.is_archived = FALSE
         AND p.status = 'active'
@@ -1948,7 +1948,7 @@ def get_active_plates_today_by_restaurant_address(
         ORDER BY p.name
     """
     results = db_read(query, (str(address_id),), connection=db)
-    return [PlateDTO(**row) for row in results]
+    return [ViandaDTO(**row) for row in results]
 
 
 # Additional methods for credit_currency_service
@@ -1975,14 +1975,12 @@ def get_by_restaurant_id(restaurant_id: UUID, db: psycopg2.extensions.connection
     return qr_code_service.get_by_restaurant(restaurant_id, db)
 
 
-# Additional methods for plate selection service
-def get_all_by_user(user_id: UUID, db: psycopg2.extensions.connection) -> list[PlateSelectionDTO]:
-    """Get all plate selections by user"""
-    query = (
-        "SELECT * FROM plate_selection_info WHERE user_id = %s AND is_archived = FALSE ORDER BY plate_selection_id DESC"
-    )
+# Additional methods for vianda selection service
+def get_all_by_user(user_id: UUID, db: psycopg2.extensions.connection) -> list[ViandaSelectionDTO]:
+    """Get all vianda selections by user"""
+    query = "SELECT * FROM vianda_selection_info WHERE user_id = %s AND is_archived = FALSE ORDER BY vianda_selection_id DESC"
     results = db_read(query, (str(user_id),), connection=db)
-    return [PlateSelectionDTO(**row) for row in results]
+    return [ViandaSelectionDTO(**row) for row in results]
 
 
 # Additional methods for subscription service
@@ -2050,11 +2048,11 @@ def update_balance(
 
 
 # Additional methods for client transaction service
-def mark_plate_selection_complete(
+def mark_vianda_selection_complete(
     transaction_id: UUID, modified_by: UUID, db: psycopg2.extensions.connection, *, commit: bool = True
 ) -> bool:
     """
-    Mark the client transaction created during plate selection as complete.
+    Mark the client transaction created during vianda selection as complete.
 
     Args:
         transaction_id: Client transaction ID
@@ -2146,17 +2144,17 @@ def create_with_conservative_balance_update(
 
 
 # Additional methods for restaurant transaction service
-def get_by_plate_selection_id(
-    plate_selection_id: UUID, db: psycopg2.extensions.connection
+def get_by_vianda_selection_id(
+    vianda_selection_id: UUID, db: psycopg2.extensions.connection
 ) -> RestaurantTransactionDTO | None:
-    """DEPRECATED: Use restaurant_transaction_service.get_by_plate_selection() instead.
+    """DEPRECATED: Use restaurant_transaction_service.get_by_vianda_selection() instead.
 
     This function will be removed in a future version.
     Please update your code to use the service method:
         from app.services.crud_service import restaurant_transaction_service
-        restaurant_transaction_service.get_by_plate_selection(plate_selection_id, db)
+        restaurant_transaction_service.get_by_vianda_selection(vianda_selection_id, db)
     """
-    return restaurant_transaction_service.get_by_plate_selection(plate_selection_id, db)
+    return restaurant_transaction_service.get_by_vianda_selection(vianda_selection_id, db)
 
 
 def update_balance_on_transaction_creation(
@@ -2394,19 +2392,19 @@ def is_holiday(country: str, date, db: psycopg2.extensions.connection) -> bool:
     return result is not None
 
 
-# Additional methods for plate kitchen days service
+# Additional methods for vianda kitchen days service
 def get_by_restaurant_and_day(
     restaurant_id: UUID, day: str, db: psycopg2.extensions.connection
-) -> PlateKitchenDaysDTO | None:
-    """Get plate kitchen day by restaurant and day"""
-    query = "SELECT pkd.* FROM plate_kitchen_days_info pkd JOIN plate_info p ON pkd.plate_id = p.plate_id WHERE p.restaurant_id = %s AND pkd.kitchen_day = %s AND pkd.is_archived = FALSE AND p.is_archived = FALSE"
+) -> ViandaKitchenDaysDTO | None:
+    """Get vianda kitchen day by restaurant and day"""
+    query = "SELECT pkd.* FROM vianda_kitchen_days_info pkd JOIN vianda_info p ON pkd.vianda_id = p.vianda_id WHERE p.restaurant_id = %s AND pkd.kitchen_day = %s AND pkd.is_archived = FALSE AND p.is_archived = FALSE"
     result = db_read(query, (restaurant_id, day), connection=db, fetch_one=True)
-    return PlateKitchenDaysDTO(**result) if result else None
+    return ViandaKitchenDaysDTO(**result) if result else None
 
 
-# Additional methods for plate service
-def get_plates_by_user_city(user_address_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
-    """Get all plates in same city as user's address"""
+# Additional methods for vianda service
+def get_viandas_by_user_city(user_address_id: UUID, db: psycopg2.extensions.connection) -> list[ViandaDTO]:
+    """Get all viandas in same city as user's address"""
     # Get the city for the user's address
     address_query = "SELECT city FROM address_info WHERE address_id = %s AND is_archived = FALSE"
     address_result = db_read(address_query, (user_address_id,), connection=db, fetch_one=True)
@@ -2414,20 +2412,20 @@ def get_plates_by_user_city(user_address_id: UUID, db: psycopg2.extensions.conne
         return []
     city = address_result["city"]
 
-    # Query plates for restaurants in that city
+    # Query viandas for restaurants in that city
     query = """
-        SELECT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
-        FROM plate_info p
+        SELECT p.vianda_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
+        FROM vianda_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
         WHERE a.city = %s AND p.is_archived = %s
     """
     results = db_read(query, (city, False), connection=db)
-    return [PlateDTO(**row) for row in results] if results else []
+    return [ViandaDTO(**row) for row in results] if results else []
 
 
-def get_active_plates_today_by_user_city(address_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
-    """Get active plates for today in user's city (with holiday logic)"""
+def get_active_viandas_today_by_user_city(address_id: UUID, db: psycopg2.extensions.connection) -> list[ViandaDTO]:
+    """Get active viandas for today in user's city (with holiday logic)"""
 
     from app.services.date_service import get_effective_current_date, get_effective_current_day
 
@@ -2443,13 +2441,13 @@ def get_active_plates_today_by_user_city(address_id: UUID, db: psycopg2.extensio
     current_day = get_effective_current_day(timezone_str)
     get_effective_current_date(timezone_str).date()
 
-    # Get all plates for the current day
+    # Get all viandas for the current day
     query = """
-        SELECT DISTINCT p.plate_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
-        FROM plate_info p
+        SELECT DISTINCT p.vianda_id, p.product_id, p.restaurant_id, p.price, p.credit, p.delivery_time_minutes, p.is_archived, p.status, p.created_date, p.modified_by, p.modified_date
+        FROM vianda_info p
         JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
-        JOIN plate_kitchen_days pkd ON p.plate_id = pkd.plate_id
+        JOIN vianda_kitchen_days pkd ON p.vianda_id = pkd.vianda_id
         WHERE a.city = %s
           AND p.is_archived = %s
           AND p.status = %s
@@ -2460,14 +2458,14 @@ def get_active_plates_today_by_user_city(address_id: UUID, db: psycopg2.extensio
     if not results:
         return []
 
-    # Filter out plates from restaurants that are closed for holidays
-    available_plates = []
+    # Filter out viandas from restaurants that are closed for holidays
+    available_viandas = []
     for row in results:
-        plate = PlateDTO(**row)
+        vianda = ViandaDTO(**row)
         row[2]  # restaurant_id is at index 2 in the query
         # TODO: Check if restaurant is closed for holiday today
-        available_plates.append(plate)
-    return available_plates
+        available_viandas.append(vianda)
+    return available_viandas
 
 
 # Additional methods for restaurant transaction service
@@ -2549,17 +2547,17 @@ def get_by_address_id(address_id: UUID, db: psycopg2.extensions.connection) -> G
     return geolocation_service.get_by_address(address_id, db)
 
 
-# Additional methods for plate service
-def get_plates_by_currency_metadata_id(
+# Additional methods for vianda service
+def get_viandas_by_currency_metadata_id(
     currency_metadata_id: UUID, db: psycopg2.extensions.connection
-) -> list[PlateDTO]:
-    """Get all non-archived plates for a specific credit currency"""
+) -> list[ViandaDTO]:
+    """Get all non-archived viandas for a specific credit currency"""
     query = """
-        SELECT * FROM plate_info
+        SELECT * FROM vianda_info
         WHERE currency_metadata_id = %s AND is_archived = FALSE
     """
     results = db_read(query, (str(currency_metadata_id),), connection=db)
-    return [PlateDTO(**row) for row in results] if results else []
+    return [ViandaDTO(**row) for row in results] if results else []
 
 
 # =============================================================================
@@ -2584,24 +2582,24 @@ referral_transaction_service = CRUDService("referral_transaction", ReferralTrans
 workplace_group_service = CRUDService("workplace_group", WorkplaceGroupDTO, "workplace_group_id")
 
 
-def find_plate_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> PlateDTO | None:
-    """Look up a plate by its canonical_key.
+def find_vianda_by_canonical_key(canonical_key: str, db: psycopg2.extensions.connection) -> ViandaDTO | None:
+    """Look up a vianda by its canonical_key.
 
-    Returns the matching PlateDTO (including archived) or None if no plate with
-    that key exists.  Used by the PUT /plates/by-key upsert endpoint to decide
+    Returns the matching ViandaDTO (including archived) or None if no vianda with
+    that key exists.  Used by the PUT /viandas/by-key upsert endpoint to decide
     insert vs update.
     """
     query = """
-        SELECT * FROM ops.plate_info
+        SELECT * FROM ops.vianda_info
         WHERE canonical_key = %s
     """
     try:
         result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
         if not result or not isinstance(result, dict):
             return None
-        return PlateDTO(**result)
+        return ViandaDTO(**result)
     except Exception as exc:
-        log_error(f"Error finding plate by canonical_key '{canonical_key}': {exc}")
+        log_error(f"Error finding vianda by canonical_key '{canonical_key}': {exc}")
         return None
 
 
@@ -2767,26 +2765,26 @@ def find_product_by_canonical_key(canonical_key: str, db: psycopg2.extensions.co
         return None
 
 
-def find_plate_kitchen_day_by_canonical_key(
+def find_vianda_kitchen_day_by_canonical_key(
     canonical_key: str, db: psycopg2.extensions.connection
-) -> "PlateKitchenDaysDTO | None":
-    """Look up a plate kitchen day by its canonical_key.
+) -> "ViandaKitchenDaysDTO | None":
+    """Look up a vianda kitchen day by its canonical_key.
 
-    Returns the matching PlateKitchenDaysDTO (including archived) or None if no
-    row with that key exists.  Used by the PUT /plate-kitchen-days/by-key upsert
+    Returns the matching ViandaKitchenDaysDTO (including archived) or None if no
+    row with that key exists.  Used by the PUT /vianda-kitchen-days/by-key upsert
     endpoint to decide insert vs update.
     """
     query = """
-        SELECT * FROM ops.plate_kitchen_days
+        SELECT * FROM ops.vianda_kitchen_days
         WHERE canonical_key = %s
     """
     try:
         result = db_read(query, (canonical_key,), connection=db, fetch_one=True)
         if not result or not isinstance(result, dict):
             return None
-        return PlateKitchenDaysDTO(**result)
+        return ViandaKitchenDaysDTO(**result)
     except Exception as exc:
-        log_error(f"Error finding plate kitchen day by canonical_key '{canonical_key}': {exc}")
+        log_error(f"Error finding vianda kitchen day by canonical_key '{canonical_key}': {exc}")
         return None
 
 

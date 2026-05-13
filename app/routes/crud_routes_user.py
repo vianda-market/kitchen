@@ -10,7 +10,7 @@ Entities requiring user context:
 - Subscription (user_id from current_user)
 - PaymentMethod (user_id from current_user)
 - ClientBill (user_id from current_user)
-- PlateSelection (user_id from current_user)
+- ViandaSelection (user_id from current_user)
 - Any other user-owned entities
 
 Benefits:
@@ -34,8 +34,8 @@ crud_router_user.include_router(subscription_payment_router)
 crud_router_user.include_router(create_subscription_routes())
 crud_router_user.include_router(create_payment_method_routes())
 
-# Note: Plate selection routes are handled by custom business logic service
-# in app/routes/plate_selection.py instead of generic CRUD routes
+# Note: Vianda selection routes are handled by custom business logic service
+# in app/routes/vianda_selection.py instead of generic CRUD routes
 
 # Add other user-dependent routes as they are identified
 # crud_router_user.include_router(create_client_bill_routes())

@@ -8,7 +8,7 @@ and billing operations. They cannot be created or modified via API.
 
 **Important**: These endpoints are read-only. All balance updates are handled
 automatically by the system when:
-- Customers place orders (via plate selection)
+- Customers place orders (via vianda selection)
 - Customers arrive at restaurants (via QR code scan)
 - Institution bills are generated and paid
 - Transactions are processed
@@ -57,7 +57,7 @@ def get_all_enriched_restaurant_balances(
     cannot be created or modified via API.**
 
     Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Institution bills are generated and paid
     - Transactions are processed
@@ -95,7 +95,7 @@ def get_enriched_restaurant_balance(
     cannot be created or modified via API.**
 
     Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Institution bills are generated and paid
     - Transactions are processed
@@ -127,7 +127,7 @@ def get_all_restaurant_balances(
     cannot be created or modified via API.**
 
     Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Institution bills are generated and paid
     - Transactions are processed
@@ -158,7 +158,7 @@ def get_restaurant_balance(
     cannot be created or modified via API.**
 
     Restaurant balances are updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Institution bills are generated and paid
     - Transactions are processed

@@ -55,15 +55,15 @@ def _load_entity_models() -> dict[str, type]:
     from app.schemas.consolidated_schemas import (  # noqa: PLC0415
         NationalHolidayResponseSchema,  # noqa: PLC0415
         PlanEnrichedResponseSchema,
-        PlateEnrichedResponseSchema,
-        PlatePickupEnrichedResponseSchema,
         RestaurantEnrichedResponseSchema,
+        ViandaEnrichedResponseSchema,
+        ViandaPickupEnrichedResponseSchema,
     )
 
     return {
         "national_holidays": NationalHolidayResponseSchema,
-        "pickups": PlatePickupEnrichedResponseSchema,
-        "plates": PlateEnrichedResponseSchema,
+        "pickups": ViandaPickupEnrichedResponseSchema,
+        "viandas": ViandaEnrichedResponseSchema,
         "plans": PlanEnrichedResponseSchema,
         "restaurants": RestaurantEnrichedResponseSchema,
     }
@@ -74,8 +74,8 @@ def _load_entity_models() -> dict[str, type]:
 # ---------------------------------------------------------------------------
 _ENTITY_ENDPOINTS: dict[str, str] = {
     "national_holidays": "/api/v1/national-holidays",
-    "pickups": "/api/v1/plate-pickup/enriched",
-    "plates": "/api/v1/plates/enriched",
+    "pickups": "/api/v1/vianda-pickup/enriched",
+    "viandas": "/api/v1/viandas/enriched",
     "plans": "/api/v1/plans/enriched",
     "restaurants": "/api/v1/restaurants/enriched",
 }

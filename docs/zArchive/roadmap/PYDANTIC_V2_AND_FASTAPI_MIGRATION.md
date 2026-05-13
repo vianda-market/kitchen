@@ -136,7 +136,7 @@ Replace every `.dict(...)` call with `.model_dump(...)`.
 - `app/routes/billing/client_bill.py`
 - `app/services/entity_service.py` (`u.dict()`)
 - `app/services/route_factory.py` (many `create_data.dict()`, `update_data.dict(exclude_unset=True)`)
-- `app/services/plate_selection_service.py`, `archival.py`
+- `app/services/vianda_selection_service.py`, `archival.py`
 - `app/tests/services/test_employer_address_service.py`
 
 Search the repo for `.dict(` and replace with `.model_dump(` everywhere.

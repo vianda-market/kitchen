@@ -1,6 +1,6 @@
 # Archived shared client docs
 
-Historical copies of guides that were merged into **`docs/api/shared_client/`** live here for reference. Prefer the consolidated files in `shared_client` (e.g. **USER_MODEL_FOR_CLIENTS.md**, **PLATE_API_CLIENT.md**).
+Historical copies of guides that were merged into **`docs/api/shared_client/`** live here for reference. Prefer the consolidated files in `shared_client` (e.g. **USER_MODEL_FOR_CLIENTS.md**, **VIANDA_API_CLIENT.md**).
 
 | Archived file | Merged into |
 |---------------|-------------|

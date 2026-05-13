@@ -21,7 +21,7 @@ This document outlines the plan for implementing the `restaurant_holidays` API a
    - ✅ Restaurant can create recurring holidays (e.g., "We're closed every Monday")
    - ⚠️ Recurring restaurant holidays that fall on national holidays should be handled carefully
 
-2. **Plate Selection Validation**:
+2. **Vianda Selection Validation**:
    - ❌ Block if target date is a national holiday
    - ❌ Block if target date is a restaurant-specific holiday
    - ✅ Allow if target date is neither a national nor restaurant holiday
@@ -54,7 +54,7 @@ This document outlines the plan for implementing the `restaurant_holidays` API a
 
 ### Option 1: Separate Tables with Validation Logic (Recommended)
 
-**Approach**: Keep `national_holidays` and `restaurant_holidays` as separate tables, validate against both during plate selection.
+**Approach**: Keep `national_holidays` and `restaurant_holidays` as separate tables, validate against both during vianda selection.
 
 **Pros**:
 - ✅ Clear separation of concerns (national vs. restaurant)
@@ -81,7 +81,7 @@ def is_restaurant_holiday(restaurant_id: UUID, date: str, country_code: str, db)
     return False
 ```
 
-**Performance**: Two queries, but both are indexed and fast. Acceptable for plate selection validation.
+**Performance**: Two queries, but both are indexed and fast. Acceptable for vianda selection validation.
 
 ---
 
@@ -273,9 +273,9 @@ return False  # No holiday
 2. If `holiday_date` is being updated, check if new date is a national holiday
 3. Check for duplicate restaurant holiday (excluding current record)
 
-### 3. Plate Selection Validation Integration
+### 3. Vianda Selection Validation Integration
 
-**Location**: `app/services/plate_selection_validation.py`
+**Location**: `app/services/vianda_selection_validation.py`
 
 **Current Function**: `validate_restaurant_status()` (status only)
 
@@ -380,19 +380,19 @@ def _is_date_restaurant_holiday(
         return False
 ```
 
-### 4. Integration into Plate Selection Flow
+### 4. Integration into Vianda Selection Flow
 
-**Location**: `app/services/plate_selection_service.py`
+**Location**: `app/services/vianda_selection_service.py`
 
 **Current Flow**:
-1. Fetch context (plate, restaurant, address, etc.)
+1. Fetch context (vianda, restaurant, address, etc.)
 2. Validate restaurant status
 3. Determine target kitchen day
 4. Validate credits
 5. Create selection
 
 **Enhanced Flow**:
-1. Fetch context (plate, restaurant, address, etc.)
+1. Fetch context (vianda, restaurant, address, etc.)
 2. Determine target kitchen day
 3. **Calculate target date from target kitchen day**
 4. **Validate restaurant (status + holidays for target date)**
@@ -453,7 +453,7 @@ validate_restaurant(
 
 **Option A: Allow Recurring, Validate on Use** (Recommended)
 - Allow restaurants to create recurring holidays (e.g., "Closed every Monday")
-- During plate selection, check if the specific date is both:
+- During vianda selection, check if the specific date is both:
   - A recurring restaurant holiday match
   - NOT a national holiday
 - If it's a national holiday, national holiday takes precedence (no need to check restaurant holiday)
@@ -488,12 +488,12 @@ validate_restaurant(
 - [ ] Support both exact date and recurring holiday checks
 - [ ] Add unit tests for holiday checking logic
 
-### Phase 4: Integration into Plate Selection
+### Phase 4: Integration into Vianda Selection
 - [ ] Extend `validate_restaurant_status()` to `validate_restaurant()` with holiday parameters
-- [ ] Add date calculation logic in plate selection service
-- [ ] Integrate holiday validation into plate selection flow
+- [ ] Add date calculation logic in vianda selection service
+- [ ] Integrate holiday validation into vianda selection flow
 - [ ] Update error messages to distinguish national vs. restaurant holidays
-- [ ] Test plate selection blocking on restaurant holidays
+- [ ] Test vianda selection blocking on restaurant holidays
 
 ### Phase 5: Testing & Documentation
 - [ ] Create Postman collection for restaurant holidays API
@@ -534,7 +534,7 @@ If performance becomes an issue:
 1. **Country code**: **`restaurant_holidays.country_code`** is stored on the row and **derived** from `restaurant_info` → `address_info.country_code` (with name→code fallback when needed), same alpha-2 space as `national_holidays`.
 
 2. **Recurring Holiday Overlap**: Should we prevent recurring restaurant holidays that might overlap with national holidays?
-   - **Recommendation**: No - validate on specific dates during plate selection, national holidays take precedence
+   - **Recommendation**: No - validate on specific dates during vianda selection, national holidays take precedence
 
 3. **Bulk Operations**: Should bulk creation allow partial success if some dates are national holidays?
    - **Recommendation**: No - atomic rejection (all or nothing) for data consistency
@@ -543,19 +543,19 @@ If performance becomes an issue:
 
 **Architecture Decision**: **Option 1 - Separate Tables with Validation Logic**
 - Keep `national_holidays` and `restaurant_holidays` as separate tables
-- Validate against both during plate selection
+- Validate against both during vianda selection
 - Two queries are fast enough and maintain clear separation
 
 **Key Validations**:
 1. Restaurant holiday creation: Reject if date is a national holiday
-2. Plate selection: Block if date is either national or restaurant holiday
+2. Vianda selection: Block if date is either national or restaurant holiday
 3. National holidays take precedence (already enforced by validation)
 
 **Implementation Priority**:
 1. API foundation (CRUD endpoints)
 2. National holiday validation (prevent duplication)
 3. Restaurant holiday checking functions
-4. Integration into plate selection validation
+4. Integration into vianda selection validation
 
 ---
 

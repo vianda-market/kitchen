@@ -24,7 +24,7 @@ The B2C app should parse `id` and `sig` from the URL query string before calling
 
 ---
 
-## 2. `POST /api/v1/plate-pickup/scan-qr`
+## 2. `POST /api/v1/vianda-pickup/scan-qr`
 
 ### Request
 
@@ -41,14 +41,14 @@ Both fields are required. `sig` must be exactly 16 lowercase hex characters.
 
 ```json
 {
-  "plate_pickup_id": "uuid",
-  "plate_pickup_ids": ["uuid", "uuid"],
+  "vianda_pickup_id": "uuid",
+  "vianda_pickup_ids": ["uuid", "uuid"],
   "restaurant_name": "Restaurant Name",
   "restaurant_id": "uuid",
-  "plates": [
+  "viandas": [
     {
-      "plate_name": "Plate Name",
-      "plate_id": "uuid-or-null",
+      "vianda_name": "Vianda Name",
+      "vianda_id": "uuid-or-null",
       "description": null
     }
   ],
@@ -61,11 +61,11 @@ Both fields are required. `sig` must be exactly 16 lowercase hex characters.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `plate_pickup_id` | UUID | Primary pickup ID (first in list) |
-| `plate_pickup_ids` | UUID[] | All pickup IDs for this scan |
+| `vianda_pickup_id` | UUID | Primary pickup ID (first in list) |
+| `vianda_pickup_ids` | UUID[] | All pickup IDs for this scan |
 | `restaurant_name` | string | Display name for confirmation screen |
 | `restaurant_id` | UUID | Restaurant UUID |
-| `plates` | array | Plate details for display |
+| `viandas` | array | Vianda details for display |
 | `countdown_seconds` | int | Timer duration (server-configurable, currently 300) |
 | `max_extensions` | int | Max timer extensions (server-configurable, currently 3) |
 | `pickup_confirmed` | bool | Always `true` on success |
@@ -84,7 +84,7 @@ Both fields are required. `sig` must be exactly 16 lowercase hex characters.
 
 ---
 
-## 3. `POST /api/v1/plate-pickup/{id}/complete`
+## 3. `POST /api/v1/vianda-pickup/{id}/complete`
 
 ### Request (optional body)
 
@@ -96,20 +96,20 @@ Both fields are required. `sig` must be exactly 16 lowercase hex characters.
 
 | Value | Meaning |
 |-------|---------|
-| `"user_confirmed"` | User tapped "I have received my plate" (default) |
+| `"user_confirmed"` | User tapped "I have received my vianda" (default) |
 | `"timer_expired"` | All countdown extensions exhausted; timer hit 0 |
 
 If no body is sent, defaults to `"user_confirmed"` for backward compatibility.
 
 ---
 
-## 4. `POST /api/v1/plate-reviews`
+## 4. `POST /api/v1/vianda-reviews`
 
 ### Request
 
 ```json
 {
-  "plate_pickup_id": "uuid",
+  "vianda_pickup_id": "uuid",
   "stars_rating": 4,
   "portion_size_rating": 2,
   "would_order_again": true,
@@ -119,7 +119,7 @@ If no body is sent, defaults to `"user_confirmed"` for backward compatibility.
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| `plate_pickup_id` | UUID | Yes | Must be completed pickup belonging to user |
+| `vianda_pickup_id` | UUID | Yes | Must be completed pickup belonging to user |
 | `stars_rating` | int | Yes | 1-5 |
 | `portion_size_rating` | int | Yes | 1-3 |
 | `would_order_again` | bool | No | — |
@@ -131,7 +131,7 @@ Both new fields are optional and nullable. Existing clients omitting them contin
 
 ### Response (201)
 
-Same fields as request, plus: `plate_review_id`, `user_id`, `plate_id`, `is_archived`, `created_date`, `modified_date`.
+Same fields as request, plus: `vianda_review_id`, `user_id`, `vianda_id`, `is_archived`, `created_date`, `modified_date`.
 
 ---
 

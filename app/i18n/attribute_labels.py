@@ -108,11 +108,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
             "user_messaging_preferences": {
                 "notify_coworker_pickup_alert": "Coworker Pickup Alerts",
-                "notify_plate_readiness_alert": "Plate Readiness Alerts",
+                "notify_vianda_readiness_alert": "Vianda Readiness Alerts",
                 "notify_promotions_push": "Promotional Push Notifications",
                 "notify_promotions_email": "Promotional Emails",
                 "coworkers_can_see_my_orders": "Visible to Coworkers",
-                "can_participate_in_plate_pickups": "Participate in Pickups",
+                "can_participate_in_vianda_pickups": "Participate in Pickups",
             },
             "workplace_group": {
                 "name": "Workplace",
@@ -137,7 +137,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
         },
         "customer": {
-            "plate_selection_info": {
+            "vianda_selection_info": {
                 "kitchen_day": "Day",
                 "pickup_date": "Pickup Date",
                 "pickup_time_range": "Time Slot",
@@ -153,7 +153,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "action_type": "Action",
                 "action_label": "Action Label",
             },
-            "plate_pickup_live": {
+            "vianda_pickup_live": {
                 "was_collected": "Collected",
                 "arrival_time": "Arrival Time",
                 "completion_time": "Completion Time",
@@ -164,7 +164,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "qr_code_payload": "QR Code",
                 "handed_out_time": "Handed Out At",
             },
-            "plate_review_info": {
+            "vianda_review_info": {
                 "stars_rating": "Rating",
                 "portion_size_rating": "Portion Size",
                 "would_order_again": "Would Order Again",
@@ -400,8 +400,8 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "dietary": "Dietary",
                 "status": "Status",
             },
-            "plate_info": {
-                "plate_id": "Plate ID",
+            "vianda_info": {
+                "vianda_id": "Vianda ID",
                 "product_id": "Product",
                 "restaurant_id": "Restaurant",
                 "price": "Price",
@@ -421,9 +421,9 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "recurring_day": "Day",
                 "status": "Status",
             },
-            "plate_kitchen_days": {
-                "plate_kitchen_day_id": "Schedule ID",
-                "plate_id": "Plate",
+            "vianda_kitchen_days": {
+                "vianda_kitchen_day_id": "Schedule ID",
+                "vianda_id": "Vianda",
                 "kitchen_day": "Day",
                 "status": "Status",
             },
@@ -544,11 +544,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
             "user_messaging_preferences": {
                 "notify_coworker_pickup_alert": "Alertas de retiro de compañeros",
-                "notify_plate_readiness_alert": "Alertas de plato listo",
+                "notify_vianda_readiness_alert": "Alertas de plato listo",
                 "notify_promotions_push": "Notificaciones push promocionales",
                 "notify_promotions_email": "Emails promocionales",
                 "coworkers_can_see_my_orders": "Visible para compañeros",
-                "can_participate_in_plate_pickups": "Participar en retiros",
+                "can_participate_in_vianda_pickups": "Participar en retiros",
             },
             "workplace_group": {
                 "name": "Lugar de trabajo",
@@ -573,7 +573,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
         },
         "customer": {
-            "plate_selection_info": {
+            "vianda_selection_info": {
                 "kitchen_day": "Día",
                 "pickup_date": "Fecha de retiro",
                 "pickup_time_range": "Turno",
@@ -589,7 +589,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "action_type": "Acción",
                 "action_label": "Etiqueta de acción",
             },
-            "plate_pickup_live": {
+            "vianda_pickup_live": {
                 "was_collected": "Retirado",
                 "arrival_time": "Hora de llegada",
                 "completion_time": "Hora de finalización",
@@ -600,7 +600,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "qr_code_payload": "Código QR",
                 "handed_out_time": "Hora de entrega",
             },
-            "plate_review_info": {
+            "vianda_review_info": {
                 "stars_rating": "Puntuación",
                 "portion_size_rating": "Tamaño de porción",
                 "would_order_again": "Volvería a pedir",
@@ -836,8 +836,8 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "dietary": "Dieta",
                 "status": "Estado",
             },
-            "plate_info": {
-                "plate_id": "ID de plato",
+            "vianda_info": {
+                "vianda_id": "ID de plato",
                 "product_id": "Producto",
                 "restaurant_id": "Restaurante",
                 "price": "Precio",
@@ -857,9 +857,9 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "recurring_day": "Día",
                 "status": "Estado",
             },
-            "plate_kitchen_days": {
-                "plate_kitchen_day_id": "ID de programación",
-                "plate_id": "Plato",
+            "vianda_kitchen_days": {
+                "vianda_kitchen_day_id": "ID de programación",
+                "vianda_id": "Plato",
                 "kitchen_day": "Día",
                 "status": "Estado",
             },
@@ -980,11 +980,11 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
             "user_messaging_preferences": {
                 "notify_coworker_pickup_alert": "Alertas de retirada de colegas",
-                "notify_plate_readiness_alert": "Alertas de prato pronto",
+                "notify_vianda_readiness_alert": "Alertas de prato pronto",
                 "notify_promotions_push": "Notificações push promocionais",
                 "notify_promotions_email": "E-mails promocionais",
                 "coworkers_can_see_my_orders": "Visível para colegas",
-                "can_participate_in_plate_pickups": "Participar de retiradas",
+                "can_participate_in_vianda_pickups": "Participar de retiradas",
             },
             "workplace_group": {
                 "name": "Local de trabalho",
@@ -1009,7 +1009,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
             },
         },
         "customer": {
-            "plate_selection_info": {
+            "vianda_selection_info": {
                 "kitchen_day": "Dia",
                 "pickup_date": "Data de retirada",
                 "pickup_time_range": "Turno",
@@ -1025,7 +1025,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "action_type": "Ação",
                 "action_label": "Rótulo da ação",
             },
-            "plate_pickup_live": {
+            "vianda_pickup_live": {
                 "was_collected": "Retirado",
                 "arrival_time": "Hora de chegada",
                 "completion_time": "Hora de conclusão",
@@ -1036,7 +1036,7 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "qr_code_payload": "Código QR",
                 "handed_out_time": "Hora de entrega",
             },
-            "plate_review_info": {
+            "vianda_review_info": {
                 "stars_rating": "Avaliação",
                 "portion_size_rating": "Tamanho da porção",
                 "would_order_again": "Pediria novamente",
@@ -1272,8 +1272,8 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "dietary": "Dieta",
                 "status": "Status",
             },
-            "plate_info": {
-                "plate_id": "ID do prato",
+            "vianda_info": {
+                "vianda_id": "ID do prato",
                 "product_id": "Produto",
                 "restaurant_id": "Restaurante",
                 "price": "Preço",
@@ -1293,9 +1293,9 @@ ATTRIBUTE_LABELS: dict[str, dict[str, dict[str, dict[str, str]]]] = {
                 "recurring_day": "Dia",
                 "status": "Status",
             },
-            "plate_kitchen_days": {
-                "plate_kitchen_day_id": "ID de programação",
-                "plate_id": "Prato",
+            "vianda_kitchen_days": {
+                "vianda_kitchen_day_id": "ID de programação",
+                "vianda_id": "Prato",
                 "kitchen_day": "Dia",
                 "status": "Status",
             },

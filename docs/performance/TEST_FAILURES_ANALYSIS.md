@@ -79,19 +79,19 @@ subscription = subscription_service.get_by_user(user_id, db)
 
 ---
 
-#### 1.3 Plate Selection Service (5 failures)
-**Files**: `app/tests/services/test_plate_selection_service.py`
+#### 1.3 Vianda Selection Service (5 failures)
+**Files**: `app/tests/services/test_vianda_selection_service.py`
 
 **Issue**: Similar to above - tests are trying to patch functions that don't exist in the module
 
 **Failing Tests**:
-1. `test_create_plate_selection_with_transactions_handles_qr_code_not_found`
-2. `test_create_plate_selection_with_transactions_handles_currency_not_found`
-3. `test_create_plate_selection_with_transactions_handles_creation_failure`
-4. `test_create_plate_selection_with_transactions_blocks_insufficient_credits`
-5. `test_create_plate_selection_with_transactions_allows_exact_credits`
+1. `test_create_vianda_selection_with_transactions_handles_qr_code_not_found`
+2. `test_create_vianda_selection_with_transactions_handles_currency_not_found`
+3. `test_create_vianda_selection_with_transactions_handles_creation_failure`
+4. `test_create_vianda_selection_with_transactions_blocks_insufficient_credits`
+5. `test_create_vianda_selection_with_transactions_allows_exact_credits`
 
-**Likely Issue**: Tests are patching non-existent functions in `plate_selection_service` module
+**Likely Issue**: Tests are patching non-existent functions in `vianda_selection_service` module
 
 ---
 
@@ -166,12 +166,12 @@ patch('app.services.crud_service.subscription_service.get_by_user')
 
 ---
 
-#### Fix 1.3: Plate Selection Service Tests
-**File**: `app/tests/services/test_plate_selection_service.py`
+#### Fix 1.3: Vianda Selection Service Tests
+**File**: `app/tests/services/test_vianda_selection_service.py`
 
 **Action Required**:
 1. Read the test file to identify incorrect function names being patched
-2. Compare with actual `plate_selection_service.py` implementation
+2. Compare with actual `vianda_selection_service.py` implementation
 3. Update patches to match actual function names
 
 **Impact**: Fixes 5 tests
@@ -204,7 +204,7 @@ After fixes are applied:
    pytest app/tests/services/test_address_service.py -v
    pytest app/tests/services/test_credit_validation_service.py -v
    pytest app/tests/services/test_credit_loading_service.py -v
-   pytest app/tests/services/test_plate_selection_service.py -v
+   pytest app/tests/services/test_vianda_selection_service.py -v
    ```
 
 2. **Run full test suite**:
@@ -276,7 +276,7 @@ def validate_patch_path(patch_path: str) -> bool:
 |----------|----------|-------|--------|--------|
 | **P0** | Credit Validation (10) | High | Low | Critical business logic |
 | **P0** | Credit Loading (2) | High | Low | Critical for payments |
-| **P1** | Plate Selection (5) | High | Medium | User-facing feature |
+| **P1** | Vianda Selection (5) | High | Medium | User-facing feature |
 | **P2** | Address Service (3) | Medium | Low | Supporting feature |
 
 ---
@@ -284,7 +284,7 @@ def validate_patch_path(patch_path: str) -> bool:
 ## Timeline
 
 - **Immediate (30 minutes)**: Fix Credit Validation & Credit Loading (12 tests)
-- **Short-term (1 hour)**: Fix Plate Selection (5 tests)
+- **Short-term (1 hour)**: Fix Vianda Selection (5 tests)
 - **Complete (1.5 hours)**: Fix Address Service (3 tests)
 - **Follow-up (2 hours)**: Add validation helpers, update test guidelines
 
@@ -305,7 +305,7 @@ After all fixes:
 1. ✅ `app/tests/services/test_address_service.py` - 3 patches to fix
 2. ✅ `app/tests/services/test_credit_validation_service.py` - 10+ patches to fix
 3. ✅ `app/tests/services/test_credit_loading_service.py` - 2 patches to fix
-4. ✅ `app/tests/services/test_plate_selection_service.py` - 5 patches to fix (need investigation)
+4. ✅ `app/tests/services/test_vianda_selection_service.py` - 5 patches to fix (need investigation)
 
 ---
 
@@ -345,10 +345,10 @@ All 21 test failures have been successfully fixed with the following changes:
 - **Additional**: Removed redundant patches where `geolocation_service` was already mocked
 - **Impact**: All geolocation-related tests now correctly mock the service
 
-#### 4. Plate Selection Service (5 tests) ✅
+#### 4. Vianda Selection Service (5 tests) ✅
 - **Changed**: All patches from `get_by_restaurant_id` to `qr_code_service`
 - **Updated**: Mock calls to use `qr_code_service.get_by_restaurant()`
-- **File**: `app/tests/services/test_plate_selection_service.py`
+- **File**: `app/tests/services/test_vianda_selection_service.py`
 - **Impact**: All QR code validation tests now work correctly
 
 ### Key Learnings

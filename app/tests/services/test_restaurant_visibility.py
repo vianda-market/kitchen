@@ -1,5 +1,5 @@
 """
-Unit tests for restaurant_visibility helpers: restaurant_has_active_plate_kitchen_days,
+Unit tests for restaurant_visibility helpers: restaurant_has_active_vianda_kitchen_days,
 restaurant_has_active_qr_code, restaurant_entity_has_payouts_enabled.
 """
 
@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from app.services.restaurant_visibility import (
     restaurant_entity_has_payouts_enabled,
-    restaurant_has_active_plate_kitchen_days,
     restaurant_has_active_qr_code,
+    restaurant_has_active_vianda_kitchen_days,
 )
 
 
@@ -36,22 +36,22 @@ class TestRestaurantHasActiveQRCode:
         assert restaurant_has_active_qr_code(restaurant_id, mock_db) is False
 
 
-class TestRestaurantHasActivePlateKitchenDays:
-    """restaurant_has_active_plate_kitchen_days returns True/False based on DB state."""
+class TestRestaurantHasActiveViandaKitchenDays:
+    """restaurant_has_active_vianda_kitchen_days returns True/False based on DB state."""
 
     @patch("app.services.restaurant_visibility.db_read")
-    def test_returns_true_when_active_plate_kitchen_days_exists(self, mock_db_read):
+    def test_returns_true_when_active_vianda_kitchen_days_exists(self, mock_db_read):
         mock_db_read.return_value = {"1": 1}  # fetch_one returns dict or None
         restaurant_id = uuid4()
         mock_db = object()
-        assert restaurant_has_active_plate_kitchen_days(restaurant_id, mock_db) is True
+        assert restaurant_has_active_vianda_kitchen_days(restaurant_id, mock_db) is True
 
     @patch("app.services.restaurant_visibility.db_read")
     def test_returns_false_when_none(self, mock_db_read):
         mock_db_read.return_value = None
         restaurant_id = uuid4()
         mock_db = object()
-        assert restaurant_has_active_plate_kitchen_days(restaurant_id, mock_db) is False
+        assert restaurant_has_active_vianda_kitchen_days(restaurant_id, mock_db) is False
 
 
 class TestRestaurantEntityHasPayoutsEnabled:

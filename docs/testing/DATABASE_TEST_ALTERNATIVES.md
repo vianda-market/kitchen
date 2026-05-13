@@ -233,7 +233,7 @@ class TestSchemaExists:
         # History tables
         'user_history', 'institution_history', 'restaurant_history',
         # Child tables
-        'plate_selection',
+        'vianda_selection',
         # ... etc
     ]
     

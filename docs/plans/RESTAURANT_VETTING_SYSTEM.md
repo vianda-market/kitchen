@@ -86,7 +86,7 @@ Approval / Rejection
     |
     v
 Supplier Onboarding (existing flow)
-    |-- Address, entity, restaurant, product, plate, kitchen day, QR code
+    |-- Address, entity, restaurant, product, vianda, kitchen day, QR code
 ```
 
 ---

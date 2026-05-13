@@ -156,7 +156,7 @@ class CreditLoadingService:
 
             transaction_data = {
                 "restaurant_id": restaurant_id,
-                "plate_selection_id": None,
+                "vianda_selection_id": None,
                 "discretionary_id": discretionary_id,
                 "currency_metadata_id": currency_metadata_id,
                 "was_collected": False,

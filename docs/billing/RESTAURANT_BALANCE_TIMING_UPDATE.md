@@ -22,13 +22,13 @@
 
 ### Updated Methods
 
-#### 1. Order Placement (`plate_selection.py`)
+#### 1. Order Placement (`vianda_selection.py`)
 ```python
 # OLD: RestaurantTransaction.create_with_balance_update(data)
 # NEW: RestaurantTransaction.create(data)  # No immediate balance update
 ```
 
-#### 2. QR Scan - Customer Arrival (`plate_pickup.py`)
+#### 2. QR Scan - Customer Arrival (`vianda_pickup.py`)
 ```python
 # NEW: Update balance when customer actually shows up
 RestaurantTransaction.update_balance_on_arrival(
@@ -80,10 +80,10 @@ Order: 10 credits × $3.00 = $30.00
    - ✅ Added `update_balance_on_arrival()`
    - ✅ Added `process_no_show_balance_update()`
 
-2. **`app/routes/plate_selection.py`**
+2. **`app/routes/vianda_selection.py`**
    - ✅ Changed to use `RestaurantTransaction.create()` (no balance update)
 
-3. **`app/routes/plate_pickup.py`** 
+3. **`app/routes/vianda_pickup.py`** 
    - ✅ Added balance update on QR scan (customer arrival)
 
 4. **`app/tests/models/test_restaurant_balance.py`**
@@ -127,7 +127,7 @@ All tests pass and the system is ready for production with the new timing logic.
 - ✅ **Restaurants get paid fairly** based on customer behavior
 - ✅ **No-show discounts** are automatically applied
 - ✅ **Full audit trail** of all payment decisions
-- ✅ **Configurable discount rates** per restaurant/plate
+- ✅ **Configurable discount rates** per restaurant/vianda
 - ✅ **Automatic end-of-day processing** for pending orders
 
 The restaurant balance system now provides a **fair and automated** payment model that protects restaurants while encouraging customer accountability. 

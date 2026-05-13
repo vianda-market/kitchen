@@ -14,11 +14,11 @@ This document outlines opportunities to apply the DRY (Don't Repeat Yourself) pr
 4. `get_enriched_restaurants()` / `get_enriched_restaurant_by_id()`
 5. `get_enriched_qr_codes()` / `get_enriched_qr_code_by_id()`
 6. `get_enriched_products()` / `get_enriched_product_by_id()`
-7. `get_enriched_plates()` / `get_enriched_plate_by_id()`
+7. `get_enriched_viandas()` / `get_enriched_vianda_by_id()`
 8. `get_enriched_plans()` / `get_enriched_plan_by_id()`
 9. `get_enriched_subscriptions()` / `get_enriched_subscription_by_id()`
 10. `get_enriched_institution_bills()`
-11. `get_enriched_plate_pickups()`
+11. `get_enriched_vianda_pickups()`
 
 ### Common Patterns Identified
 
@@ -108,7 +108,7 @@ enriched_items = [EnrichedSchema(**result) for result in results]
 
 ### Low Priority (Affects 2-4 functions)
 
-1. **User-level Filtering**: Only in `get_enriched_plate_pickups()`
+1. **User-level Filtering**: Only in `get_enriched_vianda_pickups()`
 2. **Special JOIN Logic**: Some endpoints have unique JOIN requirements
 
 ## Proposed Refactoring Strategy

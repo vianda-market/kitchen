@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "014 INGREDIENTS_AND_FAVORITES",
-    "description": "Ingredient search (local + Open Food Facts fallback) and custom creation. Customer favorite management (plates + restaurants). Run collection 000 first (creates customer, plates, restaurants).",
+    "description": "Ingredient search (local + Open Food Facts fallback) and custom creation. Customer favorite management (viandas + restaurants). Run collection 000 first (creates customer, viandas, restaurants).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -319,7 +319,7 @@
           "response": []
         },
         {
-          "name": "Discover Plate and Get Current Favorites",
+          "name": "Discover Vianda and Get Current Favorites",
           "event": [
             {
               "listen": "prerequest",
@@ -329,24 +329,24 @@
                   "const token = pm.collectionVariables.get('authToken');",
                   "",
                   "pm.sendRequest({",
-                  "    url: baseUrl + '/api/v1/plates',",
+                  "    url: baseUrl + '/api/v1/viandas',",
                   "    method: 'GET',",
                   "    header: {",
                   "        'Authorization': 'Bearer ' + token",
                   "    }",
                   "}, function (err, res) {",
                   "    if (err) {",
-                  "        console.warn('Failed to fetch plates: ' + err);",
+                  "        console.warn('Failed to fetch viandas: ' + err);",
                   "        return;",
                   "    }",
-                  "    const plates = res.json();",
-                  "    if (Array.isArray(plates) && plates.length > 0 && plates[0].plate_id) {",
-                  "        pm.collectionVariables.set('testPlateId', plates[0].plate_id);",
-                  "        pm.environment.set('testPlateId', plates[0].plate_id);",
-                  "        pm.globals.set('testPlateId', plates[0].plate_id);",
-                  "        console.log('Found plate: ' + plates[0].plate_id);",
+                  "    const viandas = res.json();",
+                  "    if (Array.isArray(viandas) && viandas.length > 0 && viandas[0].vianda_id) {",
+                  "        pm.collectionVariables.set('testPlateId', viandas[0].vianda_id);",
+                  "        pm.environment.set('testPlateId', viandas[0].vianda_id);",
+                  "        pm.globals.set('testPlateId', viandas[0].vianda_id);",
+                  "        console.log('Found vianda: ' + viandas[0].vianda_id);",
                   "    } else {",
-                  "        console.warn('No plates found via /plates. testPlateId not set.');",
+                  "        console.warn('No viandas found via /viandas. testPlateId not set.');",
                   "    }",
                   "});"
                 ],
@@ -361,11 +361,11 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Has plate_ids and restaurant_ids arrays', function () {",
+                  "pm.test('Has vianda_ids and restaurant_ids arrays', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('plate_ids');",
+                  "    pm.expect(body).to.have.property('vianda_ids');",
                   "    pm.expect(body).to.have.property('restaurant_ids');",
-                  "    pm.expect(Array.isArray(body.plate_ids)).to.be.true;",
+                  "    pm.expect(Array.isArray(body.vianda_ids)).to.be.true;",
                   "    pm.expect(Array.isArray(body.restaurant_ids)).to.be.true;",
                   "});"
                 ],
@@ -459,7 +459,7 @@
           "response": []
         },
         {
-          "name": "Add Plate Favorite",
+          "name": "Add Vianda Favorite",
           "event": [
             {
               "listen": "prerequest",
@@ -481,7 +481,7 @@
                   "const status = pm.response.code;",
                   "",
                   "if (status === 201) {",
-                  "    pm.test('Plate favorite added', function () {",
+                  "    pm.test('Vianda favorite added', function () {",
                   "        const body = pm.response.json();",
                   "        pm.expect(body).to.have.property('favorite_id');",
                   "    });",
@@ -514,7 +514,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"entity_type\": \"plate\", \"entity_id\": \"{{testPlateId}}\"}"
+              "raw": "{\"entity_type\": \"vianda\", \"entity_id\": \"{{testPlateId}}\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/favorites",
@@ -611,11 +611,11 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Has plate_ids and restaurant_ids arrays', function () {",
+                  "pm.test('Has vianda_ids and restaurant_ids arrays', function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property('plate_ids');",
+                  "    pm.expect(body).to.have.property('vianda_ids');",
                   "    pm.expect(body).to.have.property('restaurant_ids');",
-                  "    pm.expect(Array.isArray(body.plate_ids)).to.be.true;",
+                  "    pm.expect(Array.isArray(body.vianda_ids)).to.be.true;",
                   "    pm.expect(Array.isArray(body.restaurant_ids)).to.be.true;",
                   "});"
                 ],

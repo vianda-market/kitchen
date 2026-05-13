@@ -1,7 +1,7 @@
 """
 Credit Validation Service - Business Logic for Credit Balance Validation
 
-This service handles credit validation for plate selections, ensuring users
+This service handles credit validation for vianda selections, ensuring users
 cannot go into negative credits while allowing orders that result in zero balance.
 """
 
@@ -45,7 +45,7 @@ def validate_sufficient_credits(
     user_id: UUID, required_credits: float, db: psycopg2.extensions.connection
 ) -> CreditValidationResult:
     """
-    Validate if user has sufficient credits for plate selection.
+    Validate if user has sufficient credits for vianda selection.
 
     Business Rules:
     - Allow orders when user has exactly enough credits (resulting in 0 balance)
@@ -54,7 +54,7 @@ def validate_sufficient_credits(
 
     Args:
         user_id: User ID to check credits for
-        required_credits: Credits required for the plate selection
+        required_credits: Credits required for the vianda selection
         db: Database connection
 
     Returns:
@@ -116,7 +116,7 @@ def handle_insufficient_credits(
 
     Args:
         user_id: User ID (for logging)
-        required_credits: Credits required for the plate
+        required_credits: Credits required for the vianda
         current_balance: User's current balance
 
     Returns:
@@ -126,9 +126,9 @@ def handle_insufficient_credits(
 
     # Generate user-friendly message
     if current_balance == 0:
-        message = f"You have no credits remaining. This plate costs {required_credits} credits."
+        message = f"You have no credits remaining. This vianda costs {required_credits} credits."
     else:
-        message = f"You have {current_balance} credits, but this plate costs {required_credits} credits. You need {shortfall} more credits."
+        message = f"You have {current_balance} credits, but this vianda costs {required_credits} credits. You need {shortfall} more credits."
 
     # Payment instructions (supports both current and future payment methods)
     payment_instructions = _get_payment_instructions(shortfall)
@@ -155,7 +155,7 @@ def _get_payment_instructions(shortfall: float) -> str:
         f"To add {shortfall} credits to your account:\n"
         f"1. Visit the payment page and scan the QR code\n"
         f"2. Complete your payment\n"
-        f"3. Return here to retry your plate selection\n"
+        f"3. Return here to retry your vianda selection\n"
         f"Your order will be available immediately after payment."
     )
 

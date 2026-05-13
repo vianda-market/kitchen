@@ -35,13 +35,13 @@
 ### 🔥 Issue 1: Giant Route Functions (>50 lines)
 
 **Files Affected:**
-- `app/routes/plate_selection.py` (268 lines in `create_plate_selection`)
+- `app/routes/vianda_selection.py` (268 lines in `create_vianda_selection`)
 - `app/routes/billing/institution_bill.py` (245 lines)
 - `app/routes/user.py` (multiple long functions)
 
 **Current Pattern:**
 ```python
-def create_plate_selection(payload, current_user, db):
+def create_vianda_selection(payload, current_user, db):
     # 268 lines of validation, data fetching, business logic, response building
     # Mixed abstraction levels
     # Hard to test individual pieces
@@ -50,26 +50,26 @@ def create_plate_selection(payload, current_user, db):
 **✅ Target Pattern:**
 ```python
 # Small, focused functions (<30 lines each)
-def validate_plate_payload(payload: PlateSelectionCreateSchema) -> PlatesValidation:
+def validate_vianda_payload(payload: ViandaSelectionCreateSchema) -> PlatesValidation:
     """Single responsibility: validate input data"""
     
-def fetch_required_data(plate_id: UUID, db: psycopg2.connection) -> RequiredData:
+def fetch_required_data(vianda_id: UUID, db: psycopg2.connection) -> RequiredData:
     """Single responsibility: fetch all required entities"""
     
-def calculate_target_day(plate: PlateModel, payload: PlateSelectionCreateSchema) -> str:
+def calculate_target_day(vianda: PlateModel, payload: ViandaSelectionCreateSchema) -> str:
     """Pure function: business logic calculation"""
     
-def create_plate_selection_record(data: dict, db: psycopg2.connection) -> PlateSelection:
+def create_vianda_selection_record(data: dict, db: psycopg2.connection) -> ViandaSelection:
     """Single responsibility: database operation"""
 
 # Main route orchestrates small functions
-def create_plate_selection(payload, current_user, db):
-    validation_result = validate_plate_payload(payload)
-    required_data = fetch_required_data(validation_result.plate_id, db)
-    target_day = calculate_target_day(required_data.plate, payload)
+def create_vianda_selection(payload, current_user, db):
+    validation_result = validate_vianda_payload(payload)
+    required_data = fetch_required_data(validation_result.vianda_id, db)
+    target_day = calculate_target_day(required_data.vianda, payload)
     
     selection_data = build_selection_data(payload, target_day, current_user)
-    selection = create_plate_selection_record(selection_data, db)
+    selection = create_vianda_selection_record(selection_data, db)
     
     return build_response(selection, required_data)
 ```
@@ -427,7 +427,7 @@ def validate_employer_data(user_data: dict, role_type: str) -> ValidationResult:
     """Pure function: validation logic"""
 
 # Data access becomes simple and explicit
-def fetch_plate_data(plate_id: UUID, db: psycopg2.connection) -> PlateModel:
+def fetch_vianda_data(vianda_id: UUID, db: psycopg2.connection) -> PlateModel:
     """Single responsibility: data fetching only"""
     
 def fetch_restaurant_data(restaurant_id: UUID, db: psycopg2.connection) -> RestaurantModel:
@@ -450,65 +450,65 @@ def fetch_restaurant_data(restaurant_id: UUID, db: psycopg2.connection) -> Resta
 **Current Pattern:**
 ```python
 # ❌ Try statement within main function
-@router.post("/plate-selections/")
-def create_plate_selection(payload: PlateSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
+@router.post("/vianda-selections/")
+def create_vianda_selection(payload: ViandaSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
     try:
         # 50+ lines of business logic
-        validation_result = validate_plate_payload(payload)
-        required_data = fetch_required_data(validation_result.plate_id, db)
-        target_day = calculate_target_day(required_data.plate, payload)
+        validation_result = validate_vianda_payload(payload)
+        required_data = fetch_required_data(validation_result.vianda_id, db)
+        target_day = calculate_target_day(required_data.vianda, payload)
         
         selection_data = build_selection_data(payload, target_day, current_user)
-        selection = PlateSelection.create(selection_data, connection=db)
+        selection = ViandaSelection.create(selection_data, connection=db)
         
         return build_response(selection, required_data)
     except HTTPException:
         raise
     except Exception as e:
-        log_error(f"Error creating plate selection: {e}")
+        log_error(f"Error creating vianda selection: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 ```
 
 **✅ Target Pattern:**
 ```python
 # Main route function - clean orchestration
-@router.post("/plate-selections/")
-def create_plate_selection(payload: PlateSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
-    """Orchestrate plate selection creation"""
-    return handle_plate_selection_creation(payload, current_user, db)
+@router.post("/vianda-selections/")
+def create_vianda_selection(payload: ViandaSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
+    """Orchestrate vianda selection creation"""
+    return handle_vianda_selection_creation(payload, current_user, db)
 
 # Dedicated error handling function
-def handle_plate_selection_creation(payload: PlateSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
-    """Handle plate selection creation with proper error management"""
+def handle_vianda_selection_creation(payload: ViandaSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
+    """Handle vianda selection creation with proper error management"""
     try:
         # Business logic
-        validation_result = validate_plate_payload(payload)
-        required_data = fetch_required_data(validation_result.plate_id, db)
-        target_day = calculate_target_day(required_data.plate, payload)
+        validation_result = validate_vianda_payload(payload)
+        required_data = fetch_required_data(validation_result.vianda_id, db)
+        target_day = calculate_target_day(required_data.vianda, payload)
         
         selection_data = build_selection_data(payload, target_day, current_user)
-        selection = PlateSelection.create(selection_data, connection=db)
+        selection = ViandaSelection.create(selection_data, connection=db)
         
         return build_response(selection, required_data)
     except HTTPException:
         raise
     except Exception as e:
-        log_error(f"Error creating plate selection: {e}")
+        log_error(f"Error creating vianda selection: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Alternative: Separate transaction handling
-def create_plate_selection_with_transaction(payload: PlateSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
-    """Handle plate selection creation with transaction management"""
+def create_vianda_selection_with_transaction(payload: ViandaSelectionCreateSchema, current_user: dict, db: psycopg2.connection):
+    """Handle vianda selection creation with transaction management"""
     try:
         db.begin()
         
         # Business logic
-        validation_result = validate_plate_payload(payload)
-        required_data = fetch_required_data(validation_result.plate_id, db)
-        target_day = calculate_target_day(required_data.plate, payload)
+        validation_result = validate_vianda_payload(payload)
+        required_data = fetch_required_data(validation_result.vianda_id, db)
+        target_day = calculate_target_day(required_data.vianda, payload)
         
         selection_data = build_selection_data(payload, target_day, current_user)
-        selection = PlateSelection.create(selection_data, connection=db)
+        selection = ViandaSelection.create(selection_data, connection=db)
         
         db.commit()
         return build_response(selection, required_data)
@@ -517,7 +517,7 @@ def create_plate_selection_with_transaction(payload: PlateSelectionCreateSchema,
         raise
     except Exception as e:
         db.rollback()
-        log_error(f"Plate selection creation failed: {e}")
+        log_error(f"Vianda selection creation failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 ```
 
@@ -563,7 +563,7 @@ class User(BaseModelCRUD):  # CRUD operations + business logic
 
 # ❌ Same pattern repeated in 20+ files:
 # - app/models/product.py (Product + ProductModel)
-# - app/models/plate.py (Plate + PlateModel) 
+# - app/models/vianda.py (Vianda + PlateModel) 
 # - app/models/institution.py (Institution + InstitutionModel)
 # - ... 17+ more files
 ```
@@ -603,9 +603,9 @@ class ProductDTO(BaseModel):
     modified_by: UUID
     modified_date: datetime
 
-class PlateDTO(BaseModel):
+class ViandaDTO(BaseModel):
     """Pure DTO - no functions, just data structure"""
-    plate_id: UUID
+    vianda_id: UUID
     product_id: UUID
     restaurant_id: UUID
     price: Decimal
@@ -664,7 +664,7 @@ class CRUDService(Generic[T]):
 # Specific service instances - single line each
 user_service = CRUDService("user_info", UserDTO, "user_id")
 product_service = CRUDService("product_info", ProductDTO, "product_id")
-plate_service = CRUDService("plate_info", PlateDTO, "plate_id")
+vianda_service = CRUDService("vianda_info", ViandaDTO, "vianda_id")
 institution_service = CRUDService("institution_info", InstitutionDTO, "institution_id")
 # ... 20+ more services in single file
 
@@ -728,7 +728,7 @@ def create_user_with_validation(user_data: UserDTO, db: psycopg2.connection) -> 
 
 **🏗 Centralized Model System:**
 - `BaseModelCRUD` pattern avoiding duplication across 20+ models
-- Pydantic model integration (`User.UserModel`, `Plate.PlateModel`, etc.)
+- Pydantic model integration (`User.UserModel`, `Vianda.PlateModel`, etc.)
 - Consistent CRUD operations across all entities
 
 **🗄 Database Infrastructure:**

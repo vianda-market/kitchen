@@ -1,5 +1,5 @@
 """
-Restaurant visibility: helper for "has active plate_kitchen_days" used by
+Restaurant visibility: helper for "has active vianda_kitchen_days" used by
 restaurant update validation and by leads/explorer filtering (via shared SQL pattern).
 """
 
@@ -33,19 +33,19 @@ def restaurant_entity_has_payouts_enabled(
     return row is not None
 
 
-def restaurant_has_active_plate_kitchen_days(
+def restaurant_has_active_vianda_kitchen_days(
     restaurant_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> bool:
     """
-    Return True if the restaurant has at least one non-archived plate with
-    at least one plate_kitchen_days row that is non-archived AND status = 'active'.
+    Return True if the restaurant has at least one non-archived vianda with
+    at least one vianda_kitchen_days row that is non-archived AND status = 'active'.
     Used to validate "can set restaurant to Active" and for leads/explorer visibility.
     """
     query = """
         SELECT 1
-        FROM plate_info p
-        INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        FROM vianda_info p
+        INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
           AND pkd.is_archived = FALSE
           AND pkd.status = 'active'
         WHERE p.restaurant_id = %s
@@ -76,12 +76,12 @@ def restaurant_has_active_qr_code(
     return row is not None
 
 
-# SQL fragment: restaurants that have at least one plate_kitchen_day that is non-archived AND status = 'active'.
-RESTAURANT_ACTIVE_WITH_PLATE_KITCHEN_DAYS_EXISTS = """
+# SQL fragment: restaurants that have at least one vianda_kitchen_day that is non-archived AND status = 'active'.
+RESTAURANT_ACTIVE_WITH_VIANDA_KITCHEN_DAYS_EXISTS = """
     EXISTS (
         SELECT 1
-        FROM plate_info p
-        INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+        FROM vianda_info p
+        INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
         WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
     )
 """

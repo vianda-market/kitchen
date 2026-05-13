@@ -56,7 +56,7 @@ Security implementation patterns and developer guides.
 
 ### 🍽️ [Features](./)
 Feature-specific documentation and roadmaps.
-- `PLATE_PICKUP_QR_CODE_ROADMAP.md` - **Plate pickup QR code system implementation roadmap**
+- `VIANDA_PICKUP_QR_CODE_ROADMAP.md` - **Vianda pickup QR code system implementation roadmap**
 
 ## 🚀 Quick Navigation
 

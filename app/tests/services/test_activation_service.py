@@ -6,7 +6,7 @@ _check_restaurant_prereqs) are covered by Postman collections per kitchen testin
 convention: services/ → Postman.
 
 Pure function under test:
-    compute_restaurant_missing(*, status, is_archived, has_plate_kitchen_days, has_qr)
+    compute_restaurant_missing(*, status, is_archived, has_vianda_kitchen_days, has_qr)
     → list[str]  (subset of the four known keys)
 """
 
@@ -20,7 +20,7 @@ class TestComputeRestaurantMissingAllMet:
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert result == []
@@ -29,7 +29,7 @@ class TestComputeRestaurantMissingAllMet:
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert len(result) == 0
@@ -42,7 +42,7 @@ class TestComputeRestaurantMissingStatusNotActive:
         result = compute_restaurant_missing(
             status="pending",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "status_active" in result
@@ -51,7 +51,7 @@ class TestComputeRestaurantMissingStatusNotActive:
         result = compute_restaurant_missing(
             status="inactive",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "status_active" in result
@@ -60,7 +60,7 @@ class TestComputeRestaurantMissingStatusNotActive:
         result = compute_restaurant_missing(
             status=None,
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "status_active" in result
@@ -73,7 +73,7 @@ class TestComputeRestaurantMissingArchived:
         result = compute_restaurant_missing(
             status="active",
             is_archived=True,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "not_archived" in result
@@ -83,33 +83,33 @@ class TestComputeRestaurantMissingArchived:
         result = compute_restaurant_missing(
             status="active",
             is_archived=True,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "status_active" not in result
         assert "not_archived" in result
 
 
-class TestComputeRestaurantMissingPlateKitchenDays:
-    """No plate_kitchen_days → 'plate_kitchen_days' in missing."""
+class TestComputeRestaurantMissingViandaKitchenDays:
+    """No vianda_kitchen_days → 'vianda_kitchen_days' in missing."""
 
-    def test_no_plate_kitchen_days(self):
+    def test_no_vianda_kitchen_days(self):
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=False,
+            has_vianda_kitchen_days=False,
             has_qr=True,
         )
-        assert "plate_kitchen_days" in result
+        assert "vianda_kitchen_days" in result
 
-    def test_has_plate_kitchen_days_not_in_missing(self):
+    def test_has_vianda_kitchen_days_not_in_missing(self):
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
-        assert "plate_kitchen_days" not in result
+        assert "vianda_kitchen_days" not in result
 
 
 class TestComputeRestaurantMissingQR:
@@ -119,7 +119,7 @@ class TestComputeRestaurantMissingQR:
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=False,
         )
         assert "qr" in result
@@ -128,7 +128,7 @@ class TestComputeRestaurantMissingQR:
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert "qr" not in result
@@ -141,25 +141,25 @@ class TestComputeRestaurantMissingMultiple:
         result = compute_restaurant_missing(
             status="pending",
             is_archived=True,
-            has_plate_kitchen_days=False,
+            has_vianda_kitchen_days=False,
             has_qr=False,
         )
-        assert set(result) == {"status_active", "not_archived", "plate_kitchen_days", "qr"}
+        assert set(result) == {"status_active", "not_archived", "vianda_kitchen_days", "qr"}
 
     def test_only_pkd_and_qr_missing(self):
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=False,
+            has_vianda_kitchen_days=False,
             has_qr=False,
         )
-        assert set(result) == {"plate_kitchen_days", "qr"}
+        assert set(result) == {"vianda_kitchen_days", "qr"}
 
     def test_only_status_missing(self):
         result = compute_restaurant_missing(
             status="pending",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert result == ["status_active"]
@@ -168,7 +168,7 @@ class TestComputeRestaurantMissingMultiple:
         result = compute_restaurant_missing(
             status="pending",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=False,
         )
         assert set(result) == {"status_active", "qr"}
@@ -181,7 +181,7 @@ class TestComputeRestaurantMissingReturnType:
         result = compute_restaurant_missing(
             status="active",
             is_archived=False,
-            has_plate_kitchen_days=True,
+            has_vianda_kitchen_days=True,
             has_qr=True,
         )
         assert isinstance(result, list)
@@ -190,7 +190,7 @@ class TestComputeRestaurantMissingReturnType:
         result = compute_restaurant_missing(
             status="pending",
             is_archived=True,
-            has_plate_kitchen_days=False,
+            has_vianda_kitchen_days=False,
             has_qr=False,
         )
         assert isinstance(result, list)
@@ -198,7 +198,7 @@ class TestComputeRestaurantMissingReturnType:
 
     def test_known_keys_only(self):
         """Only keys from the defined set appear in missing."""
-        known = {"status_active", "not_archived", "plate_kitchen_days", "qr"}
+        known = {"status_active", "not_archived", "vianda_kitchen_days", "qr"}
         for status in ("active", "pending", None):
             for archived in (True, False):
                 for pkd in (True, False):
@@ -206,7 +206,7 @@ class TestComputeRestaurantMissingReturnType:
                         result = compute_restaurant_missing(
                             status=status,
                             is_archived=archived,
-                            has_plate_kitchen_days=pkd,
+                            has_vianda_kitchen_days=pkd,
                             has_qr=qr,
                         )
                         assert set(result).issubset(known), (

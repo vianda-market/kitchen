@@ -59,8 +59,8 @@ from app.services.restaurant_explorer_service import (
 )
 from app.services.restaurant_visibility import (
     restaurant_entity_has_payouts_enabled,
-    restaurant_has_active_plate_kitchen_days,
     restaurant_has_active_qr_code,
+    restaurant_has_active_vianda_kitchen_days,
 )
 from app.utils.country import normalize_country_code
 from app.utils.error_messages import entity_not_found
@@ -335,7 +335,7 @@ def get_explore_pickup_windows(
 ):
     """
     Return 15-minute pickup windows for the given kitchen day in market local time.
-    Use for the "Select pickup window" modal when reserving a plate.
+    Use for the "Select pickup window" modal when reserving a vianda.
     Requires a market (send market_id or have a primary market).
     """
     if kitchen_day not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
@@ -380,7 +380,7 @@ def get_explore_pickup_windows(
     )
 
 
-# GET /restaurants/by-city — B2C explore: restaurants in a city for list/map; market + kitchen_day required for plates
+# GET /restaurants/by-city — B2C explore: restaurants in a city for list/map; market + kitchen_day required for viandas
 @router.get("/by-city", response_model=RestaurantsByCityResponseSchema)
 def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query params, not algorithmic args
     city: str = Query(..., description="City name (from dropdown)"),
@@ -388,13 +388,13 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
     market_id: UUID | None = Query(None, description="User's market; if omitted, primary market is used"),
     kitchen_day: str | None = Query(
         None,
-        description="Monday–Friday; required when using market to get plates; must be this week or next week (through next Friday)",
+        description="Monday–Friday; required when using market to get viandas; must be this week or next week (through next Friday)",
     ),
     cursor: str | None = Query(
         None, description="Opaque cursor from previous response's next_cursor (infinite scroll)"
     ),
     limit: int | None = Query(
-        None, ge=1, description="Max plates per page (clamped to 10–50); enables cursor pagination"
+        None, ge=1, description="Max viandas per page (clamped to 10–50); enables cursor pagination"
     ),
     cuisine: list[str] | None = Query(
         None,
@@ -403,15 +403,15 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
     max_credits: int | None = Query(
         None,
         ge=1,
-        description="Show only plates costing at most this many credits. Restaurants with no surviving plates are dropped.",
+        description="Show only viandas costing at most this many credits. Restaurants with no surviving viandas are dropped.",
     ),
     dietary: list[str] | None = Query(
         None,
         description=(
             "Filter by dietary flags (multi-select OR logic). "
-            "Plates must have AT LEAST ONE of the requested flags in their dietary TEXT[] column. "
+            "Viandas must have AT LEAST ONE of the requested flags in their dietary TEXT[] column. "
             "Valid values: vegan, vegetarian, gluten_free, dairy_free, nut_free, halal, kosher. "
-            "Restaurants with no surviving plates are dropped."
+            "Restaurants with no surviving viandas are dropped."
         ),
     ),
     lat: float | None = Query(
@@ -429,17 +429,17 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
 ):
     """
     Return restaurants in the given city (name, cuisine, lat/lng) for list and map.
-    When a market is used (market_id or user's primary market), kitchen_day is required to return plates.
+    When a market is used (market_id or user's primary market), kitchen_day is required to return viandas.
     kitchen_day must fall within this week and next week (next week ends Friday); otherwise 400.
     City is matched case-insensitively. Customer or Internal only; 403 for Supplier. No institution scope.
 
     Optional filter params (all backward-compatible; omit for existing behavior):
     - cuisine: multi-select cuisine names (restaurant-level OR logic).
-    - max_credits: integer threshold; plates with credit > max_credits are excluded.
-      Restaurants with 0 surviving plates after this filter are dropped.
+    - max_credits: integer threshold; viandas with credit > max_credits are excluded.
+      Restaurants with 0 surviving viandas after this filter are dropped.
     - dietary: multi-select DietaryFlag values (vegan/vegetarian/gluten_free/dairy_free/nut_free/halal/kosher).
-      Uses PostgreSQL array overlap (&&); plates match if they have AT LEAST ONE requested flag.
-      Restaurants with 0 surviving plates are dropped. Invalid flag values return 400.
+      Uses PostgreSQL array overlap (&&); viandas match if they have AT LEAST ONE requested flag.
+      Restaurants with 0 surviving viandas are dropped. Invalid flag values return 400.
     - lat/lng/radius_km: distance filter via PostGIS ST_DWithin. All three must be present together
       or all absent; mixed presence returns 400. City-vs-radius: both constraints apply (AND).
     """
@@ -500,14 +500,14 @@ def get_restaurants_by_city_route(  # noqa: PLR0913 -- declarative FastAPI Query
             raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Market")
         country = (market.get("country_code") or country).upper()
         timezone_str = market.get("timezone") or None
-        # Only require kitchen_day when the client explicitly sent market_id (so explore-with-plates works).
-        # When market is inferred from user assignment, allow omitting kitchen_day (no plates returned).
+        # Only require kitchen_day when the client explicitly sent market_id (so explore-with-viandas works).
+        # When market is inferred from user assignment, allow omitting kitchen_day (no viandas returned).
         if market_id is not None and not kitchen_day:
             raise envelope_exception(
                 ErrorCode.VALIDATION_CUSTOM,
                 status=400,
                 locale=locale,
-                msg="kitchen_day is required when using a market to get restaurant plates. Choose a weekday from this week or next week (through next Friday).",
+                msg="kitchen_day is required when using a market to get restaurant viandas. Choose a weekday from this week or next week (through next Friday).",
             )
         if kitchen_day and timezone_str:
             try:
@@ -938,19 +938,19 @@ def update_restaurant(
             update_data.pop("institution_id", None)
 
         # Setting status to Active requires:
-        # (a) active plate_kitchen_days  — wizard prerequisite (Workflow #1, Steps 2-4)
+        # (a) active vianda_kitchen_days  — wizard prerequisite (Workflow #1, Steps 2-4)
         # (b) active QR code             — wizard prerequisite (Workflow #1, Steps 2-4)
         # (c) entity with completed Stripe Connect payout onboarding — parallel flow (Workflow #5, Step 3)
         # Order matters: (a)+(b) fire first so suppliers still inside the setup wizard
         # get actionable wizard errors; (c) fires last for suppliers who have completed
         # setup but haven't finished payout onboarding.
         if update_data.get("status") == Status.ACTIVE:
-            has_plate_kitchen_days = restaurant_has_active_plate_kitchen_days(restaurant_id, db)
+            has_vianda_kitchen_days = restaurant_has_active_vianda_kitchen_days(restaurant_id, db)
             has_qr_code = restaurant_has_active_qr_code(restaurant_id, db)
-            if not has_plate_kitchen_days and not has_qr_code:
+            if not has_vianda_kitchen_days and not has_qr_code:
                 raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_SETUP, status=400, locale=locale)
-            if not has_plate_kitchen_days:
-                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS, status=400, locale=locale)
+            if not has_vianda_kitchen_days:
+                raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_VIANDA_DAYS, status=400, locale=locale)
             if not has_qr_code:
                 raise envelope_exception(ErrorCode.RESTAURANT_ACTIVE_REQUIRES_QR, status=400, locale=locale)
             if not restaurant_entity_has_payouts_enabled(restaurant_id, db):

@@ -230,7 +230,7 @@ CREATE TABLE market_info (
 
 3. `application.py` - Registered markets router
 
-4. `docs/postman/collections/E2E Plate Selection.postman_collection.json` - Updated to use markets API
+4. `docs/postman/collections/E2E Vianda Selection.postman_collection.json` - Updated to use markets API
 
 ---
 

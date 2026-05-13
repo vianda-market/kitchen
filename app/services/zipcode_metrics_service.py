@@ -32,7 +32,7 @@ def get_zipcode_metrics(
     country = country_code or ""
     requested = (zip_code or "").strip()
 
-    # 1) Get distinct postal_codes that have at least one Active restaurant with plate_kitchen_days
+    # 1) Get distinct postal_codes that have at least one Active restaurant with vianda_kitchen_days
     query_postal_codes = """
         SELECT DISTINCT a.postal_code
         FROM address_info a
@@ -42,8 +42,8 @@ def get_zipcode_metrics(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
@@ -65,7 +65,7 @@ def get_zipcode_metrics(
         else:
             matched_zipcode = postal_codes[0]
 
-    # 3) Count restaurants in matched_zipcode (Active, with plate_kitchen_days)
+    # 3) Count restaurants in matched_zipcode (Active, with vianda_kitchen_days)
     query_count = """
         SELECT COUNT(DISTINCT r.restaurant_id) AS cnt
         FROM restaurant_info r
@@ -76,8 +76,8 @@ def get_zipcode_metrics(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (

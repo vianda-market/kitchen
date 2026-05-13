@@ -9,7 +9,7 @@ E2E Customer Stripe payment method management. **Phase 2 mock only** – require
    - `PAYMENT_PROVIDER=mock` on the API server
 
 2. **Customer Auth**
-   - Run **000 E2E Plate Selection** → Client Setup (Customer Signup, Login Customer User), or
+   - Run **000 E2E Vianda Selection** → Client Setup (Customer Signup, Login Customer User), or
    - Manually create a Customer user and run **Login Customer User** in Prerequisites
    - The collection uses `clientUserAuthToken` from environment or the Login step
 

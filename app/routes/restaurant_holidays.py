@@ -32,7 +32,7 @@ from app.services.crud_service import (
 )
 from app.services.error_handling import handle_business_operation
 from app.services.market_detection import MarketDetectionService
-from app.services.plate_selection_validation import _is_date_national_holiday
+from app.services.vianda_selection_validation import _is_date_national_holiday
 from app.utils.db import db_batch_insert, db_read
 from app.utils.log import log_info, log_warning
 

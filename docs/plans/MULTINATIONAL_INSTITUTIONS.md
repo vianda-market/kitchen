@@ -255,7 +255,7 @@ Currently `customer_employer` is auto-derived by checking `employer_info` and `a
 - **`customer_employer`** — "Work". User enters an address and designates it as their workplace. Label change to "Work" in UI, enum value stays `customer_employer`.
 - **`customer_other`** — "Other". Already in the enum (`address_type_enum`) and Python enum (`AddressType.CUSTOMER_OTHER`) but **missing i18n labels** — needs labels added.
 
-The B2C app allows users to select which address to center their plate/restaurant search around. Three options: Home, Work, Other.
+The B2C app allows users to select which address to center their vianda/restaurant search around. Three options: Home, Work, Other.
 
 **Changes to `address_service.py`:** The `customer_employer` type derivation logic (lines 61-76, queries `employer_info` and `address_info.employer_id`) is **removed**. Address type is now part of the address creation/update payload — the user selects "Home", "Work", or "Other" in the B2C app. The `address_type` array field on `address_info` already supports this; it just stops being auto-derived for work addresses.
 
@@ -494,7 +494,7 @@ This is a significant refactor touching many files:
 3. **Three-tier cascade** — sensible defaults at institution level, override only when needed. Single-market institutions configure once.
 4. **Controlled expansion** — `institution_market` junction prevents uncontrolled entity creation. Admin assigns markets explicitly.
 5. **Domain simplification** — `email_domain` column on entity replaces a whole table + CRUD routes + DTO + schema. Available to all entity types for future SSO.
-6. **B2C unaffected** — JWT `market_id` is for customer plate scoping, orthogonal to institution structure.
+6. **B2C unaffected** — JWT `market_id` is for customer vianda scoping, orthogonal to institution structure.
 7. **Language via primary market** — B2B users get language from their primary market assignment. Future: market picker switches language.
 8. **Backward compatible** — single-market institutions behave exactly like today (one junction row, one entity, no overrides).
 
@@ -634,7 +634,7 @@ After implementation, the following documentation must be updated before sharing
 
 | Collection | Impact | Changes |
 |------------|--------|---------|
-| `000 E2E Plate Selection` | **High** | Institution setup creates `institution_market` row. Employer path creates entity instead of `employer_info`. `employer_id` → `employer_entity_id` on user fixtures. |
+| `000 E2E Vianda Selection` | **High** | Institution setup creates `institution_market` row. Employer path creates entity instead of `employer_info`. `employer_id` → `employer_entity_id` on user fixtures. |
 | `002 ADDRESS_AUTOCOMPLETE_AND_VALIDATION` | **Medium** | Address creation with user-selected type (Home/Work/Other). Remove any `employer_id` references on address payloads. |
 | `005 TIMEZONE_DEDUCTION_TESTS` | **Low** | Timezone derivation unchanged (from city_metadata). Verify no institution.market_id dependency. |
 | `008 ROLE AND FIELD ACCESS` | **Medium** | Address type access rules — `customer_employer` is user-selected. Entity enriched includes `email_domain`. |

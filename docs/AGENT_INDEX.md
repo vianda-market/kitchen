@@ -32,13 +32,13 @@ Docs shared by both B2B (kitchen-web) and B2C (kitchen-mobile). Single source of
 | [ADDRESSES_API_CLIENT](api/shared_client/ADDRESSES_API_CLIENT.md) | Address suggest, create (place_id or structured), CRUD |
 | [PROVINCES_API_CLIENT](api/shared_client/PROVINCES_API_CLIENT.md) | Provinces/states: Country -> Province -> City cascade |
 | [CUISINES_API_CLIENT](api/shared_client/CUISINES_API_CLIENT.md) | Cuisines API |
-| [PLATE_API_CLIENT](api/shared_client/PLATE_API_CLIENT.md) | Plate: enriched, create/update, selection, pickup pending |
+| [VIANDA_API_CLIENT](api/shared_client/VIANDA_API_CLIENT.md) | Vianda: enriched, create/update, selection, pickup pending |
 | [PLANS_FILTER_CLIENT_INTEGRATION](api/shared_client/PLANS_FILTER_CLIENT_INTEGRATION.md) | Plans filtering |
 | [ENUM_SERVICE_API](api/shared_client/ENUM_SERVICE_API.md) | Enum service endpoints |
 | [ENUM_SERVICE_SPECIFICATION](api/shared_client/ENUM_SERVICE_SPECIFICATION.md) | Enum service specification |
 | [CUSTOMER_PAYMENT_METHODS_API](api/shared_client/CUSTOMER_PAYMENT_METHODS_API.md) | Payment methods: list, add, delete, set default |
 | [PAYMENT_AND_BILLING_CLIENT_CHANGES](api/shared_client/PAYMENT_AND_BILLING_CLIENT_CHANGES.md) | Payment atomic with billing; fintech link deprecation |
-| [RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS](api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md) | Restaurant status and plate kitchen days |
+| [RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS](api/shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md) | Restaurant status and vianda kitchen days |
 | [STATUS_ON_CREATE](api/shared_client/STATUS_ON_CREATE.md) | Status on create: omit or null, backend assigns default |
 | [DEBUG_LOGGING_STRATEGY](api/shared_client/DEBUG_LOGGING_STRATEGY.md) | Debug logging: `DEBUG_PASSWORD_RECOVERY` env var |
 
@@ -92,9 +92,9 @@ B2C-specific docs for kitchen-mobile (Customer app, React Native).
 | [CUSTOMER_PAYMENT_METHODS_B2C](api/b2c_client/CUSTOMER_PAYMENT_METHODS_B2C.md) | Payment methods: list, add, delete, set default (mock) |
 | [EXPLORE_KITCHEN_DAY_B2C](api/b2c_client/EXPLORE_KITCHEN_DAY_B2C.md) | Restaurant explore with enforced kitchen day |
 | [EXPLORE_AND_SAVINGS](api/b2c_client/EXPLORE_AND_SAVINGS.md) | Explore and savings |
-| [PLATE_RECOMMENDATION_AND_FAVORITES_B2C](api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md) | Recommended badges, favorites, explore integration |
-| [PLATE_SELECTION_DUPLICATE_REPLACE](api/b2c_client/PLATE_SELECTION_DUPLICATE_REPLACE.md) | Plate selection duplicate/replace |
-| [PLATE_ALREADY_RESERVED_EXPLORE_UI](api/b2c_client/PLATE_ALREADY_RESERVED_EXPLORE_UI.md) | Plate already reserved UI in explore |
+| [VIANDA_RECOMMENDATION_AND_FAVORITES_B2C](api/b2c_client/VIANDA_RECOMMENDATION_AND_FAVORITES_B2C.md) | Recommended badges, favorites, explore integration |
+| [VIANDA_SELECTION_DUPLICATE_REPLACE](api/b2c_client/VIANDA_SELECTION_DUPLICATE_REPLACE.md) | Vianda selection duplicate/replace |
+| [VIANDA_ALREADY_RESERVED_EXPLORE_UI](api/b2c_client/VIANDA_ALREADY_RESERVED_EXPLORE_UI.md) | Vianda already reserved UI in explore |
 | [POST_RESERVATION_PICKUP_B2C](api/b2c_client/POST_RESERVATION_PICKUP_B2C.md) | Post-reservation pickup flow |
 | [PICKUP_AVAILABILITY_AT_KITCHEN_START](api/b2c_client/PICKUP_AVAILABILITY_AT_KITCHEN_START.md) | Pickup availability, deferred charging, lock |
 | [PORTION_SIZE_DISPLAY_B2C](api/b2c_client/PORTION_SIZE_DISPLAY_B2C.md) | Portion size display |

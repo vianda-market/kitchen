@@ -64,7 +64,7 @@ DROP TABLE IF EXISTS audit.institution_bill_history CASCADE;
 DROP TABLE IF EXISTS audit.discretionary_resolution_history CASCADE;
 DROP TABLE IF EXISTS billing.discretionary_resolution_info CASCADE;
 DROP TABLE IF EXISTS audit.restaurant_balance_history CASCADE;
-DROP TABLE IF EXISTS audit.plate_history CASCADE;
+DROP TABLE IF EXISTS audit.vianda_history CASCADE;
 DROP TABLE IF EXISTS audit.market_history CASCADE;
 DROP TABLE IF EXISTS core.city_info CASCADE;
 DROP TABLE IF EXISTS core.market_info CASCADE;
@@ -80,8 +80,8 @@ DROP TABLE IF EXISTS audit.national_holidays_history CASCADE;
 DROP TABLE IF EXISTS core.national_holidays CASCADE;
 DROP TABLE IF EXISTS audit.restaurant_holidays_history CASCADE;
 DROP TABLE IF EXISTS ops.restaurant_holidays CASCADE;
-DROP TABLE IF EXISTS audit.plate_kitchen_days_history CASCADE;
-DROP TABLE IF EXISTS ops.plate_kitchen_days CASCADE;
+DROP TABLE IF EXISTS audit.vianda_kitchen_days_history CASCADE;
+DROP TABLE IF EXISTS ops.vianda_kitchen_days CASCADE;
 DROP TABLE IF EXISTS customer.pickup_preferences CASCADE;
 
 -- Drop tables that are children of other base tables
@@ -100,18 +100,18 @@ DROP TABLE IF EXISTS audit.discretionary_history CASCADE;
 DROP TABLE IF EXISTS billing.discretionary_info CASCADE;
 DROP TABLE IF EXISTS billing.client_transaction CASCADE;
 DROP TABLE IF EXISTS customer.user_favorite_info CASCADE;
-DROP TABLE IF EXISTS customer.plate_review_info CASCADE;
-DROP TABLE IF EXISTS audit.plate_pickup_live_history CASCADE;
-DROP TABLE IF EXISTS customer.plate_pickup_live CASCADE;
+DROP TABLE IF EXISTS customer.vianda_review_info CASCADE;
+DROP TABLE IF EXISTS audit.vianda_pickup_live_history CASCADE;
+DROP TABLE IF EXISTS customer.vianda_pickup_live CASCADE;
 DROP TABLE IF EXISTS fintech_wallet_auth CASCADE;
 
 -- Drop remaining base/parent tables
 DROP TABLE IF EXISTS customer.notification_banner CASCADE;
 DROP TABLE IF EXISTS customer.coworker_pickup_notification CASCADE;
-DROP TABLE IF EXISTS audit.plate_selection_history CASCADE;
-DROP TABLE IF EXISTS customer.plate_selection_info CASCADE;
-DROP TABLE IF EXISTS plate_selection CASCADE;
-DROP TABLE IF EXISTS ops.plate_info CASCADE;
+DROP TABLE IF EXISTS audit.vianda_selection_history CASCADE;
+DROP TABLE IF EXISTS customer.vianda_selection_info CASCADE;
+DROP TABLE IF EXISTS vianda_selection CASCADE;
+DROP TABLE IF EXISTS ops.vianda_info CASCADE;
 DROP TABLE IF EXISTS audit.employer_bill_history CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill_line CASCADE;
 DROP TABLE IF EXISTS billing.employer_bill CASCADE;
@@ -359,7 +359,7 @@ CREATE TYPE discretionary_reason_enum AS ENUM (
 
 \echo 'Creating enum type: favorite_entity_type_enum'
 CREATE TYPE favorite_entity_type_enum AS ENUM (
-    'plate',
+    'vianda',
     'restaurant'
 );
 
@@ -2012,7 +2012,7 @@ CREATE TABLE IF NOT EXISTS core.city_metadata (
     show_in_signup_picker  BOOLEAN NOT NULL DEFAULT FALSE,  -- replaces the old city_info "is this a signup-selectable city?" role
     show_in_supplier_form  BOOLEAN NOT NULL DEFAULT FALSE,  -- supplier lead capture dropdown
     show_in_customer_form  BOOLEAN NOT NULL DEFAULT FALSE,  -- customer interest capture dropdown
-    is_served              BOOLEAN NOT NULL DEFAULT FALSE,  -- derived flag: ≥1 active restaurant w/ plates + QR
+    is_served              BOOLEAN NOT NULL DEFAULT FALSE,  -- derived flag: ≥1 active restaurant w/ viandas + QR
     is_archived            BOOLEAN NOT NULL DEFAULT FALSE,
     status                 status_enum NOT NULL DEFAULT 'pending'::status_enum,  -- 'pending' until first restaurant lands here
     centroid_lat           NUMERIC(9,6) NULL,
@@ -2065,7 +2065,7 @@ COMMENT ON COLUMN core.city_metadata.show_in_supplier_form IS
 COMMENT ON COLUMN core.city_metadata.show_in_customer_form IS
     'TRUE = city appears in the customer interest capture city dropdown.';
 COMMENT ON COLUMN core.city_metadata.is_served IS
-    'Derived flag: TRUE when ≥1 active restaurant with plates + QR code exists in this city. '
+    'Derived flag: TRUE when ≥1 active restaurant with viandas + QR code exists in this city. '
     'Set by service code on restaurant activation; not maintained by a DB trigger.';
 COMMENT ON COLUMN core.city_metadata.is_archived IS
     'Soft-delete tombstone. Archived cities are excluded from all picker queries.';
@@ -2281,11 +2281,11 @@ COMMENT ON COLUMN core.user_market_assignment.created_at IS
 CREATE TABLE IF NOT EXISTS core.user_messaging_preferences (
     user_id UUID PRIMARY KEY REFERENCES core.user_info(user_id) ON DELETE CASCADE,
     notify_coworker_pickup_alert BOOLEAN NOT NULL DEFAULT TRUE,
-    notify_plate_readiness_alert BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_vianda_readiness_alert BOOLEAN NOT NULL DEFAULT TRUE,
     notify_promotions_push BOOLEAN NOT NULL DEFAULT TRUE,
     notify_promotions_email BOOLEAN NOT NULL DEFAULT TRUE,
     coworkers_can_see_my_orders BOOLEAN NOT NULL DEFAULT TRUE,
-    can_participate_in_plate_pickups BOOLEAN NOT NULL DEFAULT TRUE,
+    can_participate_in_vianda_pickups BOOLEAN NOT NULL DEFAULT TRUE,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -2296,9 +2296,9 @@ COMMENT ON TABLE core.user_messaging_preferences IS
 COMMENT ON COLUMN core.user_messaging_preferences.user_id IS
     'PK + FK to core.user_info. One row per user.';
 COMMENT ON COLUMN core.user_messaging_preferences.notify_coworker_pickup_alert IS
-    'Whether to send push notifications when a coworker offers to pick up the user''s plate.';
-COMMENT ON COLUMN core.user_messaging_preferences.notify_plate_readiness_alert IS
-    'Whether to send push notifications when the user''s plate is ready for pickup (handed-out state).';
+    'Whether to send push notifications when a coworker offers to pick up the user''s vianda.';
+COMMENT ON COLUMN core.user_messaging_preferences.notify_vianda_readiness_alert IS
+    'Whether to send push notifications when the user''s vianda is ready for pickup (handed-out state).';
 COMMENT ON COLUMN core.user_messaging_preferences.notify_promotions_push IS
     'Whether to send promotional push notifications.';
 COMMENT ON COLUMN core.user_messaging_preferences.notify_promotions_email IS
@@ -2306,8 +2306,8 @@ COMMENT ON COLUMN core.user_messaging_preferences.notify_promotions_email IS
 COMMENT ON COLUMN core.user_messaging_preferences.coworkers_can_see_my_orders IS
     'Whether coworkers in the same workplace group can see that the user has an active order. '
     'FALSE = the user is invisible to coworker pickup coordination.';
-COMMENT ON COLUMN core.user_messaging_preferences.can_participate_in_plate_pickups IS
-    'Whether the user can offer to pick up coworkers'' plates. '
+COMMENT ON COLUMN core.user_messaging_preferences.can_participate_in_vianda_pickups IS
+    'Whether the user can offer to pick up coworkers'' viandas. '
     'FALSE = user is excluded from the coworker pickup offer flow.';
 COMMENT ON COLUMN core.user_messaging_preferences.created_date IS
     'UTC timestamp when the preferences row was created.';
@@ -2914,9 +2914,9 @@ COMMENT ON COLUMN ops.restaurant_info.is_featured IS
 COMMENT ON COLUMN ops.restaurant_info.cover_image_url IS
     'CDN URL of the restaurant''s cover image. Rendered on restaurant cards and detail pages.';
 COMMENT ON COLUMN ops.restaurant_info.average_rating IS
-    'Denormalised average star rating computed from plate_review_info. Updated by cron or post-review trigger.';
+    'Denormalised average star rating computed from vianda_review_info. Updated by cron or post-review trigger.';
 COMMENT ON COLUMN ops.restaurant_info.review_count IS
-    'Denormalised count of approved plate reviews. Updated alongside average_rating.';
+    'Denormalised count of approved vianda reviews. Updated alongside average_rating.';
 COMMENT ON COLUMN ops.restaurant_info.verified_badge IS
     'When TRUE, restaurant has passed quality verification. Shown as a badge on detail pages.';
 COMMENT ON COLUMN ops.restaurant_info.spotlight_label IS
@@ -3145,7 +3145,7 @@ CREATE TABLE IF NOT EXISTS ops.product_info (
 
 COMMENT ON TABLE ops.product_info IS
     'Supplier-owned meal product (dish) definition. '
-    'A product is a reusable recipe; one product can be offered at multiple restaurants as separate plate_info rows. '
+    'A product is a reusable recipe; one product can be offered at multiple restaurants as separate vianda_info rows. '
     'Holds name, ingredient list, dietary flags, description, and image assets.';
 COMMENT ON COLUMN ops.product_info.product_id IS
     'UUIDv7 primary key. Time-ordered.';
@@ -3156,17 +3156,17 @@ COMMENT ON COLUMN ops.product_info.name IS
 COMMENT ON COLUMN ops.product_info.name_i18n IS
     'JSONB map of locale → translated product name. NULL until translations are provided.';
 COMMENT ON COLUMN ops.product_info.ingredients IS
-    'Free-text ingredient list in the primary locale. Displayed on the plate detail screen.';
+    'Free-text ingredient list in the primary locale. Displayed on the vianda detail screen.';
 COMMENT ON COLUMN ops.product_info.ingredients_i18n IS
     'JSONB map of locale → translated ingredient list text.';
 COMMENT ON COLUMN ops.product_info.description IS
-    'Short description of the product shown on explore and plate detail screens.';
+    'Short description of the product shown on explore and vianda detail screens.';
 COMMENT ON COLUMN ops.product_info.description_i18n IS
     'JSONB map of locale → translated product description.';
 COMMENT ON COLUMN ops.product_info.dietary IS
     'Array of dietary attribute slugs (e.g. ''vegan'', ''gluten_free'') for consumer filtering.';
 COMMENT ON COLUMN ops.product_info.is_archived IS
-    'Soft-delete tombstone. Archived products are hidden from supplier product lists and cannot be linked to new plates.';
+    'Soft-delete tombstone. Archived products are hidden from supplier product lists and cannot be linked to new viandas.';
 COMMENT ON COLUMN ops.product_info.status IS
     'Lifecycle status (status_enum). Controls whether the product is visible in the platform and app.';
 COMMENT ON COLUMN ops.product_info.created_date IS
@@ -3272,9 +3272,9 @@ CREATE TABLE IF NOT EXISTS audit.image_asset_history (
 COMMENT ON TABLE audit.image_asset_history IS
     'Trigger-managed history mirror of ops.image_asset. Never written by application code.';
 
-\echo 'Creating table: ops.plate_info'
-CREATE TABLE IF NOT EXISTS ops.plate_info (
-    plate_id UUID PRIMARY KEY DEFAULT uuidv7(),
+\echo 'Creating table: ops.vianda_info'
+CREATE TABLE IF NOT EXISTS ops.vianda_info (
+    vianda_id UUID PRIMARY KEY DEFAULT uuidv7(),
     product_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     price DOUBLE PRECISION NOT NULL,
@@ -3293,40 +3293,40 @@ CREATE TABLE IF NOT EXISTS ops.plate_info (
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE ops.plate_info IS
+COMMENT ON TABLE ops.vianda_info IS
     'A specific offering of a product at a restaurant, with its own pricing and credit cost. '
-    'Represents the menu item the consumer sees: one product can be offered as multiple plates '
-    'across different restaurants or price tiers. Linked to plate_kitchen_days for scheduling.';
-COMMENT ON COLUMN ops.plate_info.plate_id IS
+    'Represents the menu item the consumer sees: one product can be offered as multiple viandas '
+    'across different restaurants or price tiers. Linked to vianda_kitchen_days for scheduling.';
+COMMENT ON COLUMN ops.vianda_info.vianda_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN ops.plate_info.product_id IS
-    'FK to ops.product_info. The recipe/product this plate is based on.';
-COMMENT ON COLUMN ops.plate_info.restaurant_id IS
-    'FK to ops.restaurant_info. The restaurant offering this plate.';
-COMMENT ON COLUMN ops.plate_info.price IS
+COMMENT ON COLUMN ops.vianda_info.product_id IS
+    'FK to ops.product_info. The recipe/product this vianda is based on.';
+COMMENT ON COLUMN ops.vianda_info.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant offering this vianda.';
+COMMENT ON COLUMN ops.vianda_info.price IS
     'Local-currency price charged to subscribers without a benefit plan subsidy (double precision for compatibility with legacy data).';
-COMMENT ON COLUMN ops.plate_info.credit IS
-    'Credit cost deducted from the subscriber''s subscription balance when this plate is selected.';
-COMMENT ON COLUMN ops.plate_info.expected_payout_local_currency IS
+COMMENT ON COLUMN ops.vianda_info.credit IS
+    'Credit cost deducted from the subscriber''s subscription balance when this vianda is selected.';
+COMMENT ON COLUMN ops.vianda_info.expected_payout_local_currency IS
     'Expected payout to the supplier in local currency after platform fees. Used in financial reporting.';
-COMMENT ON COLUMN ops.plate_info.delivery_time_minutes IS
-    'Estimated minutes from order confirmation to plate readiness at the kitchen. Used to set pickup_time_range.';
-COMMENT ON COLUMN ops.plate_info.is_archived IS
-    'Soft-delete tombstone. Archived plates cannot be selected by subscribers.';
-COMMENT ON COLUMN ops.plate_info.canonical_key IS
-    'Optional stable human-readable identifier for seed/fixture plates '
-    '(e.g. ''RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA''). Used by the '
-    'PUT /api/v1/plates/by-key upsert endpoint to make Postman seed runs '
-    'idempotent. NULL for ad-hoc plates created via the normal POST endpoint.';
-COMMENT ON COLUMN ops.plate_info.status IS
-    'Lifecycle status (status_enum). Controls whether the plate is shown in explore results.';
-COMMENT ON COLUMN ops.plate_info.created_date IS
-    'UTC timestamp when the plate offering was first created.';
-COMMENT ON COLUMN ops.plate_info.created_by IS
+COMMENT ON COLUMN ops.vianda_info.delivery_time_minutes IS
+    'Estimated minutes from order confirmation to vianda readiness at the kitchen. Used to set pickup_time_range.';
+COMMENT ON COLUMN ops.vianda_info.is_archived IS
+    'Soft-delete tombstone. Archived viandas cannot be selected by subscribers.';
+COMMENT ON COLUMN ops.vianda_info.canonical_key IS
+    'Optional stable human-readable identifier for seed/fixture viandas '
+    '(e.g. ''RESTAURANT_LA_COCINA_PORTENA_VIANDA_BONDIOLA''). Used by the '
+    'PUT /api/v1/viandas/by-key upsert endpoint to make Postman seed runs '
+    'idempotent. NULL for ad-hoc viandas created via the normal POST endpoint.';
+COMMENT ON COLUMN ops.vianda_info.status IS
+    'Lifecycle status (status_enum). Controls whether the vianda is shown in explore results.';
+COMMENT ON COLUMN ops.vianda_info.created_date IS
+    'UTC timestamp when the vianda offering was first created.';
+COMMENT ON COLUMN ops.vianda_info.created_by IS
     'FK to core.user_info. NULL if created via migration or seed script.';
-COMMENT ON COLUMN ops.plate_info.modified_by IS
-    'FK to core.user_info. Last user to update this plate record.';
-COMMENT ON COLUMN ops.plate_info.modified_date IS
+COMMENT ON COLUMN ops.vianda_info.modified_by IS
+    'FK to core.user_info. Last user to update this vianda record.';
+COMMENT ON COLUMN ops.vianda_info.modified_date IS
     'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: ops.restaurant_holidays'
@@ -3425,10 +3425,10 @@ COMMENT ON COLUMN audit.restaurant_holidays_history.is_current IS
 COMMENT ON COLUMN audit.restaurant_holidays_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
-\echo 'Creating table: ops.plate_kitchen_days'
-CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
-    plate_kitchen_day_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_id UUID NOT NULL,
+\echo 'Creating table: ops.vianda_kitchen_days'
+CREATE TABLE IF NOT EXISTS ops.vianda_kitchen_days (
+    vianda_kitchen_day_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    vianda_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -3437,45 +3437,45 @@ CREATE TABLE IF NOT EXISTS ops.plate_kitchen_days (
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE CASCADE,
+    FOREIGN KEY (vianda_id) REFERENCES ops.vianda_info(vianda_id) ON DELETE CASCADE,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
-    -- Uniqueness (plate_id, kitchen_day) enforced only for non-archived rows via partial unique index in index.sql
-    -- canonical_key uniqueness enforced via uq_plate_kitchen_days_canonical_key partial index in index.sql
+    -- Uniqueness (vianda_id, kitchen_day) enforced only for non-archived rows via partial unique index in index.sql
+    -- canonical_key uniqueness enforced via uq_vianda_kitchen_days_canonical_key partial index in index.sql
 );
 
-COMMENT ON TABLE ops.plate_kitchen_days IS
-    'Scheduling rows that map a plate to the kitchen days it is available. '
-    'One row per (plate, day) combination. Drives the explore filter ("available today") '
-    'and the subscription selection flow that shows which plates can be ordered on a given kitchen_day.';
-COMMENT ON COLUMN ops.plate_kitchen_days.plate_kitchen_day_id IS
+COMMENT ON TABLE ops.vianda_kitchen_days IS
+    'Scheduling rows that map a vianda to the kitchen days it is available. '
+    'One row per (vianda, day) combination. Drives the explore filter ("available today") '
+    'and the subscription selection flow that shows which viandas can be ordered on a given kitchen_day.';
+COMMENT ON COLUMN ops.vianda_kitchen_days.vianda_kitchen_day_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN ops.plate_kitchen_days.plate_id IS
-    'FK to ops.plate_info. The plate this scheduling row belongs to.';
-COMMENT ON COLUMN ops.plate_kitchen_days.kitchen_day IS
-    'The day of the week (kitchen_day_enum) on which this plate is available. '
+COMMENT ON COLUMN ops.vianda_kitchen_days.vianda_id IS
+    'FK to ops.vianda_info. The vianda this scheduling row belongs to.';
+COMMENT ON COLUMN ops.vianda_kitchen_days.kitchen_day IS
+    'The day of the week (kitchen_day_enum) on which this vianda is available. '
     'kitchen_day_enum uses the platform''s operating-day vocabulary (Monday–Friday or market-specific).';
-COMMENT ON COLUMN ops.plate_kitchen_days.status IS
+COMMENT ON COLUMN ops.vianda_kitchen_days.status IS
     'Lifecycle status (status_enum). Inactive rows are excluded from available-day lookups.';
-COMMENT ON COLUMN ops.plate_kitchen_days.is_archived IS
+COMMENT ON COLUMN ops.vianda_kitchen_days.is_archived IS
     'Soft-delete tombstone. Archived scheduling rows are ignored by the explore and selection flows.';
-COMMENT ON COLUMN ops.plate_kitchen_days.canonical_key IS
-    'Optional stable identifier for seed/fixture rows managed by PUT /plate-kitchen-days/by-key. '
+COMMENT ON COLUMN ops.vianda_kitchen_days.canonical_key IS
+    'Optional stable identifier for seed/fixture rows managed by PUT /vianda-kitchen-days/by-key. '
     'NULL for ad-hoc rows created by suppliers. When set, must be UPPER_SNAKE_CASE and unique '
-    'across all non-NULL rows (enforced by the uq_plate_kitchen_days_canonical_key partial index).';
-COMMENT ON COLUMN ops.plate_kitchen_days.created_date IS
+    'across all non-NULL rows (enforced by the uq_vianda_kitchen_days_canonical_key partial index).';
+COMMENT ON COLUMN ops.vianda_kitchen_days.created_date IS
     'UTC timestamp when the scheduling row was first inserted.';
-COMMENT ON COLUMN ops.plate_kitchen_days.created_by IS
+COMMENT ON COLUMN ops.vianda_kitchen_days.created_by IS
     'FK to core.user_info. NULL if created via migration or seed script.';
-COMMENT ON COLUMN ops.plate_kitchen_days.modified_by IS
+COMMENT ON COLUMN ops.vianda_kitchen_days.modified_by IS
     'FK to core.user_info. Last user to update this scheduling row.';
-COMMENT ON COLUMN ops.plate_kitchen_days.modified_date IS
+COMMENT ON COLUMN ops.vianda_kitchen_days.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: audit.plate_kitchen_days_history'
-CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
+\echo 'Creating table: audit.vianda_kitchen_days_history'
+CREATE TABLE IF NOT EXISTS audit.vianda_kitchen_days_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_kitchen_day_id UUID NOT NULL,
-    plate_id UUID NOT NULL,
+    vianda_kitchen_day_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
     kitchen_day kitchen_day_enum NOT NULL,
     status status_enum NOT NULL DEFAULT 'active'::status_enum,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -3488,22 +3488,22 @@ CREATE TABLE IF NOT EXISTS audit.plate_kitchen_days_history (
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity'
 );
-COMMENT ON TABLE audit.plate_kitchen_days_history IS
-    'Trigger-managed history mirror of ops.plate_kitchen_days. Never written by application code.';
-COMMENT ON COLUMN audit.plate_kitchen_days_history.event_id IS
+COMMENT ON TABLE audit.vianda_kitchen_days_history IS
+    'Trigger-managed history mirror of ops.vianda_kitchen_days. Never written by application code.';
+COMMENT ON COLUMN audit.vianda_kitchen_days_history.event_id IS
     'UUIDv7 primary key for this history row. Time-ordered.';
-COMMENT ON COLUMN audit.plate_kitchen_days_history.operation IS
+COMMENT ON COLUMN audit.vianda_kitchen_days_history.operation IS
     'DML operation that produced this row: ''create'', ''update'', or ''delete''. '
     'From the audit_operation_enum type.';
-COMMENT ON COLUMN audit.plate_kitchen_days_history.is_current IS
+COMMENT ON COLUMN audit.vianda_kitchen_days_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
-COMMENT ON COLUMN audit.plate_kitchen_days_history.valid_until IS
+COMMENT ON COLUMN audit.vianda_kitchen_days_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
-\echo 'Creating table: audit.plate_history'
-CREATE TABLE IF NOT EXISTS audit.plate_history (
+\echo 'Creating table: audit.vianda_history'
+CREATE TABLE IF NOT EXISTS audit.vianda_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
     product_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     price DOUBLE PRECISION NOT NULL,
@@ -3517,23 +3517,23 @@ CREATE TABLE IF NOT EXISTS audit.plate_history (
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
-    FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_id) REFERENCES ops.vianda_info(vianda_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
-COMMENT ON TABLE audit.plate_history IS
-    'Trigger-managed history mirror of ops.plate_info. Never written by application code.';
-COMMENT ON COLUMN audit.plate_history.event_id IS
+COMMENT ON TABLE audit.vianda_history IS
+    'Trigger-managed history mirror of ops.vianda_info. Never written by application code.';
+COMMENT ON COLUMN audit.vianda_history.event_id IS
     'UUIDv7 primary key for this history row. Time-ordered.';
-COMMENT ON COLUMN audit.plate_history.is_current IS
+COMMENT ON COLUMN audit.vianda_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
-COMMENT ON COLUMN audit.plate_history.valid_until IS
+COMMENT ON COLUMN audit.vianda_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
-\echo 'Creating table: customer.plate_selection_info'
-CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
-    plate_selection_id UUID PRIMARY KEY DEFAULT uuidv7(),
+\echo 'Creating table: customer.vianda_selection_info'
+CREATE TABLE IF NOT EXISTS customer.vianda_selection_info (
+    vianda_selection_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
-    plate_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     product_id UUID NOT NULL,
     qr_code_id UUID NOT NULL,
@@ -3554,58 +3554,58 @@ CREATE TABLE IF NOT EXISTS customer.plate_selection_info (
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
     FOREIGN KEY (product_id) REFERENCES ops.product_info(product_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_id) REFERENCES ops.vianda_info(vianda_id) ON DELETE RESTRICT,
     FOREIGN KEY (qr_code_id) REFERENCES ops.qr_code(qr_code_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
-COMMENT ON TABLE customer.plate_selection_info IS
-    'A customer meal reservation for a specific plate on a specific kitchen day. '
+COMMENT ON TABLE customer.vianda_selection_info IS
+    'A customer meal reservation for a specific vianda on a specific kitchen day. '
     'One active row per user per kitchen day (enforced in application logic). '
-    'Becomes a plate_pickup_live row when the customer scans the QR code at pickup time.';
-COMMENT ON COLUMN customer.plate_selection_info.plate_selection_id IS
+    'Becomes a vianda_pickup_live row when the customer scans the QR code at pickup time.';
+COMMENT ON COLUMN customer.vianda_selection_info.vianda_selection_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.plate_selection_info.user_id IS
+COMMENT ON COLUMN customer.vianda_selection_info.user_id IS
     'FK to core.user_info. The customer who made the reservation.';
-COMMENT ON COLUMN customer.plate_selection_info.plate_id IS
-    'FK to ops.plate_info. The plate edition reserved.';
-COMMENT ON COLUMN customer.plate_selection_info.restaurant_id IS
-    'FK to ops.restaurant_info. The restaurant serving the plate.';
-COMMENT ON COLUMN customer.plate_selection_info.product_id IS
-    'FK to ops.product_info. The product (recipe) behind the plate.';
-COMMENT ON COLUMN customer.plate_selection_info.qr_code_id IS
+COMMENT ON COLUMN customer.vianda_selection_info.vianda_id IS
+    'FK to ops.vianda_info. The vianda edition reserved.';
+COMMENT ON COLUMN customer.vianda_selection_info.restaurant_id IS
+    'FK to ops.restaurant_info. The restaurant serving the vianda.';
+COMMENT ON COLUMN customer.vianda_selection_info.product_id IS
+    'FK to ops.product_info. The product (recipe) behind the vianda.';
+COMMENT ON COLUMN customer.vianda_selection_info.qr_code_id IS
     'FK to ops.qr_code. The QR code the user must scan at the restaurant to start pickup.';
-COMMENT ON COLUMN customer.plate_selection_info.credit IS
+COMMENT ON COLUMN customer.vianda_selection_info.credit IS
     'Credit cost deducted from the user subscription balance when this reservation is made.';
-COMMENT ON COLUMN customer.plate_selection_info.kitchen_day IS
+COMMENT ON COLUMN customer.vianda_selection_info.kitchen_day IS
     'Day-of-week the kitchen operates from kitchen_day_enum (e.g. monday, tuesday). '
-    'Determines which plate edition is active.';
-COMMENT ON COLUMN customer.plate_selection_info.pickup_date IS
+    'Determines which vianda edition is active.';
+COMMENT ON COLUMN customer.vianda_selection_info.pickup_date IS
     'Calendar date (DATE, no time) of the pickup day. Derived from kitchen_day at reservation time.';
-COMMENT ON COLUMN customer.plate_selection_info.pickup_time_range IS
+COMMENT ON COLUMN customer.vianda_selection_info.pickup_time_range IS
     'Human-readable time window string (e.g. ''11:30-12:00'') for the chosen pickup window.';
-COMMENT ON COLUMN customer.plate_selection_info.pickup_intent IS
+COMMENT ON COLUMN customer.vianda_selection_info.pickup_intent IS
     'Coworker pickup coordination mode: ''self'' (default), ''offer'' (volunteer to carry), or ''request'' (needs someone to bring it).';
-COMMENT ON COLUMN customer.plate_selection_info.flexible_on_time IS
+COMMENT ON COLUMN customer.vianda_selection_info.flexible_on_time IS
     'Only meaningful when pickup_intent = ''request''. TRUE = user is flexible ±30 min on pickup time.';
-COMMENT ON COLUMN customer.plate_selection_info.is_archived IS
+COMMENT ON COLUMN customer.vianda_selection_info.is_archived IS
     'Soft-delete tombstone. Archived reservations (e.g. cancellations) are excluded from active queries.';
-COMMENT ON COLUMN customer.plate_selection_info.status IS
+COMMENT ON COLUMN customer.vianda_selection_info.status IS
     'Lifecycle state from status_enum (active/inactive).';
-COMMENT ON COLUMN customer.plate_selection_info.created_date IS
+COMMENT ON COLUMN customer.vianda_selection_info.created_date IS
     'UTC timestamp when the reservation was placed.';
-COMMENT ON COLUMN customer.plate_selection_info.created_by IS
+COMMENT ON COLUMN customer.vianda_selection_info.created_by IS
     'FK to core.user_info. UUID of the user who created the reservation; NULL for system-created rows.';
-COMMENT ON COLUMN customer.plate_selection_info.modified_by IS
+COMMENT ON COLUMN customer.vianda_selection_info.modified_by IS
     'FK to core.user_info. UUID of the last user to write this row.';
-COMMENT ON COLUMN customer.plate_selection_info.modified_date IS
+COMMENT ON COLUMN customer.vianda_selection_info.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: audit.plate_selection_history'
-CREATE TABLE IF NOT EXISTS audit.plate_selection_history (
+\echo 'Creating table: audit.vianda_selection_history'
+CREATE TABLE IF NOT EXISTS audit.vianda_selection_history (
     event_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_selection_id UUID NOT NULL,
+    vianda_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    plate_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     product_id UUID NOT NULL,
     qr_code_id UUID NOT NULL,
@@ -3623,41 +3623,41 @@ CREATE TABLE IF NOT EXISTS audit.plate_selection_history (
     modified_date TIMESTAMPTZ NOT NULL,
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     valid_until TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_plate_selection_history_plate_selection ON audit.plate_selection_history(plate_selection_id) WHERE is_current = TRUE;
-COMMENT ON TABLE audit.plate_selection_history IS
-    'Trigger-managed history mirror of customer.plate_selection_info. Never written by application code.';
-COMMENT ON COLUMN audit.plate_selection_history.event_id IS
+CREATE INDEX IF NOT EXISTS idx_vianda_selection_history_vianda_selection ON audit.vianda_selection_history(vianda_selection_id) WHERE is_current = TRUE;
+COMMENT ON TABLE audit.vianda_selection_history IS
+    'Trigger-managed history mirror of customer.vianda_selection_info. Never written by application code.';
+COMMENT ON COLUMN audit.vianda_selection_history.event_id IS
     'UUIDv7 primary key for this history row. Time-ordered.';
-COMMENT ON COLUMN audit.plate_selection_history.is_current IS
+COMMENT ON COLUMN audit.vianda_selection_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
-COMMENT ON COLUMN audit.plate_selection_history.valid_until IS
+COMMENT ON COLUMN audit.vianda_selection_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
 
 \echo 'Creating table: customer.coworker_pickup_notification'
 CREATE TABLE IF NOT EXISTS customer.coworker_pickup_notification (
     notification_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_selection_id UUID NOT NULL,
+    vianda_selection_id UUID NOT NULL,
     notifier_user_id UUID NOT NULL,
     notified_user_id UUID NOT NULL,
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (notifier_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (notified_user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_coworker_pickup_notification_plate_selection ON customer.coworker_pickup_notification(plate_selection_id);
+CREATE INDEX IF NOT EXISTS idx_coworker_pickup_notification_vianda_selection ON customer.coworker_pickup_notification(vianda_selection_id);
 COMMENT ON TABLE customer.coworker_pickup_notification IS
     'Records a push notification sent to a coworker to alert them that a colleague '
-    'with pickup_intent=''offer'' is available at their restaurant. One row per (plate_selection, notified_user) pair. '
+    'with pickup_intent=''offer'' is available at their restaurant. One row per (vianda_selection, notified_user) pair. '
     'Read-only after insert — no updates needed.';
 COMMENT ON COLUMN customer.coworker_pickup_notification.notification_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.coworker_pickup_notification.plate_selection_id IS
-    'FK to customer.plate_selection_info. The offering pickup that triggered the notification.';
+COMMENT ON COLUMN customer.coworker_pickup_notification.vianda_selection_id IS
+    'FK to customer.vianda_selection_info. The offering pickup that triggered the notification.';
 COMMENT ON COLUMN customer.coworker_pickup_notification.notifier_user_id IS
     'FK to core.user_info. The user with pickup_intent=''offer'' who initiated the alert.';
 COMMENT ON COLUMN customer.coworker_pickup_notification.notified_user_id IS
@@ -3704,12 +3704,12 @@ COMMENT ON COLUMN customer.notification_banner.notification_type IS
 COMMENT ON COLUMN customer.notification_banner.priority IS
     'Display priority from notification_banner_priority_enum: normal or high. High-priority banners sort first.';
 COMMENT ON COLUMN customer.notification_banner.payload IS
-    'JSONB envelope with banner-type-specific data (e.g. plate_name, pickup_window). '
+    'JSONB envelope with banner-type-specific data (e.g. vianda_name, pickup_window). '
     'Schema is per notification_type; frontends read fields by type.';
 COMMENT ON COLUMN customer.notification_banner.action_type IS
     'Slug describing the frontend action to perform when tapped (e.g. open_survey, view_pickup).';
 COMMENT ON COLUMN customer.notification_banner.action_label IS
-    'Localised call-to-action button label shown on the banner (e.g. ''Rate your plate'').';
+    'Localised call-to-action button label shown on the banner (e.g. ''Rate your vianda'').';
 COMMENT ON COLUMN customer.notification_banner.client_types IS
     'Array of client identifiers that should display this banner (e.g. {b2c-mobile,b2c-web}). '
     'Backend-owned filter; frontends pass their client type and only receive relevant banners.';
@@ -3720,20 +3720,20 @@ COMMENT ON COLUMN customer.notification_banner.expires_at IS
 COMMENT ON COLUMN customer.notification_banner.acknowledged_at IS
     'UTC timestamp when the user acknowledged the banner. NULL while still active.';
 COMMENT ON COLUMN customer.notification_banner.dedup_key IS
-    'Domain-specific key (e.g. survey:<plate_pickup_id>) that prevents duplicate banners '
+    'Domain-specific key (e.g. survey:<vianda_pickup_id>) that prevents duplicate banners '
     'for the same event via UNIQUE(user_id, dedup_key).';
 COMMENT ON COLUMN customer.notification_banner.created_date IS
     'UTC timestamp when the banner was created.';
 COMMENT ON COLUMN customer.notification_banner.modified_date IS
     'UTC timestamp of the most recent update (e.g. status change on acknowledgement).';
 
-\echo 'Creating table: customer.plate_pickup_live'
-CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
-    plate_pickup_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_selection_id UUID NOT NULL,
+\echo 'Creating table: customer.vianda_pickup_live'
+CREATE TABLE IF NOT EXISTS customer.vianda_pickup_live (
+    vianda_pickup_id UUID PRIMARY KEY DEFAULT uuidv7(),
+    vianda_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
-    plate_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
     product_id UUID NOT NULL,
     qr_code_id UUID NOT NULL,
     qr_code_payload VARCHAR(255) NOT NULL,
@@ -3757,87 +3757,87 @@ CREATE TABLE IF NOT EXISTS customer.plate_pickup_live (
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_id) REFERENCES ops.vianda_info(vianda_id) ON DELETE RESTRICT,
     FOREIGN KEY (product_id) REFERENCES ops.product_info(product_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (qr_code_id) REFERENCES ops.qr_code(qr_code_id) ON DELETE RESTRICT
 );
-COMMENT ON TABLE customer.plate_pickup_live IS
+COMMENT ON TABLE customer.vianda_pickup_live IS
     'Live pickup session created when a customer scans the restaurant QR code. '
     'Tracks the full lifecycle: QR scan → arrival → (optional kiosk handoff) → completion. '
     'Used by B2B daily-orders view (restaurant staff) and B2C order history.';
-COMMENT ON COLUMN customer.plate_pickup_live.plate_pickup_id IS
+COMMENT ON COLUMN customer.vianda_pickup_live.vianda_pickup_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.plate_pickup_live.plate_selection_id IS
-    'FK to customer.plate_selection_info. The reservation that this pickup fulfils.';
-COMMENT ON COLUMN customer.plate_pickup_live.user_id IS
+COMMENT ON COLUMN customer.vianda_pickup_live.vianda_selection_id IS
+    'FK to customer.vianda_selection_info. The reservation that this pickup fulfils.';
+COMMENT ON COLUMN customer.vianda_pickup_live.user_id IS
     'FK to core.user_info. The customer picking up.';
-COMMENT ON COLUMN customer.plate_pickup_live.restaurant_id IS
+COMMENT ON COLUMN customer.vianda_pickup_live.restaurant_id IS
     'FK to ops.restaurant_info. The restaurant where pickup occurs.';
-COMMENT ON COLUMN customer.plate_pickup_live.plate_id IS
-    'FK to ops.plate_info. The plate being picked up.';
-COMMENT ON COLUMN customer.plate_pickup_live.product_id IS
+COMMENT ON COLUMN customer.vianda_pickup_live.vianda_id IS
+    'FK to ops.vianda_info. The vianda being picked up.';
+COMMENT ON COLUMN customer.vianda_pickup_live.product_id IS
     'FK to ops.product_info. The product (recipe) for this pickup.';
-COMMENT ON COLUMN customer.plate_pickup_live.qr_code_id IS
+COMMENT ON COLUMN customer.vianda_pickup_live.qr_code_id IS
     'FK to ops.qr_code. The QR code scanned to create this pickup session.';
-COMMENT ON COLUMN customer.plate_pickup_live.qr_code_payload IS
+COMMENT ON COLUMN customer.vianda_pickup_live.qr_code_payload IS
     'Signed URL payload encoded in the QR code image. Surfaced in enriched pickup responses '
     'for the B2C order history screen so the user can re-scan if needed.';
-COMMENT ON COLUMN customer.plate_pickup_live.is_archived IS
+COMMENT ON COLUMN customer.vianda_pickup_live.is_archived IS
     'Soft-delete tombstone. Archived pickup records are excluded from active queries.';
-COMMENT ON COLUMN customer.plate_pickup_live.status IS
+COMMENT ON COLUMN customer.vianda_pickup_live.status IS
     'Lifecycle state from status_enum (active/inactive).';
-COMMENT ON COLUMN customer.plate_pickup_live.was_collected IS
-    'TRUE once the pickup is fully completed (plate handed to customer). '
+COMMENT ON COLUMN customer.vianda_pickup_live.was_collected IS
+    'TRUE once the pickup is fully completed (vianda handed to customer). '
     'Used by order history and no-show detection.';
-COMMENT ON COLUMN customer.plate_pickup_live.arrival_time IS
+COMMENT ON COLUMN customer.vianda_pickup_live.arrival_time IS
     'UTC timestamp when the customer scanned the QR code (pickup session started). '
     'Used for countdown timer start in the B2C app.';
-COMMENT ON COLUMN customer.plate_pickup_live.completion_time IS
+COMMENT ON COLUMN customer.vianda_pickup_live.completion_time IS
     'UTC timestamp when the pickup was completed (was_collected set to TRUE).';
-COMMENT ON COLUMN customer.plate_pickup_live.expected_completion_time IS
+COMMENT ON COLUMN customer.vianda_pickup_live.expected_completion_time IS
     'UTC countdown deadline: arrival_time + PICKUP_COUNTDOWN_SECONDS setting. '
     'Surfaced in restaurant daily-orders for staff timer display.';
-COMMENT ON COLUMN customer.plate_pickup_live.confirmation_code IS
+COMMENT ON COLUMN customer.vianda_pickup_live.confirmation_code IS
     '6-digit numeric kiosk code for Layer 2 hand-off verification. '
     'Generated at QR scan; consumed by POST /restaurant-staff/verify-and-handoff.';
-COMMENT ON COLUMN customer.plate_pickup_live.completion_type IS
+COMMENT ON COLUMN customer.vianda_pickup_live.completion_type IS
     'How the pickup was closed: user_confirmed, user_disputed, timer_expired, '
     'confirmation_timeout, or kitchen_day_close. Stored for analytics.';
-COMMENT ON COLUMN customer.plate_pickup_live.extensions_used IS
+COMMENT ON COLUMN customer.vianda_pickup_live.extensions_used IS
     'Number of timer extensions the customer has consumed (max PICKUP_MAX_EXTENSIONS, default 3).';
-COMMENT ON COLUMN customer.plate_pickup_live.code_verified IS
+COMMENT ON COLUMN customer.vianda_pickup_live.code_verified IS
     'TRUE once the kiosk confirmation code has been validated by restaurant staff.';
-COMMENT ON COLUMN customer.plate_pickup_live.code_verified_time IS
+COMMENT ON COLUMN customer.vianda_pickup_live.code_verified_time IS
     'UTC timestamp when the kiosk code was verified. NULL if kiosk verification is not used.';
-COMMENT ON COLUMN customer.plate_pickup_live.handed_out_time IS
-    'UTC timestamp when the plate was physically handed out (Handed Out lifecycle step). '
-    'Separates "customer is here" (arrival) from "plate given" (handed_out) from "customer confirms" (completion).';
-COMMENT ON COLUMN customer.plate_pickup_live.window_start IS
+COMMENT ON COLUMN customer.vianda_pickup_live.handed_out_time IS
+    'UTC timestamp when the vianda was physically handed out (Handed Out lifecycle step). '
+    'Separates "customer is here" (arrival) from "vianda given" (handed_out) from "customer confirms" (completion).';
+COMMENT ON COLUMN customer.vianda_pickup_live.window_start IS
     'Start of the scheduled pickup window (wall-clock). Set when the pickup session '
     'is created from reservation data. NULL for pickups created before this column '
     'was added, or when no window has been assigned.';
-COMMENT ON COLUMN customer.plate_pickup_live.window_end IS
+COMMENT ON COLUMN customer.vianda_pickup_live.window_end IS
     'End of the scheduled pickup window (wall-clock). Paired with window_start. '
     'NULL for pickups created before this column was added, or when no window has '
     'been assigned.';
-COMMENT ON COLUMN customer.plate_pickup_live.created_date IS
+COMMENT ON COLUMN customer.vianda_pickup_live.created_date IS
     'UTC timestamp when the pickup session was created (QR scan moment).';
-COMMENT ON COLUMN customer.plate_pickup_live.created_by IS
+COMMENT ON COLUMN customer.vianda_pickup_live.created_by IS
     'FK to core.user_info. UUID of the user who created the session; NULL for system-created rows.';
-COMMENT ON COLUMN customer.plate_pickup_live.modified_by IS
+COMMENT ON COLUMN customer.vianda_pickup_live.modified_by IS
     'FK to core.user_info. UUID of the last user to write this row.';
-COMMENT ON COLUMN customer.plate_pickup_live.modified_date IS
+COMMENT ON COLUMN customer.vianda_pickup_live.modified_date IS
     'UTC timestamp of the most recent update.';
 
-\echo 'Creating table: audit.plate_pickup_live_history'
-CREATE TABLE IF NOT EXISTS audit.plate_pickup_live_history (
+\echo 'Creating table: audit.vianda_pickup_live_history'
+CREATE TABLE IF NOT EXISTS audit.vianda_pickup_live_history (
     event_id                 UUID        PRIMARY KEY DEFAULT uuidv7(),
-    plate_pickup_id          UUID        NOT NULL,
-    plate_selection_id       UUID        NOT NULL,
+    vianda_pickup_id          UUID        NOT NULL,
+    vianda_selection_id       UUID        NOT NULL,
     user_id                  UUID        NOT NULL,
     restaurant_id            UUID        NOT NULL,
-    plate_id                 UUID        NOT NULL,
+    vianda_id                 UUID        NOT NULL,
     product_id               UUID        NOT NULL,
     qr_code_id               UUID        NOT NULL,
     qr_code_payload          VARCHAR(255) NOT NULL,
@@ -3861,35 +3861,35 @@ CREATE TABLE IF NOT EXISTS audit.plate_pickup_live_history (
     modified_date            TIMESTAMPTZ NOT NULL,
     is_current               BOOLEAN     NOT NULL DEFAULT TRUE,
     valid_until              TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
-    FOREIGN KEY (plate_pickup_id)
-        REFERENCES customer.plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_pickup_id)
+        REFERENCES customer.vianda_pickup_live(vianda_pickup_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by)
         REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_live_history_pickup
-    ON audit.plate_pickup_live_history(plate_pickup_id)
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_live_history_pickup
+    ON audit.vianda_pickup_live_history(vianda_pickup_id)
     WHERE is_current = TRUE;
 
-COMMENT ON TABLE audit.plate_pickup_live_history IS
-    'Trigger-managed history mirror of customer.plate_pickup_live. Never written by application code.';
-COMMENT ON COLUMN audit.plate_pickup_live_history.event_id IS
+COMMENT ON TABLE audit.vianda_pickup_live_history IS
+    'Trigger-managed history mirror of customer.vianda_pickup_live. Never written by application code.';
+COMMENT ON COLUMN audit.vianda_pickup_live_history.event_id IS
     'UUIDv7 primary key for this history row. Time-ordered.';
-COMMENT ON COLUMN audit.plate_pickup_live_history.is_current IS
+COMMENT ON COLUMN audit.vianda_pickup_live_history.is_current IS
     'TRUE while this row represents the current state of the source row. Set to FALSE when a newer history row is inserted.';
-COMMENT ON COLUMN audit.plate_pickup_live_history.valid_until IS
+COMMENT ON COLUMN audit.vianda_pickup_live_history.valid_until IS
     'UTC timestamp until which this row was current. ''infinity'' for the current row.';
-COMMENT ON COLUMN audit.plate_pickup_live_history.window_start IS
-    'Mirror of customer.plate_pickup_live.window_start.';
-COMMENT ON COLUMN audit.plate_pickup_live_history.window_end IS
-    'Mirror of customer.plate_pickup_live.window_end.';
+COMMENT ON COLUMN audit.vianda_pickup_live_history.window_start IS
+    'Mirror of customer.vianda_pickup_live.window_start.';
+COMMENT ON COLUMN audit.vianda_pickup_live_history.window_end IS
+    'Mirror of customer.vianda_pickup_live.window_end.';
 
-\echo 'Creating table: customer.plate_review_info'
-CREATE TABLE IF NOT EXISTS customer.plate_review_info (
-    plate_review_id UUID PRIMARY KEY DEFAULT uuidv7(),
+\echo 'Creating table: customer.vianda_review_info'
+CREATE TABLE IF NOT EXISTS customer.vianda_review_info (
+    vianda_review_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
-    plate_id UUID NOT NULL,
-    plate_pickup_id UUID NOT NULL,
+    vianda_id UUID NOT NULL,
+    vianda_pickup_id UUID NOT NULL,
     stars_rating INTEGER NOT NULL CHECK (stars_rating >= 1 AND stars_rating <= 5),
     portion_size_rating INTEGER NOT NULL CHECK (portion_size_rating >= 1 AND portion_size_rating <= 3),
     would_order_again BOOLEAN DEFAULT NULL,
@@ -3898,45 +3898,45 @@ CREATE TABLE IF NOT EXISTS customer.plate_review_info (
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_id) REFERENCES ops.plate_info(plate_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_pickup_id) REFERENCES customer.plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT
+    FOREIGN KEY (vianda_id) REFERENCES ops.vianda_info(vianda_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_pickup_id) REFERENCES customer.vianda_pickup_live(vianda_pickup_id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_plate_review_plate_id ON customer.plate_review_info(plate_id) WHERE NOT is_archived;
-COMMENT ON TABLE customer.plate_review_info IS
-    'Post-pickup ratings submitted by customers. One review per plate_pickup_live row; '
-    'immutable after creation. Aggregated into ops.plate_info.average_rating and review_count '
-    'for the explore feed. Supplier-facing enriched view (GET /plate-reviews/by-institution/enriched) '
+CREATE INDEX IF NOT EXISTS idx_vianda_review_vianda_id ON customer.vianda_review_info(vianda_id) WHERE NOT is_archived;
+COMMENT ON TABLE customer.vianda_review_info IS
+    'Post-pickup ratings submitted by customers. One review per vianda_pickup_live row; '
+    'immutable after creation. Aggregated into ops.vianda_info.average_rating and review_count '
+    'for the explore feed. Supplier-facing enriched view (GET /vianda-reviews/by-institution/enriched) '
     'strips customer PII.';
-COMMENT ON COLUMN customer.plate_review_info.plate_review_id IS
+COMMENT ON COLUMN customer.vianda_review_info.vianda_review_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.plate_review_info.user_id IS
+COMMENT ON COLUMN customer.vianda_review_info.user_id IS
     'FK to core.user_info. The customer who submitted the review.';
-COMMENT ON COLUMN customer.plate_review_info.plate_id IS
-    'FK to ops.plate_info. The plate edition being reviewed. Indexed for aggregate queries.';
-COMMENT ON COLUMN customer.plate_review_info.plate_pickup_id IS
-    'FK to customer.plate_pickup_live. The completed pickup that this review covers. One-to-one.';
-COMMENT ON COLUMN customer.plate_review_info.stars_rating IS
-    'Overall star rating 1–5 (CHECK enforced). Aggregated into plate average_rating.';
-COMMENT ON COLUMN customer.plate_review_info.portion_size_rating IS
+COMMENT ON COLUMN customer.vianda_review_info.vianda_id IS
+    'FK to ops.vianda_info. The vianda edition being reviewed. Indexed for aggregate queries.';
+COMMENT ON COLUMN customer.vianda_review_info.vianda_pickup_id IS
+    'FK to customer.vianda_pickup_live. The completed pickup that this review covers. One-to-one.';
+COMMENT ON COLUMN customer.vianda_review_info.stars_rating IS
+    'Overall star rating 1–5 (CHECK enforced). Aggregated into vianda average_rating.';
+COMMENT ON COLUMN customer.vianda_review_info.portion_size_rating IS
     'Portion size rating 1–3 (1=too small, 2=just right, 3=too much). CHECK enforced.';
-COMMENT ON COLUMN customer.plate_review_info.would_order_again IS
-    'Optional boolean: would the customer order this plate again? NULL = not answered.';
-COMMENT ON COLUMN customer.plate_review_info.comment IS
+COMMENT ON COLUMN customer.vianda_review_info.would_order_again IS
+    'Optional boolean: would the customer order this vianda again? NULL = not answered.';
+COMMENT ON COLUMN customer.vianda_review_info.comment IS
     'Optional free-text feedback for the restaurant (max 500 chars). '
     'Visible to restaurant via enriched review endpoint; NOT shown in B2C app.';
-COMMENT ON COLUMN customer.plate_review_info.is_archived IS
+COMMENT ON COLUMN customer.vianda_review_info.is_archived IS
     'Soft-delete tombstone. Archived reviews are excluded from aggregate calculations.';
-COMMENT ON COLUMN customer.plate_review_info.created_date IS
+COMMENT ON COLUMN customer.vianda_review_info.created_date IS
     'UTC timestamp when the review was submitted.';
-COMMENT ON COLUMN customer.plate_review_info.modified_date IS
+COMMENT ON COLUMN customer.vianda_review_info.modified_date IS
     'UTC timestamp of the most recent update.';
 
 \echo 'Creating table: customer.portion_complaint'
 CREATE TABLE IF NOT EXISTS customer.portion_complaint (
     complaint_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_pickup_id UUID NOT NULL,
-    plate_review_id UUID,
+    vianda_pickup_id UUID NOT NULL,
+    vianda_review_id UUID,
     user_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     photo_storage_path VARCHAR(500),
@@ -3944,19 +3944,19 @@ CREATE TABLE IF NOT EXISTS customer.portion_complaint (
     resolution_status VARCHAR(20) NOT NULL DEFAULT 'open',
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_pickup_id) REFERENCES customer.plate_pickup_live(plate_pickup_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_pickup_id) REFERENCES customer.vianda_pickup_live(vianda_pickup_id) ON DELETE RESTRICT,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT
 );
 COMMENT ON TABLE customer.portion_complaint IS
-    'Customer complaint filed when a plate_review_info.portion_size_rating = 1 (too small). '
+    'Customer complaint filed when a vianda_review_info.portion_size_rating = 1 (too small). '
     'Optional photo stored in GCS customer bucket; resolution managed by Internal ops.';
 COMMENT ON COLUMN customer.portion_complaint.complaint_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.portion_complaint.plate_pickup_id IS
-    'FK to customer.plate_pickup_live. The pickup the complaint is about.';
-COMMENT ON COLUMN customer.portion_complaint.plate_review_id IS
-    'FK to customer.plate_review_info. The associated review (nullable — complaint can exist without a review row in edge cases).';
+COMMENT ON COLUMN customer.portion_complaint.vianda_pickup_id IS
+    'FK to customer.vianda_pickup_live. The pickup the complaint is about.';
+COMMENT ON COLUMN customer.portion_complaint.vianda_review_id IS
+    'FK to customer.vianda_review_info. The associated review (nullable — complaint can exist without a review row in edge cases).';
 COMMENT ON COLUMN customer.portion_complaint.user_id IS
     'FK to core.user_info. The customer who filed the complaint.';
 COMMENT ON COLUMN customer.portion_complaint.restaurant_id IS
@@ -3987,15 +3987,15 @@ CREATE TABLE IF NOT EXISTS customer.user_favorite_info (
 CREATE INDEX IF NOT EXISTS idx_user_favorite_user_entity ON customer.user_favorite_info(user_id, entity_type);
 COMMENT ON TABLE customer.user_favorite_info IS
     'Customer-saved favourites. Polymorphic junction: entity_type determines whether '
-    'entity_id is a plate or restaurant. UNIQUE(user_id, entity_type, entity_id) prevents duplicate favourites.';
+    'entity_id is a vianda or restaurant. UNIQUE(user_id, entity_type, entity_id) prevents duplicate favourites.';
 COMMENT ON COLUMN customer.user_favorite_info.favorite_id IS
     'UUIDv7 primary key. Time-ordered.';
 COMMENT ON COLUMN customer.user_favorite_info.user_id IS
     'FK to core.user_info (ON DELETE CASCADE). The customer who saved the favourite.';
 COMMENT ON COLUMN customer.user_favorite_info.entity_type IS
-    'Polymorphic type discriminator from favorite_entity_type_enum: plate or restaurant.';
+    'Polymorphic type discriminator from favorite_entity_type_enum: vianda or restaurant.';
 COMMENT ON COLUMN customer.user_favorite_info.entity_id IS
-    'UUID of the favourited entity. Resolves to ops.plate_info or ops.restaurant_info depending on entity_type. '
+    'UUID of the favourited entity. Resolves to ops.vianda_info or ops.restaurant_info depending on entity_type. '
     'No FK constraint (polymorphic); application layer enforces referential integrity.';
 COMMENT ON COLUMN customer.user_favorite_info.created_date IS
     'UTC timestamp when the favourite was saved.';
@@ -4003,7 +4003,7 @@ COMMENT ON COLUMN customer.user_favorite_info.created_date IS
 \echo 'Creating table: customer.pickup_preferences'
 CREATE TABLE IF NOT EXISTS customer.pickup_preferences (
     preference_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_selection_id UUID NOT NULL,
+    vianda_selection_id UUID NOT NULL,
     user_id UUID NOT NULL,
     pickup_type pickup_type_enum NOT NULL,
     target_pickup_time TIMESTAMPTZ, -- specific time for matching
@@ -4016,20 +4016,20 @@ CREATE TABLE IF NOT EXISTS customer.pickup_preferences (
     created_by UUID NULL,
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (matched_with_preference_id) REFERENCES customer.pickup_preferences(preference_id) ON DELETE SET NULL,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
 COMMENT ON TABLE customer.pickup_preferences IS
-    'Coworker pickup coordination preferences per plate_selection_info row. '
-    'Records whether the user wants to carry a coworker''s plate (offer) or needs one carried (request), '
+    'Coworker pickup coordination preferences per vianda_selection_info row. '
+    'Records whether the user wants to carry a coworker''s vianda (offer) or needs one carried (request), '
     'and whether they were matched with another user. Never exposed directly in API responses; '
     'used internally by the matching service and surfaced as pickup_type in daily-orders.';
 COMMENT ON COLUMN customer.pickup_preferences.preference_id IS
     'UUIDv7 primary key. Time-ordered.';
-COMMENT ON COLUMN customer.pickup_preferences.plate_selection_id IS
-    'FK to customer.plate_selection_info. The reservation this preference belongs to.';
+COMMENT ON COLUMN customer.pickup_preferences.vianda_selection_id IS
+    'FK to customer.vianda_selection_info. The reservation this preference belongs to.';
 COMMENT ON COLUMN customer.pickup_preferences.user_id IS
     'FK to core.user_info. The user expressing this pickup preference.';
 COMMENT ON COLUMN customer.pickup_preferences.pickup_type IS
@@ -4520,8 +4520,8 @@ FOR EACH ROW EXECUTE FUNCTION discretionary_resolution_info_history_trigger();
 CREATE TABLE IF NOT EXISTS billing.client_transaction (
     transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL,
-    source VARCHAR(50) NOT NULL,  -- e.g., 'plate_selection' or 'discretionary_promotion'
-    plate_selection_id UUID, -- references a plate_selection record when source = 'order'
+    source VARCHAR(50) NOT NULL,  -- e.g., 'vianda_selection' or 'discretionary_promotion'
+    vianda_selection_id UUID, -- references a vianda_selection record when source = 'order'
     discretionary_id UUID, -- references a discretionary record when source = 'discretionary'
     credit NUMERIC NOT NULL,
     is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -4531,7 +4531,7 @@ CREATE TABLE IF NOT EXISTS billing.client_transaction (
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (discretionary_id) REFERENCES billing.discretionary_info(discretionary_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
 );
@@ -4543,9 +4543,9 @@ COMMENT ON COLUMN billing.client_transaction.transaction_id IS
 COMMENT ON COLUMN billing.client_transaction.user_id IS
     'FK to core.user_info. The consumer whose balance this transaction affects.';
 COMMENT ON COLUMN billing.client_transaction.source IS
-    'Originating event type (e.g. ''plate_selection'', ''discretionary_promotion'', ''referral_program'').';
-COMMENT ON COLUMN billing.client_transaction.plate_selection_id IS
-    'FK to customer.plate_selection_info. Populated when source = ''plate_selection''; NULL otherwise.';
+    'Originating event type (e.g. ''vianda_selection'', ''discretionary_promotion'', ''referral_program'').';
+COMMENT ON COLUMN billing.client_transaction.vianda_selection_id IS
+    'FK to customer.vianda_selection_info. Populated when source = ''vianda_selection''; NULL otherwise.';
 COMMENT ON COLUMN billing.client_transaction.discretionary_id IS
     'FK to billing.discretionary_info. Populated when source = ''discretionary''; NULL otherwise.';
 COMMENT ON COLUMN billing.client_transaction.credit IS
@@ -4920,7 +4920,7 @@ COMMENT ON COLUMN customer.subscription_info.renewal_date IS
     'UTC timestamp of the next scheduled renewal. Default: now + 30 days. '
     'Updated by the renewal cron after each successful charge.';
 COMMENT ON COLUMN customer.subscription_info.balance IS
-    'Current meal credit balance. Decremented by plate_selection_info.credit on reservation; '
+    'Current meal credit balance. Decremented by vianda_selection_info.credit on reservation; '
     'topped up on renewal. Can temporarily go negative during order processing.';
 COMMENT ON COLUMN customer.subscription_info.subscription_status IS
     'Operational lifecycle: active, on_hold, pending, cancelled. '
@@ -5361,7 +5361,7 @@ COMMENT ON COLUMN audit.client_bill_history.valid_until IS
 CREATE TABLE IF NOT EXISTS billing.restaurant_transaction (
     transaction_id UUID PRIMARY KEY DEFAULT uuidv7(),
     restaurant_id UUID NOT NULL,
-    plate_selection_id UUID,
+    vianda_selection_id UUID,
     discretionary_id UUID,
     currency_metadata_id UUID NOT NULL,
     was_collected BOOLEAN NOT NULL DEFAULT FALSE,
@@ -5382,7 +5382,7 @@ CREATE TABLE IF NOT EXISTS billing.restaurant_transaction (
     modified_by UUID NOT NULL,
     modified_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id) ON DELETE RESTRICT,
-    FOREIGN KEY (plate_selection_id) REFERENCES customer.plate_selection_info(plate_selection_id) ON DELETE RESTRICT,
+    FOREIGN KEY (vianda_selection_id) REFERENCES customer.vianda_selection_info(vianda_selection_id) ON DELETE RESTRICT,
     FOREIGN KEY (discretionary_id) REFERENCES billing.discretionary_info(discretionary_id) ON DELETE RESTRICT,
     FOREIGN KEY (currency_metadata_id) REFERENCES core.currency_metadata(currency_metadata_id) ON DELETE RESTRICT,
     FOREIGN KEY (modified_by) REFERENCES core.user_info(user_id) ON DELETE RESTRICT
@@ -5395,8 +5395,8 @@ COMMENT ON COLUMN billing.restaurant_transaction.transaction_id IS
     'UUIDv7 primary key. Time-ordered.';
 COMMENT ON COLUMN billing.restaurant_transaction.restaurant_id IS
     'FK to ops.restaurant_info. The restaurant whose balance this event affects.';
-COMMENT ON COLUMN billing.restaurant_transaction.plate_selection_id IS
-    'FK to customer.plate_selection_info. The order that generated this transaction; NULL for non-order events.';
+COMMENT ON COLUMN billing.restaurant_transaction.vianda_selection_id IS
+    'FK to customer.vianda_selection_info. The order that generated this transaction; NULL for non-order events.';
 COMMENT ON COLUMN billing.restaurant_transaction.discretionary_id IS
     'FK to billing.discretionary_info. The discretionary adjustment; NULL for order-based events.';
 COMMENT ON COLUMN billing.restaurant_transaction.currency_metadata_id IS
@@ -6462,7 +6462,7 @@ COMMENT ON COLUMN ops.ingredient_catalog.name IS
     'Typically the OFF taxonomy name normalised to lower-case; '
     'may be a custom name for ingredients not in OFF.';
 COMMENT ON COLUMN ops.ingredient_catalog.name_display IS
-    'Consumer-facing display name (title-cased). Shown on plate ingredient lists.';
+    'Consumer-facing display name (title-cased). Shown on vianda ingredient lists.';
 COMMENT ON COLUMN ops.ingredient_catalog.name_es IS
     'Spanish translation of the ingredient name. NULL until translation pipeline runs.';
 COMMENT ON COLUMN ops.ingredient_catalog.name_en IS
@@ -6517,7 +6517,7 @@ CREATE INDEX IF NOT EXISTS idx_product_ingredient_ingredient_id
 
 COMMENT ON TABLE ops.product_ingredient IS
     'Join table linking products to their ingredients in the catalog. '
-    'Ordered by sort_order to display ingredients in the intended sequence on plate detail screens.';
+    'Ordered by sort_order to display ingredients in the intended sequence on vianda detail screens.';
 COMMENT ON COLUMN ops.product_ingredient.product_ingredient_id IS
     'UUIDv7 primary key. Time-ordered.';
 COMMENT ON COLUMN ops.product_ingredient.product_id IS

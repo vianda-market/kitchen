@@ -9,7 +9,7 @@ or system processes and don't need user_id extraction from authenticated users.
 Entities consolidated (Admin/System operations):
 - Role, Product, Plan, Restaurant, CreditCurrency, Address, Geolocation
 - QRCode, Institution, InstitutionEntity, InstitutionBankAccount
-- PaymentMethod, Plate, Employer
+- PaymentMethod, Vianda, Employer
 
 NOTE: User-dependent routes (like Subscription, ClientBill, etc.) are in crud_routes_user.py
 These routes require user_id extraction from the authenticated user context.
@@ -29,9 +29,9 @@ from app.services.route_factory import (
     create_institution_entity_routes,
     create_institution_routes,
     create_plan_routes,
-    create_plate_routes,
     create_product_routes,
     create_restaurant_routes,
+    create_vianda_routes,
 )
 
 # Create consolidated router
@@ -47,7 +47,7 @@ crud_router.include_router(create_credit_currency_routes())
 # Note: subscription_router moved to crud_routes_user.py
 crud_router.include_router(create_institution_routes())
 # Note: payment_method_routes moved to crud_routes_user.py
-crud_router.include_router(create_plate_routes())
+crud_router.include_router(create_vianda_routes())
 crud_router.include_router(create_geolocation_routes())
 crud_router.include_router(create_institution_entity_routes())
 

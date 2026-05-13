@@ -151,8 +151,8 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection: Any =
         ("user_history", "status"): "status_enum",
         ("product_info", "status"): "status_enum",
         ("product_history", "status"): "status_enum",
-        ("plate_info", "status"): "status_enum",
-        ("plate_history", "status"): "status_enum",
+        ("vianda_info", "status"): "status_enum",
+        ("vianda_history", "status"): "status_enum",
         ("restaurant_info", "status"): "status_enum",
         ("restaurant_history", "status"): "status_enum",
         ("institution_info", "status"): "status_enum",
@@ -195,9 +195,9 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection: Any =
         # Transaction type enum - stored directly on transaction tables
         ("restaurant_transaction", "transaction_type"): "transaction_type_enum",
         # Kitchen day enum
-        ("plate_kitchen_days", "kitchen_day"): "kitchen_day_enum",
-        ("plate_kitchen_days_history", "kitchen_day"): "kitchen_day_enum",
-        ("plate_selection_info", "kitchen_day"): "kitchen_day_enum",
+        ("vianda_kitchen_days", "kitchen_day"): "kitchen_day_enum",
+        ("vianda_kitchen_days_history", "kitchen_day"): "kitchen_day_enum",
+        ("vianda_selection_info", "kitchen_day"): "kitchen_day_enum",
         # Pickup type enum
         ("pickup_preferences", "pickup_type"): "pickup_type_enum",
         # Street type enum
@@ -205,7 +205,7 @@ def _prepare_value_for_db(value: Any, table: str, column: str, connection: Any =
         ("address_history", "street_type"): "street_type_enum",
         # Audit operation enum
         ("restaurant_holidays_history", "operation"): "audit_operation_enum",
-        ("plate_kitchen_days_history", "operation"): "audit_operation_enum",
+        ("vianda_kitchen_days_history", "operation"): "audit_operation_enum",
         ("discretionary_history", "operation"): "audit_operation_enum",
         ("discretionary_resolution_history", "operation"): "audit_operation_enum",
         # Bill resolution enum (institution_bill_info, institution_bill_history)
@@ -305,10 +305,10 @@ PRIMARY_KEY_MAPPING = {
     "discretionary_resolution_info": "approval_id",
     "discretionary_resolution_history": "history_id",
     "product_info": "product_id",
-    "plate_info": "plate_id",
-    "plate_selection_info": "plate_selection_id",
-    "plate_pickup_live": "plate_pickup_id",
-    "plate_review_info": "plate_review_id",
+    "vianda_info": "vianda_id",
+    "vianda_selection_info": "vianda_selection_id",
+    "vianda_pickup_live": "vianda_pickup_id",
+    "vianda_review_info": "vianda_review_id",
     "user_favorite_info": "favorite_id",
     "plan_info": "plan_id",
     "client_transaction": "transaction_id",
@@ -325,7 +325,7 @@ PRIMARY_KEY_MAPPING = {
     "institution_bill_info": "institution_bill_id",
     "institution_settlement": "settlement_id",
     "geolocation_info": "geolocation_id",
-    "plate_kitchen_days": "plate_kitchen_day_id",
+    "vianda_kitchen_days": "vianda_kitchen_day_id",
     "restaurant_holidays": "holiday_id",
     "notification_banner": "notification_id",
     "workplace_group": "workplace_group_id",
@@ -470,10 +470,10 @@ def db_batch_insert(table: str, data_list: list[dict[str, Any]], connection: Any
 
     Example:
         data_list = [
-            {"plate_id": "uuid1", "kitchen_day": "Monday"},
-            {"plate_id": "uuid1", "kitchen_day": "Tuesday"}
+            {"vianda_id": "uuid1", "kitchen_day": "Monday"},
+            {"vianda_id": "uuid1", "kitchen_day": "Tuesday"}
         ]
-        ids = db_batch_insert("plate_kitchen_days", data_list, connection)
+        ids = db_batch_insert("vianda_kitchen_days", data_list, connection)
         # Returns: [uuid1, uuid2] (primary key IDs)
     """
     if not data_list:

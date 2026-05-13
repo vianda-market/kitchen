@@ -1,7 +1,7 @@
 """
 Kitchen Day Enumeration
 
-Defines the valid kitchen days (weekdays) when plates are available.
+Defines the valid kitchen days (weekdays) when viandas are available.
 Kitchen days are fixed at compile time (Monday through Friday).
 """
 

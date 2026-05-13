@@ -395,37 +395,37 @@ def find_nearby_restaurants(user_lat: float, user_lng: float, radius_km: float, 
 
 ---
 
-### Example 3: Distance-Based Filtering in Plate Selection
+### Example 3: Distance-Based Filtering in Vianda Selection
 
 ```python
-@router.get("/plates/nearby")
-def get_nearby_plates(
+@router.get("/viandas/nearby")
+def get_nearby_viandas(
     user_lat: float = Query(...),
     user_lng: float = Query(...),
     max_distance_km: float = Query(5.0, ge=0.1, le=50),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Get today's plates from restaurants within specified distance.
+    Get today's viandas from restaurants within specified distance.
     """
     nearby_restaurants = find_nearby_restaurants(user_lat, user_lng, max_distance_km, db)
     
     if not nearby_restaurants:
-        return {"plates": [], "message": "No restaurants found within radius"}
+        return {"viandas": [], "message": "No restaurants found within radius"}
     
     restaurant_ids = [r['restaurant_id'] for r in nearby_restaurants]
     
-    # Get plates from nearby restaurants
+    # Get viandas from nearby restaurants
     with db.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(
             """
             SELECT 
-                p.plate_id,
+                p.vianda_id,
                 p.name,
                 p.price,
                 r.restaurant_id,
                 r.name as restaurant_name
-            FROM plate_info p
+            FROM vianda_info p
             INNER JOIN restaurant_info r ON p.restaurant_id = r.restaurant_id
             WHERE p.restaurant_id = ANY(%s)
               AND p.is_archived = FALSE
@@ -433,14 +433,14 @@ def get_nearby_plates(
             """,
             (restaurant_ids,)
         )
-        plates = cursor.fetchall()
+        viandas = cursor.fetchall()
     
     # Enrich with distance
     restaurant_distances = {r['restaurant_id']: r['distance_km'] for r in nearby_restaurants}
-    for plate in plates:
-        plate['distance_km'] = restaurant_distances[plate['restaurant_id']]
+    for vianda in viandas:
+        vianda['distance_km'] = restaurant_distances[vianda['restaurant_id']]
     
-    return {"plates": plates, "total": len(plates)}
+    return {"viandas": viandas, "total": len(viandas)}
 ```
 
 ---

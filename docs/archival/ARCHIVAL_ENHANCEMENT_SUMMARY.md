@@ -35,7 +35,7 @@
 - `client_transaction` → 90 days retention
 
 ### **Medium Priority Operational Tables** ✅
-- `plate_selection` → 60 days retention
+- `vianda_selection` → 60 days retention
 - `payment_method` → 365 days retention
 - `plan_info` → 730 days retention
 - `qr_code_info` → 180 days retention
@@ -80,7 +80,7 @@ log_performance_issue(), log_business_rule_violation()
 "fintech_transactions": 180 days
 
 # Operational tables (COMPLETED)
-"plate_selections": 60 days
+"vianda_selections": 60 days
 "payment_methods": 365 days
 "plans": 730 days
 "qr_codes": 180 days

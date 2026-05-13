@@ -48,9 +48,9 @@ Instead of individual table configurations, we use **business-logical categories
 "subscription_info": ArchivalCategory.FINANCIAL_OPERATIONAL,
 
 # CUSTOMER SERVICE (3 months - support window)
-"plate_pickup_live": ArchivalCategory.CUSTOMER_SERVICE,
+"vianda_pickup_live": ArchivalCategory.CUSTOMER_SERVICE,
 "client_payment_attempt": ArchivalCategory.CUSTOMER_SERVICE,
-"plate_selection": ArchivalCategory.CUSTOMER_SERVICE,
+"vianda_selection": ArchivalCategory.CUSTOMER_SERVICE,
 
 # OPERATIONAL DATA (6 months - business operations)
 "restaurant_info": ArchivalCategory.OPERATIONAL_DATA,
@@ -59,7 +59,7 @@ Instead of individual table configurations, we use **business-logical categories
 
 # REFERENCE DATA (2 years - product/catalog data)
 "product_info": ArchivalCategory.REFERENCE_DATA,  # + blob cleanup: delete image files when archived
-"plate_info": ArchivalCategory.REFERENCE_DATA,
+"vianda_info": ArchivalCategory.REFERENCE_DATA,
 "plan_info": ArchivalCategory.REFERENCE_DATA,
 "qr_code_info": ArchivalCategory.REFERENCE_DATA,
 

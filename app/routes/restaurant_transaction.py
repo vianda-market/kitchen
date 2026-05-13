@@ -3,13 +3,13 @@
 Restaurant Transaction Routes - Read-Only Endpoints
 
 This module provides read-only access to restaurant transaction information.
-Restaurant transactions are automatically managed by the backend through plate
+Restaurant transactions are automatically managed by the backend through vianda
 selection, QR code scanning, and billing operations. They cannot be created or
 modified via API.
 
 **Important**: These endpoints are read-only. All transaction creation and updates
 are handled automatically by the system when:
-- Customers place orders (via plate selection)
+- Customers place orders (via vianda selection)
 - Customers arrive at restaurants (via QR code scan)
 - Orders are completed or marked as no-show
 - Institution bills are generated and paid
@@ -52,11 +52,11 @@ def get_all_restaurant_transactions(
     Get all restaurant transactions (read-only).
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically
-    managed by the backend through plate selection, QR code scanning, and billing
+    managed by the backend through vianda selection, QR code scanning, and billing
     operations. They cannot be created or modified via API.**
 
     Restaurant transactions are created and updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Orders are completed or marked as no-show
     - Institution bills are generated and paid
@@ -82,14 +82,14 @@ def get_all_enriched_restaurant_transactions(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Get all restaurant transactions with enriched data (institution name, entity name, restaurant name, plate name, currency code, country) (read-only).
+    Get all restaurant transactions with enriched data (institution name, entity name, restaurant name, vianda name, currency code, country) (read-only).
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically
-    managed by the backend through plate selection, QR code scanning, and billing
+    managed by the backend through vianda selection, QR code scanning, and billing
     operations. They cannot be created or modified via API.**
 
     Restaurant transactions are created and updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Orders are completed or marked as no-show
     - Institution bills are generated and paid
@@ -122,14 +122,14 @@ def get_enriched_restaurant_transaction(
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
     """
-    Get a single restaurant transaction by transaction ID with enriched data (institution name, entity name, restaurant name, plate name, currency code, country) (read-only).
+    Get a single restaurant transaction by transaction ID with enriched data (institution name, entity name, restaurant name, vianda name, currency code, country) (read-only).
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically
-    managed by the backend through plate selection, QR code scanning, and billing
+    managed by the backend through vianda selection, QR code scanning, and billing
     operations. They cannot be created or modified via API.**
 
     Restaurant transactions are created and updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Orders are completed or marked as no-show
     - Institution bills are generated and paid
@@ -159,11 +159,11 @@ def get_restaurant_transaction(
     Get a single restaurant transaction by transaction ID (read-only).
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically
-    managed by the backend through plate selection, QR code scanning, and billing
+    managed by the backend through vianda selection, QR code scanning, and billing
     operations. They cannot be created or modified via API.**
 
     Restaurant transactions are created and updated automatically when:
-    - Customers place orders (via plate selection)
+    - Customers place orders (via vianda selection)
     - Customers arrive at restaurants (via QR code scan)
     - Orders are completed or marked as no-show
     - Institution bills are generated and paid

@@ -363,8 +363,8 @@ Other markets use a default order (street_name, building_number, street_type) if
 | `GET /restaurants/by-city` (restaurant list/map) | ✅ | — |
 | `GET /addresses/enriched/` | — | ✅ |
 | Employer enriched | ✅ | — |
-| `GET /plates/enriched/` and `GET /plates/enriched/{id}` | ✅ | — |
-| `GET /plate-pickup/pending` (enriched) | ✅ | — |
+| `GET /viandas/enriched/` and `GET /viandas/enriched/{id}` | ✅ | — |
+| `GET /vianda-pickup/pending` (enriched) | ✅ | — |
 
 **Client guidance:** Prefer `address_display` or `formatted_address` over building addresses from `street_type`, `street_name`, `building_number` manually. The backend applies market-specific ordering.
 
@@ -379,7 +379,7 @@ Other markets use a default order (street_name, building_number, street_type) if
 | `GET /addresses` and `GET /addresses/{id}` | `latitude`, `longitude` |
 | `GET /addresses/enriched` and `GET /addresses/enriched/{id}` | `latitude`, `longitude` |
 | `GET /addresses/search` | `latitude`, `longitude` |
-| `GET /plates/enriched/` and `GET /plates/enriched/{id}` | `latitude`, `longitude` |
+| `GET /viandas/enriched/` and `GET /viandas/enriched/{id}` | `latitude`, `longitude` |
 | `GET /restaurants/by-city` | `lat`, `lng` (per restaurant) |
 
 **B2C map integration:** The B2C app uses `latitude`/`longitude` from the user's selected address (home, work, or other) as `center_lat`/`center_lng` when calling `GET /api/v1/maps/city-snapshot`. See `docs/api/archived/STATIC_MAP_SNAPSHOT_B2C.md` for the archived static map integration guide (dormant since #214).
@@ -392,7 +392,7 @@ https://www.google.com/maps?q={latitude},{longitude}
 
 Example: `https://www.google.com/maps?q=-34.6037,-58.3816`
 
-When `latitude` or `longitude` is `null`, do not show a map link or map center toggle for that address. See [PLATE_API_CLIENT.md](PLATE_API_CLIENT.md#enriched-plate-endpoint) for the enriched plate response structure.
+When `latitude` or `longitude` is `null`, do not show a map link or map center toggle for that address. See [VIANDA_API_CLIENT.md](VIANDA_API_CLIENT.md#enriched-vianda-endpoint) for the enriched vianda response structure.
 
 ---
 

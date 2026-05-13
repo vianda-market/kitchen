@@ -237,7 +237,7 @@ def is_pickup_available(
 ) -> bool:
     """
     Return True if current local time >= effective kitchen_open_time for this supplier.
-    Gates QR code scanning and plate pickup availability.
+    Gates QR code scanning and vianda pickup availability.
 
     Args:
         country_code: ISO country code
@@ -322,16 +322,16 @@ def get_kitchen_day_for_date(
     return date_to_kitchen_day(target_date)
 
 
-def get_plate_selection_editable_until(
-    plate_selection_id,
+def get_vianda_selection_editable_until(
+    vianda_selection_id,
     db,
 ) -> datetime | None:
     """
-    Get the datetime until which a plate selection is editable.
+    Get the datetime until which a vianda selection is editable.
     Editable until 1 hour before kitchen day opens (business_hours.open = 11:30, so cutoff = 10:30 AM local).
 
     Args:
-        plate_selection_id: UUID of the plate selection
+        vianda_selection_id: UUID of the vianda selection
         db: Database connection
 
     Returns:
@@ -341,14 +341,14 @@ def get_plate_selection_editable_until(
 
     row = db_read(
         """
-        SELECT ps.plate_selection_id, ps.kitchen_day, ps.pickup_date,
+        SELECT ps.vianda_selection_id, ps.kitchen_day, ps.pickup_date,
                a.country_code, a.timezone
-        FROM plate_selection_info ps
+        FROM vianda_selection_info ps
         JOIN restaurant_info r ON ps.restaurant_id = r.restaurant_id
         JOIN address_info a ON r.address_id = a.address_id
-        WHERE ps.plate_selection_id = %s AND ps.is_archived = FALSE
+        WHERE ps.vianda_selection_id = %s AND ps.is_archived = FALSE
         """,
-        (str(plate_selection_id),),
+        (str(vianda_selection_id),),
         connection=db,
         fetch_one=True,
     )
@@ -391,16 +391,16 @@ def get_plate_selection_editable_until(
     return cutoff_utc
 
 
-def is_plate_selection_editable(plate_selection_id, db) -> bool:
+def is_vianda_selection_editable(vianda_selection_id, db) -> bool:
     """
-    Check if a plate selection is still within the editability window.
+    Check if a vianda selection is still within the editability window.
     Editable until 1 hour before kitchen day opens.
 
     In DEV_MODE, always returns True so Postman E2E collections can replace
-    plate selections regardless of time-of-day.
+    vianda selections regardless of time-of-day.
 
     Args:
-        plate_selection_id: UUID of the plate selection
+        vianda_selection_id: UUID of the vianda selection
         db: Database connection
 
     Returns:
@@ -408,7 +408,7 @@ def is_plate_selection_editable(plate_selection_id, db) -> bool:
     """
     if settings.DEV_MODE:
         return True
-    editable_until = get_plate_selection_editable_until(plate_selection_id, db)
+    editable_until = get_vianda_selection_editable_until(vianda_selection_id, db)
     if editable_until is None:
         return False
     now_utc = datetime.now(pytz.UTC)

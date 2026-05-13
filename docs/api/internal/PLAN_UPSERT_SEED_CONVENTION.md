@@ -1,9 +1,9 @@
 # Plan Upsert Endpoint & Canonical Fixture Convention
 
 > **Superseded.** This doc covers plans only.
-> The canonical-key pattern has been generalized to plates as well.
+> The canonical-key pattern has been generalized to viandas as well.
 > See [UPSERT_SEED_CONVENTION.md](./UPSERT_SEED_CONVENTION.md) for the
-> entity-agnostic reference (plans + plates).
+> entity-agnostic reference (plans + viandas).
 
 
 

@@ -10,15 +10,15 @@ There are two patterns for bulk operations:
 
 ### Pattern 1: Array in POST Body (Single Endpoint)
 
-**Endpoint**: `POST /api/v1/plate-kitchen-days/`
+**Endpoint**: `POST /api/v1/vianda-kitchen-days/`
 
 The POST endpoint accepts an array in the request body, even for single items. The response is always an array.
 
 **Example Request**:
 ```json
-POST /api/v1/plate-kitchen-days/
+POST /api/v1/vianda-kitchen-days/
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 }
 ```
@@ -27,8 +27,8 @@ POST /api/v1/plate-kitchen-days/
 ```json
 [
   {
-    "plate_kitchen_day_id": "uuid",
-    "plate_id": "uuid",
+    "vianda_kitchen_day_id": "uuid",
+    "vianda_id": "uuid",
     "kitchen_day": "Monday",
     "is_archived": false,
     "created_date": "2025-11-19T12:00:00Z",
@@ -36,8 +36,8 @@ POST /api/v1/plate-kitchen-days/
     "modified_date": "2025-11-19T12:00:00Z"
   },
   {
-    "plate_kitchen_day_id": "uuid",
-    "plate_id": "uuid",
+    "vianda_kitchen_day_id": "uuid",
+    "vianda_id": "uuid",
     "kitchen_day": "Tuesday",
     "is_archived": false,
     "created_date": "2025-11-19T12:00:00Z",
@@ -50,9 +50,9 @@ POST /api/v1/plate-kitchen-days/
 
 **Single Item**: Even for a single day, use an array:
 ```json
-POST /api/v1/plate-kitchen-days/
+POST /api/v1/vianda-kitchen-days/
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_days": ["Monday"]  // Array with 1 item
 }
 ```
@@ -61,8 +61,8 @@ POST /api/v1/plate-kitchen-days/
 ```json
 [
   {
-    "plate_kitchen_day_id": "uuid",
-    "plate_id": "uuid",
+    "vianda_kitchen_day_id": "uuid",
+    "vianda_id": "uuid",
     "kitchen_day": "Monday",
     // ... other fields
   }
@@ -132,25 +132,25 @@ POST /api/v1/national-holidays/bulk
 
 ## Available Bulk Endpoints
 
-### 1. Plate Kitchen Days
-- **Endpoint**: `POST /api/v1/plate-kitchen-days/`
+### 1. Vianda Kitchen Days
+- **Endpoint**: `POST /api/v1/vianda-kitchen-days/`
 - **Pattern**: Array in POST body (Pattern 1)
-- **Schema**: `PlateKitchenDayCreateSchema` with `kitchen_days: List[str]`
-- **Returns**: `List[PlateKitchenDayResponseSchema]`
+- **Schema**: `ViandaKitchenDayCreateSchema` with `kitchen_days: List[str]`
+- **Returns**: `List[ViandaKitchenDayResponseSchema]`
 - **Access**: Suppliers (institution-scoped), Employees (global)
 
-**Use Case**: Assign multiple days of the week (Monday-Friday) to a plate in one atomic operation.
+**Use Case**: Assign multiple days of the week (Monday-Friday) to a vianda in one atomic operation.
 
 **TypeScript Example**:
 ```typescript
 interface CreateKitchenDaysRequest {
-  plate_id: string;
+  vianda_id: string;
   kitchen_days: string[];  // ["Monday", "Tuesday", ...]
 }
 
 interface KitchenDayResponse {
-  plate_kitchen_day_id: string;
-  plate_id: string;
+  vianda_kitchen_day_id: string;
+  vianda_id: string;
   kitchen_day: string;
   is_archived: boolean;
   created_date: string;
@@ -163,14 +163,14 @@ const createKitchenDays = async (
   plateId: string,
   days: string[]
 ): Promise<KitchenDayResponse[]> => {
-  const response = await fetch(`${API_BASE_URL}/plate-kitchen-days/`, {
+  const response = await fetch(`${API_BASE_URL}/vianda-kitchen-days/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
-      plate_id: plateId,
+      vianda_id: plateId,
       kitchen_days: days  // Array of day names
     })
   });
@@ -258,7 +258,7 @@ All bulk operations are **atomic** - either all records are created/updated/dele
 **Example**: If you try to create 5 kitchen days and one already exists:
 ```json
 {
-  "error": "Plate {plate_id} is already assigned to Wednesday",
+  "error": "Vianda {vianda_id} is already assigned to Wednesday",
   "status_code": 409
 }
 ```
@@ -280,14 +280,14 @@ If any record in the bulk operation fails validation:
 **Example Error Response**:
 ```json
 {
-  "detail": "Plate {plate_id} is already assigned to Wednesday"
+  "detail": "Vianda {vianda_id} is already assigned to Wednesday"
 }
 ```
 
 ## Best Practices
 
 ### When to Use Bulk Operations
-- ✅ **Creating multiple related records** (e.g., assigning multiple days to a plate)
+- ✅ **Creating multiple related records** (e.g., assigning multiple days to a vianda)
 - ✅ **Importing data** (e.g., bulk holiday creation)
 - ✅ **Atomic requirements** (all must succeed or all must fail)
 - ✅ **Performance** (fewer HTTP requests)
@@ -322,7 +322,7 @@ Always expect an array response:
 ```typescript
 // ✅ Correct
 const results: KitchenDayResponse[] = await createKitchenDays(plateId, days);
-results.forEach(item => console.log(item.plate_kitchen_day_id));
+results.forEach(item => console.log(item.vianda_kitchen_day_id));
 
 // ❌ Incorrect - don't assume single item
 const result: KitchenDayResponse = await createKitchenDays(plateId, ["Monday"]);
@@ -333,7 +333,7 @@ const result: KitchenDayResponse = await createKitchenDays(plateId, ["Monday"]);
 
 | Endpoint | Pattern | Status | Access Control |
 |----------|---------|--------|----------------|
-| `POST /api/v1/plate-kitchen-days/` | Pattern 1 (Array in body) | ✅ Implemented | Suppliers (institution-scoped), Employees (global) |
+| `POST /api/v1/vianda-kitchen-days/` | Pattern 1 (Array in body) | ✅ Implemented | Suppliers (institution-scoped), Employees (global) |
 | `POST /api/v1/national-holidays/bulk` | Pattern 2 (Separate endpoint) | ✅ Implemented | Employees only |
 
 ## Future Considerations

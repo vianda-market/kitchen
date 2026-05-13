@@ -14,13 +14,13 @@
 - Fix: either set `PAYMENT_PROVIDER=mock` for dev (affects subscription payment too), OR add a mock payout path that skips Stripe when `DEV_MODE=True`, OR create a `STRIPE_PAYOUT_MODE=mock` separate setting
 
 ## Context
-- The billing pipeline (plate selection → promotion → QR scan → complete → settlement → bill) is fully working as of the April 12 session
+- The billing pipeline (vianda selection → promotion → QR scan → complete → settlement → bill) is fully working as of the April 12 session
 - Institution bill CRUD tests (Get/Update/Cancel) all pass
 - These 3 failures are in downstream subsystems (supplier invoicing, Stripe Connect payouts) that need separate config/setup
 
 ## DEV_MODE Fixes Applied (this session)
 - Kitchen day: weekends → friday mapping in `get_effective_current_day`, `date_to_kitchen_day`, `_find_next_available_kitchen_day_in_week`
-- Plate selection: `is_plate_selection_editable` always True in DEV_MODE
+- Vianda selection: `is_vianda_selection_editable` always True in DEV_MODE
 - Pickup date: `resolve_weekday_to_next_occurrence` returns today on weekends
 - Rate limiting: slowapi disabled in DEV_MODE
 - Billing pipeline: lowercase enum fix (`"Order"` → `"order"`), Title-case day comparison fix (`"Saturday"` → `"saturday"`)

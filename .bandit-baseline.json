@@ -1900,7 +1900,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/routes/plate_kitchen_days.py": {
+    "app/routes/vianda_kitchen_days.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 2,
       "CONFIDENCE.MEDIUM": 0,
@@ -1913,7 +1913,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/routes/plate_pickup.py": {
+    "app/routes/vianda_pickup.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1926,7 +1926,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/routes/plate_review.py": {
+    "app/routes/vianda_review.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1939,7 +1939,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/routes/plate_selection.py": {
+    "app/routes/vianda_selection.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -3005,7 +3005,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/cron/recalculate_plate_credits.py": {
+    "app/services/cron/recalculate_vianda_credits.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -3629,7 +3629,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/plate_pickup_service.py": {
+    "app/services/vianda_pickup_service.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -3642,7 +3642,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/plate_review_service.py": {
+    "app/services/vianda_review_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 3,
       "CONFIDENCE.MEDIUM": 0,
@@ -3655,7 +3655,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/plate_selection_promotion_service.py": {
+    "app/services/vianda_selection_promotion_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -3668,7 +3668,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/plate_selection_service.py": {
+    "app/services/vianda_selection_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -3681,7 +3681,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "app/services/plate_selection_validation.py": {
+    "app/services/vianda_selection_validation.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,

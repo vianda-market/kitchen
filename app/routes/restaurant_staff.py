@@ -56,7 +56,7 @@ def get_restaurant_daily_orders(
 
     **Response**:
     Returns orders grouped by restaurant with summary statistics.
-    Each order includes customer name (privacy-safe), plate name,
+    Each order includes customer name (privacy-safe), vianda name,
     confirmation code, status, and pickup time information.
     """
 

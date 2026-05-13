@@ -41,9 +41,9 @@ The backend provides enriched endpoints for multiple entities. All follow the sa
 - `GET /api/v1/restaurants/enriched/` - List enriched restaurants
 - `GET /api/v1/restaurants/enriched/{restaurant_id}` - Get single enriched restaurant
 
-**Plates:**
-- `GET /api/v1/plates/enriched/` - List enriched plates
-- `GET /api/v1/plates/enriched/{plate_id}` - Get single enriched plate
+**Viandas:**
+- `GET /api/v1/viandas/enriched/` - List enriched viandas
+- `GET /api/v1/viandas/enriched/{vianda_id}` - Get single enriched vianda
 
 **Subscriptions:** (includes `balance` and `plan_credit` for "Credits on renewal")
 - `GET /api/v1/subscriptions/enriched/` - List enriched subscriptions
@@ -535,16 +535,16 @@ For most enriched endpoints (users, restaurants, products, addresses, etc.):
 
 ### User-Level Scoping (Special Cases)
 
-For certain enriched endpoints that track user-specific data (e.g., plate pickups, subscriptions):
+For certain enriched endpoints that track user-specific data (e.g., vianda pickups, subscriptions):
 
 - **Employees** (`role_type = "Employee"`): See all records across all institutions (global access)
 - **Suppliers** (`role_type = "Supplier"`): See records for restaurants in their institution (filtered by restaurant's `institution_id`)
 - **Customers** (`role_type = "Customer"`): See only their own records (filtered by `user_id`)
 
-**Example**: `/plate-pickup/enriched/`
-- Employee logs in → sees all plate pickups from all restaurants
-- Supplier logs in → sees plate pickups for restaurants belonging to their institution
-- Customer logs in → sees only their own plate pickups
+**Example**: `/vianda-pickup/enriched/`
+- Employee logs in → sees all vianda pickups from all restaurants
+- Supplier logs in → sees vianda pickups for restaurants belonging to their institution
+- Customer logs in → sees only their own vianda pickups
 
 ### Important for UI Development
 
@@ -557,9 +557,9 @@ For certain enriched endpoints that track user-specific data (e.g., plate pickup
 
 ```typescript
 // ✅ GOOD: Just call the endpoint - scoping is automatic
-const fetchPlatePickups = async () => {
+const fetchViandaPickups = async () => {
   const token = localStorage.getItem('authToken');
-  const response = await fetch('/plate-pickup/enriched/', {
+  const response = await fetch('/vianda-pickup/enriched/', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   // Results are automatically filtered based on user's role
@@ -567,10 +567,10 @@ const fetchPlatePickups = async () => {
 };
 
 // ❌ AVOID: Don't try to filter on the client side
-const fetchPlatePickups = async () => {
+const fetchViandaPickups = async () => {
   const token = localStorage.getItem('authToken');
   const user = getCurrentUser(); // Don't do this
-  const response = await fetch(`/plate-pickup/enriched/?user_id=${user.id}`, {
+  const response = await fetch(`/vianda-pickup/enriched/?user_id=${user.id}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   // Backend already handles this - redundant filtering
