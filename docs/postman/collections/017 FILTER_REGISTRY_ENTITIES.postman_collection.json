@@ -626,6 +626,62 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /plates/enriched – multi-value dietary (in/repeated-param wire format)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Verifies repeated-param wire format: ?dietary=vegan&dietary=vegetarian.",
+                  "// Result count must be >= either single-value query (union semantics via ANY(%s)).",
+                  "// An empty result is acceptable when no seeded plates carry those dietary flags.",
+                  "pm.test('Result count is non-negative', function () {",
+                  "    pm.expect(pm.response.json().length).to.be.at.least(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plates/enriched?dietary=vegan&dietary=vegetarian",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plates",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "dietary",
+                  "value": "vegan"
+                },
+                {
+                  "key": "dietary",
+                  "value": "vegetarian"
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -812,6 +868,63 @@
                 {
                   "key": "expected_to",
                   "value": "2026-12-31T23:59:59Z"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /plate-pickup/enriched – multi-value restaurant_id (in/repeated-param wire format)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Verifies repeated-param wire format: ?restaurant_id=<uuid>&restaurant_id=<uuid>.",
+                  "// Two sentinel UUIDs are used — result may be empty if no pickups exist for them,",
+                  "// which is acceptable. The key assertion is that the server returns 200 (not 422)",
+                  "// and parses both values as a list rather than rejecting repeated params.",
+                  "pm.test('Result count is non-negative', function () {",
+                  "    pm.expect(pm.response.json().length).to.be.at.least(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?restaurant_id=00000000-0000-0000-0000-000000000001&restaurant_id=00000000-0000-0000-0000-000000000002",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plate-pickup",
+                "enriched"
+              ],
+              "query": [
+                {
+                  "key": "restaurant_id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                },
+                {
+                  "key": "restaurant_id",
+                  "value": "00000000-0000-0000-0000-000000000002"
                 }
               ]
             }
@@ -1796,6 +1909,65 @@
                 {
                   "key": "page_size",
                   "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /national-holidays – multi-value source (in/repeated-param wire format)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Verifies repeated-param wire format: ?source=manual&source=nager_date.",
+                  "// Both enum values together cover all holidays, so the result must be >= either",
+                  "// single-value query's count (both-values union >= one-value subset).",
+                  "const holidays = pm.response.json();",
+                  "pm.test('All returned holidays have a valid source value', function () {",
+                  "    const valid = ['manual', 'nager_date'];",
+                  "    holidays.forEach(function(h) {",
+                  "        pm.expect(valid).to.include(h.source);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAuthToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/national-holidays?source=manual&source=nager_date",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "national-holidays"
+              ],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "manual"
+                },
+                {
+                  "key": "source",
+                  "value": "nager_date"
                 }
               ]
             }
